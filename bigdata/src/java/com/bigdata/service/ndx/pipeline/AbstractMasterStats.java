@@ -1,6 +1,35 @@
+/*
+
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+*/
+/*
+ * Created on Apr 16, 2009
+ */
+
 package com.bigdata.service.ndx.pipeline;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -8,12 +37,17 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
 
 /**
- * Statistics for the consumer.
  * 
+ * @param <L>
+ *            The generic type of the key used to lookup subtasks in the interal
+ *            map.
+ * @param <HS>
+ *            The generic type of the subtask statistics.
+ *            
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexWriteStats {
+abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
 
     /**
      * The #of subtasks which have started.
@@ -47,10 +81,10 @@ public class IndexWriteStats {
      */
     public long elementsOut = 0L;
     
-    /**
-     * The #of duplicates which were filtered out.
-     */
-    public long duplicateCount = 0L;
+//    /**
+//     * The #of duplicates which were filtered out.
+//     */
+//    public long duplicateCount = 0L;
     
     /**
      * The #of chunks written onto index partitions using RMI.
@@ -66,28 +100,28 @@ public class IndexWriteStats {
      * Map for the per-index partition statistics. This ensures that we can
      * report the aggregate statistics in detail.
      */
-    private final Int2ObjectLinkedOpenHashMap<IndexPartitionWriteStats> partitions;
+    private final Map<L, HS> partitions = new LinkedHashMap<L, HS>();
 
     /**
      * Return the statistics object for the specified index partition and never
      * <code>null</code> (a new instance is created if none exists).
      * 
-     * @param partitionId
+     * @param locator
      *            The index partition.
      * 
      * @return The statistics for that index partition.
      */
-    public IndexPartitionWriteStats getStats(final int partitionId) {
+    public HS getSubtaskStats(final L locator) {
 
         synchronized (partitions) {
          
-            IndexPartitionWriteStats t = partitions.get(partitionId);
+            HS t = partitions.get(locator);
 
             if (t == null) {
 
-                t = new IndexPartitionWriteStats();
+                t = newSubtaskStats(locator);
 
-                partitions.put(partitionId, t);
+                partitions.put(locator, t);
 
             }
 
@@ -97,6 +131,16 @@ public class IndexWriteStats {
 
     }
 
+    /**
+     * Factory for the subtask statistics.
+     * 
+     * @param locator
+     *            The subtask key.
+     *            
+     * @return The statistics for the subtask.
+     */
+    protected abstract HS newSubtaskStats(L locator);
+    
     /**
      * Return a snapshot of the statistics for each index partition.
      */
@@ -111,10 +155,8 @@ public class IndexWriteStats {
 
     }
 
-    public IndexWriteStats() {
-        
-        this.partitions = new Int2ObjectLinkedOpenHashMap<IndexPartitionWriteStats>();
-        
+    public AbstractMasterStats() {
+
     }
  
     /**
@@ -175,12 +217,12 @@ public class IndexWriteStats {
             }
         });
 
-        t.addCounter("duplicateCount", new Instrument<Long>() {
-            @Override
-            protected void sample() {
-                setValue(duplicateCount);
-            }
-        });
+//        t.addCounter("duplicateCount", new Instrument<Long>() {
+//            @Override
+//            protected void sample() {
+//                setValue(duplicateCount);
+//            }
+//        });
 
         t.addCounter("elapsedNanos", new Instrument<Long>() {
             @Override
@@ -233,7 +275,8 @@ public class IndexWriteStats {
                 + subtaskStartCount + ", indexPartitionDoneCount="
                 + subtaskEndCount + ", staleLocatorCount="
                 + staleLocatorCount + ", chunkIn=" + chunksIn + ", elementIn="
-                + elementsIn + ", duplicateCount=" + duplicateCount
+                + elementsIn 
+//                + ", duplicateCount=" + duplicateCount
                 + ", chunksOut=" + chunksOut + ", elementsOut=" + elementsOut
                 + ", elapsedNanos=" + elapsedNanos + ", averageNanos/write="
                 + getAverageNanosPerWrite() + ", averageElements/write="

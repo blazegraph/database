@@ -45,8 +45,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.ChunkedArrayIterator;
-import com.bigdata.striterator.ChunkedOrderedStriterator;
-import com.bigdata.striterator.ClosableSingleItemIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
@@ -125,7 +123,7 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
      * <i>src</i> iff the <i>accessPath</i> does not require the
      * materialization of <code>(x rdf:type rdfs:Resource)</code> entailments.
      * 
-     * @param src
+     * @param _src
      *            The source iterator. {@link #nextChunk()} will sort statements
      *            into the {@link IKeyOrder} reported by this iterator (as long
      *            as the {@link IKeyOrder} is non-<code>null</code>).

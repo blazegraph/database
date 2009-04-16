@@ -600,15 +600,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 boolean failure = false;
 
                 /*
-                 * The #of services that will be tasked to run the clients. If
-                 * there are more clients than services, then some services will
-                 * be tasked with more than one client.
+                 * Assign clients to services. If there are more clients than
+                 * services, then some services will be tasked with more than
+                 * one client.
                  */
-                final int nservices = jobState.client2DataService.length;
-
                 if (INFO)
-                    log.info("Will run " + jobState.nclients + " on "
-                            + nservices + " services");
+                    log.info("Will run " + jobState.nclients);
 
                 final Map<Integer/* client# */, Future> clientFutures = new LinkedHashMap<Integer, Future>(
                         jobState.nclients/* initialCapacity */);
@@ -658,6 +655,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                      * Cancel all futures on error.
                      */
 
+                    log.error("Cancelling job: cause=" + t);
+                    
                     failure = true;
 
                     try {

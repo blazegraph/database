@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 15, 2009
  */
 
-package com.bigdata.service.ndx.pipeline;
+package com.bigdata.util.concurrent;
 
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.CancellationException;
@@ -75,7 +75,7 @@ public abstract class AbstractHaltableProcess {
      * 
      * @see #halt(Throwable)
      */
-    final protected void halted() {
+    final public void halted() {
 
         if (halt) {
 
@@ -95,7 +95,7 @@ public abstract class AbstractHaltableProcess {
      * 
      * @return The argument.
      */
-    final protected Throwable halt(final Throwable cause) {
+    final public Throwable halt(final Throwable cause) {
 
         halt = true;
 

@@ -43,7 +43,9 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
@@ -51,14 +53,17 @@ import com.bigdata.counters.httpd.CounterSetHTTPDServer;
 import com.bigdata.counters.httpd.XHTMLRenderer;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
+import com.bigdata.service.IScaleOutClientIndex;
 import com.bigdata.service.LoadBalancerService;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.TaskMaster;
+import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 
 /**
  * Utility class for benchmarking index operations on a federation. This test
@@ -196,6 +201,12 @@ public class ThroughputMaster
         String NAMESPACE = "namespace";
         
         /**
+         * When <code>true</code> the client writes will use the asynchronous
+         * API. Otherwise they will use the synchronous RPC API.
+         */
+        String ASYNCHRONOUS = "asynchronous";
+        
+        /**
          * The #of index partitions (pre-splits the index). ZERO (0) which is
          * interpreted as NOT pre-splitting the index. There is no default.
          */
@@ -301,6 +312,11 @@ public class ThroughputMaster
          * @see ConfigurationOptions#NAMESPACE
          */
         public final String namespace;
+
+        /**
+         * @see ConfigurationOptions#ASYNCHRONOUS
+         */
+        public final boolean asynchronous;
         
         /**
          * @see ConfigurationOptions#NPARTITIONS
@@ -337,8 +353,11 @@ public class ThroughputMaster
                     + operationCount);
             
             sb.append(", " + ConfigurationOptions.SEED + "=" + seed);
-            
+
             sb.append(", " + ConfigurationOptions.NAMESPACE + "=" + namespace);
+
+            sb.append(", " + ConfigurationOptions.ASYNCHRONOUS + "="
+                    + asynchronous);
             
             sb.append(", " + ConfigurationOptions.NPARTITIONS + "="
                     + npartitions);
@@ -373,6 +392,9 @@ public class ThroughputMaster
 
             namespace = (String) config.getEntry(component,
                     ConfigurationOptions.NAMESPACE, String.class);
+
+            asynchronous = (Boolean) config.getEntry(component,
+                    ConfigurationOptions.ASYNCHRONOUS, Boolean.TYPE);
 
             npartitions = (Integer) config.getEntry(component,
                     ConfigurationOptions.NPARTITIONS, Integer.TYPE);
@@ -420,9 +442,9 @@ public class ThroughputMaster
      * @throws InterruptedException
      * @throws KeeperException
      * 
-     * FIXME clients should report a throughput measure such as operations per
-     * second and the master should aggregate and report that back on the
-     * console.
+     * @todo clients could report a throughput measure such as operations per
+     *       second and the master should aggregate and report that back on the
+     *       console (this data is available via the LBS).
      * 
      * @todo could report as tasks complete (#running, outcome).
      */
@@ -539,7 +561,7 @@ public class ThroughputMaster
          */
         private transient Random r = null;
         
-        protected ClientTask(JobState jobState, int clientNum) {
+        protected ClientTask(final JobState jobState, final int clientNum) {
 
             super(jobState, clientNum);
 
@@ -564,8 +586,29 @@ public class ThroughputMaster
             }
 
             // unisolated view of the scale-out index.
-            final IIndex ndx = fed.getIndex(jobState.namespace, ITx.UNISOLATED);
+            final IScaleOutClientIndex ndx = fed.getIndex(jobState.namespace,
+                    ITx.UNISOLATED);
 
+            final BlockingBuffer<KVO<Void>[]> insert;
+            final BlockingBuffer<KVO<Void>[]> remove;
+            if (jobState.asynchronous) {
+                // @todo enable optional duplicate removal.
+                final int indexWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
+                final int indexPartitionWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
+                insert = ndx.newWriteBuffer(indexWriteQueueCapacity,
+                        indexPartitionWriteQueueCapacity,
+                        (IResultHandler<Void, Void>) null/* resultHandler */,
+                        (IDuplicateRemover<Void>) null/* duplicateRemover */,
+                        BatchInsertConstructor.RETURN_NO_VALUES);
+                remove = ndx.newWriteBuffer(indexWriteQueueCapacity,
+                        indexPartitionWriteQueueCapacity,
+                        (IResultHandler<Void, Void>) null/* resultHandler */,
+                        (IDuplicateRemover<Void>) null/* duplicateRemover */,
+                        BatchRemoveConstructor.RETURN_NO_VALUES);
+            } else {
+                insert = remove = null;
+            }
+            
             while (nops < jobState.operationCount) {
 
                 // [1:maxKeysPerOp+1]
@@ -615,8 +658,8 @@ public class ThroughputMaster
                  */
                 final double insertRate = 1d;
 
-                new Task(ndx, r, nkeys, firstKey, jobState.incRange, insertRate)
-                        .call();
+                new Task(ndx, insert, remove, r, nkeys, firstKey,
+                        jobState.incRange, insertRate).call();
 
                 nops += nkeys;
                 
@@ -639,6 +682,18 @@ public class ThroughputMaster
 
                 }
                 
+            } // next Task
+            
+            if(jobState.asynchronous) {
+                
+                // close the asychronous write buffers.
+                insert.close();
+                remove.close();
+                
+                // await their futures.
+                insert.getFuture().get();
+                remove.getFuture().get();
+                
             }
             
             return null;
@@ -653,6 +708,8 @@ public class ThroughputMaster
     public static class Task implements Callable<Void> {
 
         private final IIndex ndx;
+        private final BlockingBuffer<KVO<Void>[]> insert;
+        private final BlockingBuffer<KVO<Void>[]> remove;
         private final int nops;
         private final double insertRate;
         private final int incRange;
@@ -688,11 +745,18 @@ public class ThroughputMaster
          *       contains). let the caller determine the profile of operations
          *       to be executed against the service.
          */
-        public Task(final IIndex ndx, final Random r, final int nops,
-                final long firstKey, final int incRange, final double insertRate) {
+        public Task(final IScaleOutClientIndex ndx,
+                final BlockingBuffer<KVO<Void>[]> insert,
+                final BlockingBuffer<KVO<Void>[]> remove, final Random r,
+                final int nops, final long firstKey, final int incRange,
+                final double insertRate) {
 
             this.ndx = ndx;
 
+            this.insert = insert;
+            
+            this.remove = remove;
+            
             this.r = r;
 
             if (insertRate < 0d || insertRate > 1d)
@@ -716,11 +780,9 @@ public class ThroughputMaster
          * the corresponding operation with unsorted keys due to improved
          * locality of the lookups performed on the index.
          * 
-         * @return The commit time of the transaction.
+         * @todo configure the value size distribution.
          */
         public Void call() throws Exception {
-
-            final byte[][] keys = new byte[nops][];
 
             if (r.nextDouble() <= insertRate) {
 
@@ -729,24 +791,35 @@ public class ThroughputMaster
                  */
 
                 // log.info("insert: nops=" + nops);
+                final KVO<Void>[] a = new KVO[nops];
 
-                final byte[][] vals = new byte[nops][];
-                
                 for (int i = 0; i < nops; i++) {
 
-                    keys[i] = nextKey();
+                    final byte[] key = nextKey();
 
-                    // @todo configure the value size distribution.
-                    vals[i] = new byte[5];
+                    final byte[] val = new byte[5];
 
-                    r.nextBytes(vals[i]);
+                    r.nextBytes(val);
+
+                    a[i] = new KVO<Void>(key, val);
 
                 }
 
-                ndx.submit(0/* fromIndex */, nops/* toIndex */, keys, vals, //
-                        BatchInsertConstructor.RETURN_NO_VALUES, //
-                        null// handler
-                        );
+                if (insert == null) {
+
+                    // synchronous RPC
+                    ndx.submit(0/* fromIndex */, nops/* toIndex */, KVO
+                            .getKeys(a), KVO.getVals(a), //
+                            BatchInsertConstructor.RETURN_NO_VALUES, //
+                            null// handler
+                            );
+
+                } else {
+
+                    // asynchronous write.
+                    insert.add(a);
+
+                }
 
             } else {
 
@@ -761,17 +834,29 @@ public class ThroughputMaster
                  */
 
                 // log.info("remove: nops=" + nops);
+                final KVO<Void>[] a = new KVO[nops];
+
                 for (int i = 0; i < nops; i++) {
 
-                    keys[i] = nextKey();
+                    a[i] = new KVO<Void>(nextKey(), null/* val */);
 
                 }
 
-                ndx.submit(0/* fromIndex */, nops/* toIndex */, keys,
-                        null/* vals */,//
-                        BatchRemoveConstructor.RETURN_NO_VALUES,//
-                        null// handler
-                        );
+                if (remove == null) {
+
+                    // synchronous RPC
+                    ndx.submit(0/* fromIndex */, nops/* toIndex */, KVO
+                            .getKeys(a), KVO.getVals(a),
+                            BatchRemoveConstructor.RETURN_NO_VALUES,//
+                            null// handler
+                            );
+
+                } else {
+
+                    // asynchronous write.
+                    remove.add(a);
+
+                }
 
             }
             
@@ -807,7 +892,7 @@ public class ThroughputMaster
     }
     
     @Override
-    protected ClientTask newClientTask(int clientNum) {
+    protected ClientTask newClientTask(final int clientNum) {
 
         return new ClientTask(getJobState(), clientNum);
 

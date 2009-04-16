@@ -74,7 +74,8 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class BatchInsertConstructor extends AbstractKeyArrayIndexProcedureConstructor<BatchInsert> {
+    public static class BatchInsertConstructor extends
+            AbstractKeyArrayIndexProcedureConstructor<BatchInsert> {
 
         /**
          * Singleton requests the return of the old values that were overwritten

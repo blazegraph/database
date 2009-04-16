@@ -601,7 +601,8 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
         // No outcomes are ready.
         if(jobState.outcomes.isEmpty()) return EMPTY;
 
-        log.info(jobState.status());
+        if (log.isInfoEnabled())
+            log.info(jobState.status());
         
         Collection<Outcome> outcomes = new LinkedList<Outcome>(); 
         

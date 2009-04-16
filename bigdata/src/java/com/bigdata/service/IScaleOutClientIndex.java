@@ -30,13 +30,23 @@ package com.bigdata.service;
 
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
+import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.ndx.IndexTaskCounters;
+import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
+import com.bigdata.service.ndx.pipeline.IndexWriteStats;
 
 /**
  * A client-side view of a scale-out index.
@@ -107,6 +117,29 @@ public interface IScaleOutClientIndex extends IClientIndex {
      */
     void staleLocator(final long ts, final PartitionLocator locator,
             final StaleLocatorException cause);
+
+    /**
+     * Return a {@link ThreadLocal} {@link AtomicInteger} whose value is the
+     * recursion depth of the current {@link Thread}. This is initially zero
+     * when the task is submitted by the application. The value incremented when
+     * a task results in a {@link StaleLocatorException} and is decremented when
+     * returning from the recursive handling of the
+     * {@link StaleLocatorException}.
+     * <p>
+     * The recursion depth is used:
+     * <ol>
+     * <li>to limit the #of retries due to {@link StaleLocatorException}s for
+     * a split of a task submitted by the application</li>
+     * <li> to force execution of retried tasks in the caller's thread.</li>
+     * </ol>
+     * The latter point is critical - if the retry tasks are run in the client
+     * {@link #getThreadPool() thread pool} then all threads in the pool can
+     * rapidly become busy awaiting retry tasks with the result that the client
+     * is essentially deadlocked.
+     * 
+     * @return The recursion depth.
+     */
+    AtomicInteger getRecursionDepth();
     
     /**
      * Return the object used to access the services in the connected
@@ -162,4 +195,73 @@ public interface IScaleOutClientIndex extends IClientIndex {
     LinkedList<Split> splitKeys(final long ts, final int fromIndex,
             final int toIndex, final KVO[] a);
     
+    /**
+     * Asynchronous write API (streaming writes).
+     * <p>
+     * The returned buffer provides a streaming API which is highly efficient if
+     * you do not need to have synchronous notification or directly consume the
+     * returned values. The caller writes ordered {@link KVO}[] chunks onto the
+     * {@link BlockingBuffer}. Those chunks are dynamically combined and then
+     * split into per-index partition chunks which are written on internally
+     * managed {@link BlockingBuffer}s for each index partition which will be
+     * touched by a write operation. The splits are are slices of ordered chunks
+     * for a specific index partition. The {@link BlockingBuffer} uses a merge
+     * sort when it combines ordered chunks so that the combined chunks remain
+     * fully ordered. Once a chunk is ready, it is re-shaped for the CTOR and
+     * sent to the target data service using RMI.
+     * <p>
+     * {@link BlockingBuffer#getFuture()} may be used to obtain the
+     * {@link Future} of the consumer. You can use {@link Future#get()} to await
+     * the completion of the consumer, to cancel the consumer, etc. The
+     * {@link Future} will not terminate (other than by error) until the buffer
+     * has been {@link IBlockingBuffer#close() closed}. The {@link Future}
+     * evaluates to an {@link IndexWriteStats} object. Those statistics are also
+     * reported to the {@link ILoadBalancerService} via the
+     * {@link IBigdataFederation}.
+     * <p>
+     * Note: Each buffer returned by this method is independent. However, all
+     * the performance counters for all asynchronous write buffers for a given
+     * client and scale-out index are aggregated by an {@link IndexTaskCounters}.
+     * 
+     * @param <T>
+     *            The generic type of the procedure used to write on the index.
+     * @param <O>
+     *            The generic type for unserialized value objects.
+     * @param <R>
+     *            The type of the result from applying the index procedure to a
+     *            single {@link Split} of data.
+     * @param <A>
+     *            The type of the aggregated result.
+     * 
+     * @param indexWriteQueueCapacity
+     *            The capacity of the queue in front of the index. Chunks are
+     *            read off of this queue, split based on the separator keys for
+     *            the scale-out index, and then written onto a per-index
+     *            partition queue, whose capacity is specified by a different
+     *            argument.
+     * @param indexPartitionWriteQueueCapacity
+     *            The capacity of the queue in front of each index partition on
+     *            which the writes are scattered.
+     * @param resultHandler
+     *            Used to aggregate results.
+     * @param duplicateRemover
+     *            Used to filter out duplicates in an application specified
+     *            manner (optional).
+     * @param ctor
+     *            Used to create instances of the procedure that will execute a
+     *            write on an individual index partition (this implies that
+     *            insert and remove operations as well as custom index write
+     *            operations must use separate buffers).
+     * 
+     * @return A buffer on which the producer may write their data.
+     * 
+     * @see AbstractFederation#getIndexTaskCounters(String)
+     */
+    public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
+            final int indexWriteQueueCapacity,
+            final int indexPartitionWriteQueueCapacity,
+            final IResultHandler<R, A> resultHandler,
+            final IDuplicateRemover<O> duplicateRemover,
+            final AbstractKeyArrayIndexProcedureConstructor<T> ctor);
+
 }
