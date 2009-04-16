@@ -35,7 +35,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.KVO;
@@ -322,7 +324,7 @@ public class AbstractMasterTestCase extends TestCase2 {
         }
         
         @Override
-        protected boolean nextChunk(KVO<O>[] chunk) throws Exception {
+        protected boolean nextChunk(final KVO<O>[] chunk) throws Exception {
 
             synchronized (master.stats) {
 
@@ -333,6 +335,10 @@ public class AbstractMasterTestCase extends TestCase2 {
 
             stats.chunksOut++;
             stats.elementsOut += chunk.length;
+            
+            if(log.isInfoEnabled())
+                log.info("wrote chunk: " + this + ", #elements="
+                                + chunk.length);
             
             // keep processing.
             return false;
@@ -356,6 +362,40 @@ public class AbstractMasterTestCase extends TestCase2 {
     protected void tearDown() {
 
         executorService.shutdownNow();
+
+    }
+
+    /**
+     * Sleep up to the timeout or until the chunksOut takes on the specified
+     * value.
+     * 
+     * @param master
+     * @param expectedChunksOut
+     * @param timeout
+     * @param unit
+     * 
+     * @throws InterruptedException
+     * @throws AssertionFailedError
+     */
+    protected void awaitChunksOut(final M master, final int expectedChunksOut,
+            final long timeout, final TimeUnit unit)
+            throws InterruptedException {
+
+        long nanos = unit.toNanos(timeout);
+
+        while (nanos > 0) {
+
+            if (master.stats.chunksOut >= expectedChunksOut) {
+
+                return;
+
+            }
+
+            Thread.sleep(1/* ms */);
+
+        }
+
+        fail("Timeout");
 
     }
 

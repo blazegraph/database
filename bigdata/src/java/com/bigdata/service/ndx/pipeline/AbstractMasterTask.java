@@ -179,6 +179,8 @@ L>//
 
             while (src.hasNext()) {
 
+                halted();
+                
                 final E[] a = src.next();
 
                 // empty chunk?
@@ -186,11 +188,9 @@ L>//
                     continue;
                 
                 synchronized (stats) {
-
                     // update the master stats.
                     stats.chunksIn++;
                     stats.elementsIn += a.length;
-                    
                 }
 
                 nextChunk(a, false/* reopen */);
@@ -315,13 +315,6 @@ L>//
      * @throws InterruptedException
      *             If interrupted while awaiting the {@link #lock} or the child
      *             tasks.
-     * 
-     * @todo unit tests for some of these subtle points.
-     * 
-     * FIXME The practice of removing the subtask from {@link #subtasks} when it
-     * completes means that we are not able to check its {@link Future} here.
-     * Perhaps only do this if it completes normally (but also ensure that we do
-     * not re-open an output buffer if the subtask failed)?
      */
     private void awaitAll() throws InterruptedException, ExecutionException {
 
@@ -595,12 +588,6 @@ L>//
     /**
      * Removes the output buffer (unless it has been replaced by another output
      * buffer associated with a different sink).
-     * <p>
-     * Note: The {@link IndexPartitionWriteTask} invokes this method to remove
-     * its output buffer when it is done. However, it is possible for
-     * {@link #getOutputBuffer(PartitionLocator)} to replace the sink in the
-     * {@link #subtasks} map if <i>reopen</i> was true. When that occurs, the
-     * request by the old sink will be ignored.
      * 
      * @param sink
      *            The sink.
@@ -633,7 +620,11 @@ L>//
              * Note: increment counter regardless of whether or not the
              * reference was the same since the specified sink is now done.
              */
-            stats.subtaskEndCount++;
+            synchronized (stats) {
+
+                stats.subtaskEndCount++;
+
+            }
 
         } finally {
 

@@ -78,4 +78,11 @@ public class IndexTaskCounters {
      */
     final public TaskCounters synchronousCounters = new TaskCounters();
 
+    public String toString() {
+        
+        return getClass().getName() + "{asynchronous=" + asynchronousStats
+                + ", synchronous=" + synchronousCounters + "}";
+        
+    }
+    
 }

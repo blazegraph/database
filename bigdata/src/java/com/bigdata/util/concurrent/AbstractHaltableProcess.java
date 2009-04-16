@@ -125,7 +125,7 @@ public abstract class AbstractHaltableProcess {
                      */
 
                     log.warn(this + " : isFirstCause=" + isFirstCause + " : "
-                            + cause.getLocalizedMessage(), cause);
+                            + cause, cause);
 
                 }
 

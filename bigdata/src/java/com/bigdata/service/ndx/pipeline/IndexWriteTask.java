@@ -41,7 +41,6 @@ import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IScaleOutClientIndex;
@@ -87,12 +86,9 @@ import com.bigdata.service.Split;
  * @param <A>
  *            The type of the aggregated result.
  * 
- * @todo performance comparison of write buffers vs method calls or just of the
- *       size of the target chunk for the write buffer?
- * 
  * @todo throughput could probably be increased by submitting a sink to the data
  *       service which received chunks from client(s) [use a factory for this
- *       similar to the pipeline joins?], accumulated chunks, and merge sorted
+ *       similar to the pipeline joins?], accumulating chunks, and merge sorted
  *       those chunks before performing a sustained index write. However, this
  *       might go too far and cause complications with periodic overflow.
  */
@@ -204,6 +200,7 @@ A//
      * 
      * @throws InterruptedException
      */
+    @SuppressWarnings("unchecked")
     protected void addToOutputBuffer(final Split split, final E[] a,
             final boolean reopen) throws InterruptedException {
 
@@ -237,6 +234,7 @@ A//
      * @param cause
      *            The {@link StaleLocatorException}.
      */
+    @SuppressWarnings("unchecked")
     protected void handleStaleLocator(final S sink, final E[] chunk,
             final StaleLocatorException cause) throws InterruptedException {
 
@@ -286,6 +284,7 @@ A//
 
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     protected S newSubtask(final L locator, final BlockingBuffer<E[]> out) {
 
@@ -316,10 +315,12 @@ A//
         
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     protected Future<HS> submitSubtask(final S subtask) {
 
-        return ndx.getFederation().getExecutorService().submit(subtask);
+        return (Future<HS>) ndx.getFederation().getExecutorService().submit(
+                subtask);
         
     }
 
