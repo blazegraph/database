@@ -711,6 +711,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             }
 
+            endJob(jobState);
+            
             /*
              * Delete zookeeper state when the job completes successfully.
              */
@@ -730,7 +732,18 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         return null;
 
     }
-    
+
+    /**
+     * Callable invoked when the job is done executing (normal completion) but
+     * is still holding the {@link ZLock} for the {@link JobState}. The default
+     * implementation is a NOP. This may be used to for reporting, etc.
+     * 
+     * @throws Exception
+     */
+    protected void endJob(final S jobState) throws Exception {
+        
+    }
+
     /**
      * Return a {@link JobState}.
      * 
@@ -766,7 +779,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * 
      * @throws Exception
      */
-    protected void beginJob(final S JobState) throws Exception {
+    protected void beginJob(final S jobState) throws Exception {
         
     }
     

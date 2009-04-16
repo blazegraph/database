@@ -64,7 +64,6 @@ import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.TaskMaster;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
-import com.bigdata.service.ndx.pipeline.IndexWriteStats;
 
 /**
  * Utility class for benchmarking index operations on a federation. This test
@@ -532,6 +531,12 @@ public class ThroughputMaster
 
     }
 
+    protected void endJob(final JobState jobState) throws Exception {
+
+        super.endJob(jobState);
+
+    }
+    
     /**
      * The client task run on the {@link DataService}s.
      * 
@@ -593,14 +598,22 @@ public class ThroughputMaster
             final BlockingBuffer<KVO<Void>[]> insert;
             final BlockingBuffer<KVO<Void>[]> remove;
             if (jobState.asynchronous) {
-                // @todo enable optional duplicate removal.
+                /*
+                 * @todo enable optional duplicate removal and see what impact
+                 * it has.
+                 * 
+                 * @todo make the buffer capacity a config parameter for the
+                 * test.
+                 */
                 final int indexWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
                 final int indexPartitionWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
+                // for inserts.
                 insert = ndx.newWriteBuffer(indexWriteQueueCapacity,
                         indexPartitionWriteQueueCapacity,
                         (IResultHandler<Void, Void>) null/* resultHandler */,
                         (IDuplicateRemover<Void>) null/* duplicateRemover */,
                         BatchInsertConstructor.RETURN_NO_VALUES);
+                // for deletes.
                 remove = ndx.newWriteBuffer(indexWriteQueueCapacity,
                         indexPartitionWriteQueueCapacity,
                         (IResultHandler<Void, Void>) null/* resultHandler */,
@@ -696,10 +709,17 @@ public class ThroughputMaster
                 
                 remove.getFuture().get();
                 
-                // Note: All operations on the same index counters
-                System.err.println(fed.getIndexTaskCounters(ndx.getName()));
-                
             }
+            
+            /*
+             * Note: All operations (synchronous and asynchronous) are reported
+             * out on the same index counters. However, these data reflect only
+             * the client side of the index operations and only for the specific
+             * client. These counters are all reported to the LBS also so you
+             * can get them from there and then aggregate them across the
+             * clients.
+             */
+            System.err.println(fed.getIndexTaskCounters(ndx.getName()));
             
             return null;
             
