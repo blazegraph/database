@@ -71,6 +71,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 
 import org.apache.log4j.Logger;
@@ -956,7 +957,7 @@ public class BigdataSail extends SailBase implements Sail {
          *            The database. If this is a read-only view, then the
          *            {@link SailConnection} will not support update.
          */
-        protected BigdataSailConnection(AbstractTripleStore database) {
+        protected BigdataSailConnection(final AbstractTripleStore database) {
 
             BigdataSail.this.assertOpen();
             
@@ -978,7 +979,20 @@ public class BigdataSail extends SailBase implements Sail {
                 if (INFO)
                     log.info("Read-write view");
 
-                bnodes = new HashMap<String,BigdataBNodeImpl>(bufferCapacity);
+                /*
+                 * Note: A ConcurrentHashMap is used in case the SAIL has
+                 * concurrent threads which are processing RDF/XML statements
+                 * and therefore could in principle require concurrent access to
+                 * this map. ConcurrentHashMap is preferred to
+                 * Collections#synchronizedMap() since the latter requires
+                 * explicit synchronization during iterators, which breaks
+                 * encapsulation.
+                 */
+                bnodes = new ConcurrentHashMap<String, BigdataBNodeImpl>(
+                        bufferCapacity);
+//                bnodes = Collections
+//                        .synchronizedMap(new HashMap<String, BigdataBNodeImpl>(
+//                                bufferCapacity));
                 
                 if (truthMaintenance) {
 

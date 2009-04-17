@@ -171,13 +171,15 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * @todo there are other data that could be computed and reported out.
      */
 
-    // time waiting on the queue until the task begins to execute.
+    /** time waiting on the queue until the task begins to execute. */
     private double averageQueueWaitingTime = 0d;
-    // time waiting for resource locks.
+    /** time waiting for resource locks. */
     private double averageLockWaitingTime = 0d;
-    // time doing work (with any resources locks, excludes commit).
+    /** time doing work (with any resources locks, excludes commit). */
     private double averageServiceTime = 0d;
-    // total time from submit to completion.
+    /** time checkpointing indices (included in the {@link #averageServiceTime}). */
+    private double averageCheckpointTime = 0d;
+    /** total time from submit to completion. */
     private double averageQueuingTime = 0d;
 
     private double averageCommitWaitingTime = 0d;
@@ -188,6 +190,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     private long queueWaitingTime = 0L;
     private long lockWaitingTime = 0L;
     private long serviceTime = 0L;
+    private long checkpointTime = 0L; // Note: checkpointTime is included in the serviceTime.
     private long queuingTime = 0L;
 
     private long commitWaitingTime = 0L;
@@ -229,6 +232,24 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
     };
     
+    /**
+     * Moving average in milliseconds of the time that a task is checkpointing
+     * indices on which it has written (this is already reported as part of the
+     * tasks {@link #averageServiceTimeInst}).
+     * 
+     * @see IThreadPoolExecutorTaskCounters#AverageCheckpointTime
+     */
+    public final Instrument<Double> averageCheckpointTimeInst = new Instrument<Double>() {
+        
+        @Override
+        protected void sample() {
+
+            setValue( averageCheckpointTime );
+            
+        }
+        
+    };
+
     /**
      * Moving average in milliseconds of the time that a task is being serviced
      * by a worker thread (elapsed clock time from when the task was assigned to
@@ -586,6 +607,28 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
                         averageServiceTime = getMovingAverage(
                                 averageServiceTime,
+                                (delta * scalingFactor / taskCounters.taskCompleteCount.get()),
+                                w);
+
+                    }
+
+                    /*
+                     * Time that the task is busy checkpoint its indices (this
+                     * is already reported as part of the service time but which
+                     * is broken out here as a detail).
+                     */
+                    {
+
+                        final long newValue = taskCounters.checkpointNanoTime.get();
+
+                        final long delta = newValue - checkpointTime;
+
+                        assert delta >= 0 : "" + delta;
+
+                        checkpointTime = newValue;
+
+                        averageCheckpointTime = getMovingAverage(
+                                averageCheckpointTime,
                                 (delta * scalingFactor / taskCounters.taskCompleteCount.get()),
                                 w);
 

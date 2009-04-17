@@ -33,7 +33,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
@@ -87,17 +86,8 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
 
     final protected static Logger log = Logger.getLogger(StatementBuffer.class);
    
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected boolean INFO = log.isInfoEnabled();
+    final protected boolean DEBUG = log.isDebugEnabled();
     
     protected final long NULL = IRawTripleStore.NULL;
     
@@ -1390,54 +1380,6 @@ public class StatementBuffer implements IStatementBuffer<Statement> {
             
         }
 
-    }
-
-    /**
-     * An instance of this exception is thrown if cycles are detected amoung
-     * statements. A cycle can exist only when statement identifiers are enabled
-     * and a statement is made either directly about itself or indirectly via
-     * one or more statements about itself.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class StatementCyclesException extends RuntimeException {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 3506732137721004208L;
-        
-        public StatementCyclesException(String msg) {
-            
-            super(msg);
-            
-        }
-        
-    }
-    
-    /**
-     * An instance of this exception is thrown when the same blank node appears
-     * in the context position of two or more statements having a distinct
-     * subject predicate, and object. This is an error because it implies that
-     * two statements with different bindings are the same statement.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static class UnificationException extends RuntimeException {
-        
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 6430403508687043789L;
-
-        public UnificationException(String msg) {
-            
-            super(msg);
-            
-        }
-        
     }
 
 }
