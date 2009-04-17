@@ -43,6 +43,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
@@ -116,12 +117,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    static final protected boolean INFO = log.isInfoEnabled();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    static final protected boolean DEBUG = log.isDebugEnabled();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Used to protect against re-submission of the same task object.
@@ -914,8 +915,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * <p>
      * This method is invoked after an {@link ITx#UNISOLATED} task has
      * successfully completed its work, but while the task still has its locks.
+     * 
+     * @return The elapsed time in nanoseconds for this operation.
      */
-    private void checkpointTask() {
+    private long checkpointTask() {
 
         assertUnisolated();
         
@@ -926,7 +929,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          */
         final int ndirty = commitList.size();
         
-        final long begin = System.currentTimeMillis();
+        final long begin = System.nanoTime();
         
         if (INFO) {
 
@@ -949,9 +952,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         if(INFO) { 
 
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            log.info("Flushed "+ndirty+" indices in "+elapsed+"ms");
+            final long elapsed = System.nanoTime() - begin;
+
+            log.info("Flushed " + ndirty + " indices in "
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
             
         }
         
@@ -1048,13 +1052,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         // clear the commit list.
         commitList.clear();
         
+        final long elapsed = System.nanoTime() - begin;
+        
         if(INFO) { 
 
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            log.info("End task checkpoint after "+elapsed+"ms");
+            log.info("End task checkpoint after "
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
             
         }
+
+        return elapsed;
         
     }
 
@@ -1108,6 +1115,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * still do abort processing or await the next commit group.
      */
     public long nanoTime_finishedWork;
+    
+    /**
+     * The elapsed time in nanoseconds for a write task to checkpoint its
+     * index(s).
+     */
+    public long checkpointNanoTime;
     
     /**
      * Convenience constructor variant for one named resource.
@@ -1599,7 +1612,19 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             taskCounters.taskCompleteCount.incrementAndGet();
             
             // increment by the amount of time that the task was executing.
-            taskCounters.serviceNanoTime.addAndGet(nanoTime_finishedWork - nanoTime_beginWork);
+            taskCounters.serviceNanoTime.addAndGet(nanoTime_finishedWork
+                    - nanoTime_beginWork);
+
+            if (checkpointNanoTime != 0L) {
+
+                /*
+                 * Increment by the time required to checkpoint the indices
+                 * written on by the task (IFF a write task and the task
+                 * completes normally).
+                 */
+                taskCounters.checkpointNanoTime.addAndGet(checkpointNanoTime);
+
+            }
 
             /*
              * Increment by the total time from submit to completion.
@@ -1939,7 +1964,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 delegate.nanoTime_beginWork = System.nanoTime();
                 tx.lock.lock();
                 try {
-                return delegate.doTask();
+                    return delegate.doTask();
                 } finally {
                     tx.lock.unlock();
                 }
@@ -2012,7 +2037,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 final T ret = delegate.doTask();
 
                 // checkpoint while holding locks.
-                delegate.checkpointTask();
+                delegate.checkpointNanoTime = delegate.checkpointTask();
 
                 return ret;
 

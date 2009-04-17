@@ -28,14 +28,13 @@ package com.bigdata.rdf.spo;
 
 import java.io.IOException;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
@@ -69,19 +68,11 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
 
-    protected transient static final Logger log = Logger.getLogger(SPOIndexWriteProc.class);
+    protected transient static final Logger log = Logger
+            .getLogger(SPOIndexWriteProc.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final transient protected boolean INFO = log.isInfoEnabled();
+    final transient protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 

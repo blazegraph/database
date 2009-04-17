@@ -72,6 +72,18 @@ public interface IQueueCounters extends ICounterHierarchy {
         String ServiceTime = "Service Time";
 
         /**
+         * Cumulative elapsed time in milliseconds consumed by write tasks while
+         * checkpointing their indices.
+         * <p>
+         * Note: This time is already reported by the {@link #ServiceTime} but
+         * is broken out here for additional detail. Checkpoint time can be most
+         * of the service time for a task since indices buffer writes and but
+         * are required to flush those writes to the backing during during a
+         * checkpoint.
+         */
+        String CheckpointTime = "Checkpoint Time";
+
+        /**
          * Cumulative milliseconds across tasks between the submission of a task
          * and its completion including any time spent waiting for resource
          * locks, commit processing and any time spent servicing that task.
@@ -180,6 +192,16 @@ public interface IQueueCounters extends ICounterHierarchy {
          * @see ITaskCounters#ServiceTime
          */
         String AverageServiceTime = "Average Service Time";
+
+        /**
+         * Moving average in milliseconds of the time that a task is
+         * checkpointing the indices on which it has written (this is already
+         * reported as part of the {@link #AverageServiceTime} but is broken out
+         * here as a detail).
+         * 
+         * @see ITaskCounters#CheckpointTime
+         */
+        String AverageCheckpointTime = "Average Checkpoint Time";
 
         /**
          * Moving average in milliseconds of the time between the submission of

@@ -68,6 +68,9 @@ L>//
     protected static transient final Logger log = Logger
             .getLogger(AbstractSubtask.class);
 
+    protected transient final boolean INFO = log.isInfoEnabled(); 
+    protected transient final boolean DEBUG = log.isDebugEnabled(); 
+
     /**
      * The master.
      */
@@ -182,7 +185,7 @@ L>//
                     try {
                         if (!buffer.isOpen() && !src.hasNext()) {
                             // We are done.
-                            if (log.isInfoEnabled())
+                            if (INFO)
                                 log.info("No more data: " + this);
                             break;
                         }
@@ -201,11 +204,11 @@ L>//
                                  * is closed or if idle too long.
                                  */
                                 buffer.close();
-                                if (log.isInfoEnabled())
+                                if (INFO)
                                     log.info("Closed buffer: idle=" + idle
                                             + " : " + this);
                                 if(!src.hasNext()) {
-                                    if (log.isInfoEnabled())
+                                    if (INFO)
                                         log.info("No more data: " + this);
                                     break;
                                 }
@@ -224,7 +227,7 @@ L>//
                 
                 if (nextChunk(src.next())) {
 
-                    if (log.isInfoEnabled())
+                    if (INFO)
                         log.info("Eager termination.");
 
                     // Done (eager termination).
@@ -237,7 +240,7 @@ L>//
             // normal completion.
             master.removeOutputBuffer(locator, this);
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("Done: " + locator);
 
             // done.
@@ -245,7 +248,7 @@ L>//
 
         } catch (Throwable t) {
 
-            if (log.isInfoEnabled()) {
+            if (INFO) {
                 // show stack trace @ INFO
                 log.warn(this, t);
             } else {

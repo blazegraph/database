@@ -209,12 +209,6 @@ public class SPOIndexWriter implements Callable<Long> {
          * statements; and (c) the correct application of the override flag.
          */
         
-//        /*
-//         * Note: this must not be resolved until the task is executing in its
-//         * assigned thread.
-//         */
-//        final RdfKeyBuilder keyBuilder = statementStore.getKeyBuilder();
-
         final SPOTupleSerializer tupleSer = (SPOTupleSerializer) ndx
                 .getIndexMetadata().getTupleSerializer();
         

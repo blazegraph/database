@@ -33,8 +33,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -103,9 +101,6 @@ T extends IKeyArrayIndexProcedure,//
 R,//
 A//
 > extends AbstractMasterTask<H, E, S, L> {
-
-    static protected transient final Logger log = Logger
-            .getLogger(IndexWriteTask.class);
 
     // from the ctor.
     protected final IScaleOutClientIndex ndx;

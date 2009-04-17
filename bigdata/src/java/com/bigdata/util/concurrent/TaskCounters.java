@@ -67,9 +67,25 @@ public class TaskCounters {
      * time MAY exceed the actual elapsed time during which those tasks were
      * executed.
      * <p>
-     * Note: Service time on the client includes queuing time on the service.
+     * Note: Service time on the client includes queuing time on the service and
+     * the checkpoint time (for write tasks).
      */
     final public AtomicLong serviceNanoTime = new AtomicLong();
+
+    /**
+     * Cumulative elapsed time in nanoseconds consumed by write tasks while
+     * checkpointing their indices.
+     * <p>
+     * Note: Since this is aggregated over concurrent tasks the reported elapsed
+     * time MAY exceed the actual elapsed time during which those tasks were
+     * executed.
+     * <p>
+     * Note: This time is already reported by the {@link #serviceNanoTime} but
+     * is broken out here for additional detail. Checkpoint time can be most of
+     * the service time for a task since indices buffer writes and but are
+     * required to flush those writes to the backing during during a checkpoint.
+     */
+    final public AtomicLong checkpointNanoTime = new AtomicLong();
 
     /**
      * Cumulative elapsed time in nanoseconds consumed by tasks from when they
@@ -138,6 +154,14 @@ public class TaskCounters {
                 new Instrument<Long>() {
                     public void sample() {
                         setValue(TimeUnit.NANOSECONDS.toMillis(serviceNanoTime
+                                .get()));
+                    }
+                });
+
+        counterSet.addCounter(ITaskCounters.CheckpointTime,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(TimeUnit.NANOSECONDS.toMillis(checkpointNanoTime
                                 .get()));
                     }
                 });

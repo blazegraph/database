@@ -24,7 +24,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -50,11 +49,9 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.load.AssignedSplits;
@@ -62,7 +59,6 @@ import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.TermIdComparator2;
 import com.bigdata.rdf.rio.IStatementBuffer;
@@ -381,19 +377,30 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     private IIndex id2term;
     private IIndex term2id;
     private final boolean textIndex;
-    private final boolean storeBlankNodes;
+    final boolean storeBlankNodes;
 //    private final boolean scaleOutTermIds;
-    private final int termIdBitsToReverse;
+    final int termIdBitsToReverse;
 
     /**
      * <code>true</code> iff blank nodes are being stored in the lexicon's
      * forward index.
      * 
-     * @see Options#STORE_BLANK_NODES
+     * @see AbstractTripleStore.Options#STORE_BLANK_NODES
      */
     final public boolean isStoreBlankNodes() {
         
         return storeBlankNodes;
+        
+    }
+    
+    /**
+     * <code>true</code> iff the full text index is enabled.
+     * 
+     * @see AbstractTripleStore.Options#TEXT_INDEX
+     */
+    final public boolean isTextIndex() {
+        
+        return textIndex;
         
     }
     
@@ -803,209 +810,31 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         final long begin = System.currentTimeMillis();
         
-        // time to convert unicode terms to byte[] sort keys.
-        long keyGenTime = 0;
-        // time to sort terms by assigned byte[] keys.
-        long sortTime = 0;
-        // time to insert terms into indices.
-        long indexTime = 0;
-        // time on the forward index.
-        final long forwardIndexTime;
-        // time on the reverse index.
-        final long reverseIndexTime;
-        // time to insert terms into the text indexer.
-        final long fullTextIndexTime;
-        // The #of terms that could not be resolved (iff readOnly == true).
-        final AtomicInteger nunknown = new AtomicInteger();
+        final WriteTaskStats stats = new WriteTaskStats();
 
-        /*
-         * Insert into the forward index (term -> id). This will either assign a
-         * termId or return the existing termId if the term is already in the
-         * lexicon.
-         */
-        
-        // a dense array of correlated tuples.
         final KVO<BigdataValue>[] a;
-
-        // the #of distinct terms lacking a pre-assigned term identifier in [a].
-        int ndistinct = 0;
-        {
-            
-            final KVO<BigdataValue>[] b;
-
-            /*
-             * First make sure that each term has an assigned sort key.
-             */
-            {
-
-                long _begin = System.currentTimeMillis();
-                
-                final Term2IdTupleSerializer tupleSer = (Term2IdTupleSerializer) getIndex(
-                        LexiconKeyOrder.TERM2ID).getIndexMetadata()
-                        .getTupleSerializer();
-
-                // may contain duplicates and/or terms with pre-assigned term identifiers.
-                b = generateSortKeys(tupleSer.getLexiconKeyBuilder(), terms, numTerms);
-
-                keyGenTime = System.currentTimeMillis() - _begin;
-
-            }
-
-            /*
-             * Sort by the assigned sort key. This places the array into the
-             * natural order for the term:id index.
-             */
-            {
-
-                final long _begin = System.currentTimeMillis();
-
-                Arrays.sort(b);
-                
-//                Arrays.sort(terms, 0, numTerms,
-//                        _ValueSortKeyComparator.INSTANCE);
-
-                sortTime += System.currentTimeMillis() - _begin;
-
-            }
-
-            /*
-             * For each distinct term that does not have a pre-assigned term
-             * identifier, add it to a remote unisolated batch operation that
-             * assigns term identifiers.
-             * 
-             * Note: Both duplicate term references and terms with their term
-             * identifiers already assigned are dropped out in this step.
-             */
-            {
-
-                final long _begin = System.currentTimeMillis();
-
-                final IIndex termIdIndex = getTerm2IdIndex();
-
-                /*
-                 * Create a key buffer holding the sort keys. This does not
-                 * allocate new storage for the sort keys, but rather aligns the
-                 * data structures for the call to splitKeys(). This also makes
-                 * a[] into a dense copy of the references in b[], but without
-                 * duplicates and without terms that already have assigned term
-                 * identifiers. Note that keys[] and a[] are correlated.
-                 * 
-                 * @todo Could be restated as an IDuplicateRemover, but note
-                 * that this case is specialized since it can drop terms whose
-                 * term identifier is known (they do not need to be written on
-                 * T2ID, but they still need to be written on the reverse index
-                 * to ensure a robust and consistent mapping).
-                 */
-                final byte[][] keys = new byte[numTerms][];
-                a = new KVO[numTerms];
-                {
-
-                    for (int i = 0; i < numTerms; i++) {
-
-                        if (b[i].obj.getTermId() != IRawTripleStore.NULL) {
-                            
-                            if (DEBUG)
-                                log.debug("term identifier already assigned: "
-                                        + b[i].obj);
-                            
-                            // term identifier already assigned.
-                            continue;
-                            
-                        }
-                        
-                        if (i > 0 && b[i - 1].obj == b[i].obj) {
-
-                            if (DEBUG)
-                                log.debug("duplicate term reference: "
-                                        + b[i].obj);
-                            
-                            // duplicate reference.
-                            continue;
-                            
-                        }
-
-                        // assign to a[] (dense variant of b[]).
-                        a[ndistinct] = b[i];
-                        
-                        // assign to keys[] (dense and correlated with a[]).
-                        keys[ndistinct] = b[i].key;
-                        
-                        ndistinct++;
-
-                    }
-
-                }
-
-                if (ndistinct == 0) {
-                    
-                    /*
-                     * Nothing new to be written.
-                     */
-                    
-                    return;
-                    
-                }
-                
-                // run the procedure.
-                termIdIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
-                        keys, null/* vals */, new Term2IdWriteProcConstructor(
-                                readOnly, storeBlankNodes, //scaleOutTermIds,
-                                termIdBitsToReverse),
-                        new IResultHandler<Term2IdWriteProc.Result, Void>() {
-
-                            /**
-                             * Copy the assigned / discovered term identifiers
-                             * onto the corresponding elements of the terms[].
-                             */
-                            public void aggregate(
-                                    final Term2IdWriteProc.Result result,
-                                    final Split split) {
-
-                                for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
-
-                                    final long termId = result.ids[j];
-                                    
-                                    if (termId == IRawTripleStore.NULL) {
-
-                                        if (!readOnly)
-                                            throw new AssertionError();
-                                        
-                                        nunknown.incrementAndGet();
-                                        
-                                    } else {
-                                        
-                                        a[i].obj.setTermId(termId);
-                                        
-                                        if(log.isDebugEnabled()) {
-                                            log.debug("termId="+termId+", term="+a[i].obj);
-                                        }
-                                        
-                                    }
-
-                                }
-
-                            }
-
-                            public Void getResult() {
-
-                                return null;
-
-                            }
-
-                        });
-
-                indexTime = forwardIndexTime = System.currentTimeMillis()
-                        - _begin;
-
-            }
-
+        try {
+            // write on the forward index (sync RPC)
+            a = new Term2IdWriteTask(this, readOnly, numTerms, terms, stats)
+                    .call();
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
+        
+        /*
+         * Note: [a] is dense and its elements are distinct. it will be in sort
+         * key order for the Values.
+         */
+        final int ndistinct = a.length;
 
-        if(readOnly) {
+        if (ndistinct == 0) {
+
+            // Nothing left to do.
+            return;
             
-            fullTextIndexTime = reverseIndexTime = 0L;
-            
-        } else {
+        }
+        
+        if(!readOnly) {
             
             {
     
@@ -1022,9 +851,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     
                 Arrays.sort(a, 0, ndistinct, KVOTermIdComparator.INSTANCE);
                 
-//                Arrays.sort(terms, 0, numTerms, TermIdComparator.INSTANCE);
-                
-                sortTime += System.currentTimeMillis() - _begin;
+                stats.sortTime += System.currentTimeMillis() - _begin;
     
             }
 
@@ -1037,7 +864,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 final List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
 
-                tasks.add(new ReverseIndexWriterTask(a, ndistinct));
+                tasks.add(new ReverseIndexWriterTask(getId2TermIndex(),
+                        valueFactory, a, ndistinct));
 
                 if (textIndex) {
 
@@ -1080,12 +908,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                     final List<Future<Long>> futures = getExecutorService()
                             .invokeAll(tasks);
 
-                    reverseIndexTime = futures.get(0).get();
+                    stats.reverseIndexTime = futures.get(0).get();
                     
                     if (textIndex)
-                        fullTextIndexTime = futures.get(1).get();
+                        stats.fullTextIndexTime = futures.get(1).get();
                     else 
-                        fullTextIndexTime = 0L;
+                        stats.fullTextIndexTime = 0L;
 
                 } catch (Throwable t) {
 
@@ -1093,7 +921,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 }
 
-                indexTime += System.currentTimeMillis() - _begin;
+                stats.indexTime += System.currentTimeMillis() - _begin;
 
             }
             
@@ -1101,9 +929,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (INFO && readOnly && nunknown.get() > 0) {
+        if (INFO && readOnly && stats.nunknown.get() > 0) {
          
-            log.info("There are " + nunknown + " unknown terms out of "
+            log.info("There are " + stats.nunknown + " unknown terms out of "
                     + numTerms + " given");
             
         }
@@ -1112,138 +940,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             if(INFO)
             log.info("Processed " + numTerms + " in " + elapsed
-                        + "ms; keygen=" + keyGenTime + "ms, sort=" + sortTime
-                        + "ms, insert=" + indexTime + "ms" + " {forward="
-                        + forwardIndexTime + ", reverse=" + reverseIndexTime
-                        + ", fullText=" + fullTextIndexTime + "}");
+                        + "ms; keygen=" + stats.keyGenTime + "ms, sort=" + stats.sortTime
+                        + "ms, insert=" + stats.indexTime + "ms" + " {forward="
+                        + stats.forwardIndexTime + ", reverse=" + stats.reverseIndexTime
+                        + ", fullText=" + stats.fullTextIndexTime + "}");
 
         }
 
     }
 
-    /**
-     * Add terms to the reverse index, which is the index that we use to lookup
-     * the RDF value by its termId to serialize some data as RDF/XML or the
-     * like.
-     * <p>
-     * Note: Every term asserted against the forward mapping [terms] MUST be
-     * asserted against the reverse mapping [ids] EVERY time. This is required
-     * in order to guarentee that the reverse index remains complete and
-     * consistent. Otherwise a client that writes on the terms index and fails
-     * before writing on the ids index would cause those terms to remain
-     * undefined in the reverse index.
-     */
-    private class ReverseIndexWriterTask implements Callable<Long> {
-        
-        private final KVO<BigdataValue>[] a;
-        private final int ndistinct;
-        
-        public ReverseIndexWriterTask(final KVO<BigdataValue>[] a,
-                final int ndistinct) {
-            
-            this.a = a;
-            
-            this.ndistinct = ndistinct;
-            
-        }
-        
-        /**
-         * @return the elapsed time for this task.
-         */
-        public Long call() throws Exception {
-
-            final long _begin = System.currentTimeMillis();
-
-            final IIndex idTermIndex = getId2TermIndex();
-
-            final BigdataValueSerializer<BigdataValue> ser = valueFactory
-                    .getValueSerializer();
-
-            /*
-             * Create a key buffer to hold the keys generated from the term
-             * identifers and then generate those keys. The terms are already in
-             * sorted order by their term identifiers from the previous step.
-             * 
-             * Note: We DO NOT write BNodes on the reverse index.
-             */
-            final byte[][] keys = new byte[ndistinct][];
-            final byte[][] vals = new byte[ndistinct][];
-            int nonBNodeCount = 0; // #of non-bnodes.
-            {
-
-                // thread-local key builder removes single-threaded constraint.
-                final IKeyBuilder tmp = KeyBuilder
-                        .newInstance(Bytes.SIZEOF_LONG);
-
-                // buffer is reused for each serialized term.
-                final DataOutputBuffer out = new DataOutputBuffer();
-
-                for (int i = 0; i < ndistinct; i++) {
-
-                    final BigdataValue x = a[i].obj;
-
-                    if (x instanceof BNode) {
-
-                        // Blank nodes are not entered into the reverse index.
-                        continue;
-
-                    }
-
-                    keys[nonBNodeCount] = tmp.reset().append(x.getTermId())
-                            .getKey();
-
-                    // Serialize the term.
-                    vals[nonBNodeCount] = ser.serialize(x, out.reset());
-
-                    nonBNodeCount++;
-
-                }
-
-            }
-
-            // run the procedure on the index.
-            if (nonBNodeCount > 0) {
-
-                idTermIndex.submit(0/* fromIndex */,
-                        nonBNodeCount/* toIndex */, keys, vals,
-                        Id2TermWriteProcConstructor.INSTANCE,
-                        new IResultHandler<Void, Void>() {
-
-                            /**
-                             * Since the unisolated write succeeded the client
-                             * knows that the term is now in both the forward
-                             * and reverse indices.
-                             */
-                            // * We codify that knowledge by setting the
-                            // * [known] flag on the term.
-                            public void aggregate(Void result, Split split) {
-
-                                // for (int i = split.fromIndex, j = 0; i <
-                                // split.toIndex; i++, j++) {
-                                //    
-                                // terms[i].known = true;
-                                //    
-                                // }
-
-                            }
-
-                            public Void getResult() {
-
-                                return null;
-
-                            }
-                        });
-
-            }
-
-            final long elapsed = System.currentTimeMillis() - _begin;
-            
-            return elapsed;
-    
-        }
-        
-    }
-    
     /**
      * Index terms for keyword search.
      */
@@ -1252,8 +957,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         private final int capacity;
         
         private final Iterator<BigdataValue> itr;
-        
-        public FullTextIndexWriterTask(int capacity, Iterator<BigdataValue> itr) {
+
+        public FullTextIndexWriterTask(final int capacity,
+                final Iterator<BigdataValue> itr) {
         
             this.capacity = capacity;
             

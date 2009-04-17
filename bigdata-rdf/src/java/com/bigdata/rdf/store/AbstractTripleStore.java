@@ -252,7 +252,12 @@ abstract public class AbstractTripleStore extends
      * 
      * @see Options#STATEMENT_IDENTIFIERS
      */
-    final protected boolean statementIdentifiers;
+    final public boolean isStatementIdentifiers() {
+
+        return statementIdentifiers;
+        
+    }
+    final private boolean statementIdentifiers;
     
     /**
      * The {@link Axioms} class.

@@ -32,8 +32,6 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.mdi.PartitionLocator;
@@ -63,12 +61,6 @@ T extends IKeyArrayIndexProcedure,//
 R,//
 A//
 > extends AbstractSubtask<HS, M, E, L> {
-
-//public class IndexPartitionWriteTask<T extends IKeyArrayIndexProcedure, O, R, A>
-//    implements Callable<IndexPartitionWriteStats> {
-
-    static protected transient final Logger log = Logger
-            .getLogger(IndexPartitionWriteTask.class);
 
     /**
      * The data service on which the index partition resides.
@@ -116,104 +108,6 @@ A//
                 .getName(), partitionId);
 
     }
-
-//    public HS call() throws Exception {
-//
-//        try {
-//
-//            /*
-//             * Poll the iterator with a timeout to avoid deadlock with
-//             * awaitAll().
-//             * 
-//             * Note: In order to ensure termination the subtask MUST poll
-//             * the iterator with a timeout so that a subtask which was
-//             * created in response to a StaleLocatorException during
-//             * master.awaitAll() can close its own blocking buffer IF: (a)
-//             * the top-level blocking buffer is closed; and (b) the
-//             * subtask's blocking buffer is empty. This operation needs to
-//             * be coordinated using the master's [lock], as does any
-//             * operation which writes on the subtask's buffer. Otherwise we
-//             * can wait forever for a subtask to complete. The subtask uses
-//             * the [subtask] Condition signal the master when it is
-//             * finished.
-//             */
-//            while (true) {
-//
-//                master.halted();
-//
-//                // nothing available w/in timeout?
-//                if (!src.hasNext(
-//                        // @todo config timeout
-//                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
-//                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT)) {
-//
-//                    // are we done? should we close our buffer?
-//                    master.lock.lockInterruptibly();
-//                    try {
-//                        if (!buffer.isOpen() && !src.hasNext()) {
-//                            // We are done.
-//                            if (log.isInfoEnabled())
-//                                log.info("No more data: " + this);
-//                            break;
-//                        }
-//                        if (master.src.isExhausted()) {
-//                            if (buffer.isEmpty()) {
-//                                // close our buffer.
-//                                buffer.close();
-//                                if (log.isInfoEnabled())
-//                                    log.info("Closed buffer: " + this);
-//                            }
-//                        }
-//                    } finally {
-//                        master.lock.unlock();
-//                    }
-//                    continue;
-//
-//                }
-//
-//                if (Thread.interrupted()) {
-//
-//                    throw master.halt(new InterruptedException(toString()));
-//
-//                }
-//
-//                if (!nextChunk()) {
-//
-//                    // Done (handled a stale locator).
-//                    break;
-//
-//                }
-//
-//            }
-//
-//            // normal completion.
-//            master.removeOutputBuffer(locator, this);
-//
-//            if (log.isInfoEnabled())
-//                log.info("Done: " + stats);
-//
-//            // done.
-//            return stats;
-//
-//        } catch (Throwable t) {
-//
-//            // halt processing.
-//            master.halt(t);
-//
-//            throw new RuntimeException(t);
-//
-//        } finally {
-//
-//            master.lock.lock();
-//            try {
-//                master.subtask.signalAll();
-//            } finally {
-//                master.lock.unlock();
-//            }
-//
-//        }
-//
-//    }
 
     /**
      * {@inheritDoc}
@@ -307,7 +201,7 @@ A//
 
             }
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug(stats);
 
             // keep reading.
@@ -332,7 +226,7 @@ A//
                  * buffer(s).
                  */
 
-                if (log.isInfoEnabled())
+                if (INFO)
                     log.info("Stale locator: name=" + cause.getName()
                             + ", reason=" + cause.getReason());
 

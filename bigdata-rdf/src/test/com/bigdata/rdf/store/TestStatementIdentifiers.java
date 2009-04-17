@@ -68,9 +68,8 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rio.StatementBuffer.StatementCyclesException;
-import com.bigdata.rdf.rio.StatementBuffer.UnificationException;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
+import com.bigdata.rdf.rio.StatementCyclesException;
+import com.bigdata.rdf.rio.UnificationException;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -114,7 +113,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
         try {
             
-            if (!store.statementIdentifiers) {
+            if (!store.isStatementIdentifiers()) {
                 
                 log.warn("Statement identifiers are not enabled");
                 
@@ -419,7 +418,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
         
         try {
 
-            if(!store.statementIdentifiers) {
+            if(!store.isStatementIdentifiers()) {
                 
                 log.warn("Statement identifiers are not enabled");
 
@@ -536,7 +535,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
         
         try {
 
-            if(!store.statementIdentifiers) {
+            if(!store.isStatementIdentifiers()) {
                 
                 log.warn("Statement identifiers are not enabled");
 
@@ -728,7 +727,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
         try {
 
-            if (!store.statementIdentifiers) {
+            if (!store.isStatementIdentifiers()) {
 
                 log.warn("Statement identifiers are not enabled");
 
@@ -790,7 +789,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
         try {
 
-            if (!store.statementIdentifiers) {
+            if (!store.isStatementIdentifiers()) {
 
                 log.warn("Statement identifiers are not enabled");
 
@@ -855,7 +854,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
         try {
 
-            if (!store.statementIdentifiers) {
+            if (!store.isStatementIdentifiers()) {
 
                 log.warn("Statement identifiers are not enabled");
 

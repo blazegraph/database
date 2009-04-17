@@ -186,9 +186,16 @@ public class BigdataStatementImpl implements BigdataStatement {
      */
     final public int hashCode() {
         
-        return 961 * s.hashCode() + 31 * p.hashCode() + o.hashCode();
+        if (hash == 0) {
+
+            hash = 961 * s.hashCode() + 31 * p.hashCode() + o.hashCode();
+
+        }
+        
+        return hash;
     
     }
+    private int hash = 0;
     
     public String toString() {
         

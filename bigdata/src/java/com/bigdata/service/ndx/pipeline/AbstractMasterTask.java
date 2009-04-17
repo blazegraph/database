@@ -80,6 +80,9 @@ L>//
     static protected transient final Logger log = Logger
             .getLogger(AbstractMasterTask.class);
 
+    protected transient final boolean INFO = log.isInfoEnabled(); 
+    protected transient final boolean DEBUG = log.isDebugEnabled(); 
+
     /**
      * The top-level buffer on which the application is writing.
      */
@@ -338,7 +341,7 @@ L>//
 
                 }
 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug("Waiting for " + sinks.length + " subtasks : "
                             + this);
 
@@ -369,7 +372,7 @@ L>//
 
             } // continue
 
-            if (log.isInfoEnabled())
+            if (INFO)
                 log.info("All subtasks are done: " + this);
             
         } finally {
@@ -476,7 +479,7 @@ L>//
 
         if (sink == null || reopen) {
 
-            if (log.isDebugEnabled())
+            if (DEBUG)
                 log.debug("Creating output buffer: " + locator);
 
             final BlockingBuffer<E[]> out = newSubtaskBuffer();
@@ -611,7 +614,7 @@ L>//
 
                 subtasks.remove(locator);
 
-                if (log.isDebugEnabled())
+                if (DEBUG)
                     log.debug("Removed output buffer: " + locator);
 
             }

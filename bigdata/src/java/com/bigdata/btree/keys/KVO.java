@@ -163,4 +163,33 @@ public class KVO<O> implements Comparable<KVO<O>>{
 
     }
 
+    /**
+     * Return a dense array. If the array is already dense, then the array
+     * reference is returned. This is not a deep copy.
+     * 
+     * @param a
+     *            The array.
+     * @param len
+     *            The #of elements in the array [0:len-1].
+     * @return A dense array.
+     */
+    static public <T> KVO<T>[] dense(final KVO<T>[] a, final int len) {
+
+        if (a == null)
+            throw new IllegalArgumentException();
+
+        if (len < 0 || len > a.length)
+            throw new IllegalArgumentException();
+
+        if (len == a.length) // perfect fit.
+            return a;
+
+        final KVO<T>[] b = new KVO[len];
+
+        System.arraycopy(a, 0/*srcpos*/, b, 0/*dstpos*/, len);
+
+        return b;
+
+    }
+
 }

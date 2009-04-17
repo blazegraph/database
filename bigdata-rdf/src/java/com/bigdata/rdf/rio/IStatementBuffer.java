@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -126,6 +128,18 @@ public interface IStatementBuffer<F extends Statement> extends IBuffer<F> {
      * you to reuse the same map across multiple {@link IStatementBuffer}
      * instances. For example, the {@link BigdataSail} does this so that the
      * same bnode map is used throughout the life of a {@link SailConnection}.
+     * While RIO provides blank node correlation within a given source, it does
+     * NOT provide blank node correlation across sources. You need to use this
+     * method to do that.
+     * <p>
+     * Note: It is reasonable to expect that the bnodes map is used by
+     * concurrent threads. For this reason, the map SHOULD be thread-safe. This
+     * can be accomplished either using {@link Collections#synchronizedMap(Map)}
+     * or a {@link ConcurrentHashMap}. However, implementations MUST still be
+     * synchronized on the map reference across operations which conditionally
+     * insert into the map in order to make that update atomic and thread-safe.
+     * Otherwise a race condition exists for the conditional insert and
+     * different threads could get incoherent answers.
      * 
      * @param bnodes
      *            The blank nodes map.
