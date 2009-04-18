@@ -55,10 +55,10 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      */
     private int i = 0;
 
-    /**
-     * The element most recently returned by {@link #next()}.
-     */
-    private E current = null;
+//    /**
+//     * The element most recently returned by {@link #next()}.
+//     */
+//    private E current = null;
     
     /**
      * The #of elements that this iterator buffered.
@@ -80,7 +80,8 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
      *            The order of the elements in the buffer or <code>null</code>
      *            iff not known.
      */
-    public ChunkedArrayIterator(int n, E[] a, IKeyOrder<E> keyOrder) {
+    public ChunkedArrayIterator(final int n, final E[] a,
+            final IKeyOrder<E> keyOrder) {
     
         if (a == null)
             throw new IllegalArgumentException();
@@ -120,9 +121,11 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
         
         }
         
-        current = buffer[i++];
+        return buffer[i++];
         
-        return current;
+//        current = buffer[i++];
+//        
+//        return current;
         
     }
 
@@ -254,7 +257,7 @@ public class ChunkedArrayIterator<E> implements IChunkedOrderedIterator<E> {
         
         buffer = null;
         
-        current = null;
+//        current = null;
         
         i = bufferCount = 0;
         

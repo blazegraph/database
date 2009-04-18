@@ -44,6 +44,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
+import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.RioLoaderEvent;
@@ -142,6 +143,10 @@ public class DataLoader {
      * by a temporary store which accumulates the {@link SPO}s to be asserted.
      * Otherwise it will write directly on the database each time it is flushed,
      * including when it overflows.
+     * 
+     * @todo this should be refactored as an {@link IStatementBufferFactory}
+     *       where the appropriate factory is required for TM vs non-TM
+     *       scenarios (or where the factory is parameterize for tm vs non-TM).
      */
     synchronized protected StatementBuffer getAssertionBuffer() {
 

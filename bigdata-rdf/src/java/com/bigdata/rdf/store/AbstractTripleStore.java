@@ -2355,10 +2355,18 @@ abstract public class AbstractTripleStore extends
      *            dump a {@link TempTripleStore} that is using the term
      *            dictionary of the main database).
      */
-    final public StringBuilder predicateUsage(AbstractTripleStore resolveTerms) {
+    final public StringBuilder predicateUsage(final AbstractTripleStore resolveTerms) {
 
+        if(getSPORelation().oneAccessPath) {
+            
+            // The POS index does not exist.
+            throw new UnsupportedOperationException();
+            
+        }
+        
         // visit distinct term identifiers for the predicate position.
-        final IChunkedIterator<Long> itr = getSPORelation().distinctTermScan(SPOKeyOrder.POS);
+        final IChunkedIterator<Long> itr = getSPORelation().distinctTermScan(
+                SPOKeyOrder.POS);
 
         // resolve term identifiers to terms efficiently during iteration.
         final BigdataValueIterator itr2 = new BigdataValueIteratorImpl(
@@ -2370,7 +2378,6 @@ abstract public class AbstractTripleStore extends
 
             while (itr.hasNext()) {
 
-//                final long p = itr.next();
                 final BigdataValue term = itr2.next();
 
                 final long p = term.getTermId();
@@ -2424,7 +2431,7 @@ abstract public class AbstractTripleStore extends
     final public StringBuilder dumpStore(AbstractTripleStore resolveTerms,
             boolean explicit, boolean inferred, boolean axioms) {
 
-        return dumpStore(resolveTerms, explicit, inferred, axioms, false);
+        return dumpStore(resolveTerms, explicit, inferred, axioms, false/* justifications */);
 
     }
 
@@ -2450,9 +2457,38 @@ abstract public class AbstractTripleStore extends
             final boolean inferred, final boolean axioms,
             final boolean justifications) {
 
+        return dumpStore(resolveTerms, explicit, inferred, axioms,
+                justifications, SPOKeyOrder.SPO);
+        
+    }
+ 
+    /**
+     * Dumps the store in a human readable format (not suitable for
+     * interchange).
+     * 
+     * @param resolveTerms
+     *            Used to resolve term identifiers to terms (you can use this to
+     *            dump a {@link TempTripleStore} that is using the term
+     *            dictionary of the main database).
+     * @param explicit
+     *            Show statements marked as explicit.
+     * @param inferred
+     *            Show statements marked inferred.
+     * @param axioms
+     *            Show statements marked as axioms.
+     * @param justifications
+     *            Dump the justifications index also.
+     * @param keyOrder
+     *            The access path to use.
+     */
+    final public StringBuilder dumpStore(
+            final AbstractTripleStore resolveTerms, final boolean explicit,
+            final boolean inferred, final boolean axioms,
+            final boolean justifications, final IKeyOrder<ISPO> keyOrder) {
+
         final StringBuilder sb = new StringBuilder();
         
-        final long nstmts = getStatementCount();
+        final long nstmts = getAccessPath(keyOrder).rangeCount(true/* exact */);
 
         long nexplicit = 0;
         long ninferred = 0;
@@ -2462,7 +2498,7 @@ abstract public class AbstractTripleStore extends
 
             // Full SPO scan efficiently resolving SPOs to BigdataStatements.
             final BigdataStatementIterator itr = resolveTerms
-                    .asStatementIterator(getAccessPath(NULL, NULL, NULL)
+                    .asStatementIterator(getAccessPath(keyOrder)
                             .iterator());
 
             int i = 0;
@@ -2520,49 +2556,6 @@ abstract public class AbstractTripleStore extends
                 }
                 
             }
-            
-// final ITupleIterator itr = getSPOIndex().rangeIterator();
-//
-// int i = 0;
-//
-//            while (itr.hasNext()) {
-//
-//                final SPO spo = (SPO)itr.next().getObject();
-//
-//                switch (spo.getStatementType()) {
-//
-//                case Explicit:
-//                    nexplicit++;
-//                    if (!explicit)
-//                        continue;
-//                    else
-//                        break;
-//
-//                case Inferred:
-//                    ninferred++;
-//                    if (!inferred)
-//                        continue;
-//                    else
-//                        break;
-//
-//                case Axiom:
-//                    naxioms++;
-//                    if (!axioms)
-//                        continue;
-//                    else
-//                        break;
-//
-//                default:
-//                    throw new AssertionError();
-//
-//                }
-//
-//                sb.append("#" + (i + 1) + "\t" + spo.toString(resolveTerms)
-//                        + "\n");
-//
-//                i++;
-//
-//            }
 
         }
 
@@ -2576,7 +2569,7 @@ abstract public class AbstractTripleStore extends
 
             while (itrj.hasNext()) {
 
-                Justification jst = (Justification)itrj.next().getObject();
+                final Justification jst = (Justification)itrj.next().getObject();
 
                 sb.append("#" + (njust + 1) //+ "\t"
                         + jst.toString(resolveTerms)+"\n");

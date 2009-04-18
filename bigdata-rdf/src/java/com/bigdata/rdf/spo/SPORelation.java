@@ -1114,7 +1114,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return c.get().longValue();
 
     }
-    
+
     /**
      * Return a buffer onto which a multi-threaded process may write chunks of
      * elements to be written on the relation asynchronously. Chunks will be
@@ -1159,6 +1159,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *       That suggests that the reverse index writes (ID2TERM and full text
      *       index) might be queued on a {@link BlockingBuffer} but that the
      *       TERM2ID index writes must be synchronous.
+     * 
+     * FIXME This should be asynchronous all the way down but it will have to
+     * wait on synchronous RPC for the TERM2ID index for SIDs _regardless_ of
+     * whether there are dependencies among the statements since statements MUST
+     * be assigned consistent SIDS.
      */
     synchronized public BlockingBuffer<ISPO[]> newWriteBuffer(final int chunkSize) {
 

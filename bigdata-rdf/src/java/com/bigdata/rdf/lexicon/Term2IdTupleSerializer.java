@@ -390,8 +390,11 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
          * 
          * @return The sort key for that RDF value.
          */
-        public byte[] value2Key(Value value) {
+        public byte[] value2Key(final Value value) {
 
+            if (value == null)
+                throw new IllegalArgumentException();
+            
             if (value instanceof URI) {
 
                 URI uri = (URI) value;
@@ -447,7 +450,8 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
 
             } else {
 
-                throw new AssertionError();
+                throw new AssertionError("Unknown value type: "
+                        + value.getClass());
 
             }
 

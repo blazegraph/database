@@ -76,6 +76,8 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestUnsynchronizedArrayBuffer.class);
         
+        suite.addTestSuite(TestUnsynchronizedUnboundedChunkBuffer.class);
+ 
         return suite;
         
     }

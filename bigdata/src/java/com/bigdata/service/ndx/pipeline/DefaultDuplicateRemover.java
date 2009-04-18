@@ -66,11 +66,12 @@ public class DefaultDuplicateRemover<O> implements IDuplicateRemover<O> {
                 if (i > 0 && BytesUtil.bytesEqual(src[i].key, src[i - 1].key)) {
 
                     // same key
-                    if (DEBUG)
-                        log.debug("duplicate key: " + src[i].key);
+                    if (log.isTraceEnabled())
+                        log.trace("duplicate key: "
+                                + BytesUtil.toString(src[i].key));
 
                     if (testRefs && src[i].obj != null
-                            && src[i - 1].obj == src[i].obj) {
+                            && src[i].obj == src[i - 1].obj) {
 
                         if (DEBUG)
                             log.debug("duplicate reference: " + src[i].obj);

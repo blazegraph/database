@@ -134,8 +134,8 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
         
         final int n = getKeyCount();
         
-        for(int i=0; i<n; i++) {
-    
+        for (int i = 0; i < n; i++) {
+
             // Note: the key is the term identifier.
             final byte[] key = getKey(i);
             

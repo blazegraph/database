@@ -9,8 +9,10 @@ import java.io.Reader;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
@@ -19,7 +21,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
  * Tasks either loads a RDF resource or verifies that the told triples found
  * in that resource are present in the database. The difference between data
  * load and data verify is just the behavior of the {@link StatementBuffer}
- * returned by {@link ConcurrentDataLoader#getStatementBuffer()}.
+ * returned by {@link ConcurrentDataLoader#newStatementBuffer()}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -167,7 +169,7 @@ public class ReaderTask implements Runnable {
         final long begin = System.currentTimeMillis();
 
         // get buffer - determines data load vs database validate.
-        final StatementBuffer buffer = bufferFactory.getStatementBuffer();
+        final IStatementBuffer<Statement> buffer = bufferFactory.newStatementBuffer();
         
         // make sure that the buffer is empty.
         buffer.reset();

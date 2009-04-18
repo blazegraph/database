@@ -62,7 +62,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("RDF Stores");
+        final TestSuite suite = new TestSuite("RDF Stores");
 
         /*
          * Run each of the kinds of triple stores through both their specific

@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -715,9 +714,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @param numTerms
      *            The #of terms in that array.
      * 
-     * @return An array of correlated key-value-object tuples. * Note that
-     *         {@link KVO#val} is <code>null</code> until we know that we need
-     *         to write it on the reverse index.
+     * @return An array of correlated key-value-object tuples.
+     *         <p>
+     *         Note that {@link KVO#val} is <code>null</code> until we know
+     *         that we need to write it on the reverse index.
      * 
      * @see LexiconKeyBuilder
      */
@@ -742,40 +742,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
 
 
-    /**
-     * Places {@link KVO}s containing {@link BigdataValue} references into an
-     * ordering determined by the assigned term identifiers}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @see BigdataValue#getTermId()
-     */
-    final static protected class KVOTermIdComparator implements
-            Comparator<KVO<BigdataValue>> {
-
-        public static final transient Comparator<KVO<BigdataValue>> INSTANCE = new KVOTermIdComparator();
-
-        /**
-         * Note: comparison avoids possible overflow of <code>long</code> by
-         * not computing the difference directly.
-         */
-        public int compare(final KVO<BigdataValue> term1,
-                final KVO<BigdataValue> term2) {
-
-            final long id1 = term1.obj.getTermId();
-            final long id2 = term2.obj.getTermId();
-
-            if (id1 < id2)
-                return -1;
-            if (id1 > id2)
-                return 1;
-            return 0;
-
-        }
-
-    }
-    
     /**
      * Batch insert of terms into the database.
      * <p>

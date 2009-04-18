@@ -33,7 +33,7 @@ public class VerifyStatementBufferFactory implements IStatementBufferFactory {
      * Return the {@link ThreadLocal} {@link StatementBuffer} to be used for a
      * task.
      */
-    public StatementBuffer getStatementBuffer() {
+    public StatementBuffer newStatementBuffer() {
 
         /*
          * Note: this is a thread-local so the same buffer object is always

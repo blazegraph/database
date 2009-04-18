@@ -194,7 +194,7 @@ public class Term2IdWriteTask implements
                 // run the procedure.
                 termIdIndex.submit(0/* fromIndex */, ndistinct/* toIndex */,
                         keys, null/* vals */, new Term2IdWriteProcConstructor(
-                                readOnly, r.storeBlankNodes, //scaleOutTermIds,
+                                readOnly, r.storeBlankNodes,
                                 r.termIdBitsToReverse),
                         new IResultHandler<Term2IdWriteProc.Result, Void>() {
 

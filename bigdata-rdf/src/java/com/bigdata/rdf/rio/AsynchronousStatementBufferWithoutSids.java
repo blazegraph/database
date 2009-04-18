@@ -29,6 +29,7 @@ package com.bigdata.rdf.rio;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -45,19 +46,26 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.lexicon.KVOTermIdComparator;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdWriteTask;
 import com.bigdata.rdf.lexicon.WriteTaskStats;
+import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
+import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOIndexWriteProc;
@@ -66,13 +74,21 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.accesspath.UnsynchronizedUnboundedChunkBuffer;
 import com.bigdata.service.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.DefaultDuplicateRemover;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * The asynchronous statement buffer w/o SIDs is much simpler. If we require
@@ -109,7 +125,12 @@ import com.bigdata.striterator.IChunkedIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME Write a variant which does support SIDs.
+ * FIXME Write a variant which does support SIDs. This should be asynchronous
+ * all the way down but it will have to wait on synchronous RPC for the TERM2ID
+ * index for SIDs _regardless_ of whether there are dependencies among the
+ * statements since statements MUST be assigned consistent SIDS before they may
+ * be written onto the statement indices. Review the code that is already
+ * handling this for better async efficiencies.
  * 
  * <pre>
  * AsynchronousStatementBufferWithSids:
@@ -225,29 +246,34 @@ import com.bigdata.striterator.IChunkedIterator;
  * </pre>
  * 
  * @todo evaluate this approach for writing on a local triple store. if there is
- *       a performance benefit then refactor accordingly.
+ *       a performance benefit then refactor accordingly (requires asynchronous
+ *       write API for BTree and friends).
+ * 
+ * @todo This is more chunk oriented than the {@link StatementBuffer}. In
+ *       particular, it only sorts chunks or things rather than everything that
+ *       was processed (the only exception right now is for the TERM2ID index,
+ *       but that should probably be fixed). This implies that merge sorts in
+ *       the chunk combiner are going to play more of a role since we are not
+ *       doing a full sort. Things are broken out this way in order to prevent
+ *       very large chunks of Values from being written out on the indices. This
+ *       should lead to more even performance.
  */
-public class AsynchronousStatementBufferWithoutSids implements
-        IStatementBuffer<Statement> {
+public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
+        implements IStatementBuffer<S> {
 
-    final protected static Logger log = Logger
+    final protected transient static Logger log = Logger
             .getLogger(AsynchronousStatementBufferWithoutSids.class);
 
-    final protected boolean INFO = log.isInfoEnabled();
+    final protected transient boolean INFO = log.isInfoEnabled();
 
-    final protected boolean DEBUG = log.isDebugEnabled();
+    final protected transient boolean DEBUG = log.isDebugEnabled();
     
-    private final Config config;
+    private final AsynchronousWriteConfiguration<S> asynchronousWriteConfiguration;
     
     private final AbstractTripleStore database;
     
     private final BigdataValueFactory valueFactory;
     
-    /**
-     * The total #of parsed statements so far.
-     */
-    private int statementCount;
-
     /**
      * A canonicalizing map for RDF {@link Value}s. The use of this map
      * provides a ~40% performance gain.
@@ -265,34 +291,17 @@ public class AsynchronousStatementBufferWithoutSids implements
     private Map<String, BigdataBNodeImpl> bnodes;
     
     /**
-     * A list of chunks of statements. Rather than bother to filter out
-     * duplicate statements, a chunk is allocted and appended to this list.
-     * Statements are added to the current chunk until it is full, then a new
-     * chunk is allocated.
-     * <p>
-     * Note: The statement chunks are always dense. All chunks except the last
-     * one will be entirely full. The last chunk is typically only partly full.
-     * Processing of the chunks can halt either by checking for a
-     * <code>null</code> {@link Statement} reference in the chunk or by
-     * comparing a counter against {@link #statementCount}.
+     * The total #of parsed statements so far.
+     * 
+     * {@link IBuffer}
      */
-    private List<BigdataStatement[]> statementChunks;
+    private int statementCount;
 
     /**
-     * The current chunk of statements -or- <code>null</code> if a chunk needs
-     * to be allocated. The chunk is always added to {@link #statementChunks}
-     * when it is allocated. The chunk size is determined by the
-     * {@link #initialCapacity}.
+     * Buffer used to accumulate chunks of statements.
      */
-    private BigdataStatement[] statementChunk = null;
-
-    /**
-     * The #of statements in the current chunk. When the chunk is full (as
-     * determined by this counter), a new chunk is allocated and added to the
-     * {@link #statementChunks} and this counter is reset to ZERO(0).
-     */
-    private int statementChunkCount = 0;
-
+    private UnsynchronizedUnboundedChunkBuffer<S> statements;
+    
     public final AbstractTripleStore getDatabase() {
         
         return database;
@@ -326,14 +335,15 @@ public class AsynchronousStatementBufferWithoutSids implements
     /**
      * 
      */
-    protected AsynchronousStatementBufferWithoutSids(final Config config) {
-            
-        if (config == null)
+    protected AsynchronousStatementBufferWithoutSids(
+            final AsynchronousWriteConfiguration<S> asynchronousWriteConfiguration) {
+
+        if (asynchronousWriteConfiguration == null)
             throw new IllegalArgumentException();
 
-        this.config = config;
+        this.asynchronousWriteConfiguration = asynchronousWriteConfiguration;
         
-        this.database = config.tripleStore;
+        this.database = asynchronousWriteConfiguration.tripleStore;
         
         this.valueFactory = database.getValueFactory();
         
@@ -389,14 +399,10 @@ public class AsynchronousStatementBufferWithoutSids implements
         
         values = null;
         
-        statementChunks = null;
-        
-        statementChunk = null;
-        
-        statementChunkCount = 0;
+        statements = null;
         
         statementCount = 0;
-        
+
     }
     
     public void setBNodeMap(final Map<String, BigdataBNodeImpl> bnodes) {
@@ -450,7 +456,7 @@ public class AsynchronousStatementBufferWithoutSids implements
 
     }
     
-    public void add(final Statement e) {
+    public void add(final S e) {
 
         add(e.getSubject(), e.getPredicate(), e.getObject(), e.getContext(),
                 (e instanceof BigdataStatement ? ((BigdataStatement) e)
@@ -476,7 +482,7 @@ public class AsynchronousStatementBufferWithoutSids implements
              * a private map it does not need to be thread-safe.
              */
             bnodes = new HashMap<String, BigdataBNodeImpl>(
-                    config.bnodesInitialCapacity);
+                    asynchronousWriteConfiguration.bnodesInitialCapacity);
 
             // fall through.
             
@@ -496,7 +502,10 @@ public class AsynchronousStatementBufferWithoutSids implements
                 return tmp;
                 
             }
-            
+
+            if (DEBUG)
+                log.debug("added: " + bnode);
+
             // was inserted into the map.
             return bnode;
 
@@ -518,6 +527,9 @@ public class AsynchronousStatementBufferWithoutSids implements
 
             // insert this blank node into the map.
             bnodes.put(id, bnode);
+
+            if (DEBUG)
+                log.debug("added: " + bnode);
 
             // was inserted into the map.
             return bnode;
@@ -541,11 +553,21 @@ public class AsynchronousStatementBufferWithoutSids implements
      * @return Either the term or the pre-existing term in the buffer with the
      *         same data.
      */
-    private BigdataValue getCanonicalValue(BigdataValue term) {
+    private BigdataValue getCanonicalValue(final BigdataValue term0) {
 
-        if (term instanceof BNode) {
+        if (term0 == null) {
 
-            term = getCanonicalBNode((BigdataBNodeImpl) term);
+            // Note: This handles an empty context position.
+            return term0;
+            
+        }
+        
+        final BigdataValue term;
+
+        if (term0 instanceof BNode) {
+
+            // impose canonicalizing mapping for blank nodes.
+            term = getCanonicalBNode((BigdataBNodeImpl) term0);
 
             /*
              * Fall through.
@@ -555,6 +577,11 @@ public class AsynchronousStatementBufferWithoutSids implements
              * blank nodes as well.
              */
 
+        } else {
+            
+            // not a blank node.
+            term = term0;
+            
         }
 
         if (values == null) {
@@ -567,12 +594,12 @@ public class AsynchronousStatementBufferWithoutSids implements
              */
 
             values = new LinkedHashMap<Value, BigdataValue>(
-                    config.valuesInitialCapacity);
+                    asynchronousWriteConfiguration.valuesInitialCapacity);
 
         }
 
         /*
-         * Impose a canonicalizing mapping on the terms.
+         * Impose a canonicalizing mapping on the term.
          */
         
         final BigdataValue tmp = values.get(term);
@@ -591,6 +618,9 @@ public class AsynchronousStatementBufferWithoutSids implements
 
         }
 
+        if (DEBUG)
+            log.debug("n=" + values.size() + ", added: " + term);
+        
         // return the new term.
         return term;
 
@@ -615,8 +645,8 @@ public class AsynchronousStatementBufferWithoutSids implements
      * 
      * @see #nearCapacity()
      */
-    private void handleStatement(Resource s, URI p, Value o, Resource c,
-            StatementEnum type) {
+    private void handleStatement(final Resource s, final URI p, final Value o,
+            final Resource c, final StatementEnum type) {
 
         _handleStatement(
                 (Resource) getCanonicalValue((BigdataResource)valueFactory.asValue(s)),//
@@ -632,31 +662,27 @@ public class AsynchronousStatementBufferWithoutSids implements
      * bindings which were (a) allocated by the valueFactory and (b) are
      * canonical for the scope of this document.
      */
-    private void _handleStatement(Resource s, URI p, Value o, Resource c,
-            StatementEnum type) {
+    private void _handleStatement(final Resource s, final URI p, final Value o,
+            final Resource c, final StatementEnum type) {
 
         final BigdataStatement stmt = valueFactory.createStatement(
                 (BigdataResource) s, (BigdataURI) p, (BigdataValue) o,
                 (BigdataResource) c, type);
 
-        if (statementChunk == null
-                || statementChunkCount + 1 == statementChunk.length) {
-
-            // Start a new chunk of statements.
-
-            statementChunkCount = 0;
-
-            statementChunk = new BigdataStatement[config.statementChunkCapacity];
-
-            statementChunks.add(statementChunk);
-
+        if (statements == null) {
+            
+            statements = new UnsynchronizedUnboundedChunkBuffer<S>(
+                    asynchronousWriteConfiguration.statementChunkCapacity);
+            
         }
-
-        // add to the current chunk.
-        statementChunk[statementChunkCount++] = stmt;
-
+        
+        statements.add((S) stmt);
+        
         // total #of statements accepted.
         statementCount++;
+
+        if (DEBUG)
+            log.debug("n=" + statementCount + ", added: " + stmt);
 
     }
 
@@ -671,10 +697,12 @@ public class AsynchronousStatementBufferWithoutSids implements
      */
     private void write() throws Exception {
 
-        // dense array of the distinct terms.
-        final BigdataValue[] values = this.values.values().toArray(
-                new BigdataValue[0]);
-
+        if (INFO) {
+            log.info("bnodeCount=" + (bnodes == null ? 0 : bnodes.size())
+                    + ", values=" + values.size() + ", statementCount="
+                    + statementCount);
+        }
+        
         /*
          * Synchronous RPC.
          * 
@@ -682,10 +710,20 @@ public class AsynchronousStatementBufferWithoutSids implements
          * to the {@link BigdataValue}s. We CAN NOT write on the other indices
          * until we have those TIDs.
          */
-        
-        final KVO<BigdataValue>[] a = new Term2IdWriteTask(
-                config.lexiconRelation, false/* readOnly */, values.length,
-                values, new WriteTaskStats()).call();
+        {
+
+            // @todo should feed in a chunked iterator.
+            
+            // dense array of the distinct terms.
+            final BigdataValue[] values = this.values.values().toArray(
+                    new BigdataValue[0]);
+
+            final KVO<BigdataValue>[] a = new Term2IdWriteTask(
+                    asynchronousWriteConfiguration.lexiconRelation,
+                    false/* readOnly */, values.length, values,
+                    new WriteTaskStats()).call();
+            
+        }
 
         /*
          * Setup tasks which can run asynchronously. These tasks have no
@@ -698,41 +736,61 @@ public class AsynchronousStatementBufferWithoutSids implements
          * that task is complete all it means is that the data are now buffered
          * on the asynchronous write buffer for the appropriate index. It DOES
          * NOT mean that those writes are complete.
+         * 
+         * Note: These tasks all process iterators. This approach was choosen to
+         * isolate the tasks (which queue data for asynchronous writes) from the
+         * data structures in this IStatementBuffer implementation. An example
+         * of something which WOULD NOT work is if these tasks were inner
+         * classes accessing the instance fields on this class since reset()
+         * would clear those fields which might cause spontaneous failures
+         * within ongoing processing.
          */
         final List<Callable> tasks = new LinkedList<Callable>();
 
-        // @todo should break writes on buffer into chunks (or the buffer could do
-        //       that).
-        // FIXME ID2T
-//        tasks.add(new AsyncID2TermWriteTask());
+        tasks.add(new AsyncId2TermIndexWriteTask(valueFactory, newId2TIterator(
+                values.values().iterator(),
+                asynchronousWriteConfiguration.id2termChunkCapacity),
+                asynchronousWriteConfiguration.buffer_id2t));
 
-        if (config.buffer_text != null) {
+        if (asynchronousWriteConfiguration.buffer_text != null) {
 
             // FIXME full text index.
+            throw new UnsupportedOperationException();
 //            tasks.add(new AsyncTextWriteTask());
 
         }
 
         tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.SPO,
-                config.buffer_spo));
+                asynchronousWriteConfiguration.spoRelation,
+                (IChunkedOrderedIterator<ISPO>) statements.iterator(),
+                asynchronousWriteConfiguration.buffer_spo));
 
-        if (config.buffer_pos != null) {
+        if (asynchronousWriteConfiguration.buffer_pos != null) {
 
             tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.POS,
-                    config.buffer_pos));
+                    asynchronousWriteConfiguration.spoRelation,
+                    (IChunkedOrderedIterator<ISPO>) statements.iterator(),
+                    asynchronousWriteConfiguration.buffer_pos));
 
         }
 
-        if (config.buffer_osp != null) {
+        if (asynchronousWriteConfiguration.buffer_osp != null) {
 
             tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.OSP,
-                    config.buffer_osp));
+                    asynchronousWriteConfiguration.spoRelation,
+                    (IChunkedOrderedIterator<ISPO>) statements.iterator(),
+                    asynchronousWriteConfiguration.buffer_osp));
 
         }
 
-        // submit all tasks : they will run in parallel.
-        final List<Future> futures = config.tripleStore
-                .getExecutorService().invokeAll(tasks);
+        /*
+         * Submit all tasks. They will run in parallel. If they complete
+         * successfully then all we know is that the data has been buffered for
+         * asynchronous writes on the various indices.
+         */
+        @SuppressWarnings("unchecked")
+        final List<Future> futures = asynchronousWriteConfiguration.tripleStore.getExecutorService()
+                .invokeAll(tasks);
 
         // make sure that no errors were reported by those tasks.
         for (Future f : futures) {
@@ -744,6 +802,143 @@ public class AsynchronousStatementBufferWithoutSids implements
     }
 
     /**
+     * Wrap a {@link BigdataValue}[] with a chunked iterator which filters out
+     * blank nodes (blank nodes are not written onto the reverse index).
+     */
+    @SuppressWarnings("unchecked")
+    static <V extends BigdataValue> IChunkedIterator<V> newId2TIterator(
+            final Iterator<V> itr, final int chunkSize) {
+
+        return new ChunkedWrappedIterator(new Striterator(itr)
+                .addFilter(new Filter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    /*
+                     * Filter hides blank nodes since we do not write them onto
+                     * the reverse index.
+                     */
+                    @Override
+                    protected boolean isValid(Object obj) {
+
+                        return !(obj instanceof BNode);
+                        
+                    }
+
+                }), chunkSize, BigdataValue.class);
+
+    }
+    
+    /**
+     * Asynchronous writes on the ID2TERM index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class AsyncId2TermIndexWriteTask implements Callable<Void> {
+
+        final protected transient static Logger log = Logger
+                .getLogger(AsyncId2TermIndexWriteTask.class);
+
+        final protected transient boolean INFO = log.isInfoEnabled();
+
+        final protected transient boolean DEBUG = log.isDebugEnabled();
+
+        private final BigdataValueFactory valueFactory;
+
+        private final IChunkedIterator<BigdataValue> src;
+
+        private final BlockingBuffer<KVO<BigdataValue>[]> buffer;
+
+        /**
+         * 
+         * @param src
+         *            The visits chunks of distinct {@link Value}s with their
+         *            TIDs assigned. Blank nodes will automatically be filtered
+         *            out.
+         */
+        public AsyncId2TermIndexWriteTask(
+                final BigdataValueFactory valueFactory,
+                final IChunkedIterator<BigdataValue> src,
+                final BlockingBuffer<KVO<BigdataValue>[]> buffer) {
+
+            this.valueFactory = valueFactory;
+
+            this.src = src;
+            
+            this.buffer = buffer;
+
+        }
+        
+        public Void call() throws Exception {
+
+            // used to serialize the Values for the BTree.
+            final BigdataValueSerializer<BigdataValue> ser = valueFactory.getValueSerializer();
+            
+            // thread-local key builder removes single-threaded constraint.
+            final IKeyBuilder tmp = KeyBuilder.newInstance(Bytes.SIZEOF_LONG);
+
+            // buffer is reused for each serialized term.
+            final DataOutputBuffer out = new DataOutputBuffer();
+
+            while (src.hasNext()) {
+
+                final BigdataValue[] chunkIn = src.nextChunk();
+
+                final KVO<BigdataValue>[] chunkOut = new KVO[chunkIn.length];
+
+                int i = 0;
+
+                for (BigdataValue v : chunkIn) {
+
+                    assert v != null;
+                    
+                    if(v instanceof BNode) {
+
+                        // Do not write blank nodes on the reverse index.
+                        continue;
+                        
+                    }
+                    
+                    if (v.getTermId() == IRawTripleStore.NULL) {
+
+                        throw new RuntimeException("No TID: " + v);
+                        
+                    }
+
+                    final byte[] key = tmp.reset().append(v.getTermId())
+                            .getKey();
+
+                    // Serialize the term.
+                    final byte[] val = ser.serialize(v, out.reset());
+
+                    chunkOut[i++] = new KVO<BigdataValue>(key, val, v);
+                    
+                }
+
+                // make dense.
+                final KVO<BigdataValue>[] dense = KVO.dense(chunkOut, i);
+
+                /*
+                 * Put into term identifier order in preparation for writing on
+                 * the reverse index.
+                 */
+                Arrays.sort(dense, 0, dense.length,
+                        KVOTermIdComparator.INSTANCE);
+
+                // add chunk to async write buffer
+                buffer.add(dense);
+                
+            }
+
+            // Done.
+            return null;
+            
+        }
+        
+    }
+    
+    /**
      * Writes the statement chunks onto the specified statement index using the
      * asynchronous write API.
      * <p>
@@ -752,31 +947,28 @@ public class AsynchronousStatementBufferWithoutSids implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo Modify the outer class to write the statements onto a buffer which
-     *       automatically breaks them down into chunks and which is capabale of
-     *       returning an {@link IChunkedIterator}. This will connect the
-     *       chunked paradigm for producers with the chunked paradigm for
-     *       consumers. Then this (inner) class can be made static and reused
-     *       easily.
-     *       <p>
-     *       Note: We really need to do the same thing with the values[] since
-     *       we want to feed it into a chunked buffer. However, since it has
-     *       been reshaped into: (a) a value[]; and (b) a KVO[] that is dense
-     *       and distinct, we can just use those and save some effort.
      */
-    class AsyncSPOIndexWriteTask implements Callable<Void> {
+    static class AsyncSPOIndexWriteTask implements Callable<Void> {
 
-        private final SPOKeyOrder keyOrder;
+        final protected transient static Logger log = Logger
+                .getLogger(AsyncSPOIndexWriteTask.class);
 
-        // Note: Not used, but programmed in.
-        private final IElementFilter<ISPO> filter = null;
+        final protected transient boolean INFO = log.isInfoEnabled();
+
+        final protected transient boolean DEBUG = log.isDebugEnabled();
+
+        private final IKeyOrder<ISPO> keyOrder;
+
+        private final IChunkedOrderedIterator<ISPO> src;
 
         private final BlockingBuffer<KVO<ISPO>[]> writeBuffer;
 
         private final SPOTupleSerializer tupleSer;
         
-        public AsyncSPOIndexWriteTask(final SPOKeyOrder keyOrder,
+        public AsyncSPOIndexWriteTask(
+                final IKeyOrder<ISPO> keyOrder,
+                final SPORelation spoRelation,
+                final IChunkedOrderedIterator<ISPO> src,
                 final BlockingBuffer<KVO<ISPO>[]> writeBuffer) {
 
             if (keyOrder == null)
@@ -786,50 +978,42 @@ public class AsynchronousStatementBufferWithoutSids implements
                 throw new IllegalArgumentException();
             
             this.keyOrder = keyOrder;
+
+            this.src = src;
             
             this.writeBuffer = writeBuffer;
             
             // the tuple serializer for this access path.
-            this.tupleSer = (SPOTupleSerializer) config.tripleStore
-                    .getSPORelation().getIndex(keyOrder).getIndexMetadata()
-                    .getTupleSerializer();
+            this.tupleSer = (SPOTupleSerializer) spoRelation.getIndex(keyOrder)
+                    .getIndexMetadata().getTupleSerializer();
             
         }
         
         public Void call() throws Exception {
+
+            long chunksOut = 0;
+            long elementsOut = 0;
             
             final ByteArrayBuffer vbuf = new ByteArrayBuffer(1+8/*max length*/);
-            
-            int i = 0;
-            
-            ISPO last = null;
-            
-            for (BigdataStatement[] chunk : statementChunks) {
 
-                final KVO<ISPO>[] a = new KVO[statementCount];
+            while(src.hasNext()) {
 
-                int j = 0;
-                
-                for (ISPO spo : chunk) {
+                // next chunk, in the specified order.
+                final ISPO[] chunk = src.nextChunk(keyOrder);
 
-                    // done?
-                    if (i == statementCount)
-                        break;
+                // note: a[] will be dense since nothing is filtered.
+                final KVO<ISPO>[] a = new KVO[chunk.length];
+
+                for (int i = 0; i < chunk.length; i++) {
+                    
+                    final ISPO spo = chunk[i];
                     
                     if (spo == null)
-                        throw new IllegalArgumentException("null @ index=" + i);
+                        throw new IllegalArgumentException();
 
                     if (!spo.isFullyBound())
                         throw new IllegalArgumentException("Not fully bound: "
                                 + spo.toString());
-
-                    // skip statements that match the filter.
-                    if (filter != null && filter.accept(spo))
-                        continue;
-
-                    // skip duplicate records.
-                    if (last != null && last.equals(spo))
-                        continue;
 
                     // generate key for the index.
                     final byte[] key = tupleSer.statement2Key(keyOrder, spo);
@@ -837,67 +1021,97 @@ public class AsynchronousStatementBufferWithoutSids implements
                     // generate value for the index.
                     final byte[] val = spo.serializeValue(vbuf);
 
-                    a[j++] = new KVO<ISPO>(key, val, spo);
-
-                    last = spo;
+                    a[i] = new KVO<ISPO>(key, val, spo);
 
                 }
 
-                // empty chunk?
-                if (j == 0)
-                    continue;
-                
-                /*
-                 * Make the chunk dense.
-                 */
-                final KVO<ISPO>[] b;
+                // put chunk into sorted order based on assigned keys.
+                Arrays.sort(a);
 
-                if (j != a.length) {
+                // write chunk on the buffer.
+                writeBuffer.add(a);
 
-                    b = new KVO[j];
-                    
-                    System
-                            .arraycopy(a, 0/* srcpos */, b, 0/*dstpos*/, j/*len*/);
-                    
-                } else {
-                    
-                    b = a;
-                    
-                }
-                
-                // put the chunk into sorted order.
-                Arrays.sort(b);
-                
-                // write the chunk on the buffer.
-                writeBuffer.add(b);
+                chunksOut++;
+                elementsOut += a.length;
+
+                if (DEBUG)
+                    log.debug("Wrote chunk: index=" + keyOrder + ", chunksOut="
+                            + chunksOut + ", elementsOut=" + elementsOut
+                            + ", chunkSize=" + a.length);
+
+                if (log.isTraceEnabled())
+                    log.trace("Wrote: index=" + keyOrder + ", chunk="
+                            + Arrays.toString(a));
 
             }
+
+            if (DEBUG)
+                log.debug("Done: index=" + keyOrder + ", chunksOut="
+                        + chunksOut + ", elementsOut=" + elementsOut);
             
+            // done.
             return null;
 
         }
         
     }
-    
+
     /**
-     * Configuration object specifies the {@link BlockingBuffer}s which will be
-     * used to write on each of the indices and the reference for the TERM2ID
-     * index since we will use synchronous RPC on that index. The same
-     * {@link Config} may be used for multiple concurrent
-     * {@link AsynchronousStatementBufferWithoutSids} instances.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * Factory interface for asynchronous writers on an {@link ITripleStore}.
      * 
      * @todo add a factory method returning an interface or abstract class
      *       provides whatever configuration is relevant given the
      *       {@link ScaleOutTripleStore} and also provides a factory for
      *       {@link IStatementBuffer}s based on that configuration.
+     */
+    public static interface IAsynchronousWriteConfiguration<S extends Statement>
+            extends IStatementBufferFactory<S> {
+
+        /**
+         * Return a new {@link IStatementBuffer} which may be used to bulk load
+         * RDF data. The writes will proceed asynchronously using buffers shared
+         * by all {@link IStatementBuffer}s returned by this factory for a
+         * given instance of this class. Each {@link IStatementBuffer} MAY be
+         * recycled using {@link IBuffer#reset()} or simply discarded after its
+         * use.
+         */
+        public IStatementBuffer<S> newStatementBuffer();
+
+        /**
+         * Cancel all {@link Future}s.
+         * 
+         * @param mayInterruptIfRunning
+         */
+        public void cancelAll(final boolean mayInterruptIfRunning);
+
+        /**
+         * Close the {@link BlockingBuffer}s and await their {@link Future}s.
+         * 
+         * @throws ExecutionException
+         *             if any {@link Future} fails.
+         * 
+         * @throws InterruptedException
+         *             if interrupted while awaiting any of the {@link Future}s.
+         */
+        public void awaitAll() throws InterruptedException, ExecutionException;
+        
+    }
+
+    /**
+     * Configuration object specifies the {@link BlockingBuffer}s which will be
+     * used to write on each of the indices and the reference for the TERM2ID
+     * index since we will use synchronous RPC on that index. The same
+     * {@link AsynchronousWriteConfiguration} may be used for multiple
+     * concurrent {@link AsynchronousStatementBufferWithoutSids} instances.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      * 
      * @todo this is already setup such that it would be easy to parameterize
      *       for TM.
      */
-    public static class Config {
+    public static class AsynchronousWriteConfiguration<S extends BigdataStatement> implements
+            IAsynchronousWriteConfiguration<S> {
        
         private final ScaleOutTripleStore tripleStore;
         
@@ -905,10 +1119,6 @@ public class AsynchronousStatementBufferWithoutSids implements
 
         private final SPORelation spoRelation;
         
-        final int indexWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
-
-        final int indexPartitionWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
-
         /**
          * The initial capacity of the canonicalizing mapping for RDF
          * {@link Value}.
@@ -927,10 +1137,18 @@ public class AsynchronousStatementBufferWithoutSids implements
          * Note: This directly governs the size of the {@link KVO}[] chunks
          * written onto the {@link BlockingBuffer}s for the statement indices.
          */
-        final int statementChunkCapacity = BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE;
-        
-        private final IIndex term2Id;
-        private final BlockingBuffer<KVO<BigdataValue>[]> buffer_t2id;
+        final int statementChunkCapacity;
+
+        /**
+         * The chunk size for ID2TERM async writes.
+         */
+        final int id2termChunkCapacity;
+
+        final int indexWriteQueueCapacity;
+
+        final int indexPartitionWriteQueueCapacity;
+
+        private final BlockingBuffer<KVO<BigdataValue>[]> buffer_id2t;
         private final BlockingBuffer<KVO<BigdataValue>[]> buffer_text;
         private final BlockingBuffer<KVO<ISPO>[]> buffer_spo;
         private final BlockingBuffer<KVO<ISPO>[]> buffer_pos;
@@ -938,17 +1156,9 @@ public class AsynchronousStatementBufferWithoutSids implements
         
         private final LongAggregator statementResultHandler = new LongAggregator();
 
-        /**
-         * Return a new {@link IStatementBuffer} which may be used to bulk load
-         * RDF data. The writes will proceed asynchronously using buffers shared
-         * by all {@link IStatementBuffer}s returned by this factory for a
-         * given instance of this class. Each {@link IStatementBuffer} MAY be
-         * recycled using {@link IBuffer#reset()} or simply discarded after its
-         * use.
-         */
-        public IStatementBuffer<Statement> newStatementBuffer() {
+        public IStatementBuffer<S> newStatementBuffer() {
 
-            return new AsynchronousStatementBufferWithoutSids(this);
+            return new AsynchronousStatementBufferWithoutSids<S>(this);
 
         }
 
@@ -970,7 +1180,8 @@ public class AsynchronousStatementBufferWithoutSids implements
             
         }
 
-        public Config(final ScaleOutTripleStore tripleStore) {
+        public AsynchronousWriteConfiguration(final ScaleOutTripleStore tripleStore,
+                final int writeChunkSize) {
 
             if (tripleStore == null)
                 throw new IllegalArgumentException();
@@ -981,25 +1192,42 @@ public class AsynchronousStatementBufferWithoutSids implements
 
             this.spoRelation = tripleStore.getSPORelation();
 
-            this.term2Id = lexiconRelation.getTerm2IdIndex();
-
+            this.id2termChunkCapacity=writeChunkSize;
+            
+            this.statementChunkCapacity = writeChunkSize;
+            
+            this.indexWriteQueueCapacity = writeChunkSize;
+            
+            this.indexPartitionWriteQueueCapacity = writeChunkSize;
+            
             if (tripleStore.isStatementIdentifiers()) {
 
                 throw new UnsupportedOperationException("SIDs not supported");
                 
             }
             
-            // FIXME ID2T and Text indices.
-            this.buffer_t2id = null;
-            this.buffer_text = null;
-            
-//            this.buffer_t2id = ((IScaleOutClientIndex) lexiconRelation.getId2TermIndex()).newWriteBuffer(
-//                    indexWriteQueueCapacity, indexPartitionWriteQueueCapacity,
-//                    resultHandler, new DefaultDuplicateRemover<BigdataValue>(
-//                            true/* testRefs */), ctor);
-//
-//            if (tripleStore.getLexiconRelation().isTextIndex()) {
-//
+            this.buffer_id2t = ((IScaleOutClientIndex) lexiconRelation
+                    .getId2TermIndex())
+                    .newWriteBuffer(
+                            indexWriteQueueCapacity,
+                            indexPartitionWriteQueueCapacity,
+                            null/* resultHandler */,
+                            new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
+                            Id2TermWriteProcConstructor.INSTANCE);
+
+            if (tripleStore.getLexiconRelation().isTextIndex()) {
+
+                /*
+                 * FIXME text index. This can be partly handled by factoring out
+                 * a filter to be applied to a striterator. However, true async
+                 * writes need to reach into the full text index package.
+                 * Probably there should be a KVO ctor which knows how to form
+                 * the key and value from the object for a given index, e.g.,
+                 * using the tupleSerializer. I could probably clean things up
+                 * enourmously in that manner and just write filters rather than
+                 * custom glue for sync and async index writes.
+                 */
+                throw new UnsupportedOperationException();
 //                this.buffer_text = ((IScaleOutClientIndex) lexiconRelation.getId2TermIndex())
 //                        .newWriteBuffer(
 //                                indexWriteQueueCapacity,
@@ -1007,12 +1235,12 @@ public class AsynchronousStatementBufferWithoutSids implements
 //                                resultHandler,
 //                                new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
 //                                ctor);
-//                
-//            } else {
-//                
-//                this.buffer_text = null;
-//                
-//            }
+                
+            } else {
+                
+                this.buffer_text = null;
+                
+            }
 
             this.buffer_spo = ((IScaleOutClientIndex) spoRelation.getSPOIndex())
                     .newWriteBuffer(
@@ -1050,14 +1278,12 @@ public class AsynchronousStatementBufferWithoutSids implements
 
         }
         
-        /**
-         * Cancel all {@link Future}s.
-         * 
-         * @param mayInterruptIfRunning
-         */
         public void cancelAll(final boolean mayInterruptIfRunning) {
 
-            buffer_t2id.getFuture().cancel(mayInterruptIfRunning);
+            if(log.isInfoEnabled())
+                log.info("Cancelling futures.");
+
+            buffer_id2t.getFuture().cancel(mayInterruptIfRunning);
 
             if (buffer_text != null)
                 buffer_text.getFuture().cancel(mayInterruptIfRunning);
@@ -1073,21 +1299,15 @@ public class AsynchronousStatementBufferWithoutSids implements
         }
 
         /**
-         * Close the {@link BlockingBuffer}s and await their {@link Future}s.
-         * 
-         * @throws ExecutionException
-         *             if any {@link Future} fails.
-         * 
-         * @throws InterruptedException
-         *             if interrupted while awaiting any of the {@link Future}s.
+         * Close buffers and then await their {@link Future}s. Once closed, the
+         * buffers will not accept further input.
          */
         public void awaitAll() throws InterruptedException, ExecutionException {
 
-            /*
-             * Close buffers. Once closed, they will not accept further input.
-             */
+            if(log.isInfoEnabled())
+                log.info("Closing buffers.");
             
-            buffer_t2id.close();
+            buffer_id2t.close();
             
             if (buffer_text != null)
                 buffer_text.close();
@@ -1103,8 +1323,11 @@ public class AsynchronousStatementBufferWithoutSids implements
             /*
              * Await futures.
              */
-            
-            buffer_t2id.getFuture().get();
+
+            if(log.isInfoEnabled())
+                log.info("Awaiting futures.");
+
+            buffer_id2t.getFuture().get();
 
             if (buffer_text != null)
                 buffer_text.getFuture().get();

@@ -129,7 +129,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
     public void test_rdfXmlInterchange() throws SailException,
             RDFHandlerException, IOException {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
 
         try {
 
@@ -162,9 +162,10 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
      * @throws RDFHandlerException
      * @throws IOException
      */
-    public void test_blankNodeHandling() throws SailException, RDFHandlerException, IOException {
+    public void test_blankNodeHandling() throws SailException,
+            RDFHandlerException, IOException {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
 
         try {
 
@@ -212,9 +213,9 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         final BNode _bigdata = new BNodeImpl("_bigdata");
 
         /**
-         * Accepts a triple pattern and returns the matching statement. Throws an
-         * exception if there is no matching statement or if there is more than one
-         * matching statement.
+         * Accepts a triple pattern and returns the matching statement. Throws
+         * an exception if there is no matching statement or if there is more
+         * than one matching statement.
          * 
          * @param store
          * @param s
@@ -223,8 +224,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
          * @return
          * @throws SailException
          */
-        public BigdataStatement getOnlyStatement(AbstractTripleStore store,Resource s, URI p, Value o)
-                throws SailException {
+        public BigdataStatement getOnlyStatement(AbstractTripleStore store,
+                Resource s, URI p, Value o) throws SailException {
 
             final BigdataStatementIterator itr = store.getStatements(s, p, o);
 
@@ -262,9 +263,9 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
         }
         
         /**
-         * Accepts a triple pattern and returns the matching statement. Throws an
-         * exception if there is no matching statement or if there is more than one
-         * matching statement.
+         * Accepts a triple pattern and returns the matching statement. Throws
+         * an exception if there is no matching statement or if there is more
+         * than one matching statement.
          * 
          * @param store
          * @param s
@@ -273,10 +274,12 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
          * @return
          * @throws SailException
          */
-       private BigdataStatement getOnlyStatement(AbstractTripleStore store, long s, long p, long o) {
+        private BigdataStatement getOnlyStatement(AbstractTripleStore store,
+                long s, long p, long o) {
 
-            final IChunkedOrderedIterator<ISPO> itr = store.getAccessPath(s, p, o).iterator();
-            
+            final IChunkedOrderedIterator<ISPO> itr = store.getAccessPath(s, p,
+                    o).iterator();
+
             try {
 
                 if (!itr.hasNext()) {
@@ -547,7 +550,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
      * @throws RDFHandlerException
      * @throws IOException
      */
-    protected void doStatementIdentifiersTest(AbstractTripleStore store)
+    protected void doStatementIdentifiersTest(final AbstractTripleStore store)
             throws SailException, RDFHandlerException, IOException {
 
         assert store.getStatementIdentifiers() == true;
