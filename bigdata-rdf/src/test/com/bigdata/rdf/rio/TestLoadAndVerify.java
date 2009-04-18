@@ -27,17 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rio;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
@@ -45,14 +40,10 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
  * Test loads an RDF/XML resource into a database and then verifies by re-parse
  * that all expected statements were made persistent in the database.
  * 
- * @todo this test will probably fail if the source data contains bnodes since
- *       it does not validate bnodes based on consistent RDF properties but only
- *       based on their Java fields.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
+public class TestLoadAndVerify extends AbstractRIOTestCase {
 
     /**
      * 
@@ -76,8 +67,8 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
         
         final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf";
 
-        doLoadAndVerifyTest( resource );
-        
+        doLoadAndVerifyTest(resource);
+
     }
 
     /**
@@ -113,11 +104,31 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
         doLoadAndVerifyTest( file );
         
     }
-   
+
+    /**
+     * Note: This allows an override of the properties that effect the data
+     * load, in particular whether or not the full text index and statement
+     * identifiers are maintained. It can be useful to disable those features in
+     * order to estimate the best load rate for a data set.
+     */
+    protected AbstractTripleStore getStore() {
+
+        final Properties properties = new Properties(getProperties());
+
+        // properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX,
+        // "false");
+        //
+        // properties.setProperty(
+        // AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
+
+        return getStore(properties);
+
+    }
+    
     /**
      * Test loads an RDF/XML resource into a database and then verifies by
      * re-parse that all expected statements were made persistent in the
-     * database. 
+     * database.
      * 
      * @param resource
      * 
@@ -125,66 +136,11 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
      */
     protected void doLoadAndVerifyTest(final String resource) throws Exception {
 
-//        assertTrue("File not found? file=" + resource, new File(resource).exists());
+        AbstractTripleStore store = getStore();
 
-        AbstractTripleStore store;
-        {
-
-            /*
-             * Note: This allows an override of the properties that effect the
-             * data load, in particular whether or not the full text index and
-             * statement identifiers are maintained. It can be useful to disable
-             * those features in order to estimate the best load rate for a data
-             * set.
-             */
-            
-            final Properties properties = new Properties(getProperties());
-
-//            properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX,
-//                    "false");
-//
-//            properties.setProperty(
-//                    AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
-
-            store = getStore(properties);
-            
-        }
-        
         try {
 
-            /*
-             * Load the file.
-             * 
-             * Note: Normally we disable closure for this test, but that is not
-             * critical. If you compute the closure of the data set then there
-             * will simply be additional statements whose self-consistency among
-             * the statement indices will be verified, but it will not verify
-             * the correctness of the closure.
-             * 
-             * What is actually verified is that all statements that are
-             * re-parsed are found in the KB, that the lexicon is
-             * self-consistent, and that the statement indices are
-             * self-consistent. The test does NOT reject a KB which has
-             * statements not found during the re-parse since there can be
-             * axioms and other stuff in the KB.
-             */
-            {
-
-                // avoid modification of the properties.
-                final Properties properties = new Properties(getProperties());
-
-                // turn off RDFS closure for this test.
-                properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
-                
-                final DataLoader dataLoader = new DataLoader(properties, store);
-
-                // load into the datbase.
-                dataLoader.loadData(resource, "" /* baseURI */, RDFFormat.RDFXML);
-
-//                // database-at-once closure (optional for this test).
-//                store.getInferenceEngine().computeClosure(null/*focusStore*/);
-                
-            }
+            load(store, resource);
 
             store.commit();
 
@@ -194,44 +150,42 @@ public class TestLoadAndVerify extends AbstractTripleStoreTestCase {
 
             }
 
-            if (log.isInfoEnabled()) {
-                log.info("computing predicate usage.");
-                log.info("\n" + store.predicateUsage());
-            }
-
-            /*
-             * re-parse and verify all statements exist in the db using each
-             * statement index.
-             */
-            final AtomicInteger nerrs = new AtomicInteger(0);
-            final int maxerrors = 20;
-            {
-
-                log.info("Verifying all statements found using reparse: file="+resource);
-                
-                // buffer capacity (#of statements per batch).
-                final int capacity = 100000;
-
-                final IRioLoader loader = new StatementVerifier(store,
-                        capacity, nerrs, maxerrors);
-
-                loader.loadRdf(new BufferedReader(new InputStreamReader(
-                        new FileInputStream(resource))), ""/* baseURI */,
-                        RDFFormat.RDFXML, false/* verify */);
-
-                log.info("End of reparse: nerrors="+nerrs+", file="+resource);
-                
-            }
-
-            assertEquals("nerrors", 0, nerrs.get());
-
-            assertStatementIndicesConsistent(store,maxerrors);
+            verify(store, resource);
 
         } finally {
 
             store.closeAndDelete();
 
         }
+
+    }
+
+    /**
+     * Load the file using the {@link DataLoader}.
+     * <p>
+     * Note: Normally we disable closure for this test, but that is not
+     * critical. If you compute the closure of the data set then there will
+     * simply be additional statements whose self-consistency among the
+     * statement indices will be verified, but it will not verify the
+     * correctness of the closure.
+     */
+    protected void load(final AbstractTripleStore store, final String resource)
+            throws Exception {
+
+        // avoid modification of the properties.
+        final Properties properties = new Properties(getProperties());
+
+        // turn off RDFS closure for this test.
+        properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None
+                .toString());
+
+        final DataLoader dataLoader = new DataLoader(properties, store);
+
+        // load into the datbase.
+        dataLoader.loadData(resource, "" /* baseURI */, RDFFormat.RDFXML);
+
+        // // database-at-once closure (optional for this test).
+        // store.getInferenceEngine().computeClosure(null/*focusStore*/);
 
     }
 

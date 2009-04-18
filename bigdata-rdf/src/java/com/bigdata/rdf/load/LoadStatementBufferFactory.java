@@ -25,6 +25,8 @@ public class LoadStatementBufferFactory implements IStatementBufferFactory {
      * @param writeBuffer
      *            An optional buffer for asynchronous writes on the statement
      *            indices.
+     * 
+     * @todo drop the writeBuffer arg.
      */
     public LoadStatementBufferFactory(final AbstractTripleStore db,
             final int bufferCapacity, final BlockingBuffer<ISPO[]> writeBuffer) {
@@ -41,7 +43,7 @@ public class LoadStatementBufferFactory implements IStatementBufferFactory {
      * Return the {@link ThreadLocal} {@link StatementBuffer} to be used for a
      * task.
      */
-    public StatementBuffer getStatementBuffer() {
+    public StatementBuffer newStatementBuffer() {
 
         /*
          * Note: this is a thread-local so the same buffer object is always

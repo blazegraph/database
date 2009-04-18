@@ -13,9 +13,12 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.load.RDFDataLoadMaster.JobState;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteConfiguration;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.IAsynchronousWriteConfiguration;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
+import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataServiceAwareProcedure;
@@ -43,11 +46,12 @@ import com.bigdata.service.jini.JiniFederation;
 public class RDFFileLoadTask implements Callable<Void>, Serializable,
         IDataServiceAwareProcedure {
 
-    final protected static Logger log = Logger.getLogger(RDFFileLoadTask.class);
+    final protected transient static Logger log = Logger
+            .getLogger(RDFFileLoadTask.class);
 
-    final protected static boolean INFO = log.isInfoEnabled();
+    final protected transient boolean INFO = log.isInfoEnabled();
 
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    final protected transient boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 
@@ -132,15 +136,23 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
         }
 
         // optionally use asynchronous writes on the statement indices.
-        final BlockingBuffer<ISPO[]> writeBuffer = jobState.writeBufferChunkSize != 0 ? tripleStore
-                .getSPORelation().newWriteBuffer(jobState.writeBufferChunkSize)
+        final IAsynchronousWriteConfiguration statementfactory = jobState.writeBufferChunkSize != 0 ? new AsynchronousWriteConfiguration(
+                (ScaleOutTripleStore) tripleStore,
+                jobState.writeBufferChunkSize)
                 : null;
-        
-        // @todo factory method.
         final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
-                tripleStore, jobState.bufferCapacity, writeBuffer,
+                tripleStore, 
                 jobState.parserValidates, jobState.deleteAfter,
-                jobState.fallback);
+                jobState.fallback, statementfactory);
+
+        final BlockingBuffer<ISPO[]> writeBuffer = null;//@todo drop this
+//        final BlockingBuffer<ISPO[]> writeBuffer = jobState.writeBufferChunkSize != 0 ? tripleStore
+//        .getSPORelation().newWriteBuffer(jobState.writeBufferChunkSize)
+//        : null;
+//        final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
+//                tripleStore, jobState.bufferCapacity, writeBuffer,
+//                jobState.parserValidates, jobState.deleteAfter,
+//                jobState.fallback);
 
         // Setup loader.
         final ConcurrentDataLoader loader = new ConcurrentDataLoader(fed,
@@ -187,7 +199,13 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
             // Shutdown the loader.
             loader.shutdown();
-            
+
+            if (statementfactory != null) {
+                if (log.isInfoEnabled())
+                    log.info("Closing async writers.");
+                statementfactory.awaitAll();
+            }
+
             if (writeBuffer != null) {
 
                 if (log.isInfoEnabled())
@@ -207,6 +225,9 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
             
             try {
                 loader.shutdownNow();
+                if (statementfactory != null) {
+                    statementfactory.cancelAll(true/* mayInterruptIfRunning */);
+                }
                 if (writeBuffer != null) {
                     writeBuffer.getFuture()
                             .cancel(true/*mayInterruptIfRunning*/);
@@ -289,7 +310,7 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
         f.get();
 
         // cancel the scheduled task.
-        f.cancel(true/*mayInterruptIfRunning*/);
+        f.cancel(true/* mayInterruptIfRunning */);
 
     }
 
@@ -298,6 +319,13 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
      * specified directory.
      */
     static protected class RunnableFileSystemLoader implements Runnable {
+
+        final protected transient static Logger log = Logger
+                .getLogger(RunnableFileSystemLoader.class);
+
+        final protected transient boolean INFO = log.isInfoEnabled();
+
+        final protected transient boolean DEBUG = log.isDebugEnabled();
 
         volatile boolean done = false;
 

@@ -58,28 +58,6 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        /*
-         * log4j defaults to DEBUG which will produce simply huge amounts of
-         * logging information when running the unit tests. Therefore we
-         * explicitly set the default logging level to WARN if it is DEBUG. If
-         * you are using a log4j configuration file then this is unlikely to
-         * interact with your configuration, and in any case you can override
-         * specific loggers.
-         */
-        {
-
-            final Logger log = Logger.getRootLogger();
-
-            if (log.getLevel().equals(Level.DEBUG)) {
-
-                log.setLevel(Level.WARN);
-
-                log.warn("Defaulting debugging level to WARN for the unit tests");
-
-            }
-            
-        }
-        
         final TestSuite suite = new TestSuite("RDF");
 
         // test RDF Value and Statement object model (Sesame compliant).
@@ -88,6 +66,9 @@ public class TestAll extends TestCase {
         // test various RDF database implementations.
         suite.addTest( com.bigdata.rdf.store.TestAll.suite() );
 
+        // test the bulk data loader : @todo use proxy tests and move into per-store suites?
+        suite.addTest( com.bigdata.rdf.load.TestAll.suite() );
+        
         return suite;
         
     }

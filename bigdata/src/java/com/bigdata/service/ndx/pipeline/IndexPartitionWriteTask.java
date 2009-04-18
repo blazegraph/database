@@ -147,6 +147,10 @@ A//
             
             // #of duplicates that were filtered out.
             duplicateCount = sourceChunk.length - chunk.length;
+
+            if (duplicateCount > 0 && DEBUG)
+                log.debug("Filtered out " + duplicateCount
+                        + " duplicates from " + chunk.length + " elements");
             
         }
 

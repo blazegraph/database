@@ -34,6 +34,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
@@ -256,6 +257,17 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * @return A buffer on which the producer may write their data.
      * 
      * @see AbstractFederation#getIndexTaskCounters(String)
+     * 
+     * @todo The async API is only defined at this time for scale-out index
+     *       views. An asynchronous write API could be defined for local
+     *       B+Trees. It would have to ensure locks using the
+     *       {@link UnisolatedReadWriteIndex}. It would not use the same
+     *       layering since writes could not be scattered. It could be written
+     *       as a single blocking buffer which was drained by the CTOR for the
+     *       operation. If we combine the two buffer capacity parameters into a
+     *       single parameter, then this method signature could be used for both
+     *       local and scale-out index views. This method could then be moved to
+     *       an IAsynchronousIndexWriter interface.
      */
     public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
             final int indexWriteQueueCapacity,

@@ -34,14 +34,39 @@ public class RDFLoadTaskFactory<T extends Runnable> extends
      *            the loader will presume that the files are in the format
      *            specified by this parameter (if any). Files whose format can
      *            not be determined will be logged as errors.
+     * 
+     * @todo drop the writeBuffer arg.
      */
     public RDFLoadTaskFactory(final AbstractTripleStore db,
             final int bufferCapacity, final BlockingBuffer<ISPO[]> writeBuffer,
             final boolean verifyData, final boolean deleteafter,
             final RDFFormat fallback) {
 
-        super(db, verifyData, deleteafter, fallback,
+        this(db, verifyData, deleteafter, fallback,
                 new LoadStatementBufferFactory(db, bufferCapacity, writeBuffer));
+
+    }
+
+    /**
+     * 
+     * @param db
+     * @param verifyData
+     * @param deleteAfter
+     *            if the file should be deleted once it has been loaded.
+     * @param fallback
+     *            An attempt will be made to determine the interchange syntax
+     *            using {@link RDFFormat}. If no determination can be made then
+     *            the loader will presume that the files are in the format
+     *            specified by this parameter (if any). Files whose format can
+     *            not be determined will be logged as errors.
+     * @param factory
+     *            Used to buffer and load statements.
+     */
+    public RDFLoadTaskFactory(final AbstractTripleStore db,
+            final boolean verifyData, final boolean deleteafter,
+            final RDFFormat fallback, IStatementBufferFactory factory) {
+
+        super(db, verifyData, deleteafter, fallback, factory);
 
     }
 

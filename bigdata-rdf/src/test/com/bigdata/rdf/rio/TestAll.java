@@ -54,13 +54,33 @@ public class TestAll extends TestCase {
      */
     public static Test suite() {
 
-        TestSuite suite = new TestSuite("RIO Integration");
+        final TestSuite suite = new TestSuite("RIO Integration");
 
+        // basic tests for StatementBuffer.
         suite.addTestSuite(TestStatementBuffer.class);
 
+        /*
+         * Correctness tests for loading RDF data using DataLoader and
+         * StatementBuffer. Verification is by re-parsing the RDF data and
+         * checking that all statements found in the data exist in the database
+         * for each access path.
+         */
         suite.addTestSuite(TestLoadAndVerify.class);
-        
+
+        /*
+         * Correctness tests when SIDs are enabled and for blank node handling
+         * using StatementBuffer and explicitly inserting specific triples (no
+         * parsing). The RDF/XML interchange tests serialize the hand loaded
+         * data and verify that it can be parsed and that the same graph is
+         * obtained.
+         */
         suite.addTestSuite(TestRDFXMLInterchangeWithStatementIdentifiers.class);
+
+        /*
+         * Correctness tests for the asynchronous bulk data loader variant
+         * which does not support SIDs.
+         */
+        suite.addTestSuite(TestAsynchronousStatementBufferWithoutSids.class);
         
         return suite;
         

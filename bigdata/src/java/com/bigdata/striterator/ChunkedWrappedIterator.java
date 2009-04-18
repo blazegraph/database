@@ -53,6 +53,8 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     
     private boolean open = true;
 
+    private final Class<? extends E> elementClass;
+    
     /**
      * The source iterator supplied by the caller. If this is an
      * {@link ICloseableIterator} then {@link #close()} will drill through and
@@ -84,10 +86,24 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      */
     public ChunkedWrappedIterator(final Iterator<E> src) {
 
-        this(src, DEFAULT_CHUNK_SIZE, null/* keyOrder */, null/* filter */);
-        
+        this(src, DEFAULT_CHUNK_SIZE, null/*elementClass*/);
+
     }
 
+    public ChunkedWrappedIterator(final Iterator<E> src, final int chunkSize,
+            Class<? extends E> elementClass) {
+
+        this(src, chunkSize, elementClass, null/* keyOrder */, null/* filter */);
+
+    }
+
+    public ChunkedWrappedIterator(final Iterator<E> src, final int chunkSize,
+            final IKeyOrder<E> keyOrder, final IElementFilter<E> filter) {
+
+        this(src, chunkSize, null/* elementClass */, keyOrder, filter);
+        
+    }
+    
     /**
      * Create an iterator that reads from the source.
      * 
@@ -95,6 +111,10 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      *            The source iterator.
      * @param chunkSize
      *            The desired chunk size.
+     * @param elementClass
+     *            The class for the array component type (optional, but the
+     *            default will use the runtime type of the first element of the
+     *            array which can be too restrictive).
      * @param keyOrder
      *            The order in which the elements will be visited by the source
      *            iterator if known and <code>null</code> otherwise.
@@ -109,14 +129,17 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      */
     @SuppressWarnings("unchecked")
     public ChunkedWrappedIterator(final Iterator<E> src, final int chunkSize,
-            final IKeyOrder<E> keyOrder, final IElementFilter<E> filter) {
+            final Class<? extends E> elementClass, final IKeyOrder<E> keyOrder,
+            final IElementFilter<E> filter) {
         
         if (src == null)
             throw new IllegalArgumentException();
 
         if (chunkSize <= 0)
             throw new IllegalArgumentException();
-     
+
+        this.elementClass = elementClass;
+        
         this.realSource = src;
         
         /*
@@ -222,7 +245,8 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
                  * as the objects that we are visiting.
                  */
 
-                chunk = (E[]) java.lang.reflect.Array.newInstance(t.getClass(),
+                chunk = (E[]) java.lang.reflect.Array.newInstance(
+                        (elementClass != null ? elementClass : t.getClass()),
                         chunkSize);
 
             }
@@ -236,8 +260,9 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
             // make it dense.
             
-            final E[] tmp = (E[])java.lang.reflect.Array.newInstance(
-                    chunk[0].getClass(), n);
+            final E[] tmp = (E[]) java.lang.reflect.Array
+                    .newInstance((elementClass != null ? elementClass
+                            : chunk[0].getClass()), n);
             
             System.arraycopy(chunk, 0, tmp, 0, n);
             
