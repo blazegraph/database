@@ -795,7 +795,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          * <Future> or any other combination that I have tried.
          */
         final List futures = asynchronousWriteConfiguration.tripleStore.getExecutorService()
-                .invokeAll(tasks);
+                .invokeAll((List)tasks);
 
         // make sure that no errors were reported by those tasks.
         for (Object f : futures) {
