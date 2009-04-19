@@ -762,14 +762,16 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.SPO,
                 asynchronousWriteConfiguration.spoRelation,
-                (IChunkedOrderedIterator<ISPO>) statements.iterator(),
+//                (IChunkedOrderedIterator<ISPO>) 
+                statements.iterator(),
                 asynchronousWriteConfiguration.buffer_spo));
 
         if (asynchronousWriteConfiguration.buffer_pos != null) {
 
             tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.POS,
                     asynchronousWriteConfiguration.spoRelation,
-                    (IChunkedOrderedIterator<ISPO>) statements.iterator(),
+//                    (IChunkedOrderedIterator<ISPO>) 
+                    statements.iterator(),
                     asynchronousWriteConfiguration.buffer_pos));
 
         }
@@ -778,7 +780,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
             tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.OSP,
                     asynchronousWriteConfiguration.spoRelation,
-                    (IChunkedOrderedIterator<ISPO>) statements.iterator(),
+//                    (IChunkedOrderedIterator<ISPO>) 
+                    statements.iterator(),
                     asynchronousWriteConfiguration.buffer_osp));
 
         }
