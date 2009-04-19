@@ -787,15 +787,17 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          * Submit all tasks. They will run in parallel. If they complete
          * successfully then all we know is that the data has been buffered for
          * asynchronous writes on the various indices.
+         * 
+         * Note: java 1.6.0_07/12 build problems under linux when typed as
+         * <Future> or any other combination that I have tried.
          */
-        @SuppressWarnings("unchecked")
-        final List<Future> futures = asynchronousWriteConfiguration.tripleStore.getExecutorService()
+        final List futures = asynchronousWriteConfiguration.tripleStore.getExecutorService()
                 .invokeAll(tasks);
 
         // make sure that no errors were reported by those tasks.
-        for (Future f : futures) {
+        for (Object f : futures) {
 
-            f.get();
+            ((Future)f).get();
 
         }
         
@@ -959,7 +961,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         private final IKeyOrder<ISPO> keyOrder;
 
-        private final IChunkedOrderedIterator<ISPO> src;
+        /* Note: problem with java 1.6.0_07 and _12 on linux when typed. */
+        private final IChunkedOrderedIterator/*<ISPO>*/ src;
 
         private final BlockingBuffer<KVO<ISPO>[]> writeBuffer;
 
@@ -968,7 +971,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         public AsyncSPOIndexWriteTask(
                 final IKeyOrder<ISPO> keyOrder,
                 final SPORelation spoRelation,
-                final IChunkedOrderedIterator<ISPO> src,
+                /* Note: problem with java 1.6.0_07 and _12 on linux when typed. */
+                final IChunkedOrderedIterator/*<ISPO>*/ src,
                 final BlockingBuffer<KVO<ISPO>[]> writeBuffer) {
 
             if (keyOrder == null)
@@ -999,7 +1003,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             while(src.hasNext()) {
 
                 // next chunk, in the specified order.
-                final ISPO[] chunk = src.nextChunk(keyOrder);
+                final ISPO[] chunk = (ISPO[])src.nextChunk(keyOrder);
 
                 // note: a[] will be dense since nothing is filtered.
                 final KVO<ISPO>[] a = new KVO[chunk.length];
