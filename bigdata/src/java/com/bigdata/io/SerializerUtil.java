@@ -220,7 +220,7 @@ public class SerializerUtil {
      * 
      * @return The de-serialized object.
      */
-    static final public Object deserialize(byte[] b, int off, int len) {
+    static final public Object deserialize(final byte[] b, final int off, final int len) {
 
         final ByteArrayInputStream bais = new ByteArrayInputStream(b, off, len);
 
@@ -232,7 +232,11 @@ public class SerializerUtil {
 
         } catch (Exception ex) {
 
-            throw new RuntimeException(ex);
+            /*
+             * Note: an error here is often an attempt to deserialize an empty
+             * byte[].
+             */
+            throw new RuntimeException("off=" + off + ", len=" + len, ex);
 
         }
 

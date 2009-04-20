@@ -476,10 +476,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         if (open) {
          
             try {
-         
-                if (INFO)
+
+                if (log.isInfoEnabled()) {
+
+                    // Note: Stack trace is to show WHO closed the buffer
                     log.info("Closing buffer: ", new RuntimeException(
                             "Closing buffer."));
+                    
+                }
 
                 if (stackFrame != null) {
 
