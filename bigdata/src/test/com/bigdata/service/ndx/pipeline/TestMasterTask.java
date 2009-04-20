@@ -343,11 +343,11 @@ public class TestMasterTask extends AbstractMasterTestCase {
          * return before the timeout has expired.
          */
         Thread.sleep(TimeUnit.NANOSECONDS
-                .toMillis(AbstractSubtask.DEFAULT_IDLE_TIMEOUT / 2 - elapsed1));
+                .toMillis(AbstractMasterTask.DEFAULT_IDLE_TIMEOUT / 2 - elapsed1));
 
         final long elapsed2 = System.nanoTime() - beforeWrite;
         
-        if (elapsed2 > AbstractSubtask.DEFAULT_IDLE_TIMEOUT) {
+        if (elapsed2 > AbstractMasterTask.DEFAULT_IDLE_TIMEOUT) {
             
             fail("Sleep too long - idle timeout may have expired.");
             
@@ -359,7 +359,7 @@ public class TestMasterTask extends AbstractMasterTestCase {
 
         // now sleep for the entire idle timeout (this give us some padding).
         Thread.sleep(TimeUnit.NANOSECONDS
-                .toMillis(AbstractSubtask.DEFAULT_IDLE_TIMEOUT));
+                .toMillis(AbstractMasterTask.DEFAULT_IDLE_TIMEOUT));
 
         // the subtask should have terminated and no other subtask should have started.
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);

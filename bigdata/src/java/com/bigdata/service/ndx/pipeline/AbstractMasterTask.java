@@ -168,9 +168,20 @@ L>//
         return stats;
         
     }
+
+    /**
+     * The default timeout in nanoseconds before closing an idle output sink.
+     */
+    public static final long DEFAULT_IDLE_TIMEOUT = TimeUnit.MILLISECONDS.toNanos(2000);
     
-    public AbstractMasterTask(final H stats,
-            final BlockingBuffer<E[]> buffer) {
+    /**
+     * The timeout in nanoseconds before closing an idle output sink.
+     * 
+     * @todo config
+     */
+    protected final long idleTimeout = DEFAULT_IDLE_TIMEOUT;
+
+    public AbstractMasterTask(final H stats, final BlockingBuffer<E[]> buffer) {
 
         if (stats == null)
             throw new IllegalArgumentException();
@@ -179,7 +190,7 @@ L>//
             throw new IllegalArgumentException();
 
         this.stats = stats;
-        
+
         this.buffer = buffer;
 
         this.src = buffer.iterator();
@@ -190,6 +201,13 @@ L>//
 
     public H call() throws Exception {
 
+        /*
+         * Note: If idle timeouts are allowed then we need to reopen the buffer
+         * if it has closed by a timeout.
+         */
+
+        final boolean reopen = idleTimeout != 0;
+        
         try {
 
             while (src.hasNext()) {
@@ -208,7 +226,7 @@ L>//
                     stats.elementsIn += a.length;
                 }
 
-                nextChunk(a, false/* reopen */);
+                nextChunk(a, reopen);
                 
             }
 
@@ -497,12 +515,17 @@ L>//
 
         if (reopen && sink != null && !sink.buffer.isOpen()) {
 
+            if (DEBUG)
+                log.debug("Reopening sink (was closed): " + locator);
+
             // wait for the sink to terminate normally.
             awaitSink(sink);
 
+            sink = null;
+
         }
 
-        if (sink == null || reopen) {
+        if (sink == null) {
 
             if (DEBUG)
                 log.debug("Creating output buffer: " + locator);
@@ -707,9 +730,6 @@ L>//
         lock.lockInterruptibly();
         try {
 
-            // add the dense split to the appropriate output buffer.
-            final BlockingBuffer<E[]> out = getOutputBuffer(locator, reopen);
-            
             /*
              * Make a dense chunk for this split.
              */
@@ -721,7 +741,20 @@ L>//
 
             halted();
             
-            out.add(b);
+            // add the dense split to the appropriate output buffer.
+            final BlockingBuffer<E[]> out = getOutputBuffer(locator, reopen);
+
+            if (reopen) {
+
+                // stack trace through here if [reopen == true]
+                out.add(b);
+
+            } else {
+             
+                // stack trace through here if [reopen == false]
+                out.add(b);
+                
+            }
 
         } finally {
 
