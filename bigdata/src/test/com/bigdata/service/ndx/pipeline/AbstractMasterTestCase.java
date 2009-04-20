@@ -106,7 +106,7 @@ public class AbstractMasterTestCase extends TestCase2 {
         
         public String toString() {
             
-            return getClass().getName() + "{locator=" + locator + "}";
+            return "L{locator=" + locator + "}";
             
         }
 
@@ -232,12 +232,13 @@ public class AbstractMasterTestCase extends TestCase2 {
         protected void keyRangePartition(final KVO<O>[] chunk,
                 final boolean reopen) throws InterruptedException {
 
+            /*
+             * Split the tuples.
+             */
             // #of partitions (one per value that a byte can take on).
             final int N = 255;
-
             // array of ordered containers for each partition.
             final List<KVO<O>>[] v = new List[N];
-
             for (KVO<O> e : chunk) {
 
                 // adjust to [0:255] (somewhat arbitrary).
@@ -258,6 +259,9 @@ public class AbstractMasterTestCase extends TestCase2 {
 
             }
 
+            /*
+             * Assign tuples to output buffers based on those splits.
+             */
             for (int i = 0; i < v.length; i++) {
 
                 final List<KVO<O>> t = v[i];
@@ -333,21 +337,34 @@ public class AbstractMasterTestCase extends TestCase2 {
 
         }
         
+        /**
+         * This method may be overriden to simulate the latency of the
+         * write operation.  The default is a NOP.
+         */
+        protected void writeData() throws Exception {
+            
+        }
+        
         @Override
         protected boolean nextChunk(final KVO<O>[] chunk) throws Exception {
 
+            final long begin = System.nanoTime();
+            
+            writeData();
+            
+            final long elapsed = System.nanoTime() - begin;
+            
             synchronized (master.stats) {
 
                 master.stats.chunksOut++;
                 master.stats.elementsOut += chunk.length;
-                // note: not updating stats.elapsedNanos since no work is done
-                // here.
+                master.stats.elapsedNanos += elapsed;
 
             }
 
             stats.chunksOut++;
             stats.elementsOut += chunk.length;
-            // note: not updating stats.elapsedNanos since no work is done here.
+            stats.elapsedNanos += elapsed;
 
             if (log.isInfoEnabled())
                 log.info("wrote chunk: " + this + ", #elements="

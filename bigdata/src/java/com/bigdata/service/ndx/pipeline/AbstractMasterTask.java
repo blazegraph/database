@@ -293,7 +293,7 @@ L>//
         sink.buffer.close();
 
         /*
-         * Handle the chunk for which we got the stale locator exception.
+         * Handle the chunk for which we got the stale locator exception by feeding it back into the master.
          * 
          * Note: In this case we may re-open an output buffer for the index
          * partition. The circumstances under which this can occur are
@@ -310,8 +310,8 @@ L>//
         nextChunk(chunk, true/* reopen */);
 
         /*
-         * Drain the rest of the buffered chunks from the sink, assigning
-         * them to the sink(s). Again, we will 'reopen' the output buffer if
+         * Drain the rest of the buffered chunks from the closed sink, feeding them back into the master which will assign
+         * them to the new sink(s). Again, we will 'reopen' the output buffer if
          * it has been closed.
          */
         {
