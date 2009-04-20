@@ -231,6 +231,12 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          */
         protected final String lockNodeZPath;
 
+        /**
+         * @param lockNodeZPath
+         *            The path to the lock node.
+         * 
+         * @param lockNodeZPath
+         */
         public CreatePhysicalServiceTask(final String lockNodeZPath) {
 
             if (lockNodeZPath == null)
@@ -252,9 +258,6 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * <p>
          * Note: If the lock node is deleted, then we will exit and return
          * <code>false</code>.
-         * 
-         * @param lockNodeZPath
-         *            The path to the lock node.
          * 
          * @return <code>true</code> if we started the service.
          * 

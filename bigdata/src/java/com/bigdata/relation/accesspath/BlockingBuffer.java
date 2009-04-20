@@ -395,11 +395,23 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * Note: This is only allocated for debugging purposes. Otherwise the
          * stack frame should not be taken.
          */
-//        this.stackFrame = new RuntimeException("Buffer Allocation Stack Frame");
+        if (log.isInfoEnabled()) {
+
+            this.openStackFrame = new RuntimeException("Buffer Allocation Stack Frame");
+            
+        }
         
     }
 
-    private RuntimeException stackFrame;
+    /**
+     * Stack frame where the buffer was allocated.
+     */
+    private RuntimeException openStackFrame;
+    
+    /**
+     * Stack frame where the buffer was closed.
+     */
+    private RuntimeException closeStackFrame;
 
     public String toString() {
 
@@ -432,7 +444,26 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     private void assertOpen() {
         
         if(!open) {
-        
+
+            if (openStackFrame != null) {
+
+                /*
+                 * Purely for debugging.
+                 */
+
+                log.warn("buffer allocated at", openStackFrame);
+
+            }
+            if (closeStackFrame != null) {
+
+                /*
+                 * Purely for debugging.
+                 */
+
+                log.warn("buffer closed at", closeStackFrame);
+
+            }
+
             if (cause != null) {
 
                 throw new BufferClosedException(cause);
@@ -477,25 +508,32 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          
             try {
 
+//                if (log.isInfoEnabled()) {
+//
+//                    // Note: Stack trace is to show WHO closed the buffer
+//                    log.info("Closing buffer: ", new RuntimeException(
+//                            "Closing buffer."));
+//                    
+//                }
+
                 if (log.isInfoEnabled()) {
-
-                    // Note: Stack trace is to show WHO closed the buffer
-                    log.info("Closing buffer: ", new RuntimeException(
-                            "Closing buffer."));
-                    
+                
+                    this.closeStackFrame = new RuntimeException(
+                            "Buffer Closed Stack Frame");               
+                
                 }
-
-                if (stackFrame != null) {
-
-                    /*
-                     * Purely for debugging.
-                     */
-
-//                    log.warn("closing buffer at", new RuntimeException());
-
-                    log.warn("buffer allocated at", stackFrame);
-
-                }
+                
+//                if (openStackFrame != null) {
+//
+//                    /*
+//                     * Purely for debugging.
+//                     */
+//
+////                    log.warn("closing buffer at", new RuntimeException());
+//
+//                    log.warn("buffer allocated at", openStackFrame);
+//
+//                }
                 
             } finally {
 
@@ -853,7 +891,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 if(INFO)
                     log.info("Future not set");
                 
-                if (stackFrame != null) {
+                if (openStackFrame != null) {
 
                     /*
                      * Purely for debugging.
@@ -861,7 +899,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     log.warn("Future not set at", new RuntimeException());
 
-                    log.warn("buffer allocated at", stackFrame);
+                    log.warn("buffer allocated at", openStackFrame);
 
                 }
 
