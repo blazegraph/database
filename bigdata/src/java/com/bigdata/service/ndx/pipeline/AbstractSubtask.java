@@ -100,18 +100,6 @@ L>//
     protected final HS stats;
 
     /**
-     * The default timeout in nanoseconds before closing an idle output sink.
-     */
-    public static final long DEFAULT_IDLE_TIMEOUT = TimeUnit.MILLISECONDS.toNanos(2000);
-    
-    /**
-     * The timeout in nanoseconds before closing an idle output sink.
-     * 
-     * @todo config
-     */
-    private final long idleTimeout = DEFAULT_IDLE_TIMEOUT;
-    
-    /**
      * The timeout in nanoseconds that we will wait for a chunk to become
      * available. This is NOT the same as the chunk combiner timeout. It should
      * generally be a small multiple of the chunk combiner timeout so that
@@ -191,7 +179,7 @@ L>//
                         }
                         final long elapsedSinceLastChunk = System.nanoTime()
                                 - lastChunkNanos;
-                        final boolean idle = elapsedSinceLastChunk > idleTimeout;
+                        final boolean idle = elapsedSinceLastChunk > master.idleTimeout;
                         if (idle || master.src.isExhausted()) {
                             if (buffer.isEmpty()) {
                                 /*
@@ -207,13 +195,17 @@ L>//
                                 if (INFO)
                                     log.info("Closing buffer: idle=" + idle
                                             + " : " + this);
-                                buffer.close();
                                 if (idle) {
+                                    // stack trace here if closed by idle timeout.
+                                    buffer.close();
                                     synchronized (master.stats) {
                                         master.stats.subtaskIdleTimeout++;
                                     }
+                                } else {
+                                    // stack trace here if master exhausted.
+                                    buffer.close();
                                 }
-                                if(!src.hasNext()) {
+                                if (!src.hasNext()) {
                                     /*
                                      * The iterator is already exhausted so we
                                      * break out of the loop now.
