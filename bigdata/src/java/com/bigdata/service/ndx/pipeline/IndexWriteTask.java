@@ -179,6 +179,10 @@ A//
      * @TODO The test suite does not demonstrate this problem which makes
      *       detection difficult. See
      *       {@link TestMasterTaskWithRedirect#test_redirectStressTest()}.
+     * 
+     * @todo the requirement to hold the lock across the add of the splits could
+     *       stifle throughput when writes on some locators are slower and their
+     *       output buffers fill up.
      */
     protected void nextChunk(final E[] a, final boolean reopen)
             throws InterruptedException {
@@ -196,7 +200,7 @@ A//
                 halted();
 
                 addToOutputBuffer((L) split.pmd, a, split.fromIndex,
-                        split.toIndex, false/* reopen */);
+                        split.toIndex, reopen);
 
             }
 
