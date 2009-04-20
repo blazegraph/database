@@ -707,6 +707,9 @@ L>//
         lock.lockInterruptibly();
         try {
 
+            // add the dense split to the appropriate output buffer.
+            final BlockingBuffer<E[]> out = getOutputBuffer(locator, reopen);
+            
             /*
              * Make a dense chunk for this split.
              */
@@ -716,8 +719,9 @@ L>//
 
             System.arraycopy(a, fromIndex, b, 0, n);
 
-            // add the dense split to the appropriate output buffer.
-            getOutputBuffer(locator, reopen).add(b);
+            halted();
+            
+            out.add(b);
 
         } finally {
 
