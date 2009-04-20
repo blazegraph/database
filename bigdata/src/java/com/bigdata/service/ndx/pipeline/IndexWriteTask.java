@@ -163,44 +163,48 @@ A//
         
     }
 
+    /**
+     * This implementation grabs the {@link AbstractMasterTask#lock}.
+     * <p>
+     * Note: Locking is required here so that the splits are computed coherently
+     * with respect to the buffers to which they will be assigned. Otherwise,
+     * for example, a set of splits computed before a MOVE is noticed will
+     * continue to target the pre-MOVE index partition after sink for that index
+     * partition has noticed the MOVE, closed its buffer, and redirected its
+     * buffered output to another sink. If we did not hold the lock across the
+     * split/addToOutputBuffer operation then the master would discover that the
+     * output buffer assigned by the split had since been closed (due to a
+     * redirect).
+     * 
+     * @TODO The test suite does not demonstrate this problem which makes
+     *       detection difficult. See
+     *       {@link TestMasterTaskWithRedirect#test_redirectStressTest()}.
+     */
     protected void nextChunk(final E[] a, final boolean reopen)
             throws InterruptedException {
 
-        // Split the ordered chunk.
-        final LinkedList<Split> splits = ndx.splitKeys(ndx.getTimestamp(),
-                0/* fromIndex */, a.length/* toIndex */, a);
+        lock.lockInterruptibly();
+        try {
 
-        // Break the chunk into the splits
-        for (Split split : splits) {
+            // Split the ordered chunk.
+            final LinkedList<Split> splits = ndx.splitKeys(ndx.getTimestamp(),
+                    0/* fromIndex */, a.length/* toIndex */, a);
 
-            halted();
+            // Break the chunk into the splits
+            for (Split split : splits) {
 
-            addToOutputBuffer(split, a, reopen);
+                halted();
 
+                addToOutputBuffer((L) split.pmd, a, split.fromIndex,
+                        split.toIndex, false/* reopen */);
+
+            }
+
+        } finally {
+
+            lock.unlock();
+            
         }
-
-    }
-
-    /**
-     * Adds the {@link Split} of data from the chunk to the appropriate output
-     * buffer.
-     * 
-     * @param split
-     *            The split.
-     * @param a
-     *            The chunk from which the split is drawn.
-     * @param reopen
-     *            if the output buffer for the split should be reopened if it is
-     *            closed.
-     * 
-     * @throws InterruptedException
-     */
-    @SuppressWarnings("unchecked")
-    protected void addToOutputBuffer(final Split split, final E[] a,
-            final boolean reopen) throws InterruptedException {
-
-        addToOutputBuffer((L) split.pmd, a, split.fromIndex, split.toIndex,
-                false/* reopen */);
 
     }
 

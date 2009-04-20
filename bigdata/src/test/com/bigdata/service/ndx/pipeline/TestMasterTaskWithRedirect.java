@@ -45,6 +45,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.L;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.S;
 
 /**
  * Test ability to handle a redirect (subtask learns that the target service no
@@ -408,7 +411,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
          */
         
         // #of concurrent producers.
-        final int nproducers = 10;
+        final int nproducers = 60;
 
         // #of locators onto which the writes will initially be mapped.
         final int initialLocatorCount = 10;
@@ -418,6 +421,9 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                 100, // ms
                 1000, // ms
         };
+        
+        // maximum delay for writing a chunk (uniform distribution up to this max).
+        final long maxWriteDelay = 1000;
         
         // duration of the stress test.
         final long timeout = TimeUnit.SECONDS.toNanos(20/* seconds to run */);
@@ -642,7 +648,35 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             
         }
 
-        final M master = new M(masterStats, masterBuffer, executorService);
+        final M master = new M(masterStats, masterBuffer, executorService) {
+          
+            final private Random r = new Random();
+            
+            @Override
+            protected S newSubtask(L locator, BlockingBuffer<KVO<O>[]> out) {
+
+                return new S(this, locator, out) {
+
+                    /**
+                     * Overriden to simulate the latency of the write operation.
+                     */
+                    @Override
+                    protected void writeData() throws Exception {
+
+                        final long delayMillis = (long) (r.nextDouble() * maxWriteDelay);
+                        
+                        System.err.println("Writing on " + locator + " (delay="+delayMillis+") ...");
+                        
+                        Thread.sleep(delayMillis/* ms */);
+                        
+                        System.err.println("Wrote on " + locator + ".");
+                    }
+
+                };
+                
+            }
+            
+        };
         
         /*
          * Setup the initial redirects. Each byte is directed to one of the N
@@ -765,10 +799,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
         } finally {
 
-            // show the master stats
-            System.out.println(master.stats.toString());
-
-            {
+            if(false) {
                 // show the redirects using an ordered map.
                 final Map<Integer, Integer> redirects = new TreeMap<Integer, Integer>(
                         master.redirects);
@@ -793,6 +824,9 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                 }
 
             }
+
+            // show the master stats
+            System.out.println(master.stats.toString());
 
         }
 
