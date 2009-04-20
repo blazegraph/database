@@ -70,6 +70,11 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     public long subtaskEndCount = 0L;
 
     /**
+     * The #of subtasks which were closed due to an idle timeout.
+     */
+    public long subtaskIdleTimeout = 0L;
+    
+    /**
      * The #of distinct partitions for which the master has caused subtasks to
      * be created.
      * 
@@ -161,12 +166,11 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     /**
      * Return a snapshot of the statistics for each index partition.
      */
-    public IndexPartitionWriteStats[] getStats() {
+    public Map<L,HS> getSubtaskStats() {
 
         synchronized (partitions) {
 
-            return partitions.values().toArray(
-                    new IndexPartitionWriteStats[partitions.size()]);
+            return new LinkedHashMap<L,HS>(partitions);
             
         }
 
@@ -196,6 +200,13 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             @Override
             protected void sample() {
                 setValue(subtaskEndCount);
+            }
+        });
+        
+        t.addCounter("subtaskIdleTimeout", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(subtaskIdleTimeout);
             }
         });
 
@@ -289,13 +300,15 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     public String toString() {
 
         return getClass().getName() + "{subtaskStartCount=" + subtaskStartCount
-                + ", subtaskEndCount=" + subtaskEndCount + ", partitionCount="
-                + partitionCount + ", redirectCount=" + redirectCount
-                + ", chunkIn=" + chunksIn + ", elementIn=" + elementsIn
-                + ", chunksOut=" + chunksOut + ", elementsOut=" + elementsOut
-                + ", elapsedNanos=" + elapsedNanos + ", averageNanos/write="
-                + getAverageNanosPerWrite() + ", averageElements/write="
-                + getAverageElementsPerWrite() + "}";
+                + ", subtaskEndCount=" + subtaskEndCount
+                + ", subtaskIdleTimeout=" + subtaskIdleTimeout
+                + ", partitionCount=" + partitionCount + ", redirectCount="
+                + redirectCount + ", chunkIn=" + chunksIn + ", elementIn="
+                + elementsIn + ", chunksOut=" + chunksOut + ", elementsOut="
+                + elementsOut + ", elapsedNanos=" + elapsedNanos
+                + ", averageNanos/write=" + getAverageNanosPerWrite()
+                + ", averageElements/write=" + getAverageElementsPerWrite()
+                + "}";
 
     }
 

@@ -35,6 +35,7 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.journal.ITx;
+import com.bigdata.service.DataService;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataClient;
@@ -106,7 +107,7 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
      */
     public Properties getProperties() {
 
-        Properties properties = new Properties( super.getProperties() );
+        final Properties properties = new Properties( super.getProperties() );
 
 //         Note: this reduces the disk usage at the expense of memory usage.
 //        properties.setProperty(EmbeddedBigdataFederation.Options.BUFFER_MODE,
@@ -118,6 +119,8 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
 
 //        properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
+        properties.setProperty(DataService.Options.OVERFLOW_ENABLED,"false");
+        
         /*
          * Note: there are also properties to control the #of data services
          * created in the embedded federation.

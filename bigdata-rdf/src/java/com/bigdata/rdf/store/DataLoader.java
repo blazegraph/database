@@ -795,6 +795,9 @@ public class DataLoader {
 
         if (file.isDirectory()) {
 
+            if (INFO)
+                log.info("loading directory: " + file);
+
             final LoadStats loadStats = new LoadStats();
 
             final File[] files = (filter != null ? file.listFiles(filter)

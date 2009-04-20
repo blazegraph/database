@@ -50,6 +50,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.counters.CounterSet;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
@@ -268,7 +269,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
     final protected transient boolean DEBUG = log.isDebugEnabled();
     
-    private final AsynchronousWriteConfiguration<S> asynchronousWriteConfiguration;
+    private final AsynchronousWriteConfiguration<S> statementBufferFactory;
     
     private final AbstractTripleStore database;
     
@@ -341,7 +342,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         if (asynchronousWriteConfiguration == null)
             throw new IllegalArgumentException();
 
-        this.asynchronousWriteConfiguration = asynchronousWriteConfiguration;
+        this.statementBufferFactory = asynchronousWriteConfiguration;
         
         this.database = asynchronousWriteConfiguration.tripleStore;
         
@@ -482,7 +483,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
              * a private map it does not need to be thread-safe.
              */
             bnodes = new HashMap<String, BigdataBNodeImpl>(
-                    asynchronousWriteConfiguration.bnodesInitialCapacity);
+                    statementBufferFactory.bnodesInitialCapacity);
 
             // fall through.
             
@@ -594,7 +595,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
              */
 
             values = new LinkedHashMap<Value, BigdataValue>(
-                    asynchronousWriteConfiguration.valuesInitialCapacity);
+                    statementBufferFactory.valuesInitialCapacity);
 
         }
 
@@ -672,7 +673,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         if (statements == null) {
             
             statements = new UnsynchronizedUnboundedChunkBuffer<S>(
-                    asynchronousWriteConfiguration.statementChunkCapacity);
+                    statementBufferFactory.statementChunkCapacity);
             
         }
         
@@ -702,6 +703,12 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     + ", values=" + values.size() + ", statementCount="
                     + statementCount);
         }
+
+        if (statementBufferFactory.isDone()) {
+
+            throw new RuntimeException("Factory closed?");
+
+        }
         
         /*
          * Synchronous RPC.
@@ -712,14 +719,18 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          */
         {
 
-            // @todo should feed in a chunked iterator.
+            /*
+             * @todo Feed in a chunked iterator? or is that just less efficient
+             * since everything is buffered and we need to use sync RPC for
+             * TERM2ID?
+             */
             
             // dense array of the distinct terms.
             final BigdataValue[] values = this.values.values().toArray(
                     new BigdataValue[0]);
 
             final KVO<BigdataValue>[] a = new Term2IdWriteTask(
-                    asynchronousWriteConfiguration.lexiconRelation,
+                    statementBufferFactory.lexiconRelation,
                     false/* readOnly */, values.length, values,
                     new WriteTaskStats()).call();
             
@@ -749,10 +760,10 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         tasks.add(new AsyncId2TermIndexWriteTask(valueFactory, newId2TIterator(
                 values.values().iterator(),
-                asynchronousWriteConfiguration.id2termChunkCapacity),
-                asynchronousWriteConfiguration.buffer_id2t));
+                statementBufferFactory.id2termChunkCapacity),
+                statementBufferFactory.buffer_id2t));
 
-        if (asynchronousWriteConfiguration.buffer_text != null) {
+        if (statementBufferFactory.buffer_text != null) {
 
             // FIXME full text index.
             throw new UnsupportedOperationException();
@@ -761,28 +772,28 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         }
 
         tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.SPO,
-                asynchronousWriteConfiguration.spoRelation,
+                statementBufferFactory.spoRelation,
 //                (IChunkedOrderedIterator<ISPO>) 
                 statements.iterator(),
-                asynchronousWriteConfiguration.buffer_spo));
+                statementBufferFactory.buffer_spo));
 
-        if (asynchronousWriteConfiguration.buffer_pos != null) {
+        if (statementBufferFactory.buffer_pos != null) {
 
             tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.POS,
-                    asynchronousWriteConfiguration.spoRelation,
+                    statementBufferFactory.spoRelation,
 //                    (IChunkedOrderedIterator<ISPO>) 
                     statements.iterator(),
-                    asynchronousWriteConfiguration.buffer_pos));
+                    statementBufferFactory.buffer_pos));
 
         }
 
-        if (asynchronousWriteConfiguration.buffer_osp != null) {
+        if (statementBufferFactory.buffer_osp != null) {
 
             tasks.add(new AsyncSPOIndexWriteTask(SPOKeyOrder.OSP,
-                    asynchronousWriteConfiguration.spoRelation,
+                    statementBufferFactory.spoRelation,
 //                    (IChunkedOrderedIterator<ISPO>) 
                     statements.iterator(),
-                    asynchronousWriteConfiguration.buffer_osp));
+                    statementBufferFactory.buffer_osp));
 
         }
 
@@ -794,13 +805,13 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          * Note: java 1.6.0_07/12 build problems under linux when typed as
          * <Future> or any other combination that I have tried.
          */
-        final List futures = asynchronousWriteConfiguration.tripleStore.getExecutorService()
-                .invokeAll((List)tasks);
+        final List futures = statementBufferFactory.tripleStore.getExecutorService()
+                .invokeAll((List) tasks);
 
         // make sure that no errors were reported by those tasks.
         for (Object f : futures) {
 
-            ((Future)f).get();
+            ((Future) f).get();
 
         }
         
@@ -1065,11 +1076,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
     /**
      * Factory interface for asynchronous writers on an {@link ITripleStore}.
-     * 
-     * @todo add a factory method returning an interface or abstract class
-     *       provides whatever configuration is relevant given the
-     *       {@link ScaleOutTripleStore} and also provides a factory for
-     *       {@link IStatementBuffer}s based on that configuration.
      */
     public static interface IAsynchronousWriteConfiguration<S extends Statement>
             extends IStatementBufferFactory<S> {
@@ -1113,9 +1119,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
-     * 
-     * @todo this is already setup such that it would be easy to parameterize
-     *       for TM.
      */
     public static class AsynchronousWriteConfiguration<S extends BigdataStatement> implements
             IAsynchronousWriteConfiguration<S> {
@@ -1284,6 +1287,40 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             }
 
         }
+
+        /**
+         * Return <code>true</code> if the {@link Future} for any of the
+         * asynchronous write buffers is done.
+         * <p>
+         * Note: This method should be invoked periodically to verify that no
+         * errors have been encountered by the asynchronous write buffers. If
+         * this method returns <code>true</code>, invoke {@link #awaitAll()},
+         * which will detect any error(s), cancel the other {@link Future}s,
+         * and throw an error back to you.
+         */
+        public boolean isDone() {
+            
+            if (buffer_id2t.getFuture().isDone())
+                return true;
+
+            if (buffer_text != null)
+                if (buffer_text.getFuture().isDone())
+                    return true;
+
+            if (buffer_spo.getFuture().isDone())
+                return true;
+
+            if (buffer_pos != null)
+                if (buffer_pos.getFuture().isDone())
+                    return true;
+
+            if (buffer_osp != null)
+                if (buffer_osp.getFuture().isDone())
+                    return true;
+
+            return false;
+            
+        }
         
         public void cancelAll(final boolean mayInterruptIfRunning) {
 
@@ -1349,6 +1386,44 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         }
 
+        /**
+         * Return performance counters (these include the index performance
+         * counters for the indices on which the factory would write).
+         * 
+         * @return
+         */
+        public CounterSet getCounters() {
+            
+            final CounterSet root = new CounterSet();
+           
+            // sync RPC API
+            root.makePath("TERM2ID").attach(
+                    lexiconRelation.getTerm2IdIndex().getCounters());
+
+            // async API
+            root.makePath("ID2TERM").attach(
+                    lexiconRelation.getId2TermIndex().getCounters());
+
+            if (buffer_text != null) {
+                root.makePath("Text").attach(
+                        lexiconRelation.getSearchEngine().getIndex().getCounters());
+            }
+
+            root.makePath("SPO").attach(
+                    spoRelation.getSPOIndex().getCounters());
+
+            if (buffer_pos != null)
+                root.makePath("POS").attach(
+                        spoRelation.getSPOIndex().getCounters());
+
+            if (buffer_osp != null)
+                root.makePath("OSP").attach(
+                        spoRelation.getSPOIndex().getCounters());
+            
+            return root;
+            
+        }
+        
     }
 
 }

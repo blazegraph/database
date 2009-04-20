@@ -317,13 +317,13 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
-    public BigdataURIImpl createURI(String uriString) {
+    public BigdataURIImpl createURI(final String uriString) {
 
         return new BigdataURIImpl(this, uriString);
 
     }
 
-    public BigdataURIImpl createURI(String namespace, String localName) {
+    public BigdataURIImpl createURI(final String namespace, final String localName) {
 
         return new BigdataURIImpl(this, namespace + localName);
 

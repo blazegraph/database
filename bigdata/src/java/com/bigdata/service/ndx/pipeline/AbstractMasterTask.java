@@ -75,7 +75,7 @@ H extends AbstractMasterStats<L, ? extends AbstractSubtaskStats>,//
 E,//
 S extends AbstractSubtask,//
 L>//
-        extends AbstractHaltableProcess implements Callable<H> {
+        extends AbstractHaltableProcess implements Callable<H>, IMasterTask<E,H> {
 
     static protected transient final Logger log = Logger
             .getLogger(AbstractMasterTask.class);
@@ -88,6 +88,12 @@ L>//
      */
     protected final BlockingBuffer<E[]> buffer;
 
+    public BlockingBuffer<E[]> getBuffer() {
+
+        return buffer;
+        
+    }
+    
     /**
      * The iterator draining the {@link #buffer}.
      * <p>
@@ -156,6 +162,12 @@ L>//
      * Statistics for this (and perhaps other) masters.
      */
     protected final H stats;
+    
+    public H getStats() {
+        
+        return stats;
+        
+    }
     
     public AbstractMasterTask(final H stats,
             final BlockingBuffer<E[]> buffer) {
@@ -239,31 +251,44 @@ L>//
             throws InterruptedException;
     
     /**
-     * Redirects a chunk to the appropriate sink(s) and then drains the
-     * sink, redirecting all chunks which can be read from that sink to the
-     * appropriate sink(s). The <i>sink</i> is closed so that no further
-     * data may be written on it.
+     * Redirects a chunk to the appropriate sink(s) and then drains the sink,
+     * redirecting all chunks which can be read from that sink to the
+     * appropriate sink(s). The <i>sink</i> is closed so that no further data
+     * may be written on it.
      * 
      * @param sink
      *            The sink whose output needs to be redirected.
      * @param chunk
      *            The chunk which the sink was processing when it discovered
-     *            that it need to redirect its outputs to a different sink
-     *            (that is, a chunk which it had already read from its
-     *            buffer and hence which needs to be redirected now).
-     *            
+     *            that it need to redirect its outputs to a different sink (that
+     *            is, a chunk which it had already read from its buffer and
+     *            hence which needs to be redirected now).
+     * 
      * @throws InterruptedException
      */
     protected void handleRedirect(final S sink, final E[] chunk)
             throws InterruptedException {
 
+        if (sink == null)
+            throw new IllegalArgumentException();
+        
+        if (chunk == null)
+            throw new IllegalArgumentException();
+        
+        if(!lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
+        
         synchronized (stats) {
             stats.redirectCount++;
         }
-        
+
         /*
-         * Close the output buffer for this sink - nothing more may written
-         * onto it now that we have seen the StaleLocatorException.
+         * Close the output buffer for this sink - nothing more may written onto
+         * it now that we have seen the StaleLocatorException.
+         * 
+         * Note: We ensure that we are holding the lock before the buffer is
+         * closed so that addToOutputBuffer() can not attempt to add a chunk to
+         * a buffer which is concurrently closed by this method.
          */
         sink.buffer.close();
 
@@ -546,6 +571,9 @@ L>//
      */
     protected void awaitSink(final S sink) {
 
+        if (sink == null)
+            throw new IllegalArgumentException();
+        
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
@@ -596,12 +624,12 @@ L>//
      *            The sink.
      */
     protected void removeOutputBuffer(final L locator,
-            final AbstractSubtask sink) {
+            final AbstractSubtask sink) throws InterruptedException {
 
         if (sink == null)
             throw new IllegalArgumentException();
 
-        lock.lock();
+        lock.lockInterruptibly();
         try {
 
             final S t = subtasks.get(locator);

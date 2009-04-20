@@ -82,7 +82,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class StatementBuffer implements IStatementBuffer<Statement> {
+public class StatementBuffer<S extends Statement> implements IStatementBuffer<S> {
 
     final protected static Logger log = Logger.getLogger(StatementBuffer.class);
    

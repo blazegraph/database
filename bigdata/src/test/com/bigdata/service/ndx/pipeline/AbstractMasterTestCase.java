@@ -82,7 +82,7 @@ public class AbstractMasterTestCase extends TestCase2 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class L {
+    static class L implements Comparable<L> {
         
         protected final int locator;
 
@@ -108,6 +108,14 @@ public class AbstractMasterTestCase extends TestCase2 {
             
             return getClass().getName() + "{locator=" + locator + "}";
             
+        }
+
+        public int compareTo(final L o) {
+            if (locator > o.locator)
+                return 1;
+            if (locator == o.locator)
+                return 0;
+            return -1;
         }
         
     }
@@ -232,7 +240,9 @@ public class AbstractMasterTestCase extends TestCase2 {
 
             for (KVO<O> e : chunk) {
 
-                final int j = e.key[0];
+                // adjust to [0:255] (somewhat arbitrary).
+                final byte b = e.key[0];
+                final int j = (b < 0 ? 255 + b : b);
 
                 final Integer redirect = redirects.get(j);
 
@@ -330,13 +340,16 @@ public class AbstractMasterTestCase extends TestCase2 {
 
                 master.stats.chunksOut++;
                 master.stats.elementsOut += chunk.length;
+                // note: not updating stats.elapsedNanos since no work is done
+                // here.
 
             }
 
             stats.chunksOut++;
             stats.elementsOut += chunk.length;
-            
-            if(log.isInfoEnabled())
+            // note: not updating stats.elapsedNanos since no work is done here.
+
+            if (log.isInfoEnabled())
                 log.info("wrote chunk: " + this + ", #elements="
                                 + chunk.length);
             

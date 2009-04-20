@@ -210,16 +210,16 @@ A//
      * the StaleLocatorException; and (c) re-split all the data remaining in the
      * output buffer since it all needs to go into different output buffer(s).
      * <p>
-     * Note: This is synchronized in order to make the handling of a
-     * {@link StaleLocatorException} MUTEX with respect to adding data to an
-     * output buffer using {@link #addToOutputBuffer(Split, KVO[])}. This
-     * provides a guarentee that no more data will be added to a given output
-     * buffer once this method holds the monitor. Since the output buffer is
-     * single threaded we will never observe more than one
-     * {@link StaleLocatorException} for a given index partition within the
-     * context of the same {@link IndexWriteTask}. Together this allows us to
-     * decisively handle the {@link StaleLocatorException} and close out the
-     * output buffer on which it was received.
+     * Note: The handling of a {@link StaleLocatorException} MUST be MUTEX with
+     * respect to adding data to an output buffer using
+     * {@link #addToOutputBuffer(Split, KVO[])}. This provides a guarentee that
+     * no more data will be added to a given output buffer once this method
+     * holds the monitor. Since the output buffer is single threaded we will
+     * never observe more than one {@link StaleLocatorException} for a given
+     * index partition within the context of the same {@link IndexWriteTask}.
+     * Together this allows us to decisively handle the
+     * {@link StaleLocatorException} and close out the output buffer on which it
+     * was received.
      * 
      * @param sink
      *            The class draining the output buffer.
@@ -247,13 +247,11 @@ A//
 
             stats.redirectCount++;
 
-            final long ts = ndx.getTimestamp();
-
             /*
              * Notify the client so it can refresh the information for this
              * locator.
              */
-            ndx.staleLocator(ts, (L) sink.locator, cause);
+            ndx.staleLocator(ndx.getTimestamp(), (L) sink.locator, cause);
 
             /*
              * Redirect the chunk and anything in the buffer to the appropriate

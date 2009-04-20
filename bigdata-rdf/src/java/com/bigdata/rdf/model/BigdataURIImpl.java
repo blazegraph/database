@@ -77,7 +77,8 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
     /**
      * Used by {@link BigdataValueFactoryImpl}.
      */
-    BigdataURIImpl(BigdataValueFactory valueFactory, String uriString) {
+    BigdataURIImpl(final BigdataValueFactory valueFactory,
+            final String uriString) {
 
         super(valueFactory, NULL);
 

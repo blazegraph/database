@@ -28,14 +28,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 
 /**
@@ -85,7 +93,12 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                             // the write will be redirected into partition#14.
                             redirects.put(13, 14);
                             
+                            lock.lockInterruptibly();
+                            try {
                             handleRedirect(this, chunk);
+                            } finally {
+                                lock.unlock();
+                            }
                             
                             // stop processing.
                             return false;
@@ -198,7 +211,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
             @Override
             protected void removeOutputBuffer(final L locator,
-                    final AbstractSubtask sink) {
+                    final AbstractSubtask sink) throws InterruptedException {
 
                 super.removeOutputBuffer(locator, sink);
 
@@ -254,7 +267,12 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                             // the write will be redirected into partition#14.
                             redirects.put(13, 14);
                             
-                            handleRedirect(this, chunk);
+                            lock.lockInterruptibly();
+                            try {
+                                handleRedirect(this, chunk);
+                            } finally {
+                                lock.unlock();
+                            }
                             
                             // stop processing.
                             return false;
@@ -349,6 +367,433 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             assertEquals("chunksOut", 2, subtaskStats.chunksOut);
             assertEquals("elementsOut", 2, subtaskStats.elementsOut);
             
+        }
+
+    }
+
+    /**
+     * Stress test for redirects.
+     * <p>
+     * Redirects are stored in a map whose key is effectively the first byte of
+     * the {@link KVO} key. This map is pre-populated so that all bytes are
+     * mapped randomly assigned to N distinct locators, L(0..N-1). The test
+     * writes {@link KVO} tuples on a {@link M master}. The master allocates
+     * the tuples to output buffers based on the redirects mapping.
+     * <p>
+     * The test periodically simulates MOVEs by the atomic update of an entry in
+     * the {@link M#redirects} map. Note that we can not simulate SPLIT or JOIN
+     * since the indirection is by the first byte from the key rather than a key
+     * range (fixed granularity).
+     * <p>
+     * For simplicity, the keys are N bytes in length and are generated using a
+     * uniform distribution. The set of "valid" locators is maintained by the
+     * test. The redirects choose a byte at random and redirect it to the next
+     * available locator. For example, the first redirect chooses a byte at
+     * random in [0:255] and the new target for that locator is L(N), where N is
+     * the index of the next locator to be assigned. A thread issues redirects
+     * at random intervals.
+     * <p>
+     * The test ends when either {@link AbstractMasterStats#elementsOut} or
+     * {@link AbstractMasterStats#redirectCount} exceeds some threshold or if
+     * there is an error.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_redirectStressTest() throws InterruptedException,
+            ExecutionException {
+
+        /*
+         * Configuration for the stress test.
+         */
+        
+        // #of concurrent producers.
+        final int nproducers = 10;
+
+        // #of locators onto which the writes will initially be mapped.
+        final int initialLocatorCount = 10;
+        
+        final long[] redirectDelays = new long[]{
+                10, // ms
+                100, // ms
+                1000, // ms
+        };
+        
+        // duration of the stress test.
+        final long timeout = TimeUnit.SECONDS.toNanos(20/* seconds to run */);
+
+        /*
+         * Stress test impl.
+         */
+
+        // used to halt the redirecter and the producer(s) when the test is done.
+        final AtomicBoolean halt = new AtomicBoolean(false);
+        
+        /**
+         * Writes on a master.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        class ProducerTask implements Callable<Void> {
+
+            private final BlockingBuffer<KVO<O>[]> buffer;
+            
+            public ProducerTask(final BlockingBuffer<KVO<O>[]> buffer) {
+            
+                this.buffer = buffer;
+                
+            }
+
+            public Void call() throws Exception {
+
+                final KeyBuilder keyBuilder = new KeyBuilder(4);
+                
+                final Random r = new Random();
+                
+                final int incRange = 300;
+
+                while (!halt.get()) {
+
+                    final int ntuples = r.nextInt(1000);
+
+                    final KVO<O>[] a = new KVO[ntuples];
+
+                    final int firstKey = r.nextInt();
+
+                    int k = firstKey;
+
+                    for (int i = 0; i < a.length; i++) {
+
+                        final byte[] key = keyBuilder.reset().append(k)
+                                .getKey();
+
+                        final byte[] val = new byte[2];
+
+                        r.nextBytes(val);
+
+                        a[i] = new KVO(key, val);
+
+                        k += r.nextInt(incRange);
+
+                    }
+
+                    if (Thread.currentThread().isInterrupted()) {
+
+                        if (log.isInfoEnabled())
+                            log.info("Producer interrupted.");
+                        
+                        return null;
+                        
+                    }
+                    
+                    buffer.add(a);
+                    
+                }
+                
+                if(log.isInfoEnabled())
+                    log.info("Producer halting.");
+                
+                return null;
+                
+            }
+            
+        }
+
+        /**
+         * Issues redirects at random intervals of one or more key ranges (based
+         * on the first byte) to new locators. The target locators are choosen
+         * in a strict sequence.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        class RedirectTask implements Callable<Void> {
+
+            private final M master;
+
+            private final long[] times;
+            
+            // the next locator to be assigned.
+            final AtomicInteger nextLocator = new AtomicInteger(0);
+            
+            final Random r = new Random();
+
+            /**
+             * 
+             * @param master
+             * @param times
+             *            The delay times between redirects. The delay until the
+             *            next redirect is choosen randomly from among the
+             *            specified times.
+             */
+            public RedirectTask(final M master, final long[] times) {
+            
+                this.master = master;
+                
+                this.times = times;
+                
+            }
+            
+            public Void call() throws Exception {
+
+                while(!halt.get()) {
+                
+                    if(Thread.currentThread().isInterrupted()) {
+                        
+                        if(log.isInfoEnabled())
+                            log.info("Redirecter interrupted.");
+
+                        // Done.
+                        return null;
+                        
+                    }
+                    
+                    final long delayMillis = times[r.nextInt(times.length)];
+
+                    if (log.isInfoEnabled())
+                        log.info("Will wait " + delayMillis
+                                + "ms for the next redirect");
+                    
+                    Thread.sleep(delayMillis);
+                    
+                    if(!halt.get()) {
+
+                        final int n = r.nextInt(10) + 1;
+
+                        final int m = r.nextInt(n) + 1;
+
+                        redirect(n, m);
+                        
+                    }
+                    
+                }
+
+                if(log.isInfoEnabled())
+                    log.info("Redirecter halting.");
+                
+                return null;
+
+            }
+
+            /**
+             * Redirect one or more key ranges (based on the first byte of the
+             * key) to one or more new locators. The locators are assigned in
+             * strict sequence.
+             * 
+             * @param n
+             *            The #of key ranges (first bytes) to be redirected.
+             * @param m
+             *            The #of locators onto which those key ranges will be
+             *            redirected (m LTE n).
+             */
+            protected void redirect(final int n, final int m) {
+
+                assert m <= n : "n=" + n + ", m=" + m;
+
+                if (log.isInfoEnabled())
+                    log.info("Redirecting " + n + " key ranges onto " + m
+                            + " new locators");
+                
+                for (int i = 0; i < n; i++) {
+                    
+                    // random choice of the byte (key-range) to redirect.
+                    final int keyRange = r.nextInt(255);
+                    
+                    // random choice of new locator in [nextLocator:nextLocator+m-1]
+                    final int locator = r.nextInt(m) + nextLocator.get();
+
+                    if (log.isInfoEnabled())
+                        log.info("Redirecting: keyRange=" + keyRange
+                                + " to locator=" + locator);
+                    
+                    // redirect key-range to locator.
+                    master.redirects.put(keyRange, locator);
+                    
+                }
+                
+                // increment by the #of locators which were (potentially)
+                // assigned.
+                nextLocator.addAndGet(m);
+
+            }
+
+            /**
+             * Assign each key range (based on the first byte) to a locator. The
+             * locators are choosen from [0:n-1]. The {@link #nextLocator} is
+             * set as a post-condition to <i>n</i>.
+             * 
+             * @param n
+             *            The #of locators onto which the key ranges will be
+             *            mapped.
+             */
+            protected void init(int n) {
+
+                for (int i = 0; i <= 255; i++) {
+
+                    master.redirects.put(i, r.nextInt(n));
+
+                }
+
+                nextLocator.set(n);
+
+            }
+            
+        }
+
+        final M master = new M(masterStats, masterBuffer, executorService);
+        
+        /*
+         * Setup the initial redirects. Each byte is directed to one of the N
+         * initially defined locators.
+         */
+        final RedirectTask redirecter = new RedirectTask(master, redirectDelays);
+        
+        redirecter.init(initialLocatorCount);
+        
+        // start the consumer.
+        final Future<H> future = executorService.submit(master);
+        masterBuffer.setFuture(future);
+
+        // start writing data.
+        final List<Future> producerFutures = new LinkedList<Future>();
+        for (int i = 0; i < nproducers; i++) {
+
+            producerFutures.add(executorService.submit(new ProducerTask(
+                    masterBuffer)));
+            
+        }
+        
+        // start redirects.
+        final Future redirecterFuture = executorService.submit(redirecter);  
+
+        try {
+
+            // periodically verify no errors in running tasks.
+            boolean done = false;
+            final long begin = System.nanoTime();
+            while (true) {
+
+                /*
+                 * verify no errors.
+                 */
+
+                // check master.
+                if (masterBuffer.getFuture().isDone()) {
+                    // error - will be identifed below.
+                    break;
+                }
+
+                // check redirecter
+                if (redirecterFuture.isDone()) {
+                    // error - will be identifed below.
+                    break;
+                }
+
+                // check producers.
+                for (Future f : producerFutures) {
+                    if (f.isDone()) {
+                        // error - will be identifed below.
+                        break;
+                    }
+                }
+
+                /*
+                 * Check termination conditions.
+                 */
+
+                final long elapsed = System.nanoTime() - begin;
+
+                if ((timeout - elapsed) <= 0) {
+
+                    if (log.isInfoEnabled())
+                        log
+                                .info("Ending run: elapsed="
+                                        + TimeUnit.NANOSECONDS
+                                                .toMillis(elapsed) + "ms");
+
+                    done = true;
+
+                    break;
+
+                }
+
+                // sleep in 1/4 second intervals up to the timeout.
+                Thread.sleep(Math.min(TimeUnit.NANOSECONDS.toMillis(timeout
+                        - elapsed)/* remaining */, TimeUnit.MILLISECONDS
+                        .toNanos(250))/* sleep */
+                );
+
+            }
+
+            if (!done) {
+
+                /*
+                 * Something did not end normally. We will stop all the tasks and
+                 * check their futures and something will throw an exception.
+                 */
+
+                log.error("Aborting test.");
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Halting redirector and producers.");
+
+            // cause the producer and redirecter to halt.
+            halt.set(true);
+
+            // await termination and check redirector future for errors.
+            redirecterFuture.get();
+
+            // await termination and check producer futures for errors.
+            for (Future f : producerFutures) {
+
+                f.get();
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Closing master buffer.");
+
+            // close the master : queued data should be drained by sinks.
+            masterBuffer.close();
+
+            // await termination and check future for errors in master.
+            masterBuffer.getFuture().get();
+
+        } finally {
+
+            // show the master stats
+            System.out.println(master.stats.toString());
+
+            {
+                // show the redirects using an ordered map.
+                final Map<Integer, Integer> redirects = new TreeMap<Integer, Integer>(
+                        master.redirects);
+
+                for (Map.Entry<Integer, Integer> e : redirects.entrySet()) {
+
+                    System.out.println("key: " + e.getKey() + " => L("
+                            + e.getValue() + ")");
+
+                }
+
+            }
+            {
+                // show the subtask stats using an ordered map.
+                final Map<L, HS> subStats = new TreeMap<L, HS>(master.stats
+                        .getSubtaskStats());
+
+                for (Map.Entry<L, HS> e : subStats.entrySet()) {
+
+                    System.out.println(e.getKey() + " : " + e.getValue());
+
+                }
+
+            }
+
         }
 
     }
