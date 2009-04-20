@@ -196,18 +196,28 @@ L>//
                             if (buffer.isEmpty()) {
                                 /*
                                  * Close out buffer. Since the buffer is empty
-                                 * the iterator will be exhausted and the
-                                 * subtask will quit the next time through the
-                                 * loop.
+                                 * the iterator will be quickly be exhausted (it
+                                 * is possible there is one chunk waiting in the
+                                 * iterator) and the subtask will quit the next
+                                 * time through the loop.
                                  * 
-                                 * Note: This can happen either if the master
-                                 * is closed or if idle too long.
+                                 * Note: This can happen either if the master is
+                                 * closed or if idle too long.
                                  */
-                                buffer.close();
                                 if (INFO)
-                                    log.info("Closed buffer: idle=" + idle
+                                    log.info("Closing buffer: idle=" + idle
                                             + " : " + this);
+                                buffer.close();
+                                if (idle) {
+                                    synchronized (master.stats) {
+                                        master.stats.subtaskIdleTimeout++;
+                                    }
+                                }
                                 if(!src.hasNext()) {
+                                    /*
+                                     * The iterator is already exhausted so we
+                                     * break out of the loop now.
+                                     */
                                     if (INFO)
                                         log.info("No more data: " + this);
                                     break;

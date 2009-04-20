@@ -334,12 +334,13 @@ public class MutationTask extends AbstractStepTask {
     /**
      * Builds a set of tasks for the program.
      * 
-     * @param buffer
+     * @param buffers
      * 
      * @return
      */
-    protected List<Callable<RuleStats>> newMutationTasks(IStep step,
-            IJoinNexus joinNexus, Map<String, IBuffer<ISolution[]>> buffers) {
+    protected List<Callable<RuleStats>> newMutationTasks(final IStep step,
+            final IJoinNexus joinNexus,
+            final Map<String, IBuffer<ISolution[]>> buffers) {
 
         if (DEBUG)
             log.debug("program=" + step.getName());

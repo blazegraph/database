@@ -84,12 +84,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.isInfoEnabled();
+    protected final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    protected final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The initial delay before we will log a warning for {@link #add(Object)}
@@ -478,7 +478,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             try {
          
                 if (INFO)
-                    log.info("closed.");
+                    log.info("Closing buffer: ", new RuntimeException(
+                            "Closing buffer."));
 
                 if (stackFrame != null) {
 
@@ -486,7 +487,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      * Purely for debugging.
                      */
 
-                    log.warn("closing buffer at", new RuntimeException());
+//                    log.warn("closing buffer at", new RuntimeException());
 
                     log.warn("buffer allocated at", stackFrame);
 
@@ -576,6 +577,23 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         assertOpen();
 
+        if (e == null)
+            throw new IllegalArgumentException();
+
+        if (e.getClass().getComponentType() != null) {
+
+            if (((Object[]) e).length == 0) {
+
+                if(log.isInfoEnabled())
+                    log.info("Empty chunk.");
+                
+                // empty chunk.
+                return;
+
+            }
+            
+        }
+        
         final long begin = System.nanoTime();
         
         // wait if the queue is full.
@@ -1521,6 +1539,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             final Object[] e1 = (Object[]) e;
             
             final Object[] e2 = (Object[]) _next();
+            
+            if (e2.length == 0) {
+            
+                // empty chunk.
+                return e;
+                
+            }
             
             final int chunkSize = e1.length + e2.length;
             

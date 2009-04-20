@@ -226,20 +226,21 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
             try {
                 loader.shutdownNow();
                 if (statementfactory != null) {
-                    statementfactory.cancelAll(true/* mayInterruptIfRunning */);
+                    statementfactory
+                            .cancelAll(true/* mayInterruptIfRunning */);
                 }
                 if (writeBuffer != null) {
                     writeBuffer.getFuture()
-                            .cancel(true/*mayInterruptIfRunning*/);
+                            .cancel(true/* mayInterruptIfRunning */);
                 }
             } catch (Throwable t2) {
                 log.warn(this, t2);
             }
 
             throw new RuntimeException(t);
-            
+
         }
-        
+
         return null;
 
     }
@@ -307,10 +308,16 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
          * The scheduled task should run forever so this blocks until this
          * thread is interruted.
          */
-        f.get();
+        try {
 
-        // cancel the scheduled task.
-        f.cancel(true/* mayInterruptIfRunning */);
+            f.get();
+            
+        } finally {
+
+            // cancel the scheduled task.
+            f.cancel(true/* mayInterruptIfRunning */);
+
+        }
 
     }
 

@@ -158,18 +158,18 @@ public class ClientIndexView implements IScaleOutClientIndex {
     /**
      * True iff the {@link #log} level is WARN or less.
      */
-    final protected static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+    final protected boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
             .toInt();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.isInfoEnabled();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Error message used if we were unable to start a new transaction in order
@@ -1626,7 +1626,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                     split.pmd.getPartitionId() // the index partition identifier.
                     );
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Submitting task=" + this + " on " + dataService);
 
             try {
@@ -1770,7 +1770,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             final PartitionLocator locator = ndx.getFederation()
                     .getMetadataIndex(ndx.getName(), ts).find(key);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Retrying: proc=" + proc.getClass().getName()
                         + ", locator=" + locator + ", ntries=" + ntries);
 
@@ -2280,7 +2280,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             final IResultHandler<R, A> resultHandler,
             final IDuplicateRemover<O> duplicateRemover,
             final AbstractKeyArrayIndexProcedureConstructor<T> ctor) {
-
+        
         final BlockingBuffer<KVO<O>[]> writeBuffer = new BlockingBuffer<KVO<O>[]>(
                 // @todo array vs linked w/ capacity and fair vs unfair.
                 new ArrayBlockingQueue<KVO<O>[]>(indexWriteQueueCapacity), 
@@ -2289,7 +2289,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
                 true// ordered
         );
-
+        
         final IndexWriteTask.M<T, O, R, A> task = new IndexWriteTask.M<T, O, R, A>(
                 this, indexPartitionWriteQueueCapacity, resultHandler,
                 duplicateRemover, ctor,
@@ -2300,7 +2300,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         writeBuffer.setFuture(future);
 
-        return writeBuffer;
+        return task.getBuffer();
 
     }
 

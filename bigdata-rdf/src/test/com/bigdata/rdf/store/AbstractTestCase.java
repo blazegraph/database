@@ -670,7 +670,7 @@ abstract public class AbstractTestCase
      * Validates that the same statements are found in each of the statement
      * indices.
      */
-    public void assertStatementIndicesConsistent(AbstractTripleStore db, final int maxerrors) {
+    static public void assertStatementIndicesConsistent(AbstractTripleStore db, final int maxerrors) {
 
         if (log.isInfoEnabled())
         log.info("Verifying statement indices");
@@ -714,7 +714,7 @@ abstract public class AbstractTestCase
      * @param nerrs
      *            Used to report the #of errors.
      */
-    private void assertSameStatements(//
+    static private void assertSameStatements(//
             final AbstractTripleStore db,//
             final SPOKeyOrder keyOrderExpected,//
             final SPOKeyOrder keyOrderActual,//
@@ -851,7 +851,7 @@ abstract public class AbstractTestCase
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class StatementVerifier extends BasicRioLoader {
+    static protected class StatementVerifier extends BasicRioLoader {
 
         final private AbstractTripleStore db;
 
