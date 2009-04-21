@@ -113,9 +113,16 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     public long chunksOut = 0L;
     
     /**
-     * Elapsed nanoseconds for RMI requests.
+     * Elapsed time across sinks waiting for another chunk to be ready so that
+     * it can be written onto the index partition.
      */
-    public long elapsedNanos = 0L;
+    public long elapsedChunkWaitingNanos = 0L;
+
+    /**
+     * Elapsed nanoseconds across sinks writing chunks on an index partition
+     * (RMI requests).
+     */
+    public long elapsedChunkWritingNanos = 0L;
 
     /**
      * Map for the per-index partition statistics. This ensures that we can
@@ -253,10 +260,25 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             }
         });
 
-        t.addCounter("elapsedNanos", new Instrument<Long>() {
+        t.addCounter("elapsedChunkWaitingNanos", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(elapsedNanos);
+                setValue(elapsedChunkWaitingNanos);
+            }
+        });
+
+        t.addCounter("elapsedChunkWritingNanos", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(elapsedChunkWritingNanos);
+            }
+        });
+
+        t.addCounter("averageMillisPerWait", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(TimeUnit.NANOSECONDS
+                        .toMillis((long) getAverageNanosPerWait()));
             }
         });
 
@@ -281,11 +303,23 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     }
 
     /**
+     * The average #of nanoseconds waiting for a chunk to become ready so that
+     * it can be written on an output sink.
+     */
+    public double getAverageNanosPerWait() {
+
+        return (chunksOut == 0L ? 0 : elapsedChunkWaitingNanos
+                / (double) chunksOut);
+
+    }
+
+    /**
      * The average #of nanoseconds per chunk written on an output sink.
      */
     public double getAverageNanosPerWrite() {
 
-        return (chunksOut == 0L ? 0 : elapsedNanos / (double) chunksOut);
+        return (chunksOut == 0L ? 0 : elapsedChunkWritingNanos
+                / (double) chunksOut);
 
     }
 
@@ -300,13 +334,32 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
 
     public String toString() {
 
-        return getClass().getName() + "{subtaskStartCount=" + subtaskStartCount
-                + ", subtaskEndCount=" + subtaskEndCount
-                + ", subtaskIdleTimeout=" + subtaskIdleTimeout
-                + ", partitionCount=" + partitionCount + ", redirectCount="
-                + redirectCount + ", chunkIn=" + chunksIn + ", elementIn="
-                + elementsIn + ", chunksOut=" + chunksOut + ", elementsOut="
-                + elementsOut + ", elapsedNanos=" + elapsedNanos
+        return getClass().getName()
+                + "{subtaskStartCount="
+                + subtaskStartCount
+                + ", subtaskEndCount="
+                + subtaskEndCount
+                + ", subtaskIdleTimeout="
+                + subtaskIdleTimeout
+                + ", partitionCount="
+                + partitionCount
+                + ", redirectCount="
+                + redirectCount
+                + ", chunkIn="
+                + chunksIn
+                + ", elementIn="
+                + elementsIn
+                + ", chunksOut="
+                + chunksOut
+                + ", elementsOut="
+                + elementsOut
+                + ", elapsedChunkWaitingNanos="
+                + elapsedChunkWaitingNanos
+                + ", elapsedChunkWritingNanos="
+                + elapsedChunkWritingNanos
+                + ", averageMillisPerWait="
+                + TimeUnit.NANOSECONDS
+                        .toMillis((long) getAverageNanosPerWait())
                 + ", averageMillisPerWrite="
                 + TimeUnit.NANOSECONDS
                         .toMillis((long) getAverageNanosPerWrite())

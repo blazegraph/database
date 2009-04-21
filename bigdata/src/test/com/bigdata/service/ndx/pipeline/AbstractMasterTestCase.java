@@ -358,13 +358,13 @@ public class AbstractMasterTestCase extends TestCase2 {
 
                 master.stats.chunksOut++;
                 master.stats.elementsOut += chunk.length;
-                master.stats.elapsedNanos += elapsed;
+                master.stats.elapsedChunkWritingNanos += elapsed;
 
             }
 
             stats.chunksOut++;
             stats.elementsOut += chunk.length;
-            stats.elapsedNanos += elapsed;
+            stats.elapsedChunkWritingNanos += elapsed;
 
             if (log.isInfoEnabled())
                 log.info("wrote chunk: " + this + ", #elements="

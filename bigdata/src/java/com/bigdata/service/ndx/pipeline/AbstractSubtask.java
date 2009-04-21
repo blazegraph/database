@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
@@ -137,110 +136,28 @@ L>//
 
         try {
 
-//            /*
-//             * Poll the iterator with a timeout to avoid deadlock with
-//             * awaitAll().
-//             * 
-//             * Note: In order to ensure termination the subtask MUST poll the
-//             * iterator with a timeout so that a subtask which was created in
-//             * response to a StaleLocatorException during master.awaitAll() can
-//             * close its own blocking buffer IF: (a) the top-level blocking
-//             * buffer is closed; and (b) the subtask's blocking buffer is empty.
-//             * This operation needs to be coordinated using the master's [lock],
-//             * as does any operation which writes on the subtask's buffer.
-//             * Otherwise we can wait forever for a subtask to complete. The
-//             * subtask uses the [subtask] Condition signal the master when it is
-//             * finished.
-//             */
-//            final Thread t = Thread.currentThread();
-//            while (true) {
-//
-//                master.halted();
-//
-//                if (t.isInterrupted()) {
-//
-//                    throw master.halt(new InterruptedException(toString()));
-//
-//                }
-//                
-//                // nothing available w/in timeout?
-//                if (!src.hasNext(master.sinkPollTimeoutNanos,
-//                        TimeUnit.NANOSECONDS)) {
-//
-//                    // are we done? should we close our buffer?
-//                    master.lock.lockInterruptibly();
-//                    try {
-//                        if (!buffer.isOpen() && !src.hasNext()) {
-//                            // We are done.
-//                            if (INFO)
-//                                log.info("No more data: " + this);
-//                            break;
-//                        }
-//                        final long elapsedSinceLastChunk = System.nanoTime()
-//                                - lastChunkNanos;
-//                        final boolean idle = elapsedSinceLastChunk > master.sinkIdleTimeoutNanos;
-//                        if (idle || master.src.isExhausted()) {
-//                            if (buffer.isEmpty()) {
-//                                /*
-//                                 * Close out buffer. Since the buffer is empty
-//                                 * the iterator will be quickly be exhausted (it
-//                                 * is possible there is one chunk waiting in the
-//                                 * iterator) and the subtask will quit the next
-//                                 * time through the loop.
-//                                 * 
-//                                 * Note: This can happen either if the master is
-//                                 * closed or if idle too long.
-//                                 */
-//                                if (INFO)
-//                                    log.info("Closing buffer: idle=" + idle
-//                                            + " : " + this);
-//                                if (idle) {
-//                                    // stack trace here if closed by idle timeout.
-//                                    buffer.close();
-//                                    synchronized (master.stats) {
-//                                        master.stats.subtaskIdleTimeout++;
-//                                    }
-//                                } else {
-//                                    // stack trace here if master exhausted.
-//                                    buffer.close();
-//                                }
-//                                if (!src.hasNext()) {
-//                                    /*
-//                                     * The iterator is already exhausted so we
-//                                     * break out of the loop now.
-//                                     */
-//                                    if (INFO)
-//                                        log.info("No more data: " + this);
-//                                    break;
-//                                }
-//                            }
-//                        }
-//                        // poll the itr again.
-//                        continue;
-//                    } finally {
-//                        master.lock.unlock();
-//                    }
-//
-//                }
-//
-//                if (handleChunk(src.next())) {
-//
-//                    if (INFO)
-//                        log.info("Eager termination.");
-//
-//                    // Done (eager termination).
-//                    break;
-//
-//                }
-//
-//            }
-
             final NonBlockingChunkedIterator itr = new NonBlockingChunkedIterator(
                     src);
+            
+            /*
+             * Timestamp of the last chunk handled (written out on the index
+             * partition). This is used to compute the average time between
+             * chunks written on the index partition by this sink and across all
+             * sinks.
+             */
+            long lastHandledChunkNanos = System.nanoTime();
             
             while(itr.hasNext()) {
 
                 final E[] chunk = itr.next();
+
+                // how long we waited for this chunk.
+                final long elapsedChunkWaitNanos = System.nanoTime() - lastHandledChunkNanos;
+
+                synchronized (master.stats) {
+                    master.stats.elapsedChunkWaitingNanos += elapsedChunkWaitNanos;
+                }
+                stats.elapsedChunkWaitingNanos += elapsedChunkWaitNanos;
                 
                 if (handleChunk(chunk)) {
 
@@ -251,6 +168,9 @@ L>//
                     break;
 
                 }
+
+                // reset the timestamp now that we will wait again.
+                lastHandledChunkNanos = System.nanoTime();
 
             }
             
@@ -494,12 +414,6 @@ L>//
                         log.info("No more data: " + this);
                     return false;
                 }
-//                // are we done? should we close our buffer?
-//                master.lock.lockInterruptibly();
-//                try {
-//                } finally {
-//                    master.lock.unlock();
-//                }
 
                 // poll the itr again.
 

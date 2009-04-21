@@ -46,16 +46,34 @@ public class AbstractSubtaskStats {
     public long chunksOut = 0L;
 
     /**
-     * Elapsed nanoseconds for RMI requests.
+     * Elapsed time waiting for another chunk to be ready so that it can be
+     * written onto the index partition.
      */
-    public long elapsedNanos = 0L;
+    public long elapsedChunkWaitingNanos = 0L;
+
+    /**
+     * Elapsed nanoseconds writing chunks on an index partition (RMI request).
+     */
+    public long elapsedChunkWritingNanos = 0L;
+
+    /**
+     * The average #of nanoseconds for a chunk to become ready so that it can be
+     * written on the sink.
+     */
+    public double getAverageNanosPerWait() {
+
+        return (chunksOut == 0L ? 0 : elapsedChunkWaitingNanos
+                / (double) chunksOut);
+
+    }
 
     /**
      * The average #of nanoseconds per chunk written on the sink.
      */
     public double getAverageNanosPerWrite() {
 
-        return (chunksOut == 0L ? 0 : elapsedNanos / (double) chunksOut);
+        return (chunksOut == 0L ? 0 : elapsedChunkWritingNanos
+                / (double) chunksOut);
 
     }
 
@@ -75,10 +93,13 @@ public class AbstractSubtaskStats {
     public String toString() {
 
         return getClass().getName() + "{chunksOut=" + chunksOut
-                + ", elementsOut=" + elementsOut + ", elapsedNanos="
-                + elapsedNanos + ", averageNanos/write="
-                + getAverageNanosPerWrite() + ", averageElements/write="
-                + getAverageElementsPerWrite() + "}";
+                + ", elementsOut=" + elementsOut
+                + ", elapsedChunkWaitingNanos=" + elapsedChunkWaitingNanos
+                + ", elapsedChunkWritingNanos=" + elapsedChunkWritingNanos
+                + ", averageNanosPerWait=" + getAverageNanosPerWrite()
+                + ", averageNanosPerWrite=" + getAverageNanosPerWrite()
+                + ", averageElementsPerWrite=" + getAverageElementsPerWrite()
+                + "}";
 
     }
 
