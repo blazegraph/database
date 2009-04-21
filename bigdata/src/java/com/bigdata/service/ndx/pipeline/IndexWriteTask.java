@@ -32,13 +32,16 @@ import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IScaleOutClientIndex;
@@ -105,7 +108,11 @@ A//
     // from the ctor.
     protected final IScaleOutClientIndex ndx;
 
-    protected final int subtaskQueueCapacity;
+    protected final int sinkQueueCapacity;
+
+    protected final int sinkChunkSize;
+
+    protected final long sinkChunkTimeoutNanos;
 
     protected final IResultHandler<R, A> resultHandler;
 
@@ -120,41 +127,90 @@ A//
         
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * @param ndx
+     *            The client's view of the scale-out index.
+     * @param sinkIdleTimeoutNanos
+     *            The time in nanoseconds after which an idle sink will be
+     *            closed. Any buffered writes are flushed when the sink is
+     *            closed. This must be GTE the <i>sinkChunkTimeout</i>
+     *            otherwise the sink will decide that it is idle when it was
+     *            just waiting for enough data to prepare a full chunk.
+     * @param sinkPollTimeoutNanos
+     *            The time in nanoseconds that the {@link AbstractSubtask sink}
+     *            will wait inside of the {@link IAsynchronousIterator} when it
+     *            polls the iterator for a chunk. This value should be
+     *            relatively small so that the sink remains responsible rather
+     *            than blocking inside of the {@link IAsynchronousIterator} for
+     *            long periods of time.
+     * @param sinkQueueCapacity
+     *            The capacity of the internal queue for the per-sink output
+     *            buffer.
+     * @param sinkChunkSize
+     *            The desired size of the chunks written that will be written by
+     *            the {@link AbstractSubtask sink}.
+     * @param sinkChunkTimeoutNanos
+     *            The maximum amount of time in nanoseconds that a sink will
+     *            combine smaller chunks so that it can satisify the desired
+     *            <i>sinkChunkSize</i>.
+     * @param duplicateRemover
+     *            Removes duplicate key-value pairs from the (optional).
+     * @param ctor
+     *            The ctor instantiates an {@link IIndexProcedure} for each
+     *            chunk written on an index partition.
+     * @param resultHandler
+     *            Aggregates results across the individual index partition write
+     *            operations (optional).
+     * @param stats
+     *            The index statistics object.
+     * @param buffer
+     *            The buffer on which the application will write.
+     */
     public IndexWriteTask(final IScaleOutClientIndex ndx,
-            final int subtaskQueueCapacity,
-            final IResultHandler<R, A> resultHandler,
+            final long sinkIdleTimeoutNanos,
+            final long sinkPollTimeoutNanos,
+            final int sinkQueueCapacity,
+            final int sinkChunkSize,
+            final long sinkChunkTimeoutNanos,
             final IDuplicateRemover<O> duplicateRemover,
             final AbstractKeyArrayIndexProcedureConstructor<T> ctor,
+            final IResultHandler<R, A> resultHandler,
             final H stats,
             final BlockingBuffer<E[]> buffer) {
 
-        super(stats, buffer);
+        super(stats, buffer, sinkIdleTimeoutNanos, sinkPollTimeoutNanos);
         
         if (ndx == null)
             throw new IllegalArgumentException();
 
-        if (subtaskQueueCapacity <= 0)
+        if (sinkQueueCapacity <= 0)
             throw new IllegalArgumentException();
 
-//        if (resultHandler == null)
-//            throw new IllegalArgumentException();
-
+        if (sinkChunkSize <= 0)
+            throw new IllegalArgumentException();
+        
+        if (sinkChunkTimeoutNanos <= 0)
+            throw new IllegalArgumentException();
+        
 //        if (duplicateRemover == null)
 //            throw new IllegalArgumentException();
 
         if (ctor == null)
             throw new IllegalArgumentException();
 
-        if (stats == null)
-            throw new IllegalArgumentException();
-        
-        if (buffer == null)
-            throw new IllegalArgumentException();
+//      if (resultHandler == null)
+//      throw new IllegalArgumentException();
 
         this.ndx = ndx;
 
-        this.subtaskQueueCapacity = subtaskQueueCapacity;
+        this.sinkQueueCapacity = sinkQueueCapacity;
 
+        this.sinkChunkSize = sinkChunkSize;
+        
+        this.sinkChunkTimeoutNanos = sinkChunkTimeoutNanos;
+        
         this.resultHandler = resultHandler;
 
         this.duplicateRemover = duplicateRemover;
@@ -176,15 +232,21 @@ A//
      * output buffer assigned by the split had since been closed (due to a
      * redirect).
      * 
-     * @TODO The test suite does not demonstrate this problem which makes
+     * @todo The test suite does not demonstrate this problem which makes
      *       detection difficult. See
      *       {@link TestMasterTaskWithRedirect#test_redirectStressTest()}.
+     * 
+     * @todo The test suite failed to demonstrate a problem where reopen was
+     *       false and there had been an idle timeout for a sink and the master
+     *       attempted to write another chunk onto that sink. The problem has
+     *       since been repaired in the code, but the test suite still does not
+     *       detect the issue.
      * 
      * @todo the requirement to hold the lock across the add of the splits could
      *       stifle throughput when writes on some locators are slower and their
      *       output buffers fill up.
      */
-    protected void nextChunk(final E[] a, final boolean reopen)
+    protected void handleChunk(final E[] a, final boolean reopen)
             throws InterruptedException {
 
         lock.lockInterruptibly();
@@ -300,17 +362,19 @@ A//
     }
 
     /**
-     * @todo configure chunk size and timeout. could just take the values from
-     *       {@link AbstractMasterTask#buffer}.
+     * {@inheritDoc}
+     * <p>
+     * The queue capacity, chunk size and chunk timeout are taken from the ctor
+     * parameters.
      */
     @Override
     protected BlockingBuffer<E[]> newSubtaskBuffer() {
         
         return new BlockingBuffer<E[]>(//
-                new ArrayBlockingQueue<E[]>(subtaskQueueCapacity), //
-                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// 
-                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,//
-                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
+                new ArrayBlockingQueue<E[]>(sinkQueueCapacity), //
+                sinkChunkSize,// 
+                sinkChunkTimeoutNanos,//
+                TimeUnit.NANOSECONDS,//
                 true // ordered
         );
         
@@ -358,28 +422,27 @@ A//
             > {
 
         /**
-         * @param ndx
-         * @param subtaskQueueCapacity
-         * @param resultHandler
-         * @param duplicateRemover
-         * @param ctor
-         * @param stats
-         * @param buffer
+         * {@inheritDoc}
          */
         public M(
-                IScaleOutClientIndex ndx,
-                int subtaskQueueCapacity,
-                IResultHandler<R, A> resultHandler,
-                IDuplicateRemover<O> duplicateRemover,
-                AbstractKeyArrayIndexProcedureConstructor<T> ctor,
-                IndexWriteStats<PartitionLocator, IndexPartitionWriteStats> stats,
-                BlockingBuffer<KVO<O>[]> buffer) {
+                final IScaleOutClientIndex ndx,
+                final long sinkIdleTimeoutNanos,
+                final long sinkPollTimeoutNanos,
+                final int sinkQueueCapacity,
+                final int sinkChunkSize,
+                final long sinkChunkTimeoutNanos,
+                final IDuplicateRemover<O> duplicateRemover,
+                final AbstractKeyArrayIndexProcedureConstructor<T> ctor,
+                final IResultHandler<R, A> resultHandler,
+                final IndexWriteStats<PartitionLocator, IndexPartitionWriteStats> stats,
+                final BlockingBuffer<KVO<O>[]> buffer) {
             
-            super(ndx, subtaskQueueCapacity, resultHandler, duplicateRemover,
-                    ctor, stats, buffer);
+            super(ndx, sinkIdleTimeoutNanos, sinkPollTimeoutNanos,
+                    sinkQueueCapacity, sinkChunkSize, sinkChunkTimeoutNanos,
+                    duplicateRemover, ctor, resultHandler, stats, buffer);
 
         }
-        
+
     }
 
 }

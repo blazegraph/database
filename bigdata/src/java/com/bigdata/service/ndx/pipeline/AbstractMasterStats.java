@@ -279,7 +279,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     }
 
     /**
-     * The average #of nanoseconds per chunk written on the index partition.
+     * The average #of nanoseconds per chunk written on an output sink.
      */
     public double getAverageNanosPerWrite() {
 
@@ -288,8 +288,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     }
 
     /**
-     * The average #of elements (tuples) per chunk written on the index
-     * partition.
+     * The average #of elements (tuples) per chunk written on an output sink.
      */
     public double getAverageElementsPerWrite() {
 

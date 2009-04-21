@@ -50,6 +50,24 @@ public class AbstractSubtaskStats {
      */
     public long elapsedNanos = 0L;
 
+    /**
+     * The average #of nanoseconds per chunk written on the sink.
+     */
+    public double getAverageNanosPerWrite() {
+
+        return (chunksOut == 0L ? 0 : elapsedNanos / (double) chunksOut);
+
+    }
+
+    /**
+     * The average #of elements (tuples) per chunk written on the sink.
+     */
+    public double getAverageElementsPerWrite() {
+
+        return (chunksOut == 0L ? 0 : elementsOut / (double) chunksOut);
+
+    }
+
     public AbstractSubtaskStats() {
 
     }
@@ -59,7 +77,8 @@ public class AbstractSubtaskStats {
         return getClass().getName() + "{chunksOut=" + chunksOut
                 + ", elementsOut=" + elementsOut + ", elapsedNanos="
                 + elapsedNanos + ", averageNanos/write="
-                + (elapsedNanos == 0L ? 0 : chunksOut / elapsedNanos) + "}";
+                + getAverageNanosPerWrite() + ", averageElements/write="
+                + getAverageElementsPerWrite() + "}";
 
     }
 

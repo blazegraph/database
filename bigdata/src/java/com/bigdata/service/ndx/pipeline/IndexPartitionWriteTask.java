@@ -126,7 +126,7 @@ A//
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    protected boolean nextChunk(final E[] sourceChunk)
+    protected boolean handleChunk(final E[] sourceChunk)
             throws ExecutionException, InterruptedException, IOException {
 
         /*

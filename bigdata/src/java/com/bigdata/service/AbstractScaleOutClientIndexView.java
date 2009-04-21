@@ -35,10 +35,12 @@ import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IRangeQuery;
@@ -75,10 +77,9 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IBigdataClient.Options;
-import com.bigdata.service.ndx.IndexTaskCounters;
+import com.bigdata.service.ndx.ScaleOutIndexCounters;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
@@ -1252,42 +1253,52 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
             final IResultHandler aggregator);
     
     public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
-            final int indexWriteQueueCapacity,
-            final int indexPartitionWriteQueueCapacity,
             final IResultHandler<R, A> resultHandler,
             final IDuplicateRemover<O> duplicateRemover,
             final AbstractKeyArrayIndexProcedureConstructor<T> ctor) {
 
+        final AsynchronousIndexWriteConfiguration conf = getIndexMetadata()
+                .getAsynchronousIndexWriteConfiguration();
+
         final BlockingBuffer<KVO<O>[]> writeBuffer = new BlockingBuffer<KVO<O>[]>(
                 // @todo array vs linked w/ capacity and fair vs unfair.
-                new ArrayBlockingQueue<KVO<O>[]>(indexWriteQueueCapacity), 
-                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// @todo config
-                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,// @todo config
-                BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
+                new ArrayBlockingQueue<KVO<O>[]>(conf.getMasterQueueCapacity()),
+                conf.getMasterChunkSize(),//
+                conf.getMasterChunkTimeoutNanos(),// 
+                TimeUnit.NANOSECONDS,//
                 true// ordered
         );
-
+        
         final IndexWriteTask.M<T, O, R, A> task = new IndexWriteTask.M<T, O, R, A>(
-                this, indexPartitionWriteQueueCapacity, resultHandler,
-                duplicateRemover, ctor,
-                fed.getIndexTaskCounters(name).asynchronousStats, writeBuffer);
+                this, //
+                conf.getSinkIdleTimeoutNanos(),//
+                conf.getSinkPollTimeoutNanos(),//
+                conf.getSinkQueueCapacity(), //
+                conf.getSinkChunkSize(), //
+                conf.getSinkChunkTimeoutNanos(),//
+                duplicateRemover,//
+                ctor,//
+                resultHandler,//
+                fed.getIndexCounters(name).asynchronousStats,
+                writeBuffer//
+                );
 
         final Future<? extends IndexWriteStats> future = fed
                 .getExecutorService().submit(task);
 
         writeBuffer.setFuture(future);
 
-        return writeBuffer;
+        return task.getBuffer();
 
     }
 
     /**
-     * Return a new {@link CounterSet} backed by the {@link IndexTaskCounters}
+     * Return a new {@link CounterSet} backed by the {@link ScaleOutIndexCounters}
      * for this scale-out index.
      */
     public ICounterSet getCounters() {
 
-        return getFederation().getIndexTaskCounters(name).getCounters();
+        return getFederation().getIndexCounters(name).getCounters();
 
     }
 

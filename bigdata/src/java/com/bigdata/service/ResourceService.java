@@ -80,9 +80,7 @@ abstract public class ResourceService {
 
     protected static final Logger log = Logger.getLogger(ResourceService.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
+//    protected final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The port on which the service is accepting connections.
@@ -319,7 +317,7 @@ abstract public class ResourceService {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running on port=" + this.port);
 
         if (requestServicePoolSize == 0) {
@@ -407,7 +405,7 @@ abstract public class ResourceService {
 
                 if (!open) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("closed.");
 
                     return;
@@ -449,7 +447,7 @@ abstract public class ResourceService {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         /*
@@ -501,7 +499,7 @@ abstract public class ResourceService {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         acceptService.shutdownNow();
@@ -657,7 +655,7 @@ abstract public class ResourceService {
         public void run()
         {
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("localPort=" + s.getLocalPort());
 
             InputStream is = null;
@@ -673,7 +671,7 @@ abstract public class ResourceService {
                 final long leastSigBits = in.readLong();
                 final UUID uuid = new UUID(mostSigBits, leastSigBits);
                 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Requested: uuid="+uuid);
                 
                 final File file = getResource(uuid);
@@ -688,7 +686,7 @@ abstract public class ResourceService {
 
                 final long length = file.length();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Sending " + file + ", length=" + length
                             + ", uuid=" + uuid);
                 
@@ -700,7 +698,8 @@ abstract public class ResourceService {
 
                 } catch (IOException ex) {
 
-                    log.error(ex, ex);
+                    log.error("Sending " + file + ", length=" + length
+                            + ", uuid=" + uuid, ex);
 
                     sendError(StatusEnum.INTERNAL_ERROR);
 
@@ -752,13 +751,14 @@ abstract public class ResourceService {
                          * possible to service both requests without deadlock.
                          */
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Will proceed without lock: file=" + file
                                     + " : " + ex);
 
                     } catch (IOException ex) {
 
-                        log.error(ex, ex);
+                        log.error("Sending " + file + ", length=" + length
+                                + ", uuid=" + uuid, ex);
 
                         sendError(StatusEnum.INTERNAL_ERROR);
 
@@ -810,7 +810,7 @@ abstract public class ResourceService {
                 
                 try {
                 
-                    log.error(t, t);
+                    log.error("Unknown error: "+t, t);
                     
                     sendError(StatusEnum.INTERNAL_ERROR);
                     
@@ -883,6 +883,7 @@ abstract public class ResourceService {
                 break;
             case INTERNAL_ERROR:
                 counters.internalErrorCount++;
+                break;
             default:
                 throw new AssertionError();
             }
@@ -1023,7 +1024,7 @@ abstract public class ResourceService {
                 // all done.
                 os.flush();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Sent: uuid="
                             + uuid
                             + ", file="
@@ -1111,9 +1112,7 @@ abstract public class ResourceService {
 
         protected static final Logger log = Logger.getLogger(ReadResourceTask.class);
 
-        protected static final boolean INFO = log.isInfoEnabled();
-
-        protected static final boolean DEBUG = log.isDebugEnabled();
+//        protected final boolean DEBUG = log.isDebugEnabled();
 
         final InetAddress addr;
 
@@ -1167,7 +1166,7 @@ abstract public class ResourceService {
          */
         public File call() throws Exception {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("uuid=" + uuid + ", localFile=" + file);
             
             final long begin = System.nanoTime();
@@ -1300,7 +1299,7 @@ abstract public class ResourceService {
 
                 }
 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
 
                     log.info("read "
                             + nread

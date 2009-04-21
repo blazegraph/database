@@ -80,7 +80,6 @@ import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.PresortRioLoader;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.ITripleStore;
@@ -190,12 +189,17 @@ public class RDFDataLoadMaster implements Callable<Void> {
         String BUFFER_CAPACITY = "bufferCapacity";
 
         /**
-         * When non-zero, {@link SPORelation#newWriteBuffer(int)} will be used
-         * to perform asynchronous writes on the statement indices and this
-         * value will be specified as the target chunk size for an asynchronous
-         * write.
+         * When <code>true</code> the asynchronous index write API will be
+         * used.
          */
-        String WRITE_BUFFER_CHUNK_SIZE = "writeBufferChunkSize";
+        String ASYNCHRONOUS_WRITES = "asynchronousWrites";
+        
+        /**
+         * The chunk size used to break up the terms and values parsed from a
+         * document into chunks before writing them onto the master for the
+         * asynchronous write API (10k to 20k should be fine).
+         */
+        String ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE = "asynchronousWriteProducerChunkSize";
         
         /**
          * When <code>true</code>, the master will create the
@@ -402,9 +406,14 @@ public class RDFDataLoadMaster implements Callable<Void> {
         public final int bufferCapacity;
 
         /**
-         * @see ConfigurationOptions#WRITE_BUFFER_CHUNK_SIZE
+         * @see ConfigurationOptions#ASYNCHRONOUS_WRITES
          */
-        public final int writeBufferChunkSize;
+        public final boolean asynchronousWrites;
+        
+        /**
+         * @see ConfigurationOptions#ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE
+         */
+        public final int asynchronousWritesProducerChunkSize;
         
         /**
          * When <code>true</code>, the master will create the
@@ -500,9 +509,14 @@ public class RDFDataLoadMaster implements Callable<Void> {
                     + "="
                     + bufferCapacity
                     + //
-                    ", " + ConfigurationOptions.WRITE_BUFFER_CHUNK_SIZE
+                    ", "
+                    + ConfigurationOptions.ASYNCHRONOUS_WRITES
                     + "="
-                    + writeBufferChunkSize
+                    + asynchronousWrites
+                    + ", "
+                    + ConfigurationOptions.ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE
+                    + "="
+                    + asynchronousWritesProducerChunkSize
                     + //
                     ", " + ConfigurationOptions.CREATE + "="
                     + create
@@ -555,9 +569,15 @@ public class RDFDataLoadMaster implements Callable<Void> {
                     ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.BUFFER_CAPACITY, Integer.TYPE);
 
-            writeBufferChunkSize = (Integer) config.getEntry(
+            asynchronousWrites = (Boolean) config.getEntry(
                     ConfigurationOptions.COMPONENT,
-                    ConfigurationOptions.WRITE_BUFFER_CHUNK_SIZE, Integer.TYPE);
+                    ConfigurationOptions.ASYNCHRONOUS_WRITES, Boolean.TYPE);
+
+            asynchronousWritesProducerChunkSize = (Integer) config
+                    .getEntry(
+                            ConfigurationOptions.COMPONENT,
+                            ConfigurationOptions.ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE,
+                            Integer.TYPE);
 
             create = (Boolean) config.getEntry(ConfigurationOptions.COMPONENT,
                     ConfigurationOptions.CREATE, Boolean.TYPE);

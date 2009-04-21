@@ -1,46 +1,3 @@
-/**
-
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
-
-License:
-
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
-
-  http://www.CognitiveWeb.org/legal/license/
-
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
-
-Copyrights:
-
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
-
-  http://www.CognitiveWeb.org
-
-Portions Copyright (c) 2002-2003 Bryan Thompson.
-
-Acknowledgements:
-
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
-
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
-
-Modifications:
-
-*/
 /*
  * Created on Jul 14, 2008
  */
@@ -105,98 +62,422 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     }
 
-    public void test_fixedPoint_Small_Full() throws Exception {
-
-        final String file = "small.rdf";
-
-        doFixedPointTest(file, FullClosure.class);
-
-    }
-
-    public void test_fixedPoint_Small_Fast() throws Exception {
-
-        final String file = "small.rdf";
-
-        doFixedPointTest(file, FastClosure.class);
-
-    }
-
-    public void test_fixedPoint_SampleData_Full() throws Exception {
-
-        final String file = "sample data.rdf";
-
-        doFixedPointTest(file, FullClosure.class);
-
-    }
-
-    public void test_fixedPoint_SampleData_Fast() throws Exception {
-
-        final String file = "sample data.rdf";
-
-        doFixedPointTest(file, FastClosure.class);
-
-    }
-
-    public void test_fixedPoint_TestOwlSameAs_Full() throws Exception {
+    /**
+     * Overrides some properties.
+     */
+    public Properties getProperties() {
         
-        // final String file = "testOwlSameAs.rdf";
-        final String file = "small owlSameAs.rdf";
+        final Properties properties = super.getProperties();
         
-        doFixedPointTest(file, FullClosure.class);
+        // restrict to RDFS only since that is what Sesame 2 will compute.
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                        RdfsAxioms.class.getName());
+
+        /*
+         * Don't compute closure in the data loader since it does TM, not
+         * database at once closure.
+         */
+        properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None
+                .toString());
+
+        // properties.setProperty(InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
+        // "true");
+
+        return properties;
+        
+    }
+
+    /**
+     * Uses the specified closure algorithm and other properties per
+     * {@link #getProperties()}.
+     * 
+     * @param closureClass
+     *            The closure algorithm.
+     * @param nestedSubquery
+     *            <code>true</code> to use nested-subquery joins and
+     *            <code>false</code> to use pipeline joins.
+     * 
+     * @return The properties to configure the {@link AbstractTripleStore}.
+     */
+    public Properties getProperties(
+            final Class<? extends BaseClosure> closureClass,
+            final boolean nestedSubquery) {
+
+        final Properties properties = getProperties();
+
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.CLOSURE_CLASS,
+                        closureClass.getName());
+
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.NESTED_SUBQUERY,
+                        "" + nestedSubquery);
+
+        return properties;
+        
+    }
     
+    /*
+     * small.rdf
+     */
+    
+    public void test_fixedPoint_Small_Full_NestedSubqueryJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
     }
-    
-    public void test_fixedPoint_TestOwlSameAs_Fast() throws Exception {
-        
-        // final String file = "testOwlSameAs.rdf";
-        final String file = "small owlSameAs.rdf";
-        
-        doFixedPointTest(file, FastClosure.class);
-    
+
+    public void test_fixedPoint_Small_Full_PipelineJoins() throws Exception {
+
+        final Properties properties = getProperties(FullClosure.class, false/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_Small_Fast_NestedSubqueryJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_Small_Fast_PipelineJoins() throws Exception {
+
+        final Properties properties = getProperties(FastClosure.class, false/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
     }
 
     /*
-     * Commented out because these are a bit slow for unit tests and have
-     * never identified any problems.
+     * sample data.rdf
      */
     
-//    public void test_fixedPoint_LUBM_U1_As_Full() throws Exception {
-//
-//        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
-//                new FilenameFilter() {
-//
-//                    public boolean accept(File dir, String name) {
-//                        return name.endsWith(".owl");
-//                    }
-//                });
-//
-//        doFixedPointTest(files, FullClosure.class);
-//
-//    }
-//
-//    public void test_fixedPoint_LUBM_U1_As_Fast() throws Exception {
-//
-//        final File[] files = readFiles(new File("../rdf-data/lehigh/U1"),
-//                new FilenameFilter() {
-//
-//                    public boolean accept(File dir, String name) {
-//                        return name.endsWith(".owl");
-//                    }
-//                });
-//
-//        doFixedPointTest(files, FastClosure.class);
-//
-//    }
+    public void test_fixedPoint_SampleData_Full_NestedSubqueryJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "sample data.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+    public void test_fixedPoint_SampleData_Full_PipelineJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FullClosure.class, false/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "sample data.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_SampleData_Fast_NestedSubqueryJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FastClosure.class, true/* nextedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "sample data.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_SampleData_Fast_PipelineJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FastClosure.class, false/* nextedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "sample data.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    /*
+     * small owlSameAs.rdf
+     */
+    
+    public void test_fixedPoint_TestOwlSameAs_Full_NestedSubqueryJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_TestOwlSameAs_Full_PipelineJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FullClosure.class, false/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_TestOwlSameAs_Fast_NestedSubqueryJoins()
+            throws Exception {
+
+        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_TestOwlSameAs_Fast_Pipeline() throws Exception {
+
+        final Properties properties = getProperties(FastClosure.class, false/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(new String[] { "small owlSameAs.rdf" }, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    /*
+     * LUBM U1
+     * 
+     * Note: Sometimes commented out because these are a bit slow for unit tests
+     * and have never identified any problems.
+     */
+
+    public void test_fixedPoint_LUBM_U1_As_Full_NestedSubquery()
+            throws Exception {
+
+        final String[] resources = readFiles(new File(
+                "bigdata-rdf/src/resources/data/lehigh/U1"),
+                new FilenameFilter() {
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(".owl");
+                    }
+                });
+
+        final Properties properties = getProperties(FullClosure.class, true/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(resources, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_LUBM_U1_As_Full_PipelineJoins()
+            throws Exception {
+
+        final String[] resources = readFiles(new File(
+                "bigdata-rdf/src/resources/data/lehigh/U1"),
+                new FilenameFilter() {
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(".owl");
+                    }
+                });
+
+        final Properties properties = getProperties(FullClosure.class, false/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(resources, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_LUBM_U1_As_Fast_NestedSubquery() throws Exception {
+
+        final String[] resources = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
+                new FilenameFilter() {
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(".owl");
+                    }
+                });
+
+        final Properties properties = getProperties(FastClosure.class, true/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(resources, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
+
+    public void test_fixedPoint_LUBM_U1_As_Fast_PipelineJoins() throws Exception {
+
+        final String[] resources = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
+                new FilenameFilter() {
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(".owl");
+                    }
+                });
+
+        final Properties properties = getProperties(FastClosure.class, false/* nestedSubquery */);
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            doFixedPointTest(resources, store);
+
+        } finally {
+
+            store.closeAndDelete();
+
+        }
+
+    }
 
     /**
-     * Reads files matching the filter from the directory.
+     * Reads files matching the filter from the directory and return
+     * an array containing their path names.
      * 
      * @param dir
      *            The directory.
      * @param filter
      *            The filter.
      */
-    private File[] readFiles(File dir, FilenameFilter filter) {
+    private String[] readFiles(File dir, FilenameFilter filter) {
 
         assertTrue("No such file or directory: " + dir, dir.exists());
 
@@ -206,91 +487,109 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         assertNotNull("Could not read directory: " + dir, files);
         
-        return files;
+        final String[] resources = new String[files.length];
+        
+        for(int i=0; i<files.length; i++) {
+            
+            resources[i] = files[i].toString();
+            
+        }
+        
+        return resources;
         
     }
 
-    /**
-     * Compares ground truth for the closure of the source RDF/XML file (as
-     * computed by Sesame 2) against the closure as computed by bigdata.
-     * 
-     * @param file
-     *            The RDF/XML file.
-     * @param closureType
-     *            The closure program to be applied by bigdata.
-     * 
-     * @throws Exception
-     */
-    protected void doFixedPointTest(String file,
-            Class<? extends BaseClosure> closureClass) throws Exception {
-
-        doFixedPointTest(new File[] { new File(file) }, closureClass);
-        
-    }
+//    /**
+//     * Compares ground truth for the closure of the source RDF/XML file (as
+//     * computed by Sesame 2) against the closure as computed by bigdata.
+//     * 
+//     * @param file
+//     *            The RDF/XML file.
+//     * @param closureType
+//     *            The closure program to be applied by bigdata.
+//     * 
+//     * @throws Exception
+//     */
+//    protected void doFixedPointTest(final String[] resources,
+//            final Class<? extends BaseClosure> closureClass) throws Exception {
+//
+//        /*
+//         * Used to compute the entailments using our own rules engine.
+//         */
+//        final AbstractTripleStore closureStore;
+//        {
+//
+//            final Properties properties = getProperties();
+//
+//            // restrict to RDFS only since that is what Sesame 2 will compute.
+//            properties
+//                    .setProperty(
+//                            com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+//                            RdfsAxioms.class.getName());
+//
+//            // use the specified closure algorithm.
+//            properties
+//                    .setProperty(
+//                            com.bigdata.rdf.store.AbstractTripleStore.Options.CLOSURE_CLASS,
+//                            closureClass.getName());
+//
+//            /*
+//             * Don't compute closure in the data loader since it does TM, not
+//             * database at once closure.
+//             */
+//            properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None
+//                    .toString());
+//
+//            // properties.setProperty(InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE,
+//            // "true");
+//
+//            /*
+//             * Note: using variant method so that we can override some
+//             * properties for this test in a proxy test suite.
+//             */
+//            closureStore = getStore(properties);
+//
+//        }
+//
+//        try {
+//
+//            doFixedPointTest(resources, closureStore);
+//
+//        } finally {
+//
+//            closureStore.closeAndDelete();
+//
+//        }
+//        
+//    }
 
     /**
      * Compares ground truth for the closure of the source RDF/XML file(s) (as
      * computed by Sesame 2) against the closure as computed by bigdata.
      * 
-     * @param files
+     * @param resources
      *            The RDF/XML files.
-     * @param closureType
-     *            The closure program to be applied by bigdata.
+     * @param closureStore
+     *            The triple store under test as configured with some specific
+     *            {@link BaseClosure closure program}.
      * 
      * @throws Exception
      */
-    protected void doFixedPointTest(File[] files,
-                Class<? extends BaseClosure> closureClass) throws Exception {
+    protected void doFixedPointTest(final String[] resources,
+            final AbstractTripleStore closureStore) throws Exception {
             
-        /*
-         * Used to compute the entailments our own rules engine.
-         */
-        final AbstractTripleStore closure;
-        {
-
-            final Properties properties = getProperties();
-
-            // restrict to RDFS only since that is what Sesame 2 will compute.
-            properties
-                    .setProperty(
-                            com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
-                            RdfsAxioms.class.getName());
-
-            // use the specified closure algorithm.
-            properties
-                    .setProperty(
-                            com.bigdata.rdf.store.AbstractTripleStore.Options.CLOSURE_CLASS,
-                            closureClass.getName());
-
-            /*
-             * Don't compute closure in the data loader since it does TM, not
-             * database at once closure.
-             */
-            properties.setProperty(DataLoader.Options.CLOSURE,
-                    ClosureEnum.None.toString());
-            
-            // properties.setProperty(InferenceEngine.Options.FORWARD_CHAIN_RDF_TYPE_RDFS_RESOURCE, "true");
-
-            /*
-             * Note: using variant method so that we can override some
-             * properties for this test in a proxy test suite.
-             */
-            closure = getStore(properties);
-            
-        }
-
         /*
          * Gets loaded with the entailments computed by Sesame 2.
          */
         final TempTripleStore groundTruth;
         {
          
-            final Properties properties = new Properties();
+            final Properties tmp = new Properties();
             
-            properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+            tmp.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
                     NoAxioms.class.getName());
 
-            groundTruth = new TempTripleStore(properties);
+            groundTruth = new TempTripleStore(tmp);
             
         }
 
@@ -314,33 +613,35 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 	            
 	            try {
 	            	
-                    for(File file : files) {
+                    for(String resource : resources) {
                         
                         InputStream is = null;
+                        String baseURI;
 
                         try {
-                        
-                            is = new FileInputStream(file);
-                            
+
+                            is = new FileInputStream(new File(resource));
+                            baseURI = new File(resource).toURI().toString();
+
                         } catch (FileNotFoundException ex) {
-                            
-                            is = getClass()
-                                    .getResourceAsStream(file.toString());
-                            
-                        }
-                        
-                        if(is == null) {
-                            
-                            fail("No such file or resource: "+file);
-                            
+
+                            is = getClass().getResourceAsStream(resource);
+                            baseURI = getClass().getResource(resource).toURI()
+                                    .toString();
+
                         }
 
-                        cxn.add(is, file.toURI().toString()/* baseURI */,
-                                RDFFormat.RDFXML);
+                        if (is == null) {
+
+                            fail("No such file or resource: " + resource);
+
+                        }
+
+                        cxn.add(is, baseURI, RDFFormat.RDFXML);
 
                         if(log.isInfoEnabled()) {
                          
-                            log.info("Loaded: "+file);
+                            log.info("Loaded: "+resource);
                             
                         }
                         
@@ -370,11 +671,9 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                         
                     }
 	                
-                    log.error("# Sesame2 stmts: " + numSesame2Stmts);
+                    if (log.isInfoEnabled())
+                        log.info("# Sesame2 stmts: " + numSesame2Stmts);
                     
-//	                // make the data visible to a read-committed view.
-//	                groundTruth.commit();
-	                
 	            } finally {
 	            	
 	            	cxn.close();
@@ -389,35 +688,35 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                  * closure.
                  */
                 
-                for(File file : files) {
+                for(String resource : resources) {
         		
                     InputStream is = null;
+                    String baseURI;
 
                     try {
-                    
-                        is = new FileInputStream(file);
-                        
+
+                        is = new FileInputStream(new File(resource));
+                        baseURI = new File(resource).toURI().toString();
+
                     } catch (FileNotFoundException ex) {
-                        
-                        is = getClass()
-                                .getResourceAsStream(file.toString());
-                        
-                    }
-                    
-                    if(is == null) {
-                        
-                        fail("No such file or resource: "+file);
-                        
+
+                        is = getClass().getResourceAsStream(resource);
+                        baseURI = getClass().getResource(resource).toURI()
+                                .toString();
+
                     }
 
-                    closure.getDataLoader().loadData(is,
-                            file.toURI().toString()/* baseURL */,
+                    if (is == null) {
+
+                        fail("No such file or resource: " + resource);
+
+                    }
+
+                    closureStore.getDataLoader().loadData(is, baseURI,
                             RDFFormat.RDFXML);
                 
                 }
 
-// closure.commit();
-//                
                 /*
                  * compute the database at once closure.
                  * 
@@ -428,16 +727,15 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                  * by the proxy test case otherwise which does not give you much
                  * control).
                  */
-                closure.getInferenceEngine()
+                closureStore.getInferenceEngine()
                         .computeClosure(null/* focusStore */);
                 
                 if (log.isDebugEnabled()) {
 
-                    log.debug("\nclosure:\n" + closure.dumpStore());
+                    log.debug("\nclosure:\n" + closureStore.dumpStore());
                     
                 }
                 
-                // -DdataLoader.closure=None
         	}
             
             /*
@@ -449,15 +747,13 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
              * entailments) into a TempTripleStore and then compare that
              * TempTripleStore to the data from Sesame2.
              */
-            final TempTripleStore tmp = TripleStoreUtility.bulkExport(closure);
+            final TempTripleStore tmp = TripleStoreUtility.bulkExport(closureStore);
 
             assertTrue(TripleStoreUtility.modelsEqual(groundTruth, tmp));
             
             tmp.closeAndDelete();
             
         } finally {
-            
-            closure.closeAndDelete();
             
             groundTruth.closeAndDelete();
             
@@ -495,10 +791,12 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
      */
     public void test_simpleFixPoint() throws Exception {
         
-        final Properties properties = super.getProperties();
+        final Properties properties = getProperties();
         
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
         
         final AbstractTripleStore store = getStore(properties);
         
@@ -529,9 +827,6 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
                 
                 if (log.isInfoEnabled())
                     log.info("\n" + store.dumpStore());
-                
-//                // make the data visible to a read-committed view.
-//                store.commit();
                 
             }
             

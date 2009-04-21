@@ -45,9 +45,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.L;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.S;
 
 /**
  * Test ability to handle a redirect (subtask learns that the target service no
@@ -90,7 +87,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                     return new S(this, locator, out) {
 
                         @Override
-                        protected boolean nextChunk(final KVO<O>[] chunk)
+                        protected boolean handleChunk(final KVO<O>[] chunk)
                                 throws Exception {
 
                             // the write will be redirected into partition#14.
@@ -252,7 +249,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                     return new S(this, locator, out) {
 
                         @Override
-                        protected boolean nextChunk(final KVO<O>[] chunk)
+                        protected boolean handleChunk(final KVO<O>[] chunk)
                                 throws Exception {
 
                             lck.lock();

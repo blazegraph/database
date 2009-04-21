@@ -595,31 +595,27 @@ public class ThroughputMaster
             final IScaleOutClientIndex ndx = fed.getIndex(jobState.namespace,
                     ITx.UNISOLATED);
 
+            final IDuplicateRemover<Void> duplicateRemover;
             final BlockingBuffer<KVO<Void>[]> insert;
             final BlockingBuffer<KVO<Void>[]> remove;
             if (jobState.asynchronous) {
                 /*
                  * @todo enable optional duplicate removal and see what impact
                  * it has.
-                 * 
-                 * @todo make the buffer capacity a config parameter for the
-                 * test.
                  */
-                final int indexWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
-                final int indexPartitionWriteQueueCapacity = BlockingBuffer.DEFAULT_PRODUCER_QUEUE_CAPACITY;
+                duplicateRemover = null;
                 // for inserts.
-                insert = ndx.newWriteBuffer(indexWriteQueueCapacity,
-                        indexPartitionWriteQueueCapacity,
-                        (IResultHandler<Void, Void>) null/* resultHandler */,
-                        (IDuplicateRemover<Void>) null/* duplicateRemover */,
+                insert = ndx.newWriteBuffer(//
+                        (IResultHandler<Void, Void>) null,// resultHandler
+                        duplicateRemover,
                         BatchInsertConstructor.RETURN_NO_VALUES);
                 // for deletes.
-                remove = ndx.newWriteBuffer(indexWriteQueueCapacity,
-                        indexPartitionWriteQueueCapacity,
-                        (IResultHandler<Void, Void>) null/* resultHandler */,
-                        (IDuplicateRemover<Void>) null/* duplicateRemover */,
+                remove = ndx.newWriteBuffer(//
+                        (IResultHandler<Void, Void>) null,// resultHandler
+                        duplicateRemover,//
                         BatchRemoveConstructor.RETURN_NO_VALUES);
             } else {
+                duplicateRemover = null;
                 insert = remove = null;
             }
             
@@ -719,7 +715,7 @@ public class ThroughputMaster
              * can get them from there and then aggregate them across the
              * clients.
              */
-            System.err.println(fed.getIndexTaskCounters(ndx.getName()));
+            System.err.println(fed.getIndexCounters(ndx.getName()));
             
             return null;
             
