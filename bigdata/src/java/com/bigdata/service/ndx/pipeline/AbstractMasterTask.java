@@ -45,7 +45,6 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.Split;
 import com.bigdata.util.concurrent.AbstractHaltableProcess;
 
@@ -170,18 +169,42 @@ L>//
     }
 
     /**
-     * The default timeout in nanoseconds before closing an idle output sink.
-     */
-    public static final long DEFAULT_IDLE_TIMEOUT = TimeUnit.MILLISECONDS.toNanos(2000);
-    
-    /**
      * The timeout in nanoseconds before closing an idle output sink.
-     * 
-     * @todo config
      */
-    protected final long idleTimeout = DEFAULT_IDLE_TIMEOUT;
+    protected final long sinkIdleTimeoutNanos;
 
-    public AbstractMasterTask(final H stats, final BlockingBuffer<E[]> buffer) {
+    /**
+     * The time in nanoseconds that the {@link AbstractSubtask sink} will wait
+     * inside of the {@link IAsynchronousIterator} when it polls the iterator
+     * for a chunk. If this value is too large then the sink will block for
+     * noticable lengths of time and will be less responsive to interrupts.
+     * Something in the 10s of milliseconds is appropriate.
+     */
+    protected final long sinkPollTimeoutNanos;
+
+    /**
+     * 
+     * @param stats
+     *            Statistics for the master.
+     * @param buffer
+     *            The buffer on which data is written by the application and
+     *            from which it is drained by the master.
+     * @param sinkIdleTimeoutNanos
+     *            The time in nanoseconds after which an idle sink will be
+     *            closed. Any buffered writes are flushed when the sink is
+     *            closed. This must be GTE the <i>sinkChunkTimeout</i>
+     *            otherwise the sink will decide that it is idle when it was
+     *            just waiting for enough data to prepare a full chunk.
+     * @param sinkPollTimeoutNanos
+     *            The time in nanoseconds that the {@link AbstractSubtask sink}
+     *            will wait inside of the {@link IAsynchronousIterator} when it
+     *            polls the iterator for a chunk. If this value is too large
+     *            then the sink will block for noticable lengths of time and
+     *            will be less responsive to interrupts. Something in the 10s of
+     *            milliseconds is appropriate.
+     */
+    public AbstractMasterTask(final H stats, final BlockingBuffer<E[]> buffer,
+            final long sinkIdleTimeoutNanos, final long sinkPollTimeoutNanos) {
 
         if (stats == null)
             throw new IllegalArgumentException();
@@ -189,10 +212,20 @@ L>//
         if (buffer == null)
             throw new IllegalArgumentException();
 
+        if (sinkIdleTimeoutNanos <= 0)
+            throw new IllegalArgumentException();
+
+        if (sinkPollTimeoutNanos <= 0)
+            throw new IllegalArgumentException();
+        
         this.stats = stats;
 
         this.buffer = buffer;
 
+        this.sinkIdleTimeoutNanos = sinkIdleTimeoutNanos;
+        
+        this.sinkPollTimeoutNanos = sinkPollTimeoutNanos;
+        
         this.src = buffer.iterator();
 
         this.subtasks = new LinkedHashMap<L, S>();
@@ -206,7 +239,7 @@ L>//
          * if it has closed by a timeout.
          */
 
-        final boolean reopen = idleTimeout != 0;
+        final boolean reopen = sinkIdleTimeoutNanos != 0;
         
         try {
 
@@ -226,7 +259,7 @@ L>//
                     stats.elementsIn += a.length;
                 }
 
-                nextChunk(a, reopen);
+                handleChunk(a, reopen);
                 
             }
 
@@ -265,7 +298,7 @@ L>//
      *            closed) and should be <code>true</code> if you are handling
      *            redirects.
      */
-    abstract protected void nextChunk(E[] chunk, boolean reopen)
+    abstract protected void handleChunk(E[] chunk, boolean reopen)
             throws InterruptedException;
     
     /**
@@ -311,26 +344,26 @@ L>//
         sink.buffer.close();
 
         /*
-         * Handle the chunk for which we got the stale locator exception by feeding it back into the master.
+         * Handle the chunk for which we got the stale locator exception by
+         * feeding it back into the master.
          * 
          * Note: In this case we may re-open an output buffer for the index
-         * partition. The circumstances under which this can occur are
-         * subtle. However, if data had already been assigned to the output
-         * buffer for the index partition and written through to the index
-         * partition and the output buffer closed because awaitAll() was
-         * invoked before we received the stale locator exception for an
-         * outstanding RMI, then it is possible for the desired output
-         * buffer to already be closed. In order for this condition to arise
-         * either the stale locator exception must have been received in
-         * response to a different index operation or the the client is not
-         * caching the index partition locators.
+         * partition. The circumstances under which this can occur are subtle.
+         * However, if data had already been assigned to the output buffer for
+         * the index partition and written through to the index partition and
+         * the output buffer closed because awaitAll() was invoked before we
+         * received the stale locator exception for an outstanding RMI, then it
+         * is possible for the desired output buffer to already be closed. In
+         * order for this condition to arise either the stale locator exception
+         * must have been received in response to a different index operation or
+         * the the client is not caching the index partition locators.
          */
-        nextChunk(chunk, true/* reopen */);
+        handleChunk(chunk, true/* reopen */);
 
         /*
-         * Drain the rest of the buffered chunks from the closed sink, feeding them back into the master which will assign
-         * them to the new sink(s). Again, we will 'reopen' the output buffer if
-         * it has been closed.
+         * Drain the rest of the buffered chunks from the closed sink, feeding
+         * them back into the master which will assign them to the new sink(s).
+         * Again, we will 'reopen' the output buffer if it has been closed.
          */
         {
 
@@ -338,7 +371,7 @@ L>//
 
             while (itr.hasNext()) {
 
-                nextChunk(itr.next(), true/* reopen */);
+                handleChunk(itr.next(), true/* reopen */);
 
             }
 
@@ -469,18 +502,16 @@ L>//
     }
 
     /**
-     * Return a {@link BlockingBuffer} which will write onto the indicated index
-     * partition. The buffer is created if it does not exist. The buffer will be
-     * drained by a concurrent thread running on the
-     * {@link IBigdataFederation#getExecutorService()}. Buffers returned via
-     * this method are automatically closed when the source iterator for this
-     * class is exhausted.
+     * Return the sink for the locator. The sink is created if it does not exist
+     * using {@link #newSubtaskBuffer()} and
+     * {@link #newSubtask(Object, BlockingBuffer)}.
      * <p>
      * Note: The caller must own the {@link #lock}. This requirement arises
      * because this method is invoked not only from within the thread consuming
      * consuming the top-level buffer but also invoked concurrently from the
-     * thread(s) consuming the output buffer(s) when handling a
-     * {@link StaleLocatorException} for that output buffer.
+     * thread(s) consuming the output buffer(s)
+     * {@link #handleRedirect(AbstractSubtask, Object[])} is invoked for that
+     * sink.
      * 
      * @param locator
      *            The locator (unique subtask key).
@@ -490,7 +521,7 @@ L>//
      *            buffer will be drained by a new
      *            {@link IndexPartitionWriteTask}).
      * 
-     * @return The {@link BlockingBuffer} for that index partition.
+     * @return The sink for that locator.
      * 
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
@@ -499,8 +530,7 @@ L>//
      * @throws RuntimeException
      *             if {@link #halted()}
      */
-    private BlockingBuffer<E[]> getOutputBuffer(final L locator,
-            final boolean reopen) {
+    private S getSink(final L locator, final boolean reopen) {
 
         if (locator == null)
             throw new IllegalArgumentException();
@@ -548,7 +578,7 @@ L>//
 
         }
 
-        return sink.buffer;
+        return sink;
 
     }
 
@@ -742,19 +772,22 @@ L>//
             halted();
             
             // add the dense split to the appropriate output buffer.
-            final BlockingBuffer<E[]> out = getOutputBuffer(locator, reopen);
+            final S sink = getSink(locator, reopen);
 
             if (reopen) {
 
                 // stack trace through here if [reopen == true]
-                out.add(b);
+                sink.buffer.add(b);
 
             } else {
              
                 // stack trace through here if [reopen == false]
-                out.add(b);
+                sink.buffer.add(b);
                 
             }
+            
+            // update timestamp of the last chunk written on that sink.
+            sink.lastChunkNanos = System.nanoTime();
 
         } finally {
 

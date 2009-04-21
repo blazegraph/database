@@ -136,9 +136,9 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
         }
 
         // optionally use asynchronous writes on the statement indices.
-        final IAsynchronousWriteConfiguration statementfactory = jobState.writeBufferChunkSize != 0 ? new AsynchronousWriteConfiguration(
+        final IAsynchronousWriteConfiguration statementfactory = jobState.asynchronousWrites ? new AsynchronousWriteConfiguration(
                 (ScaleOutTripleStore) tripleStore,
-                jobState.writeBufferChunkSize)
+                jobState.asynchronousWritesProducerChunkSize)
                 : null;
         final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
                 tripleStore, 

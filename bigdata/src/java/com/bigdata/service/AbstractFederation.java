@@ -63,7 +63,7 @@ import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataClient.Options;
-import com.bigdata.service.ndx.IndexTaskCounters;
+import com.bigdata.service.ndx.ScaleOutIndexCounters;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -321,7 +321,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
     /**
      * Counters for each scale-out index accessed by the client.
      */
-    private final Map<String, IndexTaskCounters> indexTaskCounters = new HashMap<String, IndexTaskCounters>();
+    private final Map<String, ScaleOutIndexCounters> scaleOutIndexCounters = new HashMap<String, ScaleOutIndexCounters>();
     
     /**
      * Return the {@link TaskCounters} which aggregate across all operations
@@ -337,7 +337,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
     }
     
     /**
-     * Return the {@link IndexTaskCounters} for the specified scale-out index
+     * Return the {@link ScaleOutIndexCounters} for the specified scale-out index
      * for this client. There is only a single instance per scale-out index and
      * all operations by this client on that index are aggregated by that
      * instance. These counters are reported by the client to the
@@ -346,20 +346,20 @@ abstract public class AbstractFederation implements IBigdataFederation {
      * @param name
      *            The scale-out index name.
      */
-    public IndexTaskCounters getIndexTaskCounters(final String name) {
+    public ScaleOutIndexCounters getIndexCounters(final String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
 
-        synchronized (indexTaskCounters) {
+        synchronized (scaleOutIndexCounters) {
 
-            IndexTaskCounters t = indexTaskCounters.get(name);
+            ScaleOutIndexCounters t = scaleOutIndexCounters.get(name);
 
             if (t == null) {
         
-                t = new IndexTaskCounters();
+                t = new ScaleOutIndexCounters();
                 
-                indexTaskCounters.put(name, t);
+                scaleOutIndexCounters.put(name, t);
                 
                 /*
                  * Attach to the counters reported by the client to the LBS.
@@ -368,8 +368,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
                  * are just creating them now, but if they do then they are
                  * replaced.
                  */
-                getCounterSet().makePath(name)
-                        .attach(t.getCounters(), true/*replace*/);
+                getServiceCounterSet().makePath("Indices").makePath(name)
+                        .attach(t.getCounters(), true/* replace */);
                 
             }
             

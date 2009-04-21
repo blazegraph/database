@@ -277,13 +277,13 @@ public class SerializerUtil {
      * 
      * @return The de-serialized object.
      */
-    static final public Object deserialize(ByteBuffer buf) {
+    static final public Object deserialize(final ByteBuffer buf) {
 
         if (true && buf.hasArray()) {
 
-            int off = buf.arrayOffset();
+            final int off = buf.arrayOffset();
 
-            int len = buf.remaining();
+            final int len = buf.remaining();
 
             Object ret = deserialize(buf.array(), off, len);
             

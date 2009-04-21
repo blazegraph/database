@@ -47,9 +47,9 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo varient to test w/ and w/o the full text index (with lookup by tokens).
+ * FIXME varient to test w/ and w/o the full text index (with lookup by tokens).
  * 
- * @todo variant to test async w/ sids (once written).
+ * FIXME variant to test async w/ sids (once written).
  * 
  * @todo The async API is only defined at this time for scale-out index views,
  *       so maybe move this into the scale-out proxy test suite.

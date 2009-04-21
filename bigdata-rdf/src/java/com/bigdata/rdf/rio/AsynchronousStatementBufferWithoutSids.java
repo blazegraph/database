@@ -46,6 +46,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -673,7 +674,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         if (statements == null) {
             
             statements = new UnsynchronizedUnboundedChunkBuffer<S>(
-                    statementBufferFactory.statementChunkCapacity);
+                    statementBufferFactory.producerChunkSize);
             
         }
         
@@ -760,7 +761,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         tasks.add(new AsyncId2TermIndexWriteTask(valueFactory, newId2TIterator(
                 values.values().iterator(),
-                statementBufferFactory.id2termChunkCapacity),
+                statementBufferFactory.producerChunkSize),
                 statementBufferFactory.buffer_id2t));
 
         if (statementBufferFactory.buffer_text != null) {
@@ -1142,21 +1143,11 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         final int bnodesInitialCapacity = 10000;
         
         /**
-         * The chunk size for statements.
-         * <p>
-         * Note: This directly governs the size of the {@link KVO}[] chunks
-         * written onto the {@link BlockingBuffer}s for the statement indices.
+         * The chunk size used by the producer to break the terms and statements
+         * into chunks before writing them onto the {@link BlockingBuffer} for
+         * the master.
          */
-        final int statementChunkCapacity;
-
-        /**
-         * The chunk size for ID2TERM async writes.
-         */
-        final int id2termChunkCapacity;
-
-        final int indexWriteQueueCapacity;
-
-        final int indexPartitionWriteQueueCapacity;
+        final int producerChunkSize;
 
         private final BlockingBuffer<KVO<BigdataValue>[]> buffer_id2t;
         private final BlockingBuffer<KVO<BigdataValue>[]> buffer_text;
@@ -1190,8 +1181,23 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             
         }
 
+        /**
+         * 
+         * @param tripleStore
+         * @param producerChunkSize
+         *            The chunk size used when writing chunks onto the master
+         *            for the asynchronous index write API. If this value is on
+         *            the order of the #of terms or statements in the parsed
+         *            documents, then all terms / statements will be written
+         *            onto the master in one chunk. The master will split the
+         *            chunk based on the separator keys for the index partitions
+         *            and write splits onto the sink for each index partition.
+         *            The master and sink configuration is specified via the
+         *            {@link IndexMetadata} when the triple store indices are
+         *            created.
+         */
         public AsynchronousWriteConfiguration(final ScaleOutTripleStore tripleStore,
-                final int writeChunkSize) {
+                final int producerChunkSize) {
 
             if (tripleStore == null)
                 throw new IllegalArgumentException();
@@ -1202,13 +1208,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
             this.spoRelation = tripleStore.getSPORelation();
 
-            this.id2termChunkCapacity=writeChunkSize;
-            
-            this.statementChunkCapacity = writeChunkSize;
-            
-            this.indexWriteQueueCapacity = writeChunkSize;
-            
-            this.indexPartitionWriteQueueCapacity = writeChunkSize;
+            this.producerChunkSize = producerChunkSize;
             
             if (tripleStore.isStatementIdentifiers()) {
 
@@ -1219,8 +1219,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             this.buffer_id2t = ((IScaleOutClientIndex) lexiconRelation
                     .getId2TermIndex())
                     .newWriteBuffer(
-                            indexWriteQueueCapacity,
-                            indexPartitionWriteQueueCapacity,
                             null/* resultHandler */,
                             new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
                             Id2TermWriteProcConstructor.INSTANCE);
@@ -1254,8 +1252,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
             this.buffer_spo = ((IScaleOutClientIndex) spoRelation.getSPOIndex())
                     .newWriteBuffer(
-                            indexWriteQueueCapacity,
-                            indexPartitionWriteQueueCapacity,
                             statementResultHandler,
                             new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
                             SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
@@ -1264,16 +1260,12 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
                 this.buffer_pos = ((IScaleOutClientIndex) spoRelation.getPOSIndex())
                         .newWriteBuffer(
-                                indexWriteQueueCapacity,
-                                indexPartitionWriteQueueCapacity,
                                 null/* resultHandler */,
                                 new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
                                 SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
 
                 this.buffer_osp = ((IScaleOutClientIndex) spoRelation.getOSPIndex())
                         .newWriteBuffer(
-                                indexWriteQueueCapacity,
-                                indexPartitionWriteQueueCapacity,
                                 null/* resultHandler */,
                                 new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
                                 SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);

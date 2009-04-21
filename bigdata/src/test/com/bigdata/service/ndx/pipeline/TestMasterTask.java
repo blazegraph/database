@@ -297,9 +297,6 @@ public class TestMasterTask extends AbstractMasterTestCase {
      * Unit test to verify that output buffers are not closed too quickly. This
      * also verifies that a buffer automatically re-opened if it was closed by a
      * timeout.
-     * 
-     * @todo the [reopen] flag could in fact go away no that buffers get closed
-     *       if they are idle.
      */
     public void test_idleTimeout() throws InterruptedException,
             ExecutionException {
@@ -342,15 +339,15 @@ public class TestMasterTask extends AbstractMasterTestCase {
          * Note: If the idle timeout is too short then Thread#sleep() will not
          * return before the timeout has expired.
          */
-        Thread.sleep(TimeUnit.NANOSECONDS
-                .toMillis(AbstractMasterTask.DEFAULT_IDLE_TIMEOUT / 2 - elapsed1));
+        Thread.sleep(TimeUnit.NANOSECONDS.toMillis(M.DEFAULT_SINK_IDLE_TIMEOUT
+                / 2 - elapsed1));
 
         final long elapsed2 = System.nanoTime() - beforeWrite;
-        
-        if (elapsed2 > AbstractMasterTask.DEFAULT_IDLE_TIMEOUT) {
-            
+
+        if (elapsed2 > M.DEFAULT_SINK_IDLE_TIMEOUT) {
+
             fail("Sleep too long - idle timeout may have expired.");
-            
+
         }
 
         // the original subtask should still be running.
@@ -358,8 +355,9 @@ public class TestMasterTask extends AbstractMasterTestCase {
         assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount);
 
         // now sleep for the entire idle timeout (this give us some padding).
-        Thread.sleep(TimeUnit.NANOSECONDS
-                .toMillis(AbstractMasterTask.DEFAULT_IDLE_TIMEOUT));
+        Thread
+                .sleep(TimeUnit.NANOSECONDS
+                .toMillis(M.DEFAULT_SINK_IDLE_TIMEOUT));
 
         // the subtask should have terminated and no other subtask should have started.
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);

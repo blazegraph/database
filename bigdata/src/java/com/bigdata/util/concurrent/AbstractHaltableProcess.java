@@ -95,7 +95,7 @@ public abstract class AbstractHaltableProcess {
      * 
      * @return The argument.
      */
-    final public Throwable halt(final Throwable cause) {
+    final public <T extends Throwable> T halt(final T cause) {
 
         halt = true;
 

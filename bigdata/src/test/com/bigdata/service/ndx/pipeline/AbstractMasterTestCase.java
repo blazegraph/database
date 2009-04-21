@@ -295,7 +295,7 @@ public class AbstractMasterTestCase extends TestCase2 {
          * across the output buffers for the subtasks.
          */
         @Override
-        protected void nextChunk(final KVO<O>[] chunk, final boolean reopen)
+        protected void handleChunk(final KVO<O>[] chunk, final boolean reopen)
                 throws InterruptedException {
 
             keyRangePartition(chunk, reopen);
@@ -346,7 +346,7 @@ public class AbstractMasterTestCase extends TestCase2 {
         }
         
         @Override
-        protected boolean nextChunk(final KVO<O>[] chunk) throws Exception {
+        protected boolean handleChunk(final KVO<O>[] chunk) throws Exception {
 
             final long begin = System.nanoTime();
             

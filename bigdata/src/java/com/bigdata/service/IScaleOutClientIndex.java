@@ -34,6 +34,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
@@ -45,7 +46,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.ndx.IndexTaskCounters;
+import com.bigdata.service.ndx.ScaleOutIndexCounters;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexWriteStats;
 
@@ -222,7 +223,7 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * <p>
      * Note: Each buffer returned by this method is independent. However, all
      * the performance counters for all asynchronous write buffers for a given
-     * client and scale-out index are aggregated by an {@link IndexTaskCounters}.
+     * client and scale-out index are aggregated by an {@link ScaleOutIndexCounters}.
      * 
      * @param <T>
      *            The generic type of the procedure used to write on the index.
@@ -234,15 +235,6 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * @param <A>
      *            The type of the aggregated result.
      * 
-     * @param indexWriteQueueCapacity
-     *            The capacity of the queue in front of the index. Chunks are
-     *            read off of this queue, split based on the separator keys for
-     *            the scale-out index, and then written onto a per-index
-     *            partition queue, whose capacity is specified by a different
-     *            argument.
-     * @param indexPartitionWriteQueueCapacity
-     *            The capacity of the queue in front of each index partition on
-     *            which the writes are scattered.
      * @param resultHandler
      *            Used to aggregate results.
      * @param duplicateRemover
@@ -256,7 +248,9 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * 
      * @return A buffer on which the producer may write their data.
      * 
-     * @see AbstractFederation#getIndexTaskCounters(String)
+     * @see IndexMetadata#getAsynchronousIndexWriteConfiguration()
+     * 
+     * @see AbstractFederation#getIndexCounters(String)
      * 
      * @todo The async API is only defined at this time for scale-out index
      *       views. An asynchronous write API could be defined for local
@@ -270,8 +264,6 @@ public interface IScaleOutClientIndex extends IClientIndex {
      *       an IAsynchronousIndexWriter interface.
      */
     public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
-            final int indexWriteQueueCapacity,
-            final int indexPartitionWriteQueueCapacity,
             final IResultHandler<R, A> resultHandler,
             final IDuplicateRemover<O> duplicateRemover,
             final AbstractKeyArrayIndexProcedureConstructor<T> ctor);

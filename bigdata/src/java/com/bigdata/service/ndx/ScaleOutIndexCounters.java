@@ -42,9 +42,9 @@ import com.bigdata.util.concurrent.TaskCounters;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexTaskCounters {
+public class ScaleOutIndexCounters {
 
-    public IndexTaskCounters() {
+    public ScaleOutIndexCounters() {
         
     }
 

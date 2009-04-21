@@ -3554,3 +3554,43 @@ BufferedDiskStrategy
     disk.
 
 ------------------------------------------------------------
+
+Clear problem with locking for unisolated B+Tree reads:
+
+java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.IllegalArgumentException: Not our child : child=com.bigdata.btree.Leaf@1f0cf51#1165593256395406
+	at com.bigdata.rdf.rio.AbstractRIOTestCase.doVerify(AbstractRIOTestCase.java:470)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase.doLoadAndVerifyTest(AbstractRIOTestCase.java:101)
+	at com.bigdata.rdf.rio.TestLoadAndVerify.test_loadAndVerify_U1(TestLoadAndVerify.java:115)
+...
+Caused by: java.lang.IllegalArgumentException: Not our child : child=com.bigdata.btree.Leaf@1f0cf51#1165593256395406
+	at com.bigdata.btree.Node.getIndexOf(Node.java:1826)
+	at com.bigdata.btree.Node.getRightSibling(Node.java:1734)
+	at com.bigdata.btree.BTree$LeafCursor.next(BTree.java:2035)
+	at com.bigdata.btree.AbstractBTreeTupleCursor$AbstractCursorPosition.nextLeaf(AbstractBTreeTupleCursor.java:1508)
+	at com.bigdata.btree.AbstractBTreeTupleCursor$MutableCursorPosition.nextLeaf(AbstractBTreeTupleCursor.java:2035)
+	at com.bigdata.btree.AbstractBTreeTupleCursor$AbstractCursorPosition.forwardScan(AbstractBTreeTupleCursor.java:1766)
+	at com.bigdata.btree.AbstractBTreeTupleCursor.nextTuple(AbstractBTreeTupleCursor.java:783)
+	at com.bigdata.btree.AbstractBTreeTupleCursor.next(AbstractBTreeTupleCursor.java:809)
+	at com.bigdata.btree.filter.Advancer$Advancerator.next(Advancer.java:116)
+	at com.bigdata.btree.filter.Advancer$Advancerator.next(Advancer.java:1)
+	at cutthecrap.utils.striterators.Striterator.next(Striterator.java:60)
+	at com.bigdata.btree.filter.FilterConstructor$WrappedTupleIterator.next(FilterConstructor.java:99)
+	at com.bigdata.btree.ResultSet.<init>(ResultSet.java:978)
+	at com.bigdata.btree.ChunkedLocalRangeIterator.getResultSet(ChunkedLocalRangeIterator.java:140)
+	at com.bigdata.btree.UnisolatedReadWriteIndex$ChunkedIterator.getResultSet(UnisolatedReadWriteIndex.java:719)
+	at com.bigdata.btree.AbstractChunkedTupleIterator.rangeQuery(AbstractChunkedTupleIterator.java:305)
+	at com.bigdata.btree.AbstractChunkedTupleIterator.hasNext(AbstractChunkedTupleIterator.java:427)
+	at cutthecrap.utils.striterators.Resolverator.hasNext(Resolverator.java:48)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at com.bigdata.striterator.ChunkedWrappedIterator.hasNext(ChunkedWrappedIterator.java:197)
+	at com.bigdata.rdf.store.AbstractTripleStore.predicateUsage(AbstractTripleStore.java:2379)
+	at com.bigdata.rdf.store.AbstractTripleStore.predicateUsage(AbstractTripleStore.java:2345)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase$VerifyTask.verify(AbstractRIOTestCase.java:618)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase$VerifyTask.call(AbstractRIOTestCase.java:596)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase$VerifyTask.call(AbstractRIOTestCase.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+	at java.lang.Thread.run(Thread.java:619)
+

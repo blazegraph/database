@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
@@ -53,11 +54,13 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ndx.pipeline.AbstractSubtask;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -210,7 +213,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     
     protected static final Logger log = Logger.getLogger(IndexMetadata.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
+    protected final boolean INFO = log.isInfoEnabled();
     
     /**
      * Options and their defaults for the {@link com.bigdata.btree} package and
@@ -609,6 +612,76 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         String DEFAULT_SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = ".75";
 
         String DEFAULT_SPLIT_HANDLER_SAMPLE_RATE = "20"; 
+        
+        /*
+         * Asynchronous index write API.
+         */
+
+        /**
+         * The capacity of the queue on which the application writes. Chunks are
+         * drained from this queue by the {@link AbstractTaskMaster}, broken
+         * into splits, and each split is written onto the
+         * {@link AbstractSubtask} sink handling writes for the associated index
+         * partition.
+         */
+        String MASTER_QUEUE_CAPACITY = "masterQueueCapacity";
+        String DEFAULT_MASTER_QUEUE_CAPACITY = "5000";
+
+        /**
+         * The desired size of the chunks that the master will draw from its
+         * queue.
+         */
+        String MASTER_CHUNK_SIZE = "masterChunkSize";
+
+        String DEFAULT_MASTER_CHUNK_SIZE = "10000";
+
+        /**
+         * The time in nanoseconds that the master will combine smaller chunks
+         * so that it can satisify the desired <i>masterChunkSize</i>.
+         */
+        String MASTER_CHUNK_TIMEOUT_NANOS = "masterChunkTimeoutNanos";
+        String DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(50);
+        
+        /**
+         * The time in nanoseconds after which an idle sink will be closed. Any
+         * buffered writes are flushed when the sink is closed. This must be GTE
+         * the <i>sinkChunkTimeout</i> otherwise the sink will decide that it
+         * is idle when it was just waiting for enough data to prepare a full
+         * chunk.
+         */
+        // GTE chunkTimeout
+        String SINK_IDLE_TIMEOUT_NANOS = "sinkIdleTimeoutNanos";
+        String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(10000);
+        
+        /**
+         * The time in nanoseconds that the {@link AbstractSubtask sink} will
+         * wait inside of the {@link IAsynchronousIterator} when it polls the
+         * iterator for a chunk. This value should be relatively small so that
+         * the sink remains responsible rather than blocking inside of the
+         * {@link IAsynchronousIterator} for long periods of time.
+         */
+        String SINK_POLL_TIMEOUT_NANOS = "sinkPollTimeoutNanos";
+        String DEFAULT_SINK_POLL_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(50);
+
+        /**
+         * The capacity of the internal queue for the per-sink output buffer.
+         */
+        String SINK_QUEUE_CAPACITY = "sinkQueueCapacity";
+        String DEFAULT_SINK_QUEUE_CAPACITY = "5000";
+
+        /**
+         * The desired size of the chunks written that will be written by the
+         * {@link AbstractSubtask sink}.
+         */
+        String SINK_CHUNK_SIZE = "sinkChunkSize";
+        String DEFAULT_SINK_CHUNK_SIZE = "10000";
+        
+        /**
+         * The maximum amount of time in nanoseconds that a sink will combine
+         * smaller chunks so that it can satisify the desired <i>sinkChunkSize</i>.
+         */
+        String SINK_CHUNK_TIMEOUT_NANOS = "sinkChunkTimeoutNanos";
+        String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(5000);
 
     }
     
@@ -684,6 +757,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
 //    private Object historyPolicy;
+    private AsynchronousIndexWriteConfiguration asynchronousIndexWriteConfiguration;
 
     /* 
      * IndexSegment fields.
@@ -692,7 +766,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private int indexSegmentBranchingFactor;
     private boolean indexSegmentBufferNodes;
     private int indexSegmentLeafCacheCapacity;
-
+    
     /**
      * The unique identifier for the (scale-out) index whose data is stored in
      * this B+Tree data structure.
@@ -1186,6 +1260,28 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
     
     /**
+     * The asynchronous index write API configuration for this index.
+     */
+    public AsynchronousIndexWriteConfiguration getAsynchronousIndexWriteConfiguration() {
+        
+        return asynchronousIndexWriteConfiguration;
+        
+    }
+
+    /**
+     * Set the asynchronous index write API configuration for this index.
+     */
+    public void getAsynchronousIndexWriteConfiguration(
+            AsynchronousIndexWriteConfiguration newVal) {
+
+        if (newVal == null)
+            throw new IllegalArgumentException();
+        
+        this.asynchronousIndexWriteConfiguration = newVal;
+        
+    }
+
+    /**
      * <strong>De-serialization constructor only</strong> - DO NOT use this
      * ctor for creating a new instance!
      */
@@ -1457,6 +1553,64 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         }
 
+        /*
+         * Asynchronous index write API configuration.
+         */
+        {
+
+            final int masterQueueCapacity = Integer.parseInt(getProperty(
+                    indexManager, properties, namespace,
+                    Options.MASTER_QUEUE_CAPACITY,
+                    Options.DEFAULT_MASTER_QUEUE_CAPACITY));
+
+            final int masterChunkSize = Integer.parseInt(getProperty(
+                    indexManager, properties, namespace,
+                    Options.MASTER_CHUNK_SIZE,
+                    Options.DEFAULT_MASTER_CHUNK_SIZE));
+
+            final long masterChunkTimeoutNanos = Long.parseLong(getProperty(
+                    indexManager, properties, namespace,
+                    Options.MASTER_CHUNK_TIMEOUT_NANOS,
+                    Options.DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS));
+            
+            final long sinkIdleTimeoutNanos = Long.parseLong(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SINK_IDLE_TIMEOUT_NANOS,
+                    Options.DEFAULT_SINK_IDLE_TIMEOUT_NANOS));
+            
+            final long sinkPollTimeoutNanos = Long.parseLong(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SINK_POLL_TIMEOUT_NANOS,
+                    Options.DEFAULT_SINK_POLL_TIMEOUT_NANOS));
+
+            final int sinkQueueCapacity = Integer.parseInt(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SINK_QUEUE_CAPACITY,
+                    Options.DEFAULT_SINK_QUEUE_CAPACITY));
+
+            final int sinkChunkSize = Integer.parseInt(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SINK_CHUNK_SIZE,
+                    Options.DEFAULT_SINK_CHUNK_SIZE));
+
+            final long sinkChunkTimeoutNanos = Long.parseLong(getProperty(
+                    indexManager, properties, namespace,
+                    Options.SINK_CHUNK_TIMEOUT_NANOS,
+                    Options.DEFAULT_SINK_CHUNK_TIMEOUT_NANOS));
+
+            this.asynchronousIndexWriteConfiguration = new AsynchronousIndexWriteConfiguration(
+                    masterQueueCapacity,//
+                    masterChunkSize,//
+                    masterChunkTimeoutNanos,//
+                    sinkIdleTimeoutNanos,//
+                    sinkPollTimeoutNanos,//
+                    sinkQueueCapacity,//
+                    sinkChunkSize,//
+                    sinkChunkTimeoutNanos//
+            );
+
+        }
+
     }
 
     /**
@@ -1559,6 +1713,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
         sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
+        sb.append(", asynchronousIndexWriteConfiguration=" + asynchronousIndexWriteConfiguration);
 
         return sb.toString();
         
@@ -1568,16 +1723,22 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * The initial version.
      */
     private static transient final int VERSION0 = 0x0;
+    /**
+     * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
+     * {@link #VERSION0} reads create a instance of that field based on a
+     * default configuration.
+     */
+    private static transient final int VERSION1 = 0x1;
     
     /**
      * @todo review generated record for compactness.
      */
-    public void readExternal(ObjectInput in) throws IOException,
+    public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         final int version = (int) LongPacker.unpackLong(in);
 
-        if (version != VERSION0) {
+        if (version != VERSION0 && version != VERSION1) {
 
             throw new IOException("Unknown version: version=" + version);
 
@@ -1637,11 +1798,62 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         indexSegmentBufferNodes = in.readBoolean();
 
+        if (version < VERSION1) {
+
+            /*
+             * Use the default configuration since not present in the serialized
+             * form before VERSION1.
+             */
+
+            final int masterQueueCapacity = Integer
+                    .parseInt(Options.DEFAULT_MASTER_QUEUE_CAPACITY);
+
+            final int masterChunkSize = Integer
+                    .parseInt(Options.DEFAULT_MASTER_CHUNK_SIZE);
+
+            final long masterChunkTimeoutNanos = Long
+                    .parseLong(Options.DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS);
+
+            final long sinkIdleTimeoutNanos = Long
+                    .parseLong(Options.DEFAULT_SINK_IDLE_TIMEOUT_NANOS);
+
+            final long sinkPollTimeoutNanos = Long
+                    .parseLong(Options.DEFAULT_SINK_POLL_TIMEOUT_NANOS);
+
+            final int sinkQueueCapacity = Integer
+                    .parseInt(Options.DEFAULT_SINK_QUEUE_CAPACITY);
+
+            final int sinkChunkSize = Integer
+                    .parseInt(Options.DEFAULT_SINK_CHUNK_SIZE);
+
+            final long sinkChunkTimeoutNanos = Long
+                    .parseLong(Options.DEFAULT_SINK_CHUNK_TIMEOUT_NANOS);
+
+            asynchronousIndexWriteConfiguration = new AsynchronousIndexWriteConfiguration(
+                    masterQueueCapacity,//
+                    masterChunkSize,//
+                    masterChunkTimeoutNanos,//
+                    sinkIdleTimeoutNanos,//
+                    sinkPollTimeoutNanos,//
+                    sinkQueueCapacity,//
+                    sinkChunkSize,//
+                    sinkChunkTimeoutNanos//
+                    );
+            
+        } else {
+        
+            asynchronousIndexWriteConfiguration = (AsynchronousIndexWriteConfiguration) in
+                    .readObject();
+            
+        }
+
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
+
+        final int version = VERSION1;
         
-        LongPacker.packLong(out, VERSION0);
+        LongPacker.packLong(out, version);
 
         // hasName?
         out.writeBoolean(name != null ? true : false);
@@ -1698,13 +1910,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         LongPacker.packLong(out, indexSegmentBranchingFactor);
 
         LongPacker.packLong(out, indexSegmentLeafCacheCapacity);
-        
+
         out.writeBoolean(indexSegmentBufferNodes);
-        
+
+        if (version >= VERSION1) {
+
+            // introduced in VERSION1
+            out.writeObject(asynchronousIndexWriteConfiguration);
+
+        }
+
     }
 
     /**
-     * Makes a copy of the persistent data, clearing the 
+     * Makes a copy of the persistent data, clearing the
      */
     public IndexMetadata clone() {
         

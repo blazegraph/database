@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
+import java.util.concurrent.TimeUnit;
+
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 
@@ -48,10 +50,17 @@ L extends Object, //
 HS extends MockSubtaskStats//
 > extends AbstractMasterTask<H, E, S, L> {
 
+    static final long DEFAULT_SINK_IDLE_TIMEOUT = TimeUnit.MILLISECONDS
+            .toNanos(2000);
+
+    static final long DEFAULT_SINK_POLL_TIMEOUT = TimeUnit.MILLISECONDS
+            .toNanos(50);
+
     public MockMaster(H stats, BlockingBuffer<E[]> buffer) {
 
-        super(stats, buffer);
-        
+        super(stats, buffer, DEFAULT_SINK_IDLE_TIMEOUT,
+                DEFAULT_SINK_POLL_TIMEOUT);
+
     }
 
 }

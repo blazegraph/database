@@ -39,10 +39,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import cern.colt.GenericSorting;
-import cern.colt.Swapper;
-import cern.colt.function.IntComparator;
-
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.relation.rule.IQueryOptions;
@@ -183,7 +179,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * 
      * @see #DEFAULT_CONSUMER_CHUNK_SIZE
      */
-    public final int getChunkCapacity() {
+    public final int getChunkSize() {
 
         return chunkCapacity;
         
@@ -694,14 +690,26 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     logTimeout += Math.min(maxLogTimeout, logTimeout);
 
-                    log.warn("waiting - queue is full: ntries="
+                    final String msg = "waiting - queue is full: ntries="
                             + ntries
                             + ", elapsed="
                             + TimeUnit.MILLISECONDS.convert(elapsed,
                                     TimeUnit.NANOSECONDS)
                             + ", timeout="
                             + TimeUnit.MILLISECONDS.convert(logTimeout,
-                                    TimeUnit.NANOSECONDS));
+                                    TimeUnit.NANOSECONDS);
+                    
+                    if (log.isInfoEnabled() && logTimeout > maxLogTimeout) {
+                        /*
+                         * Issue warning with stack trace showing who is
+                         * blocked.
+                         */
+                        log.warn(msg, new RuntimeException(
+                                "Blocked Producer Stack Frame"));
+                    } else {
+                        // issue warning.
+                        log.warn(msg);
+                    }
 
                 }
 
@@ -1389,6 +1397,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         }
         
+        /**
+         * Return the next element. If the element is an array type, then the
+         * optional chunk combiner may be applied to aggregate chunks. When the
+         * chunk combiner is applied, this method will block until either a
+         * chunk of sufficient size has been accumulated -or- the chunk combiner
+         * timeout has been exceeded. In either case, it will then return the
+         * chunk which was accumulated.
+         */
         public E next() {
             
             if (!hasNext()) {
@@ -1436,11 +1452,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     if (len1 != len0) {
 
-                        GenericSorting.mergeSort(
-                                0, // fromIndex
-                                len1, // toIndex
-                                new MyIntComparator((Comparable[]) chunk),
-                                new MySwapper((Object[]) chunk));
+                        // in place merge sort.
+                        ChunkMergeSortHelper.mergeSort((Object[]) chunk);
 
                     }
 
@@ -1550,19 +1563,20 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * empty.
                  */
                 hasNext();
-                
-                return combineChunks(combineNextChunk(e), nchunks + 1, startTime, timeout);
+
+                return combineChunks(combineNextChunk(e), nchunks + 1,
+                        startTime, timeout);
 
             }
 
             // Done.
-            if (INFO) 
-            log.info("done:\n" + ">>> #chunks=" + nchunks + ", #elements="
-                    + chunk.length + ", chunkCapacity=" + chunkCapacity
-                    + ", elapsed=" + elapsed + "ns, isTimeout=" + isTimeout
-                    + ", queueEmpty=" + queue.isEmpty() + ", open="
-                    + BlockingBuffer.this.open);
-            
+            if (INFO)
+                log.info("done:\n" + ">>> #chunks=" + nchunks + ", #elements="
+                        + chunk.length + ", chunkCapacity=" + chunkCapacity
+                        + ", elapsed=" + elapsed + "ns, isTimeout=" + isTimeout
+                        + ", queueEmpty=" + queue.isEmpty() + ", open="
+                        + BlockingBuffer.this.open);
+
             return e;
             
         }
@@ -1613,60 +1627,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
             throw new UnsupportedOperationException();
             
-        }
-
-    }
-
-    /**
-     * Implementation for data in an array whose element type implements
-     * {@link Comparable}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    final static private class MyIntComparator implements IntComparator {
-
-        private final Comparable[] a;
-
-        public MyIntComparator(final Comparable[] a) {
-
-            this.a = a;
-
-        }
-
-        @SuppressWarnings("unchecked")
-        public int compare(int o1, int o2) {
-
-            return a[o1].compareTo(a[o2]);
-
-        }
-
-    }
-
-    /**
-     * Implementation swaps object references in an array.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    final static private class MySwapper implements Swapper {
-
-        private final Object[] a;
-
-        public MySwapper(final Object[] a) {
-
-            this.a = a;
-
-        }
-
-        public void swap(final int i, final int j) {
-
-            final Object t = a[i];
-
-            a[i] = a[j];
-
-            a[j] = t;
-
         }
 
     }
