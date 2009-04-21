@@ -252,14 +252,14 @@ A//
             // update the local statistics.
             stats.chunksOut++;
             stats.elementsOut += chunkSize;
-            stats.elapsedNanos += elapsedNanos;
+            stats.elapsedChunkWritingNanos += elapsedNanos;
 
             // update the master's statistics.
             synchronized (master.stats) {
                 master.stats.chunksOut++;
                 master.stats.elementsOut += chunkSize;
                 master.stats.duplicateCount += duplicateCount;
-                master.stats.elapsedNanos += elapsedNanos;
+                master.stats.elapsedChunkWritingNanos += elapsedNanos;
             }
 
         }
