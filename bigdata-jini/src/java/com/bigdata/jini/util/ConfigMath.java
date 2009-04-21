@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.util;
 
+import java.util.concurrent.TimeUnit;
+
 import net.jini.config.Configuration;
 
 /**
@@ -74,4 +76,18 @@ public class ConfigMath {
         
     }
     
+    /**
+     * Convert milliseconds to nanoseconds.
+     * 
+     * @param ms
+     *            Milliseconds.
+     *            
+     * @return Nanoseconds.
+     */
+    public static long ms2ns(final long ms) {
+        
+        return TimeUnit.MILLISECONDS.toNanos(ms);
+        
+    }
+
 }

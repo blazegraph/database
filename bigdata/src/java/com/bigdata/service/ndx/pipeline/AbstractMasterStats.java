@@ -30,6 +30,7 @@ package com.bigdata.service.ndx.pipeline;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -259,14 +260,15 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             }
         });
 
-        t.addCounter("averageNanos/write", new Instrument<Double>() {
+        t.addCounter("averageMillisPerWrite", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(getAverageNanosPerWrite());
+                setValue(TimeUnit.NANOSECONDS
+                        .toMillis((long) getAverageNanosPerWrite()));
             }
         });
 
-        t.addCounter("averageElements/write", new Instrument<Double>() {
+        t.addCounter("averageElementsPerWrite", new Instrument<Double>() {
             @Override
             protected void sample() {
                 setValue((chunksOut == 0L ? 0 : elementsOut
@@ -305,8 +307,10 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 + redirectCount + ", chunkIn=" + chunksIn + ", elementIn="
                 + elementsIn + ", chunksOut=" + chunksOut + ", elementsOut="
                 + elementsOut + ", elapsedNanos=" + elapsedNanos
-                + ", averageNanos/write=" + getAverageNanosPerWrite()
-                + ", averageElements/write=" + getAverageElementsPerWrite()
+                + ", averageMillisPerWrite="
+                + TimeUnit.NANOSECONDS
+                        .toMillis((long) getAverageNanosPerWrite())
+                + ", averageElementsPerWrite=" + getAverageElementsPerWrite()
                 + "}";
 
     }
