@@ -77,6 +77,20 @@ public class ConfigMath {
     }
     
     /**
+     * Convert seconds to nanoseconds.
+     * 
+     * @param s
+     *            seconds.
+     *            
+     * @return Nanoseconds.
+     */
+    public static long s2ns(final long s) {
+
+        return TimeUnit.SECONDS.toNanos(s);
+
+    }
+
+    /**
      * Convert milliseconds to nanoseconds.
      * 
      * @param ms
@@ -85,9 +99,9 @@ public class ConfigMath {
      * @return Nanoseconds.
      */
     public static long ms2ns(final long ms) {
-        
+
         return TimeUnit.MILLISECONDS.toNanos(ms);
-        
+
     }
 
 }
