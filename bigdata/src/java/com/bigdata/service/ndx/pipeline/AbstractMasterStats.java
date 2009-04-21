@@ -77,7 +77,9 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     
     /**
      * The #of distinct partitions for which the master has caused subtasks to
-     * be created.
+     * be created. You can compute the #of active subtasks as
+     * {@link #subtaskStartCount} - {@link #subtaskEndCount}, which is also
+     * reported by {@link #getCounterSet()}.
      * 
      * @todo if {@link #partitions} is made into a weak value hash map then we
      *       need to change how this is maintained and add another counter which
@@ -225,6 +227,13 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             }
         });
 
+        t.addCounter("activePartitionCount", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(subtaskStartCount-subtaskEndCount);
+            }
+        });
+
         t.addCounter("redirectCount", new Instrument<Long>() {
             @Override
             protected void sample() {
@@ -343,6 +352,8 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 + subtaskIdleTimeout
                 + ", partitionCount="
                 + partitionCount
+                + ", activePartitionCount="
+                + (subtaskStartCount-subtaskEndCount)
                 + ", redirectCount="
                 + redirectCount
                 + ", chunkIn="
