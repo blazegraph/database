@@ -111,7 +111,11 @@ abstract public class JiniServiceConfiguration extends
          * for the {@link Configuration} and will appear at the end of the
          * command line. This may be used to pass in overrides for the Jini
          * {@link Configuration} that apply to either a specific service or to
-         * all jini services.
+         * all jini services. The option may be specified for the
+         * {@link JiniClient} (as defaults) and for each service (as overrides).
+         * The service options will be appended to those given for the
+         * {@link JiniClient} and therefore will override those given for the
+         * {@link JiniClient}.
          * 
          * @see ConfigurationProvider#getInstance(String[])
          */
@@ -267,7 +271,7 @@ abstract public class JiniServiceConfiguration extends
          * and to add the {@link Options#JINI_OPTIONS}.
          */
         @Override
-        protected void addServiceOptions(List<String> cmds) {
+        protected void addServiceOptions(final List<String> cmds) {
 
             // The configuration file goes 1st.
             cmds.add(configFile.toString());
@@ -901,11 +905,24 @@ abstract public class JiniServiceConfiguration extends
 
     }
 
-    public static String[] getJiniOptions(String className, Configuration config)
-            throws ConfigurationException {
+    /**
+     * Reads options from (a) the {@link JiniClient} component and concatenates
+     * options from the <i>className</i> component.
+     * 
+     * @param className
+     * @param config
+     * @return
+     * @throws ConfigurationException
+     */
+    public static String[] getJiniOptions(final String className,
+            final Configuration config) throws ConfigurationException {
 
-        return getStringArray(Options.JINI_OPTIONS, className, config,
-                new String[0]);
+        return concat( // for all services
+                getStringArray(Options.JINI_OPTIONS,
+                        JiniClient.class.getName(), config, new String[0]),
+                // for this service.
+                getStringArray(Options.JINI_OPTIONS, className, config,
+                        new String[0]));
 
     }
 }
