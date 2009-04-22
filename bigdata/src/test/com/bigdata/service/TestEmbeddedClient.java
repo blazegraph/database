@@ -36,6 +36,7 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.service.ndx.ClientIndexView;
 
 /**
  * Test suite for the {@link EmbeddedClient}.

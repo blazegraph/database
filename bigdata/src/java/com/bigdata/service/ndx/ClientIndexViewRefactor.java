@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 22, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -40,7 +40,9 @@ import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.ClientIndexView.AbstractDataServiceProcedureTask;
+import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.DataServiceTupleIterator;
+import com.bigdata.service.IDataService;
 
 /**
  * <p>

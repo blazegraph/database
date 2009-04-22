@@ -33,7 +33,7 @@ import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Set;
 
-import com.bigdata.service.PartitionedTupleIterator;
+import com.bigdata.service.ndx.PartitionedTupleIterator;
 
 /**
  * Streaming iterator pattern.

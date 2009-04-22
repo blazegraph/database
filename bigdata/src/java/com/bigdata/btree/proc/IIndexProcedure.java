@@ -34,9 +34,9 @@ import java.util.concurrent.Callable;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISimpleBTree;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.sparse.SparseRowStore;
 
 /**

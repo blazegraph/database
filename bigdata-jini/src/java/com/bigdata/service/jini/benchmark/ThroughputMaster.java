@@ -57,12 +57,12 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
-import com.bigdata.service.IScaleOutClientIndex;
 import com.bigdata.service.LoadBalancerService;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.TaskMaster;
+import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 
 /**

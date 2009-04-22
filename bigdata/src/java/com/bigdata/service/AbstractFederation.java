@@ -63,6 +63,7 @@ import com.bigdata.journal.TemporaryStoreFactory;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataClient.Options;
+import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.service.ndx.ScaleOutIndexCounters;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;

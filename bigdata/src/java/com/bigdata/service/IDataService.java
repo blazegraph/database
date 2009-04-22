@@ -48,6 +48,7 @@ import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.sparse.SparseRowStore;
 
 /**

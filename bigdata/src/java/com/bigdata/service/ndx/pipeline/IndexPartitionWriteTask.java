@@ -50,7 +50,7 @@ import com.bigdata.util.InnerCause;
  * @version $Id$
  */
 public class IndexPartitionWriteTask<//
-H extends IndexWriteStats<L, HS>, //
+H extends IndexAsyncWriteStats<L, HS>, //
 O extends Object, //
 E extends KVO<O>, //
 L extends PartitionLocator, //

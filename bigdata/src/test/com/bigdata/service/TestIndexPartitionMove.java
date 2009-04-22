@@ -51,6 +51,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.ResourceManager.Options;
+import com.bigdata.service.ndx.ClientIndexView;
 
 /**
  * Some unit tests for moving an index partition.

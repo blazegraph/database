@@ -1,6 +1,9 @@
 package com.bigdata.service;
 
 import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.service.ndx.IClientIndex;
+import com.bigdata.service.ndx.IScaleOutClientIndex;
 
 /**
  * Concrete implementation for {@link IClientIndex} views.

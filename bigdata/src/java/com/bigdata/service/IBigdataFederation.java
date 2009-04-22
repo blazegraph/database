@@ -36,6 +36,8 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 

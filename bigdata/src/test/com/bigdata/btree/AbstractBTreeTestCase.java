@@ -48,7 +48,7 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
-import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.ndx.ClientIndexView;
 
 /**
  * Abstract test case for {@link BTree} tests.

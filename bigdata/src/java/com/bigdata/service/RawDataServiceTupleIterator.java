@@ -40,6 +40,8 @@ import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
+import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.service.ndx.PartitionedTupleIterator;
 
 /**
  * Class supports range query across against an unpartitioned index on an
@@ -91,7 +93,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
      * The name of the index partition on which the range query is being
      * performed.
      */
-    protected final String name;
+    public final String name;
     
     /**
      * From the ctor.

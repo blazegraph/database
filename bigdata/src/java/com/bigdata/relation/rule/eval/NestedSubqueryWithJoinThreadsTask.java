@@ -57,7 +57,7 @@ import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISlice;
 import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.ExecutionHelper;

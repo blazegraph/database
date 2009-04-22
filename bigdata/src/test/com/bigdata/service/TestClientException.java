@@ -30,6 +30,8 @@ package com.bigdata.service;
 
 import java.util.Arrays;
 
+import com.bigdata.service.ndx.ClientException;
+
 import junit.framework.TestCase;
 
 /**

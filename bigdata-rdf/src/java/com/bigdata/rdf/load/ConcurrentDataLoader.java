@@ -126,18 +126,18 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     /**
      * True iff the {@link #log} level is WARN or less.
      */
-    final protected static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+    final protected boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
             .toInt();
     
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.isInfoEnabled();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Thread pool provinding concurrent load services.
@@ -336,11 +336,12 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
      * 
      * @return The {@link CounterSet} for the {@link ConcurrentDataLoader}.
      */
-    synchronized public CounterSet getCounters() {
+//    synchronized 
+    public CounterSet getCounters() {
 
-        if (counterSet == null) {
+//        if (counterSet == null) {
 
-            counterSet = new CounterSet();
+        final CounterSet counterSet = new CounterSet();
             
             counterSet.addCounter("#threads",
                     new OneShotInstrument<Integer>(nthreads));
@@ -397,12 +398,12 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                 
             }
 
-        }
+//        }
         
         return counterSet;
         
     }
-    private CounterSet counterSet;
+//    private CounterSet counterSet;
     
     /**
      * If there is a task on the {@link #errorQueue} then re-submit it.

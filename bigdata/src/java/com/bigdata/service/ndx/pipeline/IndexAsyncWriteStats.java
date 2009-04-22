@@ -2,7 +2,6 @@ package com.bigdata.service.ndx.pipeline;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Statistics for the consumer.
@@ -10,7 +9,7 @@ import com.bigdata.resources.StaleLocatorException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexWriteStats<L, HS extends IndexPartitionWriteStats> extends
+public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extends
         AbstractMasterStats<L, HS> {
 
     /**

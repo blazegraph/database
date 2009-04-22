@@ -8,7 +8,7 @@ import java.io.ObjectOutput;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.service.IScaleOutClientIndex;
+import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.AbstractMasterTask;
 import com.bigdata.service.ndx.pipeline.AbstractSubtask;
 

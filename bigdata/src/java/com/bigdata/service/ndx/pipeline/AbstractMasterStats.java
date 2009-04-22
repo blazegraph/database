@@ -302,8 +302,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("averageElementsPerWrite", new Instrument<Double>() {
             @Override
             protected void sample() {
-                setValue((chunksOut == 0L ? 0 : elementsOut
-                        / (double) chunksOut));
+                setValue(getAverageElementsPerWrite());
             }
         });
 

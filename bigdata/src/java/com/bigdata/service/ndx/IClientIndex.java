@@ -26,12 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 17, 2008
  */
 
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.service.IBigdataClient;
+import com.bigdata.service.IDataService;
 
 /**
  * {@link IBigdataClient}-side {@link IIndex} interface.

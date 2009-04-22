@@ -82,6 +82,7 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.resources.IndexManager.IIndexManagerCounters;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.ManagedJournal;
+import com.bigdata.service.jini.DataServer;
 
 /**
  * An implementation of a network-capable {@link IDataService}. The service is
