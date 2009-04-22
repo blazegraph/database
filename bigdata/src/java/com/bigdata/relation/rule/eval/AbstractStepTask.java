@@ -56,10 +56,10 @@ import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.service.ndx.IClientIndex;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

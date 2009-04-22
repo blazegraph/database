@@ -1,11 +1,9 @@
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.List;
-
-import com.bigdata.service.ClientIndexView.AbstractDataServiceProcedureTask;
 
 /**
  * Exposes a linked list of retry exceptions leading to the failure of an

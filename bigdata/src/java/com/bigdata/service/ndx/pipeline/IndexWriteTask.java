@@ -44,8 +44,8 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IScaleOutClientIndex;
 import com.bigdata.service.Split;
+import com.bigdata.service.ndx.IScaleOutClientIndex;
 
 /**
  * Task drains a {@link BlockingBuffer} containing {@link KVO}[] chunks, splits
@@ -94,7 +94,7 @@ import com.bigdata.service.Split;
  *       might go too far and cause complications with periodic overflow.
  */
 abstract public class IndexWriteTask <//
-H extends IndexWriteStats<L, HS>, //
+H extends IndexAsyncWriteStats<L, HS>, //
 O extends Object, //
 E extends KVO<O>, //
 S extends IndexPartitionWriteTask, //
@@ -410,7 +410,7 @@ A//
      */
     public static class M<T extends IKeyArrayIndexProcedure, O, R, A> extends
             IndexWriteTask<//
-            IndexWriteStats<PartitionLocator, IndexPartitionWriteStats>, // H
+            IndexAsyncWriteStats<PartitionLocator, IndexPartitionWriteStats>, // H
             O, // O
             KVO<O>, // E
             IndexPartitionWriteTask, // S
@@ -434,7 +434,7 @@ A//
                 final IDuplicateRemover<O> duplicateRemover,
                 final AbstractKeyArrayIndexProcedureConstructor<T> ctor,
                 final IResultHandler<R, A> resultHandler,
-                final IndexWriteStats<PartitionLocator, IndexPartitionWriteStats> stats,
+                final IndexAsyncWriteStats<PartitionLocator, IndexPartitionWriteStats> stats,
                 final BlockingBuffer<KVO<O>[]> buffer) {
             
             super(ndx, sinkIdleTimeoutNanos, sinkPollTimeoutNanos,

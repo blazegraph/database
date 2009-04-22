@@ -1,6 +1,7 @@
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import com.bigdata.btree.proc.IResultHandler;
+import com.bigdata.service.Split;
 
 /**
  * Hands back the object visited for a single index partition.
@@ -8,7 +9,8 @@ import com.bigdata.btree.proc.IResultHandler;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-@SuppressWarnings("unused") class IdentityHandler implements IResultHandler<Object, Object> {
+@SuppressWarnings("unused")
+public class IdentityHandler implements IResultHandler<Object, Object> {
 
     int nvisited = 0;
     private Object ret;

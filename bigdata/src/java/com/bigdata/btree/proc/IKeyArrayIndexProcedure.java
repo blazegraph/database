@@ -1,6 +1,6 @@
 package com.bigdata.btree.proc;
 
-import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.ndx.ClientIndexView;
 
 /**
  * Interface for procedures that are mapped across one or more index partitions

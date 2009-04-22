@@ -33,7 +33,7 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.service.ClientIndexView;
+import com.bigdata.service.ndx.ClientIndexView;
 
 /**
  * An immutable object that may be used to locate an index partition. Instances

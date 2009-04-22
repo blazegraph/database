@@ -43,6 +43,8 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.service.ndx.PartitionedTupleIterator;
 
 /**
  * Test suite for the {@link IRangeQuery} API.

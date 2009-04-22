@@ -44,6 +44,7 @@ import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 /**

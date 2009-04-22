@@ -76,11 +76,12 @@ public class RDFLoadTaskFactory<T extends Runnable> extends
      * 
      * @todo in the base class also?
      */
-    synchronized public CounterSet getCounters() {
+//    synchronized 
+    public CounterSet getCounters() {
 
-        if (counterSet == null) {
+//        if (counterSet == null) {
 
-            counterSet = new CounterSet();
+            final CounterSet counterSet = new CounterSet();
 
             /*
              * Elapsed ms since the start of the load up to and until the end of
@@ -139,13 +140,13 @@ public class RDFLoadTaskFactory<T extends Runnable> extends
                 }
             });
 
-        }
+//        }
 
         return counterSet;
 
     }
 
-    private CounterSet counterSet = null;
+//    private CounterSet counterSet = null;
     
     /**
      * Report totals.

@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 31, 2009
  */
 
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -46,9 +46,14 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
-import com.bigdata.service.ndx.ScaleOutIndexCounters;
+import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.ILoadBalancerService;
+import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
-import com.bigdata.service.ndx.pipeline.IndexWriteStats;
+import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 
 /**
  * A client-side view of a scale-out index.
@@ -217,7 +222,7 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * the completion of the consumer, to cancel the consumer, etc. The
      * {@link Future} will not terminate (other than by error) until the buffer
      * has been {@link IBlockingBuffer#close() closed}. The {@link Future}
-     * evaluates to an {@link IndexWriteStats} object. Those statistics are also
+     * evaluates to an {@link IndexAsyncWriteStats} object. Those statistics are also
      * reported to the {@link ILoadBalancerService} via the
      * {@link IBigdataFederation}.
      * <p>

@@ -54,6 +54,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
 import com.bigdata.service.AbstractScaleOutClient.Options;
+import com.bigdata.service.ndx.ClientIndexView;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

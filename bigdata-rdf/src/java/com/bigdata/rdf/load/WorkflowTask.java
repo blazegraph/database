@@ -10,7 +10,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.service.ClientException;
+import com.bigdata.service.ndx.ClientException;
 import com.bigdata.util.InnerCause;
 
 /**

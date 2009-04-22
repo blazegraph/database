@@ -42,6 +42,7 @@ import com.bigdata.journal.ResourceLockService;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.EmbeddedFederation.EmbeddedTransactionServiceImpl;
+import com.bigdata.service.ndx.DataServiceIndex;
 import com.bigdata.util.InnerCause;
 
 /**

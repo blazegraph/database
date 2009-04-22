@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 22, 2007
  */
 
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -56,7 +56,6 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
-import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
@@ -83,13 +82,16 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.DataServiceTupleIterator;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.Split;
 import com.bigdata.service.IBigdataClient.Options;
-import com.bigdata.service.ndx.ScaleOutIndexCounters;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
-import com.bigdata.service.ndx.pipeline.IndexWriteStats;
+import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
-import com.bigdata.util.InnerCause;
-import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * <p>
@@ -286,9 +288,12 @@ public class ClientIndexView implements IScaleOutClientIndex {
      *       different from the timestamp of the view (e.g., a read-consistent
      *       transaction).
      * 
+     * @todo should be protected, but some unit tests in a different package
+     *       access this.
+     * 
      * @see IBigdataFederation#getMetadataIndex(String, long)
      */
-    final protected IMetadataIndex getMetadataIndex() {
+    final public IMetadataIndex getMetadataIndex() {
         
         return metadataIndex;
         
@@ -897,7 +902,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @param proc
      * @param resultHandler
      */
-    private void submit(final long ts, final byte[] fromKey,
+    void submit(final long ts, final byte[] fromKey,
             final byte[] toKey, final IKeyRangeIndexProcedure proc,
             final IResultHandler resultHandler) {
 
@@ -1092,7 +1097,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * @param ctor
      * @param aggregator
      */
-    private void submit(final long ts, final int fromIndex, final int toIndex,
+    void submit(final long ts, final int fromIndex, final int toIndex,
             final byte[][] keys, final byte[][] vals,
             final AbstractKeyArrayIndexProcedureConstructor ctor,
             final IResultHandler aggregator) {
@@ -1411,567 +1416,6 @@ public class ClientIndexView implements IScaleOutClientIndex {
             
         }
 
-    }
-    
-    /**
-     * Helper class for submitting an {@link IIndexProcedure} to run on an
-     * {@link IDataService}. The class traps {@link StaleLocatorException}s
-     * and handles the redirection of requests to the appropriate
-     * {@link IDataService}. When necessary, the data for an
-     * {@link IKeyArrayIndexProcedure} will be re-split in order to distribute
-     * the requests to the new index partitions following a split of the target
-     * index partition.
-     * <p>
-     * Note: If an index partition is moved then the key range is unchanged.
-     * <p>
-     * Note: If an index partition is split, then the key range for each new
-     * index partition is a sub-range of the original key range and the total
-     * key range for the new index partitions is exactly the original key range.
-     * <p>
-     * Note: If an index partition is joined with another index partition then
-     * the key range of the new index partition is increased. However, we will
-     * wind up submitting one request to the new index partition for each index
-     * partition that we knew about at the time that the procedure was first
-     * mapped across the index partitions.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected abstract class AbstractDataServiceProcedureTask implements
-            Callable<Void> {
-
-        protected final IScaleOutClientIndex ndx;
-        
-        /**
-         * The timestamp for the operation. This will be the timestamp for the
-         * view (the outer class) unless the operation is read-only, in which
-         * case a different timestamp may be choosen either to improve
-         * concurrency or to provide globally read-consistent operations (in the
-         * latter cases this will be a read-only transaction identifier).
-         */
-        protected final long ts;
-
-        /**
-         * The split assigned to this instance of the procedure.
-         */
-        protected final Split split;
-
-        /**
-         * The procedure to be executed against that {@link #split}.
-         */
-        protected final IIndexProcedure proc;
-
-        /**
-         * Used to aggregate results when a procedure can span more than one
-         * index partition.
-         */
-        protected final IResultHandler resultHandler;
-        private final TaskCounters taskCounters;
-//        protected final TaskCounters taskCountersByProc;
-        private final TaskCounters taskCountersByIndex;
-        
-        private long nanoTime_submitTask;
-        private long nanoTime_beginWork;
-        private long nanoTime_finishedWork;
-        
-        /**
-         * If the task fails then this will be populated with an ordered list of
-         * the exceptions. There will be one exception per-retry of the task.
-         * For some kinds of failure this list MAY remain unbound.
-         */
-        protected List<Throwable> causes = null;
-        
-        /**
-         * A human friendly representation.
-         */
-        public String toString() {
-            
-            return "index=" + ndx.getName() + ", ts=" + ts + ", procedure "
-                    + proc.getClass().getName() + " : " + split;
-            
-        }
-
-        /**
-         * Variant used for procedures that are NOT instances of
-         * {@link IKeyArrayIndexProcedure}.
-         * 
-         * @param ts
-         * @param split
-         * @param proc
-         * @param resultHandler
-         */
-        public AbstractDataServiceProcedureTask(IScaleOutClientIndex ndx, final long ts,
-                final Split split, final IIndexProcedure proc,
-                final IResultHandler resultHandler) {
-
-            if (ndx == null)
-                throw new IllegalArgumentException();
-
-            if (split.pmd == null)
-                throw new IllegalArgumentException();
-            
-            if(!(split.pmd instanceof PartitionLocator)) {
-                
-                throw new IllegalArgumentException("Split does not have a locator");
-                
-            }
-
-            if (proc == null)
-                throw new IllegalArgumentException();
-
-            this.ndx = ndx;
-            
-            this.ts = ts;
-            
-            this.split = split;
-            
-            this.proc = proc;
-
-            this.resultHandler = resultHandler;
-
-            this.taskCounters = ndx.getFederation().getTaskCounters();
-            
-//            this.taskCountersByProc = fed.getTaskCounters(proc);
-//            
-            this.taskCountersByIndex = ndx.getFederation()
-                    .getIndexCounters(ndx.getName()).synchronousCounters;
-
-            nanoTime_submitTask = System.nanoTime();
-            
-        }
-        
-        final public Void call() throws Exception {
-
-            // the index partition locator.
-            final PartitionLocator locator = (PartitionLocator) split.pmd;
-
-            taskCounters.taskSubmitCount.incrementAndGet();
-//            taskCountersByProc.taskSubmitCount.incrementAndGet();
-            taskCountersByIndex.taskSubmitCount.incrementAndGet();
-
-            nanoTime_beginWork = System.nanoTime();
-            final long queueWaitingTime = nanoTime_beginWork - nanoTime_submitTask;
-            taskCounters.queueWaitingNanoTime.addAndGet(queueWaitingTime);
-//            taskCountersByProc.queueWaitingTime.addAndGet(queueWaitingTime);
-            taskCountersByIndex.queueWaitingNanoTime.addAndGet(queueWaitingTime);
-            
-            try {
-
-                submit(locator);
-                
-                taskCounters.taskSuccessCount.incrementAndGet();
-//                taskCountersByProc.taskSuccessCount.incrementAndGet();
-                taskCountersByIndex.taskSuccessCount.incrementAndGet();
-
-            } catch(Exception ex) {
-
-                taskCounters.taskFailCount.incrementAndGet();
-//                taskCountersByProc.taskFailCount.incrementAndGet();
-                taskCountersByIndex.taskFailCount.incrementAndGet();
-
-                throw ex;
-                
-            } finally {
-
-                nanoTime_finishedWork = System.nanoTime();
-
-                taskCounters.taskCompleteCount.incrementAndGet();
-//                taskCountersByProc.taskCompleteCount.incrementAndGet();
-                taskCountersByIndex.taskCompleteCount.incrementAndGet();
-
-                // increment by the amount of time that the task was executing.
-                final long serviceNanoTime = nanoTime_finishedWork - nanoTime_beginWork;
-                taskCounters.serviceNanoTime.addAndGet(serviceNanoTime);
-//                taskCountersByProc.serviceNanoTime.addAndGet(serviceNanoTime);
-                taskCountersByIndex.serviceNanoTime.addAndGet(serviceNanoTime);
-
-                // increment by the total time from submit to completion.
-                final long queuingNanoTime = nanoTime_finishedWork - nanoTime_submitTask;
-                taskCounters.queuingNanoTime.addAndGet(queuingNanoTime);
-//                taskCountersByProc.queuingNanoTime.addAndGet(queuingNanoTime);
-                taskCountersByIndex.queuingNanoTime.addAndGet(queuingNanoTime);
-
-            }
-            
-            return null;
-
-        }
-
-        /**
-         * Submit the procedure to the {@link IDataService} identified by the
-         * locator.
-         * 
-         * @param locator
-         *            An index partition locator.
-         *            
-         * @throws Exception
-         */
-        final protected void submit(final PartitionLocator locator)
-                throws Exception {
-            
-            if (locator == null)
-                throw new IllegalArgumentException();
-            
-            if (Thread.interrupted())
-                throw new InterruptedException();
-            
-            // resolve service UUID to data service.
-            final IDataService dataService = ndx.getDataService(locator);
-
-            if (dataService == null)
-                throw new RuntimeException("DataService not found: " + locator);
-            
-            // the name of the index partition.
-            final String name = DataService.getIndexPartitionName(//
-                    ndx.getName(), // the name of the scale-out index.
-                    split.pmd.getPartitionId() // the index partition identifier.
-                    );
-
-            if (log.isInfoEnabled())
-                log.info("Submitting task=" + this + " on " + dataService);
-
-            try {
-
-                submit(dataService, name);
-
-            } catch(Exception ex) {
-
-                if (causes == null)
-                    causes = new LinkedList<Throwable>();
-                
-                causes.add(ex);
-                
-                final StaleLocatorException cause = (StaleLocatorException) InnerCause
-                        .getInnerCause(ex, StaleLocatorException.class);
-                
-                if(cause != null) {
-
-                    // notify the client so that it can refresh its cache.
-                    ndx.staleLocator(ts, locator, cause);
-                    
-                    // retry the operation.
-                    retry();
-                    
-                } else {
-                    
-                    throw ex;
-                    
-                }
-                
-            }
-            
-        }
-        
-        /**
-         * Submit the procedure to the {@link IDataService} and aggregate the
-         * result with the caller's {@link IResultHandler} (if specified).
-         * 
-         * @param dataService
-         *            The data service on which the procedure will be executed.
-         * @param name
-         *            The name of the index partition on that data service.
-         * 
-         * @todo do not require aggregator for {@link ISimpleIndexProcedure} so
-         *       make this abstract in the base class or just override for
-         *       {@link ISimpleIndexProcedure}. This would also mean that
-         *       {@link #call()} would return the value for
-         *       {@link ISimpleIndexProcedure}.
-         */
-        @SuppressWarnings("unchecked")
-        final private void submit(final IDataService dataService,
-                final String name) throws Exception {
-
-            /*
-             * Note: The timestamp here is the one specified for the task. This
-             * allows us to realize read-consistent procedures by choosing a
-             * read-only transaction based on the lastCommitTime of the
-             * federation for the procedure.
-             */
-
-            final Object result = dataService.submit(ts, name, proc).get();
-
-            if (resultHandler != null) {
-
-                resultHandler.aggregate(result, split);
-
-            }
-
-        }
-        
-        /**
-         * Invoked when {@link StaleLocatorException} was thrown. Since the
-         * procedure was being run against an index partition of some scale-out
-         * index this exception indicates that the index partition locator was
-         * stale. We re-cache the locator(s) for the same key range as the index
-         * partition which we thought we were addressing and then re-map the
-         * operation against those updated locator(s). Note that a split will go
-         * from one locator to N locators for a key range while a join will go
-         * from N locators for a key range to 1. A move does not change the #of
-         * locators for the key range, just where that index partition is living
-         * at this time.
-         * 
-         * @throws Exception
-         */
-        abstract protected void retry() throws Exception;
-
-    }
-
-    /**
-     * Class handles stale locators by finding the current locator for the
-     * <i>key</i> and redirecting the request to execute the procedure on the
-     * {@link IDataService} identified by that locator.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class SimpleDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
-
-        protected final byte[] key;
-        
-        private int ntries = 1;
-        
-        /**
-         * @param key
-         * @param split
-         * @param proc
-         * @param resultHandler
-         */
-        public SimpleDataServiceProcedureTask(final IScaleOutClientIndex ndx,
-                final byte[] key, long ts, final Split split,
-                final ISimpleIndexProcedure proc,
-                final IResultHandler resultHandler) {
-
-            super(ndx, ts, split, proc, resultHandler);
-            
-            if (key == null)
-                throw new IllegalArgumentException();
-        
-            this.key = key;
-            
-        }
-
-        /**
-         * The locator is stale. We locate the index partition that spans the
-         * {@link #key} and re-submit the request.
-         */
-        @Override
-        protected void retry() throws Exception {
-            
-            if (ntries++ > ndx.getFederation().getClient().getMaxStaleLocatorRetries()) {
-
-                throw new RuntimeException("Retry count exceeded: ntries="
-                        + ntries);
-
-            }
-
-            /*
-             * Note: uses the metadata index for the timestamp against which the
-             * procedure is running.
-             */
-            final PartitionLocator locator = ndx.getFederation()
-                    .getMetadataIndex(ndx.getName(), ts).find(key);
-
-            if (log.isInfoEnabled())
-                log.info("Retrying: proc=" + proc.getClass().getName()
-                        + ", locator=" + locator + ", ntries=" + ntries);
-
-            /*
-             * Note: In this case we do not recursively submit to the outer
-             * interface on the client since all we need to do is fetch the
-             * current locator for the key and re-submit the request to the data
-             * service identified by that locator.
-             */
-
-            submit(locator);
-            
-        }
-        
-    }
-
-    /**
-     * Handles stale locators for {@link IKeyRangeIndexProcedure}s.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class KeyRangeDataServiceProcedureTask extends AbstractDataServiceProcedureTask {
-
-        final byte[] fromKey;
-        final byte[] toKey;
-        
-        /**
-         * @param fromKey
-         * @param toKey
-         * @param split
-         * @param proc
-         * @param resultHandler
-         */
-        public KeyRangeDataServiceProcedureTask(final IScaleOutClientIndex ndx,
-                final byte[] fromKey, final byte[] toKey, final long ts,
-                final Split split, final IKeyRangeIndexProcedure proc,
-                final IResultHandler resultHandler) {
-
-            super(ndx, ts, split, proc, resultHandler);
-            
-            /*
-             * Constrain the range to the index partition. This constraint will
-             * be used if we discover that the locator data was stale in order
-             * to discover the new locator(s).
-             */
-            
-            this.fromKey = AbstractKeyRangeIndexProcedure.constrainFromKey(
-                    fromKey, split.pmd);
-
-            this.toKey = AbstractKeyRangeIndexProcedure.constrainFromKey(toKey,
-                    split.pmd);
-            
-        }
-
-        /**
-         * The {@link IKeyRangeIndexProcedure} is re-mapped for the constrained
-         * key range of the stale locator using
-         * {@link ClientIndexView#submit(byte[], byte[], IKeyRangeIndexProcedure, IResultHandler)}.
-         */
-        @Override
-        protected void retry() throws Exception {
-
-            /*
-             * Note: recursive retries MUST run in the same thread in order to
-             * avoid deadlock of the client's thread pool. The recursive depth
-             * is used to enforce this constrain.
-             */
-
-            final AtomicInteger recursionDepth = ndx.getRecursionDepth();
-            
-            final int depth = recursionDepth.incrementAndGet();
-
-            try {
-            
-                if (depth > ndx.getFederation().getClient().getMaxStaleLocatorRetries()) {
-
-                    throw new RuntimeException("Retry count exceeded: ntries="
-                            + depth);
-                    
-                }
-
-                /*
-                 * Note: This MUST use the timestamp already assigned for this
-                 * operation but MUST compute new splits against the updated
-                 * locators.
-                 */
-                ((ClientIndexView) ndx).submit(ts, fromKey, toKey,
-                        (IKeyRangeIndexProcedure) proc, resultHandler);
-
-            } finally {
-
-                final int tmp = recursionDepth.decrementAndGet();
-
-                assert tmp >= 0 : "depth=" + depth + ", tmp=" + tmp;
-
-            }
-            
-        }
-        
-    }
-
-    /**
-     * Handles stale locators for {@link IKeyArrayIndexProcedure}s. When
-     * necessary the procedure will be re-split.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class KeyArrayDataServiceProcedureTask extends
-            AbstractDataServiceProcedureTask {
-
-        protected final byte[][] keys;
-        protected final byte[][] vals;
-        protected final AbstractKeyArrayIndexProcedureConstructor ctor;
-        
-        /**
-         * Variant used for {@link IKeyArrayIndexProcedure}s.
-         * 
-         * @param keys
-         *            The original keys[][].
-         * @param vals
-         *            The original vals[][].
-         * @param split
-         *            The split identifies the subset of keys and values to be
-         *            applied by this procedure.
-         * @param proc
-         *            The procedure instance.
-         * @param resultHandler
-         *            The result aggregator.
-         * @param ctor
-         *            The object used to create instances of the <i>proc</i>.
-         *            This is used to re-split the data if necessary in response
-         *            to stale locator information.
-         */
-        public KeyArrayDataServiceProcedureTask(final IScaleOutClientIndex ndx,
-                final byte[][] keys, final byte[][] vals, final long ts,
-                final Split split, final IKeyArrayIndexProcedure proc,
-                final IResultHandler resultHandler,
-                final AbstractKeyArrayIndexProcedureConstructor ctor) {
-            
-            super( ndx, ts, split, proc, resultHandler );
-            
-            if (ctor == null)
-                throw new IllegalArgumentException();
-
-            this.ctor = ctor;
-            
-            this.keys = keys;
-            
-            this.vals = vals;
-            
-        }
-
-        /**
-         * Submit using
-         * {@link ClientIndexView#submit(int, int, byte[][], byte[][], AbstractKeyArrayIndexProcedureConstructor, IResultHandler)}.
-         * This will recompute the split points and re-map the procedure across
-         * the newly determined split points.
-         */
-        @Override
-        protected void retry() throws Exception {
-
-            /*
-             * Note: recursive retries MUST run in the same thread in order to
-             * avoid deadlock of the client's thread pool. The recursive depth
-             * is used to enforce this constrain.
-             */
-            final AtomicInteger recursionDepth = ndx.getRecursionDepth();
-            
-            final int depth = recursionDepth.incrementAndGet();
-
-            try {
-            
-                if (depth > ndx.getFederation().getClient()
-                        .getMaxStaleLocatorRetries()) {
-
-                    throw new RuntimeException("Retry count exceeded: ntries="
-                            + depth);
-                    
-                }
-                
-                /*
-                 * Note: This MUST use the timestamp already assigned for this
-                 * operation but MUST compute new splits against the updated
-                 * locators.
-                 */
-                ((ClientIndexView)ndx).submit(ts, split.fromIndex, split.toIndex,
-                        keys, vals, ctor, resultHandler);
-                
-            } finally {
-                
-                final int tmp = recursionDepth.decrementAndGet();
-                
-                assert tmp >= 0 : "depth="+depth+", tmp="+tmp;
-                
-            }
-            
-        }
-        
     }
     
     /**
@@ -2306,7 +1750,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 writeBuffer//
                 );
 
-        final Future<? extends IndexWriteStats> future = fed
+        final Future<? extends IndexAsyncWriteStats> future = fed
                 .getExecutorService().submit(task);
 
         writeBuffer.setFuture(future);

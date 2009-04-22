@@ -46,7 +46,6 @@ import com.bigdata.service.EventReceiver.EventBTree;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
-import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorCounters;
 import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 
 /**

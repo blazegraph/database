@@ -148,7 +148,7 @@ import com.bigdata.search.IHit;
 import com.bigdata.service.AbstractEmbeddedDataService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IClientIndex;
+import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;

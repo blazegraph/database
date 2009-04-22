@@ -29,8 +29,8 @@ import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IClientIndex;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.service.proxy.RemoteBuffer;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 

@@ -34,6 +34,8 @@ import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.service.ndx.IScaleOutClientIndex;
 
 /**
  * Class supports range query across against an unpartitioned index on an

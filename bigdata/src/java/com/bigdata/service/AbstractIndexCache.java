@@ -14,6 +14,7 @@ import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.concurrent.NamedLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.util.NT;
 
 /**

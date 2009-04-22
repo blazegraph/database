@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 31, 2009
  */
 
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -78,10 +78,14 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.AbstractScaleOutFederation;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.Split;
 import com.bigdata.service.IBigdataClient.Options;
-import com.bigdata.service.ndx.ScaleOutIndexCounters;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
-import com.bigdata.service.ndx.pipeline.IndexWriteStats;
+import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
 
 /**
@@ -127,18 +131,18 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
     /**
      * True iff the {@link #log} level is WARN or less.
      */
-    final protected static boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
+    final protected boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
             .toInt();
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.isInfoEnabled();
+    final protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Error message used if we were unable to start a new transaction in order
@@ -1283,7 +1287,7 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
                 writeBuffer//
                 );
 
-        final Future<? extends IndexWriteStats> future = fed
+        final Future<? extends IndexAsyncWriteStats> future = fed
                 .getExecutorService().submit(task);
 
         writeBuffer.setFuture(future);

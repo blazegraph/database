@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 10, 2008
  */
 
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -56,6 +56,10 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.service.DataService;
+import com.bigdata.service.LocalDataServiceFederation;
+import com.bigdata.service.RawDataServiceTupleIterator;
+import com.bigdata.service.Split;
 
 /**
  * A view onto an unpartitioned index living inside an embedded

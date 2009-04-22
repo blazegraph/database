@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.service;
+package com.bigdata.service.ndx;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -41,6 +41,10 @@ import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.DataService;
+import com.bigdata.service.DataServiceTupleIterator;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.TestRangeQuery;
 import com.bigdata.util.InnerCause;
 
 /**

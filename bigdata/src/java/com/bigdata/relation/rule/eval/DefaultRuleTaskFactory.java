@@ -13,8 +13,8 @@ import com.bigdata.relation.rule.eval.pipeline.DistributedJoinMasterTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.relation.rule.eval.pipeline.LocalJoinMasterTask;
-import com.bigdata.service.ClientIndexView;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.ndx.ClientIndexView;
 
 /**
  * Default factory for tasks to execute {@link IRule}s.

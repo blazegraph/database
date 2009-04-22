@@ -29,8 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.service.IScaleOutClientIndex;
-import com.bigdata.service.ndx.pipeline.IndexWriteStats;
+import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.util.concurrent.TaskCounters;
 
 /**
@@ -49,8 +48,13 @@ public class ScaleOutIndexCounters {
     }
 
     /**
-     * Return a new {@link CounterSet} reporting both the {@link TaskCounters}
-     * and the {@link IndexWriteStats} for this index.
+     * Return a new {@link CounterSet} reporting both the
+     * {@link IndexSyncRPCCounters} and the {@link IndexAsyncWriteStats} for
+     * this index.
+     * 
+     * @todo While this reports several averages, those are not moving averages
+     *       but averages over the life of the client. They should be sampled
+     *       and converted into moving averages.
      */
     public CounterSet getCounters() {
 
@@ -71,12 +75,12 @@ public class ScaleOutIndexCounters {
     /**
      * These counters are used only for the asynchronous write pipeline.
      */
-    final public IndexWriteStats asynchronousStats = new IndexWriteStats();
+    final public IndexAsyncWriteStats asynchronousStats = new IndexAsyncWriteStats();
 
     /**
      * These counters are used for the synchronous RPC calls (reads and writes).
      */
-    final public TaskCounters synchronousCounters = new TaskCounters();
+    final public IndexSyncRPCCounters synchronousCounters = new IndexSyncRPCCounters();
 
     public String toString() {
         
