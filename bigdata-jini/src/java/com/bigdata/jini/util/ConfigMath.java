@@ -104,4 +104,32 @@ public class ConfigMath {
 
     }
 
+    /**
+     * Convert seconds to milliseconds.
+     * 
+     * @param s
+     *            seconds.
+     *            
+     * @return Milliseconds.
+     */
+    public static long s2ms(final long s) {
+
+        return TimeUnit.SECONDS.toMillis(s);
+
+    }
+
+    /**
+     * Convert minutes to milliseconds.
+     * 
+     * @param m
+     *            minutes.
+     *            
+     * @return Milliseconds.
+     */
+    public static long m2ms(final long m) {
+
+        return TimeUnit.MINUTES.toMillis(m);
+
+    }
+
 }

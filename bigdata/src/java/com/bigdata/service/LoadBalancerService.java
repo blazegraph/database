@@ -245,6 +245,8 @@ abstract public class LoadBalancerService extends AbstractService
     
     /**
      * The directory in which the service will log the {@link CounterSet}s.
+     * 
+     * @see Options#LOG_DIR
      */
     protected final File logDir;
     

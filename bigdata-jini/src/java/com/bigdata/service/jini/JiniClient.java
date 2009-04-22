@@ -361,10 +361,8 @@ public class JiniClient extends AbstractScaleOutClient {
      * Configures a client.
      * 
      * @param args
-     *            Either the command line arguments or the arguments from the
-     *            {@link ServiceDescriptor}. Either way they identify the jini
-     *            {@link Configuration} (you may specify either a file or URL)
-     *            and optional overrides for that {@link Configuration}.
+     *            The jini {@link Configuration} (you may specify either a file
+     *            or URL) and optional overrides for that {@link Configuration}.
      * 
      * @throws ConfigurationException
      */
@@ -416,12 +414,12 @@ public class JiniClient extends AbstractScaleOutClient {
 
             System.setSecurityManager(new SecurityManager());
          
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Set security manager");
 
         } else {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Security manager already in place: " + sm.getClass());
 
         }
@@ -439,7 +437,7 @@ public class JiniClient extends AbstractScaleOutClient {
     static protected Properties getProperties(final File propertyFile)
             throws IOException {
 
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info("Reading properties: file="+propertyFile);
             
@@ -455,7 +453,7 @@ public class JiniClient extends AbstractScaleOutClient {
 
             properties.load(is);
 
-            if(INFO) {
+            if(log.isInfoEnabled()) {
                 
                 log.info("Read properties: " + properties);
                 

@@ -23,9 +23,9 @@ public class JiniClientConfig {
     final static protected Logger log = Logger
             .getLogger(JiniClientConfig.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
+    final protected boolean INFO = log.isInfoEnabled();
 
-    final static protected boolean DEBUG = log.isDebugEnabled();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * {@link Configuration} options for this class.
