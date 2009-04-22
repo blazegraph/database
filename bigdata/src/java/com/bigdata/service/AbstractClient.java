@@ -47,12 +47,12 @@ abstract public class AbstractClient implements IBigdataClient {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.isInfoEnabled();
+    protected final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    protected final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The properties specified to the ctor.

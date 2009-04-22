@@ -763,8 +763,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * IndexSegment fields.
      */
     
+    /**
+     * @see Options#INDEX_SEGMENT_BRANCHING_FACTOR
+     */
     private int indexSegmentBranchingFactor;
+
+    /**
+     * @see Options#INDEX_SEGMENT_BUFFER_NODES
+     */
     private boolean indexSegmentBufferNodes;
+
+    /**
+     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
+     */
     private int indexSegmentLeafCacheCapacity;
     
     /**
