@@ -137,6 +137,14 @@ abstract public class IndexManager extends StoreManager {
          * {@link AbstractBTree} (the reverse is not true - an {@link IRawStore}
          * reference does NOT hold a hard reference to {@link AbstractBTree}s
          * on that {@link IRawStore}).
+         * <p>
+         * Note: The retention of the {@link BTree}s on the live
+         * {@link ManagedJournal}s is governed by
+         * {@link com.bigdata.journal.Options#LIVE_INDEX_CACHE_CAPACITY}.
+         * <p>
+         * Note: The retention of the {@link BTree}s on the open historical
+         * {@link ManagedJournal}s is governed by
+         * {@link com.bigdata.journal.Options#HISTORICAL_INDEX_CACHE_CAPACITY}.
          * 
          * @see #DEFAULT_INDEX_CACHE_CAPACITY
          */
