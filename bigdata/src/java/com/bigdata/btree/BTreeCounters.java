@@ -446,19 +446,19 @@ final public class BTreeCounters {
                 
                 final CounterSet tmp = counterSet.makePath("keySearch");
 
-                tmp.addCounter("#find", new Instrument<Long>() {
+                tmp.addCounter("find", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nfinds);
                     }
                 });
 
-                tmp.addCounter("#insert", new Instrument<Long>() {
+                tmp.addCounter("insert", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ninserts);
                     }
                 });
 
-                tmp.addCounter("#nremove", new Instrument<Long>() {
+                tmp.addCounter("remove", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nremoves);
                     }
@@ -472,19 +472,19 @@ final public class BTreeCounters {
                 
                 final CounterSet tmp = counterSet.makePath("linearList");
 
-                tmp.addCounter("#indexOf", new Instrument<Long>() {
+                tmp.addCounter("indexOf", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nindexOf);
                     }
                 });
 
-                tmp.addCounter("#getKey", new Instrument<Long>() {
+                tmp.addCounter("getKey", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ngetKey);
                     }
                 });
 
-                tmp.addCounter("#getValue", new Instrument<Long>() {
+                tmp.addCounter("getValue", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ngetValue);
                     }
@@ -505,13 +505,13 @@ final public class BTreeCounters {
                 
                 final CounterSet tmp = counterSet.makePath("rangeQuery");
 
-                tmp.addCounter("#rangeCount", new Instrument<Long>() {
+                tmp.addCounter("rangeCount", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nrangeCount);
                     }
                 });
                 
-                tmp.addCounter("#rangeIterator", new Instrument<Long>() {
+                tmp.addCounter("rangeIterator", new Instrument<Long>() {
                     protected void sample() {
                         setValue(nrangeIterator);
                     }
@@ -529,61 +529,61 @@ final public class BTreeCounters {
                
                 final CounterSet tmp = counterSet.makePath("structure");
                 
-                tmp.addCounter("#rootSplit", new Instrument<Integer>() {
+                tmp.addCounter("rootSplit", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(rootsSplit);
                     }
                 });
 
-                tmp.addCounter("#rootJoined", new Instrument<Integer>() {
+                tmp.addCounter("rootJoined", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(rootsJoined);
                     }
                 });
 
-                tmp.addCounter("#nodeSplit", new Instrument<Integer>() {
+                tmp.addCounter("nodeSplit", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(nodesSplit);
                     }
                 });
 
-                tmp.addCounter("#nodeJoined", new Instrument<Integer>() {
+                tmp.addCounter("nodeJoined", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(nodesJoined);
                     }
                 });
 
-                tmp.addCounter("#leafSplit", new Instrument<Integer>() {
+                tmp.addCounter("leafSplit", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(leavesSplit);
                     }
                 });
 
-                tmp.addCounter("#leafJoined", new Instrument<Integer>() {
+                tmp.addCounter("leafJoined", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(leavesJoined);
                     }
                 });
 
-                tmp.addCounter("#headSplit", new Instrument<Integer>() {
+                tmp.addCounter("headSplit", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(headSplit);
                     }
                 });
 
-                tmp.addCounter("#tailSplit", new Instrument<Integer>() {
+                tmp.addCounter("tailSplit", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(tailSplit);
                     }
                 });
 
-                tmp.addCounter("#leafCopyOnWrite", new Instrument<Integer>() {
+                tmp.addCounter("leafCopyOnWrite", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(leavesCopyOnWrite);
                     }
                 });
 
-                tmp.addCounter("#nodeCopyOnWrite", new Instrument<Integer>() {
+                tmp.addCounter("nodeCopyOnWrite", new Instrument<Integer>() {
                     protected void sample() {
                         setValue(nodesCopyOnWrite);
                     }
@@ -598,30 +598,30 @@ final public class BTreeCounters {
                 
                 final CounterSet tmp = counterSet.makePath("tuples");
 
-                tmp.addCounter("#insertValue", new Instrument<Long>() {
+                tmp.addCounter("insertValue", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ntupleInsertValue);
                     }
                 });
-                tmp.addCounter("#insertDelete", new Instrument<Long>() {
+                tmp.addCounter("insertDelete", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ntupleInsertDelete);
                     }
                 });
 
-                tmp.addCounter("#updateValue", new Instrument<Long>() {
+                tmp.addCounter("updateValue", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ntupleUpdateValue);
                     }
                 });
 
-                tmp.addCounter("#updateDelete", new Instrument<Long>() {
+                tmp.addCounter("updateDelete", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ntupleUpdateDelete);
                     }
                 });
 
-                tmp.addCounter("#tupleRemove", new Instrument<Long>() {
+                tmp.addCounter("tupleRemove", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ntupleRemove);
                     }

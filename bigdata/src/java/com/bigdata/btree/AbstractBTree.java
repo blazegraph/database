@@ -562,8 +562,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         if (readRetentionQueue != null) {
 
-            counterSet.addCounter("Write Retention Queue Capacity",
-                    new OneShotInstrument<Integer>(writeRetentionQueue
+            counterSet.addCounter("Read Retention Queue Capacity",
+                    new OneShotInstrument<Integer>(readRetentionQueue
                             .capacity()));
 
         }
