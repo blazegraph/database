@@ -127,7 +127,7 @@ public class ClientFuture<T> implements Future<T>, Serializable {
      * @see http://archives.java.sun.com/cgi-bin/wa?A2=ind0512&L=rmi-users&P=3747
      * @see http://archives.java.sun.com/cgi-bin/wa?A2=ind0601&L=rmi-users&P=1985
      */
-    public boolean cancel(boolean mayInterruptIfRunning) {
+    public boolean cancel(final boolean mayInterruptIfRunning) {
 
         try {
 
