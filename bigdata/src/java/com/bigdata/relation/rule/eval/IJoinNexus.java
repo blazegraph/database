@@ -60,7 +60,7 @@ import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -416,7 +416,7 @@ public interface IJoinNexus {
      * partitions from which an {@link IAccessPath} must read in order to
      * materialize all elements which would be visited for that predicate.
      * <p>
-     * Note: You can use an {@link IDataServiceAwareProcedure} to obtain the
+     * Note: You can use an {@link IDataServiceAwareCallable} to obtain the
      * reference of the {@link IDataService} and pass that into your
      * {@link AbstractTask} in order to have the federation reference available
      * when running under the {@link ConcurrencyManager}.

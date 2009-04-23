@@ -143,7 +143,7 @@ abstract public class MetadataService extends DataService implements
             final Integer partitionId = (Integer) getConcurrencyManager().submit(
                     task).get();
         
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Assigned partitionId=" + partitionId + ", name="
                         + name);
             
@@ -371,7 +371,7 @@ abstract public class MetadataService extends DataService implements
                 
                 metadata.setDeleteMarkers(true);
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Enabling delete markers: "+metadata.getName());
                 
             }
@@ -507,7 +507,7 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("name=" + getOnlyResource() + ", oldLocator="
                         + oldLocator + ", locators="
                         + Arrays.toString(newLocators));
@@ -689,7 +689,7 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("name=" + getOnlyResource() + ", oldLocators="
                         + Arrays.toString(oldLocators) + ", newLocator="
                         + newLocator);
@@ -809,7 +809,7 @@ abstract public class MetadataService extends DataService implements
         @Override
         protected Object doTask() throws Exception {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("name=" + getOnlyResource() + ", oldLocator="
                         + oldLocator + ", newLocator=" + newLocator);
 
@@ -1096,7 +1096,7 @@ abstract public class MetadataService extends DataService implements
                         rightSeparator
                         );
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("name=" + scaleOutIndexName + ", pmd=" + pmd);
 
                 /*
@@ -1232,7 +1232,7 @@ abstract public class MetadataService extends DataService implements
             // name of the scale-out index.
             final String name = ndx.getScaleOutIndexMetadata().getName();
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Will drop index partitions for " + name);
             
 //            final ChunkedLocalRangeIterator itr = new ChunkedLocalRangeIterator(
@@ -1263,7 +1263,7 @@ abstract public class MetadataService extends DataService implements
                     final IDataService dataService = fed
                             .getDataService(serviceUUID);
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Dropping index partition: partitionId="
                                 + partitionId + ", dataService=" + dataService);
 
@@ -1279,7 +1279,7 @@ abstract public class MetadataService extends DataService implements
 //            // flush all delete requests.
 //            itr.flush();
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Dropped " + ndropped + " index partitions for "
                         + name);
 

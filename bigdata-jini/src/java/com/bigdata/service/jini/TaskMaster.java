@@ -81,7 +81,7 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.jini.DumpFederation.ScheduledDumpTask;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
@@ -760,7 +760,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     /**
      * Return a client to be executed on a remote data service. The client can
      * obtain access to the {@link IBigdataFederation} when it executes on the
-     * remote data service if it implements {@link IDataServiceAwareProcedure}.
+     * remote data service if it implements {@link IDataServiceAwareCallable}.
      * You can use {@link AbstractClientTask} as a starting point.
      * 
      * @param clientNum
@@ -1096,7 +1096,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      *            The generic type of the client state (stored in zookeeper).
      */
     abstract public static class AbstractClientTask<S extends JobState, T, U extends Serializable>
-            implements Callable<T>, Serializable, IDataServiceAwareProcedure {
+            implements Callable<T>, Serializable, IDataServiceAwareCallable {
 
         protected final S jobState;
 

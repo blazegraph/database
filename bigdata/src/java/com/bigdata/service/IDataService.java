@@ -36,7 +36,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
@@ -263,7 +262,7 @@ import com.bigdata.sparse.SparseRowStore;
  *       can have more flexibility since they are under less of a latency
  *       constraint.
  */
-public interface IDataService extends ITxCommitProtocol, IService {
+public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecutor {
 
     /**
      * Register a named mutable index on the {@link DataService}.
@@ -445,24 +444,15 @@ public interface IDataService extends ITxCommitProtocol, IService {
             throws IOException;
 
     /**
-     * Execute an arbitrary {@link Callable} on the {@link IDataService}.
+     * {@inheritDoc}
      * <p>
-     * The task can implement {@link IRemoteIndexProcedure} in which case it
-     * will be run against the {@link ConcurrencyManager}. Otherwise it will be
-     * run against the {@link IBigdataFederation#getExecutorService()} for the
-     * {@link IDataService}. The task can implement
-     * {@link IDataServiceAwareProcedure} in order to gain access to the
-     * {@link IDataService} instance.
+     * Note: This interface is specialized by the {@link IDataService} for tasks
+     * which need to gain access to the {@link IDataService} in order to gain
+     * local access to index partitions, etc. Such tasks declare the
+     * {@link IDataServiceAwareCallable}. For example, scale-out joins use
+     * this mechanism.
      * 
-     * @return The {@link Future} for that task.
-     * 
-     * @throws RejectedExecutionException
-     *             if the task can not be accepted for execution.
-     * @throws IOException
-     *             if there is an RMI problem.
-     * 
-     * @todo change API to <T> Future<T> submit(Callable<T> proc). This will
-     *       break existing code but reflects the correct use of generics.
+     * @see IDataServiceAwareCallable
      */
     public Future<? extends Object> submit(Callable<? extends Object> proc)
             throws IOException;

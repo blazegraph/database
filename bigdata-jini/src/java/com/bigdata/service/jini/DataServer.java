@@ -186,10 +186,6 @@ public class DataServer extends AbstractServer {
          * Adds the following parameters to the {@link MDC}
          * <dl>
          * 
-         * <dt>hostname
-         * <dt>
-         * <dd>The hostname or IP address of this server.</dd>
-         * 
          * <dt>clientname
          * <dt>
          * <dd>The hostname or IP address of the client making the request.</dd>
@@ -225,13 +221,9 @@ public class DataServer extends AbstractServer {
 
             }
 
-            MDC.put("hostname", server.getHostName());
-
         }
 
         protected void clearLoggingContext() {
-
-            MDC.remove("hostname");
 
             MDC.remove("clientname");
 

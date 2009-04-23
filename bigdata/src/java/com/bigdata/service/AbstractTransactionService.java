@@ -42,7 +42,6 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
-import org.apache.log4j.MDC;
 
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.config.LongValidator;
@@ -2183,56 +2182,6 @@ abstract public class AbstractTransactionService extends AbstractService
     }
     
     private static transient final String[] EMPTY = new String[0];
-
-    /**
-     * Sets up the {@link MDC} logging context. You should do this on every
-     * client facing point of entry and then call {@link #clearLoggingContext()}
-     * in a <code>finally</code> clause. You can extend this method to add
-     * additional context.
-     * <p>
-     * This implementation add the "serviceUUID" parameter to the {@link MDC}.
-     * The serviceUUID is, in general, assigned asynchronously by the service
-     * registrar. Once the serviceUUID becomes available it will be added to the
-     * {@link MDC}. This datum can be injected into log messages using
-     * %X{serviceUUID} in your log4j pattern layout.
-     */
-    protected void setupLoggingContext() {
-
-        try {
-            
-            // Note: This _is_ a local method call.
-            
-            UUID serviceUUID = getServiceUUID();
-            
-            // Will be null until assigned by the service registrar.
-            
-            if (serviceUUID == null) {
-
-                return;
-                
-            }
-            
-            // Add to the logging context for the current thread.
-            
-            MDC.put("serviceUUID", serviceUUID.toString());
-
-        } catch(Throwable t) {
-            /*
-             * Ignore.
-             */
-        }
-        
-    }
-
-    /**
-     * Clear the logging context.
-     */
-    protected void clearLoggingContext() {
-        
-        MDC.remove("serviceUUID");
-        
-    }
-
 
     /**
      * Return the {@link CounterSet}.

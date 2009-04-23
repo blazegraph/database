@@ -78,7 +78,7 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.ListIndicesTask;
 import com.bigdata.service.MetadataService;
@@ -1317,7 +1317,7 @@ public class DumpFederation {
      * @version $Id$
      */
     static public class FetchIndexPartitionByteCountRecordTask implements
-            Callable<IndexPartitionDetailRecord>, IDataServiceAwareProcedure {
+            Callable<IndexPartitionDetailRecord>, IDataServiceAwareCallable {
 
         /**
          * 

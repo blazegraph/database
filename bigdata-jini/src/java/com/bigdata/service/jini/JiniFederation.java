@@ -216,7 +216,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
         // @todo config initalDelay and timeout
         addScheduledTask(new MonitorFuturesTask(futures), 1, 5, TimeUnit.SECONDS);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(jiniConfig.toString());
         
         final String[] groups = jiniConfig.groups;
@@ -563,7 +563,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
         final long begin = System.currentTimeMillis();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
 
         super.shutdown();
@@ -572,7 +572,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Done: elapsed=" + elapsed + "ms");
 
     }
@@ -585,7 +585,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         final long begin = System.currentTimeMillis();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
         
         super.shutdownNow();
@@ -594,7 +594,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
         
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Done: elapsed=" + elapsed + "ms");
 
     }
@@ -975,7 +975,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
             // export proxy.
             proxy = (RemoteFuture<E>) exporter.export(impl);
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("Exported proxy: proxy=" + proxy + "("
                         + proxy.getClass() + ")");
@@ -1023,7 +1023,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
             // export proxy.
             proxy = (RemoteBuffer<E>) exporter.export(impl);
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("Exported proxy: proxy=" + proxy + "("
                         + proxy.getClass() + ")");
@@ -1183,7 +1183,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 //     */
 //    public void process(final WatchedEvent event) {
 //
-//        if (INFO)
+//        if (log.isInfoEnabled())
 //            log.info(event.toString());
 //
 //        try {
@@ -1226,7 +1226,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 //        if (w == null)
 //            throw new IllegalArgumentException();
 //
-//        if(INFO)
+//        if(log.isInfoEnabled())
 //            log.info("watcher="+w);
 //        
 //        watchers.add(w);
@@ -1244,7 +1244,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
 //        if (w == null)
 //            throw new IllegalArgumentException();
 //
-//        if(INFO)
+//        if(log.isInfoEnabled())
 //            log.info("watcher="+w);
 //
 //        watchers.remove(w);
@@ -1334,10 +1334,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
         protected static final Logger log = Logger.getLogger(MonitorFuturesTask.class);
         
-        protected static final boolean INFO = log.isInfoEnabled();
-        
-        protected static final boolean DEBUG = log.isDebugEnabled();
-        
         private final ConcurrentLinkedQueue<TaskFuture> futures;
         
         public MonitorFuturesTask(final ConcurrentLinkedQueue<TaskFuture> futures) {
@@ -1354,7 +1350,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
          */
         public void run() {
             
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("#tasks=" + futures.size());
             
             for(TaskFuture f : futures) {
@@ -1375,7 +1371,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
                          * InterruptedException.
                          */
                         
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Interrupted: "+f.task, e);
                         else
                             log.warn("Interrupted: task="

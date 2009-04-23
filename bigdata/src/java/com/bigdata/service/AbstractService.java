@@ -31,6 +31,7 @@ package com.bigdata.service;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.MDC;
 
 import com.bigdata.Banner;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -46,8 +47,6 @@ import com.bigdata.counters.CounterSet;
 abstract public class AbstractService implements IService {
 
     protected static final Logger log = Logger.getLogger(AbstractService.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
     
     private String serviceName;
     private UUID serviceUUID;
@@ -106,7 +105,7 @@ abstract public class AbstractService implements IService {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("uuid=" + serviceUUID);
 
         this.serviceUUID = serviceUUID;
@@ -192,4 +191,69 @@ abstract public class AbstractService implements IService {
         
     }
     
+    /**
+     * Sets up the {@link MDC} logging context. You should do this on every
+     * client facing point of entry and then call {@link #clearLoggingContext()}
+     * in a <code>finally</code> clause. You can extend this method to add
+     * additional context.
+     * <p>
+     * This implementation adds the following parameters to the {@link MDC}.
+     * <dl>
+     * <dt>serviceName</dt>
+     * <dd> The serviceName is typically a configuration property for the
+     * service. This datum can be injected into log messages using
+     * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
+     * <dt>serviceUUID</dt>
+     * <dd>The serviceUUID is, in general, assigned asynchronously by the
+     * service registrar. Once the serviceUUID becomes available it will be
+     * added to the {@link MDC}. This datum can be injected into log messages
+     * using <em>%X{serviceUUID}</em> in your log4j pattern layout.</dd>
+     * <dt>hostname</dt>
+     * <dd>The hostname statically determined. This datum can be injected into
+     * log messages using <em>%X{hostname}</em> in your log4j pattern layout.</dd>
+     * </dl>
+     */
+    protected void setupLoggingContext() {
+
+        try {
+
+            // Note: This _is_ a local method call.
+
+            UUID serviceUUID = getServiceUUID();
+
+            // Will be null until assigned by the service registrar.
+
+            if (serviceUUID != null) {
+
+                MDC.put("serviceUUID", serviceUUID);
+
+            } 
+            
+            MDC.put("serviceName", getServiceName());
+            
+            MDC.put("hostname", getHostname());
+
+        } catch(Throwable t) {
+
+            /*
+             * Ignore.
+             */
+            
+        }
+        
+    }
+
+    /**
+     * Clear the logging context.
+     */
+    protected void clearLoggingContext() {
+        
+        MDC.remove("serviceName");
+
+        MDC.remove("serviceUUID");
+
+        MDC.remove("hostname");
+        
+    }
+
 }

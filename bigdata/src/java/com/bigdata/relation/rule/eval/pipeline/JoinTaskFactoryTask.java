@@ -28,7 +28,7 @@ import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.Session;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.sparse.SparseRowStore;
@@ -88,7 +88,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @version $Id$
  */
 public class JoinTaskFactoryTask implements Callable<Future>,
-        IDataServiceAwareProcedure, Serializable {
+        IDataServiceAwareCallable, Serializable {
 
     /**
      * 
@@ -129,7 +129,7 @@ public class JoinTaskFactoryTask implements Callable<Future>,
 
     /**
      * Set by the {@link DataService} which recognized that this class
-     * implements the {@link IDataServiceAwareProcedure}.
+     * implements the {@link IDataServiceAwareCallable}.
      */
     private transient DataService dataService;
     

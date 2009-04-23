@@ -88,10 +88,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     protected static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-
     private AbstractClient client;
     
     public AbstractClient getClient() {
@@ -128,7 +124,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
         final long begin = System.currentTimeMillis();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
 
         try {
@@ -185,7 +181,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
         
         client = null;
@@ -215,7 +211,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
         final long begin = System.currentTimeMillis();
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("begin");
         
         // stop client requests.
@@ -246,7 +242,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
             
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("done: elapsed=" + (System.currentTimeMillis() - begin));
         
         client = null;
@@ -417,7 +413,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
         if (task == null)
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Scheduling task: task=" + task.getClass()
                     + ", initialDelay=" + initialDelay + ", delay=" + delay
                     + ", unit=" + unit);
@@ -688,7 +684,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
      */
     public IClientIndex getIndex(String name, long timestamp) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name="+name+" @ "+timestamp);
         
         assertOpen();
@@ -699,7 +695,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     public void dropIndex(String name) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name);
 
         assertOpen();
@@ -708,7 +704,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             getMetadataService().dropScaleOutIndex(name);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("dropped scale-out index.");
             
             getIndexCache().dropIndexFromCache(name);
@@ -837,7 +833,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     public void serviceJoin(IService service, UUID serviceUUID) {
         
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info("service=" + service + ", serviceUUID" + serviceUUID);
             
@@ -851,7 +847,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
     public void serviceLeave(UUID serviceUUID) {
         
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info("serviceUUID="+serviceUUID);
             
@@ -919,8 +915,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
          * the inner class names.
          */
         final protected Logger log = Logger.getLogger(StartDeferredTasksTask.class);
-
-        final protected boolean INFO = log.isInfoEnabled();
         
         /**
          * The timestamp when we started running this task.
@@ -950,7 +944,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 //                 */
 //                if (!awaitPreconditions(1000, TimeUnit.MILLISECONDS)) {
 //                    
-//                    if(INFO)
+//                    if(log.isInfoEnabled())
 //                        log.info("Preconditions not yet satisified.");
 //                    
 //                    return;
@@ -1003,7 +997,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
                     log.warn(ERR_NO_SERVICE_UUID + " : iface="
                             + getServiceIface() + ", name=" + getServiceName()
                             + ", elapsed=" + elapsed);
-                else if (INFO)
+                else if (log.isInfoEnabled())
                     log.info(ERR_NO_SERVICE_UUID);
 
                 return false;
@@ -1016,7 +1010,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
                     log.warn(ERR_SERVICE_NOT_READY + " : iface="
                             + getServiceIface() + ", name=" + getServiceName()
                             + ", elapsed=" + elapsed);
-                else if (INFO)
+                else if (log.isInfoEnabled())
                     log.info(ERR_SERVICE_NOT_READY + " : " + elapsed);
 
                 return false;
@@ -1063,7 +1057,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             if (!client.getCollectQueueStatistics()) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Queue statistics collection disabled: "
                             + getServiceIface());
 
@@ -1117,7 +1111,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
                 ((CounterSet) getCounterSet()).attach(statisticsCollector
                         .getCounters());
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Collecting platform statistics: uuid="
                             + serviceUUID);
 
@@ -1135,7 +1129,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
             final long delay = Long.parseLong(p.getProperty(
                     Options.REPORT_DELAY, Options.DEFAULT_REPORT_DELAY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.REPORT_DELAY + "=" + delay);
 
             final TimeUnit unit = TimeUnit.MILLISECONDS;
@@ -1145,7 +1139,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
             addScheduledTask(new ReportTask(AbstractFederation.this),
                     initialDelay, delay, unit);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Started ReportTask.");
 
         }
@@ -1169,7 +1163,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             if (httpdPort == -1) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("httpd disabled: " + path);
 
                 return;
@@ -1201,7 +1195,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
                         + ":" + httpd.getPort() + "/?path="
                         + URLEncoder.encode(path, "UTF-8");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("start:\n" + httpdURL);
 
                 // add counter reporting that url to the load balancer.
@@ -1229,11 +1223,6 @@ abstract public class AbstractFederation implements IBigdataFederation {
          * the inner class names.
          */
         final protected Logger log = Logger.getLogger(ReportTask.class);
-
-        /**
-         * True iff the {@link #log} level is INFO or less.
-         */
-        final protected boolean INFO = log.isInfoEnabled();
 
         private final AbstractFederation fed;
         
@@ -1291,7 +1280,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
             // Will be null until assigned by the service registrar.
             if (serviceUUID == null) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Service UUID not assigned yet.");
 
                 return;
@@ -1321,7 +1310,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
             loadBalancerService.notify(serviceUUID, baos.toByteArray());
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Notified the load balancer.");
             
         }
@@ -1475,7 +1464,7 @@ abstract public class AbstractFederation implements IBigdataFederation {
 
                 }
 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
                     
                     final int nevents = c.size();
 

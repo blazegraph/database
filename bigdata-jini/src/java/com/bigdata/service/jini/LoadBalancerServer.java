@@ -528,10 +528,6 @@ public class LoadBalancerServer extends AbstractServer {
          * Adds the following parameters to the {@link MDC}
          * <dl>
          * 
-         * <dt>hostname
-         * <dt>
-         * <dd>The hostname or IP address of this server.</dd>
-         * 
          * <dt>clientname
          * <dt>
          * <dd>The hostname or IP address of the client making the request (at
@@ -546,13 +542,9 @@ public class LoadBalancerServer extends AbstractServer {
             if (INFO)
                 MDC.put("clientname", getClientHostname());
 
-            MDC.put("hostname", server.getHostName());
-
         }
 
         protected void clearLoggingContext() {
-
-            MDC.remove("hostname");
 
             if (INFO)
                 MDC.remove("clientname");

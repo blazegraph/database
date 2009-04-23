@@ -57,7 +57,7 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.service.ndx.IClientIndex;
 
@@ -65,7 +65,7 @@ import com.bigdata.service.ndx.IClientIndex;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractStepTask implements IStepTask, IDataServiceAwareProcedure, Cloneable {
+abstract public class AbstractStepTask implements IStepTask, IDataServiceAwareCallable, Cloneable {
 
     protected static final transient Logger log = Logger.getLogger(AbstractStepTask.class);
 
@@ -106,7 +106,7 @@ abstract public class AbstractStepTask implements IStepTask, IDataServiceAwarePr
      * {@link DataService}.
      * <p>
      * Note: The {@link DataService} will notice the
-     * {@link IDataServiceAwareProcedure} interface and set a reference to
+     * {@link IDataServiceAwareCallable} interface and set a reference to
      * itself using {@link #setDataService(DataService)}. {@link #submit()}
      * notices this case and causes <i>this</i> task to be {@link #clone()}ed,
      * the {@link ExecutorService} set on the clone, and the clone is then

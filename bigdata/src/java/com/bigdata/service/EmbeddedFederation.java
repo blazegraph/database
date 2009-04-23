@@ -257,7 +257,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         isTransient = BufferMode.Transient.toString().equals(
                 properties.getProperty(Options.BUFFER_MODE));
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("federation is "+(isTransient?"not ":"")+"persistent");
         
         // true if temp files are being requested.
@@ -316,7 +316,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
                 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.DATA_DIR + "=" + dataDir);
 
             if (!dataDir.exists()) {
@@ -408,7 +408,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
                     
                     if(!pathname.isDirectory()) {
                         
-                        if(INFO)
+                        if(log.isInfoEnabled())
                             log.info("Ignoring normal file: "+pathname);
                         
                         return false;
@@ -421,14 +421,14 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
                         
                         UUID.fromString(name);
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Found service directory: " + pathname);
 
                         return true;
 
                     } catch (IllegalArgumentException ex) {
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Ignoring directory: " + pathname);
 
                         return false;
@@ -758,7 +758,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
      */
     synchronized public void shutdown() {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
 
         super.shutdown();
@@ -790,7 +790,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         // Note: don't clear ref until all down since nextTimestamp() still active.
         abstractTransactionService = null;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("done");
 
     }
@@ -800,7 +800,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
      */
     synchronized public void shutdownNow() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
 
         super.shutdownNow();
@@ -832,14 +832,14 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         // Note: don't clear ref until all down since nextTimestamp() still active.
         abstractTransactionService = null;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("done");
 
     }
 
     public void destroy() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         abstractTransactionService.shutdownNow();
