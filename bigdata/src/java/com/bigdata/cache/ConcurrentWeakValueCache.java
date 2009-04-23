@@ -36,9 +36,9 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
 
     protected static final Logger log = Logger.getLogger(ConcurrentWeakValueCache.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+    protected final boolean INFO = log.isInfoEnabled();
 
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    protected final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * A concurrency-savvy map.
@@ -545,7 +545,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
     /**
      * Invoked when a reference needs to be removed from the map.
      * 
-     * @param k
+     * @param k The key.
      */
     protected WeakReference<V> removeMapEntry(final K k) {
         

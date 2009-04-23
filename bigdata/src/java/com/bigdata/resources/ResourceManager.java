@@ -106,16 +106,6 @@ abstract public class ResourceManager extends OverflowManager implements
     protected static final Logger log = Logger.getLogger(ResourceManager.class);
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
      * Interface defines and documents the counters and counter namespaces for
      * the {@link ResourceManager}.
      * 

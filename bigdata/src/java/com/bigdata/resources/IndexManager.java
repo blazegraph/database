@@ -107,16 +107,6 @@ abstract public class IndexManager extends StoreManager {
     protected static final Logger log = Logger.getLogger(IndexManager.class);
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
      * Options understood by the {@link IndexManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -527,7 +517,6 @@ abstract public class IndexManager extends StoreManager {
      * @see Options#INDEX_SEGMENT_CACHE_TIMEOUT
      */
     final private ConcurrentWeakValueCache<UUID, IndexSegment> indexSegmentCache;
-//    final private WeakValueCache<UUID, IndexSegment> indexSegmentCache;
 
     /**
      * Provides locks on a per-{name+timestamp} basis for higher concurrency.
@@ -546,21 +535,6 @@ abstract public class IndexManager extends StoreManager {
      */
     private final transient NamedLock<UUID> segmentLock = new NamedLock<UUID>();
     
-//    /**
-//     * Clears any stale entries in the LRU backing the {@link #indexCache} or
-//     * the {@link #indexSegmentCache}.
-//     */
-//    public void clearStaleCacheEntries() {
-//
-//        // the store manager.
-//        super.clearStaleCacheEntries();
-//        
-//        indexCache.clearStaleRefs();
-//
-//        indexSegmentCache.clearStaleRefs();
-//        
-//    }
-
     /**
      * The #of entries in the hard reference cache for {@link IIndex}s. There
      * MAY be more {@link IIndex}s open than are reported by this method if
@@ -661,7 +635,7 @@ abstract public class IndexManager extends StoreManager {
         if (reason == null)
             throw new IllegalArgumentException();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + ", reason=" + reason);
 
         staleLocatorCache.put(name, reason, true);
@@ -684,13 +658,16 @@ abstract public class IndexManager extends StoreManager {
         
         super(properties);
      
+        /*
+         * indexCache
+         */
         {
             
             final int indexCacheCapacity = Integer.parseInt(properties.getProperty(
                     Options.INDEX_CACHE_CAPACITY,
                     Options.DEFAULT_INDEX_CACHE_CAPACITY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.INDEX_CACHE_CAPACITY + "="
                         + indexCacheCapacity);
 
@@ -702,22 +679,19 @@ abstract public class IndexManager extends StoreManager {
                     .getProperty(Options.INDEX_CACHE_TIMEOUT,
                             Options.DEFAULT_INDEX_CACHE_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.INDEX_CACHE_TIMEOUT + "=" + indexCacheTimeout); 
 
             if (indexCacheTimeout < 0)
                 throw new RuntimeException(Options.INDEX_CACHE_TIMEOUT
                         + " must be non-negative");
-            
-//            indexCache = new WeakValueCache<NT, IIndex>(
-//                    new LRUCache<NT, IIndex>(indexCacheCapacity));
 
             indexCache = new IndexCache(indexCacheCapacity, indexCacheTimeout);
 
         }
         
         /*
-         * indexSegmentCacheCapacity
+         * indexSegmentCache
          */
         {
 
@@ -725,7 +699,7 @@ abstract public class IndexManager extends StoreManager {
                     Options.INDEX_SEGMENT_CACHE_CAPACITY,
                     Options.DEFAULT_INDEX_SEGMENT_CACHE_CAPACITY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.INDEX_SEGMENT_CACHE_CAPACITY + "="
                         + indexSegmentCacheCapacity);
 
@@ -737,7 +711,7 @@ abstract public class IndexManager extends StoreManager {
                     .getProperty(Options.INDEX_SEGMENT_CACHE_TIMEOUT,
                             Options.DEFAULT_INDEX_SEGMENT_CACHE_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.INDEX_SEGMENT_CACHE_TIMEOUT + "="
                         + indexSegmentCacheTimeout);
 
@@ -748,14 +722,6 @@ abstract public class IndexManager extends StoreManager {
             indexSegmentCache = new ConcurrentWeakValueCacheWithTimeout<UUID, IndexSegment>(
                     indexSegmentCacheCapacity, TimeUnit.MILLISECONDS
                             .toNanos(indexSegmentCacheTimeout));
-
-// indexSegmentCache = new WeakValueCache<UUID, IndexSegment>(
-////                    WeakValueCache.INITIAL_CAPACITY,//
-////                    WeakValueCache.LOAD_FACTOR, //
-//                    new LRUCache<UUID, IndexSegment>(indexSegmentCacheCapacity)
-////                    new WeakCacheEntryFactory<UUID,IndexSegment>()
-////                    new ClearReferenceListener()
-//                    );
 
         }
 
@@ -833,7 +799,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + ", timestamp=" + timestamp + ", found="
                     + (btree != null) + ", store=" + store + " : " + btree);
 
@@ -972,7 +938,7 @@ abstract public class IndexManager extends StoreManager {
 
                 if (seg == null) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log
                                 .info("Loading index segment from store: name="
                                         + name + ", file="
@@ -982,8 +948,6 @@ abstract public class IndexManager extends StoreManager {
                     seg = segStore.loadIndexSegment();
 
                     indexSegmentCache.put(storeUUID, seg);
-                    // indexSegmentCache
-                    // .put(storeUUID, seg, false/* dirty */);
 
                 }
 
@@ -1005,7 +969,7 @@ abstract public class IndexManager extends StoreManager {
     public AbstractBTree[] getIndexSources(final String name,
             final long timestamp) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + ", timestamp=" + timestamp);
 
         /*
@@ -1030,7 +994,7 @@ abstract public class IndexManager extends StoreManager {
 
             if (btree == null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("No such index: name=" + name + ", timestamp="
                             + timestamp);
 
@@ -1038,7 +1002,7 @@ abstract public class IndexManager extends StoreManager {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("name=" + name + ", timestamp=" + timestamp
                         + ", counter=" + btree.getCounter().get()
                         + ", journal=" + journal.getResourceMetadata());
@@ -1073,7 +1037,7 @@ abstract public class IndexManager extends StoreManager {
 
             // An unpartitioned index (one source).
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Unpartitioned index: name=" + name + ", ts="
                         + timestamp);
 
@@ -1167,7 +1131,7 @@ abstract public class IndexManager extends StoreManager {
 
                 }
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Added to view: " + resource);
 
                 sources[i] = ndx;
@@ -1176,7 +1140,7 @@ abstract public class IndexManager extends StoreManager {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Opened index partition:  name=" + name + ", timestamp="
                     + timestamp);
 
@@ -1254,7 +1218,7 @@ abstract public class IndexManager extends StoreManager {
 
                     if (ndx != null) {
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Cache hit: " + nt);
 
                         return ndx;
@@ -1381,7 +1345,7 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources == null) {
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("No such index: name=" + name
                                     + ", timestamp=" + timestamp);
 
@@ -1436,7 +1400,7 @@ abstract public class IndexManager extends StoreManager {
 
                     if (sources == null) {
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("No such index: name=" + name
                                     + ", timestamp=" + timestamp);
 
@@ -1464,7 +1428,7 @@ abstract public class IndexManager extends StoreManager {
                         && timestamp != ITx.UNISOLATED) {
 
                 // update the indexCache.
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Adding to cache: " + nt);
 
 //                synchronized (indexCache) {
@@ -1734,7 +1698,7 @@ abstract public class IndexManager extends StoreManager {
                         src.getSources(), indexMetadata, segmentMetadata,
                         builder);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("built index segment: " + tmp);
 
                 return tmp;
@@ -1860,7 +1824,7 @@ abstract public class IndexManager extends StoreManager {
 
             } else {
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("New counters: indexPartitionName=" + name);
                 
             }
@@ -1921,7 +1885,7 @@ abstract public class IndexManager extends StoreManager {
                 // first total for this index partition.
                 delta.put(name, current);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("First time: " + name);
 
             } else {
@@ -1929,7 +1893,7 @@ abstract public class IndexManager extends StoreManager {
                 // compute the delta for this index partition.
                 delta.put(name, current.subtract(prior));
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Computed delta: " + name);
 
             }

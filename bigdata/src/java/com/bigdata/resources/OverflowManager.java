@@ -102,16 +102,6 @@ abstract public class OverflowManager extends IndexManager {
     protected static final Logger log = Logger.getLogger(OverflowManager.class);
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
      * @see Options#COPY_INDEX_THRESHOLD
      */
     final protected int copyIndexThreshold;
@@ -1047,7 +1037,7 @@ abstract public class OverflowManager extends IndexManager {
                             Options.OVERFLOW_ENABLED,
                             Options.DEFAULT_OVERFLOW_ENABLED));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.OVERFLOW_ENABLED + "=" + overflowEnabled);
 
         }
@@ -1059,7 +1049,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.OVERFLOW_MAX_COUNT,
                     Options.DEFAULT_OVERFLOW_MAX_COUNT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.OVERFLOW_MAX_COUNT + "=" + overflowMaxCount);
 
         }
@@ -1072,7 +1062,7 @@ abstract public class OverflowManager extends IndexManager {
                             Options.OVERFLOW_THRESHOLD,
                             Options.DEFAULT_OVERFLOW_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.OVERFLOW_THRESHOLD + "=" + overflowThreshold);
 
         }
@@ -1085,7 +1075,7 @@ abstract public class OverflowManager extends IndexManager {
                             Options.OVERFLOW_TIMEOUT,
                             Options.DEFAULT_OVERFLOW_TIMEOUT));
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(Options.OVERFLOW_TIMEOUT + "=" + overflowTimeout);
             
         }
@@ -1097,7 +1087,7 @@ abstract public class OverflowManager extends IndexManager {
                     .getProperty(Options.OVERFLOW_TASKS_CONCURRENT,
                             Options.DEFAULT_OVERFLOW_TASKS_CONCURRENT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.OVERFLOW_TASKS_CONCURRENT + "="
                         + overflowTasksConcurrent);
 
@@ -1112,7 +1102,7 @@ abstract public class OverflowManager extends IndexManager {
                                     Options.OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL,
                                     Options.DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL + "="
                         + overflowCancelledWhenJournalFull);
 
@@ -1125,7 +1115,7 @@ abstract public class OverflowManager extends IndexManager {
                     .getProperty(Options.COPY_INDEX_THRESHOLD,
                             Options.DEFAULT_COPY_INDEX_THRESHOLD));
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(Options.COPY_INDEX_THRESHOLD + "="
                     + copyIndexThreshold);
 
@@ -1146,7 +1136,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.ACCELERATE_SPLIT_THRESHOLD,
                     Options.DEFAULT_ACCELERATE_SPLIT_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.ACCELERATE_SPLIT_THRESHOLD + "="
                         + accelerateSplitThreshold);
 
@@ -1166,7 +1156,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.PERCENT_OF_SPLIT_THRESHOLD,
                     Options.DEFAULT_PERCENT_OF_SPLIT_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.PERCENT_OF_SPLIT_THRESHOLD + "="
                         + percentOfSplitThreshold);
 
@@ -1186,7 +1176,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.TAIL_SPLIT_THRESHOLD,
                     Options.DEFAULT_TAIL_SPLIT_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.TAIL_SPLIT_THRESHOLD + "="
                         + tailSplitThreshold);
 
@@ -1206,7 +1196,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.HOT_SPLIT_THRESHOLD,
                     Options.DEFAULT_HOT_SPLIT_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.HOT_SPLIT_THRESHOLD + "="
                         + hotSplitThreshold);
 
@@ -1226,7 +1216,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.SCATTER_SPLIT_ENABLED,
                     Options.DEFAULT_SCATTER_SPLIT_ENABLED));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.SCATTER_SPLIT_ENABLED + "="
                         + scatterSplitEnabled);
 
@@ -1241,7 +1231,7 @@ abstract public class OverflowManager extends IndexManager {
                                     Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD,
                                     Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD + "="
                         + scatterSplitPercentOfSplitThreshold);
 
@@ -1263,7 +1253,7 @@ abstract public class OverflowManager extends IndexManager {
                     .getProperty(Options.SCATTER_SPLIT_DATA_SERVICES_COUNT,
                             Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICES_COUNT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.SCATTER_SPLIT_DATA_SERVICES_COUNT + "="
                         + scatterSplitDataServicesCount);
 
@@ -1286,7 +1276,7 @@ abstract public class OverflowManager extends IndexManager {
                                     Options.SCATTER_SPLIT_INDEX_PARTITIONS_COUNT,
                                     Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITIONS_COUNT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.SCATTER_SPLIT_INDEX_PARTITIONS_COUNT + "="
                         + scatterSplitIndexPartitionsCount);
 
@@ -1306,7 +1296,7 @@ abstract public class OverflowManager extends IndexManager {
             joinsEnabled = Boolean.parseBoolean(properties.getProperty(
                     Options.JOINS_ENABLED, Options.DEFAULT_JOINS_ENABLED));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.JOINS_ENABLED + "=" + joinsEnabled);
             
         }
@@ -1318,7 +1308,7 @@ abstract public class OverflowManager extends IndexManager {
                     .getProperty(Options.MINIMUM_ACTIVE_INDEX_PARTITIONS,
                             Options.DEFAULT_MINIMUM_ACTIVE_INDEX_PARTITIONS));
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(Options.MINIMUM_ACTIVE_INDEX_PARTITIONS + "="
                     + minimumActiveIndexPartitions);
 
@@ -1338,7 +1328,7 @@ abstract public class OverflowManager extends IndexManager {
             maximumMoves = Integer.parseInt(properties.getProperty(
                     Options.MAXIMUM_MOVES, Options.DEFAULT_MAXIMUM_MOVES));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.MAXIMUM_MOVES + "=" + maximumMoves);
 
             if (maximumMoves < 0) {
@@ -1357,7 +1347,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.MAXIMUM_MOVES_PER_TARGET,
                     Options.DEFAULT_MAXIMUM_MOVES_PER_TARGET));
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(Options.MAXIMUM_MOVES_PER_TARGET + "="
                     + maximumMovesPerTarget);
 
@@ -1384,7 +1374,7 @@ abstract public class OverflowManager extends IndexManager {
                     .getProperty(Options.MOVE_PERCENT_CPU_TIME_THRESHOLD,
                             Options.DEFAULT_MOVE_PERCENT_CPU_TIME_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.MOVE_PERCENT_CPU_TIME_THRESHOLD + "="
                         + movePercentCpuTimeThreshold);
             
@@ -1404,7 +1394,7 @@ abstract public class OverflowManager extends IndexManager {
 //                    Options.MAXIMUM_SOURCES_PER_VIEW,
 //                    Options.DEFAULT_MAXIMUM_SOURCES_PER_VIEW));
 //
-//            if(INFO)
+//            if(log.isInfoEnabled())
 //                log.info(Options.MAXIMUM_SOURCES_PER_VIEW+ "="
 //                    + maximumSourcesPerView);
 //
@@ -1424,7 +1414,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW,
                     Options.DEFAULT_OPTIONAL_COMPACTING_MERGES_PER_OVERFLOW));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW + "="
                         + maximumOptionalMergesPerOverflow);
 
@@ -1444,7 +1434,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.MAXIMUM_JOURNALS_PER_VIEW,
                     Options.DEFAULT_MAXIMUM_JOURNALS_PER_VIEW));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.MAXIMUM_JOURNALS_PER_VIEW + "="
                         + maximumJournalsPerView);
 
@@ -1463,7 +1453,7 @@ abstract public class OverflowManager extends IndexManager {
                     Options.MAXIMUM_SEGMENTS_PER_VIEW,
                     Options.DEFAULT_MAXIMUM_SEGMENTS_PER_VIEW));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.MAXIMUM_SEGMENTS_PER_VIEW + "="
                         + maximumSegmentsPerView);
 
@@ -1490,7 +1480,7 @@ abstract public class OverflowManager extends IndexManager {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.MAXIMUM_BUILD_SEGMENT_BYTES + "="
                         + maximumBuildSegmentBytes);
 
@@ -1510,7 +1500,7 @@ abstract public class OverflowManager extends IndexManager {
 
             }
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(Options.SHUTDOWN_TIMEOUT + "=" + shutdownTimeout);
 
         }
@@ -1559,7 +1549,7 @@ abstract public class OverflowManager extends IndexManager {
         
         final long begin = System.currentTimeMillis();
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Begin");
         
         /*
@@ -1609,7 +1599,7 @@ abstract public class OverflowManager extends IndexManager {
         
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Done: elapsed="+elapsed+"ms");
         
     }
@@ -1620,7 +1610,7 @@ abstract public class OverflowManager extends IndexManager {
         
         final long begin = System.currentTimeMillis();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Begin");
 
         if(overflowService!=null)
@@ -1628,7 +1618,7 @@ abstract public class OverflowManager extends IndexManager {
 
         super.shutdownNow();
         
-        if(INFO) {
+        if(log.isInfoEnabled()) {
 
             final long elapsed = System.currentTimeMillis() - begin;
 
@@ -1651,7 +1641,7 @@ abstract public class OverflowManager extends IndexManager {
              * then re-open a transient journal.
              */
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Overflow processing not allowed for transient journals");
 
             return false;
@@ -1660,7 +1650,7 @@ abstract public class OverflowManager extends IndexManager {
 
         if (!isOverflowEnabled()) {
             
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Overflow processing is disabled");
             
             return false;
@@ -1675,7 +1665,7 @@ abstract public class OverflowManager extends IndexManager {
              * @todo show elapsed time since disabled in log message.
              */
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Asynchronous overflow still active");
             
             return false;
@@ -1704,12 +1694,12 @@ abstract public class OverflowManager extends IndexManager {
                 
             }
 
-            if (!shouldOverflow && DEBUG) {
+            if (!shouldOverflow && log.isDebugEnabled()) {
 
                 log.debug("should not overflow" + ": nextOffset=" + nextOffset
                         + ", maximumExtent=" + journal.getMaximumExtent());
 
-            } else if (shouldOverflow && INFO) {
+            } else if (shouldOverflow && log.isInfoEnabled()) {
 
                 log.debug("shouldOverflow" + ": nextOffset=" + nextOffset
                         + ", maximumExtent=" + journal.getMaximumExtent());
@@ -1783,7 +1773,7 @@ abstract public class OverflowManager extends IndexManager {
                      * Post-processing SHOULD be performed.
                      */
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log
                                 .info("Will start asynchronous overflow processing.");
 
@@ -1813,7 +1803,7 @@ abstract public class OverflowManager extends IndexManager {
 
                 }
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Asynchronous overflow not required");
 
                 /*
@@ -1872,7 +1862,7 @@ abstract public class OverflowManager extends IndexManager {
      */
     protected OverflowMetadata doSynchronousOverflow() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
         
         final OverflowMetadata overflowMetadata = new OverflowMetadata(
@@ -1917,7 +1907,7 @@ abstract public class OverflowManager extends IndexManager {
             // // remove from list of open journals.
             // storeCache.remove(oldJournal.getRootBlockView().getUUID());
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Closed out the old journal.");
 
             if (maximumJournalSizeAtOverflow < oldJournal.size()) {
@@ -2027,7 +2017,7 @@ abstract public class OverflowManager extends IndexManager {
                 
             }
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("New live journal: " + newJournal.getFile());
 
         }
@@ -2067,7 +2057,7 @@ abstract public class OverflowManager extends IndexManager {
         final long firstCommitTime;
         {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("doOverflow(): lastCommitTime="
                         + lastCommitTime
                         + "\nfile="
@@ -2255,7 +2245,7 @@ abstract public class OverflowManager extends IndexManager {
                     // note the current counter value.
                     final long oldCounter = oldBTree.getCounter().get();
 
-                    if(INFO)
+                    if(log.isInfoEnabled())
                     log.info("Re-defining view on new journal"//
                             + ": name=" + bm.name //
                             + ", copyIndex=" + copyIndex//
@@ -2305,7 +2295,7 @@ abstract public class OverflowManager extends IndexManager {
                          * (see above).
                          */
                         
-                        if(DEBUG)
+                        if(log.isDebugEnabled())
                         log.debug("Copying data to new journal: name=" + bm.name
                                 + ", entryCount=" + entryCount + ", threshold="
                                 + copyIndexThreshold);
@@ -2350,7 +2340,7 @@ abstract public class OverflowManager extends IndexManager {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Processed indices: #indices=" + numIndices
                         + ", ncopy=" + ncopy + ", ncopyNonZero="
                         + numIndicesNonZeroCopy + ", #viewRedefined="
@@ -2443,7 +2433,7 @@ abstract public class OverflowManager extends IndexManager {
          * this before we cut over then the data will still be read from the old
          * journal.
          */
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("\ndoOverflow(): firstCommitTime="
                     + firstCommitTime
                     + "\nfile="
