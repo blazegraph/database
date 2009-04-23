@@ -33,7 +33,7 @@ import com.bigdata.journal.Name2Addr.EntrySerializer;
  * @version $Id$
  */
 public class ListIndicesTask implements Callable<String[]>,
-        IDataServiceAwareProcedure, Serializable {
+        IDataServiceAwareCallable, Serializable {
 
     /**
      * 

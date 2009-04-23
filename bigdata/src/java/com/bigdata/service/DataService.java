@@ -186,18 +186,8 @@ abstract public class DataService extends AbstractService
     implements IDataService, IServiceShutdown //IWritePipeline
 {
 
-    public static final Logger log = Logger.getLogger(DataService.class);
+    protected static final Logger log = Logger.getLogger(DataService.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * Options understood by the {@link DataService}.
      * 
@@ -207,7 +197,8 @@ abstract public class DataService extends AbstractService
     public static interface Options extends com.bigdata.journal.Options,
             com.bigdata.journal.ConcurrencyManager.Options,
             com.bigdata.resources.ResourceManager.Options,
-            com.bigdata.counters.AbstractStatisticsCollector.Options
+            com.bigdata.counters.AbstractStatisticsCollector.Options,
+            com.bigdata.service.IBigdataClient.Options
             // @todo local tx manager options?
             {
 
@@ -376,7 +367,7 @@ abstract public class DataService extends AbstractService
      * 
      * @see #start()
      */
-    protected DataService(Properties properties) {
+    protected DataService(final Properties properties) {
         
         // show the copyright banner during statup.
         Banner.banner();
@@ -573,7 +564,7 @@ abstract public class DataService extends AbstractService
                                 .attach(service.resourceManager
                                         .getIndexCounters());
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log
                                     .info("Attached index partition counters: preexisting="
                                             + exists
@@ -1358,68 +1349,6 @@ abstract public class DataService extends AbstractService
 
     }
     
-    /**
-     * Sets up the {@link MDC} logging context. You should do this on every
-     * client facing point of entry and then call {@link #clearLoggingContext()}
-     * in a <code>finally</code> clause. You can extend this method to add
-     * additional context.
-     * <p>
-     * This implementation adds the following parameters to the {@link MDC}.
-     * <dl>
-     * <dt>serviceName</dt>
-     * <dd> The serviceName is typically a configuration property for the
-     * service. This datum can be injected into log messages using
-     * <em>%X{serviceName}</em> in your log4j pattern layout.</dd>
-     * <dt>serviceUUID</dt>
-     * <dd>The serviceUUID is, in general, assigned asynchronously by the
-     * service registrar. Once the serviceUUID becomes available it will be
-     * added to the {@link MDC}. This datum can be injected into log messages
-     * using <em>%X{serviceUUID}</em> in your log4j pattern layout.</dd>
-     * </dl>
-     */
-    protected void setupLoggingContext() {
-
-        try {
-            
-            // Note: This _is_ a local method call.
-            
-            UUID serviceUUID = getServiceUUID();
-            
-            // Will be null until assigned by the service registrar.
-            
-            if (serviceUUID == null) {
-
-                return;
-                
-            }
-            
-            // Add to the logging context for the current thread.
-            
-            MDC.put("serviceName", getServiceName());
-
-            MDC.put("serviceUUID", serviceUUID);
-
-        } catch(Throwable t) {
-
-            /*
-             * Ignore.
-             */
-            
-        }
-        
-    }
-
-    /**
-     * Clear the logging context.
-     */
-    protected void clearLoggingContext() {
-        
-        MDC.remove("serviceName");
-
-        MDC.remove("serviceUUID");
-        
-    }
-    
     public void registerIndex(String name, IndexMetadata metadata)
             throws IOException, InterruptedException, ExecutionException {
 
@@ -1545,16 +1474,16 @@ abstract public class DataService extends AbstractService
             final AbstractTask task = new IndexProcedureTask(
                     concurrencyManager, timestamp, name, proc);
             
-            if(proc instanceof IDataServiceAwareProcedure) {
+            if(proc instanceof IDataServiceAwareCallable) {
 
-                if(INFO) {
+                if(log.isInfoEnabled()) {
                     
                     log.info("Data service aware procedure: "+proc.getClass().getName());
                     
                 }
 
                 // set the data service on the task.
-                ((IDataServiceAwareProcedure)proc).setDataService( this );
+                ((IDataServiceAwareCallable)proc).setDataService( this );
                 
             }
             
@@ -1575,19 +1504,9 @@ abstract public class DataService extends AbstractService
      * 
      * @see AbstractDistributedFederation#getProxy(Future)
      * 
-     * @todo Map/reduce can be handled in the this manner.
-     *       <p>
-     *       Note that we have excellent locators for the best data service when
-     *       the map/reduce input is the scale-out repository since the task
-     *       should run on the data service that hosts the file block(s). When
-     *       failover is supported, the task can run on the service instance
-     *       with the least load. When the input is a networked file system,
-     *       then additional network topology smarts would be required to make
-     *       good choices.
-     * 
      * @todo we should probably put the federation object in a sandbox in order
      *       to prevent various operations by tasks running in the
-     *       {@link DataService} using the {@link IDataServiceAwareProcedure}
+     *       {@link DataService} using the {@link IDataServiceAwareCallable}
      *       interface to gain access to the {@link DataService}'s federation.
      *       for example, if they use {@link AbstractFederation#shutdownNow()}
      *       then the {@link DataService} itself would be shutdown.
@@ -1608,7 +1527,7 @@ abstract public class DataService extends AbstractService
              * indices.
              */
 
-            if (task instanceof IDataServiceAwareProcedure) {
+            if (task instanceof IDataServiceAwareCallable) {
 
                 if (log.isInfoEnabled()) {
 
@@ -1618,7 +1537,7 @@ abstract public class DataService extends AbstractService
                 }
 
                 // set the data service on the task.
-                ((IDataServiceAwareProcedure) task).setDataService(this);
+                ((IDataServiceAwareCallable) task).setDataService(this);
 
             }
 

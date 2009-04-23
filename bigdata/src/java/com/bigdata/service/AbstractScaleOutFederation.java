@@ -87,7 +87,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
                 .getProperty(Options.METADATA_INDEX_CACHE_POLICY,
                         Options.DEFAULT_METADATA_INDEX_CACHE_POLICY));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.METADATA_INDEX_CACHE_POLICY + "="
                     + metadataIndexCachePolicy);
        
@@ -221,7 +221,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
      */
     public IMetadataIndex getMetadataIndex(String name, long timestamp) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name="+name+" @ "+timestamp);
         
         assertOpen();
@@ -274,7 +274,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
             final long timestamp, final byte[] fromKey, final byte[] toKey,
             final boolean reverseScan) {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Querying metadata index: name=" + name + ", timestamp="
                     + timestamp + ", reverseScan=" + reverseScan + ", fromKey="
                     + BytesUtil.toString(fromKey) + ", toKey="
@@ -458,7 +458,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
             
             ntries++;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Waiting : ntries=" + ntries + ", metadataService="
                         + (metadataService == null ? "not " : "")
                         + " found; #dataServices=" + dataServiceUUIDs.length
@@ -472,7 +472,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("MDS=" + (metadataService != null) + ", #dataServices="
                     + dataServiceUUIDs.length);
 
@@ -516,7 +516,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
         final int ndataServices = dataServiceUUIDs.length;
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("#dataServices=" + ndataServices + ", now=" + new Date());
 
         final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(ndataServices);
@@ -569,7 +569,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
         }
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Did overflow: #ok=" + nok + ", #dataServices="
                 + ndataServices + ", now=" + new Date());
 
@@ -595,8 +595,6 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         protected static final Logger log = Logger
                 .getLogger(PurgeResourcesTask.class);
 
-        protected static final boolean INFO = log.isInfoEnabled();
-
         private final IDataService dataService;
 
         private final boolean truncateJournal;
@@ -615,7 +613,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
         public Void call() throws Exception {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("dataService: " + dataService.getServiceName());
 
             if (!dataService.purgeOldResources(5000/* ms */, truncateJournal)) {
@@ -643,8 +641,6 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         protected static final Logger log = Logger
                 .getLogger(ForceOverflowTask.class);
 
-        protected static final boolean INFO = log.isInfoEnabled();
-        
         private final IDataService dataService;
         private final boolean truncateJournal;
         
@@ -662,14 +658,14 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
         
         public Void call() throws Exception {
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("dataService: " + dataService.getServiceName());
 
             // returns once synchronous overflow is complete.
             dataService
                     .forceOverflow(true/* immediate */, true/* compactingMerge */);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Synchronous overflow is done: "
                         + dataService.getServiceName());
 
@@ -680,7 +676,7 @@ public abstract class AbstractScaleOutFederation extends AbstractFederation {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Asynchronous overflow is done: "
                         + dataService.getServiceName());
             

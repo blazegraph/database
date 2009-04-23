@@ -21,7 +21,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -44,14 +44,10 @@ import com.bigdata.service.jini.JiniFederation;
  *       reported under the namespace of the job.
  */
 public class RDFFileLoadTask implements Callable<Void>, Serializable,
-        IDataServiceAwareProcedure {
+        IDataServiceAwareCallable {
 
     final protected transient static Logger log = Logger
             .getLogger(RDFFileLoadTask.class);
-
-    final protected transient boolean INFO = log.isInfoEnabled();
-
-    final protected transient boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 
@@ -61,7 +57,7 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
     /**
      * The {@link DataService} on which the client is executing. This is set
      * automatically by the {@link DataService} when it notices that this
-     * class implements the {@link IDataServiceAwareProcedure} interface.
+     * class implements the {@link IDataServiceAwareCallable} interface.
      */
     private transient DataService dataService;
 
@@ -330,10 +326,6 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
         final protected transient static Logger log = Logger
                 .getLogger(RunnableFileSystemLoader.class);
 
-        final protected transient boolean INFO = log.isInfoEnabled();
-
-        final protected transient boolean DEBUG = log.isDebugEnabled();
-
         volatile boolean done = false;
 
         final ConcurrentDataLoader loader;
@@ -381,7 +373,7 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
             try {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("start: file=" + file);
 
                 // loads everything in the file or directory.
@@ -390,7 +382,7 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
                 // wait until the data have been loaded.
                 loader.awaitCompletion(Long.MAX_VALUE, TimeUnit.SECONDS);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("done : file=" + file);
 
             } catch (InterruptedException t) {

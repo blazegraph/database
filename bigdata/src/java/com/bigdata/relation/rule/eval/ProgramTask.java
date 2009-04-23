@@ -54,7 +54,7 @@ import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -96,7 +96,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @version $Id$
  */
 public class ProgramTask implements IProgramTask,
-        IDataServiceAwareProcedure, Serializable {
+        IDataServiceAwareCallable, Serializable {
 
     /**
      * 

@@ -60,7 +60,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareProcedure;
+import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
@@ -901,7 +901,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * @version $Id$
      */
     protected static class ReceiveIndexPartitionTask implements
-            Callable<Void>, IDataServiceAwareProcedure {
+            Callable<Void>, IDataServiceAwareCallable {
 
         /**
          * 

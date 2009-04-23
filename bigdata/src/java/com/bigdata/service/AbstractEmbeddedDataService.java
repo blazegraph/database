@@ -24,7 +24,8 @@ abstract public class AbstractEmbeddedDataService extends DataService {
 
     public void destroy() throws IOException {
 
-        if(INFO) log.info("");
+        if (log.isInfoEnabled())
+            log.info("");
         
         IResourceManager resourceManager = getResourceManager();
 
