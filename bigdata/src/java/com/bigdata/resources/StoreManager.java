@@ -142,16 +142,6 @@ abstract public class StoreManager extends ResourceEvents implements
     protected static final Logger log = Logger.getLogger(StoreManager.class);
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
      * Options for the {@link StoreManager}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -718,7 +708,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             try {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Waiting on startup : " + dataDir + " ...");
 
                 Thread.sleep(1000/* ms */);
@@ -968,7 +958,7 @@ abstract public class StoreManager extends ResourceEvents implements
                             Options.IGNORE_BAD_FILES,
                             Options.DEFAULT_IGNORE_BAD_FILES));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.IGNORE_BAD_FILES + "=" + ignoreBadFiles);
 
         }
@@ -981,7 +971,7 @@ abstract public class StoreManager extends ResourceEvents implements
                             Options.PURGE_OLD_RESOURCES_DURING_STARTUP,
                             Options.DEFAULT_PURGE_OLD_RESOURCES_DURING_STARTUP));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.PURGE_OLD_RESOURCES_DURING_STARTUP + "="
                         + purgeOldResourcesDuringStartup);
 
@@ -995,7 +985,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     .getProperty(Options.ACCELERATE_OVERFLOW_THRESHOLD,
                             Options.DEFAULT_ACCELERATE_OVERFLOW_THRESHOLD));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.ACCELERATE_OVERFLOW_THRESHOLD + "="
                         + accelerateOverflowThreshold);
 
@@ -1018,7 +1008,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     .getProperty(Options.STORE_CACHE_CAPACITY,
                             Options.DEFAULT_STORE_CACHE_CAPACITY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.STORE_CACHE_CAPACITY + "="
                         + storeCacheCapacity);
 
@@ -1030,7 +1020,7 @@ abstract public class StoreManager extends ResourceEvents implements
                     .getProperty(Options.STORE_CACHE_TIMEOUT,
                             Options.DEFAULT_STORE_CACHE_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.STORE_CACHE_TIMEOUT + "=" + storeCacheTimeout); 
 
             if (storeCacheTimeout < 0)
@@ -1063,7 +1053,7 @@ abstract public class StoreManager extends ResourceEvents implements
         journalIndex = JournalIndex.createTransient();//tmpStore);
         segmentIndex = IndexSegmentIndex.createTransient();//(tmpStore);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Current working directory: "
                     + new File(".").getAbsolutePath());
 
@@ -1108,7 +1098,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 // Note: stored in canonical form.
                 dataDir = new File(val).getCanonicalFile();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(Options.DATA_DIR + "=" + dataDir);
 
                 journalsDir = new File(dataDir, "journals").getCanonicalFile();
@@ -1123,7 +1113,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (!dataDir.exists()) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Creating: " + dataDir);
 
                 if (!dataDir.mkdirs()) {
@@ -1137,7 +1127,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (!journalsDir.exists()) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Creating: " + journalsDir);
 
                 if (!journalsDir.mkdirs()) {
@@ -1151,7 +1141,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             if (!segmentsDir.exists()) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Creating: " + segmentsDir);
 
                 if (!segmentsDir.mkdirs()) {
@@ -1207,12 +1197,12 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(Options.TMP_DIR + "=" + tmpDir);
 
             if (!tmpDir.exists()) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Creating temp directory: " + tmpDir);
 
                 if (!tmpDir.mkdirs()) {
@@ -1290,7 +1280,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 starting.set(false);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Startup "
                             + (isOpen() ? "successful" : "failed")
                             + " : "
@@ -1334,7 +1324,7 @@ abstract public class StoreManager extends ResourceEvents implements
              * Verify that the concurrency manager has been set and wait a while
              * it if is not available yet.
              */
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Waiting for concurrency manager");
             for (int i = 0; i < 5; i++) {
                 try {
@@ -1352,7 +1342,7 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             if (!isTransient) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Starting scan of data directory: " + dataDir);
 
                 final Stats stats = new Stats();
@@ -1361,7 +1351,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 final int nbad = stats.badFiles.size();
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Scan results: " + stats);
 
                 if (!stats.badFiles.isEmpty()) {
@@ -1474,7 +1464,7 @@ abstract public class StoreManager extends ResourceEvents implements
          */
         private void openLiveJournal() throws InterruptedException {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Creating/opening the live journal: dataDir="
                         + dataDir);
 
@@ -1504,7 +1494,7 @@ abstract public class StoreManager extends ResourceEvents implements
                  * with the same problem.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Creating initial journal: dataDir=" + dataDir);
 
                 // unique file name for new journal.
@@ -1556,7 +1546,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 final IResourceMetadata resource = journalIndex
                         .find(Long.MAX_VALUE);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Will open as live journal: " + resource);
 
                 assert resource != null : "No resource? : timestamp="
@@ -1571,7 +1561,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 }
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Opening most recent journal: " + file
                             + ", resource=" + resource);
 
@@ -1587,7 +1577,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Open/create of live journal: newJournal="
                         + newJournal + ", file=" + file);
 
@@ -1781,7 +1771,7 @@ abstract public class StoreManager extends ResourceEvents implements
     
     synchronized public void shutdown() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         final boolean wasOpen = this.open.get();
@@ -1825,7 +1815,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
     synchronized public void shutdownNow() {
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("");
 
         final boolean wasOpen = this.open.get();
@@ -1961,7 +1951,7 @@ abstract public class StoreManager extends ResourceEvents implements
         if (Thread.interrupted())
             throw new InterruptedException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Scanning file: " + file + ", stats=" + stats);
 
         final IResourceMetadata resource;
@@ -2087,7 +2077,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Found " + resource + " in " + file);
 
 //        if (!file.getName().equals(new File(resource.getFile()).getName())) {
@@ -2239,7 +2229,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         final UUID uuid = resourceMetadata.getUUID();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("file=" + file + ", uuid=" + uuid);
 
         if (file != null) {
@@ -2645,7 +2635,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         if (resource == null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("No such journal: timestamp=" + timestamp);
 
             return null;
@@ -2984,7 +2974,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Removing: " + f);
 
         if (f.exists() && !f.delete()) {
@@ -3088,7 +3078,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         if (lastCommitTime == 0L) {
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Nothing committed yet.");
             
             return null;
@@ -3247,7 +3237,7 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             final long releaseAge = (lastCommitTime - choosenReleaseTime); 
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Choosen releaseTime=" + choosenReleaseTime
                         + ": given releaseTime=" + this.releaseTime
                         + ", indexRetentionTime=" + indexRetentionTime
@@ -3286,7 +3276,7 @@ abstract public class StoreManager extends ResourceEvents implements
                  * nothing that could be deleted and we just return immediately.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Release time is earlier than any commit time.");
 
                 // Nothing to do.
@@ -3308,7 +3298,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 commitTimeToPreserve = lastCommitTime;
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("commitTimeToPreserve := " + commitTimeToPreserve
                             + " (this is the lastCommitTime)");
 
@@ -3321,7 +3311,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
                 commitTimeToPreserve = getCommitTimeStrictlyGreaterThan(choosenReleaseTime);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log
                             .info("commitTimeToPreserve := "
                                     + commitTimeToPreserve
@@ -3354,7 +3344,7 @@ abstract public class StoreManager extends ResourceEvents implements
                 elapsedScanCommitIndicesTime = System.currentTimeMillis()
                         - begin;
             }
-            if (INFO) {
+            if (log.isInfoEnabled()) {
                 /* Log the in use resources (resources that MUST NOT be
                  * deleted).
                  */
@@ -3476,7 +3466,7 @@ abstract public class StoreManager extends ResourceEvents implements
                      * given commit time.
                      */
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log
                                 .info("Stopping at resource GTE commitTime to preserve: createTime="
                                         + createTime
@@ -3553,7 +3543,7 @@ abstract public class StoreManager extends ResourceEvents implements
                      * given commit time.
                      */
                     
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log
                                 .info("Stopping at resource GTE commitTime to preserve: createTime="
                                         + createTime
@@ -3596,7 +3586,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Given " + resourcesInUse.size()
                     + " resources that are in use as of timestamp="
                     + commitTimeToPreserve + ", deleted " + njournals
@@ -3648,7 +3638,7 @@ abstract public class StoreManager extends ResourceEvents implements
     protected void deleteResource(final UUID uuid, final boolean isJournal)
             throws NoSuchStoreException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("deleteResource: uuid=" + uuid + ", isJournal="
                     + isJournal);
         
@@ -3743,7 +3733,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
             final File file = resourceFiles.remove(uuid);
 
-//            if (INFO)
+//            if (log.isInfoEnabled())
 //                log.info
                 log.warn("DELETE: file=" + file + ", uuid=" + uuid + ", isJournal="
                     + isJournal);
@@ -3904,7 +3894,7 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private void deleteUnusedResource(final IResourceMetadata resourceMetadata) {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("deleteResource: " + resourceMetadata);
         
         if (resourceMetadata == null)
@@ -4004,7 +3994,7 @@ abstract public class StoreManager extends ResourceEvents implements
              * Note: This logs the file as reported by [resourceFiles] as well
              * as the file in IResourceMetadata in case any discrepency arises.
              */
-//            if (INFO)
+//            if (log.isInfoEnabled())
 //                log.info
                 log.warn("DELETE: " + resourceMetadata + " : " + file);
             
@@ -4159,7 +4149,7 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected Set<UUID> getResourcesForTimestamp(final long commitTimeToPreserve) {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("commitTimeToPreserve=" + commitTimeToPreserve
                     + ", lastCommitTime="
                     + getLiveJournal().getRootBlockView().getLastCommitTime());
@@ -4224,7 +4214,7 @@ abstract public class StoreManager extends ResourceEvents implements
                  */
                 {
                     
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("Examining journal: file="
                             + journal.getFile() + ", lastCommitTime="
                             + lastCommitTime + ", uuid="
@@ -4305,7 +4295,7 @@ abstract public class StoreManager extends ResourceEvents implements
                                  * New checkpoint address.
                                  */
 
-                                if (DEBUG)
+                                if (log.isDebugEnabled())
                                     log.debug("index: name=" + entry3.name);
                                 
                                 // load checkpoint record from the store.
@@ -4337,7 +4327,7 @@ abstract public class StoreManager extends ResourceEvents implements
                                     
                                     if (uuids.add(t.getUUID())) {
 
-                                        if (INFO)
+                                        if (log.isInfoEnabled())
                                             log.info("Dependency: file="
                                                     + t.getFile() + ", uuid="
                                                     + t.getUUID() + ", view="
@@ -4359,7 +4349,7 @@ abstract public class StoreManager extends ResourceEvents implements
             
         } // synchronized( journalIndex )
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("commitTime=" + commitTimeToPreserve + ", #used=" + uuids.size());
 
         return uuids;
@@ -4465,7 +4455,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Created file: " + file);
 
         return file;
@@ -4623,7 +4613,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         p.setProperty(Options.MAXIMUM_EXTENT, Long.toString(adjustedExtent));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("discount=" + d //
                     + ", bytesUnderManagement=" + bytesUnderManagement //
                     + ", threshold=" + accelerateOverflowThreshold//

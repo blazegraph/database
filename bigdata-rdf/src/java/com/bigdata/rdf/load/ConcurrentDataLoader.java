@@ -333,13 +333,18 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
      * Return the {@link CounterSet} to be reported to the
      * {@link ILoadBalancerService}. The caller is responsible for attaching
      * the counters to those reported by {@link JiniFederation#getCounterSet()}
+     * <p>
+     * Note: the CDL relies on some side-effects on the returned
+     * {@link CounterSet} to establish the
+     * {@link ThreadPoolExecutorStatisticsTask} and have it report its counters
+     * via the client to the LBS.
      * 
      * @return The {@link CounterSet} for the {@link ConcurrentDataLoader}.
      */
-//    synchronized 
+    synchronized 
     public CounterSet getCounters() {
 
-//        if (counterSet == null) {
+        if (counterSet == null) {
 
         final CounterSet counterSet = new CounterSet();
             
@@ -398,12 +403,12 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                 
             }
 
-//        }
+        }
         
         return counterSet;
         
     }
-//    private CounterSet counterSet;
+    private CounterSet counterSet;
     
     /**
      * If there is a task on the {@link #errorQueue} then re-submit it.

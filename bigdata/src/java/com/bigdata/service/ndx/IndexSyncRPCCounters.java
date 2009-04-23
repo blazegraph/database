@@ -168,7 +168,7 @@ public class IndexSyncRPCCounters extends TaskCounters {
             }
         });
 
-        t.addCounter("averageElementsPerWrite", new Instrument<Double>() {
+        t.addCounter("averageElementsPerRequest", new Instrument<Double>() {
             @Override
             protected void sample() {
                 setValue(getAverageElementsPerRequest());
