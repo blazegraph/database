@@ -449,10 +449,10 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      * Note: This interface is specialized by the {@link IDataService} for tasks
      * which need to gain access to the {@link IDataService} in order to gain
      * local access to index partitions, etc. Such tasks declare the
-     * {@link IDataServiceAwareCallable}. For example, scale-out joins use
+     * {@link IDataServiceCallable}. For example, scale-out joins use
      * this mechanism.
      * 
-     * @see IDataServiceAwareCallable
+     * @see IDataServiceCallable
      */
     public Future<? extends Object> submit(Callable<? extends Object> proc)
             throws IOException;

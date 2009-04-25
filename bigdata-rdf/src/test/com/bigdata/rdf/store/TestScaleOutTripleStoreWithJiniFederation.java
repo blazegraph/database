@@ -35,7 +35,7 @@ import junit.framework.Test;
 
 import com.bigdata.jini.start.ServicesManagerServer;
 import com.bigdata.journal.ITx;
-import com.bigdata.service.jini.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
  * Proxy test suite for {@link ScaleOutTripleStore} running against an

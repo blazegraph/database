@@ -1,120 +1,85 @@
-/**
-
- The Notice below must appear in each file of the Source Code of any
- copy you distribute of the Licensed Product.  Contributors to any
- Modifications may add their own copyright notices to identify their
- own contributions.
-
- License:
-
- The contents of this file are subject to the CognitiveWeb Open Source
- License Version 1.1 (the License).  You may not copy or use this file,
- in either source code or executable form, except in compliance with
- the License.  You may obtain a copy of the License from
-
- http://www.CognitiveWeb.org/legal/license/
-
- Software distributed under the License is distributed on an AS IS
- basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
- the License for the specific language governing rights and limitations
- under the License.
-
- Copyrights:
-
- Portions created by or assigned to CognitiveWeb are Copyright
- (c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
- information for CognitiveWeb is available at
-
- http://www.CognitiveWeb.org
-
- Portions Copyright (c) 2002-2003 Bryan Thompson.
-
- Acknowledgements:
-
- Special thanks to the developers of the Jabber Open Source License 1.0
- (JOSL), from which this License was derived.  This License contains
- terms that differ from JOSL.
-
- Special thanks to the CognitiveWeb Open Source Contributors for their
- suggestions and support of the Cognitive Web.
-
- Modifications:
-
- */
 /*
- * Created on Jan 17, 2009
- */
 
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.load;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.Date;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.NodeExistsException;
-import org.apache.zookeeper.data.Stat;
-import org.openrdf.model.BNode;
+import org.apache.zookeeper.KeeperException;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.BigdataZooDefs;
+import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.rio.IStatementBuffer;
-import com.bigdata.rdf.rio.PresortRioLoader;
-import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.inf.ClosureStats;
+import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
-import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.TaskMaster;
-import com.bigdata.zookeeper.ZLock;
-import com.bigdata.zookeeper.ZooHelper;
-import com.bigdata.zookeeper.ZooQueue;
+import com.bigdata.service.jini.master.TaskMaster;
 
 /**
- * Distributed bulk loader for RDF data.
+ * Distributed bulk loader for RDF data. Creates/(re-)opens the
+ * {@link AbstractTripleStore}, loads the optional ontology, and starts the
+ * clients. The clients will run until the master is cancelled loading any data
+ * found in the {@link JobState#dataDir}. Files are optionally deleted after
+ * they have been succesfully loaded. Closure may be optionally computed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo pull a lot of stuff into an abstract base class for masters.
+ * @todo When loading files from a local file system, this master can not handle
+ *       the death of the service on which it is running.
+ * 
+ * @todo Support loading files from URLs, BFS, etc. This can be achieved via
+ *       subclassing and overriding {@link #newClientTask(int)} and
+ *       {@link #newJobState(String, Configuration)} as necessary.
+ * 
+ * @todo Delete after semantics are weak with asynchronous writes until I get
+ *       the asynchronous eventual notifier integrated.
  * 
  * @see TaskMaster
  */
-public class RDFDataLoadMaster implements Callable<Void> {
+public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends Callable<U>, U>
+        extends TaskMaster<S, T, U> {
 
     final protected static Logger log = Logger
             .getLogger(RDFDataLoadMaster.class);
-
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * {@link Configuration} options for the {@link RDFDataLoadMaster}.
@@ -122,33 +87,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public interface ConfigurationOptions {
-
-        /**
-         * The component (namespace for the configuration options).
-         */
-        String COMPONENT = RDFDataLoadMaster.class.getName();
-
-        /**
-         * The job name is used to identify the job within zookeeper. A znode
-         * with this name will be created as follows:
-         * 
-         * <pre>
-         * zroot (of the federation)
-         *    / jobs
-         *      / RDFDataLoadMaster (fully qualified name of that class).
-         *        / jobName
-         * </pre>
-         * 
-         * Under that znode are the following.
-         * 
-         * <pre>
-         *          / client# (where # is the client#).
-         *            / locknode (used to elect the client that is running if there is contention).
-         *            ...
-         * </pre>
-         */
-        String JOB_NAME = "jobName";
+    public interface ConfigurationOptions extends TaskMaster.ConfigurationOptions {
 
         /**
          * The KB namespace.
@@ -172,11 +111,6 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * loads you can always use the {@link BigdataSail}.
          */
         String ONTOLOGY = "ontology";
-
-        /**
-         * #of clients to use.
-         */
-        String NCLIENTS = "nclients";
 
         /**
          * #of threads to use on each client.
@@ -234,88 +168,23 @@ public class RDFDataLoadMaster implements Callable<Void> {
         String DELETE_AFTER = "deleteAfter";
 
         /**
-         * When <code>true</code> as an after action on the job, the
-         * {@link DataService}s in the federation will be made to undergo
-         * asynchronous overflow processing and the live journals will be
-         * truncated so that the total size on disk of the federation is at its
-         * minimum footprint for the given history retention policy. The master
-         * will block during this operation so you can readily tell when it is
-         * finished. Note that this option only makes sense in benchmark
-         * environments where you can contol the total system otherwise
-         * asynchronous writes may continue.
-         * 
-         * @see AbstractScaleOutFederation#forceOverflow(boolean)
+         * When <code>true</code>, an overflow with a compacting merge will
+         * be requested for each data service before we compute the database at
+         * once closure. This can save effort because we will need to scan large
+         * key-ranges in the database for some rules in order to compute the
+         * closure, and where the rule is embedded in a fixed point program, we
+         * will need to scan those key-ranges more than once. Also, the overflow
+         * operation is full distributed so it does not add all that much
+         * latency while the closure operation has less concurrency.
          */
-        String FORCE_OVERFLOW = "forceOverflow";
-
-        /**
-         * When <code>true</code> the {@link StatementBuffer} is flushed after
-         * each document and cleared on error. When <code>false</code> the
-         * buffer is only flushed when it would overflow and the caller has
-         * responsibility to make buffer is flushed before the total job
-         * completes.
-         * <p>
-         * Note: The use of this option will blur the boundaries between one
-         * document and the next and therefore can cause {@link BNode}
-         * resolution to span document boundaries. However, the use of blank
-         * nodes is already not "safe" (meaning idempotent) since each time a
-         * given document is loaded the blank nodes in that document will be
-         * recognized as distinct resources.
-         * 
-         * FIXME This option MAY NOT be turned off yet. There are two main
-         * problems.
-         * <p>
-         * (1) A thread-local {@link IStatementBuffer} is used to bind the
-         * buffer to the thread. This keeps down the #of buffers and makes it
-         * possible to reuse the same buffer for each task run by a given
-         * thread. However, to turn off {@link #AUTO_FLUSH} we would have to
-         * identify and flush those thread-local buffers in
-         * {@link ConcurrentDataLoader#awaitCompletion(long, java.util.concurrent.TimeUnit)}
-         * or perhaps by signaling {@link ReaderTask} that it must flush the
-         * buffer(s). Raising the buffer into the caller is a bit difficult as
-         * we queue up tasks before they are executed so we can't really assign
-         * the buffer to the task until it starts to execute.
-         * <p>
-         * (2) If {@link #AUTO_FLUSH} is turned off then {@link #DELETE_AFTER}
-         * can delete a file before the {@link IStatementBuffer} containing its
-         * assertions has been flushed. This weakens the "eventual success"
-         * guarentee since the file will not be re-processed once it has been
-         * deleted and a database error could occur after the file has been
-         * parsed and deleted but before the statement buffer containing the
-         * last of its assertions has been flushed to the database. To regain
-         * that guarentee we can not deletes a file until the statement buffer
-         * on which it wrote has been successfully flushed to the database.
-         * <p>
-         * (3) Also, the {@link PresortRioLoader}, the {@link DataLoader} and
-         * various other things need to be sure that they do not reset, clear,
-         * etc. the buffer on error or on success when autoFlush is turned off.
-         * 
-         * @see ConcurrentDataLoader#submitTask(String, ITaskFactory)
-         * @see AbstractRDFTaskFactory#newTask(String)
-         * @see ReaderTask#readData()
-         */
-        String AUTO_FLUSH = "autoFlush";
-
-        boolean DEFAULT_AUTO_FLUSH = true;
-
+        String FORCE_OVERFLOW_BEFORE_CLOSURE = "forceOverflowBeforeClosure";
+        
         /**
          * When <code>true</code> a validating parsed will be used.
          */
         String PARSER_VALIDATES = "parserValidates";
         
         boolean DEFAULT_PARSER_VALIDATES = false;
-        
-        /**
-         * The minimum #of {@link IDataService}s to discover before the master
-         * will assign the clients to those services.
-         */
-        String MIN_DATA_SERVICES = "minDataServices";
-
-        /**
-         * The timeout in milliseconds to await the discovery of
-         * {@link #MIN_DATA_SERVICES}.
-         */
-        String AWAIT_DATA_SERVICES_TIMEOUT = "awaitDataServicesTimeout";
 
         /**
          * The capacity of the queue of jobs awaiting execution.
@@ -347,17 +216,12 @@ public class RDFDataLoadMaster implements Callable<Void> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class JobState implements Serializable {
+    public static class JobState extends TaskMaster.JobState {
 
         /**
          * 
          */
         private static final long serialVersionUID = -7097810235721797668L;
-
-        /**
-         * The job name.
-         */
-        final String jobName;
 
         /**
          * The namespace of the {@link ITripleStore} into which the data will be
@@ -367,8 +231,6 @@ public class RDFDataLoadMaster implements Callable<Void> {
 
         /**
          * The directory from which files will be read.
-         * 
-         * @todo is this needed if we use a {@link ZooQueue} integration?
          */
         public final File dataDir;
 
@@ -379,17 +241,6 @@ public class RDFDataLoadMaster implements Callable<Void> {
          * @see ConfigurationOptions#ONTOLOGY
          */
         public final File ontology;
-
-        /**
-         * The #of clients. Each client will be assigned to run on some
-         * {@link IDataService}. Each client may run multiple threads.
-         * <p>
-         * Note: When loading data from the local file system a client MUST be
-         * created on an {@link IDataService} on each host in order to read data
-         * from its local file system. This is not an issue when reading from a
-         * shared volume.
-         */
-        public final int nclients;
 
         /**
          * The #of concurrent threads to use to load the data. A single thread
@@ -434,21 +285,15 @@ public class RDFDataLoadMaster implements Callable<Void> {
         public final boolean computeClosure;
 
         /**
+         * @see ConfigurationOptions#FORCE_OVERFLOW_BEFORE_CLOSURE
+         */
+        final boolean forceOverflowBeforeClosure;
+        
+        /**
          * When <code>true</code>, the each data file will be deleted once
          * its data has been loaded into the {@link ITripleStore}.
          */
         public final boolean deleteAfter;
-
-        /**
-         * When <code>true</code> the {@link DataService}s in the federation
-         * will be made to undergo asynchronous overflow processing and the
-         * live journals will be truncated so that the total size on disk of
-         * the federation is at its minimum footprint for the given history
-         * retention policy.
-         * 
-         * @see ConfigurationOptions#FORCE_OVERFLOW
-         */
-        public final boolean forceOverflow;
                 
         /**
          * When <code>true</code> a validating parsed will be used.
@@ -481,233 +326,122 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         final static transient public RDFFormat fallback = RDFFormat.RDFXML;
 
-        public String toString() {
+        @Override
+        protected void toString(StringBuilder sb) {
+        
+            sb.append(", " + ConfigurationOptions.NAMESPACE + "="
+                    + namespace);
+            
+            sb.append(", " + ConfigurationOptions.DATA_DIR+ "="
+                    + dataDir);
+        
+            sb.append(", " + ConfigurationOptions.NTHREADS + "="
+                    + nthreads);
+            
+            sb.append(", " + ConfigurationOptions.BUFFER_CAPACITY+ "="
+                    + bufferCapacity);
+        
+            sb.append(", " + ConfigurationOptions.ASYNCHRONOUS_WRITES+ "="
+                    + asynchronousWrites);
+            
+            sb.append(", " + ConfigurationOptions.ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE+ "="
+                    + asynchronousWritesProducerChunkSize);
+            
+            sb.append(", " + ConfigurationOptions.CREATE + "=" + create);
+            
+            sb.append(", " + ConfigurationOptions.LOAD_DATA + "=" + loadData);
+            
+            sb.append(", " + ConfigurationOptions.COMPUTE_CLOSURE + "="
+                    + computeClosure);
+            
+            sb.append(", " + ConfigurationOptions.DELETE_AFTER + "="
+                    + deleteAfter);
 
-            return getClass().getName()
-                    + //
-                    "{ " + ConfigurationOptions.JOB_NAME
-                    + "="
-                    + jobName
-                    + //
-                    ", " + ConfigurationOptions.NAMESPACE
-                    + "="
-                    + namespace
-                    + //
-                    ", " + ConfigurationOptions.DATA_DIR
-                    + "="
-                    + dataDir
-                    + //
-                    ", " + ConfigurationOptions.NCLIENTS
-                    + "="
-                    + nclients
-                    + //
-                    ", " + ConfigurationOptions.NTHREADS
-                    + "="
-                    + nthreads
-                    + //
-                    ", " + ConfigurationOptions.BUFFER_CAPACITY
-                    + "="
-                    + bufferCapacity
-                    + //
-                    ", "
-                    + ConfigurationOptions.ASYNCHRONOUS_WRITES
-                    + "="
-                    + asynchronousWrites
-                    + ", "
-                    + ConfigurationOptions.ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE
-                    + "="
-                    + asynchronousWritesProducerChunkSize
-                    + //
-                    ", " + ConfigurationOptions.CREATE + "="
-                    + create
-                    + //
-                    ", " + ConfigurationOptions.LOAD_DATA + "="
-                    + loadData
-                    + //
-                    ", " + ConfigurationOptions.COMPUTE_CLOSURE + "="
-                    + computeClosure
-                    + //
-                    ", " + ConfigurationOptions.DELETE_AFTER + "="
-                    + deleteAfter
-                    + //
-                    ", " + ConfigurationOptions.FORCE_OVERFLOW + "="
-                    + forceOverflow + //
-                    "}";
+            sb.append(", " + ConfigurationOptions.FORCE_OVERFLOW_BEFORE_CLOSURE + "="
+                    + forceOverflowBeforeClosure);
+
+            // @todo more fields in the job state.
 
         }
 
         /**
-         * @param configuration
-         * @throws ConfigurationException
+         * {@inheritDoc}
          */
-        public JobState(final Configuration config)
+        public JobState(final String component, final Configuration config)
                 throws ConfigurationException {
 
-            jobName = (String) config.getEntry(ConfigurationOptions.COMPONENT,
-                    ConfigurationOptions.JOB_NAME, String.class);
-
-            namespace = (String) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+            super(component,config);
+            
+            namespace = (String) config.getEntry(component,
                     ConfigurationOptions.NAMESPACE, String.class);
 
-            dataDir = (File) config.getEntry(ConfigurationOptions.COMPONENT,
+            dataDir = (File) config.getEntry(component,
                     ConfigurationOptions.DATA_DIR, File.class);
 
             ontology = (File) config
-                    .getEntry(ConfigurationOptions.COMPONENT,
-                            ConfigurationOptions.ONTOLOGY, File.class, null/* defaultValue */);
+                    .getEntry(component, ConfigurationOptions.ONTOLOGY,
+                            File.class, null/* defaultValue */);
 
-            nclients = (Integer) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
-                    ConfigurationOptions.NCLIENTS, Integer.TYPE);
-
-            nthreads = (Integer) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+            nthreads = (Integer) config.getEntry(component,
                     ConfigurationOptions.NTHREADS, Integer.TYPE);
 
-            bufferCapacity = (Integer) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+            bufferCapacity = (Integer) config.getEntry(component,
                     ConfigurationOptions.BUFFER_CAPACITY, Integer.TYPE);
 
-            asynchronousWrites = (Boolean) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+            asynchronousWrites = (Boolean) config.getEntry(component,
                     ConfigurationOptions.ASYNCHRONOUS_WRITES, Boolean.TYPE);
 
             asynchronousWritesProducerChunkSize = (Integer) config
                     .getEntry(
-                            ConfigurationOptions.COMPONENT,
+                            component,
                             ConfigurationOptions.ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE,
                             Integer.TYPE);
 
-            create = (Boolean) config.getEntry(ConfigurationOptions.COMPONENT,
+            create = (Boolean) config.getEntry(component,
                     ConfigurationOptions.CREATE, Boolean.TYPE);
 
             loadData = (Boolean) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+                    component,
                     ConfigurationOptions.LOAD_DATA, Boolean.TYPE);
 
             computeClosure = (Boolean) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+                    component,
                     ConfigurationOptions.COMPUTE_CLOSURE, Boolean.TYPE);
 
             deleteAfter = (Boolean) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+                    component,
                     ConfigurationOptions.DELETE_AFTER, Boolean.TYPE);
 
-            forceOverflow = (Boolean) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
-                    ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE);
+            forceOverflowBeforeClosure = (Boolean) config.getEntry(component,
+                    ConfigurationOptions.FORCE_OVERFLOW_BEFORE_CLOSURE,
+                    Boolean.TYPE);
 
             parserValidates = (Boolean) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+                    component,
                     ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE,
                     ConfigurationOptions.DEFAULT_PARSER_VALIDATES);
 
             queueCapacity = (Integer) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+                    component,
                     ConfigurationOptions.QUEUE_CAPACITY, Integer.TYPE);
             
             rejectedExecutionDelay = (Long) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+                    component,
                     ConfigurationOptions.REJECTED_EXECUTION_DELAY, Long.TYPE,
                     ConfigurationOptions.DEFAULT_REJECTED_EXECUTION_DELAY);
             
             maxTries = (Integer) config.getEntry(
-                    ConfigurationOptions.COMPONENT,
+                    component,
                     ConfigurationOptions.MAX_TRIES, Integer.TYPE,
                     ConfigurationOptions.DEFAULT_MAX_TRIES);
             
-            client2DataService = new UUID[nclients];
-
-        }
-
-        /**
-         * The mapping of clients onto the {@link DataService}s. The index is
-         * the client#. The value is the {@link DataService} {@link UUID}.
-         * 
-         * @todo a stable mapping is only required if the files are being loaded
-         *       from local directories vs NAS or some other "file" source.
-         */
-        final public UUID[] client2DataService;
-
-        /**
-         * Return the zpath of the node for all jobs which are instances of this class.
-         */
-        public String getJobClassZPath(final JiniFederation fed) {
-            
-            return fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS + "/"
-                    + RDFDataLoadMaster.class.getName();
-            
-        }
-        
-        /**
-         * Return the zpath to the node which corresponds to the
-         * {@link JobState}.
-         */
-        public String getJobZPath(final JiniFederation fed) {
-
-            return getJobClassZPath(fed) + "/" + jobName;
-
-        }
-
-        /**
-         * Return the zpath to the node which corresponds to the specified
-         * client task.
-         * 
-         * @param clientNum
-         *            The client number.
-         */
-        public String getClientZPath(final JiniFederation fed,
-                final int clientNum) {
-
-            return getJobZPath(fed) + "/" + "client" + clientNum;
-
-        }
-
-        /**
-         * Return the zpath of the locknode for the specified client task. Any
-         * tasks running with that clientNum MUST contend for a {@link ZLock}
-         * which permits it to run the task. This prevents concurrent execution
-         * of the task for the specified client in the event that more than one
-         * master is running for the same {@link JobState}.
-         * 
-         * @param clientNum
-         *            The client number.
-         */
-        public String getLockNodeZPath(final JiniFederation fed,
-                final int clientNum) {
-
-            return getClientZPath(fed, clientNum) + "/" + "locknode";
-
         }
 
     }
 
-    protected final JiniFederation fed;
-
-    protected final ZooKeeper zookeeper;
-
-    public JobState jobState;
-
     /**
-     * @see ConfigurationOptions#MIN_DATA_SERVICES
-     */
-    final int minDataServices;
-
-    /**
-     * @see ConfigurationOptions#AWAIT_DATA_SERVICES_TIMEOUT}
-     */
-    final long awaitDataServicesTimeout;
-
-    /**
-     * The zpath to the znode which corresponds to the job which is being
-     * executed.
-     */
-    final String jobZPath;
-
-    /**
-     * Runs a bulk data load job. SIGTERM (normal kill or ^C) will cancel the
-     * job, including any running clients.
+     * Runs the master. SIGTERM (normal kill or ^C) will cancel the job,
+     * including any running clients.
      * 
      * @param args
      *            The {@link Configuration} and any overrides.
@@ -715,361 +449,280 @@ public class RDFDataLoadMaster implements Callable<Void> {
      * @throws ConfigurationException
      * @throws ExecutionException
      * @throws InterruptedException
+     * @throws KeeperException
+     * 
+     * @todo clients could report a throughput measure such as operations per
+     *       second and the master should aggregate and report that back on the
+     *       console (this data is available via the LBS).
+     * 
+     * @todo could report as tasks complete (#running, outcome).
      */
-    public static void main(final String[] args) throws ConfigurationException,
-            InterruptedException, ExecutionException {
+    static public void main(final String[] args) throws ConfigurationException,
+            ExecutionException, InterruptedException, KeeperException {
 
         final JiniFederation fed = new JiniClient(args).connect();
 
-        final Callable<Void> task = new RDFDataLoadMaster(fed);
+        final TaskMaster task = new RDFDataLoadMaster(fed);
 
-        final Future<Void> future = fed.getExecutorService().submit(task);
-
-        /*
-         * Install a shutdown hook so that the master will cancel any running
-         * clients if it is interrupted (normal kill will trigger this hook).
-         */
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-
-            public void run() {
-
-                future.cancel(true/* mayInterruptIfRunning */);
-
-            }
-
-        });
-
-        // wait for the master to finish.
-        future.get();
-
+        // execute master wait for it to finish.
+        task.innerMain().get();
+        
     }
-
+    
     public RDFDataLoadMaster(final JiniFederation fed)
             throws ConfigurationException {
 
-        if (fed == null)
-            throw new IllegalArgumentException();
-
-        this.fed = fed;
-
-        this.zookeeper = fed.getZookeeper();
-
-        final Configuration config = fed.getClient().getConfiguration();
-
-        jobState = new JobState(config);
-
-        minDataServices = (Integer) config.getEntry(
-                ConfigurationOptions.COMPONENT,
-                ConfigurationOptions.MIN_DATA_SERVICES, Integer.TYPE);
-
-        awaitDataServicesTimeout = (Long) config.getEntry(
-                ConfigurationOptions.COMPONENT,
-                ConfigurationOptions.AWAIT_DATA_SERVICES_TIMEOUT, Long.TYPE);
-
-        jobZPath = jobState.getJobZPath(fed);
-
+        super(fed);
+    
     }
 
     /**
-     * Creates/(re-)opens the {@link AbstractTripleStore}, loads the optional
-     * ontology, and starts the clients. The clients will run until the master
-     * is cancelled loading any data found in the {@link JobState#dataDir}.
-     * Files are optionally deleted after they have been succesfully loaded.
-     * 
-     * Wait a bit to discover some minimum #of data services. Then allocate the
-     * clients to the data services. There can be more than one per data
-     * service.
+     * Extended to support optional load, closure, and reporting.
      */
-    public Void call() throws Exception {
+    protected void runClients() throws ExecutionException,
+            InterruptedException, IOException, ConfigurationException {
 
-        try {
-            // ensure znode exists.
-            fed.getZookeeper().create(
-                    fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS,
-                    new byte[0], fed.getZooConfig().acl, CreateMode.PERSISTENT);
-        } catch (NodeExistsException ex) {
-            // ignore.
-        }
-        try {
-            // ensure znode exists.
-            fed.getZookeeper().create(jobState.getJobClassZPath(fed),
-                    new byte[0], fed.getZooConfig().acl, CreateMode.PERSISTENT);
-        } catch (NodeExistsException ex) {
-            // ignore.
-        }
-
-        boolean restart = false;
-        try {
-
-            // create znode that is the root for the job.
-            fed.getZookeeper().create(jobZPath,
-                    SerializerUtil.serialize(jobState), fed.getZooConfig().acl,
-                    CreateMode.PERSISTENT);
-
-        } catch (NodeExistsException ex) {
-
-            /*
-             * Resuming a job already in progress and/or providing backup
-             * clients for a job that is currently running.
-             * 
-             * Note: We use the client to data service UUID assignments read
-             * from the znode data!
-             */
-
-            jobState = (JobState) SerializerUtil.deserialize(zookeeper.getData(
-                    jobZPath, false, new Stat()));
-
-            restart = true;
-
-            log.warn("Running an existing job: " + jobZPath);
-
-        }
-
-        final UUID[] serviceUUIDs = fed.awaitServices(minDataServices,
-                awaitDataServicesTimeout);
+        final S jobState = getJobState();
 
         final long begin = System.currentTimeMillis();
 
-        /*
-         * The #of services that will be tasked to run the clients. If there are
-         * more clients than services, then some services will be tasked with
-         * more than one client.
-         */
-        final int nservices = serviceUUIDs.length;
+        final AbstractTripleStore tripleStore = openTripleStore();
 
-        if (INFO)
-            log.info("Will run " + jobState.nclients + " on " + nservices
-                    + " services");
+        // @todo this will include any pre-loaded ontology and axioms
+        // (non-zero). @todo exact?
+        final long statementCount0 = tripleStore.getStatementCount(); 
 
-        final Map<Integer/* client# */, Future> producerFutures = new LinkedHashMap<Integer, Future>(
-                jobState.nclients/* initialCapacity */);
-
-        if (!restart) {
+        if (jobState.loadData) {
 
             /*
-             * Make stable assignments of each client to a specific data
-             * service. The same assignments MUST be used by the producer and
-             * the consumer or the consumer will not be able to find the data if
-             * it was written onto a local file system.
+             * Start the producer and consumer tasks.
+             * 
+             * Note: The producer and consumer tasks are paired. The tasks in
+             * each pair run on the SAME data service.
              */
 
-            for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
-
-                final int i = clientNum % serviceUUIDs.length;
-
-                final UUID serviceUUID = serviceUUIDs[i];
-
-                final String clientZPath = jobState.getClientZPath(fed,
-                        clientNum);
-
-                // ClientState clientState;
-                try {
-
-                    // clientState = new ClientState(jobState.startIndex);
-
-                    zookeeper.create(clientZPath, /*
-                                                     * SerializerUtil
-                                                     * .serialize(clientState)
-                                                     */new byte[0],
-                            fed.getZooConfig().acl, CreateMode.PERSISTENT);
-
-                } catch (NodeExistsException ex) {
-
-                    // clientState = (ClientState) SerializerUtil
-                    // .deserialize(zookeeper.getData(clientZPath, false,
-                    // new Stat()));
-
-                    if (INFO)
-                        log.info("Client will restart: ");// + clientState);
-
-                }
-
-                jobState.client2DataService[clientNum] = serviceUUID;
-
-            }
-
-            // write those assignments into zookeeper.
-            zookeeper
-                    .setData(jobZPath, SerializerUtil.serialize(jobState), -1/* version */);
-
-            if (INFO)
-                log.info("Wrote client assignments into zookeeper.");
-
-        }
-
-        // open/create the kb.
-        openTripleStore();
-
-        /*
-         * Start the producer and consumer tasks.
-         * 
-         * Note: The producer and consumer tasks are paired. The tasks in each
-         * pair run on the SAME data service.
-         */
-        for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
-
-            // use the stable assignment made above or read from zookeeper.
-            final UUID serviceUUID = jobState.client2DataService[clientNum];
-
-            // lookup the data service.
-            final IDataService dataService = fed.getDataService(serviceUUID);
-
-            if (INFO)
-                log.info("Running client#=" + clientNum + " on "
-                        + dataService.getHostname());
-
-            final RDFFileLoadTask task = new RDFFileLoadTask(jobState,
-                    clientNum);
-
-            producerFutures.put(clientNum, dataService.submit(task));
-
-        }
-
-        try {
-
-            while (!allDone(producerFutures)) {
-
-                final int nremaining = producerFutures.size();
-
-                if (DEBUG)
-                    log.debug("#remaining futures=" + nremaining);
-
-                if (nremaining < 10)
-                    // sleep a bit before rechecking the futures.
-                    Thread.sleep(1000/* ms */);
-                else
-                    // sleep longer if there are more clients.
-                    Thread.sleep(10000/* ms */);
-
-            }
-
-        } catch (Throwable t) {
+            super.runClients();
 
             /*
-             * Cancel all futures on error.
+             * The data generator aspect of the job is finished.
              */
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            /*
+             * Report tps for distributed data load.
+             */
+
+            final long statementCount = tripleStore.getStatementCount(); // @todo exact?
+
+            final long statementsAdded = statementCount - statementCount0;
+
+            final long tps = ((long) (((double) statementsAdded)
+                    / ((double) elapsed) * 1000d));
+
+            System.out.println("Load: tps=" + tps + ", ntriples="
+                    + statementCount + ", nnew=" + statementsAdded
+                    + ", elapsed=" + elapsed + "ms");
+
+            /*
+             * @todo consider commenting this out but SHOULD be safe w/
+             * read-committed or read-historical reads.
+             */ 
+            System.out.println(getKBInfo(tripleStore));
+
+        }
+        
+        if (jobState.computeClosure) {
+
+            /*
+             * FIXME (Robustly) Compute database-at-once closure.
+             * 
+             * @todo Given the long running nature of closure over a large data
+             * set, clients could write the set of rules that have reached fixed
+             * point (stages in the program) onto the lock node. That way if the
+             * client computing closure fails, the operation can failover to the
+             * next client which gains the lock.
+             * 
+             * @todo Also, without some persistent record of the closure
+             * operation state if there are two masters running then the 2nd
+             * master will begin the closure operation _again_ as soon as the
+             * first one completes!
+             * 
+             * @todo We should probably put the zlock for this into
+             * inf.computeClosure() itself together with the state updates for
+             * the closure job. That is going to be the only way to put a lock
+             * on things that will prevent anyone else from running closure.
+             * 
+             * @todo We also want to prevent concurrent writes on the triple
+             * store while computing the closure or the wrong fixed point could
+             * be computed. This means that other writes need to be buffered
+             * elsewhere until the closure is complete, which is really the
+             * workflow level for bigdata triple store updates.
+             */
+            final IResourceLock lock = fed.getResourceLockService()
+                    .acquireLock(tripleStore.getNamespace());
+
+            if (jobState.forceOverflowBeforeClosure) {
+
+                /*
+                 * Force overflow before computing the closure since we will
+                 * perform full range scans on several predicates, some range
+                 * scans on all statements, and some of these things we will do
+                 * more than once if the triple pattern occurs within a fixed
+                 * point enclosure.
+                 */
+                
+                System.out.println("Forcing overflow: now=" + new Date()+" (before closure)");
+
+                fed.forceOverflow(true/* truncateJournal */);
+
+                System.out.println("Forced overflow: now=" + new Date()+" (before closure)");
+
+                System.out.println(getKBInfo(tripleStore));
+
+            }
 
             try {
-                cancelAll(producerFutures, true/* mayInterruptIfRunning */);
-            } catch (Throwable t2) {
-                log.error(t2);
-            }
 
-            throw new Exception(t);
+                final long statementCount1 = tripleStore.getStatementCount(); // @todo exact?
+                
+                final long beginClosure = System.currentTimeMillis();
+                
+                // show the current time when we start.
+                System.out.println("Computing closure: now="
+                        + new Date().toString());
+
+                final InferenceEngine inf = tripleStore.getInferenceEngine();
+
+                // database at once closure.
+                final ClosureStats closureStats = inf
+                        .computeClosure(null/* focusStore */);
+
+                System.out.println("closure: " + closureStats);
+
+                final long elapsed = System.currentTimeMillis() - beginClosure;
+
+                final long statementCount = tripleStore.getStatementCount(); // @todo exact?
+                
+                final long statementsAdded = statementCount - statementCount1;
+
+                final long tps = ((long) (((double) statementsAdded)
+                        / ((double) elapsed) * 1000d));
+
+                System.out.println("Closure: tps=" + tps + ", ntriples="
+                        + statementCount + ", nnew=" + statementsAdded
+                        + ", elapsed=" + elapsed + "ms");
+
+                System.out.println(getKBInfo(tripleStore));
+                
+            } finally {
+
+                lock.unlock();
+                
+            }
 
         }
 
-        /*
-         * Delete all znode children and the jobZPath when the job completes
-         * successfully.
-         */
+        if (jobState.loadData
+                && jobState.computeClosure) {
 
-        if (INFO)
-            log.info("Success - cleaning up job state: elapsed="
-                    + (System.currentTimeMillis() - begin));
+            /*
+             * Report total tps throughput for load+closure.
+             */
 
-        ZooHelper.destroyZNodes(fed.getZookeeper(), jobZPath, 0/* depth */);
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            final long statementCount = tripleStore.getStatementCount(); // @todo exact?
+            
+            final long statementsAdded = statementCount - statementCount0;
 
-        if (INFO)
-            log.info("All done: elapsed="
-                    + (System.currentTimeMillis() - begin));
+            final long tps = ((long) (((double) statementsAdded)
+                    / ((double) elapsed) * 1000d));
 
-        return null;
+            System.out.println("Net: tps=" + tps + ", ntriples="
+                    + statementCount + ", nnew=" + statementsAdded
+                    + ", elapsed=" + elapsed + "ms");
+
+        }
+        
+        if (jobState.forceOverflow) {
+
+            /*
+             * @todo this is another operation that we only want to run once
+             * even if there are multiple masters.
+             */
+            
+            System.out.println("Forcing overflow: now=" + new Date());
+
+            fed.forceOverflow(true/* truncateJournal */);
+
+            System.out.println("Forced overflow: now=" + new Date());
+
+            System.out.println(getKBInfo(tripleStore));
+
+        }
 
     }
 
     /**
-     * Check the futures.
-     * <p>
-     * Note: This polls the futures of the spawned clients. Those tasks are
-     * running with the {@link ZooKeeper} client of the {@link DataService}'s
-     * {@link JiniFederation}, so they will only appear to be "disconnected"
-     * and their ephemeral znodes will only disappear if the {@link DataService}
-     * itself becomes disconnected from the zookeeper ensemble.
-     * 
-     * @todo This master can not handle {@link DataService} death. It assumes
-     *       that the files are being written onto the local file system for the
-     *       host on which the DataService is running. If the
-     *       {@link DataService} were to die the files would be inaccessible to
-     *       another {@link DataService} unless it was running on the same host.
-     *       However, {@link DataService} failover is not supported yet either,
-     *       so if the {@link DataService} dies you are toast.
+     * Return various interesting metadata about the KB state.
      */
-    protected boolean allDone(final Map<Integer/* client */, Future> futures) {
+    protected StringBuilder getKBInfo(final AbstractTripleStore tripleStore) {
+        
+        final StringBuilder sb = new StringBuilder();
 
-        // Note: used to avoid concurrent modification of [futures].
-        final List<Integer> finished = new LinkedList<Integer>();
+//      if(true) return sb;// comment out to get detailed info.
 
-        for (Map.Entry<Integer, Future> entry : futures.entrySet()) {
+        try {
 
-            final int clientNum = entry.getKey();
+            sb.append("namespace\t" + tripleStore.getNamespace() + "\n");
 
-            final Future future = entry.getValue();
+            sb.append("class\t" + tripleStore.getClass().getName() + "\n");
 
-            if (future.isDone()) {
+            sb
+                    .append("indexManager\t"
+                            + tripleStore.getIndexManager().getClass()
+                                    .getName() + "\n");
 
-                try {
+            // @todo exact?
+//            sb.append("exactStatementCount\t"
+//                    + tripleStore.getExactStatementCount() + "\n");
+            
+            sb.append("statementCount\t" + tripleStore.getStatementCount()
+                    + "\n");
 
-                    future.get();
+            sb.append("termCount\t" + tripleStore.getTermCount() + "\n");
 
-                } catch (Throwable t) {
+            sb.append("uriCount\t" + tripleStore.getURICount() + "\n");
 
-                    /*
-                     * @todo To be robust we would have to restart the client (a
-                     * producer or consumer) if one throws an exception.
-                     * 
-                     * This could be done automatically.
-                     * 
-                     * However, this also can be done manually by running
-                     * another instance of the master with the same
-                     * configuration. It will automatically create backup
-                     * clients. Since the original client is dead, the backup
-                     * client will gain the zlock and pickup where the other
-                     * client left off.
-                     */
+            sb.append("literalCount\t" + tripleStore.getLiteralCount() + "\n");
 
-                    log.error("client#=" + clientNum + ": " + t, t);
+            sb.append("bnodeCount\t" + tripleStore.getBNodeCount() + "\n");
 
-                }
+            // sb.append(tripleStore.predicateUsage());
 
-                finished.add(clientNum);
+        } catch (Throwable t) {
 
-            }
+            log.warn(t.getMessage(), t);
 
         }
-
-        for (int clientNum : finished) {
-
-            futures.remove(clientNum);
-
-        }
-
-        // finished iff no more futures.
-        return futures.isEmpty();
-
+        
+        return sb;
+        
     }
 
-    protected void cancelAll(final Map<Integer, Future> futures,
-            final boolean mayInterruptIfRunning) {
+    /**
+     * Extended to open/create the KB.
+     */
+    protected void beginJob(final S jobState) throws Exception {
 
-        final Iterator<Future> itr = futures.values().iterator();
+        super.beginJob(jobState);
 
-        while (itr.hasNext()) {
-
-            final Future f = itr.next();
-
-            if (!f.isDone()) {
-
-                f.cancel(mayInterruptIfRunning);
-
-            }
-
-            itr.remove();
-
-        }
-
+        // create/re-open the kb.
+        openTripleStore();
+        
     }
-
+    
     /**
      * Create/re-open the repository.
      * <p>
@@ -1087,6 +740,8 @@ public class RDFDataLoadMaster implements Callable<Void> {
          */
         AbstractTripleStore tripleStore;
 
+        final JobState jobState = getJobState();
+        
         // locate the resource declaration (aka "open").
         tripleStore = (AbstractTripleStore) fed.getResourceLocator().locate(
                 jobState.namespace, ITx.UNISOLATED);
@@ -1123,7 +778,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
 
         } else {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Re-opened tripleStore: " + jobState.namespace);
 
             showProperties(tripleStore);
@@ -1147,7 +802,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
      */
     protected AbstractTripleStore createTripleStore() throws ConfigurationException {
 
-        if (INFO)
+        final JobState jobState = getJobState();
+        
+        if (log.isInfoEnabled())
             log.info("Creating tripleStore: " + jobState.namespace);
 
         /*
@@ -1168,7 +825,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
         // show #of axioms.
         System.out.println("axiomCount=" + tripleStore.getStatementCount());
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Created tripleStore: " + jobState.namespace);
 
         return tripleStore;
@@ -1184,7 +841,9 @@ public class RDFDataLoadMaster implements Callable<Void> {
     protected void loadOntology(final AbstractTripleStore tripleStore)
             throws IOException {
 
-        if (INFO)
+        final JobState jobState = getJobState();
+        
+        if (log.isInfoEnabled())
             log.info("Loading ontology: " + jobState.ontology);
 
         tripleStore.getDataLoader().loadFiles(jobState.ontology/* file */,
@@ -1194,7 +853,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
         System.out.println("axiomAndOntologyCount="
                 + tripleStore.getStatementCount());
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Loaded ontology: " + jobState.ontology);
 
     }
@@ -1204,7 +863,7 @@ public class RDFDataLoadMaster implements Callable<Void> {
      */
     public void showProperties(final AbstractTripleStore tripleStore) {
 
-        if (!INFO) return;
+        if (!log.isInfoEnabled()) return;
 
         log.info("tripleStore: namespace=" + tripleStore.getNamespace());
         
@@ -1257,6 +916,24 @@ public class RDFDataLoadMaster implements Callable<Void> {
 //                + tripleStore.getSPORelation().getSPOIndex().getIndexMetadata()
 //                        .getBloomFilterFactory());
 
+    }
+
+    /**
+     * The default creates {@link RDFFileLoadTask} instances.
+     */
+    @Override
+    protected T newClientTask(final int clientNum) {
+
+        return (T)new RDFFileLoadTask(getJobState(), clientNum);
+        
+    }
+
+    @Override
+    protected S newJobState(final String component, final Configuration config)
+            throws ConfigurationException {
+
+        return (S) new JobState(component, config);
+        
     }
 
 }

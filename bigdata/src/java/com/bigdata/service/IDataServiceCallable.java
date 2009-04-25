@@ -1,7 +1,5 @@
 package com.bigdata.service;
 
-import java.io.Serializable;
-
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.DropIndexTask;
@@ -24,31 +22,33 @@ import com.bigdata.journal.RegisterIndexTask;
  * 
  * @see IFederationCallable
  */
-public interface IDataServiceAwareCallable extends Serializable {
+public interface IDataServiceCallable extends IFederationCallable {
 
     /**
-     * Invoked before the task is executed to given the procedure a reference to
-     * the {@link IDataService} on which it is executing.
+     * Invoked before the task is executed to provide a reference to the
+     * {@link IDataService} on which it is executing. This method is also
+     * responsible for setting the {@link IBigdataFederation} reference using
+     * {@link IFederationCallable#setFederation(IBigdataFederation)}.
      * 
      * @param dataService
      *            The data service.
-     *            
+     * 
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>
      * @throws IllegalStateException
      *             if {@link #setDataService(DataService)} has already been
-     *             invoked.
+     *             invoked and was set with a different value.
      */
     void setDataService(DataService dataService);
     
-//    /**
-//     * Return the {@link DataService}.
-//     * 
-//     * @return The data service and never <code>null</code>.
-//     * 
-//     * @throws IllegalStateException
-//     *             if {@link #setDataService(DataService)} has not been invoked.
-//     */
-//    DataService getDataService();
+    /**
+     * Return the {@link DataService}.
+     * 
+     * @return The data service and never <code>null</code>.
+     * 
+     * @throws IllegalStateException
+     *             if {@link #setDataService(DataService)} has not been invoked.
+     */
+    DataService getDataService();
     
 }

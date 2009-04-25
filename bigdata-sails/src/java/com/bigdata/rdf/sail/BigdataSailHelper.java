@@ -35,7 +35,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.LocalDataServiceFederation;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
  * Class provides guidence on parameter setup a data set and queries.
