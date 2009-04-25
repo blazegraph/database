@@ -52,7 +52,7 @@ public interface IFederationCallable extends Serializable {
      *             if the argument is <code>null</code>
      * @throws IllegalStateException
      *             if {@link #setFederation(IBigdataFederation)} has already
-     *             been invoked.
+     *             been invoked and was set with a different value.
      */
     void setFederation(IBigdataFederation fed);
 

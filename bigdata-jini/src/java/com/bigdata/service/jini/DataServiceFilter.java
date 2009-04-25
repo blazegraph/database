@@ -45,10 +45,6 @@ public class DataServiceFilter implements ServiceItemFilter {
     protected static final transient Logger log = Logger
             .getLogger(DataServiceFilter.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-    
-    protected static final boolean DEBUG = log.isDebugEnabled();
-
     public static final transient DataServiceFilter INSTANCE = new DataServiceFilter();
     
     /**
@@ -74,14 +70,14 @@ public class DataServiceFilter implements ServiceItemFilter {
         
         if(!(item.service instanceof IMetadataService)) {
            
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Matched: " + item);
             
             return true;
             
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("Ignoring: " + item);
         
         return false;

@@ -34,7 +34,6 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BTree;
@@ -57,10 +56,10 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.service.DataService;
+import com.bigdata.service.DataServiceCallable;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
@@ -900,8 +899,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class ReceiveIndexPartitionTask implements
-            Callable<Void>, IDataServiceAwareCallable {
+    protected static class ReceiveIndexPartitionTask extends DataServiceCallable<Void> {
 
         /**
          * 
@@ -955,22 +953,22 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
             this.port = port;
         }
     
-        private transient DataService dataService;
-        
-        public void setDataService(DataService dataService) {
-            
-            this.dataService = dataService;
-            
-        }
-
-        protected DataService getDataService() {
-            
-            if (dataService == null)
-                throw new IllegalArgumentException();
-
-            return dataService;
-            
-        }
+//        private transient DataService dataService;
+//        
+//        public void setDataService(DataService dataService) {
+//            
+//            this.dataService = dataService;
+//            
+//        }
+//
+//        protected DataService getDataService() {
+//            
+//            if (dataService == null)
+//                throw new IllegalArgumentException();
+//
+//            return dataService;
+//            
+//        }
 
         public Void call() throws Exception {
             

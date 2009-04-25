@@ -30,7 +30,7 @@ package com.bigdata.rdf.store;
 import junit.framework.TestCase2;
 
 import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data

@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.relation.rule.eval;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -52,9 +51,9 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
 import com.bigdata.service.DataService;
+import com.bigdata.service.DataServiceCallable;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -95,8 +94,7 @@ import com.bigdata.striterator.ICloseableIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ProgramTask implements IProgramTask,
-        IDataServiceAwareCallable, Serializable {
+public class ProgramTask extends DataServiceCallable<Object> implements IProgramTask {
 
     /**
      * 
@@ -108,12 +106,12 @@ public class ProgramTask implements IProgramTask,
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    protected static final boolean INFO = log.isInfoEnabled();
+    protected final boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    protected static final boolean DEBUG = log.isDebugEnabled();
+    protected final boolean DEBUG = log.isDebugEnabled();
 
     private final ActionEnum action;
     
@@ -134,20 +132,14 @@ public class ProgramTask implements IProgramTask,
      */
     private transient IIndexManager indexManager;
     
-    /**
-     * Note: NOT serialized!
-     */
-    private transient DataService dataService;
+//    /**
+//     * Note: NOT serialized!
+//     */
+//    private transient DataService dataService;
 
     public void setDataService(DataService dataService) {
 
-        if (dataService == null)
-            throw new IllegalArgumentException();
-
-        if (DEBUG)
-            log.debug("Running on data service: dataService="+dataService);
-        
-        this.dataService = dataService;
+        super.setDataService(dataService);
         
         this.indexManager = dataService.getFederation();
 
@@ -386,7 +378,7 @@ public class ProgramTask implements IProgramTask,
 
         // the task to execute.
         final QueryTask queryTask = new QueryTask(step, joinNexusFactory,
-                buffer, indexManager, dataService);
+                buffer, indexManager, getDataService());
 
         Future<RuleStats> future = null;
         
@@ -576,7 +568,7 @@ public class ProgramTask implements IProgramTask,
         }
 
         final MutationTask mutationTask = new MutationTask(action, joinNexusFactory,
-                step, indexManager, dataService );
+                step, indexManager, getDataService());
 
         if (DEBUG)
             log.debug("begin: action=" + action + ", program=" + step.getName()

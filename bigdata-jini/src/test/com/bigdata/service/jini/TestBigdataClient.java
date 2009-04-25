@@ -44,6 +44,8 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.jini.util.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniUtil;
 
 /**
  * Test suite for the {@link JiniClient}.

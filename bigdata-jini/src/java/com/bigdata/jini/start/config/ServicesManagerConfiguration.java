@@ -38,6 +38,7 @@ import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 import cern.colt.Arrays;
 
 import com.bigdata.jini.start.ServicesManagerServer;
+import com.bigdata.service.jini.ClientServer;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
@@ -159,6 +160,10 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
             } else if (a.equals(LoadBalancerServer.class.getName())) {
 
                 v.add(new LoadBalancerConfiguration(config));
+
+            } else if (a.equals(ClientServer.class.getName())) {
+
+                v.add(new ClientServerConfiguration(config));
 
             } else {
 

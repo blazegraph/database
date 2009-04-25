@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Sep 20, 2008
  */
 
-package com.bigdata.service.jini;
+package com.bigdata.service.jini.util;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -77,11 +77,13 @@ import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.DataService;
+import com.bigdata.service.DataServiceCallable;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareCallable;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.ListIndicesTask;
 import com.bigdata.service.MetadataService;
+import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -1316,8 +1318,8 @@ public class DumpFederation {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static public class FetchIndexPartitionByteCountRecordTask implements
-            Callable<IndexPartitionDetailRecord>, IDataServiceAwareCallable {
+    static public class FetchIndexPartitionByteCountRecordTask extends
+            DataServiceCallable<IndexPartitionDetailRecord> {
 
         /**
          * 
@@ -1351,14 +1353,7 @@ public class DumpFederation {
 
         public IndexPartitionDetailRecord call() throws Exception {
 
-            if (dataService == null) {
-
-                // data service was not set?
-                throw new IllegalStateException();
-
-            }
-
-            final ResourceManager resourceManager = dataService
+            final ResourceManager resourceManager = getDataService()
                     .getResourceManager();
 
             return new IndexPartitionDetailRecord(resourceManager, timestamp,
@@ -1372,13 +1367,6 @@ public class DumpFederation {
             
         }
 
-        public void setDataService(DataService dataService) {
-            
-            this.dataService = dataService;
-            
-        }
-        private transient DataService dataService;
-        
     }
         
     /**

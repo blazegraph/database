@@ -1474,17 +1474,16 @@ abstract public class DataService extends AbstractService
             final AbstractTask task = new IndexProcedureTask(
                     concurrencyManager, timestamp, name, proc);
             
-            if(proc instanceof IDataServiceAwareCallable) {
+            if (task instanceof IFederationCallable) {
 
-                if(log.isInfoEnabled()) {
-                    
-                    log.info("Data service aware procedure: "+proc.getClass().getName());
-                    
-                }
+                ((IFederationCallable) task).setFederation(getFederation());
 
-                // set the data service on the task.
-                ((IDataServiceAwareCallable)proc).setDataService( this );
-                
+            }
+
+            if (task instanceof IDataServiceCallable) {
+
+                ((IDataServiceCallable) task).setDataService(this);
+
             }
             
             // submit the procedure and await its completion.
@@ -1506,7 +1505,7 @@ abstract public class DataService extends AbstractService
      * 
      * @todo we should probably put the federation object in a sandbox in order
      *       to prevent various operations by tasks running in the
-     *       {@link DataService} using the {@link IDataServiceAwareCallable}
+     *       {@link DataService} using the {@link IDataServiceCallable}
      *       interface to gain access to the {@link DataService}'s federation.
      *       for example, if they use {@link AbstractFederation#shutdownNow()}
      *       then the {@link DataService} itself would be shutdown.
@@ -1527,17 +1526,14 @@ abstract public class DataService extends AbstractService
              * indices.
              */
 
-            if (task instanceof IDataServiceAwareCallable) {
+            if (task instanceof IFederationCallable) {
 
-                if (log.isInfoEnabled()) {
+                ((IFederationCallable) task).setFederation(getFederation());
 
-                    log.info("Data service aware procedure: "
-                            + task.getClass().getName());
+            }
+            if (task instanceof IDataServiceCallable) {
 
-                }
-
-                // set the data service on the task.
-                ((IDataServiceAwareCallable) task).setDataService(this);
+                ((IDataServiceCallable) task).setDataService(this);
 
             }
 

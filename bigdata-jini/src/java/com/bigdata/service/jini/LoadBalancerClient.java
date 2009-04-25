@@ -41,7 +41,7 @@ import com.bigdata.service.ILoadBalancerService;
  * @version $Id$
  */
 public class LoadBalancerClient extends
-        AbstractCachingServiceClient<ILoadBalancerService> {
+        BigdataCachingServiceClient<ILoadBalancerService> {
 
     public LoadBalancerClient(final JiniFederation fed, final long timeout) throws RemoteException {
 

@@ -39,7 +39,7 @@ import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.Options;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.service.jini.JiniClientConfig;
-import com.bigdata.service.jini.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
  * Test suite for the {@link JiniCoreServicesProcessHelper}

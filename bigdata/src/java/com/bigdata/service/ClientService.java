@@ -112,7 +112,7 @@ abstract public class ClientService extends AbstractService implements
      * 
      * @todo we should probably put the federation object in a sandbox in order
      *       to prevent various operations by tasks running in the
-     *       {@link DataService} using the {@link IDataServiceAwareCallable}
+     *       {@link DataService} using the {@link IDataServiceCallable}
      *       interface to gain access to the {@link DataService}'s federation.
      *       for example, if they use {@link AbstractFederation#shutdownNow()}
      *       then the {@link DataService} itself would be shutdown.
@@ -125,6 +125,12 @@ abstract public class ClientService extends AbstractService implements
 
             if (task == null)
                 throw new IllegalArgumentException();
+
+            if (task instanceof IFederationCallable) {
+
+                ((IFederationCallable) task).setFederation(getFederation());
+
+            }
 
             // submit the task and return its Future.
             return getFederation().getExecutorService().submit(task);

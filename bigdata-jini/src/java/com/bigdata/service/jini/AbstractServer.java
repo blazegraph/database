@@ -85,6 +85,7 @@ import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
+import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.service.mapred.jini.MapServer;
 import com.bigdata.service.mapred.jini.ReduceServer;
 import com.bigdata.zookeeper.ZLock;

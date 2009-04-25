@@ -72,10 +72,12 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractFederation;
+import com.bigdata.service.IClientService;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IService;
+import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.service.proxy.ClientBuffer;
 import com.bigdata.service.proxy.ClientFuture;
@@ -109,6 +111,8 @@ public class JiniFederation extends AbstractDistributedFederation implements
     private TransactionServiceClient transactionServiceClient;
 
     private ServicesManagerClient servicesManagerClient;
+
+    private ClientServiceClient clientServiceClient;
 
     private final ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
@@ -200,6 +204,15 @@ public class JiniFederation extends AbstractDistributedFederation implements
     }
     
     /**
+     * Cached lookup for discovered {@link IClientService}s. 
+     */
+    public ClientServiceClient getClientServiceClient() {
+        
+        return clientServiceClient;
+        
+    }
+    
+    /**
      * Initiaties discovery for one or more service registrars and establishes a
      * lookup caches for various bigdata services.
      * 
@@ -284,6 +297,10 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
             // Start discovery for the services manager.
             servicesManagerClient = new ServicesManagerClient(this,
+                    cacheMissTimeout);
+
+            // Start discovery for the client services.
+            clientServiceClient = new ClientServiceClient(this,
                     cacheMissTimeout);
 
         } catch (Exception ex) {
@@ -520,11 +537,21 @@ public class JiniFederation extends AbstractDistributedFederation implements
 
     }
 
-    public IDataService getDataService(UUID serviceUUID) {
+    public IDataService getDataService(final UUID serviceUUID) {
 
         // Note: return null if service not available/discovered.
         if (dataServicesClient == null) {
 
+            /*
+             * Note: This can occur under moderate to heavy swapping. You can
+             * mask the symptom under those conditions by increasing the lease
+             * time for the JoinManager, but you really need to avoid swapping
+             * for stable runs. This is a great reason why you SHOULD NOT
+             * distribute client tasks onto data services and why you SHOULD NOT
+             * run the client services (the proper container for client tasks)
+             * on the same machine as a data service. All in all, it is much
+             * better for everyone if a client fails rather than a data service.
+             */
             log.error("No data service client?");
             
             return null;
@@ -604,6 +631,10 @@ public class JiniFederation extends AbstractDistributedFederation implements
      */
     private void terminateDiscoveryProcesses() {
         
+        /*
+         * bigdata specific service discovery.
+         */
+        
         if (transactionServiceClient != null) {
 
             transactionServiceClient.terminate();
@@ -628,6 +659,26 @@ public class JiniFederation extends AbstractDistributedFederation implements
             
         }
 
+        if (servicesManagerClient != null) {
+
+            servicesManagerClient.terminate();
+
+            servicesManagerClient = null;
+            
+        }
+
+        if (clientServiceClient != null) {
+
+            clientServiceClient.terminate();
+
+            clientServiceClient = null;
+            
+        }
+
+        /*
+         * and the lower level jini processes.
+         */
+        
         if (serviceDiscoveryManager != null) {
 
             serviceDiscoveryManager.terminate();
@@ -694,6 +745,10 @@ public class JiniFederation extends AbstractDistributedFederation implements
         servicesManagerClient.shutdownDiscoveredServices(getExecutorService(),
                 null/* filter */, immediateShutdown);
         
+        // client services
+        clientServiceClient.shutdownDiscoveredServices(getExecutorService(),
+                null/* filter */, immediateShutdown);
+        
         // data services.
         dataServicesClient.shutdownDiscoveredServices(getExecutorService(),
                 DataServiceFilter.INSTANCE, immediateShutdown);
@@ -725,6 +780,10 @@ public class JiniFederation extends AbstractDistributedFederation implements
              * to start a new service each time we will one.
              */
             servicesManagerClient.destroyDiscoveredServices(
+                    getExecutorService(), null/* filter */);
+
+            // client services
+            clientServiceClient.destroyDiscoveredServices(
                     getExecutorService(), null/* filter */);
 
             // data services.
@@ -1165,93 +1224,6 @@ public class JiniFederation extends AbstractDistributedFederation implements
         }
         
     }
-
-//    /**
-//     * Lock controlling access to the {@link #zookeeperEvent} {@link Condition}.
-//     */
-//    protected final ReentrantLock zookeeperEventLock = new ReentrantLock();
-//
-//    /**
-//     * Condition signaled any time there is a {@link WatchedEvent} delivered to
-//     * our {@link #process(WatchedEvent)}.
-//     */
-//    protected final Condition zookeeperEvent = zookeeperEventLock
-//            .newCondition();
-//
-//    /**
-//     * Signals anyone awaiting {@link #zookeeperEvent}.   
-//     */
-//    public void process(final WatchedEvent event) {
-//
-//        if (log.isInfoEnabled())
-//            log.info(event.toString());
-//
-//        try {
-//            
-//            zookeeperEventLock.lockInterruptibly();
-//            
-//            try {
-//                
-//                zookeeperEvent.signalAll();
-//            
-//            } finally {
-//                
-//                zookeeperEventLock.unlock();
-//                
-//            }
-//            
-//        } catch (InterruptedException ex) {
-//            
-//            return;
-//            
-//        }
-//        
-//        for (Watcher w : watchers) {
-//
-//            w.process(event);
-//
-//        }
-//        
-//    }
-//    
-//    /**
-//     * Adds a {@link Watcher} which will receive {@link WatchedEvent}s until it
-//     * is removed.
-//     * 
-//     * @param w
-//     *            The watcher.
-//     */
-//    public void addWatcher(final Watcher w) {
-//
-//        if (w == null)
-//            throw new IllegalArgumentException();
-//
-//        if(log.isInfoEnabled())
-//            log.info("watcher="+w);
-//        
-//        watchers.add(w);
-//
-//    }
-//
-//    /**
-//     * Remove a {@link Watcher}.
-//     * 
-//     * @param w
-//     *            The watcher.
-//     */
-//    public void removeWatcher(final Watcher w) {
-//
-//        if (w == null)
-//            throw new IllegalArgumentException();
-//
-//        if(log.isInfoEnabled())
-//            log.info("watcher="+w);
-//
-//        watchers.remove(w);
-//
-//    }
-//
-//    private final CopyOnWriteArrayList<Watcher> watchers = new CopyOnWriteArrayList<Watcher>();
     
     /**
      * Submits the task for execution and monitors its {@link Future}.

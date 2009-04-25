@@ -1,9 +1,6 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
-import java.io.IOException;
-import java.io.Serializable;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
@@ -27,8 +24,9 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
+import com.bigdata.service.DataServiceCallable;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataServiceAwareCallable;
+import com.bigdata.service.IDataServiceCallable;
 import com.bigdata.service.Session;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.sparse.SparseRowStore;
@@ -87,8 +85,7 @@ import com.bigdata.striterator.IKeyOrder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JoinTaskFactoryTask implements Callable<Future>,
-        IDataServiceAwareCallable, Serializable {
+public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
 
     /**
      * 
@@ -127,17 +124,17 @@ public class JoinTaskFactoryTask implements Callable<Future>,
     
     final IKeyOrder[] keyOrders;
 
-    /**
-     * Set by the {@link DataService} which recognized that this class
-     * implements the {@link IDataServiceAwareCallable}.
-     */
-    private transient DataService dataService;
-    
-    public void setDataService(DataService dataService) {
-        
-        this.dataService = dataService;
-        
-    }
+//    /**
+//     * Set by the {@link DataService} which recognized that this class
+//     * implements the {@link IDataServiceCallable}.
+//     */
+//    private transient DataService dataService;
+//    
+//    public void setDataService(DataService dataService) {
+//        
+//        this.dataService = dataService;
+//        
+//    }
 
     /**
      * Set by {@link #call()} to the federation instance available on the
@@ -223,10 +220,10 @@ public class JoinTaskFactoryTask implements Callable<Future>,
      */
     public Future call() throws Exception {
         
-        if (dataService == null)
-            throw new IllegalStateException();
+//        if (dataService == null)
+//            throw new IllegalStateException();
 
-        this.fed = (AbstractScaleOutFederation) dataService.getFederation();
+        this.fed = (AbstractScaleOutFederation) getFederation();
 
         /*
          * Start the iterator using our local thread pool in order to avoid
@@ -247,7 +244,7 @@ public class JoinTaskFactoryTask implements Callable<Future>,
         
         final Future<Void> joinTaskFuture;
 
-        final Session session = dataService.getSession();
+        final Session session = getDataService().getSession();
         
         /*
          * @todo this serializes all requests for a new join task on this data
@@ -325,12 +322,12 @@ public class JoinTaskFactoryTask implements Callable<Future>,
              * how to assemble the index partition view.
              */
             final IIndexManager indexManager = new DelegateIndexManager(
-                    dataService);
+                    getDataService());
 
             task = new DistributedJoinTask(scaleOutIndexName, rule,
                     joinNexusFactory.newInstance(indexManager), order,
                     orderIndex, partitionId, fed, masterProxy, masterUUID,
-                    sourceItrProxy, keyOrders, dataService);
+                    sourceItrProxy, keyOrders, getDataService());
             
         }
 
@@ -345,7 +342,7 @@ public class JoinTaskFactoryTask implements Callable<Future>,
                     + ", partitionId=" + partitionId + ", indexName="
                     + scaleOutIndexName);
 
-        Future<Void> joinTaskFuture = dataService.getFederation()
+        Future<Void> joinTaskFuture = getFederation()
                 .getExecutorService().submit(task);
 
         if (fed.isDistributed()) {

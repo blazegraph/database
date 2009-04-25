@@ -20,52 +20,35 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
 */
 /*
- * Created on Apr 23, 2009
+ * Created on Mar 18, 2008
  */
 
-package com.bigdata.service;
+package com.bigdata.service.jini;
 
-import java.util.concurrent.Callable;
+import java.rmi.RemoteException;
+
+import net.jini.core.lookup.ServiceTemplate;
+
+import com.bigdata.service.IClientService;
 
 /**
- * Base class for {@link IFederationCallable}.
+ * Class handles discovery of an {@link IClientService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class FederationCallable<T> implements IFederationCallable,
-        Callable<T> {
+public class ClientServiceClient extends
+        BigdataCachingServiceClient<IClientService> {
 
-    private transient IBigdataFederation fed;
+    public ClientServiceClient(final JiniFederation fed, final long timeout)
+            throws RemoteException {
 
-    /**
-     * Deserialization ctor.
-     */
-    public FederationCallable() {
-    }
-
-    synchronized public void setFederation(final IBigdataFederation fed) {
-
-        if (fed == null)
-            throw new IllegalArgumentException();
-
-        if (this.fed != null && this.fed != fed)
-            throw new IllegalStateException();
-
-        this.fed = fed;
+        super(fed, IClientService.class, new ServiceTemplate(null,
+                new Class[] { IClientService.class }, null), null/* filter */,
+                timeout);
 
     }
 
-    public IBigdataFederation getFederation() {
-
-        if (fed == null)
-            throw new IllegalStateException();
-
-        return fed;
-
-    }
-    
 }

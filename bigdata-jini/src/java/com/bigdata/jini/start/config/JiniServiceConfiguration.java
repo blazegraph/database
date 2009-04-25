@@ -76,7 +76,7 @@ import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.ZNodeCreatedWatcher;
 
 /**

@@ -42,9 +42,7 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
-import net.jini.discovery.DiscoveryManagement;
 import net.jini.lookup.LookupCache;
-import net.jini.lookup.ServiceDiscoveryEvent;
 import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
@@ -52,6 +50,7 @@ import net.jini.lookup.ServiceItemFilter;
 import org.apache.log4j.Logger;
 
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
+import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.util.InnerCause;
 import com.sun.jini.admin.DestroyAdmin;
 
@@ -71,12 +70,15 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     protected static final transient Logger log = Logger
             .getLogger(AbstractCachingServiceClient.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isInfoEnabled();
-
-    final protected JiniFederation fed;
-
+//    final protected JiniFederation fed;
+    private final ServiceDiscoveryManager serviceDiscoveryManager;
+    
+    protected ServiceDiscoveryManager getServiceDiscoveryManager() {
+        
+        return serviceDiscoveryManager;
+        
+    }
+    
     /**
      * A {@link LookupCache} that will be populated with all services that match
      * a filter. This is used to keep track of all services registered with any
@@ -97,16 +99,19 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     /**
      * Timeout for remote lookup on cache miss (milliseconds).
      */
-    protected final long timeout;
+    protected final long cacheMissTimeout;
 
     /**
-     * Provides direct cached lookup of services by their {@link ServiceID}.
+     * Provides direct cached lookup of discovered services matching both the
+     * {@link #template} and the optional {@link #filter} by their
+     * {@link ServiceID}.
      */
     protected final ServiceCache serviceCache;
 
     /**
-     * An object that provides direct cached lookup of proxies by their
-     * {@link ServiceID}.
+     * An object that provides direct cached lookup of discovered services
+     * matching both the {@link #template} and the optional {@link #filter} by
+     * their {@link ServiceID}.
      */
     final public ServiceCache getServiceCache() {
 
@@ -115,7 +120,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     }
 
     /**
-     * An object that provides cached lookup of discovered services.
+     * An object that provides cached lookup of discovered services matching
+     * both the {@link #template} and the optional {@link #filter}.
      */
     final public LookupCache getLookupCache() {
 
@@ -124,43 +130,42 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
     }
 
     /**
-     * The most interesting interface on the service (this is used for log
-     * messages).
+     * The most interesting interface on the services to be discovered (this is
+     * used for log messages).
      */
     private final Class serviceIface;
 
     /**
      * Sets up service discovery for the designed class of services.
      * 
-     * @param fed
-     *            The {@link JiniFederation}. This class will use the
-     *            {@link DiscoveryManagement } and
-     *            {@link ServiceDiscoveryManager} objects exposed by the
-     *            {@link JiniFederation}. Also, {@link ServiceDiscoveryEvent}s
-     *            will be passed by this class to the {@link JiniFederation},
-     *            which implements {@link ServiceDiscoveryListener}. Those
-     *            events are used to notice service joins.\
-     *            @param serviceIface The most interesting interface on the service (this is used for log
-     * messages).
+     * @param serviceDiscoveryManager
+     *            Used to discovery services matching the template and filter.
+     * @param serviceDiscoveryListener
+     *            Service discovery notices are delivered to this class.
+     * @param serviceIface
+     *            The most interesting interface on the service (this is used
+     *            for log messages).
      * @param template
      *            A template used to restrict the services which are discovered
      *            and cached by this class (required).
      * @param filter
      *            A filter used to further restrict the services which are
      *            discovered and cached by this class (optional).
-     * @param timeout
+     * @param cacheMissTimeout
      *            The timeout in milliseconds that the client will await the
      *            discovery of a service if there is a cache miss.
      * 
      * @throws RemoteException
      *             if we could not setup the {@link LookupCache}
      */
-    public AbstractCachingServiceClient(final JiniFederation fed,
+    public AbstractCachingServiceClient(
+            final ServiceDiscoveryManager serviceDiscoveryManager,
+            final ServiceDiscoveryListener serviceDiscoveryListener,
             final Class serviceIface, final ServiceTemplate template,
-            final ServiceItemFilter filter, final long timeout)
+            final ServiceItemFilter filter, final long cacheMissTimeout)
             throws RemoteException {
 
-        if (fed == null)
+        if (serviceDiscoveryManager == null)
             throw new IllegalArgumentException();
 
         if (serviceIface == null)
@@ -169,10 +174,10 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
         if (template == null)
             throw new IllegalArgumentException();
 
-        if (timeout < 0)
+        if (cacheMissTimeout < 0)
             throw new IllegalArgumentException();
 
-        this.fed = fed;
+        this.serviceDiscoveryManager = serviceDiscoveryManager;
 
         this.serviceIface = serviceIface;
 
@@ -180,11 +185,11 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         this.filter = filter;
 
-        this.timeout = timeout;
+        this.cacheMissTimeout = cacheMissTimeout;
 
-        serviceCache = new ServiceCache(fed);
+        serviceCache = new ServiceCache(serviceDiscoveryListener);
 
-        lookupCache = fed.getServiceDiscoveryManager().createLookupCache(//
+        lookupCache = getServiceDiscoveryManager().createLookupCache(//
                 template,//
                 filter, //
                 serviceCache // ServiceDiscoveryListener
@@ -264,7 +269,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         if (item == null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Cache miss.");
 
             item = handleCacheMiss(filter);
@@ -296,8 +301,8 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         try {
 
-            item = fed.getServiceDiscoveryManager().lookup(template, filter,
-                    timeout);
+            item = getServiceDiscoveryManager().lookup(template, filter,
+                    cacheMissTimeout);
 
         } catch (RemoteException ex) {
 
@@ -307,7 +312,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
 
         } catch (InterruptedException ex) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Interrupted - no match.");
 
             return null;
@@ -319,13 +324,14 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
             // Could not discover a matching service.
 
             log.warn("Could not discover matching service: template="
-                    + template + ", filter=" + filter + ", timeout=" + timeout);
+                    + template + ", filter=" + filter + ", timeout="
+                    + cacheMissTimeout);
 
             return null;
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Found: " + item);
 
         return item;
@@ -350,6 +356,83 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
                 .getServiceItemByID(JiniUtil.uuid2ServiceID(serviceUUID));
 
         return serviceItem;
+
+    }
+
+    /**
+     * Return an array {@link ServiceItem}s for up to <i>maxCount</i>
+     * discovered services which satisify the optional <i>filter</i>.
+     * 
+     * @param maxCount
+     *            The maximum #of data services whose {@link UUID} will be
+     *            returned. When zero (0) the {@link UUID} for all known data
+     *            services will be returned.
+     * @param filter
+     *            An optional filter. If given it will be applied in addition to
+     *            the optional filter specified to the ctor.
+     * 
+     * @return An array of {@link ServiceItem}s for matching discovered
+     *         services.
+     */
+    public ServiceItem[] getServiceItems(final int maxCount,
+            ServiceItemFilter filter) {
+
+        /*
+         * If the instance was configured with a filter and the caller specified
+         * a filter then combine the filters. Otherwise use whichever one is non
+         * null.
+         */
+        if (filter != null && this.filter != null) {
+
+            filter = new ServiceItemFilterChain(new ServiceItemFilter[] {
+                    filter, this.filter });
+
+        } else if (this.filter != null) {
+
+            filter = this.filter;
+
+        } // else filter is non-null and we use it.
+       
+        final ServiceItem[] items = serviceCache.getServiceItems(maxCount,
+                filter);
+
+        if (log.isInfoEnabled())
+            log.info("There are at least " + items.length
+                    + " services : maxCount=" + maxCount);
+
+        return items;
+        
+    }
+    
+    /**
+     * Return an array {@link UUID}s for up to <i>maxCount</i> discovered
+     * services which satisify the optional <i>filter</i>.
+     * 
+     * @param maxCount
+     *            The maximum #of data services whose {@link UUID} will be
+     *            returned. When zero (0) the {@link UUID} for all known data
+     *            services will be returned.
+     * @param filter
+     *            An optional filter. If given it will be applied in addition to
+     *            the optional filter specified to the ctor.
+     * 
+     * @return An array of service {@link UUID}s for matching discovered
+     *         services.
+     */
+    public UUID[] getServiceUUIDs(final int maxCount,
+            final ServiceItemFilter filter) {
+
+        final ServiceItem[] items = getServiceItems(maxCount, filter);
+
+        final UUID[] uuids = new UUID[items.length];
+
+        for (int i = 0; i < items.length; i++) {
+
+            uuids[i] = JiniUtil.serviceID2UUID(items[i].serviceID);
+
+        }
+
+        return uuids;
 
     }
 

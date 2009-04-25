@@ -40,7 +40,7 @@ import com.bigdata.journal.ITransactionService;
  * @version $Id$
  */
 public class TransactionServiceClient extends
-        AbstractCachingServiceClient<ITransactionService> {
+        BigdataCachingServiceClient<ITransactionService> {
 
     public TransactionServiceClient(final JiniFederation fed, final long timeout)
             throws RemoteException {

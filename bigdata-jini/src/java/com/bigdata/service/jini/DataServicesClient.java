@@ -51,7 +51,7 @@ import com.bigdata.service.IMetadataService;
  * @version $Id$
  */
 public class DataServicesClient extends
-        AbstractCachingServiceClient<IDataService> {
+        BigdataCachingServiceClient<IDataService> {
 
     /**
      * {@inheritDoc}
@@ -186,22 +186,24 @@ public class DataServicesClient extends
      */
     public UUID[] getDataServiceUUIDs(final int maxCount) {
 
-        final ServiceItem[] items = serviceCache.getServiceItems(maxCount,
-                DataServiceFilter.INSTANCE);
-
-        if (INFO)
-            log.info("There are at least " + items.length
-                    + " data services : maxCount=" + maxCount);
-
-        final UUID[] uuids = new UUID[items.length];
-
-        for (int i = 0; i < items.length; i++) {
-
-            uuids[i] = JiniUtil.serviceID2UUID(items[i].serviceID);
-
-        }
-
-        return uuids;
+        return super.getServiceUUIDs(maxCount, DataServiceFilter.INSTANCE);
+        
+//        final ServiceItem[] items = serviceCache.getServiceItems(maxCount,
+//                DataServiceFilter.INSTANCE);
+//
+//        if (INFO)
+//            log.info("There are at least " + items.length
+//                    + " data services : maxCount=" + maxCount);
+//
+//        final UUID[] uuids = new UUID[items.length];
+//
+//        for (int i = 0; i < items.length; i++) {
+//
+//            uuids[i] = JiniUtil.serviceID2UUID(items[i].serviceID);
+//
+//        }
+//
+//        return uuids;
 
     }
 

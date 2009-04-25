@@ -61,11 +61,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
 
     protected static final transient Logger log = Logger
             .getLogger(ServiceCache.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
+        
     private ConcurrentHashMap<ServiceID, ServiceItem> serviceIdMap = new ConcurrentHashMap<ServiceID, ServiceItem>();
 
     /**
@@ -102,7 +98,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceAdded(final ServiceDiscoveryEvent e) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("" + e + ", class="
                     + e.getPostEventServiceItem().toString());
 
@@ -122,7 +118,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceChanged(final ServiceDiscoveryEvent e) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("" + e + ", class="
                     + e.getPostEventServiceItem().toString());
 
@@ -142,7 +138,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
      */
     public void serviceRemoved(final ServiceDiscoveryEvent e) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("" + e + ", class="
                     + e.getPreEventServiceItem().toString());
 
@@ -226,7 +222,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
 
         final int m = v.size();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("found " + m + " matching service items");
 
         return v.toArray(new ServiceItem[m]);

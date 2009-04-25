@@ -42,7 +42,7 @@ import net.jini.core.lookup.ServiceRegistrar;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.service.jini.JiniClientConfig;
-import com.bigdata.service.jini.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
  * Somewhat specialized configuration for starting the core jini services

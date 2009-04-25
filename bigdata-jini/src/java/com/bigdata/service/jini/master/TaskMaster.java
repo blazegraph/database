@@ -1,54 +1,36 @@
-/**
+/*
 
- The Notice below must appear in each file of the Source Code of any
- copy you distribute of the Licensed Product.  Contributors to any
- Modifications may add their own copyright notices to identify their
- own contributions.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
- License:
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
 
- The contents of this file are subject to the CognitiveWeb Open Source
- License Version 1.1 (the License).  You may not copy or use this file,
- in either source code or executable form, except in compliance with
- the License.  You may obtain a copy of the License from
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
 
- http://www.CognitiveWeb.org/legal/license/
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
- Software distributed under the License is distributed on an AS IS
- basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
- the License for the specific language governing rights and limitations
- under the License.
-
- Copyrights:
-
- Portions created by or assigned to CognitiveWeb are Copyright
- (c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
- information for CognitiveWeb is available at
-
- http://www.CognitiveWeb.org
-
- Portions Copyright (c) 2002-2003 Bryan Thompson.
-
- Acknowledgements:
-
- Special thanks to the developers of the Jabber Open Source License 1.0
- (JOSL), from which this License was derived.  This License contains
- terms that differ from JOSL.
-
- Special thanks to the CognitiveWeb Open Source Contributors for their
- suggestions and support of the Cognitive Web.
-
- Modifications:
-
- */
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 /*
  * Created on Jan 16, 2009
  */
 
-package com.bigdata.service.jini;
+package com.bigdata.service.jini.master;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -64,15 +46,13 @@ import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
+import net.jini.core.lookup.ServiceItem;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.ConnectionLossException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
-import org.apache.zookeeper.KeeperException.SessionExpiredException;
-import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
@@ -80,9 +60,15 @@ import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IClientService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IDataServiceAwareCallable;
-import com.bigdata.service.jini.DumpFederation.ScheduledDumpTask;
+import com.bigdata.service.IDataServiceCallable;
+import com.bigdata.service.IMetadataService;
+import com.bigdata.service.IRemoteExecutor;
+import com.bigdata.service.IService;
+import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.util.JiniUtil;
+import com.bigdata.service.jini.util.DumpFederation.ScheduledDumpTask;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
 import com.bigdata.zookeeper.ZooHelper;
@@ -99,18 +85,22 @@ import com.bigdata.zookeeper.ZooHelper;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <S>
- *            The generic type of the master's state.
+ *            The generic type of the {@link JobState}.
  * @param <T>
  *            The generic type of the client task.
+ * @param <U>
+ *            The generic type of the value returned by the client task.
+ * 
+ * FIXME Update the configuration files.
+ * 
+ * @todo could refactor the task to a task sequence easily enough, perhaps using
+ *       some of the rule step logic. That would be an interesting twist on a
+ *       parallel datalog.
  */
-abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callable<? extends Object>>
+abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callable<U>, U>
         implements Callable<Void> {
 
     final protected static Logger log = Logger.getLogger(TaskMaster.class);
-
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * {@link Configuration} options for the {@link TaskMaster} and derived
@@ -161,16 +151,33 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         String INDEX_DUMP_NAMESPACE = "indexDumpNamespace";
 
         /**
-         * The minimum #of {@link IDataService}s to discover before the master
-         * will assign the clients to those services.
-         */
-        String MIN_DATA_SERVICES = "minDataServices";
+         * A {@link ServicesTemplate} describing the types of services, and the
+         * minimum #of services of each type, to which the clients will be
+         * submitted for execution.
+         * <p>
+         * These services MUST implement {@link IRemoteExecutor} since that is
+         * that API which will be used to submit the client tasks for execution.
+         * Normally, you will specify {@link IClientService} as the required
+         * interface. While it is also possible to run clients on an
+         * {@link IDataService} or even an {@link IMetadataService}, that is
+         * discouraged except when the tasks require local access to resources
+         * hosted by the service - for example, an administrative task requiring
+         * access to the index partitions locally on each {@link IDataService}.
+         */ 
+        String CLIENTS_TEMPLATE = "clientsTemplate";
 
         /**
-         * The timeout in milliseconds to await the discovery of
-         * {@link #MIN_DATA_SERVICES}.
+         * An array of zero or more {@link ServicesTemplate} describing the
+         * types of services, and the minimum #of services of each type, that
+         * must be discovered before the job may begin.
+         */ 
+        String SERVICES_TEMPLATES = "servicesTemplates";
+        
+        /**
+         * The timeout in milliseconds to await the discovery of services
+         * described by the {@link #SERVICES_TEMPLATES}.
          */
-        String AWAIT_DATA_SERVICES_TIMEOUT = "awaitDataServicesTimeout";
+        String SERVICES_DISCOVERY_TIMEOUT = "awaitServicesTimeout";
 
         /**
          * The job name is used to identify the job within zookeeper. A znode
@@ -232,7 +239,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         public final String component;
 
         /**
-         * The #of client tasks
+         * The #of client tasks.
          * 
          * @see ConfigurationOptions#NCLIENTS
          */
@@ -246,14 +253,27 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         public final String jobName;
 
         /**
-         * @see ConfigurationOptions#MIN_DATA_SERVICES
+         * The {@link ServicesTemplate} describing the types of services and the
+         * minimum #of services to which the clients will be distributed for
+         * remote execution.
+         * 
+         * @see ConfigurationOptions#CLIENTS_TEMPLATE
          */
-        public final int minDataServices;
+        public final ServicesTemplate clientsTemplate;
+        
+        /**
+         * An array of zero or more {@link ServicesTemplate} describing the
+         * types of services, and the minimum #of services of each type, that
+         * must be discovered before the job may begin.
+         * 
+         * @see ConfigurationOptions#SERVICES_TEMPLATES
+         */
+        public final ServicesTemplate[] servicesTemplates;
 
         /**
-         * @see ConfigurationOptions#AWAIT_DATA_SERVICES_TIMEOUT}
+         * @see ConfigurationOptions#AWAIT_SERVICES_TIMEOUT}
          */
-        public final long awaitDataServicesTimeout;
+        public final long servicesDiscoveryTimeout;
 
         /*
          * Debugging and benchmarking options.
@@ -310,6 +330,15 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             sb.append(", " + ConfigurationOptions.JOB_NAME + "=" + jobName);
 
+            sb.append(", " + ConfigurationOptions.CLIENTS_TEMPLATE + "="
+                    + clientsTemplate);
+
+            sb.append(", " + ConfigurationOptions.SERVICES_TEMPLATES + "="
+                    + Arrays.toString(servicesTemplates));
+
+            sb.append(", " + ConfigurationOptions.SERVICES_DISCOVERY_TIMEOUT + "="
+                    + servicesDiscoveryTimeout);
+
             /*
              * Debugging and benchmarking options.
              */
@@ -356,12 +385,15 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             jobName = (String) config.getEntry(component,
                     ConfigurationOptions.JOB_NAME, String.class);
 
-            minDataServices = (Integer) config.getEntry(component,
-                    ConfigurationOptions.MIN_DATA_SERVICES, Integer.TYPE);
+            clientsTemplate = (ServicesTemplate) config.getEntry(component,
+                    ConfigurationOptions.CLIENTS_TEMPLATE, ServicesTemplate.class);
 
-            awaitDataServicesTimeout = (Long) config
+            servicesTemplates = (ServicesTemplate[]) config.getEntry(component,
+                    ConfigurationOptions.SERVICES_TEMPLATES, ServicesTemplate[].class);
+
+            servicesDiscoveryTimeout = (Long) config
                     .getEntry(component,
-                            ConfigurationOptions.AWAIT_DATA_SERVICES_TIMEOUT,
+                            ConfigurationOptions.SERVICES_DISCOVERY_TIMEOUT,
                             Long.TYPE);
 
             client2DataService = new UUID[nclients];
@@ -386,6 +418,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         /**
          * The mapping of clients onto the {@link DataService}s. The index is
          * the client#. The value is the {@link DataService} {@link UUID}.
+         * 
+         * @todo rename serviceUUIDs
          */
         final public UUID[] client2DataService;
 
@@ -515,12 +549,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @param fed
      * 
      * @throws ConfigurationException
-     * @throws KeeperException
-     * @throws InterruptedException
      */
     protected TaskMaster(final JiniFederation fed)
-            throws ConfigurationException, KeeperException,
-            InterruptedException {
+            throws ConfigurationException {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -540,13 +571,13 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * 
      * @return <code>null</code>
      * 
-     * @todo In my experience zookeeper (at least 3.0.1) has a tendency to drop
-     *       sessions for the java client when under modest load. Because of
-     *       this I am not verifying that the {@link TaskMaster} retains the
-     *       {@link ZLock} for the job throughout its run. Doing so at this
-     *       point is just begging for an aborted run.
+     * @todo In my experience zookeeper (at least 3.0.1 and 3.1.0) has a
+     *       tendency to drop sessions for the java client when under even
+     *       moderate swapping. Because of this I am not verifying that the
+     *       {@link TaskMaster} retains the {@link ZLock} for the job throughout
+     *       its run. Doing so at this point is just begging for an aborted run.
      */
-    public Void call() throws Exception {
+    final public Void call() throws Exception {
 
         /*
          * Setup the jobState.
@@ -555,7 +586,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * existing instance of the job in zookeeper (same component and
          * jobName).
          */
-        final ZLock zlock = setupJobState();
+        final ZLock zlock = setupJob();
 
         try {
 
@@ -565,133 +596,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             // callback for overrides.
             beginJob(getJobState());
 
-            /*
-             * Setup scheduled metadata dumps of the index partitions in the KB.
-             */
-            if (jobState.indexDumpDir != null) {
-
-                // runs @t0, 1m, 2m, ... 9m.
-                fed.addScheduledTask(new ScheduledDumpTask(fed,
-                        jobState.indexDumpNamespace, 10, jobState.indexDumpDir,
-                        "indexDump", TimeUnit.MINUTES), 0/* initialDelay */,
-                        1/* delay */, TimeUnit.MINUTES);
-
-                // runs @t10m, 20m, 30m, ... 50m.
-                fed.addScheduledTask(new ScheduledDumpTask(fed,
-                        jobState.indexDumpNamespace, 5, jobState.indexDumpDir,
-                        "indexDump", TimeUnit.MINUTES), 10/* initialDelay */,
-                        10/* delay */, TimeUnit.MINUTES);
-
-                // runs @t1h, 2h, ... until cancelled.
-                fed.addScheduledTask(new ScheduledDumpTask(fed,
-                        jobState.indexDumpNamespace, 0, jobState.indexDumpDir,
-                        "indexDump", TimeUnit.MINUTES), 1/* initialDelay */,
-                        1/* delay */, TimeUnit.HOURS);
-
-            }
-
-            {
-
-                /*
-                 * Start the client tasks.
-                 */
-
-                // set if some task fails.
-                boolean failure = false;
-
-                /*
-                 * Assign clients to services. If there are more clients than
-                 * services, then some services will be tasked with more than
-                 * one client.
-                 */
-                if (INFO)
-                    log.info("Will run " + jobState.nclients);
-
-                final Map<Integer/* client# */, Future> clientFutures = new LinkedHashMap<Integer, Future>(
-                        jobState.nclients/* initialCapacity */);
-
-                for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
-
-                    // use the stable assignment made above or read from
-                    // zookeeper.
-                    final UUID serviceUUID = jobState.client2DataService[clientNum];
-
-                    // lookup the data service.
-                    final IDataService dataService = fed
-                            .getDataService(serviceUUID);
-
-                    if (INFO)
-                        log.info("Running client#=" + clientNum + " on "
-                                + dataService.getHostname());
-
-                    final Callable<? extends Object> clientTask = newClientTask(clientNum);
-
-                    clientFutures
-                            .put(clientNum, dataService.submit(clientTask));
-
-                }
-
-                try {
-
-                    while (!allDone(clientFutures)) {
-
-                        final int nremaining = clientFutures.size();
-
-                        if (DEBUG)
-                            log.debug("#remaining futures=" + nremaining);
-
-                        if (nremaining < 10)
-                            // sleep a bit before rechecking the futures.
-                            Thread.sleep(1000/* ms */);
-                        else
-                            // sleep longer if there are more clients.
-                            Thread.sleep(10000/* ms */);
-
-                    }
-
-                } catch (Throwable t) {
-
-                    /*
-                     * Cancel all futures on error.
-                     */
-
-                    log.error("Cancelling job: cause=" + t);
-                    
-                    failure = true;
-
-                    try {
-
-                        cancelAll(clientFutures, true/* mayInterruptIfRunning */);
-
-                    } catch (Throwable t2) {
-
-                        log.error(t2);
-
-                    }
-
-                    throw new Exception(t);
-
-                }
-
-                /*
-                 * Done.
-                 */
-
-                final long elapsed = System.currentTimeMillis() - begin;
-
-                if (INFO)
-                    log.info("Done: " + (failure ? "failure" : "success")
-                            + ", elapsed=" + elapsed);
-
-                if (failure) {
-
-                    // halt processing on failure.
-                    return null;
-
-                }
-
-            }
-
+            // run the clients and wait for them to complete.
+            runClients();
+            
             if (jobState.forceOverflow) {
 
                 /*
@@ -711,22 +618,16 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             }
 
-            endJob(jobState);
-            
-            /*
-             * Delete zookeeper state when the job completes successfully.
-             */
-            ZooHelper.destroyZNodes(fed.getZookeeperAccessor().getZookeeper(),
-                    jobState.getJobZPath(fed), 0/* depth */);
+            success(jobState);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("All done: elapsed="
                         + (System.currentTimeMillis() - begin));
 
         } finally {
 
-            zlock.unlock();
-
+            tearDownJob(jobState, zlock);
+            
         }
         
         return null;
@@ -734,14 +635,231 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     }
 
     /**
-     * Callable invoked when the job is done executing (normal completion) but
+     * Start the client tasks and await their futures.
+     * 
+     * @throws InterruptedException
+     *             Master interrupted awaiting clients.
+     * @throws ExecutionException
+     *             Client execution problem.
+     * @throws IOException
+     *             RMI problem.
+     */
+    protected void runClients() throws ExecutionException,
+            InterruptedException, IOException, ConfigurationException {
+
+        final long begin = System.currentTimeMillis();
+
+        // unless successfull.
+        boolean failure = true;
+
+        try {
+
+            awaitAll(startClients());
+
+            failure = false;
+
+        } finally {
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            if (log.isInfoEnabled())
+                log.info("Done: " + (failure ? "failure" : "success")
+                        + ", elapsed=" + elapsed);
+
+        }
+
+    }
+    
+    /**
+     * Distributes the clients to the services on which they will execute and
+     * returns a map containing their {@link Future}s. The kind of service on
+     * which the clients are run is determined by
+     * {@link JobState#clientsTemplate} but must implement
+     * {@link IRemoteExecutor}. Clients are assigned to the services using a
+     * stable ordered assignment {@link JobState#client2DataService}. If there
+     * are more clients than services, then some services will be tasked with
+     * more than one client. If there is a problem submitting the clients then
+     * any clients already submitted will be cancelled and the original
+     * exception will be thrown out of this method.
+     * 
+     * @return A map giving the {@link Future} for each client. The keys of the
+     *         map are the client numbers in [0:N-1].
+     * 
+     * @throws IOException
+     *             If there is an RMI problem submitting the clients to the
+     *             {@link IRemoteExecutor}s.
+     * @throws ConfigurationException
+     */
+    protected Map<Integer/* client# */, Future<U>> startClients()
+            throws IOException, ConfigurationException {
+
+        if (log.isInfoEnabled())
+            log.info("Will run " + jobState.nclients);
+        
+        final Map<Integer/* client# */, Future<U>> futures = new LinkedHashMap<Integer, Future<U>>(
+                jobState.nclients/* initialCapacity */);
+
+        // unless all clients are submitted successfully.
+        boolean failure = true;
+        try {
+
+            for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
+
+                // use the stable assignment made above or read from
+                // zookeeper.
+                final UUID serviceUUID = jobState.client2DataService[clientNum];
+
+                /*
+                 * lookup the data service
+                 * 
+                 * FIXME IRemoteExecutor can include IDataService,
+                 * IMetadataService, or IClientService. The lookup should be
+                 * cached. Since we already had the service items, we should
+                 * just use those services. On restart, if the same assignments
+                 * must be used (if local data access is required) then read the
+                 * UUIDs from zookeeper and resolve them to service items.
+                 * Otherwise, just use the newly discovered set of services.
+                 */
+                final IRemoteExecutor service = fed.getDataService(serviceUUID);
+
+                if (log.isInfoEnabled())
+                    log.info("Running client#=" + clientNum + " on "
+                            + ((IService)service).getHostname());// @todo no cast!
+
+                final Callable<U> clientTask = newClientTask(clientNum);
+
+                futures.put(clientNum, (Future<U>) service.submit(clientTask));
+
+            } // start the next client.
+            
+            failure = false;
+
+            return futures;
+
+        } finally {
+
+            if(failure) {
+
+                log.error("Aborting : could not start client(s)");
+
+                cancelAll(futures, true/* mayInterruptIfRunning */);
+                
+            }
+            
+        }
+        
+    }
+    
+    /**
+     * Await the completion of the {@link Future}. If any client fails then the
+     * remaining clients will be cancelled.
+     * 
+     * @param futures
+     *            A map of the client futures. The keys are the client numbers
+     *            in [0:N-1]. The values are the {@link Future}s for each
+     *            client.
+     * 
+     * @throws ExecutionException
+     *             for the first client whose failure is noticed.
+     * @throws InterruptedException
+     *             if the master is interrupted while awaiting the
+     *             {@link Future}s.
+     */
+    protected void awaitAll(final Map<Integer/* client# */, Future<U>> futures)
+            throws ExecutionException, InterruptedException {
+
+        try {
+
+            while (!allDone(futures)) {
+
+                final int nremaining = futures.size();
+
+                if (log.isDebugEnabled())
+                    log.debug("#remaining futures=" + nremaining);
+
+                if (nremaining < 10)
+                    // sleep a bit before rechecking the futures.
+                    Thread.sleep(1000/* ms */);
+                else
+                    // sleep longer if there are more clients.
+                    Thread.sleep(10000/* ms */);
+
+            }
+
+        } catch (InterruptedException t) {
+
+            /*
+             * Cancel all futures on error.
+             */
+
+            log.error("Cancelling job: cause=" + t);
+
+            try {
+
+                cancelAll(futures, true/* mayInterruptIfRunning */);
+
+            } catch (Throwable t2) {
+
+                log.error(t2);
+
+            }
+
+            throw new RuntimeException(t);
+
+        } catch (ExecutionException t) {
+
+            /*
+             * Cancel all futures on error.
+             */
+
+            log.error("Cancelling job: cause=" + t);
+
+            try {
+
+                cancelAll(futures, true/* mayInterruptIfRunning */);
+
+            } catch (Throwable t2) {
+
+                log.error(t2);
+
+            }
+
+            throw new RuntimeException(t);
+
+        }
+
+    }
+    
+    /**
+     * Callback invoked when the job is done executing (normal completion) but
      * is still holding the {@link ZLock} for the {@link JobState}. The default
-     * implementation is a NOP. This may be used to for reporting, etc.
+     * implementation destroys the znodes for the job since it is done
+     * executing.
      * 
      * @throws Exception
      */
-    protected void endJob(final S jobState) throws Exception {
+    protected void success(final S jobState) throws Exception {
         
+        /*
+         * Delete zookeeper state when the job completes successfully.
+         */
+        ZooHelper.destroyZNodes(fed.getZookeeperAccessor().getZookeeper(),
+                jobState.getJobZPath(fed), 0/* depth */);
+
+    }
+    
+    /**
+     * Callback invoked when the job is done executing (any completion) but has
+     * not yet release the {@link ZLock} for the {@link JobState}. The default
+     * releases the {@link ZLock}. It may be extended to handle other cleanup.
+     * 
+     * @throws Exception
+     */
+    protected void tearDownJob(final S jobState, final ZLock zlock)
+            throws Exception {
+
+        zlock.unlock();
+
     }
 
     /**
@@ -760,7 +878,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     /**
      * Return a client to be executed on a remote data service. The client can
      * obtain access to the {@link IBigdataFederation} when it executes on the
-     * remote data service if it implements {@link IDataServiceAwareCallable}.
+     * remote data service if it implements {@link IDataServiceCallable}.
      * You can use {@link AbstractClientTask} as a starting point.
      * 
      * @param clientNum
@@ -770,17 +888,45 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * 
      * @see AbstractClientTask
      */
-    abstract protected T newClientTask(final int clientNum);
+    abstract protected T newClientTask(final int clientNum)
+            throws ConfigurationException;
     
     /**
      * Callable invoked when the job is ready to execute and is holding the
-     * {@link ZLock} for the {@link JobState}. The default implementation is a
-     * NOP. This may be used to register indices, etc.
+     * {@link ZLock} for the {@link JobState}. This may be extended to register
+     * indices, etc.
      * 
      * @throws Exception
      */
     protected void beginJob(final S jobState) throws Exception {
-        
+
+        /*
+         * Setup scheduled metadata dumps of the index partitions in the KB.
+         * 
+         * @todo @t0 can fail if the indices do not yet exist.
+         */
+        if (jobState.indexDumpDir != null) {
+
+            // runs @t0, 1m, 2m, ... 9m.
+            fed.addScheduledTask(new ScheduledDumpTask(fed,
+                    jobState.indexDumpNamespace, 10, jobState.indexDumpDir,
+                    "indexDump", TimeUnit.MINUTES), 0/* initialDelay */,
+                    1/* delay */, TimeUnit.MINUTES);
+
+            // runs @t10m, 20m, 30m, ... 50m.
+            fed.addScheduledTask(new ScheduledDumpTask(fed,
+                    jobState.indexDumpNamespace, 5, jobState.indexDumpDir,
+                    "indexDump", TimeUnit.MINUTES), 10/* initialDelay */,
+                    10/* delay */, TimeUnit.MINUTES);
+
+            // runs @t1h, 2h, ... until cancelled.
+            fed.addScheduledTask(new ScheduledDumpTask(fed,
+                    jobState.indexDumpNamespace, 0, jobState.indexDumpDir,
+                    "indexDump", TimeUnit.MINUTES), 1/* initialDelay */,
+                    1/* delay */, TimeUnit.HOURS);
+
+        }
+
     }
     
     /**
@@ -795,7 +941,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @throws InterruptedException
      * @throws TimeoutException
      */
-    protected ZLock setupJobState() throws KeeperException,
+    protected ZLock setupJob() throws KeeperException,
             InterruptedException, TimeoutException {
 
         final ZooKeeper zookeeper = fed.getZookeeperAccessor().getZookeeper();
@@ -839,7 +985,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 zookeeper.create(jobZPath, SerializerUtil.serialize(jobState),
                         fed.getZooConfig().acl, CreateMode.PERSISTENT);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("New job: " + jobState);
 
                 try {
@@ -850,7 +996,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                     zookeeper.setData(jobZPath, SerializerUtil
                             .serialize(jobState), -1/* version */);
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Wrote client assignments into zookeeper.");
 
                 } catch (Throwable t) {
@@ -925,31 +1071,129 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     /**
      * Make stable assignments of each client to a specific data service.
      * 
-     * @todo stable assignments are only required if the client will be reading
-     *       or writing data local to the data service so this should be a
-     *       configuration option.
-     *       <p>
-     *       we also need to support pipelines of master tasks.
+     * @todo Since stable assignments across re-runs are only required if the
+     *       client will be reading or writing data local to the data service,
+     *       that choice should be a configuration option.  Otherwise we are
+     *       free to choose new assignments on restart or even to add more
+     *       clients over time in an m/r model. 
      */
     protected void assignClientsToServices(final ZooKeeper zookeeper,
-            final JobState jobState) throws KeeperException,
-            InterruptedException, TimeoutException {
+            final S jobState) throws Exception {
 
-        final UUID[] serviceUUIDs = fed.awaitServices(jobState.minDataServices,
-                jobState.awaitDataServicesTimeout);
+        final ServiceItem[] serviceItems = new DiscoverServicesWithPreconditionsTask()
+                .call();
 
         for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
 
-            final int i = clientNum % serviceUUIDs.length;
+            final int i = clientNum % serviceItems.length;
 
-            final UUID serviceUUID = serviceUUIDs[i];
+            final UUID serviceUUID = JiniUtil
+                    .serviceID2UUID(serviceItems[i].serviceID);
 
             jobState.client2DataService[clientNum] = serviceUUID;
-            
+
         }
 
     }
     
+    /**
+     * Class awaits discovery of all services required by the {@link JobState}
+     * up to the {@link JobState#servicesDiscoveryTimeout} and returns the
+     * {@link ServiceItem}s for the services on which the clients should be
+     * executed.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class DiscoverServicesWithPreconditionsTask implements
+            Callable<ServiceItem[]> {
+
+        public DiscoverServicesWithPreconditionsTask() {
+
+        }
+
+        /**
+         * Await discovery of the services described by
+         * {@link JobState#servicesTemplates} and by
+         * {@link JobState#clientsTemplate}.
+         * 
+         * @return An array of {@link ServiceItem}s for the discovered services
+         *         which match the {@link JobState#clientsTemplate}.
+         */
+        public ServiceItem[] call() throws Exception {
+
+            if (jobState == null)
+                throw new IllegalArgumentException();
+
+            if (jobState.servicesTemplates == null)
+                throw new IllegalArgumentException();
+
+            if (jobState.servicesDiscoveryTimeout <= 0)
+                throw new IllegalArgumentException();
+
+            final List<Callable<ServiceItem[]>> tasks = new LinkedList<Callable<ServiceItem[]>>();
+
+            /*
+             * This is the task that will give us the services on which the
+             * clients will execute.
+             */
+            tasks.add(new DiscoverServices(fed, jobState.clientsTemplate,
+                    jobState.servicesDiscoveryTimeout));
+
+            /*
+             * Additional tasks for the other services which must be discovered
+             * as pre-conditions before the job can execute.
+             */
+            for (ServicesTemplate t : jobState.servicesTemplates) {
+
+                tasks.add(new DiscoverServices(fed, jobState.clientsTemplate,
+                        jobState.servicesDiscoveryTimeout));
+
+            }
+
+            // submit all tasks in parallel.
+            final Future<ServiceItem[]>[] futures = fed.getExecutorService()
+                    .invokeAll(tasks).toArray(new Future[tasks.size()]);
+
+            // the services on which we will execute the clients.
+            final ServiceItem[] serviceItems = futures[0].get();
+
+            if (serviceItems.length < jobState.clientsTemplate.minMatches) {
+
+                throw new RuntimeException(
+                        "Not enough services to run clients: found="
+                                + serviceItems.length + ", required="
+                                + jobState.clientsTemplate.minMatches
+                                + ", template=" + jobState.clientsTemplate);
+
+            }
+
+            /*
+             * Check the other pre-conditions for discovered services.
+             */
+            for (int i = 1; i < futures.length; i++) {
+
+                final Future<ServiceItem[]> f = futures[i];
+
+                final ServiceItem[] a = f.get();
+
+                if (a.length < jobState.clientsTemplate.minMatches) {
+
+                    throw new RuntimeException("Not enough services: found="
+                            + a.length + ", required="
+                            + jobState.clientsTemplate.minMatches
+                            + ", template=" + jobState.clientsTemplate);
+
+                }
+
+            }
+
+            return serviceItems;
+
+        }
+
+    }
+
     /**
      * Verify the existence of the client's zpath. If it does not exist then it
      * is created but its data will be an empty byte[]. The client, when it
@@ -974,12 +1218,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             zookeeper.create(clientZPath, new byte[0], fed.getZooConfig().acl,
                     CreateMode.PERSISTENT);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("New client: " + clientZPath);
 
         } catch (NodeExistsException ex) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Existing client: " + clientZPath);
 
             // fall through.
@@ -1004,8 +1248,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * 
      * @throws ExecutionException
      * @throws InterruptedException
+     * 
+     * @todo An alternative is to re-submit the client relying on the state in
+     *       zookeeper so the new client can pick up where the previous one left
+     *       off in its efforts.
      */
-    protected boolean allDone(final Map<Integer/* client */, Future> futures)
+    protected boolean allDone(final Map<Integer/* client */, Future<U>> futures)
             throws InterruptedException, ExecutionException {
 
         if (futures == null)
@@ -1014,17 +1262,25 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         // Note: used to avoid concurrent modification of [futures].
         final List<Integer> finished = new LinkedList<Integer>();
 
-        for (Map.Entry<Integer, Future> entry : futures.entrySet()) {
+        for (Map.Entry<Integer, Future<U>> entry : futures.entrySet()) {
 
             final int clientNum = entry.getKey();
 
-            final Future future = entry.getValue();
+            final Future<U> future = entry.getValue();
 
             if (future.isDone()) {
 
-                // note: test the client's future and halt if the client fails.
-                future.get();
+                /*
+                 * Note: test the client's future and halt if the client fails.
+                 */
+                final U value = future.get();
                 
+                try {
+                    notifyOutcome(clientNum, value);
+                } catch (Throwable t) {
+                    log.error("Ignoring thrown exception: " + t);
+                }
+
                 finished.add(clientNum);
 
             }
@@ -1050,12 +1306,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @param mayInterruptIfRunning
      *            If the tasks for the futures may be interrupted.
      */
-    protected void cancelAll(final Map<Integer, Future> futures,
+    protected void cancelAll(final Map<Integer, Future<U>> futures,
             final boolean mayInterruptIfRunning) {
 
         log.warn("Cancelling all futures: nfutures=" + futures.size());
 
-        final Iterator<Future> itr = futures.values().iterator();
+        final Iterator<Future<U>> itr = futures.values().iterator();
 
         while (itr.hasNext()) {
 
@@ -1074,268 +1330,16 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     }
 
     /**
-     * Base class for client tasks run by the master on one or more data
-     * services. This class contends for a {@link ZLock} based on the assigned
-     * {@link #clientNum} and then invoked {@link #runWithZLock()} if the
-     * {@link ZLock} if granted. If the lock is lost, it will continue to
-     * contend for the lock and then run until finished.
-     * <p>
-     * Note: This implementation presumes that {@link #runWithZLock()} has some
-     * means of understanding when it is done and can restart its work from
-     * where it left off. One way to handle that is to write the state of the
-     * client into the client's znode and to update that from time to time as
-     * the client makes progress on its task.
+     * Callback for the master to consume the outcome of the client's
+     * {@link Future} (default is NOP).
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * @param <S>
-     *            The generic for the {@link JobState}.
-     * @param <T>
-     *            The generic for the {@link Callable}'s return type.
-     * @param <U>
-     *            The generic type of the client state (stored in zookeeper).
+     * @param clientNum
+     *            The client number.
+     * @param value
+     *            The value returned by the {@link Future}.
      */
-    abstract public static class AbstractClientTask<S extends JobState, T, U extends Serializable>
-            implements Callable<T>, Serializable, IDataServiceAwareCallable {
-
-        protected final S jobState;
-
-        protected final int clientNum;
-
-        /**
-         * The {@link DataService} on which this task is execution.
-         */
-        protected transient DataService dataService;
-
-        /**
-         * The federation object for the {@link DataService} on which the client
-         * is executing.
-         */
-        protected transient JiniFederation fed;
-
-        /**
-         * The zpath for this client (set once the client starts executing on
-         * the target {@link DataService}). The data of this znode is the
-         * client's state (if it saves its state in zookeeper).
-         */
-        protected transient String clientZPath;
-
-        protected transient List<ACL> acl;
-
-        /**
-         * The zpath for the {@link ZLock} node. Only the instance of this task
-         * holding the {@link ZLock} is allowed to run. This makes it safe to
-         * run multiple instances of this task for the same {@link #clientNum}.
-         * If one instance dies, the instance that gains the {@link ZLock} will
-         * read the client's state from zookeeper and continue processing.
-         * <p>
-         * This is <code>null</code> until {@link #call()}.
-         */
-        protected transient ZLockImpl zlock;
-
-        public void setDataService(final DataService dataService) {
-
-            if (dataService == null)
-                throw new IllegalArgumentException();
-
-            if (INFO)
-                log.info("Got data service.");
-
-            this.dataService = dataService;
-
-            this.fed = (JiniFederation) dataService.getFederation();
-
-            this.clientZPath = jobState.getClientZPath(fed, clientNum);
-
-            this.acl = fed.getZooConfig().acl;
-
-        }
-
-        /**
-         * The {@link JiniFederation} for the {@link DataService} on which this
-         * task is executed.
-         * 
-         * @throws IllegalStateException
-         *             unless the task is running within the {@link DataService}.
-         */
-        protected JiniFederation getFederation() {
-
-            if (fed == null)
-                throw new IllegalStateException();
-
-            return fed;
-
-        }
-
-        public String toString() {
-
-            return getClass().getName() + "{clientNum=" + clientNum + "}";
-
-        }
-
-        protected AbstractClientTask(final S jobState, final int clientNum) {
-
-            this.jobState = jobState;
-
-            this.clientNum = clientNum;
-
-        }
-
-        /**
-         * Runs the generator.
-         */
-        public T call() throws Exception {
-
-            if (INFO)
-                log.info("Running: client#=" + clientNum + ", " + jobState);
-
-            while (true) {
-
-                zlock = ZLockImpl.getLock(fed.getZookeeper(), jobState
-                        .getLockNodeZPath(fed, clientNum), acl);
-
-                zlock.lock();
-                try {
-
-                    final T ret = runWithZLock();
-
-                    if (INFO)
-                        log.info("Finished: client#=" + clientNum + ", "
-                                + jobState);
-
-                    return ret;
-
-                } catch (SessionExpiredException ex) {
-
-                    /*
-                     * Log warning and then try to re-obtain the zlock so we can
-                     * finish the job.
-                     */
-
-                    log.warn(this + " : will seek zlock again", ex);
-
-                    continue;
-
-                } finally {
-
-                    zlock.unlock();
-
-                }
-
-            }
-
-        }
-
-        /**
-         * Do work while holding the {@link ZLock}. The implementation SHOULD
-         * verify from time to time that it in fact holds the {@link ZLock}
-         * using {@link ZLock#isLockHeld()}.
-         * 
-         * @return The result.
-         * 
-         * @throws Exception
-         * @throws KeeperException
-         * @throws InterruptedException
-         */
-        abstract protected T runWithZLock() throws Exception, KeeperException,
-                InterruptedException;
-
-        /**
-         * Method should be invoked from within {@link #runWithZLock()} if the
-         * client wishes to store state in zookeeper. If there is no state in
-         * zookeeper, then {@link #newClientState()} is invoked and the result
-         * will be stored in zookeeper. You can update the client's state from
-         * time to time using #writeClientState(). If the client looses the
-         * {@link ZLock}, it can read the client state from zookeeper using
-         * this method and pick up processing more or less where it left off
-         * (depending on when you last updated the client state in zookeeper).
-         * 
-         * @return
-         * 
-         * @throws InterruptedException
-         * @throws KeeperException
-         */
-        protected U setupClientState() throws InterruptedException,
-                KeeperException {
-
-            if (!zlock.isLockHeld())
-                throw new InterruptedException("Lost ZLock");
-
-            final ZooKeeper zookeeper = zlock.getZooKeeper();
-
-            final String clientZPath = jobState.getClientZPath(fed, clientNum);
-
-            U clientState;
-            try {
-
-                clientState = newClientState();
-
-                zookeeper.create(clientZPath, SerializerUtil
-                        .serialize(clientState), fed.getZooConfig().acl,
-                        CreateMode.PERSISTENT);
-
-                if (INFO)
-                    log.info("Running: " + clientState);
-
-            } catch (NodeExistsException ex) {
-
-                clientState = (U) SerializerUtil.deserialize(zookeeper.getData(
-                        clientZPath, false, new Stat()));
-
-                if (INFO)
-                    log.info("Client will restart: " + clientState);
-
-            }
-
-            return clientState;
-            
-        }
-
-        /**
-         * Method updates the client state in zookeeper. The caller MUST be
-         * holding the {@link ZLock} (this is verified).
-         * 
-         * @param clientState
-         *            The state to be written into the znode identified by
-         *            {@link #clientZPath}.
-         * 
-         * @throws InterruptedException
-         * @throws KeeperException
-         */
-        protected void writeClientState(final U clientState)
-                throws KeeperException, InterruptedException {
-
-            if (clientState == null)
-                throw new IllegalArgumentException();
-            
-            if (!zlock.isLockHeld())
-                throw new InterruptedException("Lost ZLock");
-
-            final ZooKeeper zookeeper = zlock.getZooKeeper();
-
-            try {
-                /*
-                 * Update the client state.
-                 */
-                zookeeper.setData(clientZPath, SerializerUtil
-                        .serialize(clientState), -1/* version */);
-            } catch (ConnectionLossException ex) {
-                /*
-                 * Note: There are a variety of transient errors which can
-                 * occur. Next time we are connected and and this method is
-                 * invoked we will update the client state, and that should be
-                 * good enough.
-                 */
-                log.warn(ex);
-            }
-
-        }
+    protected void notifyOutcome(final int clientNum,final U value) {
         
-        /**
-         * Return a new instance of the client's state.
-         */
-        abstract protected U newClientState();
-
     }
 
 }

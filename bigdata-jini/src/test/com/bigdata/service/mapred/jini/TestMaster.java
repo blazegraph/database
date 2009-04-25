@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.mapred.jini;
 
 import com.bigdata.service.jini.AbstractServerTestCase;
-import com.bigdata.service.jini.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 import com.bigdata.service.mapReduce.TestEmbeddedMaster;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.MapReduceJob;

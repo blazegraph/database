@@ -40,7 +40,7 @@ import com.bigdata.jini.start.IServicesManagerService;
  * @version $Id$
  */
 public class ServicesManagerClient extends
-        AbstractCachingServiceClient<IServicesManagerService> {
+        BigdataCachingServiceClient<IServicesManagerService> {
 
     public ServicesManagerClient(final JiniFederation fed, final long timeout)
             throws RemoteException {

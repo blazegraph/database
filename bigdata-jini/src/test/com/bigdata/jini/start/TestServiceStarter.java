@@ -50,9 +50,9 @@ import com.bigdata.jini.start.config.TransactionServerConfiguration;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration.ManagedServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.IService;
-import com.bigdata.service.jini.JiniUtil;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.jini.TransactionServer;
+import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.ZNodeDeletedWatcher;
 
 /**

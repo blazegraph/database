@@ -61,7 +61,7 @@ import com.bigdata.service.LoadBalancerService;
 import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.TaskMaster;
+import com.bigdata.service.jini.master.TaskMaster;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 
@@ -169,7 +169,7 @@ import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
  */
 public class ThroughputMaster
         extends
-        TaskMaster<ThroughputMaster.JobState, ThroughputMaster.ClientTask> {
+        TaskMaster<ThroughputMaster.JobState, ThroughputMaster.ClientTask, Void> {
 
     /**
      * {@link Configuration} options for the {@link ThroughputMaster}.
@@ -418,13 +418,11 @@ public class ThroughputMaster
 
     /**
      * @param fed
+     * 
      * @throws ConfigurationException
-     * @throws KeeperException
-     * @throws InterruptedException
      */
     protected ThroughputMaster(JiniFederation fed)
-            throws ConfigurationException, KeeperException,
-            InterruptedException {
+            throws ConfigurationException {
 
         super(fed);
 
@@ -472,7 +470,7 @@ public class ThroughputMaster
 
         if (fed.getIndex(name, ITx.UNISOLATED) == null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Registering index: " + name);
 
             final int npartitions = getJobState().npartitions;
@@ -501,7 +499,7 @@ public class ThroughputMaster
 
                     key += Long.MAX_VALUE / npartitions;
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("separatorKey="
                                 + BytesUtil.toString(separatorKeys[i]));
 
@@ -531,12 +529,6 @@ public class ThroughputMaster
 
     }
 
-    protected void endJob(final JobState jobState) throws Exception {
-
-        super.endJob(jobState);
-
-    }
-    
     /**
      * The client task run on the {@link DataService}s.
      * 
@@ -548,7 +540,7 @@ public class ThroughputMaster
      *       scale-out index (simulates writes onto a distributed index).
      */
     static class ClientTask extends
-            com.bigdata.service.jini.TaskMaster.AbstractClientTask<JobState, Void, Serializable> {
+            com.bigdata.service.jini.master.AbstractClientTask<JobState, Void, Serializable> {
 
         /**
          * 
@@ -592,7 +584,7 @@ public class ThroughputMaster
             }
 
             // unisolated view of the scale-out index.
-            final IScaleOutClientIndex ndx = fed.getIndex(jobState.namespace,
+            final IScaleOutClientIndex ndx = getFederation().getIndex(jobState.namespace,
                     ITx.UNISOLATED);
 
             final IDuplicateRemover<Void> duplicateRemover;
@@ -715,7 +707,7 @@ public class ThroughputMaster
              * can get them from there and then aggregate them across the
              * clients.
              */
-            System.err.println(fed.getIndexCounters(ndx.getName()));
+            System.err.println(getFederation().getIndexCounters(ndx.getName()));
             
             return null;
             

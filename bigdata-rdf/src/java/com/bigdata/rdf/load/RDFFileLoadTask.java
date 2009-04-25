@@ -2,7 +2,6 @@ package com.bigdata.rdf.load;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +20,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.DataService;
-import com.bigdata.service.IDataServiceAwareCallable;
+import com.bigdata.service.DataServiceCallable;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -43,8 +42,7 @@ import com.bigdata.service.jini.JiniFederation;
  *       {@link JiniFederation} of the {@link DataService}. they should be
  *       reported under the namespace of the job.
  */
-public class RDFFileLoadTask implements Callable<Void>, Serializable,
-        IDataServiceAwareCallable {
+public class RDFFileLoadTask extends DataServiceCallable<Void> implements Serializable {
 
     final protected transient static Logger log = Logger
             .getLogger(RDFFileLoadTask.class);
@@ -54,12 +52,12 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
      */
     private static final long serialVersionUID = 6787939197771556658L;
 
-    /**
-     * The {@link DataService} on which the client is executing. This is set
-     * automatically by the {@link DataService} when it notices that this
-     * class implements the {@link IDataServiceAwareCallable} interface.
-     */
-    private transient DataService dataService;
+//    /**
+//     * The {@link DataService} on which the client is executing. This is set
+//     * automatically by the {@link DataService} when it notices that this
+//     * class implements the {@link IDataServiceCallable} interface.
+//     */
+//    private transient DataService dataService;
 
     protected final JobState jobState;
 
@@ -79,26 +77,26 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
 
     }
 
-    public void setDataService(final DataService dataService) {
-
-        this.dataService = dataService;
-
-    }
-
-    /**
-     * Return the {@link DataService} on which this task is executing.
-     * 
-     * @throws IllegalStateException
-     *             if the task is not executing on a {@link DataService}.
-     */
-    public DataService getDataService() {
-
-        if (dataService == null)
-            throw new IllegalStateException();
-
-        return dataService;
-
-    }
+//    public void setDataService(final DataService dataService) {
+//
+//        this.dataService = dataService;
+//
+//    }
+//
+//    /**
+//     * Return the {@link DataService} on which this task is executing.
+//     * 
+//     * @throws IllegalStateException
+//     *             if the task is not executing on a {@link DataService}.
+//     */
+//    public DataService getDataService() {
+//
+//        if (dataService == null)
+//            throw new IllegalStateException();
+//
+//        return dataService;
+//
+//    }
 
     /**
      * The federation object used by the {@link DataService} on which this
@@ -106,7 +104,7 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
      */
     public JiniFederation getFederation() {
 
-        return (JiniFederation) getDataService().getFederation();
+        return (JiniFederation) super.getFederation();
 
     }
 
@@ -115,10 +113,7 @@ public class RDFFileLoadTask implements Callable<Void>, Serializable,
      */
     public Void call() throws Exception {
 
-        if (dataService == null)
-            throw new IllegalStateException();
-
-        final JiniFederation fed = (JiniFederation) dataService.getFederation();
+        final JiniFederation fed = getFederation();
 
         final AbstractTripleStore tripleStore = (AbstractTripleStore) fed
                 .getResourceLocator()

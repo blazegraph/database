@@ -1,9 +1,7 @@
 package com.bigdata.service;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
@@ -32,8 +30,7 @@ import com.bigdata.journal.Name2Addr.EntrySerializer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ListIndicesTask implements Callable<String[]>,
-        IDataServiceAwareCallable, Serializable {
+public class ListIndicesTask extends DataServiceCallable<String[]> {
 
     /**
      * 
@@ -54,7 +51,7 @@ public class ListIndicesTask implements Callable<String[]>,
      */
     private final String namespace;
 
-    private transient DataService dataService;
+//    private transient DataService dataService;
 
     /**
      * 
@@ -72,18 +69,18 @@ public class ListIndicesTask implements Callable<String[]>,
 
     }
 
-    public void setDataService(DataService dataService) {
-
-        this.dataService = dataService;
-
-    }
+//    public void setDataService(DataService dataService) {
+//
+//        this.dataService = dataService;
+//
+//    }
 
     public String[] call() throws Exception {
 
-        if (dataService == null)
-            throw new IllegalStateException("DataService not set.");
+//        if (dataService == null)
+//            throw new IllegalStateException("DataService not set.");
 
-        final AbstractJournal journal = dataService.getResourceManager()
+        final AbstractJournal journal = getDataService().getResourceManager()
                 .getJournal(ts);
 
         // @todo possible problem if [ts] is a read-write tx.
@@ -162,7 +159,7 @@ fromKey=[65, 49, 79, 41, 47, 41, 79, 41, 7, 144, 81, 38, 124, 38, 122, 1, 16, 1,
         if (INFO)
             log.info("Will read " + n + " index names within namespace="
                     + namespace + " from "
-                    + dataService.getClass().getSimpleName());
+                    + getDataService().getClass().getSimpleName());
 
         final List<String> names = new ArrayList<String>(n);
 

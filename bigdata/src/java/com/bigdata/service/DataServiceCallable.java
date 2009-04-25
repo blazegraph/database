@@ -28,44 +28,59 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
-import java.util.concurrent.Callable;
 
 /**
- * Base class for {@link IFederationCallable}.
+ * Base class for {@link IDataServiceCallable}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class FederationCallable<T> implements IFederationCallable,
-        Callable<T> {
+abstract public class DataServiceCallable<T> extends FederationCallable<T>
+        implements IDataServiceCallable {
 
-    private transient IBigdataFederation fed;
+    private transient DataService dataService;
 
     /**
      * Deserialization ctor.
      */
-    public FederationCallable() {
+    public DataServiceCallable() {
     }
 
-    synchronized public void setFederation(final IBigdataFederation fed) {
+    /**
+     * Sets the {@link DataService} reference and the {@link IBigdataFederation}
+     * reference (if not already set).
+     */
+    synchronized public void setDataService(final DataService dataService) {
 
-        if (fed == null)
+        if (dataService == null)
             throw new IllegalArgumentException();
 
-        if (this.fed != null && this.fed != fed)
+        if (this.dataService != null && this.dataService != dataService)
             throw new IllegalStateException();
 
-        this.fed = fed;
+        this.dataService = dataService;
 
+        setFederation(dataService.getFederation());
+        
     }
 
-    public IBigdataFederation getFederation() {
+    public DataService getDataService() {
 
-        if (fed == null)
+        if (dataService == null)
             throw new IllegalStateException();
 
-        return fed;
+        return dataService;
 
     }
     
+    /**
+     * Return <code>true</code> iff the {@link DataService} reference has been
+     * set.
+     */
+    public boolean isDataService() {
+        
+        return dataService != null;
+        
+    }
+
 }

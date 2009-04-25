@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 10, 2009
  */
 
-package com.bigdata.service.jini;
+package com.bigdata.service.jini.util;
 
 import org.apache.log4j.Logger;
 
@@ -33,6 +33,8 @@ import net.jini.config.ConfigurationException;
 import net.jini.core.lookup.ServiceItem;
 
 import com.bigdata.jini.start.IServicesManagerService;
+import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniFederation;
 
 /**
  * Utility will broadcast the {@link IServicesManagerService#sighup()} method to

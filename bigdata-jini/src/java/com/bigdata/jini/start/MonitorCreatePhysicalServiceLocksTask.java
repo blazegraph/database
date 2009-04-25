@@ -34,7 +34,7 @@ import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.JiniUtil;
+import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;

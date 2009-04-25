@@ -40,7 +40,7 @@ import com.bigdata.jini.start.config.HostAllowConstraint;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.JiniCoreServicesStarter;
 import com.bigdata.service.jini.JiniClientConfig;
-import com.bigdata.service.jini.JiniServicesHelper;
+import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
  * Class for starting the jini services.
