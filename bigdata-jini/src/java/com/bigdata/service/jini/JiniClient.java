@@ -43,6 +43,7 @@ import org.apache.zookeeper.ZooKeeper;
 import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.service.AbstractScaleOutClient;
+import com.bigdata.service.jini.lookup.DataServicesClient;
 import com.bigdata.util.NV;
 import com.sun.jini.start.ServiceDescriptor;
 

@@ -9,8 +9,8 @@ import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.HostnameFilter;
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.jini.DataServiceFilter;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.lookup.DataServiceFilter;
 
 /**
  * Constraint on the #of {@link IDataService}s on the same host.

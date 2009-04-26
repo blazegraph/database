@@ -1,5 +1,6 @@
 package com.bigdata.jini.lookup.entry;
 
+import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -12,8 +13,13 @@ import net.jini.lookup.ServiceItemFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ServiceItemFilterChain implements ServiceItemFilter {
+public class ServiceItemFilterChain implements ServiceItemFilter, Serializable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 8754783713903293241L;
+    
     private final List<ServiceItemFilter> chain = new LinkedList<ServiceItemFilter>();
 
     public ServiceItemFilterChain() {

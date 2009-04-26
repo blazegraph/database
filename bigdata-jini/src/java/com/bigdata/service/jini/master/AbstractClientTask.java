@@ -1,8 +1,13 @@
 package com.bigdata.service.jini.master;
 
 import java.io.Serializable;
+import java.rmi.RemoteException;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+
+import net.jini.core.lookup.ServiceItem;
+import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
@@ -15,26 +20,37 @@ import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceCallable;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IClientService;
+import com.bigdata.service.IDataService;
+import com.bigdata.service.IFederationDelegate;
+import com.bigdata.service.IRemoteExecutor;
+import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.master.TaskMaster.JobState;
+import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
 
 /**
- * An abstract base class which may be used for client tasks run by the
- * master on one or more data services. This class contends for a
- * {@link ZLock} based on the assigned {@link #clientNum} and then invoked
- * {@link #runWithZLock()} if the {@link ZLock} if granted. If the lock is
- * lost, it will continue to contend for the lock and then run until
- * finished.
+ * An abstract base class which may be used for client tasks run by the master
+ * on one or more data services. This class contends for a {@link ZLock} based
+ * on the assigned {@link #clientNum} and then invoked {@link #runWithZLock()}
+ * if the {@link ZLock} if granted. If the lock is lost, it will continue to
+ * contend for the lock and then run until finished.
  * <p>
  * Note: This implementation presumes that {@link #runWithZLock()} has some
- * means of understanding when it is done and can restart its work from
- * where it left off. One way to handle that is to write the state of the
- * client into the client's znode and to update that from time to time as
- * the client makes progress on its task.
+ * means of understanding when it is done and can restart its work from where it
+ * left off. One way to handle that is to write the state of the client into the
+ * client's znode and to update that from time to time as the client makes
+ * progress on its task. You can invoke {@link #setupClientState()} to do that.
+ * <p>
+ * Note: This class DOES NOT have to be submitted to an {@link IDataService} for
+ * execution. Most client tasks will in fact run on {@link IClientService}s
+ * rather than {@link IDataService}s. This class extends
+ * {@link DataServiceCallable} for the convienence of subclasses which MAY
+ * introduce a requirement to execute on an {@link IDataService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -54,15 +70,38 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
     protected final S jobState;
 
     protected final int clientNum;
+    
+    /**
+     * Return the jobstate.
+     */
+    public S getJobState() {
+        
+        return jobState;
+        
+    }
+    
+    /**
+     * Return the index assigned to the client.
+     * 
+     * @return The client index.
+     */
+    public int getClientNum() {
+        
+        return clientNum;
+        
+    }
 
     /**
-     * The zpath for this client (set once the client starts executing on
-     * the target {@link DataService}). The data of this znode is the
-     * client's state (if it saves its state in zookeeper).
+     * The zpath for this client (set once the client starts executing on the
+     * target {@link IRemoteExecutor}). The data of this znode is the client's
+     * state (if it saves its state in zookeeper).
      */
-    protected transient String clientZPath;
+    private transient String clientZPath;
 
-    protected transient List<ACL> acl;
+    /**
+     * The ACL to use with zookeeper.
+     */
+    private transient List<ACL> acl;
 
     /**
      * The zpath for the {@link ZLock} node. Only the instance of this task
@@ -75,9 +114,9 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
      */
     protected transient ZLockImpl zlock;
 
-    public void setDataService(final DataService dataService) {
+    public void setFederation(final IBigdataFederation fed) {
 
-        super.setDataService(dataService);
+        super.setFederation(fed);
 
         this.clientZPath = jobState.getClientZPath(getFederation(), clientNum);
 
@@ -87,7 +126,7 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
 
     public JiniFederation getFederation() {
 
-        return (JiniFederation)super.getFederation();
+        return (JiniFederation) super.getFederation();
 
     }
 
@@ -166,35 +205,44 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
 
     /**
      * Method should be invoked from within {@link #runWithZLock()} if the
-     * client wishes to store state in zookeeper. If there is no state in
-     * zookeeper, then {@link #newClientState()} is invoked and the result
-     * will be stored in zookeeper. You can update the client's state from
-     * time to time using #writeClientState(). If the client looses the
-     * {@link ZLock}, it can read the client state from zookeeper using
-     * this method and pick up processing more or less where it left off
-     * (depending on when you last updated the client state in zookeeper).
+     * client wishes to store state in zookeeper under the zpath returned by
+     * {@link JobState#getClientZPath(JiniFederation, int)}. If there is no
+     * state in zookeeper, then {@link #newClientState()} is invoked and the
+     * result will be stored in zookeeper. You can update the client's state
+     * from time to time using #writeClientState(). If the client looses the
+     * {@link ZLock}, it can read the client state from zookeeper using this
+     * method and pick up processing more or less where it left off (depending
+     * on when you last updated the client state in zookeeper).
      * 
-     * @return
+     * @return The client's state.
      * 
      * @throws InterruptedException
      * @throws KeeperException
+     * 
+     * @see JobState#getClientZPath(JiniFederation, int)
      */
-    protected V setupClientState() throws InterruptedException,
-            KeeperException {
+    @SuppressWarnings("unchecked")
+    protected V setupClientState() throws InterruptedException, KeeperException {
 
-        if (!zlock.isLockHeld())
-            throw new InterruptedException("Lost ZLock");
+        /*
+         * Note: This is assuming that the zlock is held, but not checking in
+         * case the client decides not to rely on the zlock for some reason.
+         */
+//        if (!zlock.isLockHeld())
+//            throw new InterruptedException("Lost ZLock");
 
-        final ZooKeeper zookeeper = zlock.getZooKeeper();
-
-        final String clientZPath = jobState.getClientZPath(getFederation(), clientNum);
+        final ZooKeeper zookeeper = getFederation().getZookeeperAccessor().getZookeeper();
+        
+        final String clientZPath = jobState.getClientZPath(getFederation(),
+                clientNum);
 
         V clientState;
         try {
 
             clientState = newClientState();
 
-            zookeeper.create(clientZPath, SerializerUtil
+            zookeeper.create(clientZPath,
+                    SerializerUtil
                     .serialize(clientState), getFederation().getZooConfig().acl,
                     CreateMode.PERSISTENT);
 
@@ -259,5 +307,71 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
      * Return a new instance of the client's state.
      */
     abstract protected V newClientState();
+
+    /**
+     * This is a hack which resolves the {@link IRemoteExecutor} for the local
+     * service. It works by getting the {@link UUID} of the
+     * {@link IFederationDelegate} and then (attempting to) resolve the service
+     * for that {@link UUID}.
+     * 
+     * @throws RuntimeException
+     *             if something goes wrong.
+     * 
+     * @return FIXME {@link IFederationDelegate} should probably be able to
+     *         directly return the reference of the delegate, which is the
+     *         client or {@link IService}. It should probably have a generic
+     *         type for the type of the delegate, but that information is also
+     *         available via {@link IFederationDelegate#getServiceIface()}.
+     */
+    protected IRemoteExecutor getLocalRemoteExecutor() {
+
+        // UUID of the local service.
+        final UUID serviceUUID = getFederation().getServiceUUID();
+
+        ServiceItem serviceItem;
+
+        serviceItem = getFederation().getClientServiceClient().getServiceItem(
+                serviceUUID);
+
+        if (serviceItem == null) {
+
+            serviceItem = getFederation().getDataServicesClient()
+                    .getServiceItem(serviceUUID);
+
+        }
+
+        if (serviceItem == null) {
+
+            try {
+                serviceItem = getFederation().getServiceDiscoveryManager()
+                        .lookup(
+                                new ServiceTemplate(JiniUtil
+                                        .uuid2ServiceID(serviceUUID),
+                                        new Class[] { IRemoteExecutor.class },
+                                        null/* attribs */), null/* filter */,
+                                1000/* timeoutMillis */);
+                
+            } catch (RemoteException e) {
+
+                throw new RuntimeException(e);
+
+            } catch (InterruptedException e) {
+
+                throw new RuntimeException(e);
+                
+            }
+
+        }
+        
+        if (serviceItem == null) {
+
+            throw new RuntimeException("Could not resolve local "
+                    + IRemoteExecutor.class);
+            
+        }
+
+        return (IRemoteExecutor) serviceItem.service;
+        
+    }
 
 }

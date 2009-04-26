@@ -346,7 +346,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
         if (counterSet == null) {
 
-        final CounterSet counterSet = new CounterSet();
+            counterSet = new CounterSet();
             
             counterSet.addCounter("#threads",
                     new OneShotInstrument<Integer>(nthreads));

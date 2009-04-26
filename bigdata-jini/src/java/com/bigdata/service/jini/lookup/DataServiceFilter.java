@@ -22,7 +22,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
-package com.bigdata.service.jini;
+package com.bigdata.service.jini.lookup;
+
+import java.io.Serializable;
 
 import net.jini.core.lookup.ServiceItem;
 import net.jini.lookup.ServiceItemFilter;
@@ -40,7 +42,12 @@ import com.bigdata.service.IMetadataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataServiceFilter implements ServiceItemFilter {
+public class DataServiceFilter implements ServiceItemFilter, Serializable {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 8403645355677682562L;
 
     protected static final transient Logger log = Logger
             .getLogger(DataServiceFilter.class);

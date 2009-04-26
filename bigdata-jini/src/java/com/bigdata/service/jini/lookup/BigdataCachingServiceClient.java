@@ -25,10 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 24, 2009
  */
 
-package com.bigdata.service.jini;
+package com.bigdata.service.jini.lookup;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+
+import com.bigdata.service.jini.JiniFederation;
 
 import net.jini.core.lookup.ServiceTemplate;
 import net.jini.lookup.ServiceDiscoveryEvent;

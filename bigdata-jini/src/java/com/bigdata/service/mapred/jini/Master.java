@@ -37,10 +37,10 @@ import net.jini.lookup.LookupCache;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
-import com.bigdata.service.jini.DataServicesClient;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.LoadBalancerClient;
+import com.bigdata.service.jini.lookup.DataServicesClient;
+import com.bigdata.service.jini.lookup.LoadBalancerClient;
 import com.bigdata.service.mapred.AbstractMaster;
 import com.bigdata.service.mapred.IMapService;
 import com.bigdata.service.mapred.IReduceService;

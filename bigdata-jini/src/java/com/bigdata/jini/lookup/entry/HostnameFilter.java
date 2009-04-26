@@ -1,5 +1,6 @@
 package com.bigdata.jini.lookup.entry;
 
+import java.io.Serializable;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 
@@ -13,8 +14,13 @@ import net.jini.lookup.ServiceItemFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class HostnameFilter implements ServiceItemFilter {
+public class HostnameFilter implements ServiceItemFilter, Serializable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -973420571400694111L;
+    
     final Hostname[] acceptHostname;
 
     public String toString() {

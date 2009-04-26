@@ -20,7 +20,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.DataService;
-import com.bigdata.service.DataServiceCallable;
+import com.bigdata.service.FederationCallable;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
@@ -34,15 +34,24 @@ import com.bigdata.service.jini.JiniFederation;
  * <p>
  * Note: Counters reporting the progress of this task will be attached to the
  * data service on which this task is executing.
+ * <p>
+ * Note: When loading files from a <em>local</em> file system, this task can
+ * not handle the death of the service on which it is running.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @param <S>
+ *            The generic for the {@link JobState}.
+ * @param <V>
+ *            The generic type of the client state (stored in zookeeper).
  * 
  * @todo report counters to federation. they will be attached to the
  *       {@link JiniFederation} of the {@link DataService}. they should be
  *       reported under the namespace of the job.
  */
-public class RDFFileLoadTask extends DataServiceCallable<Void> implements Serializable {
+public class RDFFileLoadTask<S extends JobState, V extends Serializable>
+        extends FederationCallable<Void> implements Serializable {
 
     final protected transient static Logger log = Logger
             .getLogger(RDFFileLoadTask.class);
@@ -52,14 +61,7 @@ public class RDFFileLoadTask extends DataServiceCallable<Void> implements Serial
      */
     private static final long serialVersionUID = 6787939197771556658L;
 
-//    /**
-//     * The {@link DataService} on which the client is executing. This is set
-//     * automatically by the {@link DataService} when it notices that this
-//     * class implements the {@link IDataServiceCallable} interface.
-//     */
-//    private transient DataService dataService;
-
-    protected final JobState jobState;
+    protected final S jobState;
 
     protected final int clientNum;
 
@@ -69,34 +71,13 @@ public class RDFFileLoadTask extends DataServiceCallable<Void> implements Serial
 
     }
 
-    public RDFFileLoadTask(final JobState jobState, final int clientNum) {
+    public RDFFileLoadTask(final S jobState, final int clientNum) {
 
         this.jobState = jobState;
 
         this.clientNum = clientNum;
 
     }
-
-//    public void setDataService(final DataService dataService) {
-//
-//        this.dataService = dataService;
-//
-//    }
-//
-//    /**
-//     * Return the {@link DataService} on which this task is executing.
-//     * 
-//     * @throws IllegalStateException
-//     *             if the task is not executing on a {@link DataService}.
-//     */
-//    public DataService getDataService() {
-//
-//        if (dataService == null)
-//            throw new IllegalStateException();
-//
-//        return dataService;
-//
-//    }
 
     /**
      * The federation object used by the {@link DataService} on which this

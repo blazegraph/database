@@ -7,8 +7,8 @@ import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
 
 import com.bigdata.service.IRemoteExecutor;
-import com.bigdata.service.jini.BigdataCachingServiceClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.lookup.BigdataCachingServiceClient;
 import com.bigdata.service.jini.master.TaskMaster.JobState;
 
 /**

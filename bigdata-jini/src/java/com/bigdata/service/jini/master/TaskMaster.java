@@ -30,6 +30,7 @@ package com.bigdata.service.jini.master;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.rmi.RemoteException;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
@@ -46,7 +47,9 @@ import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
+import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
+import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
@@ -57,6 +60,7 @@ import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.BigdataZooDefs;
+import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -65,7 +69,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.IDataServiceCallable;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IRemoteExecutor;
-import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.service.jini.util.DumpFederation.ScheduledDumpTask;
@@ -91,7 +94,9 @@ import com.bigdata.zookeeper.ZooHelper;
  * @param <U>
  *            The generic type of the value returned by the client task.
  * 
- * FIXME Update the configuration files.
+ * FIXME Update the configuration files. Several properties have disappeared,
+ * one has been renamed (generateQueueCapacity), and the LUBM properties are now
+ * a pure superset of the {@link RDFDataLoadMaster} properties.
  * 
  * @todo could refactor the task to a task sequence easily enough, perhaps using
  *       some of the rule step logic. That would be an interesting twist on a
@@ -190,13 +195,19 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          *        / jobName
          * </pre>
          * 
-         * Under that znode are the following.
+         * If the client will store state in zookeeper or use {@link ZLock}s,
+         * it must create a znode under the jobName whose name is the assigned
+         * <em>client#</em>. This znode may be used by the client to store
+         * its state in zookeeper. The client may also create {@link ZLock}s
+         * which are children of this znode.
          * 
          * <pre>
          *          / client# (where # is the client#; the data of this znode is typically the client's state).
          *            / locknode (used to elect the client that is running if there is contention).
          *            / ...
          * </pre>
+         * 
+         * @see JobState#getClientZPath(JiniFederation, int)
          */
         String JOB_NAME = "jobName";
         
@@ -396,8 +407,6 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                             ConfigurationOptions.SERVICES_DISCOVERY_TIMEOUT,
                             Long.TYPE);
 
-            client2DataService = new UUID[nclients];
-
             /*
              * Benchmarking and debugging options.
              */
@@ -412,16 +421,39 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             indexDumpNamespace = (String) config.getEntry(component,
                     ConfigurationOptions.INDEX_DUMP_NAMESPACE, String.class,
                     null);
+            
+            /*
+             * Client/service maps.
+             */
+
+            serviceItems = new ServiceItem[nclients];
+
+            serviceUUIDs = new UUID[nclients];
 
         }
 
         /**
-         * The mapping of clients onto the {@link DataService}s. The index is
-         * the client#. The value is the {@link DataService} {@link UUID}.
-         * 
-         * @todo rename serviceUUIDs
+         * The mapping of clients onto the {@link IRemoteExecutor}s on which
+         * that client will execute. The index is the client#. The value is the
+         * {@link ServiceItem} for the {@link IRemoteExecutor} on which that
+         * client will execute.
+         * <p>
+         * This provides richer information than the {@link #serviceUUIDs}, but
+         * this information can be (and is) recovered on demand from just the
+         * {@link #serviceUUIDs}.
+         * <p>
+         * This is private since it is used by the master to assign clients to
+         * services. In contrast, the {@link #serviceUUIDs} are serialized and
+         * have public scope.
          */
-        final public UUID[] client2DataService;
+        final private transient ServiceItem[] serviceItems;
+        
+        /**
+         * The mapping of clients onto the {@link IRemoteExecutor}s on which
+         * that client will execute. The index is the client#. The value is the
+         * {@link IRemoteExecutor} {@link UUID service UUID}.
+         */
+        final public UUID[] serviceUUIDs;
 
         /**
          * Return the zpath of the node for all jobs which are instances of the
@@ -448,10 +480,15 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         /**
          * Return the zpath to the node which corresponds to the specified
-         * client task.
+         * client task. This znode is a direct child of the znode for the job.
+         * The client is responsible for creating this zpath if they wish to
+         * store state in zookeeper. Any {@link ZLock}s used by the client and
+         * scoped to its work should be created as children of this zpath.
          * 
          * @param clientNum
          *            The client number.
+         * 
+         * @see ConfigurationOptions#JOB_NAME
          */
         final public String getClientZPath(final JiniFederation fed,
                 final int clientNum) {
@@ -485,8 +522,18 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     protected final JiniFederation fed;
 
     /**
-     * Either set from the {@link Configuration} (new job) or read from
-     * zookeeper (existing job) and thereafter unchanging.
+     * The federation (from the ctor).
+     */
+    public JiniFederation getFederation() {
+        
+        return fed;
+        
+    }
+
+    /**
+     * The {@link JobState} which is either set from the {@link Configuration}
+     * (new job) or read from zookeeper (existing job) and thereafter
+     * unchanging.
      */
     public S getJobState() {
         
@@ -601,20 +648,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             
             if (jobState.forceOverflow) {
 
-                /*
-                 * @todo This is an operation that we would like to run once by
-                 * the master which actually executes the clients even if there
-                 * are multiple masters (multiple master support is not really
-                 * all there yet and there are interactions with how the client
-                 * tasks handle multiple instances of themselves so this is all
-                 * forward looking).
-                 */
-
-                System.out.println("Forcing overflow: now=" + new Date());
-
-                fed.forceOverflow(true/* truncateJournal */);
-
-                System.out.println("Forced overflow: now=" + new Date());
+                forceOverflow();
 
             }
 
@@ -676,7 +710,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * which the clients are run is determined by
      * {@link JobState#clientsTemplate} but must implement
      * {@link IRemoteExecutor}. Clients are assigned to the services using a
-     * stable ordered assignment {@link JobState#client2DataService}. If there
+     * stable ordered assignment {@link JobState#serviceUUIDs}. If there
      * are more clients than services, then some services will be tasked with
      * more than one client. If there is a problem submitting the clients then
      * any clients already submitted will be cancelled and the original
@@ -705,30 +739,39 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
 
-                // use the stable assignment made above or read from
-                // zookeeper.
-                final UUID serviceUUID = jobState.client2DataService[clientNum];
+                final ServiceItem serviceItem = jobState.serviceItems[clientNum];
 
-                /*
-                 * lookup the data service
-                 * 
-                 * FIXME IRemoteExecutor can include IDataService,
-                 * IMetadataService, or IClientService. The lookup should be
-                 * cached. Since we already had the service items, we should
-                 * just use those services. On restart, if the same assignments
-                 * must be used (if local data access is required) then read the
-                 * UUIDs from zookeeper and resolve them to service items.
-                 * Otherwise, just use the newly discovered set of services.
-                 */
-                final IRemoteExecutor service = fed.getDataService(serviceUUID);
+                if (serviceItem == null) {
+
+                    /*
+                     * Note: The ServiceItem should have been resolved when we
+                     * setup the JobState, even if the JobState was read from
+                     * zookeeper.
+                     */
+                    throw new RuntimeException(
+                            "ServiceItem not resolved? client#=" + clientNum);
+
+                }
+
+                if (!(serviceItem.service instanceof IRemoteExecutor)) {
+
+                    throw new RuntimeException("Service does not implement "
+                            + IRemoteExecutor.class + ", serviceItem="
+                            + serviceItem);
+                    
+                }
+
+                final IRemoteExecutor service = (IRemoteExecutor) serviceItem.service;
+                
+                final Callable<U> clientTask = newClientTask(clientNum);
 
                 if (log.isInfoEnabled())
                     log.info("Running client#=" + clientNum + " on "
-                            + ((IService)service).getHostname());// @todo no cast!
+                            + serviceItem);
 
-                final Callable<U> clientTask = newClientTask(clientNum);
-
-                futures.put(clientNum, (Future<U>) service.submit(clientTask));
+                futures.put(clientNum,
+                        (Future<U>) service
+                                .submit(clientTask));
 
             } // start the next client.
             
@@ -990,7 +1033,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
                 try {
 
-                    assignClientsToServices(zookeeper, jobState);
+                    assignClientsToServices(jobState);
 
                     // write those assignments into zookeeper.
                     zookeeper.setData(jobZPath, SerializerUtil
@@ -1032,17 +1075,19 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 jobState = (S) SerializerUtil.deserialize(zookeeper.getData(
                         jobZPath, false, new Stat()));
 
+                resolveServiceUUIDs(jobState);
+                
                 jobState.resumedJob = true;
                 
                 log.warn("Pre-existing job: " + jobZPath);
 
             }
             
-            for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
-
-                setupClientState(zookeeper, clientNum);
-
-            }
+//            for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
+//
+//                setupClientState(zookeeper, clientNum);
+//
+//            }
             
         } catch(KeeperException t) {
 
@@ -1077,8 +1122,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      *       free to choose new assignments on restart or even to add more
      *       clients over time in an m/r model. 
      */
-    protected void assignClientsToServices(final ZooKeeper zookeeper,
-            final S jobState) throws Exception {
+    protected void assignClientsToServices(final S jobState) throws Exception {
 
         final ServiceItem[] serviceItems = new DiscoverServicesWithPreconditionsTask()
                 .call();
@@ -1090,12 +1134,75 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             final UUID serviceUUID = JiniUtil
                     .serviceID2UUID(serviceItems[i].serviceID);
 
-            jobState.client2DataService[clientNum] = serviceUUID;
+            jobState.serviceItems[clientNum] = serviceItems[i];
+
+            jobState.serviceUUIDs[clientNum] = serviceUUID;
 
         }
 
     }
-    
+
+    /**
+     * Populates the elements of the {@link JobState#serviceItems} array by
+     * resolving the {@link JobState#serviceUUIDs} to the corresponding
+     * {@link ServiceItem}s. For each service, this tests the service cache for
+     * {@link IClientService}s and {@link IDataService}s and only then does a
+     * lookup with a timeout for the service.
+     * 
+     * @throws InterruptedException
+     *             If interrupted during service lookup.
+     * @throws IOException
+     *             If there is an RMI problem.
+     */
+    private void resolveServiceUUIDs(final S jobState) throws RemoteException,
+            InterruptedException {
+
+        for (int i = 0; i < jobState.nclients; i++) {
+
+            final UUID serviceUUID = jobState.serviceUUIDs[i];
+
+            final ServiceID serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
+
+            ServiceItem serviceItem = null;
+
+            // test client service cache.
+            serviceItem = fed.getClientServiceClient().getServiceCache()
+                    .getServiceItemByID(serviceID);
+
+            if (serviceItem == null) {
+
+                // test data service cache.
+                serviceItem = fed.getDataServicesClient().getServiceCache()
+                        .getServiceItemByID(serviceID);
+
+                if (serviceItem == null) {
+
+                    // direct lookup.
+                    serviceItem = fed.getServiceDiscoveryManager()
+                            .lookup(
+                                    new ServiceTemplate(
+                                            serviceID,
+                                            new Class[] { IRemoteExecutor.class }/* types */,
+                                            null/* attr */),
+                                    null/* filter */, 1000/* timeoutMillis */);
+
+                    if (serviceItem == null) {
+
+                        throw new RuntimeException(
+                                "Could not discover service: " + serviceUUID);
+
+                    }
+
+                }
+
+            }
+
+            jobState.serviceItems[i] = serviceItem;
+
+        }
+
+    }
+
     /**
      * Class awaits discovery of all services required by the {@link JobState}
      * up to the {@link JobState#servicesDiscoveryTimeout} and returns the
@@ -1146,7 +1253,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
              */
             for (ServicesTemplate t : jobState.servicesTemplates) {
 
-                tasks.add(new DiscoverServices(fed, jobState.clientsTemplate,
+                tasks.add(new DiscoverServices(fed, t,
                         jobState.servicesDiscoveryTimeout));
 
             }
@@ -1194,43 +1301,43 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
     }
 
-    /**
-     * Verify the existence of the client's zpath. If it does not exist then it
-     * is created but its data will be an empty byte[]. The client, when it
-     * runs, can examine the data in this znode and decide whether it is a new
-     * start or resuming an existing run.
-     * 
-     * @param clientNum
-     *            The client number.
-     * 
-     * @see JobState#getClientZPath(JiniFederation, int)
-     * 
-     * @throws InterruptedException
-     * @throws KeeperException
-     */
-    protected void setupClientState(final ZooKeeper zookeeper,
-            final int clientNum) throws KeeperException, InterruptedException {
-
-        final String clientZPath = jobState.getClientZPath(fed, clientNum);
-
-        try {
-
-            zookeeper.create(clientZPath, new byte[0], fed.getZooConfig().acl,
-                    CreateMode.PERSISTENT);
-
-            if (log.isInfoEnabled())
-                log.info("New client: " + clientZPath);
-
-        } catch (NodeExistsException ex) {
-
-            if (log.isInfoEnabled())
-                log.info("Existing client: " + clientZPath);
-
-            // fall through.
-
-        }
-
-    }
+//    /**
+//     * Verify the existence of the client's zpath. If it does not exist then it
+//     * is created but its data will be an empty byte[]. The client, when it
+//     * runs, can examine the data in this znode and decide whether it is a new
+//     * start or resuming an existing run.
+//     * 
+//     * @param clientNum
+//     *            The client number.
+//     * 
+//     * @see JobState#getClientZPath(JiniFederation, int)
+//     * 
+//     * @throws InterruptedException
+//     * @throws KeeperException
+//     */
+//    protected void setupClientState(final ZooKeeper zookeeper,
+//            final int clientNum) throws KeeperException, InterruptedException {
+//
+//        final String clientZPath = jobState.getClientZPath(fed, clientNum);
+//
+//        try {
+//
+//            zookeeper.create(clientZPath, new byte[0], fed.getZooConfig().acl,
+//                    CreateMode.PERSISTENT);
+//
+//            if (log.isInfoEnabled())
+//                log.info("New client: " + clientZPath);
+//
+//        } catch (NodeExistsException ex) {
+//
+//            if (log.isInfoEnabled())
+//                log.info("Existing client: " + clientZPath);
+//
+//            // fall through.
+//
+//        }
+//
+//    }
     
     /**
      * Check the futures.
@@ -1329,6 +1436,27 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
     }
 
+    /**
+     * Force overflow on all discovered {@link IDataService}.
+     * 
+     * @see ConfigurationOptions#FORCE_OVERFLOW
+     * 
+     * @todo This is an operation that we would like to run once by the master
+     *       which actually executes the clients even if there are multiple
+     *       masters (multiple master support is not really all there yet and
+     *       there are interactions with how the client tasks handle multiple
+     *       instances of themselves so this is all forward looking).
+     */
+    protected void forceOverflow() {
+
+        System.out.println("Forcing overflow: now=" + new Date());
+
+        fed.forceOverflow(true/* truncateJournal */);
+
+        System.out.println("Forced overflow: now=" + new Date());
+
+    }
+    
     /**
      * Callback for the master to consume the outcome of the client's
      * {@link Future} (default is NOP).

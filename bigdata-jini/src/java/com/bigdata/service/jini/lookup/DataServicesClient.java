@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Mar 18, 2008
  */
 
-package com.bigdata.service.jini;
+package com.bigdata.service.jini.lookup;
 
 import java.rmi.RemoteException;
 import java.util.UUID;
@@ -38,6 +38,7 @@ import net.jini.lookup.entry.Name;
 
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
+import com.bigdata.service.jini.JiniFederation;
 
 /**
  * Class handles discovery, caching, and local lookup of {@link IDataService}s

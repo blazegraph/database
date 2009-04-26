@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 19, 2009
  */
 
-package com.bigdata.service.jini;
+package com.bigdata.service.jini.lookup;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -50,6 +50,7 @@ import net.jini.lookup.ServiceItemFilter;
 import org.apache.log4j.Logger;
 
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
+import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.util.InnerCause;
 import com.sun.jini.admin.DestroyAdmin;
@@ -447,7 +448,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * 
      * @throws InterruptedException
      */
-    protected void destroyDiscoveredServices(
+    public void destroyDiscoveredServices(
             final ExecutorService executorService,
             final ServiceItemFilter filter) throws InterruptedException {
 
@@ -542,7 +543,7 @@ abstract public class AbstractCachingServiceClient<S extends Remote> {
      * 
      * @throws InterruptedException
      */
-    protected void shutdownDiscoveredServices(
+    public void shutdownDiscoveredServices(
             final ExecutorService executorService,
             final ServiceItemFilter filter, final boolean immediateShutdown)
             throws InterruptedException {

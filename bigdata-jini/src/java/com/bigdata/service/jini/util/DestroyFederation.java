@@ -42,8 +42,18 @@ import net.jini.config.ConfigurationException;
  */
 public class DestroyFederation {
 
-    protected static final String COMPONENT = DestroyFederation.class.getName(); 
-
+    public interface ConfigurationOptions {
+        
+        /**
+         * The time in milliseconds to await registrar and service discovery
+         * before proceeding (default {@value #DEFAULT_DISCOVERY_DELAY}).
+         */
+        String DISCOVERY_DELAY = "discoveryDelay";
+        
+        long DEFAULT_DISCOVERY_DELAY = 7000L;
+        
+    }
+    
     /**
      * @param args
      *            Configuration file and optional overrides.
@@ -56,10 +66,13 @@ public class DestroyFederation {
 
         final JiniFederation fed = JiniClient.newInstance(args).connect();
 
+        final String component = DestroyFederation.class.getName(); 
+
         final long discoveryDelay = (Long) fed
                 .getClient()
                 .getConfiguration()
-                .getEntry(COMPONENT, "discoveryDelay", Long.TYPE, 5000L/* default */);
+                .getEntry(component, ConfigurationOptions.DISCOVERY_DELAY,
+                        Long.TYPE, ConfigurationOptions.DEFAULT_DISCOVERY_DELAY);
 
         System.out.println("Waiting " + discoveryDelay
                 + "ms for service discovery.");
