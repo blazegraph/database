@@ -63,17 +63,12 @@ import com.bigdata.service.jini.master.TaskMaster;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo When loading files from a local file system, this master can not handle
- *       the death of the service on which it is running.
- * 
  * @todo Support loading files from URLs, BFS, etc. This can be achieved via
  *       subclassing and overriding {@link #newClientTask(int)} and
  *       {@link #newJobState(String, Configuration)} as necessary.
  * 
  * @todo Delete after semantics are weak with asynchronous writes until I get
  *       the asynchronous eventual notifier integrated.
- * 
- * @see TaskMaster
  */
 public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends Callable<U>, U>
         extends TaskMaster<S, T, U> {
@@ -118,7 +113,8 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         String NTHREADS = "nthreads";
 
         /**
-         * The buffer capacity for parsed RDF statements.
+         * The buffer capacity for parsed RDF statements (not used when
+         * {@link #ASYNCHRONOUS_WRITES} are enabled).
          */
         String BUFFER_CAPACITY = "bufferCapacity";
 
@@ -370,7 +366,7 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         public JobState(final String component, final Configuration config)
                 throws ConfigurationException {
 
-            super(component,config);
+            super(component, config);
             
             namespace = (String) config.getEntry(component,
                     ConfigurationOptions.NAMESPACE, String.class);
@@ -571,12 +567,8 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
                  * more than once if the triple pattern occurs within a fixed
                  * point enclosure.
                  */
-                
-                System.out.println("Forcing overflow: now=" + new Date()+" (before closure)");
 
-                fed.forceOverflow(true/* truncateJournal */);
-
-                System.out.println("Forced overflow: now=" + new Date()+" (before closure)");
+                forceOverflow();
 
                 System.out.println(getKBInfo(tripleStore));
 
@@ -735,9 +727,6 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
      */
     public AbstractTripleStore openTripleStore() throws ConfigurationException {
 
-        /*
-         * Create/re-open the triple store.
-         */
         AbstractTripleStore tripleStore;
 
         final JobState jobState = getJobState();
