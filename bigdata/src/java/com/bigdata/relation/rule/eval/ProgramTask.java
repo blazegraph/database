@@ -378,7 +378,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
 
         // the task to execute.
         final QueryTask queryTask = new QueryTask(step, joinNexusFactory,
-                buffer, indexManager, getDataService());
+                buffer, indexManager, isDataService()?getDataService():null);
 
         Future<RuleStats> future = null;
         
@@ -568,7 +568,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
         }
 
         final MutationTask mutationTask = new MutationTask(action, joinNexusFactory,
-                step, indexManager, getDataService());
+                step, indexManager, isDataService()?getDataService():null);
 
         if (DEBUG)
             log.debug("begin: action=" + action + ", program=" + step.getName()

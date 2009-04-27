@@ -26,7 +26,6 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceCallable;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataServiceCallable;
 import com.bigdata.service.Session;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.sparse.SparseRowStore;
