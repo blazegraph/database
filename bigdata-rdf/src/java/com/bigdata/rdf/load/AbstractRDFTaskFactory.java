@@ -5,6 +5,7 @@ import java.net.MalformedURLException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -18,26 +19,16 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * 
  * @todo report the #of resources processed in each case.
  */
-public class AbstractRDFTaskFactory<T extends Runnable> implements
+public class AbstractRDFTaskFactory<S extends Statement,T extends Runnable> implements
         ITaskFactory<T> {
 
     protected static final Logger log = Logger
             .getLogger(RDFLoadTaskFactory.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * The database on which the data will be written.
      */
-    final AbstractTripleStore db;
+    final protected AbstractTripleStore db;
 
     /**
      * The timestamp set when {@link #notifyStart()} is invoked.
@@ -110,20 +101,26 @@ public class AbstractRDFTaskFactory<T extends Runnable> implements
      * parameter (if any). Files whose format can not be determined will be
      * logged as errors.
      */
-    final RDFFormat fallback;
+    final public RDFFormat fallback;
 
     /**
      * Validation of RDF by the RIO parser is disabled unless this is true.
      */
-    final boolean verifyData;
+    final public boolean verifyData;
 
     /**
      * Delete files after successful processing when <code>true</code>.
      */
-    final boolean deleteAfter;
+    final public boolean deleteAfter;
 
     final IStatementBufferFactory bufferFactory;
 
+    public IStatementBufferFactory<S> getBufferFactory() {
+        
+        return bufferFactory;
+        
+    }
+    
     /**
      * #of told triples loaded into the database by successfully completed {@link ReaderTask}s.
      */
@@ -169,8 +166,8 @@ public class AbstractRDFTaskFactory<T extends Runnable> implements
 
     public T newTask(final String resource) throws Exception {
         
-        if(INFO)
-            log.info("resource="+resource);
+        if (log.isInfoEnabled())
+            log.info("resource=" + resource);
         
         final RDFFormat rdfFormat = getRDFFormat( resource );
         

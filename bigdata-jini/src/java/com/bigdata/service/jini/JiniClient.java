@@ -58,8 +58,10 @@ import com.sun.jini.start.ServiceDescriptor;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public class JiniClient extends AbstractScaleOutClient {
+public class JiniClient<T> extends AbstractScaleOutClient<T> {
 
     /**
      * Options understood by the {@link JiniClient}.
@@ -85,7 +87,7 @@ public class JiniClient extends AbstractScaleOutClient {
     /**
      * The federation and <code>null</code> iff not connected.
      */
-    private JiniFederation fed = null;
+    private JiniFederation<T> fed = null;
 
     synchronized public boolean isConnected() {
         
@@ -134,7 +136,7 @@ public class JiniClient extends AbstractScaleOutClient {
 
     }
 
-    synchronized public JiniFederation getFederation() {
+    synchronized public JiniFederation<T> getFederation() {
 
         if (fed == null) {
 
@@ -146,11 +148,11 @@ public class JiniClient extends AbstractScaleOutClient {
 
     }
 
-    synchronized public JiniFederation connect() {
+    synchronized public JiniFederation<T> connect() {
 
         if (fed == null) {
 
-            fed = new JiniFederation(this, jiniConfig, zooConfig);
+            fed = new JiniFederation<T>(this, jiniConfig, zooConfig);
 
         }
 

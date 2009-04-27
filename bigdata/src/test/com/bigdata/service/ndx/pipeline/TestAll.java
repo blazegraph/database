@@ -67,6 +67,8 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestMasterTaskWithErrors.class);
         
+        suite.addTestSuite(TestMasterTaskWithInfiniteTimeout.class);
+        
         suite.addTestSuite(TestMasterTaskWithRedirect.class);
         
         return suite;

@@ -40,20 +40,10 @@ import com.bigdata.Banner;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractClient implements IBigdataClient {
+abstract public class AbstractClient<T> implements IBigdataClient<T> {
     
     protected static final Logger log = Logger.getLogger(IBigdataClient.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected final boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected final boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * The properties specified to the ctor.
      */
@@ -190,7 +180,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_THREAD_POOL_SIZE,
                     Options.DEFAULT_CLIENT_THREAD_POOL_SIZE));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_THREAD_POOL_SIZE + "="
                                 + threadPoolSize);
 
@@ -203,7 +193,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_MAX_STALE_LOCATOR_RETRIES,
                     Options.DEFAULT_CLIENT_MAX_STALE_LOCATOR_RETRIES));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_MAX_STALE_LOCATOR_RETRIES + "="
                         + maxStaleLocatorRetries);
 
@@ -225,7 +215,7 @@ abstract public class AbstractClient implements IBigdataClient {
                                     Options.CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST,
                                     Options.DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST + "="
                         + maxParallelTasksPerRequest);
 
@@ -246,7 +236,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_TASK_TIMEOUT,
                     Options.DEFAULT_CLIENT_TASK_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_TASK_TIMEOUT + "=" + taskTimeout);
 
         }
@@ -258,7 +248,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.CLIENT_RANGE_QUERY_CAPACITY,
                             Options.DEFAULT_CLIENT_RANGE_QUERY_CAPACITY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_RANGE_QUERY_CAPACITY + "="
                         + defaultRangeQueryCapacity);
             
@@ -283,7 +273,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.CLIENT_LOCATOR_CACHE_CAPACITY,
                             Options.DEFAULT_CLIENT_LOCATOR_CACHE_CAPACITY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_LOCATOR_CACHE_CAPACITY + "="
                         + locatorCacheCapacity);
 
@@ -291,7 +281,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.CLIENT_LOCATOR_CACHE_TIMEOUT,
                             Options.DEFAULT_CLIENT_LOCATOR_CACHE_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_LOCATOR_CACHE_TIMEOUT + "="
                         + locatorCacheTimeout);
         }
@@ -303,7 +293,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.CLIENT_INDEX_CACHE_CAPACITY,
                     Options.DEFAULT_CLIENT_INDEX_CACHE_CAPACITY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_INDEX_CACHE_CAPACITY + "="
                         + indexCacheCapacity);
 
@@ -320,7 +310,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.CLIENT_INDEX_CACHE_TIMEOUT,
                             Options.DEFAULT_CLIENT_INDEX_CACHE_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.CLIENT_INDEX_CACHE_TIMEOUT + "="
                         + indexCacheTimeout);
 
@@ -337,7 +327,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.TEMP_STORE_MAXIMUM_EXTENT,
                     Options.DEFAULT_TEMP_STORE_MAXIMUM_EXTENT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.TEMP_STORE_MAXIMUM_EXTENT + "="
                         + tempStoreMaxExtent);
 
@@ -353,7 +343,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.COLLECT_PLATFORM_STATISTICS,
                             Options.DEFAULT_COLLECT_PLATFORM_STATISTICS));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.COLLECT_PLATFORM_STATISTICS + "="
                         + collectPlatformStatistics);
             
@@ -365,7 +355,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     .getProperty(Options.COLLECT_QUEUE_STATISTICS,
                             Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.COLLECT_QUEUE_STATISTICS + "="
                         + collectQueueStatistics);
             
@@ -377,7 +367,7 @@ abstract public class AbstractClient implements IBigdataClient {
                     Options.HTTPD_PORT,
                     Options.DEFAULT_HTTPD_PORT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.HTTPD_PORT+ "="
                         + httpdPort);
 
@@ -390,12 +380,12 @@ abstract public class AbstractClient implements IBigdataClient {
         
     }
     
-    private IFederationDelegate delegate = null;
+    private IFederationDelegate<T> delegate = null;
 
     /**
      * The delegate for the federation.
      */
-    public final synchronized IFederationDelegate getDelegate() {
+    public final synchronized IFederationDelegate<T> getDelegate() {
         
         return delegate;
         
@@ -413,7 +403,7 @@ abstract public class AbstractClient implements IBigdataClient {
      * @throws IllegalStateException
      *             if the client is already connected.
      */
-    public final synchronized void setDelegate(IFederationDelegate delegate) {
+    public final synchronized void setDelegate(final IFederationDelegate<T> delegate) {
         
         if (delegate == null) {
 

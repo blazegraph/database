@@ -6,6 +6,8 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.Vector;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
@@ -19,21 +21,46 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DefaultClientDelegate implements IFederationDelegate {
+public class DefaultClientDelegate<T> implements IFederationDelegate<T> {
 
+    protected static final Logger log = Logger.getLogger(DefaultClientDelegate.class);
+    
     private final UUID uuid = UUID.randomUUID();
 
     private final AbstractFederation fed;
 
-    public DefaultClientDelegate(final AbstractFederation fed) {
+    private final T clientOrService;
+
+    /**
+     * 
+     * @param fed
+     *            The federation.
+     * @param clientOrService
+     *            The client or service connected to the federation. This MAY be
+     *            <code>null</code> but then {@link #getService()} will also
+     *            return <code>null</code>.
+     */
+    public DefaultClientDelegate(final AbstractFederation fed,
+            final T clientOrService) {
 
         if (fed == null)
             throw new IllegalArgumentException();
 
+        if (clientOrService == null)
+            log.warn("Client or service not specified: " + this);
+
         this.fed = fed;
+
+        this.clientOrService = clientOrService;
 
     }
 
+    public T getService() {
+
+        return clientOrService;
+        
+    }
+    
     /**
      * Returns a stable but randomly assigned {@link UUID}.
      */

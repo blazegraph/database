@@ -1,13 +1,8 @@
 package com.bigdata.service.jini.master;
 
 import java.io.Serializable;
-import java.rmi.RemoteException;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.Callable;
-
-import net.jini.core.lookup.ServiceItem;
-import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
@@ -24,12 +19,9 @@ import com.bigdata.service.DataServiceCallable;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IClientService;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.IFederationDelegate;
 import com.bigdata.service.IRemoteExecutor;
-import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.master.TaskMaster.JobState;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
 
@@ -308,70 +300,70 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
      */
     abstract protected V newClientState();
 
-    /**
-     * This is a hack which resolves the {@link IRemoteExecutor} for the local
-     * service. It works by getting the {@link UUID} of the
-     * {@link IFederationDelegate} and then (attempting to) resolve the service
-     * for that {@link UUID}.
-     * 
-     * @throws RuntimeException
-     *             if something goes wrong.
-     * 
-     * @return FIXME {@link IFederationDelegate} should probably be able to
-     *         directly return the reference of the delegate, which is the
-     *         client or {@link IService}. It should probably have a generic
-     *         type for the type of the delegate, but that information is also
-     *         available via {@link IFederationDelegate#getServiceIface()}.
-     */
-    protected IRemoteExecutor getLocalRemoteExecutor() {
-
-        // UUID of the local service.
-        final UUID serviceUUID = getFederation().getServiceUUID();
-
-        ServiceItem serviceItem;
-
-        serviceItem = getFederation().getClientServiceClient().getServiceItem(
-                serviceUUID);
-
-        if (serviceItem == null) {
-
-            serviceItem = getFederation().getDataServicesClient()
-                    .getServiceItem(serviceUUID);
-
-        }
-
-        if (serviceItem == null) {
-
-            try {
-                serviceItem = getFederation().getServiceDiscoveryManager()
-                        .lookup(
-                                new ServiceTemplate(JiniUtil
-                                        .uuid2ServiceID(serviceUUID),
-                                        new Class[] { IRemoteExecutor.class },
-                                        null/* attribs */), null/* filter */,
-                                1000/* timeoutMillis */);
-                
-            } catch (RemoteException e) {
-
-                throw new RuntimeException(e);
-
-            } catch (InterruptedException e) {
-
-                throw new RuntimeException(e);
-                
-            }
-
-        }
-        
-        if (serviceItem == null) {
-
-            throw new RuntimeException("Could not resolve local "
-                    + IRemoteExecutor.class);
-            
-        }
-
-        return (IRemoteExecutor) serviceItem.service;
-        
-    }
+//    /**
+//     * This is a hack which resolves the {@link IRemoteExecutor} for the local
+//     * service. It works by getting the {@link UUID} of the
+//     * {@link IFederationDelegate} and then (attempting to) resolve the service
+//     * for that {@link UUID}.
+//     * 
+//     * @throws RuntimeException
+//     *             if something goes wrong.
+//     * 
+//     * @return FIXME {@link IFederationDelegate} should probably be able to
+//     *         directly return the reference of the delegate, which is the
+//     *         client or {@link IService}. It should probably have a generic
+//     *         type for the type of the delegate, but that information is also
+//     *         available via {@link IFederationDelegate#getServiceIface()}.
+//     */
+//    protected IRemoteExecutor getLocalRemoteExecutor() {
+//
+//        // UUID of the local service.
+//        final UUID serviceUUID = getFederation().getServiceUUID();
+//
+//        ServiceItem serviceItem;
+//
+//        serviceItem = getFederation().getClientServiceClient().getServiceItem(
+//                serviceUUID);
+//
+//        if (serviceItem == null) {
+//
+//            serviceItem = getFederation().getDataServicesClient()
+//                    .getServiceItem(serviceUUID);
+//
+//        }
+//
+//        if (serviceItem == null) {
+//
+//            try {
+//                serviceItem = getFederation().getServiceDiscoveryManager()
+//                        .lookup(
+//                                new ServiceTemplate(JiniUtil
+//                                        .uuid2ServiceID(serviceUUID),
+//                                        new Class[] { IRemoteExecutor.class },
+//                                        null/* attribs */), null/* filter */,
+//                                1000/* timeoutMillis */);
+//                
+//            } catch (RemoteException e) {
+//
+//                throw new RuntimeException(e);
+//
+//            } catch (InterruptedException e) {
+//
+//                throw new RuntimeException(e);
+//                
+//            }
+//
+//        }
+//        
+//        if (serviceItem == null) {
+//
+//            throw new RuntimeException("Could not resolve local "
+//                    + IRemoteExecutor.class);
+//            
+//        }
+//
+//        return (IRemoteExecutor) serviceItem.service;
+//        
+//    }
 
 }

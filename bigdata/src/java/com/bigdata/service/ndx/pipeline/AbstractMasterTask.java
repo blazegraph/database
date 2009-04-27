@@ -79,8 +79,8 @@ L>//
     static protected transient final Logger log = Logger
             .getLogger(AbstractMasterTask.class);
 
-    protected transient final boolean INFO = log.isInfoEnabled(); 
-    protected transient final boolean DEBUG = log.isDebugEnabled(); 
+//    protected transient final boolean INFO = log.isInfoEnabled(); 
+//    protected transient final boolean log.isDebugEnabled() = log.isDebugEnabled(); 
 
     /**
      * The top-level buffer on which the application is writing.
@@ -417,7 +417,7 @@ L>//
 
                 }
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Waiting for " + sinks.length + " subtasks : "
                             + this);
 
@@ -448,7 +448,7 @@ L>//
 
             } // continue
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("All subtasks are done: " + this);
             
         } finally {
@@ -545,7 +545,7 @@ L>//
 
         if (reopen && sink != null && !sink.buffer.isOpen()) {
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Reopening sink (was closed): " + locator);
 
             // wait for the sink to terminate normally.
@@ -557,7 +557,7 @@ L>//
 
         if (sink == null) {
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Creating output buffer: " + locator);
 
             final BlockingBuffer<E[]> out = newSubtaskBuffer();
@@ -695,7 +695,7 @@ L>//
 
                 subtasks.remove(locator);
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Removed output buffer: " + locator);
 
             }

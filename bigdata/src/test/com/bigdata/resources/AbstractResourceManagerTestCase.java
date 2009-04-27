@@ -399,10 +399,16 @@ public class AbstractResourceManagerTestCase extends
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected class MockFederation implements IBigdataFederation {
+    protected class MockFederation implements IBigdataFederation<MockMetadataService> {
 
         private final MockMetadataService metadataService = new MockMetadataService();
         
+        public MockMetadataService getService() {
+            
+            return metadataService;
+            
+        }
+
         public void destroy() {
 
             

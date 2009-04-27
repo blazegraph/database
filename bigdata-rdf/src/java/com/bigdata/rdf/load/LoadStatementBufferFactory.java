@@ -1,5 +1,7 @@
 package com.bigdata.rdf.load;
 
+import org.openrdf.model.Statement;
+
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -10,7 +12,8 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LoadStatementBufferFactory implements IStatementBufferFactory {
+public class LoadStatementBufferFactory<S extends Statement> implements
+        IStatementBufferFactory<S> {
 
     private final AbstractTripleStore db;
 
@@ -40,29 +43,39 @@ public class LoadStatementBufferFactory implements IStatementBufferFactory {
     }
     
     /**
-     * Return the {@link ThreadLocal} {@link StatementBuffer} to be used for a
-     * task.
+     * Return the {@link StatementBuffer} to be used for a task.
      */
-    public StatementBuffer newStatementBuffer() {
+    public StatementBuffer<S> newStatementBuffer() {
 
-        /*
-         * Note: this is a thread-local so the same buffer object is always
-         * reused by the same thread.
-         */
-
-        return threadLocal.get();
+        return new StatementBuffer<S>(null/* statementStore */, db,
+                bufferCapacity, writeBuffer);
         
     }
-
-    private ThreadLocal<StatementBuffer> threadLocal = new ThreadLocal<StatementBuffer>() {
-
-        protected synchronized StatementBuffer initialValue() {
-
-            return new StatementBuffer(null/* statementStore */, db,
-                    bufferCapacity, writeBuffer);
-            
-        }
-
-    };
+    
+//    /**
+//     * Return the {@link ThreadLocal} {@link StatementBuffer} to be used for a
+//     * task.
+//     */
+//    public StatementBuffer<S> newStatementBuffer() {
+//
+//        /*
+//         * Note: this is a thread-local so the same buffer object is always
+//         * reused by the same thread.
+//         */
+//
+//        return threadLocal.get();
+//        
+//    }
+//
+//    private ThreadLocal<StatementBuffer<S>> threadLocal = new ThreadLocal<StatementBuffer<S>>() {
+//
+//        protected synchronized StatementBuffer<S> initialValue() {
+//
+//            return new StatementBuffer<S>(null/* statementStore */, db,
+//                    bufferCapacity, writeBuffer);
+//            
+//        }
+//
+//    };
     
 }

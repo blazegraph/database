@@ -78,19 +78,21 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  * 
  * @todo implement {@link IServiceShutdown}. When it is declared here it messes
  *       up the Options interface hierarchy. What appears to be happening is
  *       that the IServiceShutdown.Options interface is flattened into
  *       IServiceShutdown and it shadows the Options that are being used.
  */
-abstract public class AbstractFederation implements IBigdataFederation {
+abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     protected static final Logger log = Logger.getLogger(IBigdataFederation.class);
 
-    private AbstractClient client;
+    private AbstractClient<T> client;
     
-    public AbstractClient getClient() {
+    public AbstractClient<T> getClient() {
         
         assertOpen();
         
@@ -522,22 +524,23 @@ abstract public class AbstractFederation implements IBigdataFederation {
         
     }
 
-    protected AbstractFederation(final IBigdataClient client) {
+    protected AbstractFederation(final IBigdataClient<T> client) {
 
         if (client == null)
             throw new IllegalArgumentException();
 
-        this.client = (AbstractClient) client;
+        this.client = (AbstractClient<T>) client;
 
         if (this.client.getDelegate() == null) {
 
             /*
-             * If no service has set the delegate by this point then we setup a
+             * If no one has set the delegate by this point then we setup a
              * default delegate.
              */
 
-            this.client.setDelegate(new DefaultClientDelegate(this));
-            
+            this.client
+                    .setDelegate(new DefaultClientDelegate<T>(this, null/* clientOrService */));
+
         }
         
         final int threadPoolSize = client.getThreadPoolSize();
@@ -576,8 +579,8 @@ abstract public class AbstractFederation implements IBigdataFederation {
         // Setup locator.
         resourceLocator = new DefaultResourceLocator(this,
                 null, // delegate
-                ((AbstractClient) client).getLocatorCacheCapacity(),
-                ((AbstractClient) client).getLocatorCacheTimeout());
+                ((AbstractClient<T>) client).getLocatorCacheCapacity(),
+                ((AbstractClient<T>) client).getLocatorCacheTimeout());
         
     }
     
@@ -750,6 +753,17 @@ abstract public class AbstractFederation implements IBigdataFederation {
     public void reportCounters() {
 
         new ReportTask(this).run();
+        
+    }
+
+    /**
+     * Delegated.
+     */
+    public T getService() {
+    
+        assertOpen();
+
+        return (T)client.getDelegate().getService();
         
     }
 

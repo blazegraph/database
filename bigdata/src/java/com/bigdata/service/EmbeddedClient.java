@@ -39,14 +39,14 @@ import java.util.Properties;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedClient extends AbstractScaleOutClient {
+public class EmbeddedClient<T> extends AbstractScaleOutClient<T> {
 
     /**
      * 
      * @param properties
      *            See {@link EmbeddedFederation.Options}.
      */
-    public EmbeddedClient(Properties properties) {
+    public EmbeddedClient(final Properties properties) {
 
         super(properties);
         
@@ -55,7 +55,7 @@ public class EmbeddedClient extends AbstractScaleOutClient {
     /**
      * The federation and <code>null</code> iff not connected.
      */
-    private EmbeddedFederation fed = null;
+    private EmbeddedFederation<T> fed = null;
 
     synchronized public boolean isConnected() {
         
@@ -83,7 +83,7 @@ public class EmbeddedClient extends AbstractScaleOutClient {
 
     }
     
-    synchronized public IBigdataFederation getFederation() {
+    synchronized public IBigdataFederation<T> getFederation() {
 
         if (fed == null) {
 
@@ -95,11 +95,11 @@ public class EmbeddedClient extends AbstractScaleOutClient {
 
     }
 
-    synchronized public EmbeddedFederation connect() {
+    synchronized public EmbeddedFederation<T> connect() {
 
         if (fed == null) {
 
-            fed = new EmbeddedFederation(this);
+            fed = new EmbeddedFederation<T>(this);
 
         }
 

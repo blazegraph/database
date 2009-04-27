@@ -148,11 +148,26 @@ public class AbstractMasterTestCase extends TestCase2 {
     static class M extends MockMaster<H, O, KVO<O>, S, L, HS> {
 
         private final ExecutorService executorService;
-        
-        public M(H stats, BlockingBuffer<KVO<O>[]> buffer,
-                ExecutorService executorService) {
 
-            super(stats, buffer);
+        static final long DEFAULT_SINK_IDLE_TIMEOUT = TimeUnit.MILLISECONDS
+                .toNanos(2000);
+
+        static final long DEFAULT_SINK_POLL_TIMEOUT = TimeUnit.MILLISECONDS
+                .toNanos(50);
+
+        public M(final H stats, final BlockingBuffer<KVO<O>[]> buffer,
+                final ExecutorService executorService) {
+
+            this(stats, buffer, executorService, DEFAULT_SINK_IDLE_TIMEOUT,
+                    DEFAULT_SINK_POLL_TIMEOUT);
+            
+        }
+
+        public M(final H stats, final BlockingBuffer<KVO<O>[]> buffer,
+                final ExecutorService executorService, final long sinkIdleTimeout,
+                final long sinkPollTimeout) {
+
+            super(stats, buffer, sinkIdleTimeout, sinkPollTimeout);
 
             this.executorService = executorService;
             
@@ -331,7 +346,8 @@ public class AbstractMasterTestCase extends TestCase2 {
      */
     static class S extends MockSubtask<H, O, KVO<O>, L, S, HS, M> {
 
-        public S(M master, L locator, BlockingBuffer<KVO<O>[]> buffer) {
+        public S(final M master, final L locator,
+                final BlockingBuffer<KVO<O>[]> buffer) {
 
             super(master, locator, buffer);
 

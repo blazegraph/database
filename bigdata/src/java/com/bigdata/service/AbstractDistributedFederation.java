@@ -48,10 +48,12 @@ import com.bigdata.relation.accesspath.IBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-abstract public class AbstractDistributedFederation extends AbstractScaleOutFederation {
+abstract public class AbstractDistributedFederation<T> extends AbstractScaleOutFederation<T> {
 
-    public AbstractDistributedFederation(IBigdataClient client) {
+    public AbstractDistributedFederation(final IBigdataClient<T> client) {
 
         super(client);
 

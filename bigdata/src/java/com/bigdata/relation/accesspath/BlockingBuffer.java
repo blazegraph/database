@@ -74,19 +74,15 @@ import com.bigdata.striterator.ICloseableIterator;
  * @version $Id$
  */
 public class BlockingBuffer<E> implements IBlockingBuffer<E> {
-    
+
+    /**
+     * Warning messages are emitted if either the producer or the consumer is
+     * stalled. When {@link Logger#isInfoEnabled()} is <code>true</code>,
+     * those log messages will be include stack traces which can help to
+     * identify the the consumer or producer.
+     */
     protected static final Logger log = Logger.getLogger(BlockingBuffer.class);
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected final boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected final boolean DEBUG = log.isDebugEnabled();
-
     /**
      * The initial delay before we will log a warning for {@link #add(Object)}
      * and {@link BlockingBuffer.BlockingIterator#hasNext(long, TimeUnit)}.
@@ -393,19 +389,50 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         if (log.isInfoEnabled()) {
 
-            this.openStackFrame = new RuntimeException("Buffer Allocation Stack Frame");
+            this.openStackFrame = new RuntimeException(
+                    MSG_ALLOCATION_STACK_FRAME);
             
         }
         
     }
 
     /**
-     * Stack frame where the buffer was allocated.
+     * Label for messages displaying the stack frame within which the
+     * {@link BlockingBuffer} was allocated.
+     * 
+     * @see #openStackFrame
+     */
+    private static transient final String MSG_ALLOCATION_STACK_FRAME = "Buffer Allocation Stack Frame";
+
+    /**
+     * Label for messages displaying the stack frame within which the
+     * {@link BlockingBuffer} was {@link #close() closed}.
+     * 
+     * @see #closeStackFrame
+     */
+    private static transient final String MSG_CLOSED_STACK_FRAME = "Buffer Closed Stack Frame";
+    
+    /**
+     * Label for messages displaying the stack frame of the producer writing on
+     * the {@link BlockingBuffer} using {@link #add(Object)}.
+     */
+    private static transient final String MSG_PRODUCER_STACK_FRAME = "Buffer Producer Stack Frame";
+
+    /**
+     * Label for messages displaying the stack frame of the consumer draining
+     * the {@link BlockingBuffer} using the {@link BlockingIterator}.
+     */
+    private static transient final String MSG_CONSUMER_STACK_FRAME = "Buffer Consumer Stack Frame";
+
+    /**
+     * Stack frame where the buffer was allocated. This is allocated iff
+     * {@link Logger#isInfoEnabled()} is <code>true</code> for {@link #log}.
      */
     private RuntimeException openStackFrame;
     
     /**
-     * Stack frame where the buffer was closed.
+     * Stack frame where the buffer was closed. This is allocated iff
+     * {@link Logger#isInfoEnabled()} is <code>true</code> for {@link #log}.
      */
     private RuntimeException closeStackFrame;
 
@@ -447,7 +474,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * Purely for debugging.
                  */
 
-                log.warn("buffer allocated at", openStackFrame);
+                log.warn(openStackFrame);
 
             }
             if (closeStackFrame != null) {
@@ -456,7 +483,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * Purely for debugging.
                  */
 
-                log.warn("buffer closed at", closeStackFrame);
+                log.warn(closeStackFrame);
 
             }
 
@@ -515,7 +542,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 if (log.isInfoEnabled()) {
                 
                     this.closeStackFrame = new RuntimeException(
-                            "Buffer Closed Stack Frame");               
+                            MSG_CLOSED_STACK_FRAME);               
                 
                 }
                 
@@ -546,7 +573,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         if (cause == null)
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("cause=" + cause, cause);
 
         synchronized (this) {
@@ -690,22 +717,22 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     logTimeout += Math.min(maxLogTimeout, logTimeout);
 
-                    final String msg = "waiting - queue is full: ntries="
+                    final String msg = "blocked: ntries="
                             + ntries
                             + ", elapsed="
                             + TimeUnit.MILLISECONDS.convert(elapsed,
                                     TimeUnit.NANOSECONDS)
                             + ", timeout="
                             + TimeUnit.MILLISECONDS.convert(logTimeout,
-                                    TimeUnit.NANOSECONDS);
-                    
+                                    TimeUnit.NANOSECONDS) + "ms : " + this;
+
                     if (log.isInfoEnabled() && logTimeout > maxLogTimeout) {
                         /*
                          * Issue warning with stack trace showing who is
                          * blocked.
                          */
                         log.warn(msg, new RuntimeException(
-                                "Blocked Producer Stack Frame"));
+                                MSG_PRODUCER_STACK_FRAME));
                     } else {
                         // issue warning.
                         log.warn(msg);
@@ -730,7 +757,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 elementCount++;
 
             }
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("added: " + e.toString());
 
             return;
@@ -838,7 +865,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         private BlockingIterator() {
        
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Starting iterator.");
             
         }
@@ -864,7 +891,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         private void _close() {
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("");
             
             if (!open)
@@ -896,22 +923,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * caller (Query works this way).
                  */
                 
-                if(INFO)
-                    log.info("Future not set");
-                
-                if (openStackFrame != null) {
+                if (log.isInfoEnabled()) {
 
                     /*
                      * Purely for debugging.
                      */
 
-                    log.warn("Future not set at", new RuntimeException());
+                    final String msg = "Future not set: " + this;
 
-                    log.warn("buffer allocated at", openStackFrame);
+                    log.warn(msg, new RuntimeException());
+
+                    if (openStackFrame != null) {
+
+                        log.warn(msg, openStackFrame);
+
+                    }
 
                 }
-
-
+                
             } else if (!future.isDone()) {
 
                 if (log.isInfoEnabled()) {
@@ -974,7 +1003,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             if (!futureIsDone && future != null && future.isDone()) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Future is done");
 
                 // don't re-execute this code.
@@ -994,7 +1023,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 } catch (InterruptedException e) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info(e.getMessage());
 
                     // itr will not deliver any more elements.
@@ -1102,6 +1131,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         private boolean _hasNext(long nanos) {
 
+            /*
+             * This false until the producer/consumer stack traces have been
+             * logged. The flag is used to prevent repeated logging of those
+             * stack traces while the iterator is blocked in this method. The
+             * traces will be logged at most once per invocation of this method.
+             */
+            boolean loggedStackTraces = false;
+            
             final long begin = System.nanoTime();
 
             long lastTime = begin;
@@ -1154,7 +1191,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 if(!open) {
                     
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("iterator is closed");
 
                     // check before returning a strong [false] (vs timeout).
@@ -1182,7 +1219,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
                 if (nanos <= 0) {
 
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("Timeout");
 
                     // weak false (timeout).
@@ -1217,7 +1254,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                     if ((nextE = queue.poll()) != null) {
                         
-                        if (DEBUG)
+                        if (log.isDebugEnabled())
                             log.debug("next: " + nextE);
 
                         return true;
@@ -1239,7 +1276,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                         
                         if ((nextE = queue.poll(timeout, TimeUnit.MILLISECONDS)) != null) {
 
-                            if (DEBUG)
+                            if (log.isDebugEnabled())
                                 log.debug("next: " + nextE);
 
                             return true;
@@ -1248,7 +1285,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                     } catch (InterruptedException ex) {
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info(ex.getMessage());
 
                         // itr will not deliver any more elements.
@@ -1309,17 +1346,36 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                          */
                         
                         checkFuture();
-                        
-                        log.warn("Iterator is not progressing: ntries="
+
+                        final String msg = "Iterator is not progressing: ntries="
                                 + ntries
                                 + ", elapsed="
                                 + TimeUnit.MILLISECONDS.convert(elapsedNanos,
-                                        TimeUnit.NANOSECONDS) + "ms"
-//                                + ", buffer.open=" + BlockingBuffer.this.open
-//                                + ", itr.open=" + this.open
-//                                        , stackFrame // shows where it was allocated.
-//                                        , new RuntimeException() // shows where it is being consumed.
-                                );
+                                        TimeUnit.NANOSECONDS) + "ms : " + this;
+
+                        if (log.isInfoEnabled() && !loggedStackTraces) {
+                            
+                            // shows stack trace of the consumer.
+                            log.warn(msg, new RuntimeException(
+                                    MSG_CONSUMER_STACK_FRAME));
+                            
+                            if (openStackFrame != null) {
+                            
+                                // shows stack trace where allocated.
+                                log.warn(msg, openStackFrame);
+
+                            }
+                            
+                            // Do not log the stack traces again during this
+                            // invocation.
+                            loggedStackTraces = true;
+                            
+                        } else {
+                            
+                            // log a warning w/o stack trace.
+                            log.warn(msg);
+                            
+                        }
                         
                     }
 
@@ -1330,7 +1386,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Exhausted");
 
             assert isExhausted();
@@ -1570,7 +1626,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             }
 
             // Done.
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("done:\n" + ">>> #chunks=" + nchunks + ", #elements="
                         + chunk.length + ", chunkCapacity=" + chunkCapacity
                         + ", elapsed=" + elapsed + "ns, isTimeout=" + isTimeout

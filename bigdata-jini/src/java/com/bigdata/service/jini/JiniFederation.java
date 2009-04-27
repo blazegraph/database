@@ -104,7 +104,7 @@ import com.bigdata.zookeeper.ZooResourceLockService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class JiniFederation extends AbstractDistributedFederation implements
+public class JiniFederation<T> extends AbstractDistributedFederation<T> implements
         DiscoveryListener, ServiceDiscoveryListener {
 
     private LookupDiscoveryManager lookupDiscoveryManager;
@@ -226,7 +226,7 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * @param client
      *            The client.
      */
-    public JiniFederation(final JiniClient client, final JiniClientConfig jiniConfig,
+    public JiniFederation(final JiniClient<T> client, final JiniClientConfig jiniConfig,
             final ZookeeperClientConfig zooConfig) {
 
         super(client);
@@ -494,9 +494,9 @@ public class JiniFederation extends AbstractDistributedFederation implements
 //
 //    }
 
-    public JiniClient getClient() {
+    public JiniClient<T> getClient() {
 
-        return (JiniClient) super.getClient();
+        return (JiniClient<T>) super.getClient();
         
     }
     
@@ -1242,16 +1242,16 @@ public class JiniFederation extends AbstractDistributedFederation implements
      * 
      * @todo move this up to {@link AbstractFederation}?
      */
-    public <T> Future<T> submitMonitoredTask(final Callable<T> task) {
+    public <T1> Future<T1> submitMonitoredTask(final Callable<T1> task) {
 
         if (task == null)
             throw new IllegalArgumentException();
 
         assertOpen();
 
-        final Future<T> f = getExecutorService().submit(task);
+        final Future<T1> f = getExecutorService().submit(task);
 
-        futures.add(new TaskFuture<T>(task, f));
+        futures.add(new TaskFuture<T1>(task, f));
 
         return f;
 

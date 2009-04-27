@@ -40,9 +40,16 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public interface IFederationDelegate {
+public interface IFederationDelegate<T> {
 
+    /**
+     * Return the client or service.
+     */
+    public T getService();
+    
     /**
      * Return a name for the service.  It is up to administrators to ensure that
      * service names are unique.

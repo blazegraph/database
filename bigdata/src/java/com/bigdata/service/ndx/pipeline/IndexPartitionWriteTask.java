@@ -148,7 +148,7 @@ A//
             // #of duplicates that were filtered out.
             duplicateCount = sourceChunk.length - chunk.length;
 
-            if (duplicateCount > 0 && DEBUG)
+            if (duplicateCount > 0 && log.isDebugEnabled())
                 log.debug("Filtered out " + duplicateCount
                         + " duplicates from " + chunk.length + " elements");
             
@@ -205,7 +205,7 @@ A//
 
             }
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug(stats);
 
             // keep reading.
@@ -230,7 +230,7 @@ A//
                  * buffer(s).
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Stale locator: name=" + cause.getName()
                             + ", reason=" + cause.getReason());
 

@@ -55,7 +55,7 @@ import com.bigdata.service.EmbeddedClient.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmbeddedFederation extends AbstractScaleOutFederation {
+public class EmbeddedFederation<T> extends AbstractScaleOutFederation<T> {
 
     /**
      * The #of data service instances.
@@ -112,9 +112,9 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
         
     }
     
-    public EmbeddedClient getClient() {
+    public EmbeddedClient<T> getClient() {
         
-        return (EmbeddedClient) super.getClient();
+        return (EmbeddedClient<T>) super.getClient();
         
     }
 
@@ -247,7 +247,7 @@ public class EmbeddedFederation extends AbstractScaleOutFederation {
      * @param client
      *            The client.
      */
-    protected EmbeddedFederation(final EmbeddedClient client) {
+    protected EmbeddedFederation(final EmbeddedClient<T> client) {
         
         super(client);
         

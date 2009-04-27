@@ -65,13 +65,15 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public abstract class AbstractScaleOutFederation extends AbstractFederation {
+public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T> {
 
     /**
      * @param client
      */
-    public AbstractScaleOutFederation(IBigdataClient client) {
+    public AbstractScaleOutFederation(final IBigdataClient<T> client) {
        
         super(client);
         

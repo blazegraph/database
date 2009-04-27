@@ -71,9 +71,6 @@ L>//
     protected static transient final Logger log = Logger
             .getLogger(AbstractSubtask.class);
 
-    protected transient final boolean INFO = log.isInfoEnabled(); 
-    protected transient final boolean DEBUG = log.isDebugEnabled(); 
-
     /**
      * The master.
      */
@@ -161,7 +158,7 @@ L>//
                 
                 if (handleChunk(chunk)) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Eager termination.");
 
                     // Done (eager termination).
@@ -177,7 +174,7 @@ L>//
             // normal completion.
             master.removeOutputBuffer(locator, this);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Done: " + locator);
 
             // done.
@@ -185,8 +182,8 @@ L>//
 
         } catch (Throwable t) {
 
-            if (INFO) {
-                // show stack trace @ INFO
+            if (log.isInfoEnabled()) {
+                // show stack trace @ log.isInfoEnabled()
                 log.warn(this, t);
             } else {
                 // else only abbreviated warning.
@@ -321,7 +318,7 @@ L>//
                              * Note: This can happen either if the master is
                              * closed or if idle too long.
                              */
-                            if (INFO)
+                            if (log.isInfoEnabled())
                                 log.info("Closing buffer: idle=" + idle + " : "
                                         + this);
                             if (idle) {
@@ -339,7 +336,7 @@ L>//
                                  * The iterator is already exhausted so we break
                                  * out of the loop now.
                                  */
-                                if (INFO)
+                                if (log.isInfoEnabled())
                                     log.info("No more data: " + this);
                                 return false;
                             }
@@ -379,9 +376,10 @@ L>//
                         TimeUnit.NANOSECONDS)) {
 
                     /*
-                     * Take whatever is already buffered but do allow the source
-                     * iterator to combine chunks since that would increase our
-                     * blocking time by whatever the chunkTimeout is.
+                     * Take whatever is already buffered but do not allow the
+                     * source iterator to combine chunks since that would
+                     * increase our blocking time by whatever the chunkTimeout
+                     * is.
                      */
                     final E[] a = src.next(1L, TimeUnit.NANOSECONDS);
 
@@ -395,7 +393,7 @@ L>//
                     chunkSize += a.length;
 
                     if (log.isDebugEnabled())
-                        log.debug("Combined another chunk: chunkSize="
+                        log.debug("Combining chunks: chunkSize="
                                 + a.length
                                 + ", ncombined="
                                 + chunks.size()
@@ -410,7 +408,7 @@ L>//
                 
                 if (chunkSize == 0 && !buffer.isOpen() && !src.hasNext()) {
                     // We are done.
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("No more data: " + this);
                     return false;
                 }
