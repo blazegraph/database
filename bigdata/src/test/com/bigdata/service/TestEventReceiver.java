@@ -527,7 +527,7 @@ public class TestEventReceiver extends TestCase2 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    static class MockFederation implements IBigdataFederation {
+    static class MockFederation implements IBigdataFederation<IEventReceivingService> {
 
         private final IEventReceivingService eventReceiver;
         private final UUID serviceUUID = UUID.randomUUID();
@@ -538,16 +538,31 @@ public class TestEventReceiver extends TestCase2 {
             
         }
         
+        public IEventReceivingService getService() {
+            
+            return eventReceiver;
+            
+        }
+        
         public Class getServiceIface() {
-            return TestEventReceiver.class;
+        
+            return IEventReceivingService.class;
+//            return TestEventReceiver.class;
+            
         }
 
         public String getServiceName() {
-            return TestEventReceiver.class.getName();
+  
+            return IEventReceivingService.class.getName();
+            
+//            return TestEventReceiver.class.getName();
+            
         }
 
         public UUID getServiceUUID() {
+            
             return serviceUUID;
+            
         }
 
         /*

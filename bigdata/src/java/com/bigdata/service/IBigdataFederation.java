@@ -48,8 +48,10 @@ import com.bigdata.sparse.SparseRowStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public interface IBigdataFederation extends IIndexManager, IFederationDelegate {
+public interface IBigdataFederation<T> extends IIndexManager, IFederationDelegate<T> {
 
     /**
      * Return the client object that was used to connect to the federation.

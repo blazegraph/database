@@ -34,7 +34,7 @@ import java.util.Properties;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.load.RDFFileLoadTask;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteConfiguration;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -228,7 +228,7 @@ public class TestAsynchronousStatementBufferWithoutSids extends
         // FIXME chunkSize parameter.
         final int chunkSize = 20000;
 
-        final AsynchronousWriteConfiguration<BigdataStatement> factory = new AsynchronousWriteConfiguration<BigdataStatement>(
+        final AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement> factory = new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
                 (ScaleOutTripleStore) store, chunkSize);
 
         try {

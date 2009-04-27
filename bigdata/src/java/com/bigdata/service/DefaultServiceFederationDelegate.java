@@ -52,19 +52,25 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  * @version $Id$
  */
 public class DefaultServiceFederationDelegate<T extends AbstractService>
-        implements IFederationDelegate {
+        implements IFederationDelegate<T> {
 
     protected final static Logger log = Logger
             .getLogger(DefaultServiceFederationDelegate.class);
     
     final protected T service;
     
-    public DefaultServiceFederationDelegate(T service) {
+    public DefaultServiceFederationDelegate(final T service) {
         
         if (service == null)
             throw new IllegalArgumentException();
         
         this.service = service;
+        
+    }
+
+    public T getService() {
+        
+        return service;
         
     }
     

@@ -38,8 +38,10 @@ import com.bigdata.mdi.PartitionLocator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public abstract class AbstractScaleOutClient extends AbstractClient {
+public abstract class AbstractScaleOutClient<T> extends AbstractClient<T> {
 
     /**
      * @param properties

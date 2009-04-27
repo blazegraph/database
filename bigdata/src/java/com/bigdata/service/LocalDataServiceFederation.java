@@ -56,8 +56,10 @@ import com.bigdata.util.InnerCause;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public class LocalDataServiceFederation extends AbstractFederation {
+public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
     private AbstractTransactionService abstractTransactionService;
     final private ResourceLockService resourceLockManager = new ResourceLockService();
@@ -75,7 +77,7 @@ public class LocalDataServiceFederation extends AbstractFederation {
 //
 //    }
 
-    public LocalDataServiceFederation(final LocalDataServiceClient client) {
+    public LocalDataServiceFederation(final LocalDataServiceClient<T> client) {
         
         super(client);
 
@@ -185,9 +187,9 @@ public class LocalDataServiceFederation extends AbstractFederation {
     /**
      * Extended for type-safe return.
      */
-    public LocalDataServiceClient getClient() {
+    public LocalDataServiceClient<T> getClient() {
 
-        return (LocalDataServiceClient) super.getClient();
+        return (LocalDataServiceClient<T>) super.getClient();
         
     }
     

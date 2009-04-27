@@ -632,7 +632,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * queue.
          */
         String MASTER_CHUNK_SIZE = "masterChunkSize";
-
         String DEFAULT_MASTER_CHUNK_SIZE = "10000";
 
         /**
@@ -641,18 +640,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         String MASTER_CHUNK_TIMEOUT_NANOS = "masterChunkTimeoutNanos";
         String DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(50);
-        
-        /**
-         * The time in nanoseconds after which an idle sink will be closed. Any
-         * buffered writes are flushed when the sink is closed. This must be GTE
-         * the <i>sinkChunkTimeout</i> otherwise the sink will decide that it
-         * is idle when it was just waiting for enough data to prepare a full
-         * chunk.
-         */
-        // GTE chunkTimeout
-        String SINK_IDLE_TIMEOUT_NANOS = "sinkIdleTimeoutNanos";
-        String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(10000);
-        
+
         /**
          * The time in nanoseconds that the {@link AbstractSubtask sink} will
          * wait inside of the {@link IAsynchronousIterator} when it polls the
@@ -679,10 +667,27 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         /**
          * The maximum amount of time in nanoseconds that a sink will combine
          * smaller chunks so that it can satisify the desired <i>sinkChunkSize</i>.
+         * 
+         * FIXME Both the sink and idle timeouts should default to
+         * {@link Long#MAX_VALUE}, in which case they simply wait until
+         * {@link #SINK_CHUNK_SIZE} elements have accumualated before writing on
+         * the index partition. This makes it much easier to adjust the
+         * performance since you simply adjust the {@link #SINK_CHUNK_SIZE}.
          */
         String SINK_CHUNK_TIMEOUT_NANOS = "sinkChunkTimeoutNanos";
-        String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(5000);
-
+        String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = ""+TimeUnit.SECONDS.toNanos(5);
+       
+        /**
+         * The time in nanoseconds after which an idle sink will be closed. Any
+         * buffered writes are flushed when the sink is closed. This must be GTE
+         * the <i>sinkChunkTimeout</i> otherwise the sink will decide that it
+         * is idle when it was just waiting for enough data to prepare a full
+         * chunk.
+         */
+        // GTE chunkTimeout
+        String SINK_IDLE_TIMEOUT_NANOS = "sinkIdleTimeoutNanos";
+        String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = ""+TimeUnit.SECONDS.toNanos(10);
+        
     }
     
     /**

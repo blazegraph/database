@@ -1,5 +1,6 @@
 package com.bigdata.rdf.load;
 
+import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -10,8 +11,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RDFVerifyTaskFactory<T extends Runnable> extends
-        AbstractRDFTaskFactory<T> {
+public class RDFVerifyTaskFactory<S extends Statement,T extends Runnable> extends
+        AbstractRDFTaskFactory<S,T> {
 
     public RDFVerifyTaskFactory(AbstractTripleStore db, int bufferCapacity,
             boolean verifyData, boolean deleteAfter, RDFFormat fallback) {

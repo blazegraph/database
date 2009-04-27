@@ -1,5 +1,6 @@
 package com.bigdata.rdf.load;
 
+import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.counters.CounterSet;
@@ -15,8 +16,8 @@ import com.bigdata.service.ILoadBalancerService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RDFLoadTaskFactory<T extends Runnable> extends
-        AbstractRDFTaskFactory<T> {
+public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
+        AbstractRDFTaskFactory<S,T> {
     
     /**
      * 
@@ -43,7 +44,7 @@ public class RDFLoadTaskFactory<T extends Runnable> extends
             final RDFFormat fallback) {
 
         this(db, verifyData, deleteafter, fallback,
-                new LoadStatementBufferFactory(db, bufferCapacity, writeBuffer));
+                new LoadStatementBufferFactory<S>(db, bufferCapacity, writeBuffer));
 
     }
 

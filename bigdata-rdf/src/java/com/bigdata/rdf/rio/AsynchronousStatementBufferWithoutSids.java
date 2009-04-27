@@ -42,7 +42,6 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
@@ -60,7 +59,6 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdWriteTask;
 import com.bigdata.rdf.lexicon.WriteTaskStats;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
-import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -77,7 +75,6 @@ import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -270,7 +267,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
     final protected transient boolean DEBUG = log.isDebugEnabled();
     
-    private final AsynchronousWriteConfiguration<S> statementBufferFactory;
+    private final AsynchronousWriteBufferFactoryWithoutSids<S> statementBufferFactory;
     
     private final AbstractTripleStore database;
     
@@ -338,7 +335,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
      * 
      */
     protected AsynchronousStatementBufferWithoutSids(
-            final AsynchronousWriteConfiguration<S> asynchronousWriteConfiguration) {
+            final AsynchronousWriteBufferFactoryWithoutSids<S> asynchronousWriteConfiguration) {
 
         if (asynchronousWriteConfiguration == null)
             throw new IllegalArgumentException();
@@ -1076,53 +1073,17 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
     }
 
     /**
-     * Factory interface for asynchronous writers on an {@link ITripleStore}.
-     */
-    public static interface IAsynchronousWriteConfiguration<S extends Statement>
-            extends IStatementBufferFactory<S> {
-
-        /**
-         * Return a new {@link IStatementBuffer} which may be used to bulk load
-         * RDF data. The writes will proceed asynchronously using buffers shared
-         * by all {@link IStatementBuffer}s returned by this factory for a
-         * given instance of this class. Each {@link IStatementBuffer} MAY be
-         * recycled using {@link IBuffer#reset()} or simply discarded after its
-         * use.
-         */
-        public IStatementBuffer<S> newStatementBuffer();
-
-        /**
-         * Cancel all {@link Future}s.
-         * 
-         * @param mayInterruptIfRunning
-         */
-        public void cancelAll(final boolean mayInterruptIfRunning);
-
-        /**
-         * Close the {@link BlockingBuffer}s and await their {@link Future}s.
-         * 
-         * @throws ExecutionException
-         *             if any {@link Future} fails.
-         * 
-         * @throws InterruptedException
-         *             if interrupted while awaiting any of the {@link Future}s.
-         */
-        public void awaitAll() throws InterruptedException, ExecutionException;
-        
-    }
-
-    /**
      * Configuration object specifies the {@link BlockingBuffer}s which will be
      * used to write on each of the indices and the reference for the TERM2ID
      * index since we will use synchronous RPC on that index. The same
-     * {@link AsynchronousWriteConfiguration} may be used for multiple
+     * {@link AsynchronousWriteBufferFactoryWithoutSids} may be used for multiple
      * concurrent {@link AsynchronousStatementBufferWithoutSids} instances.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static class AsynchronousWriteConfiguration<S extends BigdataStatement> implements
-            IAsynchronousWriteConfiguration<S> {
+    public static class AsynchronousWriteBufferFactoryWithoutSids<S extends BigdataStatement> implements
+            IAsynchronousWriteBufferFactory<S> {
        
         private final ScaleOutTripleStore tripleStore;
         
@@ -1196,7 +1157,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          *            {@link IndexMetadata} when the triple store indices are
          *            created.
          */
-        public AsynchronousWriteConfiguration(final ScaleOutTripleStore tripleStore,
+        public AsynchronousWriteBufferFactoryWithoutSids(final ScaleOutTripleStore tripleStore,
                 final int producerChunkSize) {
 
             if (tripleStore == null)
@@ -1280,16 +1241,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         }
 
-        /**
-         * Return <code>true</code> if the {@link Future} for any of the
-         * asynchronous write buffers is done.
-         * <p>
-         * Note: This method should be invoked periodically to verify that no
-         * errors have been encountered by the asynchronous write buffers. If
-         * this method returns <code>true</code>, invoke {@link #awaitAll()},
-         * which will detect any error(s), cancel the other {@link Future}s,
-         * and throw an error back to you.
-         */
         public boolean isDone() {
             
             if (buffer_id2t.getFuture().isDone())
@@ -1333,13 +1284,9 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                 buffer_osp.getFuture().cancel(mayInterruptIfRunning);
 
         }
-
-        /**
-         * Close buffers and then await their {@link Future}s. Once closed, the
-         * buffers will not accept further input.
-         */
-        public void awaitAll() throws InterruptedException, ExecutionException {
-
+        
+        public void close() {
+            
             if(log.isInfoEnabled())
                 log.info("Closing buffers.");
             
@@ -1356,10 +1303,14 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             if (buffer_osp != null)
                 buffer_osp.close();
 
-            /*
-             * Await futures.
-             */
+        }
 
+        public void awaitAll() throws InterruptedException, ExecutionException {
+
+            // Close buffers.
+            close();
+            
+            // Await futures.
             if(log.isInfoEnabled())
                 log.info("Awaiting futures.");
 

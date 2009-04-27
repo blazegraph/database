@@ -54,8 +54,10 @@ import com.bigdata.journal.AbstractTask;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public class LocalDataServiceClient extends AbstractClient {
+public class LocalDataServiceClient<T> extends AbstractClient<T> {
 
     /**
      * Options understood by the {@link LocalDataServiceClient}.
@@ -82,7 +84,7 @@ public class LocalDataServiceClient extends AbstractClient {
     /**
      * The federation and <code>null</code> iff not connected.
      */
-    private LocalDataServiceFederation fed = null;
+    private LocalDataServiceFederation<T> fed = null;
 
     synchronized public boolean isConnected() {
         
@@ -113,7 +115,7 @@ public class LocalDataServiceClient extends AbstractClient {
 
     }
     
-    synchronized public LocalDataServiceFederation getFederation() {
+    synchronized public LocalDataServiceFederation<T> getFederation() {
 
         if (fed == null) {
 
@@ -125,11 +127,11 @@ public class LocalDataServiceClient extends AbstractClient {
 
     }
 
-    synchronized public LocalDataServiceFederation connect() {
+    synchronized public LocalDataServiceFederation<T> connect() {
 
         if (fed == null) {
 
-            fed = new LocalDataServiceFederation(this);
+            fed = new LocalDataServiceFederation<T>(this);
 
         }
 

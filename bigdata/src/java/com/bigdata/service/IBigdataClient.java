@@ -85,8 +85,10 @@ import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @param <T>
+ *            The generic type of the client or service.
  */
-public interface IBigdataClient {
+public interface IBigdataClient<T> {
 
     /**
      * Connect to a bigdata federation. If the client is already connected, then
@@ -97,7 +99,7 @@ public interface IBigdataClient {
      * @throws RuntimeException
      *             if the connection can not be established.
      */
-    public IBigdataFederation connect();
+    public IBigdataFederation<T> connect();
 
     /**
      * Return the connected federation,
@@ -105,7 +107,7 @@ public interface IBigdataClient {
      * @throws IllegalStateException
      *             if the client is not connected.
      */
-    public IBigdataFederation getFederation();
+    public IBigdataFederation<T> getFederation();
 
     /**
      * Disconnect from the bigdata federation.

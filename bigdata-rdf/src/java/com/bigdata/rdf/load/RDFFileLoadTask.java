@@ -12,13 +12,12 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.load.RDFDataLoadMaster.JobState;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteConfiguration;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.IAsynchronousWriteConfiguration;
-import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.rio.IAsynchronousWriteBufferFactory;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.DataService;
 import com.bigdata.service.FederationCallable;
 import com.bigdata.service.jini.JiniFederation;
@@ -108,7 +107,7 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
         }
 
         // optionally use asynchronous writes on the statement indices.
-        final IAsynchronousWriteConfiguration statementfactory = jobState.asynchronousWrites ? new AsynchronousWriteConfiguration(
+        final IAsynchronousWriteBufferFactory<BigdataStatement> statementfactory = jobState.asynchronousWrites ? new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
                 (ScaleOutTripleStore) tripleStore,
                 jobState.asynchronousWritesProducerChunkSize)
                 : null;
@@ -117,7 +116,7 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
                 jobState.parserValidates, jobState.deleteAfter,
                 jobState.fallback, statementfactory);
 
-        final BlockingBuffer<ISPO[]> writeBuffer = null;//@todo drop this
+//        final BlockingBuffer<ISPO[]> writeBuffer = null;//@todo drop this
 //        final BlockingBuffer<ISPO[]> writeBuffer = jobState.writeBufferChunkSize != 0 ? tripleStore
 //        .getSPORelation().newWriteBuffer(jobState.writeBufferChunkSize)
 //        : null;
@@ -173,23 +172,26 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
             loader.shutdown();
 
             if (statementfactory != null) {
+                
                 if (log.isInfoEnabled())
                     log.info("Closing async writers.");
+                
                 statementfactory.awaitAll();
-            }
-
-            if (writeBuffer != null) {
-
-                if (log.isInfoEnabled())
-                    log.info("Closing the write buffer.");
-                
-                // done with this buffer. 
-                writeBuffer.close();
-                
-                // await the completion of the task draining the buffer.
-                writeBuffer.getFuture().get();
                 
             }
+
+//            if (writeBuffer != null) {
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Closing the write buffer.");
+//                
+//                // done with this buffer. 
+//                writeBuffer.close();
+//                
+//                // await the completion of the task draining the buffer.
+//                writeBuffer.getFuture().get();
+//                
+//            }
 
         } catch (Throwable t) {
 
@@ -201,10 +203,10 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
                     statementfactory
                             .cancelAll(true/* mayInterruptIfRunning */);
                 }
-                if (writeBuffer != null) {
-                    writeBuffer.getFuture()
-                            .cancel(true/* mayInterruptIfRunning */);
-                }
+//                if (writeBuffer != null) {
+//                    writeBuffer.getFuture()
+//                            .cancel(true/* mayInterruptIfRunning */);
+//                }
             } catch (Throwable t2) {
                 log.warn(this, t2);
             }
