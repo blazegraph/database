@@ -116,7 +116,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            
      * @return The timeout (milliseconds).
      */
-    private static final long getTimeout(final int ntries) {
+    private static final long getTimeoutMillis(final int ntries) {
         
         return ntries < 500 ? 10L : ntries < 1000 ? 100L : 250L;
         
@@ -690,7 +690,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             } else {
 
-                final long timeout = getTimeout(ntries);
+                final long timeout = getTimeoutMillis(ntries);
 
                 try {
 
@@ -1272,7 +1272,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                     try {
 
-                        final long timeout = getTimeout(ntries);
+                        final long timeout = getTimeoutMillis(ntries);
                         
                         if ((nextE = queue.poll(timeout, TimeUnit.MILLISECONDS)) != null) {
 
@@ -1286,7 +1286,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     } catch (InterruptedException ex) {
 
                         if (log.isInfoEnabled())
-                            log.info(ex.getMessage());
+                            log.info("Interrupted: " + this);
 
                         // itr will not deliver any more elements.
                         _close();

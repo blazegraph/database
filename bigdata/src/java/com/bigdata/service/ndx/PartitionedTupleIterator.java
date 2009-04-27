@@ -44,7 +44,6 @@ import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataServiceTupleIterator;
 import com.bigdata.service.IDataService;
-import com.bigdata.service.TestRangeQuery;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -146,7 +145,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
      *       an empty partition in the middle of the key range scan for both
      *       forward and reverse traversal and a test where there is a non-empty
      *       partition whose tuples are filtered out such that it is effectively
-     *       empty. see {@link TestRangeQuery#test_reverseScan()}
+     *       empty. see TestRangeQuery#test_reverseScan()
      * 
      * @todo if we restart a locator scan and the index partition boundaries
      *       have changed, then what do we need to do in order to make sure that
