@@ -281,7 +281,7 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
                     
                     lst.add(l);
                     
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("Will verify using locator: "+l);
                     
                 }
@@ -308,7 +308,7 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
             // adjust for elapsed time.
             nanos -= elapsed;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log
                         .info("Registrars: #found=" + registrars.length
                                 + ", elapsed="

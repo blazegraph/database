@@ -81,11 +81,11 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.start.BigdataZooDefs;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.service.mapred.jini.MapServer;
 import com.bigdata.service.mapred.jini.ReduceServer;
 import com.bigdata.zookeeper.ZLock;
@@ -152,15 +152,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     
     final static protected Logger log = Logger.getLogger(AbstractServer.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is log.isInfoEnabled() or less.
+//     */
+//    final static protected boolean log.isInfoEnabled() = log.isInfoEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final static protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The {@link ServiceID} for this server is either read from a local file,
@@ -353,12 +353,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             System.setSecurityManager(new SecurityManager());
          
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Set security manager");
 
         } else {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Security manager already in place: " + sm.getClass());
             
         }
@@ -656,7 +656,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 
             } else {
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("New service instance.");
 
             }
@@ -719,13 +719,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * to avoid this subclass ctor init problem.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Creating service impl...");
 
             // init w/ client's properties.
             impl = newService(client.getProperties());
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Service impl is " + impl);
 
             // Connect to the federation (starts service discovery for client).
@@ -804,7 +804,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             proxy = exporter.export(impl);
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Proxy is " + proxy + "(" + proxy.getClass() + ")");
 
         } catch (ExportException ex) {
@@ -1028,7 +1028,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     synchronized protected boolean unexport(boolean force) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("force=" + force + ", proxy=" + proxy);
 
         try {
@@ -1076,7 +1076,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             final ServiceID serviceID = new ServiceID(new DataInputStream(is));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Read ServiceID=" + serviceID + " from " + file);
 
             return serviceID;
@@ -1102,7 +1102,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         if (serviceID == null)
             throw new IllegalArgumentException();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("serviceID=" + serviceID);
 
         if (this.serviceID != null && !this.serviceID.equals(serviceID)) {
@@ -1165,7 +1165,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 dout.flush();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("ServiceID saved: file=" + serviceIdFile
                             + ", serviceID=" + serviceID);
 
@@ -1390,7 +1390,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("(Re)-registered with zookeeper: zpath="
                     + physicalServiceZPath);
 
@@ -1426,7 +1426,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                     // Note: Happens during shutdown.
 
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("Interrupted.");
 
                 } catch (SessionExpiredException t) {
@@ -1584,7 +1584,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 } else {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Service remains registered with " + a.length
                                 + " service registrars");
                     
@@ -1651,7 +1651,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
          */
         try {
         
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Unexporting the service proxy.");
 
             unexport(true/* force */);
@@ -1682,7 +1682,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 //
 //                if (zookeeper != null) {
 //
-//                    if (INFO)
+//                    if (log.isInfoEnabled())
 //                        log.info("Deleting service znode: "
 //                                + physicalServiceZPath);
 //
@@ -1817,7 +1817,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     synchronized protected void terminate() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Terminating service management threads.");
 
         if (joinManager != null) {
@@ -1847,7 +1847,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                  * cause the ephemeral znode for the service to be removed.
                  */
 
-//                if (INFO)
+//                if (log.isInfoEnabled())
 //                    log.info("Disconnecting from federation");
                 
                 client.disconnect(true/* immediateShutdown */);
@@ -1865,7 +1865,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     public void run() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Started server.");
 
         /*
@@ -1936,7 +1936,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 
             } catch (InterruptedException ex) {
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(ex.getLocalizedMessage());
 
             } finally {
@@ -1984,7 +1984,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             
             try {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Running shutdown.");
 
                 /*
@@ -2018,7 +2018,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         shutdownNow();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Deleting: " + serviceIdFile);
 
         if (!serviceIdFile.delete()) {

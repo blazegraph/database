@@ -37,10 +37,6 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
     protected static final Logger log = Logger.getLogger(ServicesManagerStartupTask.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     protected final JiniFederation fed;
 
     protected final Configuration config;
@@ -124,7 +120,7 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
     protected void doStartup() throws Exception {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running.");
 
         // the service manager's own configuration.
@@ -280,6 +276,9 @@ public class ServicesManagerStartupTask implements Callable<Void> {
             throws KeeperException, InterruptedException,
             ConfigurationException {
 
+    	if(log.isInfoEnabled())
+    		log.info("Preparing zookeeper for configuration push.");
+    	
         final ZooKeeper zookeeper = fed.getZookeeper();
 
         if (zookeeper == null)
@@ -362,7 +361,7 @@ public class ServicesManagerStartupTask implements Callable<Void> {
             } catch (NodeExistsException ex) {
 
                 // that's fine - the configuration already exists.
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("exists: " + zpath);
 
                 return;
@@ -388,6 +387,9 @@ public class ServicesManagerStartupTask implements Callable<Void> {
             throws KeeperException, InterruptedException,
             ConfigurationException {
 
+    	if(log.isInfoEnabled())
+    		log.info("Pushing configuration.");
+    	
         for (ServiceConfiguration x : serviceConfigurations) {
 
             if (!(x instanceof ManagedServiceConfiguration)) {
@@ -405,9 +407,9 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
                 zookeeper.create(zpath, data, acl, CreateMode.PERSISTENT);
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Created: " + zpath + " : " + x);
-                else if (INFO)
+                else if (log.isInfoEnabled())
                     log.info("Created: " + zpath);
 
             } catch (NodeExistsException ex) {
@@ -415,9 +417,9 @@ public class ServicesManagerStartupTask implements Callable<Void> {
                 try {
                     zookeeper.setData(zpath, data, -1/* version */);
 
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("Updated: " + zpath + " : " + x);
-                    else if (INFO)
+                    else if (log.isInfoEnabled())
                         log.info("Updated: " + zpath);
 
                 } catch (KeeperException ex2) {

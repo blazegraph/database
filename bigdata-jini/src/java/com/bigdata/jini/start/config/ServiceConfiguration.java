@@ -41,11 +41,7 @@ import com.sun.jini.tool.ClassServer;
 abstract public class ServiceConfiguration implements Serializable {
 
     protected static final Logger log = Logger.getLogger(ServiceConfiguration.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
 
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * Options understood by {@link ServiceConfiguration}.
      * 
@@ -266,7 +262,7 @@ abstract public class ServiceConfiguration implements Serializable {
         
         this.className = className;
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("className="+className);
 
         args = getArgs(className, config);
@@ -281,7 +277,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.ARGS + "=" + Arrays.toString(args));
         
         options = getOptions(className, config);
@@ -296,7 +292,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.OPTIONS + "=" + Arrays.toString(options));
         
         serviceDir = getServiceDir(className, config);
@@ -304,12 +300,12 @@ abstract public class ServiceConfiguration implements Serializable {
         if (serviceDir == null)
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.SERVICE_DIR + "=" + serviceDir);
 
         timeout = getTimeout(className, config, getDefaultTimeout());
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.TIMEOUT + "=" + timeout);
 
         serviceCount = getServiceCount(className, config);
@@ -317,7 +313,7 @@ abstract public class ServiceConfiguration implements Serializable {
         if (serviceCount < 0) // @todo LTE ZERO?
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.SERVICE_COUNT + "=" + serviceCount);
 
         replicationCount = getReplicationCount(className, config);
@@ -344,12 +340,12 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
        
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.REPLICATION_COUNT + "=" + replicationCount);
 
         constraints = getConstraints(className, config);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.CONSTRAINTS + "=" + Arrays.toString(constraints));
 
     }
@@ -377,7 +373,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
     /**
      * Verify that we could start this service. All constraints that would be
-     * violated are logged.
+     * violated are logged @ INFO.
      * <p>
      * Note: Constraints which can be evaluated without the federation reference
      * MUST NOT throw an exception if that reference is <code>null</code>.
@@ -386,8 +382,34 @@ abstract public class ServiceConfiguration implements Serializable {
      * 
      * @param fed
      *            The federation.
+	 *            
+	 * @return <code>true</code> if all constraints are satisified.
      */
-    public boolean canStartService(final JiniFederation fed) {
+	public boolean canStartService(final JiniFederation fed) {
+
+		return canStartService(fed, null/* violated */);
+    	
+    }
+    
+    /**
+	 * Verify that we could start this service. All constraints that would be
+	 * violated are logged @ INFO.
+	 * <p>
+	 * Note: Constraints which can be evaluated without the federation reference
+	 * MUST NOT throw an exception if that reference is <code>null</code>.
+	 * This allows us to evaluate constraints for boostrap services as well as
+	 * for {@link ManagedServiceConfiguration}s
+	 * 
+	 * @param fed
+	 *            The federation.
+	 * @param violatedConstraints
+	 *            When non-<code>null</code>, any constraints which would be
+	 *            violated are added to this list.
+	 *            
+	 * @return <code>true</code> if all constraints are satisified.
+	 */
+    public boolean canStartService(final JiniFederation fed,
+			List<IServiceConstraint> violatedConstraints) {
 
         boolean canStart = true;
         
@@ -395,9 +417,15 @@ abstract public class ServiceConfiguration implements Serializable {
 
             try {
 
-                if (!constraint.allow(fed)) {
+				if (!constraint.allow(fed)) {
 
-                    if (INFO)
+					if (violatedConstraints != null) {
+
+						violatedConstraints.add(constraint);
+
+					}
+                	
+                    if (log.isInfoEnabled())
                         log.info("Violates constraint: class=" + className
                                 + ", constraint=" + constraint);
 
@@ -415,8 +443,8 @@ abstract public class ServiceConfiguration implements Serializable {
             
         }
         
-        if (INFO)
-            log.info("canStart=" + canStart+" : "+this);
+        if (log.isInfoEnabled())
+			log.info("canStart=" + canStart + " : " + this);
         
         return canStart;
 
@@ -473,7 +501,7 @@ abstract public class ServiceConfiguration implements Serializable {
          */
         public V call() throws Exception {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("config: " + this);
 
             // hook for setup before the process starts.

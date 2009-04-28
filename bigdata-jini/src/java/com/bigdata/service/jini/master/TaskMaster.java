@@ -60,6 +60,7 @@ import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.BigdataZooDefs;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
@@ -70,7 +71,6 @@ import com.bigdata.service.IDataServiceCallable;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.service.jini.util.DumpFederation.ScheduledDumpTask;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;

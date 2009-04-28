@@ -37,6 +37,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.ITimestampService;
 import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
@@ -45,7 +46,6 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.util.JiniServicesHelper;
-import com.bigdata.service.jini.util.JiniUtil;
 
 /**
  * Test suite for the {@link JiniClient}.

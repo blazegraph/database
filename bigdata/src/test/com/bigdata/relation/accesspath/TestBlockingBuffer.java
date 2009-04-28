@@ -44,8 +44,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo this should have a more extensive test suite since we use it all over.
  */
 public class TestBlockingBuffer extends TestCase2 {
 
@@ -81,10 +79,6 @@ public class TestBlockingBuffer extends TestCase2 {
      * @throws TimeoutException
      * @throws ExecutionException
      * @throws InterruptedException
-     * 
-     * FIXME Do a variant of this for chunks. I suspect that the problem emerges
-     * when there is a partial chunk and next(timeout) fails to respect the
-     * timeout.
      */
     public void test_blockingBuffer() throws InterruptedException,
             ExecutionException, TimeoutException {

@@ -1,5 +1,7 @@
 package com.bigdata.service.jini;
 
+import org.apache.log4j.Logger;
+
 import com.sun.jini.start.LifeCycle;
 
 /**
@@ -11,17 +13,20 @@ import com.sun.jini.start.LifeCycle;
  */
 public final class FakeLifeCycle implements LifeCycle {
 
-    public FakeLifeCycle() {
-        
-    }
-    
-    public boolean unregister(final Object arg0) {
-        
-        if (AbstractServer.INFO)
-            AbstractServer.log.info("");
-        
-        return true;
-        
-    }
-    
+	protected final static transient Logger log = Logger
+			.getLogger(FakeLifeCycle.class);
+
+	public FakeLifeCycle() {
+
+	}
+
+	public boolean unregister(final Object arg0) {
+
+		if (log.isInfoEnabled())
+			log.info("");
+
+		return true;
+
+	}
+
 }

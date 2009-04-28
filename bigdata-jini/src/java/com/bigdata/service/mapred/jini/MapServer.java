@@ -36,12 +36,12 @@ import net.jini.config.Configuration;
 
 import org.apache.log4j.MDC;
 
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.service.mapred.MapService;
 import com.sun.jini.start.LifeCycle;
 import com.sun.jini.start.ServiceDescriptor;

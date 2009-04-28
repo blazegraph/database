@@ -36,8 +36,8 @@ import net.jini.entry.AbstractEntry;
 
 import com.bigdata.jini.start.config.JiniServiceConfiguration;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.jini.AbstractServer;
-import com.bigdata.service.jini.util.JiniUtil;
 
 /**
  * An {@link Entry} whose value is the {@link ServiceID} assigned to a service

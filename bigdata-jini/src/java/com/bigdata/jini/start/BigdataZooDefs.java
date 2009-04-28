@@ -11,9 +11,9 @@ import org.apache.zookeeper.ZooKeeper;
 
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.service.jini.TransactionServer;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZLock;
 

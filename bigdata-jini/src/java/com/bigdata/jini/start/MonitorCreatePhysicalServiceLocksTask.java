@@ -5,6 +5,7 @@ import java.net.UnknownHostException;
 import java.nio.channels.FileLock;
 import java.rmi.RemoteException;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -32,9 +33,9 @@ import com.bigdata.jini.start.config.AbstractHostConstraint;
 import com.bigdata.jini.start.config.IServiceConstraint;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
@@ -61,10 +62,6 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
     final static protected Logger log = Logger
             .getLogger(MonitorCreatePhysicalServiceLocksTask.class);
-
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
 
     private final JiniFederation fed;
     
@@ -166,7 +163,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                     // path to the new lock node.
                     final String lockNodeZPath = locksZPath + "/" + znode;
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("new lock: zpath=" + lockNodeZPath);
 
                     /*
@@ -291,7 +288,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                      * since all running tasks will be cancelled.
                      */
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Interrupted - will not start service.");
 
                     return false;
@@ -321,7 +318,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
                 Thread.sleep(sleep/* ms */);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Retrying: delay=" + sleep + "ms : "
                             + lockNodeZPath);
 
@@ -373,7 +370,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                  * is given by the data in the lock node.
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("have lock: zpath=" + lockNodeZPath);
                 
                 if (runWithZLock()) {
@@ -473,21 +470,21 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             final String serviceConfigZPath = logicalServiceZPath.substring(0,
                     logicalServiceZPath.lastIndexOf('/'));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("logicalServiceZPath=" + logicalServiceZPath);
 
             final ManagedServiceConfiguration config = (ManagedServiceConfiguration) SerializerUtil
                     .deserialize(zookeeper.getData(serviceConfigZPath, false,
                             new Stat()));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Considering: " + config);
 
             if (!config.canStartService(fed)) {
 
                 // will not start this service.
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Constraint(s) do not allow service start: "
                             + config);
 
@@ -500,7 +497,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                     .getChildren(logicalServiceZPath + "/"
                             + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, false);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("serviceConfigZPath=" + serviceConfigZPath
                         + ", logicalServiceZPath=" + logicalServiceZPath
                         + ", targetReplicationCount=" + config.replicationCount
@@ -552,7 +549,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         protected void startService(final ManagedServiceConfiguration config,
                 final String logicalServiceZPath) throws Exception {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("config=" + config + ", zpath=" + logicalServiceZPath);
 
             /*
@@ -638,7 +635,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Service is local: className=" + serviceConfig.className
                     + ", physicalServiceZPath=" + physicalServiceZPath);
 
@@ -651,7 +648,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 if(!shouldRestartPhysicalService(serviceConfig,
                         physicalServiceZPath, attributes)) {
                     
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Will not restart: className="
                                 + serviceConfig.className
                                 + ", physicalServiceZPath="
@@ -692,11 +689,13 @@ public class MonitorCreatePhysicalServiceLocksTask implements
              * which are currently running before deciding whether or not to
              * restart a service?
              */
-            if (!serviceConfig.canStartService(fed)) {
+            final LinkedList<IServiceConstraint> violatedConstraints = new LinkedList<IServiceConstraint>();
+			if (!serviceConfig.canStartService(fed, violatedConstraints)) {
 
                 log.warn("Restart prevented by constraints: className="
-                        + serviceConfig.className + ", physicalServiceZPath="
-                        + physicalServiceZPath);
+						+ serviceConfig.className + ", physicalServiceZPath="
+						+ physicalServiceZPath + ", violatedConstraints="
+						+ violatedConstraints);
 
                 // can't start.
                 return false;
@@ -779,7 +778,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Considering: className=" + serviceConfig.className
                     + ", physicalServiceZPath=" + physicalServiceZPath);
 
@@ -789,7 +788,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
              * Not a persistent service according to the state in zookeeper.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Service not persistent: className="
                         + serviceConfig.className + ", physicalServiceZPath="
                         + physicalServiceZPath);
@@ -805,7 +804,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
              * Discoverable and responding to its API.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Service running: className=" + serviceConfig.className
                         + ", physicalServiceZPath=" + physicalServiceZPath);
 
@@ -871,7 +870,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
    
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Attempting service discovery: className="
                     + serviceConfig.className + ", physicalServiceZPath="
                     + physicalServiceZPath + ", ServiceID=" + serviceID);
@@ -900,7 +899,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * The service is discoverable, but is it alive?
          */
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Service discovered: className=" + serviceConfig.className
                     + ", physicalServiceZPath=" + physicalServiceZPath
                     + ", ServiceItem=" + serviceItem);
@@ -912,7 +911,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 // Is the service alive?
                 ((IService) serviceItem.service).getServiceIface();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Service responding: className="
                             + serviceConfig.className
                             + ", physicalServiceZPath=" + physicalServiceZPath
@@ -942,7 +941,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * how to test its API.
          */
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Assuming service is alive: className="
                     + serviceConfig.className + ", physicalServiceZPath="
                     + physicalServiceZPath + ", ServiceItem=" + serviceItem);
@@ -1012,7 +1011,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
              * persistent but destroyed.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("znode gone: className=" + serviceConfig.className
                         + ", physicalServiceZPath=" + physicalServiceZPath);
 
@@ -1027,7 +1026,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
              * service.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("znode ephemeral: className="
                         + serviceConfig.className + ", physicalServiceZPath="
                         + physicalServiceZPath);
@@ -1069,7 +1068,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("config=" + serviceConfig + ", zpath="
                     + logicalServiceZPath);
 

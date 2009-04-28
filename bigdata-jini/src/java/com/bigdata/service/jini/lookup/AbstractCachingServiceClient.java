@@ -50,8 +50,8 @@ import net.jini.lookup.ServiceItemFilter;
 import org.apache.log4j.Logger;
 
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.util.InnerCause;
 import com.sun.jini.admin.DestroyAdmin;
 

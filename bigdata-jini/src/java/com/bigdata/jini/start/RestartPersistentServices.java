@@ -32,10 +32,6 @@ public class RestartPersistentServices implements Callable<Void> {
 
     protected static final Logger log = Logger.getLogger(RestartPersistentServices.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-
     /**
      * A fatal error (jini registrars not joined, zookeeper client is
      * disconnected, etc).
@@ -68,7 +64,7 @@ public class RestartPersistentServices implements Callable<Void> {
     
     public Void call() throws Exception {
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Running.");
         
         /*
@@ -120,9 +116,17 @@ public class RestartPersistentServices implements Callable<Void> {
             return null;
             
         }
+
+        if (log.isInfoEnabled())
+			log.info("Considering " + serviceConfigZNodes.size()
+					+ " service configurations");
         
         for (String serviceConfigZNode : serviceConfigZNodes) {
 
+            if (log.isInfoEnabled())
+				log.info("Considering service configuration: "
+						+ serviceConfigZNode);
+            
             /*
              * Get the service configuration. We will need it iff we restart an
              * instance of this service type.
@@ -141,6 +145,11 @@ public class RestartPersistentServices implements Callable<Void> {
             final List<String> logicalServiceZNodes = zookeeper.getChildren(
                     serviceConfigZPath, false);
 
+            if (log.isInfoEnabled())
+				log.info("Considering " + logicalServiceZNodes.size()
+						+ " logical services configurations for "
+						+ serviceConfigZNode);
+
             for (String logicalServiceZNode : logicalServiceZNodes) {
 
                 final String logicalServiceZPath = serviceConfigZPath + "/"
@@ -157,6 +166,13 @@ public class RestartPersistentServices implements Callable<Void> {
                 final List<String> physicalServiceZNodes = zookeeper
                         .getChildren(physicalServicesContainerZPath,
                                 false);
+
+                if (log.isInfoEnabled())
+					log
+							.info("Considering " + physicalServiceZNodes.size()
+									+ " physical services configurations for "
+									+ logicalServiceZNode + " of "
+									+ serviceConfigZNode);
                 
                 for (String physicalServiceZNode : physicalServiceZNodes) {
 
@@ -167,7 +183,7 @@ public class RestartPersistentServices implements Callable<Void> {
                             .deserialize(zookeeper.getData(
                                     physicalServiceZPath, false, new Stat()));
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Considering: "
                                 + physicalServicesContainerZPath);
                     

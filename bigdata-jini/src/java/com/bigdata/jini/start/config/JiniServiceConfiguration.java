@@ -72,11 +72,11 @@ import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.util.JiniUtil;
 import com.bigdata.zookeeper.ZNodeCreatedWatcher;
 
 /**
@@ -328,7 +328,7 @@ abstract public class JiniServiceConfiguration extends
                 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("configFile=" + configFile + "\n" + contents);
 
             // and write the data onto the file.
@@ -367,7 +367,7 @@ abstract public class JiniServiceConfiguration extends
                     ConfigurationProvider.getInstance(new String[] { configFile
                             .toString() });
                     
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("Validated generated configuration");
                     
                 } catch (ConfigurationException e) {
@@ -808,7 +808,7 @@ abstract public class JiniServiceConfiguration extends
                 serviceDiscoveryManager = new ServiceDiscoveryManager(fed
                         .getDiscoveryManagement(), new LeaseRenewalManager());
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Awaiting service discovery: "
                             + processHelper.name);
 
@@ -843,7 +843,7 @@ abstract public class JiniServiceConfiguration extends
 
                 }
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Discovered service: elapsed=" + elapsed
                             + ", name=" + processHelper.name + ", item="
                             + items[0]);
@@ -895,7 +895,7 @@ abstract public class JiniServiceConfiguration extends
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("znode exists: zpath=" + physicalServiceZPath);
 
             // success.

@@ -185,7 +185,7 @@ public class LoadBalancerServer extends AbstractServer {
 
             this.oldHandler = Signal.handle(signal, this);
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Installed handler: " + signal + ", oldHandler="
                         + this.oldHandler);
 
@@ -261,7 +261,7 @@ public class LoadBalancerServer extends AbstractServer {
                 // Note: This is an RMI request!
                 final String hostname = service.getHostname();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("serviceJoin: serviceUUID=" + serviceUUID
                             + ", serviceIface=" + serviceIface + ", hostname="
                             + hostname);
@@ -282,7 +282,7 @@ public class LoadBalancerServer extends AbstractServer {
          */
         public void serviceLeave(UUID serviceUUID) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("serviceUUID=" + serviceUUID);
             
             this.service.leave(serviceUUID);
@@ -518,7 +518,7 @@ public class LoadBalancerServer extends AbstractServer {
 
         public Object getAdmin() throws RemoteException {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(""+getServiceUUID());
 
             return server.proxy;
@@ -532,7 +532,7 @@ public class LoadBalancerServer extends AbstractServer {
          * <dt>clientname
          * <dt>
          * <dd>The hostname or IP address of the client making the request (at
-         * {@link #INFO} or better)</dd>
+         * {@link #log.isInfoEnabled()} or better)</dd>
          * 
          * </dl>
          */
@@ -540,14 +540,14 @@ public class LoadBalancerServer extends AbstractServer {
 
             super.setupLoggingContext();
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 MDC.put("clientname", getClientHostname());
 
         }
 
         protected void clearLoggingContext() {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 MDC.remove("clientname");
 
             super.clearLoggingContext();

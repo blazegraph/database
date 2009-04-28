@@ -164,7 +164,7 @@ public class ClientServer extends AbstractServer {
         
         public Object getAdmin() throws RemoteException {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("" + getServiceUUID());
 
             return server.proxy;

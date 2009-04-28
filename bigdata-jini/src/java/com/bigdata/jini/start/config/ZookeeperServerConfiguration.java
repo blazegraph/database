@@ -265,32 +265,32 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
         // validate [servers].
         getZookeeperServerEntries();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.SERVERS + "=" + servers);
 
         clientPort = (Integer) config.getEntry(Options.NAMESPACE,
                 Options.CLIENT_PORT, Integer.TYPE);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.CLIENT_PORT + "=" + clientPort);
    
         this.dataDir = (File) config
                 .getEntry(Options.NAMESPACE, Options.DATA_DIR, File.class,
                         new File(serviceDir, "zookeeper"));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.DATA_DIR + "=" + dataDir);
 
         dataLogDir = (File) config.getEntry(Options.NAMESPACE,
                 Options.DATA_LOG_DIR, File.class, dataDir);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.DATA_LOG_DIR + "=" + dataLogDir);
 
         configFile = (String) config.getEntry(Options.NAMESPACE,
                 Options.CONFIG_FILE, String.class, Options.DEFAULT_CONFIG_FILE);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.CONFIG_FILE + "=" + configFile);
         
         other = new LinkedHashMap<String,String>();
@@ -393,7 +393,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
 
             serverEntries.add(entry);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(entry.toString());
             
         }
@@ -499,7 +499,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
             dataDir = new File(ZookeeperServerConfiguration.this.dataDir,
                     Integer.toString(entry.id));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.DATA_DIR + "=" + dataDir);
 
             /*
@@ -511,7 +511,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
             dataLogDir = new File(ZookeeperServerConfiguration.this.dataLogDir,
                     Integer.toString(entry.id));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.DATA_LOG_DIR + "=" + dataLogDir);
 
             // the zookeeper configuration file to be generated.
@@ -763,7 +763,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("configFile=" + configFile + "\n" + contents);
 
             /*
