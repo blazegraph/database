@@ -181,7 +181,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         
         /**
          * The timeout in milliseconds to await the discovery of services
-         * described by the {@link #SERVICES_TEMPLATES}.
+         * described by the {@link #SERVICES_TEMPLATES} and {@link #CLIENTS_TEMPLATE}.
          */
         String SERVICES_DISCOVERY_TIMEOUT = "awaitServicesTimeout";
 

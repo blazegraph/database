@@ -206,7 +206,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
         final Iterator<Map.Entry<ServiceID, ServiceItem>> itr = serviceIdMap
                 .entrySet().iterator();
 
-        while (itr.hasNext()) {
+        while (itr.hasNext() && v.size() < n) {
 
             final Map.Entry<ServiceID, ServiceItem> entry = itr.next();
 

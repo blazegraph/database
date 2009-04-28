@@ -91,17 +91,21 @@ public class DiscoverServices implements Callable<ServiceItem[]> {
         final long begin = System.currentTimeMillis();
 
         int serviceCount;
-        long elapsed;
+        long elapsed = 0;
+        int ntries = 0;
 
         while ((serviceCount = serviceClient.getServiceCache()
 				.getServiceCount()) < servicesTemplate.minMatches
 				&& (elapsed = (System.currentTimeMillis() - begin)) < timeout) {
 
-            final long remaining = timeout - elapsed;
-
+        	ntries++;
+        	
             if (log.isDebugEnabled())
-				log.debug("Discovered " + serviceCount + " : elapsed=" + elapsed
-						+ ", template=" + servicesTemplate);
+				log.debug("Discovered " + serviceCount + " : ntries=" + ntries
+						+ ", elapsed=" + elapsed + ", template="
+						+ servicesTemplate);
+
+            final long remaining = timeout - elapsed;
             
             // sleep a bit to await further service discovery.
             Thread.sleep(remaining < 100 ? remaining : 100);
@@ -115,10 +119,13 @@ public class DiscoverServices implements Callable<ServiceItem[]> {
 				.getServiceItems(0/* maxCount */, null/* filter */);
 
         if (log.isInfoEnabled())
-			log.info("Discovered " + serviceCount + " : template=" + servicesTemplate);
+			log
+					.info("Discovered " + serviceCount + " : ntries=" + ntries
+							+ ", elapsed=" + elapsed + ", template="
+							+ servicesTemplate);
 
-        return a;
-        
-    }
+		return a;
+
+	}
 
 }
