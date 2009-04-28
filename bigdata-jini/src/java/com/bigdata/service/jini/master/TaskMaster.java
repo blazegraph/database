@@ -1263,23 +1263,29 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             final Future<ServiceItem[]>[] futures = fed.getExecutorService()
                     .invokeAll(tasks).toArray(new Future[tasks.size()]);
 
+            // Assemble a list of errors.
+            final List<Throwable> causes = new LinkedList<Throwable>();
+
             // the services on which we will execute the clients.
             final ServiceItem[] serviceItems = futures[0].get();
 
             if (serviceItems.length < jobState.clientsTemplate.minMatches) {
 
-                throw new RuntimeException(
-                        "Not enough services to run clients: found="
-                                + serviceItems.length + ", required="
-                                + jobState.clientsTemplate.minMatches
-                                + ", template=" + jobState.clientsTemplate);
+            	final String msg = "Not enough services to run clients: found="
+                    + serviceItems.length + ", required="
+                    + jobState.clientsTemplate.minMatches
+                    + ", template=" + jobState.clientsTemplate;
+            	
+                log.error(msg);
+                
+                causes.add(new RuntimeException(msg));
 
             }
 
             /*
              * Check the other pre-conditions for discovered services.
              */
-            final List<Throwable> causes = new LinkedList<Throwable>();
+
             for (int i = 1; i < futures.length; i++) {
 
                 final Future<ServiceItem[]> f = futures[i];

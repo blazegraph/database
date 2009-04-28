@@ -220,21 +220,23 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
     }
     
     /**
-     * Initiaties discovery for one or more service registrars and establishes a
-     * lookup caches for various bigdata services.
-     * 
-     * @param client
-     *            The client.
-     */
-    public JiniFederation(final JiniClient<T> client, final JiniClientConfig jiniConfig,
-            final ZookeeperClientConfig zooConfig) {
+	 * Initiaties discovery for one or more service registrars and establishes a
+	 * lookup caches for various bigdata services.
+	 * 
+	 * @param client
+	 *            The client.
+	 */
+	public JiniFederation(final JiniClient<T> client,
+			final JiniClientConfig jiniConfig,
+			final ZookeeperClientConfig zooConfig) {
 
-        super(client);
-    
-        open = true;
+		super(client);
 
-        // @todo config initalDelay and timeout
-        addScheduledTask(new MonitorFuturesTask(futures), 1, 5, TimeUnit.SECONDS);
+		open = true;
+
+		// @todo config initalDelay and timeout
+		addScheduledTask(new MonitorFuturesTask(futures), 1, 5,
+				TimeUnit.SECONDS);
 
         if (log.isInfoEnabled())
             log.info(jiniConfig.toString());

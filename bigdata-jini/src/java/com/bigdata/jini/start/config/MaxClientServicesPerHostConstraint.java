@@ -10,6 +10,7 @@ import com.bigdata.jini.lookup.entry.HostnameFilter;
 import com.bigdata.jini.lookup.entry.ServiceItemFilterChain;
 import com.bigdata.service.IClientService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.jini.lookup.ClientServiceFilter;
 
 /**
  * Constraint on the #of {@link IClientService}s on the same host.
@@ -43,8 +44,13 @@ public class MaxClientServicesPerHostConstraint extends
 
         final ServiceItemFilterChain filter = new ServiceItemFilterChain();
 
-//        // only consider data services.
-//        filter.add(DataServiceFilter.INSTANCE);
+        /*
+		 * consider only client services
+		 * 
+		 * @todo this should not be necessary since we are using the lookup
+		 * cache for the client services.
+		 */
+        filter.add(ClientServiceFilter.INSTANCE);
 
         final String hostname = InetAddress.getLocalHost().getHostName();
 
