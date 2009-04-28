@@ -752,13 +752,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 chunkCount++;
                 elementCount += ((Object[]) e).length;
 
+                if (log.isDebugEnabled())
+                    log.debug("added chunk: len=" + ((Object[])e).length);
+
             } else {
 
                 elementCount++;
+                
+                if (log.isDebugEnabled())
+                    log.debug("added: " + e.toString());
 
             }
-            if (log.isDebugEnabled())
-                log.debug("added: " + e.toString());
 
             return;
 
@@ -859,7 +863,34 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * The #of elements read so far.
          */
         private long nelements = 0L;
-        
+
+        /**
+         * Safe non-blocking representation of the iterator state.
+         */
+        public String toString() {
+
+            final StringBuilder sb = new StringBuilder();
+
+            sb.append("BlockingIterator");
+
+            sb.append("{ open=" + open);
+
+            sb.append(", futureIsDone=" + futureIsDone);
+
+            sb.append(", bufferIsOpen=" + BlockingBuffer.this.open);
+
+            sb.append(", nextE=" + (nextE != null));
+
+            sb.append(", chunkCount=" + chunkCount);
+
+            sb.append(", elementCount=" + elementCount);
+
+            sb.append("}");
+
+            return sb.toString();
+
+        }
+
         /**
          * Create an iterator that reads from the buffer.
          */
@@ -1131,6 +1162,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          */
         private boolean _hasNext(long nanos) {
 
+        	// set to true to log stack traces at most once per request.
+        	final boolean logOnce = !log.isDebugEnabled();
+
             /*
              * This false until the producer/consumer stack traces have been
              * logged. The flag is used to prevent repeated logging of those
@@ -1303,8 +1337,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                     } catch (InterruptedException ex) {
 
-                        if (log.isInfoEnabled())
-                            log.info("Interrupted: " + this);
+                        if (log.isDebugEnabled())
+							log.info("Interrupted: " + this, ex);
+						else if (log.isInfoEnabled())
+							log.info("Interrupted: " + this);
 
                         // itr will not deliver any more elements.
                         _close();
@@ -1384,9 +1420,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                             }
                             
-                            // Do not log the stack traces again during this
-                            // invocation.
-                            loggedStackTraces = true;
+                            if (logOnce) {
+								/*
+								 * Do not log the stack traces again during this
+								 * invocation.
+								 */
+								loggedStackTraces = true;
+							}
                             
                         } else {
                             
@@ -1416,12 +1456,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         }
 
-        public E next(final long timeout, final TimeUnit unit) {
+        public E next(long timeout, final TimeUnit unit) {
 
+        	// elapsed is measured against this timestamp.
             final long startTime = System.nanoTime();
             
-            // timeout in nanoseconds.
-            long nanos = TimeUnit.NANOSECONDS.convert(timeout, unit);
+        	// convert timeout to nanos seconds.
+        	timeout = TimeUnit.NANOSECONDS.convert(timeout, unit);
+        	
+            // time remaining in nanoseconds.
+            long nanos = timeout;
             
             if (!hasNext(nanos, TimeUnit.NANOSECONDS)) {
 
@@ -1461,7 +1505,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 if (nanos > 0) {
 
                     // combine chunks.
-                    return combineChunks(e, 1/* nchunks */, now, nanos);
+                    return combineChunks(e, 1/* nchunks */, startTime, timeout);
 
                 }
                 
