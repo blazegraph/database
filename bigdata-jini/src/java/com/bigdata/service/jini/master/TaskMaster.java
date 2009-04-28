@@ -72,6 +72,7 @@ import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.util.DumpFederation.ScheduledDumpTask;
+import com.bigdata.util.concurrent.ExecutionExceptions;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
 import com.bigdata.zookeeper.ZooHelper;
@@ -1278,23 +1279,45 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             /*
              * Check the other pre-conditions for discovered services.
              */
+            final List<Throwable> causes = new LinkedList<Throwable>();
             for (int i = 1; i < futures.length; i++) {
 
                 final Future<ServiceItem[]> f = futures[i];
 
-                final ServiceItem[] a = f.get();
+                try {
+                    
+                    final ServiceItem[] a = f.get();
 
-                if (a.length < jobState.clientsTemplate.minMatches) {
+                    if (a.length < jobState.clientsTemplate.minMatches) {
 
-                    throw new RuntimeException("Not enough services: found="
-                            + a.length + ", required="
-                            + jobState.clientsTemplate.minMatches
-                            + ", template=" + jobState.clientsTemplate);
+                        final String msg = "Not enough services: found="
+                                + a.length + ", required="
+                                + jobState.clientsTemplate.minMatches
+                                + ", template=" + jobState.clientsTemplate;
 
+                        // log error w/ specific cause of rejected run.
+                        log.error(msg);
+
+                        // add msg to list of causes.
+                        causes.add(new RuntimeException(msg));
+                        
+                    }
+                    
+                } catch (Throwable ex) {
+
+                    // add thrown execption to list of causes.
+                    causes.add(ex);
+                    
                 }
 
             }
 
+            if(!causes.isEmpty()) {
+                
+                throw new ExecutionExceptions(causes);
+
+            }
+            
             return serviceItems;
 
         }
