@@ -60,7 +60,7 @@ import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 /**
  * Test suite for IRIS-based truth maintenance on delete.
  *
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
 public class TestIRIS extends AbstractInferenceEngineTestCase {
