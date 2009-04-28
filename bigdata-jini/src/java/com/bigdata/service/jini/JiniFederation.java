@@ -78,7 +78,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IService;
-import com.bigdata.service.jini.lookup.ClientServiceClient;
+import com.bigdata.service.jini.lookup.ClientServicesClient;
 import com.bigdata.service.jini.lookup.DataServiceFilter;
 import com.bigdata.service.jini.lookup.DataServicesClient;
 import com.bigdata.service.jini.lookup.LoadBalancerClient;
@@ -119,7 +119,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
 
     private ServicesManagerClient servicesManagerClient;
 
-    private ClientServiceClient clientServiceClient;
+    private ClientServicesClient clientServicesClient;
 
     private final ZooResourceLockService resourceLockService = new ZooResourceLockService(this);
 
@@ -213,9 +213,9 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
     /**
      * Cached lookup for discovered {@link IClientService}s. 
      */
-    public ClientServiceClient getClientServiceClient() {
+    public ClientServicesClient getClientServicesClient() {
         
-        return clientServiceClient;
+        return clientServicesClient;
         
     }
     
@@ -307,7 +307,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
                     cacheMissTimeout);
 
             // Start discovery for the client services.
-            clientServiceClient = new ClientServiceClient(this,
+            clientServicesClient = new ClientServicesClient(this,
                     cacheMissTimeout);
 
         } catch (Exception ex) {
@@ -674,11 +674,11 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
             
         }
 
-        if (clientServiceClient != null) {
+        if (clientServicesClient != null) {
 
-            clientServiceClient.terminate();
+            clientServicesClient.terminate();
 
-            clientServiceClient = null;
+            clientServicesClient = null;
             
         }
 
@@ -753,7 +753,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
                 null/* filter */, immediateShutdown);
         
         // client services
-        clientServiceClient.shutdownDiscoveredServices(getExecutorService(),
+        clientServicesClient.shutdownDiscoveredServices(getExecutorService(),
                 null/* filter */, immediateShutdown);
         
         // data services.
@@ -790,7 +790,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
                     getExecutorService(), null/* filter */);
 
             // client services
-            clientServiceClient.destroyDiscoveredServices(
+            clientServicesClient.destroyDiscoveredServices(
                     getExecutorService(), null/* filter */);
 
             // data services.

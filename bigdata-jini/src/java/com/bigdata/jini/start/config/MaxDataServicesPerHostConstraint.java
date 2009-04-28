@@ -63,7 +63,7 @@ public class MaxDataServicesPerHostConstraint extends
 
         final boolean allowed = serviceItems.length < maxServices;
 
-             if (INFO)
+             if (log.isInfoEnabled())
                 log.info("New instance: allowed=" + allowed + ", maxServices="
                         + maxServices + ", #found=" + serviceItems.length
                         + ", host=" + canonicalHostname);

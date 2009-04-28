@@ -67,7 +67,7 @@ abstract public class MaxServicesPerHostConstraint implements IServiceConstraint
 
     protected static final Logger log = Logger.getLogger(MaxServicesPerHostConstraint.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
     
 //    protected final String className;
     

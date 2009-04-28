@@ -40,10 +40,10 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ClientServiceClient extends
+public class ClientServicesClient extends
         BigdataCachingServiceClient<IClientService> {
 
-    public ClientServiceClient(final JiniFederation fed, final long timeout)
+    public ClientServicesClient(final JiniFederation fed, final long timeout)
             throws RemoteException {
 
         super(fed, IClientService.class, new ServiceTemplate(null,

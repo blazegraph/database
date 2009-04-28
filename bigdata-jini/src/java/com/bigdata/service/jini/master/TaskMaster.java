@@ -1166,7 +1166,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             ServiceItem serviceItem = null;
 
             // test client service cache.
-            serviceItem = fed.getClientServiceClient().getServiceCache()
+            serviceItem = fed.getClientServicesClient().getServiceCache()
                     .getServiceItemByID(serviceID);
 
             if (serviceItem == null) {
