@@ -3,6 +3,8 @@ package com.bigdata.service.jini.master;
 import java.rmi.Remote;
 import java.util.concurrent.Callable;
 
+import org.apache.log4j.Logger;
+
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
 
@@ -23,6 +25,8 @@ import com.bigdata.service.jini.master.TaskMaster.JobState;
  */
 public class DiscoverServices implements Callable<ServiceItem[]> {
 
+	protected static final transient Logger log = Logger.getLogger(DiscoverServices.class);
+	
     private final JiniFederation fed;
 
     private final ServicesTemplate servicesTemplate;
@@ -79,20 +83,26 @@ public class DiscoverServices implements Callable<ServiceItem[]> {
          * lookup by ServiceID here.
          */
         final BigdataCachingServiceClient<Remote> serviceClient = new BigdataCachingServiceClient<Remote>(
-                fed, Remote.class/* serviceIface */,
+                fed, Remote.class/* serviceIfaceIsForLoggingOnly */,
                 servicesTemplate.template, servicesTemplate.filter, 1000/* cacheMissTimeout */) {
 
         };
 
         final long begin = System.currentTimeMillis();
 
+        int serviceCount;
         long elapsed;
 
-        while (serviceClient.getServiceCache().getServiceCount() < servicesTemplate.minMatches
-                && (elapsed = System.currentTimeMillis() - begin) < timeout) {
+        while ((serviceCount = serviceClient.getServiceCache()
+				.getServiceCount()) < servicesTemplate.minMatches
+				&& (elapsed = (System.currentTimeMillis() - begin)) < timeout) {
 
             final long remaining = timeout - elapsed;
 
+            if (log.isDebugEnabled())
+				log.debug("Discovered " + serviceCount + " : elapsed=" + elapsed
+						+ ", template=" + servicesTemplate);
+            
             // sleep a bit to await further service discovery.
             Thread.sleep(remaining < 100 ? remaining : 100);
 
@@ -101,9 +111,14 @@ public class DiscoverServices implements Callable<ServiceItem[]> {
         /*
          * Return all discovered services which matched the template.
          */
-        return serviceClient.getServiceCache().getServiceItems(
-                0/* maxCount */, null/* filter */);
+        final ServiceItem[] a = serviceClient.getServiceCache()
+				.getServiceItems(0/* maxCount */, null/* filter */);
 
+        if (log.isInfoEnabled())
+			log.info("Discovered " + serviceCount + " : template=" + servicesTemplate);
+
+        return a;
+        
     }
 
 }
