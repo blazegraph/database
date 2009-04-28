@@ -1239,19 +1239,21 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             if (jobState.servicesDiscoveryTimeout <= 0)
                 throw new IllegalArgumentException();
 
-            final List<Callable<ServiceItem[]>> tasks = new LinkedList<Callable<ServiceItem[]>>();
-
             /*
              * This is the task that will give us the services on which the
              * clients will execute.
              */
-            tasks.add(new DiscoverServices(fed, jobState.clientsTemplate,
-                    jobState.servicesDiscoveryTimeout));
+            final Future<ServiceItem[]> discoverClientServicesFuture = fed
+					.getExecutorService().submit(
+							new DiscoverServices(fed, jobState.clientsTemplate,
+									jobState.servicesDiscoveryTimeout));
 
             /*
              * Additional tasks for the other services which must be discovered
              * as pre-conditions before the job can execute.
              */
+            final List<Callable<ServiceItem[]>> tasks = new LinkedList<Callable<ServiceItem[]>>();
+
             for (ServicesTemplate t : jobState.servicesTemplates) {
 
                 tasks.add(new DiscoverServices(fed, t,
@@ -1266,9 +1268,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             // Assemble a list of errors.
             final List<Throwable> causes = new LinkedList<Throwable>();
 
-            // the services on which we will execute the clients.
-            final ServiceItem[] serviceItems = futures[0].get();
-
+            /*
+			 * Get the future, which gives the services on which we will execute
+			 * the clients.
+			 */
+            final ServiceItem[] serviceItems = discoverClientServicesFuture.get();
+            
             if (serviceItems.length < jobState.clientsTemplate.minMatches) {
 
             	final String msg = "Not enough services to run clients: found="
@@ -1286,20 +1291,22 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
              * Check the other pre-conditions for discovered services.
              */
 
-            for (int i = 1; i < futures.length; i++) {
+            for (int i = 0; i < futures.length; i++) {
 
                 final Future<ServiceItem[]> f = futures[i];
 
-                try {
-                    
-                    final ServiceItem[] a = f.get();
+				final ServicesTemplate servicesTemplate = jobState.servicesTemplates[i];
 
-                    if (a.length < jobState.clientsTemplate.minMatches) {
+				try {
 
-                        final String msg = "Not enough services: found="
-                                + a.length + ", required="
-                                + jobState.clientsTemplate.minMatches
-                                + ", template=" + jobState.clientsTemplate;
+					final ServiceItem[] a = f.get();
+
+					if (a.length < servicesTemplate.minMatches) {
+
+						final String msg = "Not enough services: found="
+								+ a.length + ", required="
+								+ servicesTemplate.minMatches + ", template="
+								+ servicesTemplate;
 
                         // log error w/ specific cause of rejected run.
                         log.error(msg);
