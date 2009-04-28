@@ -179,6 +179,8 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             // question exists in the resulting closure, if it does, then the
             // statement is supported by other facts in the database
             
+            // stolen from InferenceEngine.computeClosure()
+            
             final long begin = System.currentTimeMillis();
             
             final boolean justify = false;
