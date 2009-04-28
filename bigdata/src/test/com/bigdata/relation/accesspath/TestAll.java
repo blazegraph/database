@@ -73,6 +73,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestArrayBuffer.class);
         
         suite.addTestSuite(TestBlockingBuffer.class);
+
+        suite.addTestSuite(TestBlockingBufferWithChunks.class);
         
         suite.addTestSuite(TestUnsynchronizedArrayBuffer.class);
         

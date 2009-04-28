@@ -1167,6 +1167,23 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             while (nextE != null || BlockingBuffer.this.open
                     || ((nextE = queue.poll()) != null)) {
 
+                if (nextE == null) {
+
+                    /*
+                     * Non-blocking test. This covers the case when the buffer
+                     * is still open so we would not have polled the queue in
+                     * the while() condition above. Since we did not poll above
+                     * we will do it now before testing against the timeout. If
+                     * we don't poll the queue before we examine the timeout
+                     * then hasNext(timeout) will return false when there is
+                     * something already buffered and the timeout is short
+                     * (1ns).
+                     */
+
+                    nextE = queue.poll();
+                
+                }
+                
                 if (nextE != null) {
 
                     /*
@@ -1180,6 +1197,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      * DO NOT poll unless [nextE] is [null] since that would
                      * cause us to loose the value in [nextE].
                      */
+                    
                     return true;
 
                 }
