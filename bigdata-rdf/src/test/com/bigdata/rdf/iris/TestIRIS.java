@@ -54,6 +54,7 @@ import com.bigdata.rdf.rules.BaseClosure;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.rules.RuleRdfs11;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -73,7 +74,33 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Test suite for IRIS-based truth maintenance on delete.
- *
+ * <p>
+ * I would use a one up counter to assign the variable names during the
+ * conversion and append it to the variable names in our rules.
+ * 
+ * The constraints are really just additional conditions on the rule. E.g.,
+ * {@link RuleRdfs11} looks like this in prolog:
+ * 
+ * <pre>
+ * triple(U,uri(rdfs:subClassOf),X) :-
+ *  triple(U,uri(rdfs:subClassOf),V),
+ *  triple(V,uri(rdfs:subClassOf),X),
+ *  U != V,
+ *  V != X.
+ * </pre>
+ * 
+ * The RDF values will be expressed a atoms with the follow arity: uri/1,
+ * literal/3, and bnode/1.
+ * 
+ * <pre>
+ * uri(stringValue)
+ * literal(stringValue,languageCode,datatTypeUri)
+ * bnode(id)
+ * </pre>
+ * 
+ * All for the values for those atoms will be string values.
+ * 
+ * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
