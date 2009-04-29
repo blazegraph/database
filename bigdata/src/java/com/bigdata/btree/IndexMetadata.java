@@ -1734,26 +1734,28 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         // Scatter-split configuration
         {
 
-            final boolean scatterSplitEnabled = Boolean.parseBoolean(properties
-                    .getProperty(Options.SCATTER_SPLIT_ENABLED,
+            final boolean scatterSplitEnabled = Boolean
+                    .parseBoolean(getProperty(indexManager, properties,
+                            namespace, Options.SCATTER_SPLIT_ENABLED,
                             Options.DEFAULT_SCATTER_SPLIT_ENABLED));
 
             final double scatterSplitPercentOfSplitThreshold = Double
-                    .parseDouble(properties
-                            .getProperty(
-                                    Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD,
-                                    Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD));
+                    .parseDouble(getProperty(
+                            indexManager,
+                            properties,
+                            namespace,
+                            Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD,
+                            Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD));
 
             final int scatterSplitDataServicesCount = Integer
-                    .parseInt(properties.getProperty(
+                    .parseInt(getProperty(indexManager, properties, namespace,
                             Options.SCATTER_SPLIT_DATA_SERVICE_COUNT,
                             Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT));
 
             final int scatterSplitIndexPartitionsCount = Integer
-                    .parseInt(properties
-                            .getProperty(
-                                    Options.SCATTER_SPLIT_INDEX_PARTITION_COUNT,
-                                    Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT));
+                    .parseInt(getProperty(indexManager, properties, namespace,
+                            Options.SCATTER_SPLIT_INDEX_PARTITION_COUNT,
+                            Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT));
 
             this.scatterSplitConfiguration = new ScatterSplitConfiguration(
                     scatterSplitEnabled, scatterSplitPercentOfSplitThreshold,
