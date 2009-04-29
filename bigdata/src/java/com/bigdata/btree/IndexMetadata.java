@@ -769,7 +769,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * asynchronous index writes in order to obtain high throughput with
          * sustained index writes.
          */
-        String SCATTER_SPLIT_INDEX_PARTITION_COUNT = "scatterSplitIndexPartitionsCount";
+        String SCATTER_SPLIT_INDEX_PARTITION_COUNT = "scatterSplitIndexPartitionCount";
 
         String DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT = "0";
         
@@ -1738,28 +1738,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                     .getProperty(Options.SCATTER_SPLIT_ENABLED,
                             Options.DEFAULT_SCATTER_SPLIT_ENABLED));
 
-            if (log.isInfoEnabled())
-                log.info(Options.SCATTER_SPLIT_ENABLED + "="
-                        + scatterSplitEnabled);
-
             final double scatterSplitPercentOfSplitThreshold = Double
                     .parseDouble(properties
                             .getProperty(
                                     Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD,
                                     Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD));
 
-            if (log.isInfoEnabled())
-                log.info(Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD + "="
-                        + scatterSplitPercentOfSplitThreshold);
-
             final int scatterSplitDataServicesCount = Integer
                     .parseInt(properties.getProperty(
                             Options.SCATTER_SPLIT_DATA_SERVICE_COUNT,
                             Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT));
-
-            if (log.isInfoEnabled())
-                log.info(Options.SCATTER_SPLIT_DATA_SERVICE_COUNT + "="
-                        + scatterSplitDataServicesCount);
 
             final int scatterSplitIndexPartitionsCount = Integer
                     .parseInt(properties
@@ -1767,16 +1755,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                                     Options.SCATTER_SPLIT_INDEX_PARTITION_COUNT,
                                     Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT));
 
-            if (log.isInfoEnabled())
-                log.info(Options.SCATTER_SPLIT_INDEX_PARTITION_COUNT + "="
-                        + scatterSplitIndexPartitionsCount);
-
             this.scatterSplitConfiguration = new ScatterSplitConfiguration(
                     scatterSplitEnabled, scatterSplitPercentOfSplitThreshold,
                     scatterSplitDataServicesCount,
                     scatterSplitIndexPartitionsCount);
             
         }
+        
+        if (log.isInfoEnabled())
+            log.info(toString());
         
     }
 
