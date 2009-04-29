@@ -40,7 +40,6 @@ import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
 import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -49,13 +48,17 @@ import com.bigdata.rdf.rules.BaseClosure;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
+import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * Test suite for IRIS-based truth maintenance on delete.
@@ -183,48 +186,29 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             final long begin = System.currentTimeMillis();
             
-            final boolean justify = false;
+            // run the query as a native rule.
+            final IEvaluationPlanFactory planFactory =
+                    DefaultEvaluationPlanFactory2.INSTANCE;
             
-            /*
-             * FIXME remove IJoinNexus.RULE once we we can generate the
-             * justifications from just the bindings and no longer need the rule
-             * to generate the justifications (esp. for scale-out).
-             */
-            final int solutionFlags = IJoinNexus.ELEMENT//
-                    | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
-//                  | IJoinNexus.RULE  // iff debugging.
-                  ;
-          
-            final RuleContextEnum ruleContext = focusStore == null
-                ? RuleContextEnum.DatabaseAtOnceClosure
-                : RuleContextEnum.TruthMaintenance
-                ;
+            final IJoinNexusFactory joinNexusFactory =
+                    store.newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
+                            ActionEnum.Query, IJoinNexus.ELEMENT, null, // filter
+                            false, // justify 
+                            false, // backchain
+                            planFactory);
             
-            final IJoinNexusFactory joinNexusFactory = store
-                    .newJoinNexusFactory(ruleContext, ActionEnum.Insert,
-                            solutionFlags, inference.doNotAddFilter, justify,
-                            false/* backchain */,
-                            DefaultEvaluationPlanFactory2.INSTANCE);
+            final IJoinNexus joinNexus =
+                    joinNexusFactory.newInstance(store.getIndexManager());
+            
+            IChunkedOrderedIterator<ISolution> solutions = joinNexus.runQuery(magicProgram);
+            
+            while (solutions.hasNext()) {
 
-            final IJoinNexus joinNexus = joinNexusFactory.newInstance(store
-                    .getIndexManager());
+                ISolution<ISPO> solution = solutions.next();
+                
+                System.err.println(solution.get().toString(store));
 
-            final long mutationCount = joinNexus.runMutation(magicProgram);
-
-            final long elapsed = System.currentTimeMillis() - begin;
-
-            ClosureStats stats = new ClosureStats(mutationCount, elapsed);
-            
-            System.err.println(stats.toString());
-            
-            if (log.isInfoEnabled())
-                log.info("\n\nfocus store:\n"
-                        + focusStore.dumpStore(store,
-                                true, true, true, true));
-            
-            // Bryan: what am I doing wrong here, why is my focus store empty?
-            // I am essentially doing full forward closure, since my
-            // magicProgram = program.
+            }
             
         } catch( Exception ex ) {
             
