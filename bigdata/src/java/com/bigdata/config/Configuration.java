@@ -76,8 +76,6 @@ public class Configuration {
      */
     protected static final transient Logger log = Logger.getLogger(Configuration.class);
     
-    protected static final transient boolean INFO = log.isInfoEnabled();
-
     /**
      * The prefix for namespace specific property value overrides.
      */
@@ -125,7 +123,7 @@ public class Configuration {
      * 
      * </ol>
      * 
-     * @param indexManager
+     * @param indexManagerIsIgnored
      *            The value specified to the ctor (optional).
      * @param properties
      *            The properties object against which the value of the property
@@ -133,7 +131,8 @@ public class Configuration {
      * @param namespace
      *            The namespace of the index, relation, etc (optional).
      * @param propertyName
-     *            The name of the property whose default value is requested.
+     *            The bare name of the property whose default value is requested
+     *            (without the namespace).
      * @param defaultValue
      *            The value for that property that will be returned if the
      *            default has not been overriden as described above (optional).
@@ -142,11 +141,11 @@ public class Configuration {
      * 
      * @todo test when namespace is empty (journal uses that) and possibly null.
      */
-    public static String getProperty(final IIndexManager indexManager,
+    public static String getProperty(final IIndexManager indexManagerIsIgnored,
             final Properties properties, final String namespace,
             final String propertyName, final String defaultValue) {
     
-        final NV nv = getProperty2(indexManager, properties, namespace,
+        final NV nv = getProperty2(indexManagerIsIgnored, properties, namespace,
                 propertyName, defaultValue);
         
         if(nv == null) return null;
@@ -159,14 +158,14 @@ public class Configuration {
      * Variant returns both the name under which the value was discovered and
      * the value.
      * 
-     * @param indexManager
+     * @param indexManagerIsIgnored
      * @param properties
      * @param namespace
      * @param globalName
      * @param defaultValue
      * @return
      */
-    public static NV getProperty2(final IIndexManager indexManager,
+    public static NV getProperty2(final IIndexManager indexManagerIsIgnored,
             final Properties properties, final String namespace,
             final String globalName, final String defaultValue) {
 
@@ -219,6 +218,9 @@ public class Configuration {
                     break;
                     
                 }
+                
+                if (log.isDebugEnabled())
+                    log.debug("No match: " + key);
 
                 final int lastIndexOf = prefix.lastIndexOf(DOT);
                 
@@ -250,7 +252,7 @@ public class Configuration {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(key + "=" + val);
         
         return new NV(key, val);
@@ -408,7 +410,7 @@ public class Configuration {
         
         final String override = NAMESPACE + DOT + namespace + DOT + property;
         
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info("namespace=" + namespace + ", property=" + property
                     + ", override=" + override);

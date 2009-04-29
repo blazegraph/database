@@ -74,11 +74,7 @@ import com.bigdata.util.concurrent.ParallelismLimitedExecutorService;
  */
 abstract public class AbstractResource<E> implements IMutableResource<E> {
 
-    protected final static Logger log = Logger.getLogger(AbstractResource.class);
-    
-    protected final static boolean INFO = log.isInfoEnabled();
-
-    protected final static boolean DEBUG = log.isDebugEnabled();
+    protected final transient static Logger log = Logger.getLogger(AbstractResource.class);
 
     final private IIndexManager indexManager;
     
@@ -430,7 +426,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
         properties.setProperty(RelationSchema.CLASS, getClass().getName());
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("namespace=" + namespace + ", timestamp=" + timestamp
                     + ", container=" + containerNamespace + ", indexManager="
@@ -497,7 +493,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
                     if (getContainerNamespace() != null) {
 
-                        if (INFO) {
+                        if (log.isInfoEnabled()) {
 
                             log.info("resolving container: "
                                     + getContainerNamespace());
@@ -607,7 +603,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      */
     public void create() {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(toString());
     
         /*
@@ -642,7 +638,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
         final Map afterMap = indexManager.getGlobalRowStore().write(
                 RelationSchema.INSTANCE, map);
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("Properties after write: "+afterMap);
             
@@ -665,7 +661,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
     public void destroy() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(toString());
 
         // Delete the entry for this relation from the row store.

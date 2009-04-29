@@ -129,10 +129,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     protected static final Logger log = Logger.getLogger(SPORelation.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     private static transient final long NULL = IRawTripleStore.NULL;
     
     private final Set<String> indexNames;
@@ -655,7 +651,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             
             final BloomFilterFactory factory = BloomFilterFactory.DEFAULT;
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Enabling bloom filter for SPO index: " + factory);
             
             metadata.setBloomFilterFactory( factory );
@@ -830,7 +826,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final SPOAccessPath accessPath = getAccessPath(keyOrder, predicate);
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug(accessPath.toString());
 
         //            System.err.println("new access path: pred="+predicate);
@@ -1074,7 +1070,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final SPO spo = new SPO(s, p, o, StatementEnum.Inferred);
         
-        if(DEBUG)
+        if(log.isDebugEnabled())
             log.debug(spo.toString());
         
         return spo;
@@ -1219,7 +1215,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 nchunks++;
                 nelements += chunk.length;
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("#chunks=" + nchunks + ", chunkSize="
                             + chunk.length + ", nelements=" + nelements);
 
@@ -1228,7 +1224,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Done: #chunks=" + nchunks + ", #elements="
                         + nelements);
 
@@ -1351,7 +1347,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final long begin = System.currentTimeMillis();
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("indexManager="+getIndexManager());
             
@@ -1417,7 +1413,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (INFO && numStmts > 1000) {
+        if (log.isInfoEnabled() && numStmts > 1000) {
 
             log.info("Wrote " + numStmts + " statements (mutationCount="
                     + mutationCount + ") in " + elapsed + "ms" //
@@ -1543,7 +1539,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         long elapsed = System.currentTimeMillis() - begin;
 
-        if (INFO && numStmts > 1000) {
+        if (log.isInfoEnabled() && numStmts > 1000) {
 
             log.info("Removed " + numStmts + " in " + elapsed
                     + "ms; sort=" + sortTime + "ms, keyGen+delete="
@@ -1641,7 +1637,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Wrote " + nwritten + " justifications in " + elapsed
                         + " ms");
 
