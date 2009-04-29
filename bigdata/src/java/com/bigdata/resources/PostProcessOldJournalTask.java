@@ -35,6 +35,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.ScatterSplitConfiguration;
 import com.bigdata.btree.proc.BatchLookup;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
@@ -419,14 +420,20 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * access to the potential move targets, #of index partitions for
              * the scale-out index, etc.
              */
+
+            final ScatterSplitConfiguration ssc = vmd.indexMetadata
+                    .getScatterSplitConfiguration();
+            
             if ( // only a single index partitions?
                 (vmd.getIndexPartitionCount() == 1L)//
                 // move not in progress
                 && vmd.pmd.getSourcePartitionId() == -1//
-                // scatter splits enabled.
-                && resourceManager.scatterSplitEnabled
+                // scatter splits enabled for service
+                && resourceManager.scatterSplitEnabled//
+                // scatter splits enabled for index
+                && ssc.isEnabled()//
                 // trigger scatter split before too much data builds up in one place.
-                && vmd.getPercentOfSplit() >= resourceManager.scatterSplitPercentOfSplitThreshold
+                && vmd.getPercentOfSplit() >= ssc.getPercentOfSplitThreshold()
             ) {
 
                 /*
@@ -457,7 +464,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     final UUID[] a = resourceManager
                             .getFederation()
                             .getDataServiceUUIDs(
-                                    resourceManager.scatterSplitDataServicesCount/* maxCount */);
+                                    ssc.getDataServiceCount()/* maxCount */);
 
                     if (a == null || a.length == 1) {
 
@@ -479,9 +486,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 }
 
                 // #of splits.
-                final int nsplits = resourceManager.scatterSplitIndexPartitionsCount == 0//
+                final int nsplits = ssc.getIndexPartitionCount() == 0//
                         ? (2 * moveTargets.length) // two per data service.
-                        : resourceManager.scatterSplitIndexPartitionsCount//
+                        : ssc.getIndexPartitionCount()//
                         ;
 
                 // scatter split task.
@@ -1840,7 +1847,9 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * for that index and scatter splits are enabled.
              */
             if (vmd.getIndexPartitionCount() == 1
-                    && resourceManager.scatterSplitEnabled) {
+                    && resourceManager.scatterSplitEnabled
+                    && vmd.indexMetadata.getScatterSplitConfiguration()
+                            .isEnabled()) {
 
                 if (INFO)
                     log.info("Skipping index: name=" + name
