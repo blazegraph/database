@@ -58,12 +58,11 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentCheckpoint;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.config.Configuration;
 import com.bigdata.jini.lookup.entry.Hostname;
 import com.bigdata.journal.DumpJournal;
@@ -102,8 +101,6 @@ public class DumpFederation {
 
     protected static final Logger log = Logger.getLogger(DumpFederation.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-
     /**
      * The component name for this class (for use with the
      * {@link ConfigurationOptions}).
@@ -203,7 +200,7 @@ public class DumpFederation {
             /*
              * Wait until we have the metadata service
              */
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Waiting up to " + discoveryDelay
                         + "ms for metadata service discovery.");
 
@@ -232,7 +229,7 @@ public class DumpFederation {
 
             }
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Done");
 
         } finally {
@@ -545,6 +542,7 @@ public class DumpFederation {
                             + "\tView"//
                             + "\tCause"//
                             + "\tHistory"//
+                            + "\tIndexMetadata"//
                             ;
 
             out.println(s);
@@ -639,8 +637,12 @@ public class DumpFederation {
                 // history
                 sb.append("\t\"" + rec.detailRec.pmd.getHistory() + "\"");
 
+                // indexMetadata
+                sb.append("\t\"" + rec.detailRec.indexMetadata + "\"");
+
             } else {
 
+                sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
@@ -736,7 +738,7 @@ public class DumpFederation {
 
         final String[] names = getIndexNames(namespace);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Found " + names.length + " indices: "
                     + Arrays.toString(names));
 
@@ -878,7 +880,8 @@ public class DumpFederation {
         public final ServiceMetadata smd;
 
         /**
-         * The #of bytes across all {@link IndexSegment}s in the view.
+         * Details across all components of the index partition view, including
+         * the mutable {@link BTree} and any {@link IndexSegment}s in the view.
          * <p>
          * Note: views generally have data on the live and possibly one (or
          * more) historical journals. However, there is no way to accurately
@@ -891,38 +894,38 @@ public class DumpFederation {
         
     }
 
-    /**
-     * Helper task returns the {@link LocalPartitionMetadata} for an index
-     * partition.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static public class FetchLocalPartitionMetadataTask implements
-            IIndexProcedure {
-
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -482901101593128076L;
-
-        public FetchLocalPartitionMetadataTask() {
-        
-        }
-
-        public LocalPartitionMetadata apply(IIndex ndx) {
-
-            return ndx.getIndexMetadata().getPartitionMetadata();
-            
-        }
-
-        public boolean isReadOnly() {
-            
-            return true;
-            
-        }
-        
-    }
+//    /**
+//     * Helper task returns the {@link LocalPartitionMetadata} for an index
+//     * partition.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static public class FetchLocalPartitionMetadataTask implements
+//            IIndexProcedure {
+//
+//        /**
+//         * 
+//         */
+//        private static final long serialVersionUID = -482901101593128076L;
+//
+//        public FetchLocalPartitionMetadataTask() {
+//        
+//        }
+//
+//        public LocalPartitionMetadata apply(final IIndex ndx) {
+//
+//            return ndx.getIndexMetadata().getPartitionMetadata();
+//            
+//        }
+//
+//        public boolean isReadOnly() {
+//            
+//            return true;
+//            
+//        }
+//        
+//    }
 
     /**
      * A record detailing various things counted on a per-source basis.
@@ -1060,10 +1063,16 @@ public class DumpFederation {
         public final String indexPartitionName;
         
         /**
+         * The complete {@link IndexMetadata} record for the mutable
+         * {@link BTree} on the live journal.
+         */
+        public final IndexMetadata indexMetadata;
+        
+        /**
          * The detailed description of the index view.
          */
         public final LocalPartitionMetadata pmd;
-        
+     
         /**
          * Details on each source in the view.  The order is the order
          * of the sources in the view.
@@ -1180,7 +1189,8 @@ public class DumpFederation {
 
                 }
 
-                pmd = btree.getIndexMetadata().getPartitionMetadata();
+                indexMetadata = btree.getIndexMetadata();
+                pmd = indexMetadata.getPartitionMetadata();
                 
             }
 
