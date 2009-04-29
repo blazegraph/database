@@ -212,9 +212,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     private static final long serialVersionUID = 4370669592664382720L;
     
-    protected static final Logger log = Logger.getLogger(IndexMetadata.class);
-
-    protected final boolean INFO = log.isInfoEnabled();
+    protected static final transient Logger log = Logger
+            .getLogger(IndexMetadata.class);
     
     /**
      * Options and their defaults for the {@link com.bigdata.btree} package and
@@ -1515,7 +1514,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 
                     // Not a UUID.
                     
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Not a UUID: " + val);
                     
                     // Ignore & fall through.
@@ -2227,7 +2226,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * @throws IllegalArgumentException
      *             if the oldCheckpoint is <code>null</code>.
      */
-    final public Checkpoint overflowCheckpoint(Checkpoint oldCheckpoint) {
+    final public Checkpoint overflowCheckpoint(final Checkpoint oldCheckpoint) {
        
         if (oldCheckpoint == null) {
          
@@ -2285,7 +2284,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * 
      * @return The {@link Checkpoint}.
      */
-    final public Checkpoint newCheckpoint(BTree btree) {
+    final public Checkpoint newCheckpoint(final BTree btree) {
         
         try {
             
