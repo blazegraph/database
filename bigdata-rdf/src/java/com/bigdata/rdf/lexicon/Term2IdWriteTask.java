@@ -3,6 +3,8 @@ package com.bigdata.rdf.lexicon;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.IResultHandler;
@@ -20,6 +22,8 @@ import com.bigdata.service.Split;
 public class Term2IdWriteTask implements
         Callable<KVO<BigdataValue>[]> {
 
+    protected static transient final Logger log = Logger.getLogger(Term2IdWriteTask.class);
+            
     private final LexiconRelation r;
     private final boolean readOnly;
     private final int numTerms;
@@ -149,8 +153,8 @@ public class Term2IdWriteTask implements
 
                         if (b[i].obj.getTermId() != IRawTripleStore.NULL) {
                             
-                            if (LexiconRelation.DEBUG)
-                                LexiconRelation.log.debug("term identifier already assigned: "
+                            if (log.isDebugEnabled())
+                                log.debug("term identifier already assigned: "
                                         + b[i].obj);
                             
                             // term identifier already assigned.
@@ -160,8 +164,8 @@ public class Term2IdWriteTask implements
                         
                         if (i > 0 && b[i - 1].obj == b[i].obj) {
 
-                            if (LexiconRelation.DEBUG)
-                                LexiconRelation.log.debug("duplicate term reference: "
+                            if (log.isDebugEnabled())
+                                log.debug("duplicate term reference: "
                                         + b[i].obj);
                             
                             // duplicate reference.

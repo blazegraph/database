@@ -199,16 +199,6 @@ abstract public class AbstractTripleStore extends
     final static protected Logger log = Logger.getLogger(ITripleStore.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * This is used to conditionally enable the logic to retract justifications
      * when the corresponding statements is retracted.
      */
@@ -1192,7 +1182,7 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No axioms defined? : "
                                 + this);
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("read axioms: "+axioms.size());
                     
                 }
@@ -1243,7 +1233,7 @@ abstract public class AbstractTripleStore extends
                         throw new RuntimeException("No vocabulary defined? : "
                                 + this);
                     
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("read vocabular: "+vocab.size());
                     
                 }
@@ -1777,7 +1767,7 @@ abstract public class AbstractTripleStore extends
 
             final boolean found = ndx.contains(key);
 
-            if(DEBUG) {
+            if(log.isDebugEnabled()) {
                 
                 log.debug(spo + " : found=" + found + ", key="
                         + BytesUtil.toString(key));
@@ -1824,7 +1814,7 @@ abstract public class AbstractTripleStore extends
 
         if (_s == NULL && s != null) {
          
-            if(DEBUG)
+            if(log.isDebugEnabled())
                 log.debug("Subject not in kb: "+s);
             
             return false;
@@ -1835,7 +1825,7 @@ abstract public class AbstractTripleStore extends
 
         if (_p == NULL && p != null) {
 
-            if(DEBUG)
+            if(log.isDebugEnabled())
                 log.debug("Predicate not in kb: "+s);            
             
             return false;
@@ -1846,7 +1836,7 @@ abstract public class AbstractTripleStore extends
 
         if (_o == NULL && o != null) {
 
-            if(DEBUG)
+            if(log.isDebugEnabled())
                 log.debug("Object not in kb: "+s);
             
             return false;
@@ -1855,7 +1845,7 @@ abstract public class AbstractTripleStore extends
 
         final boolean found = hasStatement(_s, _p, _o);
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("<" + s + "," + p + "," + o + "> : found=" + found);
             
@@ -2756,7 +2746,7 @@ abstract public class AbstractTripleStore extends
 
             }
 
-            if(INFO)
+            if(log.isInfoEnabled())
             log.info("Copied "
                     + nwritten
                     + " statements in "
@@ -2963,7 +2953,7 @@ abstract public class AbstractTripleStore extends
                 
                 if (numStmts > 1000) {
 
-                    if(INFO)
+                    if(log.isInfoEnabled())
                     log.info("Wrote "
                             + numStmts
                             + " statements (mutationCount="
@@ -3249,7 +3239,7 @@ abstract public class AbstractTripleStore extends
             // note: count will be exact.
             statementCount1 = tempStore.getStatementCount();
 
-            if(INFO)
+            if(log.isInfoEnabled())
             log.info("Finished " + nrounds + " rounds: statementBefore="
                     + statementCount0 + ", statementsAfter=" + statementCount1);
             
@@ -3662,7 +3652,7 @@ abstract public class AbstractTripleStore extends
 
             final IRule tmp = r.specialize(constants, null/* constraints */);
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug(tmp.toString());
             
             program.addStep(tmp);

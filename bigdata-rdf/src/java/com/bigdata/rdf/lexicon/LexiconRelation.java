@@ -114,10 +114,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     final protected static Logger log = Logger.getLogger(LexiconRelation.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
     private final Set<String> indexNames;
 
     /**
@@ -477,7 +473,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
     private SoftReference<FullTextIndex> searchEngineRef;
 
-    protected IndexMetadata getTerm2IdIndexMetadata(String name) {
+    protected IndexMetadata getTerm2IdIndexMetadata(final String name) {
 
         final IndexMetadata metadata = newIndexMetadata(name);
 
@@ -487,7 +483,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     }
 
-    protected IndexMetadata getId2TermIndexMetadata(String name) {
+    protected IndexMetadata getId2TermIndexMetadata(final String name) {
 
         final IndexMetadata metadata = newIndexMetadata(name);
 
@@ -768,7 +764,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     public void addTerms(final BigdataValue[] terms, final int numTerms,
             final boolean readOnly) {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("numTerms=" + numTerms + ", readOnly=" + readOnly);
         
         if (numTerms == 0)
@@ -895,7 +891,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (INFO && readOnly && stats.nunknown.get() > 0) {
+        if (log.isInfoEnabled() && readOnly && stats.nunknown.get() > 0) {
          
             log.info("There are " + stats.nunknown + " unknown terms out of "
                     + numTerms + " given");
@@ -904,7 +900,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         
         if (numTerms > 1000 || elapsed > 3000) {
 
-            if(INFO)
+            if(log.isInfoEnabled())
             log.info("Processed " + numTerms + " in " + elapsed
                         + "ms; keygen=" + stats.keyGenTime + "ms, sort=" + stats.sortTime
                         + "ms, insert=" + stats.indexTime + "ms" + " {forward="
@@ -1116,7 +1112,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (INFO && n > 1000 || elapsed > 3000) {
+        if (log.isInfoEnabled() && n > 1000 || elapsed > 3000) {
 
             log.info("Wrote " + n + " in " + elapsed + "ms; keygen="
                     + keyGenTime + "ms, sort=" + sortTime + "ms, insert="
@@ -1189,7 +1185,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         // flush writes to the text index.
         buffer.flush();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("indexed " + n + " new terms");
 
     }
@@ -1263,7 +1259,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          */
         if (numNotFound > 0) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("nterms=" + n + ", numNotFound=" + numNotFound
                         + (termCache!=null?(", cacheSize=" + termCache.size() + "\n"
                         + termCache.getStatistics()):""));
@@ -1367,7 +1363,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                 final long elapsed = System.currentTimeMillis() - begin;
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("resolved " + numNotFound + " terms in "
                             + tasks.size() + " chunks and " + elapsed + "ms");
                 

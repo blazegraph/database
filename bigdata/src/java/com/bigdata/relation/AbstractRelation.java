@@ -152,7 +152,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
                 && timestamp == ITx.UNISOLATED
                 && (indexManager instanceof Journal || indexManager instanceof TemporaryStore)) {
 
-            if(DEBUG) {
+            if(log.isDebugEnabled()) {
                 
                 log.debug("Imposing read-write concurrency controls on index: name="
                                 + name);

@@ -624,22 +624,32 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@link AbstractSubtask} sink handling writes for the associated index
          * partition.
          */
-        String MASTER_QUEUE_CAPACITY = "masterQueueCapacity";
+        String MASTER_QUEUE_CAPACITY = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".masterQueueCapacity";
+
         String DEFAULT_MASTER_QUEUE_CAPACITY = "5000";
 
         /**
          * The desired size of the chunks that the master will draw from its
          * queue.
          */
-        String MASTER_CHUNK_SIZE = "masterChunkSize";
+        String MASTER_CHUNK_SIZE = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".masterChunkSize";
+
         String DEFAULT_MASTER_CHUNK_SIZE = "10000";
 
         /**
          * The time in nanoseconds that the master will combine smaller chunks
          * so that it can satisify the desired <i>masterChunkSize</i>.
          */
-        String MASTER_CHUNK_TIMEOUT_NANOS = "masterChunkTimeoutNanos";
-        String DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(50);
+        String MASTER_CHUNK_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".masterChunkTimeoutNanos";
+
+        String DEFAULT_MASTER_CHUNK_TIMEOUT_NANOS = ""
+                + TimeUnit.MILLISECONDS.toNanos(50);
 
         /**
          * The time in nanoseconds that the {@link AbstractSubtask sink} will
@@ -648,22 +658,32 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * the sink remains responsible rather than blocking inside of the
          * {@link IAsynchronousIterator} for long periods of time.
          */
-        String SINK_POLL_TIMEOUT_NANOS = "sinkPollTimeoutNanos";
-        String DEFAULT_SINK_POLL_TIMEOUT_NANOS = ""+TimeUnit.MILLISECONDS.toNanos(50);
+        String SINK_POLL_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".sinkPollTimeoutNanos";
+
+        String DEFAULT_SINK_POLL_TIMEOUT_NANOS = ""
+                + TimeUnit.MILLISECONDS.toNanos(50);
 
         /**
          * The capacity of the internal queue for the per-sink output buffer.
          */
-        String SINK_QUEUE_CAPACITY = "sinkQueueCapacity";
+        String SINK_QUEUE_CAPACITY = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".sinkQueueCapacity";
+
         String DEFAULT_SINK_QUEUE_CAPACITY = "5000";
 
         /**
          * The desired size of the chunks written that will be written by the
          * {@link AbstractSubtask sink}.
          */
-        String SINK_CHUNK_SIZE = "sinkChunkSize";
+        String SINK_CHUNK_SIZE = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".sinkChunkSize";
+
         String DEFAULT_SINK_CHUNK_SIZE = "10000";
-        
+
         /**
          * The maximum amount of time in nanoseconds that a sink will combine
          * smaller chunks so that it can satisify the desired <i>sinkChunkSize</i>
@@ -673,9 +693,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * the index partition. This makes it much easier to adjust the
          * performance since you simply adjust the {@link #SINK_CHUNK_SIZE}.
          */
-        String SINK_CHUNK_TIMEOUT_NANOS = "sinkChunkTimeoutNanos";
-        String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = ""+Long.MAX_VALUE;
-       
+        String SINK_CHUNK_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".sinkChunkTimeoutNanos";
+
+        String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = "" + Long.MAX_VALUE;
+
         /**
          * The time in nanoseconds after which an idle sink will be closed. Any
          * buffered writes are flushed when the sink is closed (default
@@ -688,13 +711,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * all sinks are flushed and closed.
          */
         // GTE chunkTimeout
-        String SINK_IDLE_TIMEOUT_NANOS = "sinkIdleTimeoutNanos";
-        String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = ""+Long.MAX_VALUE;
-        
+        String SINK_IDLE_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
+                .getName()
+                + ".sinkIdleTimeoutNanos";
+
+        String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = "" + Long.MAX_VALUE;
+
         /*
          * Scatter split configuration.
          */
-        
+
         /**
          * Boolean option indicates whether or not scatter splits are performed
          * (default {@value #SCATTER_SPLIT_ENABLED}). Scatter splits only apply
@@ -711,7 +737,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * @see OverflowManager.Options#SCATTER_SPLIT_ENABLED
          */
-        String SCATTER_SPLIT_ENABLED = "scatterSplitEnabled";
+        String SCATTER_SPLIT_ENABLED = ScatterSplitConfiguration.class
+                .getName()
+                + ".enabled";
 
         String DEFAULT_SCATTER_SPLIT_ENABLED = "true";
 
@@ -728,16 +756,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * performed. The allowable range is therefore constrained to
          * <code>(0.1 : 1.0)</code>.
          */
-        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = "scatterSplitPercentOfSplitThreshold";
-        
+        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ScatterSplitConfiguration.class
+                .getName()
+                + ".percentOfSplitThreshold";
+
         String DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ".25";
-        
+
         /**
          * The #of data services on which the index will be scattered or ZERO(0)
          * to use all discovered data services (default
          * {@value #DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT}).
          */
-        String SCATTER_SPLIT_DATA_SERVICE_COUNT = "scatterSplitDataServiceCount";
+        String SCATTER_SPLIT_DATA_SERVICE_COUNT = ScatterSplitConfiguration.class
+                .getName()
+                + ".dataServiceCount";
 
         String DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT = "0";
 
@@ -769,7 +801,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * asynchronous index writes in order to obtain high throughput with
          * sustained index writes.
          */
-        String SCATTER_SPLIT_INDEX_PARTITION_COUNT = "scatterSplitIndexPartitionCount";
+        String SCATTER_SPLIT_INDEX_PARTITION_COUNT = ScatterSplitConfiguration.class
+                .getName()
+                + ".indexPartitionCount";
 
         String DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT = "0";
         
@@ -1875,7 +1909,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         return sb.toString();
         
     }
-
+    
     /**
      * The initial version.
      */
@@ -1894,6 +1928,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * configuration.
      */
     private static transient final int VERSION2 = 0x2;
+
+    /**
+     * The version that will be serialized by this class.
+     */
+    private static transient final int CURRENT_VERSION = VERSION2;
     
     /**
      * @todo review generated record for compactness.
@@ -2049,7 +2088,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
-        final int version = VERSION1;
+        final int version = CURRENT_VERSION;
         
         LongPacker.packLong(out, version);
 

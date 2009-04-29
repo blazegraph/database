@@ -32,7 +32,10 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 
 /**
  * Unit tests for {@link Configuration}.
@@ -153,4 +156,129 @@ public class TestConfiguration extends TestCase {
         
     }
     
+    public void test_getOverrideProperty() {
+        
+        final String namespace = "U8000";
+        final String namespace2 = "U100";
+
+        final String propertyName = IndexMetadata.Options.SCATTER_SPLIT_ENABLED;
+
+        final String overrideName = Configuration.getOverrideProperty(namespace
+                + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                + LexiconKeyOrder.TERM2ID, propertyName);
+
+        System.err.println(overrideName);
+
+        final String defaultValue = "true";
+        
+        final Properties p = new Properties();
+
+        // override this property.
+        p.setProperty(overrideName, "false");
+
+        final IIndexManager indexManager = null;
+
+        /*
+         * Verify override used for U8000.lex.TERM2ID (this is the specific case
+         * for the override).
+         */
+        assertEquals("false", Configuration.getProperty(indexManager, p,
+                namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+
+        /*
+         * Verify override ignored for U8000.lex.ID2TERM (another index in the
+         * same relation).
+         */
+        assertEquals(defaultValue, Configuration.getProperty(indexManager, p,
+                namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.ID2TERM, propertyName, defaultValue));
+
+        /*
+         * Verify override ignored for U100.lex.TERM2ID (an index in a different
+         * relation).
+         */
+        assertEquals(defaultValue, Configuration.getProperty(indexManager, p,
+                namespace2 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+
+    }
+
+    public void test_getOverrideProperty2() {
+        
+        final String namespace = "U8000";
+        final String namespace1 = "U100";
+        final String namespace2 = "U50";
+
+        final String propertyName = IndexMetadata.Options.SCATTER_SPLIT_DATA_SERVICE_COUNT;
+
+        // override of a specific index in a specific relation.
+        final String overrideName = Configuration.getOverrideProperty(namespace
+                + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                + LexiconKeyOrder.TERM2ID, propertyName);
+
+        // override of all indices in a different relation.
+        final String overrideName2 = Configuration.getOverrideProperty(
+                namespace2, propertyName);
+
+        System.err.println(overrideName);
+        System.err.println(overrideName2);
+
+        Properties p = new Properties();
+
+        final String defaultValue = "0";
+        
+        final String globalOverride = "10";
+
+        p = new Properties(p);
+        
+        final String otherOverride = "5";
+        
+        // override the global default.
+        p.setProperty(propertyName, globalOverride);
+        
+        // a different override for the specific index.
+        p.setProperty(overrideName, "2");
+
+        // a different override for a different relation.
+        p.setProperty(overrideName2, otherOverride);
+
+        final IIndexManager indexManager = null;
+
+        /*
+         * Verify override used for U8000.lex.TERM2ID (this is the specific case
+         * for the override).
+         */
+        assertEquals("2", Configuration.getProperty(indexManager, p,
+                namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+
+        /*
+         * Verify global override used for a different index in the same
+         * relation.
+         */
+        assertEquals(globalOverride, Configuration.getProperty(indexManager, p,
+                namespace + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.ID2TERM, propertyName, defaultValue));
+
+        /*
+         * Verify global override used for an index in another relation.
+         */
+        assertEquals(globalOverride, Configuration.getProperty(indexManager, p,
+                namespace1 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+
+        /*
+         * Verify other override used for all indices in the namespace2
+         * relation.
+         */
+        assertEquals(otherOverride, Configuration.getProperty(indexManager, p,
+                namespace2 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.TERM2ID, propertyName, defaultValue));
+        assertEquals(otherOverride, Configuration.getProperty(indexManager, p,
+                namespace2 + "." + LexiconRelation.NAME_LEXICON_RELATION + "."
+                        + LexiconKeyOrder.ID2TERM, propertyName, defaultValue));
+
+    }
+
 }

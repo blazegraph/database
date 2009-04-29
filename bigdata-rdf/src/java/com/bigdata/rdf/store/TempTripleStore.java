@@ -249,7 +249,7 @@ public class TempTripleStore extends AbstractLocalTripleStore {
 
         this(store, db == null ? properties : stackProperties(properties, db));
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("new temporary store: " + store.getFile() + ", namespace="
                     + getNamespace());
