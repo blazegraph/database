@@ -95,7 +95,22 @@ public class ScatterSplitConfiguration implements Externalizable {
         return sb.toString();
         
     }
-    
+
+    /**
+     * De-serialization ctor.
+     */
+    public ScatterSplitConfiguration() {
+        
+    }
+
+    /**
+     * Core impl.
+     * 
+     * @param enabled
+     * @param percentOfSplitThreshold
+     * @param dataServiceCount
+     * @param indexPartitionCount
+     */
     public ScatterSplitConfiguration(final boolean enabled,
             final double percentOfSplitThreshold, final int dataServiceCount,
             final int indexPartitionCount) {
