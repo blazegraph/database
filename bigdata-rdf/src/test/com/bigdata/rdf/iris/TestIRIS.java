@@ -27,14 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.iris;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Properties;
 import org.deri.iris.api.IProgramOptimisation.Result;
 import org.deri.iris.api.basics.IAtom;
+import org.deri.iris.api.basics.ILiteral;
 import org.deri.iris.api.basics.IQuery;
 import org.deri.iris.api.basics.IRule;
+import org.deri.iris.api.basics.ITuple;
 import org.deri.iris.api.factory.IBasicFactory;
 import org.deri.iris.api.factory.ITermFactory;
+import org.deri.iris.api.terms.ITerm;
 import org.deri.iris.basics.BasicFactory;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
@@ -52,6 +58,11 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.relation.rule.IConstant;
+import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IProgram;
+import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
@@ -68,6 +79,12 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  */
 public class TestIRIS extends AbstractInferenceEngineTestCase {
 
+    final IBasicFactory BASIC = BasicFactory.getInstance();
+    
+    final ITermFactory TERM = TermFactory.getInstance();
+    
+
+    
     /**
      * 
      */
@@ -88,7 +105,14 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
      * not a statement is grounded by other facts in the database.  To determine 
      * this without justifications, we could use a magic sets optimization
      * against the normal inference rules using the statement to test as the
-     * query. 
+     * query.
+     * 
+     * @fixme variables for bigdata rules are assigned locally to the rule. will
+     * this create problems for the iris program, where all the rules are mushed
+     * together?
+     * 
+     * @fixme what do we do about the IConstraints on bigdata rules?  do they
+     * get promoted to full-fledged IRIS rules in the IRIS program?
      */
     public void testRetractionWithIRIS() {
         
@@ -107,7 +131,6 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             final BigdataURI V = f.createURI("http://www.bigdata.com/V");
             final BigdataURI X = f.createURI("http://www.bigdata.com/X");
             final BigdataURI sco = f.asValue(RDFS.SUBCLASSOF);
-            
             
             // set the stage
             // U sco V and V sco X implies U sco X
@@ -144,19 +167,18 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             // now we convert the bigdata program into an IRIS program
 
-            Collection<IRule> rules = null; // convertToIRIS(program);
+            Collection<IRule> rules = new LinkedList<IRule>();
+            
+            convertToIRISProgram(program, rules);
             
             // then we create a query for the fact we are looking for
             
-            IBasicFactory BASIC = BasicFactory.getInstance();
-            
-            ITermFactory TERM = TermFactory.getInstance();
-            
             IAtom atom = BASIC.createAtom(
-                BASIC.createPredicate(sco.stringValue(), 2),
+                BASIC.createPredicate("stmt", 3),
                 BASIC.createTuple(
-                    TERM.createString(U.stringValue()), 
-                    TERM.createString(X.stringValue())
+                    TERM.createString(String.valueOf(U.getTermId())), 
+                    TERM.createString(String.valueOf(sco.getTermId())), 
+                    TERM.createString(String.valueOf(X.getTermId()))
                     )
                 );
             
@@ -171,7 +193,13 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             MagicSets magicSets = new MagicSets();
             
-            Result result = null; // magicSets.optimise(rules, query);
+            Result result = magicSets.optimise(rules, query);
+            
+            for (IRule rule : result.rules) {
+                
+                System.err.println("rule: " + rule);
+                
+            }
             
             // now we take the optimized set of rules and convert it back to a
             // bigdata program
@@ -181,8 +209,6 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             // then we somehow run the magic program and see if the fact in
             // question exists in the resulting closure, if it does, then the
             // statement is supported by other facts in the database
-            
-            // stolen from InferenceEngine.computeClosure()
             
             final long begin = System.currentTimeMillis();
             
@@ -201,11 +227,11 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                     joinNexusFactory.newInstance(store.getIndexManager());
             
             IChunkedOrderedIterator<ISolution> solutions = joinNexus.runQuery(magicProgram);
-            
+
             while (solutions.hasNext()) {
 
                 ISolution<ISPO> solution = solutions.next();
-                
+
                 System.err.println(solution.get().toString(store));
 
             }
@@ -219,6 +245,111 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             store.closeAndDelete();
             
         }
+        
+    }
+    
+    /**
+     * Turn a bigdata IStep (either a program or a rule) into a set of IRIS
+     * rules.  Uses recursion where needed.
+     * 
+     * @param step 
+     *              the bigdata step
+     * 
+     * @param rules 
+     *              the set of IRIS rules
+     */
+    private void convertToIRISProgram(IStep step, Collection<IRule> rules) {
+
+        if (step.isRule()) {
+            
+            com.bigdata.relation.rule.IRule bigdataRule =
+                (com.bigdata.relation.rule.IRule) step;
+
+            rules.add(convertToIRISRule(bigdataRule));
+            
+        } else {
+            
+            IProgram program = (IProgram) step;
+            
+            Iterator<IStep> substeps = program.steps();
+    
+            while (substeps.hasNext()) {
+                
+                IStep substep = substeps.next();
+                
+                convertToIRISProgram(substep, rules);
+                
+            }
+
+        }
+        
+    }
+    
+    /**
+     * Convert a bigdata rule into an IRIS rule.
+     * 
+     * @param bigdataRule
+     *                  the bigdata rule
+     * @return
+     *                  the IRIS rule
+     */
+    private IRule convertToIRISRule(
+        com.bigdata.relation.rule.IRule bigdataRule) {
+        
+        ILiteral[] head = new ILiteral[1];
+        
+        head[0] = convertToIRISLiteral(bigdataRule.getHead());
+        
+        int tailCount = bigdataRule.getTailCount();
+        
+        ILiteral[] body = new ILiteral[tailCount];
+        
+        for (int i = 0; i < tailCount; i++) {
+            
+            body[i] = convertToIRISLiteral(bigdataRule.getTail(i));
+            
+        }
+        
+        return BASIC.createRule(
+            Arrays.asList(head), 
+            Arrays.asList(body)
+            );
+        
+    }
+    
+    /**
+     * Convert a bigdata predicate to an IRIS literal.
+     * 
+     * @param bigdataPred
+     *                  the bigdata predicate
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(IPredicate bigdataPred) {
+
+        ITerm[] terms = new ITerm[bigdataPred.arity()];
+        
+        for (int i = 0; i < terms.length; i++) {
+            
+            IVariableOrConstant<Long> bigdataTerm = bigdataPred.get(i);
+            
+            if (bigdataTerm.isConstant()) {
+
+                terms[i] = TERM.createString(String.valueOf(bigdataTerm.get()));
+                
+            } else {
+                
+                terms[i] = TERM.createVariable(bigdataTerm.getName());
+                
+            }
+            
+        }
+        
+        return BASIC.createLiteral(
+            true, 
+            BASIC.createPredicate("stmt", terms.length),
+            BASIC.createTuple(terms)
+            );
         
     }
     
