@@ -78,6 +78,24 @@ public class ScatterSplitConfiguration implements Externalizable {
         
     }
 
+    public String toString() {
+        
+        final StringBuilder sb = new StringBuilder(getClass().getName());
+        
+        sb.append("{enabled="+enabled);
+        
+        sb.append(", percentOfSplitThreshold="+percentOfSplitThreshold);
+        
+        sb.append(", dataServiceCount="+dataServiceCount);
+        
+        sb.append(", indexPartitionCount="+indexPartitionCount);
+
+        sb.append("}");
+       
+        return sb.toString();
+        
+    }
+    
     public ScatterSplitConfiguration(final boolean enabled,
             final double percentOfSplitThreshold, final int dataServiceCount,
             final int indexPartitionCount) {
