@@ -38,5 +38,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/start.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/sun-util.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/tools.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/iris-0.58.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/jgrapht-jdk1.5-0.7.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

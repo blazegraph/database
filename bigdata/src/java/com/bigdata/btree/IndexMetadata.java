@@ -56,6 +56,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.DefaultSplitHandler;
+import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -666,30 +667,115 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         /**
          * The maximum amount of time in nanoseconds that a sink will combine
-         * smaller chunks so that it can satisify the desired <i>sinkChunkSize</i>.
-         * 
-         * FIXME Both the sink and idle timeouts should default to
-         * {@link Long#MAX_VALUE}, in which case they simply wait until
+         * smaller chunks so that it can satisify the desired <i>sinkChunkSize</i>
+         * (default {@value #DEFAULT_SINK_CHUNK_TIMEOUT_NANOS}). The default is
+         * an infinite timeout. This means that the sink will simply wait until
          * {@link #SINK_CHUNK_SIZE} elements have accumualated before writing on
          * the index partition. This makes it much easier to adjust the
          * performance since you simply adjust the {@link #SINK_CHUNK_SIZE}.
          */
         String SINK_CHUNK_TIMEOUT_NANOS = "sinkChunkTimeoutNanos";
-        String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = ""+TimeUnit.SECONDS.toNanos(5);
+        String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = ""+Long.MAX_VALUE;
        
         /**
          * The time in nanoseconds after which an idle sink will be closed. Any
-         * buffered writes are flushed when the sink is closed. This must be GTE
-         * the <i>sinkChunkTimeout</i> otherwise the sink will decide that it
-         * is idle when it was just waiting for enough data to prepare a full
-         * chunk.
+         * buffered writes are flushed when the sink is closed (default
+         * {@value #DEFAULT_SINK_IDLE_TIMEOUT_NANOS}). This must be GTE the
+         * <i>sinkChunkTimeout</i> otherwise the sink will decide that it is
+         * idle when it was just waiting for enough data to prepare a full
+         * chunk. The default is an infinite timeout which means that sinks are
+         * closed only by an index partition has been split/move/join or by
+         * closing the master on which the application is writing, in which case
+         * all sinks are flushed and closed.
          */
         // GTE chunkTimeout
         String SINK_IDLE_TIMEOUT_NANOS = "sinkIdleTimeoutNanos";
-        String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = ""+TimeUnit.SECONDS.toNanos(10);
+        String DEFAULT_SINK_IDLE_TIMEOUT_NANOS = ""+Long.MAX_VALUE;
+        
+        /*
+         * Scatter split configuration.
+         */
+        
+        /**
+         * Boolean option indicates whether or not scatter splits are performed
+         * (default {@value #SCATTER_SPLIT_ENABLED}). Scatter splits only apply
+         * for scale-out indices where they "scatter" the initial index
+         * partition across the {@link IDataService}s in the federation. This
+         * is normally very useful.
+         * <P>
+         * Sometimes a scatter split is not the "right" thing for an index. An
+         * example would be an index where you have to do a LOT of synchronous
+         * RPC rather than using asynchronous index writes. In this case, the
+         * synchronous RPC can be a bottleneck unless the "chunk" size of the
+         * writes is large. This is especially true when writes on other indices
+         * must wait for the outcome of the synchronous RPC. E.g., foreign keys.
+         * 
+         * @see OverflowManager.Options#SCATTER_SPLIT_ENABLED
+         */
+        String SCATTER_SPLIT_ENABLED = "scatterSplitEnabled";
+
+        String DEFAULT_SCATTER_SPLIT_ENABLED = "true";
+
+        /**
+         * The percentage of the nominal index partition size at which a scatter
+         * split is triggered when there is only a single index partition for a
+         * given scale-out index (default
+         * {@link #DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD}). The
+         * scatter split will break the index into multiple partitions and
+         * distribute those index partitions across the federation in order to
+         * allow more resources to be brought to bear on the scale-out index.
+         * The value must LT the nominal index partition split point or normal
+         * index splits will take precedence and a scatter split will never be
+         * performed. The allowable range is therefore constrained to
+         * <code>(0.1 : 1.0)</code>.
+         */
+        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = "scatterSplitPercentOfSplitThreshold";
+        
+        String DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ".25";
+        
+        /**
+         * The #of data services on which the index will be scattered or ZERO(0)
+         * to use all discovered data services (default
+         * {@value #DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT}).
+         */
+        String SCATTER_SPLIT_DATA_SERVICE_COUNT = "scatterSplitDataServiceCount";
+
+        String DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT = "0";
+
+        /**
+         * The #of index partitions to generate when an index is scatter split.
+         * The index partitions will be evenly distributed across up to
+         * {@link #SCATTER_SPLIT_DATA_SERVICE_COUNT} discovered data services.
+         * When ZERO(0), the scatter split will generate
+         * <code>(NDATA_SERVICES x 2)</code> index partitions, where
+         * NDATA_SERVICES is either {@link #SCATTER_SPLIT_DATA_SERVICE_COUNT} or
+         * the #of discovered data services when that option is ZERO (0).
+         * <p>
+         * The "ideal" number of index partitions is generally between (NCORES x
+         * NDATA_SERVICES / NINDICES) and (NCORES x NDATA_SERVICES). When there
+         * are NCORES x NDATA_SERVICES index partitions, each core is capable of
+         * servicing a distinct index partition assuming that the application
+         * and the "schema" are capable of driving the data service writes with
+         * that concurrency. However, if you have NINDICES, and the application
+         * drives writes on all index partitions of all indices at the same
+         * rate, then a 1:1 allocation of index partitions to cores would be
+         * "ideal".
+         * <p>
+         * The "right" answer also depends on the data scale. If you have far
+         * less data than can fill that many index partitions to 200M each, then
+         * you should adjust the scatter split to use fewer index partitions or
+         * fewer data services.
+         * <p>
+         * Finally, the higher the scatter the more you will need to use
+         * asynchronous index writes in order to obtain high throughput with
+         * sustained index writes.
+         */
+        String SCATTER_SPLIT_INDEX_PARTITION_COUNT = "scatterSplitIndexPartitionsCount";
+
+        String DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT = "0";
         
     }
-    
+
     /**
      * Address that can be used to read this metadata record from the store.
      * <p>
@@ -763,6 +849,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private ISplitHandler splitHandler;
 //    private Object historyPolicy;
     private AsynchronousIndexWriteConfiguration asynchronousIndexWriteConfiguration;
+    private ScatterSplitConfiguration scatterSplitConfiguration;
 
     /* 
      * IndexSegment fields.
@@ -1298,6 +1385,24 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
 
     /**
+     * The scatter split configuration for a scale-out index.
+     */
+    public ScatterSplitConfiguration getScatterSplitConfiguration() {
+        
+        return scatterSplitConfiguration;
+        
+    }
+
+    public void setScatterSplitConfiguration(final ScatterSplitConfiguration newVal) {
+
+        if (newVal == null)
+            throw new IllegalArgumentException();
+
+        this.scatterSplitConfiguration = newVal;
+        
+    }
+    
+    /**
      * <strong>De-serialization constructor only</strong> - DO NOT use this
      * ctor for creating a new instance!
      */
@@ -1627,6 +1732,53 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         }
 
+        // Scatter-split configuration
+        {
+
+            final boolean scatterSplitEnabled = Boolean.parseBoolean(properties
+                    .getProperty(Options.SCATTER_SPLIT_ENABLED,
+                            Options.DEFAULT_SCATTER_SPLIT_ENABLED));
+
+            if (log.isInfoEnabled())
+                log.info(Options.SCATTER_SPLIT_ENABLED + "="
+                        + scatterSplitEnabled);
+
+            final double scatterSplitPercentOfSplitThreshold = Double
+                    .parseDouble(properties
+                            .getProperty(
+                                    Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD,
+                                    Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD));
+
+            if (log.isInfoEnabled())
+                log.info(Options.SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD + "="
+                        + scatterSplitPercentOfSplitThreshold);
+
+            final int scatterSplitDataServicesCount = Integer
+                    .parseInt(properties.getProperty(
+                            Options.SCATTER_SPLIT_DATA_SERVICE_COUNT,
+                            Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT));
+
+            if (log.isInfoEnabled())
+                log.info(Options.SCATTER_SPLIT_DATA_SERVICE_COUNT + "="
+                        + scatterSplitDataServicesCount);
+
+            final int scatterSplitIndexPartitionsCount = Integer
+                    .parseInt(properties
+                            .getProperty(
+                                    Options.SCATTER_SPLIT_INDEX_PARTITION_COUNT,
+                                    Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT));
+
+            if (log.isInfoEnabled())
+                log.info(Options.SCATTER_SPLIT_INDEX_PARTITION_COUNT + "="
+                        + scatterSplitIndexPartitionsCount);
+
+            this.scatterSplitConfiguration = new ScatterSplitConfiguration(
+                    scatterSplitEnabled, scatterSplitPercentOfSplitThreshold,
+                    scatterSplitDataServicesCount,
+                    scatterSplitIndexPartitionsCount);
+            
+        }
+        
     }
 
     /**
@@ -1730,6 +1882,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
         sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
         sb.append(", asynchronousIndexWriteConfiguration=" + asynchronousIndexWriteConfiguration);
+        sb.append(", scatterSplitConfiguration=" + scatterSplitConfiguration);
 
         return sb.toString();
         
@@ -1739,12 +1892,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * The initial version.
      */
     private static transient final int VERSION0 = 0x0;
+
     /**
      * This version introduced the {@link #asynchronousIndexWriteConfiguration}.
-     * {@link #VERSION0} reads create a instance of that field based on a
+     * Reads of an earlier version create a instance of that field based on a
      * default configuration.
      */
     private static transient final int VERSION1 = 0x1;
+    
+    /**
+     * This version introduced the {@link #scatterSplitConfiguration}. Reads of
+     * an earlier version create a instance of that field based on a default
+     * configuration.
+     */
+    private static transient final int VERSION2 = 0x2;
     
     /**
      * @todo review generated record for compactness.
@@ -1754,10 +1915,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         final int version = (int) LongPacker.unpackLong(in);
 
-        if (version != VERSION0 && version != VERSION1) {
-
+        switch (version) {
+        case VERSION0:
+        case VERSION1:
+        case VERSION2:
+            break;
+        default:
             throw new IOException("Unknown version: version=" + version);
-
         }
 
         final boolean hasName = in.readBoolean();
@@ -1863,6 +2027,36 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             
         }
 
+        if (version < VERSION2) {
+
+            /*
+             * Use the default configuration since not present in the serialized
+             * form before VERSION2.
+             */
+
+            final boolean scatterSplitEnabled = Boolean
+                    .parseBoolean(Options.DEFAULT_SCATTER_SPLIT_ENABLED);
+
+            final double scatterSplitPercentOfSplitThreshold = Double
+                    .parseDouble(Options.DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD);
+
+            final int scatterSplitDataServicesCount = Integer
+                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_DATA_SERVICE_COUNT);
+
+            final int scatterSplitIndexPartitionsCount = Integer
+                    .parseInt(Options.DEFAULT_SCATTER_SPLIT_INDEX_PARTITION_COUNT);
+
+            this.scatterSplitConfiguration = new ScatterSplitConfiguration(
+                    scatterSplitEnabled, scatterSplitPercentOfSplitThreshold,
+                    scatterSplitDataServicesCount,
+                    scatterSplitIndexPartitionsCount);
+
+        } else {
+
+            scatterSplitConfiguration = (ScatterSplitConfiguration) in.readObject();
+            
+        }
+        
     }
 
     public void writeExternal(final ObjectOutput out) throws IOException {
@@ -1933,6 +2127,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
             // introduced in VERSION1
             out.writeObject(asynchronousIndexWriteConfiguration);
+
+        }
+
+        if (version >= VERSION2) {
+
+            // introduced in VERSION2
+            out.writeObject(scatterSplitConfiguration);
 
         }
 

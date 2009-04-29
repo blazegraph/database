@@ -229,6 +229,30 @@ public class AsynchronousIndexWriteConfiguration implements Externalizable {
             final long sinkChunkTimeoutNanos//
             ) {
 
+        if (masterQueueCapacity <= 0)
+            throw new IllegalArgumentException();
+
+        if (masterChunkSize <= 0)
+            throw new IllegalArgumentException();
+        
+        if (masterChunkTimeoutNanos <= 0)
+            throw new IllegalArgumentException();
+        
+        if (sinkIdleTimeoutNanos <= 0)
+            throw new IllegalArgumentException();
+        
+        if (sinkPollTimeoutNanos <= 0)
+            throw new IllegalArgumentException();
+        
+        if (sinkQueueCapacity <= 0)
+            throw new IllegalArgumentException();
+        
+        if (sinkChunkTimeoutNanos <= 0)
+            throw new IllegalArgumentException();
+        
+        if (sinkIdleTimeoutNanos < sinkChunkTimeoutNanos)
+            throw new IllegalArgumentException();
+
         this.masterQueueCapacity = masterQueueCapacity;
         this.masterChunkSize = masterChunkSize;
         this.masterChunkTimeoutNanos = masterChunkTimeoutNanos;
