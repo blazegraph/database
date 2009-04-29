@@ -2,6 +2,7 @@ package com.bigdata.service.ndx;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
@@ -17,16 +18,45 @@ import com.bigdata.service.Split;
 class KeyArrayDataServiceProcedureTask extends
         AbstractDataServiceProcedureTask {
 
+    /**
+     * The keys. Only the elements in this array indexed by
+     * {@link AbstractDataServiceProcedureTask#split} will be operated on by
+     * this instance of the procedure.
+     * <p>
+     * Note: On the client, {@link #keys} may be partitioned across many
+     * {@link Split}s but is always dense on the server. This conversion to a
+     * dense array is achieved by the {@link AbstractKeyArrayIndexProcedure}
+     * when it serializes its keys.
+     */
     protected final byte[][] keys;
+
+    /**
+     * The values and <code>null</code> if the operation does not take values
+     * as an input. Only the elements in this array indexed by
+     * {@link AbstractDataServiceProcedureTask#split} will be operated on by
+     * this instance of the procedure.
+     * <p>
+     * Note: On the client, {@link #vals} may be partitioned across many
+     * {@link Split}s but is always dense on the server. This conversion to a
+     * dense array is achieved by the {@link AbstractKeyArrayIndexProcedure}
+     * when it serializes its values.
+     */
     protected final byte[][] vals;
+    
+    /**
+     * The object that knows how to create an instance of the procedure to be
+     * applied to the keys and values when they are de-serialized on the server.
+     */
     protected final AbstractKeyArrayIndexProcedureConstructor ctor;
     
     /**
-     * Reports the #of keys.
+     * Reports the #of keys that are used by the {@link Split} tasked to this
+     * instance of the procedure to be executed.
      */
     protected int getElementCount() {
         
-        return keys.length;
+        return split.ntuples;
+//        return keys.length;
         
     }
     
