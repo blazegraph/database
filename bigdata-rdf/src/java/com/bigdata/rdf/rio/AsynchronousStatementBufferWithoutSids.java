@@ -81,6 +81,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedUnboundedChunkBuffer;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.DefaultDuplicateRemover;
+import com.bigdata.service.ndx.pipeline.KVOLatch;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -263,10 +264,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
     final protected transient static Logger log = Logger
             .getLogger(AsynchronousStatementBufferWithoutSids.class);
 
-    final protected transient boolean INFO = log.isInfoEnabled();
-
-    final protected transient boolean DEBUG = log.isDebugEnabled();
-    
     private final AsynchronousWriteBufferFactoryWithoutSids<S> statementBufferFactory;
     
     private final AbstractTripleStore database;
@@ -401,7 +398,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         statements = null;
         
         statementCount = 0;
-
+        
     }
     
     public void setBNodeMap(final Map<String, BigdataBNodeImpl> bnodes) {
@@ -502,7 +499,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                 
             }
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("added: " + bnode);
 
             // was inserted into the map.
@@ -527,7 +524,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             // insert this blank node into the map.
             bnodes.put(id, bnode);
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("added: " + bnode);
 
             // was inserted into the map.
@@ -617,7 +614,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("n=" + values.size() + ", added: " + term);
         
         // return the new term.
@@ -680,7 +677,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         // total #of statements accepted.
         statementCount++;
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("n=" + statementCount + ", added: " + stmt);
 
     }
@@ -696,7 +693,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
      */
     private void write() throws Exception {
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
             log.info("bnodeCount=" + (bnodes == null ? 0 : bnodes.size())
                     + ", values=" + values.size() + ", statementCount="
                     + statementCount);
@@ -718,10 +715,24 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         {
 
             /*
-             * @todo Feed in a chunked iterator? or is that just less efficient
-             * since everything is buffered and we need to use sync RPC for
-             * TERM2ID?
+             * FIXME Modify to use KVOLatch. The Term2ID task can use the same
+             * ctor, but must create KVOC instances, so we need to pass in the
+             * latch.
+             * 
+             * @todo We could feed in a chunked iterator wrapping
+             * values#iterator() rather than materializing the Value[].
+             * 
+             * @todo If there is not enough load being placed the async index
+             * write then it can wait up to its timeout. For that reason the
+             * TERM2ID async writer should use a shorter timeout or it can live
+             * lock. Ideally, there should be some explicit notice when we are
+             * done queueing writes on TERM2ID across all source documents. Even
+             * then we can live lock if the input queue is not large enough.
              */
+//            final KVOLatch latch = new KVOLatch();
+//
+//            // pre-increment to avoid notice on transient zeros.
+//            latch.inc();
             
             // dense array of the distinct terms.
             final BigdataValue[] values = this.values.values().toArray(
@@ -731,6 +742,13 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     statementBufferFactory.lexiconRelation,
                     false/* readOnly */, values.length, values,
                     new WriteTaskStats()).call();
+            
+//            // decrement now that all chunks have been queued for asynchronous
+//            // writes.
+//            latch.dec();
+//            
+//            // wait for the latch.
+//            latch.await();
             
         }
 
@@ -854,10 +872,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         final protected transient static Logger log = Logger
                 .getLogger(AsyncId2TermIndexWriteTask.class);
 
-        final protected transient boolean INFO = log.isInfoEnabled();
-
-        final protected transient boolean DEBUG = log.isDebugEnabled();
-
         private final BigdataValueFactory valueFactory;
 
         private final IChunkedIterator<BigdataValue> src;
@@ -967,10 +981,6 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         final protected transient static Logger log = Logger
                 .getLogger(AsyncSPOIndexWriteTask.class);
 
-        final protected transient boolean INFO = log.isInfoEnabled();
-
-        final protected transient boolean DEBUG = log.isDebugEnabled();
-
         private final IKeyOrder<ISPO> keyOrder;
 
         /* Note: problem with java 1.6.0_07 and _12 on linux when typed. */
@@ -1050,7 +1060,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                 chunksOut++;
                 elementsOut += a.length;
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Wrote chunk: index=" + keyOrder + ", chunksOut="
                             + chunksOut + ", elementsOut=" + elementsOut
                             + ", chunkSize=" + a.length);
@@ -1061,7 +1071,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
             }
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Done: index=" + keyOrder + ", chunksOut="
                         + chunksOut + ", elementsOut=" + elementsOut);
             
