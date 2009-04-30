@@ -131,21 +131,6 @@ abstract public class OverflowManager extends IndexManager {
      */
     final protected boolean scatterSplitEnabled;
 
-//    /**
-//     * @see Options#SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD
-//     */
-//    final protected double scatterSplitPercentOfSplitThreshold;
-//
-//    /**
-//     * @see Options#SCATTER_SPLIT_DATA_SERVICE_COUNT
-//     */
-//    final protected int scatterSplitDataServicesCount;
-//
-//    /**
-//     * @see Options#SCATTER_SPLIT_INDEX_PARTITION_COUNT
-//     */
-//    final protected int scatterSplitIndexPartitionsCount;
-    
     /**
      * @see Options#JOINS_ENABLED
      */
@@ -178,18 +163,6 @@ abstract public class OverflowManager extends IndexManager {
      * @see Options#MAXIMUM_OPTIONAL_MERGES_PER_OVERFLOW
      */
     protected final int maximumOptionalMergesPerOverflow;
-    
-//    /**
-//     * The maximum #of sources for an index partition view before a compacting
-//     * merge of the index partition will be triggered in preference to an
-//     * incremental build.
-//     * 
-//     * @see Options#MAXIMUM_SOURCES_PER_VIEW
-//     * 
-//     * @deprecated should be redundent with {@link #maximumJournalsPerView} and
-//     *             {@link #maximumSegmentsPerView}
-//     */
-//    protected final int maximumSourcesPerView;
     
     /**
      * @see Options#MAXIMUM_JOURNALS_PER_VIEW
@@ -339,7 +312,7 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * @see Options#OVERFLOW_TASKS_CONCURRENT
      */
-    protected final boolean overflowTasksConcurrent;
+    protected final int overflowTasksConcurrent;
     
     /**
      * @see Options#OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL
@@ -778,8 +751,8 @@ abstract public class OverflowManager extends IndexManager {
 //        String DEFAULT_MAXIMUM_SOURCES_PER_VIEW = "5";
 
         /**
-         * The maximum #of journals that may appear in an index partition view
-         * before a compacting merge is triggered (default
+         * A compacting merge will be triggered when the #of journals in an
+         * index partition view is GTE to this value (default
          * {@value #DEFAULT_MAXIMUM_JOURNALS_PER_VIEW}). The minimum value is
          * TWO (2) since there will be two journals in a view when an index
          * partition overflows and {@link OverflowActionEnum#Copy} is not
@@ -811,8 +784,8 @@ abstract public class OverflowManager extends IndexManager {
         String DEFAULT_MAXIMUM_JOURNALS_PER_VIEW = "3";
 
         /**
-         * The maximum #of index segments that may appear in an index partition
-         * view before a compacting merge is triggered (default
+         * A compacting merge will be triggered when the #of index segments in
+         * an index partition view is GTE to this value (default
          * {@value #DEFAULT_MAXIMUM_SEGMENTS_PER_VIEW}).
          * <p>
          * It is extremely important to perform compacting merges in order to
@@ -886,15 +859,15 @@ abstract public class OverflowManager extends IndexManager {
         String DEFAULT_OVERFLOW_TIMEOUT = "" + (10 * 1000 * 60L); // 10 minutes.
 
         /**
-         * When <code>true</code> the asynchronous overflow processing tasks
-         * will run concurrently (default
-         * {@value #DEFAULT_OVERFLOW_TASKS_CONCURRENT}). When
-         * <code>false</code> they will run sequentially.
+         * The #of threads used to execute the asynchronous overflow tasks in
+         * parallel, ZERO (0) to execute ALL asynchronous overflow tasks in
+         * parallel, or ONE (1) to execute the asynchronous overflow tasks
+         * sequentially (default {@value #DEFAULT_OVERFLOW_TASKS_CONCURRENT}).
          */
         String OVERFLOW_TASKS_CONCURRENT = OverflowManager.class.getName()
                 + ".overflowTasksConcurrent";
 
-        String DEFAULT_OVERFLOW_TASKS_CONCURRENT = "false";
+        String DEFAULT_OVERFLOW_TASKS_CONCURRENT = "0";
 
         /**
          * Cancel an existing asychronous overflow process (interrupting any
@@ -902,8 +875,8 @@ abstract public class OverflowManager extends IndexManager {
          * extent (default
          * {@value #DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL}).
          * 
-         * @todo this option is ignored if {@link #OVERFLOW_TASKS_CONCURRENT} is
-         *       <code>true</code>.
+         * @todo this option is ignored if {@link #OVERFLOW_TASKS_CONCURRENT}
+         *       has a value other than ONE (1) <code>true</code>.
          */
         String OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL = OverflowManager.class
                 .getName()
@@ -1085,7 +1058,7 @@ abstract public class OverflowManager extends IndexManager {
         // overflowTasksConcurrent
         {
 
-            overflowTasksConcurrent = Boolean.parseBoolean(properties
+            overflowTasksConcurrent = Integer.parseInt(properties
                     .getProperty(Options.OVERFLOW_TASKS_CONCURRENT,
                             Options.DEFAULT_OVERFLOW_TASKS_CONCURRENT));
 
@@ -1093,6 +1066,14 @@ abstract public class OverflowManager extends IndexManager {
                 log.info(Options.OVERFLOW_TASKS_CONCURRENT + "="
                         + overflowTasksConcurrent);
 
+            if (overflowTasksConcurrent < 0) {
+                
+                throw new IllegalArgumentException(
+                        Options.OVERFLOW_TASKS_CONCURRENT
+                                + " : must be non-negative.");
+           
+            }
+            
         }
         
         // overflowCancelledWhenJournalFull

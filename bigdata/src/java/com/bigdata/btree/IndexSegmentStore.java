@@ -38,7 +38,6 @@ import java.nio.channels.OverlappingFileLockException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
@@ -75,13 +74,6 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentStore.class);
-
-    protected static final boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
-            .toInt();
-    
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The mode that will be used to open the {@link #file} .
@@ -347,7 +339,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(checkpoint.toString());
         
     }
@@ -363,7 +355,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
         if(open) {
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Closing IndexSegmentStore: " + getFile());
 
             _close();
@@ -631,7 +623,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         try {
         
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(file.toString());
 
 //          assertOpen();
@@ -717,7 +709,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
             }
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Closed: file=" + getFile());
 
         } finally {
@@ -912,7 +904,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
          */
         final boolean isNodeAddr = addressManager.isNodeAddr(addr);
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("addr=" + addr + "(" + addressManager.toString(addr)
                     + "), isNodeAddr="+isNodeAddr);
@@ -1121,7 +1113,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         // open the file.
         this.raf = new RandomAccessFile(file, mode);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("(Re-)opened file: " + file);
 
         try {
@@ -1183,7 +1175,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * overlapping requests (concurrent requests).
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log
                         .info("Will proceed without lock: file=" + file + " : "
                                 + ex);
@@ -1196,7 +1188,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * accidental deletes or overwrites.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("FileLock not supported: file=" + getFile(), ex);
 
         }
@@ -1279,7 +1271,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             buf_nodes = DirectBufferPool.INSTANCE.acquire(100/* ms */,
                     TimeUnit.MILLISECONDS);
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Buffering nodes: #nodes=" + checkpoint.nnodes
                         + ", #bytes=" + checkpoint.extentNodes + ", file=" + file);
 
@@ -1346,7 +1338,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("reading bloom filter: "+addressManager.toString(addr));
         
         final long off = addressManager.getOffset(addr);
@@ -1377,7 +1369,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
         final BloomFilter bloomFilter = (BloomFilter) SerializerUtil.deserialize(buf);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Read bloom filter: bytesOnDisk=" + len );
 
         return bloomFilter;
@@ -1394,7 +1386,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
         assert addr != 0L;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("reading metadata: "+addressManager.toString(addr));
         
         final long off = addressManager.getOffset(addr);
@@ -1426,7 +1418,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         final IndexMetadata md = (IndexMetadata) SerializerUtil
                 .deserialize(buf);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Read metadata: " + md);
 
         return md;

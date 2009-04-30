@@ -520,6 +520,8 @@ public class DumpFederation {
                             + "\tSourceJournalCount"
                             + "\tSourceSegmentCount"
                             + "\tSumEntryCounts" //
+                            + "\tSumNodeCounts" //
+                            + "\tSumLeafCounts" //
                             + "\tSumSegmentBytes"// 
                             + "\tSumSegmentNodeBytes" //
                             + "\tSumSegmentLeafBytes"// 
@@ -575,6 +577,8 @@ public class DumpFederation {
                 
                 // per source stats (aggregated across sources in the view).
                 sb.append("\t" + sourceDetailRec.entryCount);
+                sb.append("\t" + sourceDetailRec.nodeCount);
+                sb.append("\t" + sourceDetailRec.leafCount);
                 sb.append("\t" + sourceDetailRec.segmentByteCount);
                 sb.append("\t" + sourceDetailRec.segmentNodeByteCount);
                 sb.append("\t" + sourceDetailRec.segmentLeafByteCount);
@@ -600,6 +604,8 @@ public class DumpFederation {
                 sb.append("\tN/A");
                 
                 // aggregated per-source in view stats.
+                sb.append("\tN/A");
+                sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
                 sb.append("\tN/A");
@@ -962,6 +968,18 @@ public class DumpFederation {
         public final long entryCount;
         
         /**
+         * The sum of the #of nodes in each {@link AbstractBTree} in the index
+         * partition view.
+         */
+        public final long nodeCount;
+
+        /**
+         * The sum of the #of leaves in each {@link AbstractBTree} in the index
+         * partition view.
+         */
+        public final long leafCount;
+        
+        /**
          * The #of bytes across all {@link IndexSegment}s in the view.
          */
         public final long segmentByteCount;
@@ -987,12 +1005,18 @@ public class DumpFederation {
          */
         public SourceDetailRecord(//
                 final long entryCount,//
+                final long nodeCount,
+                final long leafCount,
                 final long segmentByteCount,//
                 final long segmentNodeByteCount,//
                 final long segmentLeafByteCount//
                 ) {
             
             this.entryCount = entryCount;
+            
+            this.nodeCount = nodeCount;
+            
+            this.leafCount = leafCount;
             
             this.segmentByteCount = segmentByteCount;
             
@@ -1015,6 +1039,8 @@ public class DumpFederation {
                 throw new IllegalArgumentException();
             
             long entryCount = 0;
+            long nodeCount = 0;
+            long leafCount = 0;
             long segmentByteCount = 0;
             long nodeByteCount = 0;
             long leafByteCount = 0;
@@ -1022,6 +1048,10 @@ public class DumpFederation {
             for (SourceDetailRecord t : a) {
 
                 entryCount += t.entryCount;
+
+                nodeCount += t.nodeCount;
+
+                leafCount += t.leafCount;
 
                 segmentByteCount += t.segmentByteCount;
 
@@ -1032,6 +1062,10 @@ public class DumpFederation {
             }
 
             this.entryCount = entryCount;
+
+            this.nodeCount = nodeCount;
+            
+            this.leafCount = leafCount;
 
             this.segmentByteCount = segmentByteCount;
 
@@ -1139,7 +1173,6 @@ public class DumpFederation {
 
         /**
          * 
-         * @param btree
          * @param resourceManager
          */
         public IndexPartitionDetailRecord(
@@ -1197,8 +1230,9 @@ public class DumpFederation {
             if (pmd == null) {
 
                 sources = new SourceDetailRecord[] { //
-                // the btree on the live journal.
-                new SourceDetailRecord(btree.getEntryCount(), 0L, 0L, 0L) //
+                    // the btree on the live journal.
+                    new SourceDetailRecord(btree.getEntryCount(), btree
+                        .getNodeCount(), btree.getLeafCount(), 0L, 0L, 0L) //
                 };
 
                 this.sourceCount = 1;
@@ -1262,8 +1296,9 @@ public class DumpFederation {
 
                             }
 
-                            sources[i] = new SourceDetailRecord(tmp
-                                    .getEntryCount(), 0L, 0L, 0L);
+                            sources[i] = new SourceDetailRecord(
+                                tmp.getEntryCount(), tmp.getNodeCount(), tmp
+                                        .getLeafCount(), 0L, 0L, 0L);
 
 //                        }
 
@@ -1278,9 +1313,17 @@ public class DumpFederation {
                         // #of tuples in this index segment.
                         final long entryCount = segStore.getCheckpoint().nentries;
 
+                        final long nodeCount = segStore.getCheckpoint().nnodes;
+                        
+                        final long leafCount = segStore.getCheckpoint().nleaves;
+
                         sources[i] = new SourceDetailRecord(//
                                 // #of tuples
                                 entryCount,//
+                                // #of nodes.
+                                nodeCount,
+                                // #of leaves.
+                                leafCount,
                                 // #of bytes in the index segment.
                                 segStore.size(),//
                                 // #of bytes in the nodes extent of the seg.

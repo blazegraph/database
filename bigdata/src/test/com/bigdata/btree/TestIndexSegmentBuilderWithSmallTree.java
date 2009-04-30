@@ -46,10 +46,6 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
     
     public TestIndexSegmentBuilderWithSmallTree(String name) {super(name);}
     
-    /**
-     * Sets up the {@link #btree} and ensures that the {@link #outFile} on
-     * which the {@link IndexSegment} will be written does not exist.
-     */
     public void setUp() {
 
         outFile = new File(getName() + ".seg");

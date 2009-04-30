@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.keys;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.service.ndx.pipeline.KVOC;
 
 /**
  * A key-value-object tuple. Comparison places the {@link KVO} tuples into an
@@ -96,6 +97,17 @@ public class KVO<O> implements Comparable<KVO<O>>{
 
         this.obj = obj;
 
+    }
+    
+    /**
+     * Method is invoked when the tuple represented by the {@link KVO} has been
+     * written onto the index by an <em>asynchronous</em> write operation.
+     * {@link KVOC} overrides this method to support notification when
+     * all tuples generated within some scope have been written onto the
+     * database.
+     */
+    public void done() {
+        
     }
 
     public int compareTo(final KVO<O> arg0) {

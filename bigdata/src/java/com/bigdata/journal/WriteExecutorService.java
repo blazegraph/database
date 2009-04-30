@@ -126,6 +126,14 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  * processing.
  * </p>
  * 
+ * @todo There should be a clear advantage to pipelining operations for the same
+ *       index partition into the same commit group. That would maximize the
+ *       reuse of the index buffers and minimize the concurrent demand for
+ *       distinct indices. This is basically barging in on the write service
+ *       based on an affinity for active indices. The trick is to not starve out
+ *       indices which are not active. If the scope is limited to a commit group
+ *       or a period of time then that might do it.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
