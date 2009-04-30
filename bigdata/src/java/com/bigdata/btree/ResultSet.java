@@ -42,7 +42,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.compression.IRandomAccessByteArray;
 import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.btree.filter.ITupleFilter;
-import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
@@ -936,9 +935,12 @@ public class ResultSet implements Externalizable {
         
         sources = ndx.getResourceMetadata();
 
-        commitTime = (ndx instanceof AbstractBTree ? ((AbstractBTree) ndx)
-                .getLastCommitTime() : ((FusedView) ndx).srcs[0]
-                .getLastCommitTime());
+        commitTime = ((ILocalBTreeView) ndx).getMutableBTree()
+                .getLastCommitTime();
+
+//        commitTime = (ndx instanceof AbstractBTree ? ((AbstractBTree) ndx)
+//                .getLastCommitTime() : ((FusedView) ndx).srcs[0]
+//                .getLastCommitTime());
 
     }
 

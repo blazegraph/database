@@ -208,6 +208,16 @@ A//
             if (log.isDebugEnabled())
                 log.debug(stats);
 
+            /*
+             * Since the chunk was successfully written, we now rip through
+             * the KVOs and  
+             */
+            for (int i = 0; i < chunkSize; i++) {
+
+                chunk[i].done();
+
+            }
+
             // keep reading.
             return false;
 

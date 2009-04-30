@@ -144,6 +144,13 @@ public class EventReceiver implements IEventReceivingService,
         this.ndx = new UnisolatedReadWriteIndex(eventBTree);
         
         this.tupleSer = eventBTree.getIndexMetadata().getTupleSerializer();
+
+        if (log.isInfoEnabled()) {
+         
+            // log the event header.
+            log.info(Event.getHeader());
+            
+        }
         
     }
 

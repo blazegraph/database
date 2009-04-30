@@ -23,7 +23,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
-import org.apache.log4j.MDC;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
@@ -141,16 +140,6 @@ abstract public class LoadBalancerService extends AbstractService
     implements ILoadBalancerService, IServiceShutdown, IEventReportingService {
 
     final static protected Logger log = Logger.getLogger(LoadBalancerService.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    static final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    static final protected boolean DEBUG = log.isDebugEnabled();
 
     final protected String ps = ICounterSet.pathSeparator;
     
@@ -462,7 +451,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             logDir = new File(val);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.LOG_DIR + "=" + logDir);                
 
             // ensure exists.
@@ -476,7 +465,7 @@ abstract public class LoadBalancerService extends AbstractService
             logDelayMillis = Long.parseLong(properties.getProperty(
                     Options.LOG_DELAY, Options.DEFAULT_LOG_DELAY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.LOG_DELAY + "=" + logDelayMillis);
 
         }
@@ -487,7 +476,7 @@ abstract public class LoadBalancerService extends AbstractService
             logMaxFiles = Integer.parseInt(properties.getProperty(
                     Options.LOG_MAX_FILES, Options.DEFAULT_LOG_MAX_FILES));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.LOG_MAX_FILES + "=" + logMaxFiles);
 
         }
@@ -498,7 +487,7 @@ abstract public class LoadBalancerService extends AbstractService
                     Options.HISTORY_MINUTES,
                     Options.DEFAULT_HISTORY_MINUTES));
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.HISTORY_MINUTES+ "="
                         + historyMinutes);
             
@@ -515,7 +504,7 @@ abstract public class LoadBalancerService extends AbstractService
                     Options.SERVICE_JOIN_TIMEOUT,
                     Options.DEFAULT_SERVICE_JOIN_TIMEOUT));
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.SERVICE_JOIN_TIMEOUT + "="
                         + serviceJoinTimeout);
             
@@ -532,7 +521,7 @@ abstract public class LoadBalancerService extends AbstractService
                     .getProperty(Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT,
                             Options.DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.INITIAL_ROUND_ROBIN_UPDATE_COUNT + "="
                         + initialRoundRobinUpdateCount);
 
@@ -542,7 +531,7 @@ abstract public class LoadBalancerService extends AbstractService
                     Options.UPDATE_DELAY,
                     Options.DEFAULT_UPDATE_DELAY));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.UPDATE_DELAY + "=" + delay);
 
             /*
@@ -570,7 +559,7 @@ abstract public class LoadBalancerService extends AbstractService
                     .getProperty(Options.EVENT_HISTORY_MILLIS,
                             Options.DEFAULT_EVENT_HISTORY_MILLIS));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.EVENT_HISTORY_MILLIS + "="
                         + eventHistoryMillis);
 
@@ -640,7 +629,7 @@ abstract public class LoadBalancerService extends AbstractService
 
         if(!isOpen()) return;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
         
         updateService.shutdown();
@@ -673,7 +662,7 @@ abstract public class LoadBalancerService extends AbstractService
         
         super.shutdown();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("done");
 
     }
@@ -682,7 +671,7 @@ abstract public class LoadBalancerService extends AbstractService
 
         if(!isOpen()) return;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
         
         updateService.shutdownNow();
@@ -695,7 +684,7 @@ abstract public class LoadBalancerService extends AbstractService
         
         super.shutdownNow();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("done");
 
     }
@@ -750,12 +739,12 @@ abstract public class LoadBalancerService extends AbstractService
             // update score in global map.
             activeHosts.put(score.hostname, score);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(score.toString());
             
         }
         
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info("The most active host was: " + a[a.length - 1]);
 
@@ -808,12 +797,12 @@ abstract public class LoadBalancerService extends AbstractService
             // update score in global map.
             activeDataServices.put(score.serviceUUID, score);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(score.toString());
 
         }
         
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("The most active service was: " + a[a.length - 1]);
 
@@ -862,11 +851,7 @@ abstract public class LoadBalancerService extends AbstractService
          * class the name uses a "$" delimiter (vs a ".") between the outer and
          * the inner class names.
          */
-        final protected Logger log = Logger.getLogger(UpdateTask.class);
-
-        final protected boolean INFO = log.isInfoEnabled();
-
-        final protected boolean DEBUG = log.isDebugEnabled();
+        final protected transient Logger log = Logger.getLogger(UpdateTask.class);
 
         public UpdateTask() {
         }
@@ -906,7 +891,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             if(activeHosts.isEmpty()) {
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("No active hosts");
                 
                 return;
@@ -933,7 +918,7 @@ abstract public class LoadBalancerService extends AbstractService
                 if(!activeHosts.containsKey(hostname)) {
 
                     // Host is not active.
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("Host is not active: " + hostname);
                     
                     continue;
@@ -1008,7 +993,7 @@ abstract public class LoadBalancerService extends AbstractService
             
             if(activeDataServices.isEmpty()) {
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("No active services");
                 
                 LoadBalancerService.this.serviceScores.set( null );
@@ -1040,7 +1025,7 @@ abstract public class LoadBalancerService extends AbstractService
                 if (hostScore == null) {
 
                     // Host is not active.
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Host is not active: " + hostname);
 
                     continue;
@@ -1137,7 +1122,7 @@ abstract public class LoadBalancerService extends AbstractService
 
                             if (score == null) {
 
-                                if (INFO)
+                                if (log.isInfoEnabled())
                                     log.info("Service leave during update task: "
                                                     + serviceCounterSet.getPath());
 
@@ -1313,7 +1298,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("hostname=" + hostname + " : adjustedRawScore("
                         + scoreFormat.format(adjustedRawScore)
@@ -1522,7 +1507,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
              
                 log.info("serviceName=" + serviceName//
                         + ", serviceUUID=" + serviceUUID //
@@ -1886,7 +1871,7 @@ abstract public class LoadBalancerService extends AbstractService
         if (file == null)
             throw new IllegalArgumentException();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Writing counters on " + file);
         
         OutputStream os = null;
@@ -1950,7 +1935,7 @@ abstract public class LoadBalancerService extends AbstractService
         if (hostname == null)
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("serviceUUID=" + serviceUUID + ", serviceIface="
                     + serviceIface + ", hostname=" + hostname);
         
@@ -1978,7 +1963,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             if (activeHosts.putIfAbsent(hostname, new HostScore(hostname)) == null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("New host joined: hostname=" + hostname);
 
             }
@@ -1994,7 +1979,7 @@ abstract public class LoadBalancerService extends AbstractService
                 if (activeDataServices.putIfAbsent(serviceUUID,
                         new ServiceScore(hostname, serviceUUID, serviceName)) == null) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Data service join: hostname=" + hostname
                                 + ", serviceUUID=" + serviceUUID);
 
@@ -2052,7 +2037,7 @@ abstract public class LoadBalancerService extends AbstractService
      */
     public void leave(final UUID serviceUUID) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("serviceUUID=" + serviceUUID);
 
         try {
@@ -2138,7 +2123,7 @@ abstract public class LoadBalancerService extends AbstractService
         
         try {
         
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("serviceUUID=" + serviceUUID);
 
             if (!serviceUUID.equals(getServiceUUID())) {
@@ -2218,7 +2203,7 @@ abstract public class LoadBalancerService extends AbstractService
             // No scores yet?
             if (scores == null) {
 
-                if(INFO) log.info("No scores yet");
+                if(log.isInfoEnabled()) log.info("No scores yet");
 
                 return false;
 
@@ -2228,7 +2213,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             if (score == null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Service is not scored: " + serviceUUID);
 
                 return false;
@@ -2257,7 +2242,7 @@ abstract public class LoadBalancerService extends AbstractService
             // No scores yet?
             if (scores == null) {
 
-                if(INFO) log.info("No scores yet");
+                if(log.isInfoEnabled()) log.info("No scores yet");
 
                 return false;
 
@@ -2267,7 +2252,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             if (score == null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Service is not scored: " + serviceUUID);
 
                 return false;
@@ -2309,7 +2294,7 @@ abstract public class LoadBalancerService extends AbstractService
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("highlyUtilized=" + highlyUtilized + " : " + score);
 
         return highlyUtilized;
@@ -2341,7 +2326,7 @@ abstract public class LoadBalancerService extends AbstractService
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("underUtilized=" + underUtilized + " : " + score);
 
         return underUtilized;
@@ -2384,7 +2369,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("minCount=" + minCount + ", maxCount=" + maxCount
                         + ", exclude=" + exclude + " : reporting "
                         + uuids.length
@@ -2415,7 +2400,7 @@ abstract public class LoadBalancerService extends AbstractService
             final int maxCount, final UUID exclude) throws TimeoutException,
             InterruptedException {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("minCount=" + minCount + ", maxCount=" + maxCount
                     + ", exclude=" + exclude);
         
@@ -2440,7 +2425,7 @@ abstract public class LoadBalancerService extends AbstractService
 
             if (minCount == 0) {
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log
                             .debug("No scores, minCount is zero - will return null.");
 
@@ -2498,7 +2483,7 @@ abstract public class LoadBalancerService extends AbstractService
              * There are no non-excluded active services.
              */
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("No non-excluded services.");
 
             if (minCount == 0) {
@@ -2508,7 +2493,7 @@ abstract public class LoadBalancerService extends AbstractService
                  * caller, we return [null].
                  */
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log
                             .debug("No non-excluded services, minCount is zero - will return null.");
 
@@ -2522,7 +2507,7 @@ abstract public class LoadBalancerService extends AbstractService
                  * does not use scores and that awaits a service join.
                  */
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Will await a service join.");
 
                 return new ServiceLoadHelperWithoutScores()
@@ -2537,7 +2522,7 @@ abstract public class LoadBalancerService extends AbstractService
          * Use the scores to compute the under-utilized services.
          */
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("Will recommend services based on scores: #scored="
                     + scores.length + ", nok=" + nok + ", knownGood="
                     + knownGood + ", exclude=" + exclude);

@@ -175,8 +175,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      * @throws IllegalArgumentException
      *             if the <i>fromKey</i> is GTE the <i>toKey</i>.
      */
-    public AbstractBTreeTupleCursor(I btree, Tuple<E> tuple,
-            byte[] fromKey, byte[] toKey) {
+    public AbstractBTreeTupleCursor(final I btree, final Tuple<E> tuple,
+            final byte[] fromKey, final byte[] toKey) {
 
         if (btree == null)
             throw new IllegalArgumentException();
@@ -184,8 +184,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         if (tuple == null)
             throw new IllegalArgumentException();
 
-        if (tuple.btree != btree)
-            throw new IllegalArgumentException();
+//        if (tuple.getBTree() != btree)
+//            throw new IllegalArgumentException();
         
         if (fromKey != null) {
 

@@ -1369,12 +1369,19 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * {@link IRangeQuery#VALS} are requested so that indices which encode part
      * of the application object within the key can recover the application
      * object in {@link #insert(Object, Object)} and {@link #remove(Object)}.
+     * <p>
+     * Note: This field is NOT static. This limits the scope of the
+     * {@link Tuple} to the containing {@link AbstractBTree} instance.
      */
     public final Tuple writeTuple = new Tuple(this, KEYS | VALS);
 
     /**
      * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
      * associated with a key out of the btree during lookup operations.
+     * <p>
+     * Note: This field is NOT static. This limits the scope of the
+     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
+     * instance.
      */
     public final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
 
@@ -1394,6 +1401,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * <code>null</code>. When isolation is supported, the version metadata
      * is examined to determine if the matching entry is flagged as deleted in
      * which case contains() will report "false".
+     * <p>
+     * Note: This field is NOT static. This limits the scope of the
+     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
+     * instance.
      */
     public final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
 

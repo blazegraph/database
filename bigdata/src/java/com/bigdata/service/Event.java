@@ -69,10 +69,6 @@ public class Event implements Serializable {
 
     protected static transient final Logger log = Logger.getLogger(Event.class);
 
-    protected static transient final boolean INFO = log.isInfoEnabled();
-
-    protected static transient final boolean DEBUG = log.isDebugEnabled();
-
     /**
      * 
      */
@@ -468,18 +464,18 @@ public class Event implements Serializable {
     }
 
     /**
-     * Dispatche the {@link Event} via
+     * Dispatch the {@link Event} via
      * {@link AbstractFederation#sendEvent(Event)}.
      */
     protected void sendEvent() throws IOException {
 
         if(fed instanceof AbstractFederation) {
 
-                ((AbstractFederation) fed).sendEvent(this);
+            ((AbstractFederation) fed).sendEvent(this);
             
         } else {
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(this);
             
         }

@@ -434,6 +434,20 @@ public class Name2Addr extends BTree {
     }
     
     /**
+     * Return the approximate number of indices in the live index cache.
+     * 
+     * @throws IllegalStateException
+     *             unless this is the {@link ITx#UNISOLATED} instance.
+     */
+    public int getIndexCacheSize() {
+    
+        assertUnisolatedInstance();
+        
+        return indexCache.size();
+    
+    }
+    
+    /**
      * Return <code>true</code> iff the named index is on the commit list.
      * <p>
      * Note: This is synchronized even through the commitList is thread-safe in

@@ -140,16 +140,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 public class PostProcessOldJournalTask implements Callable<Object> {
 
     protected static final Logger log = Logger.getLogger(PostProcessOldJournalTask.class);
-    
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * 
@@ -468,7 +458,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                     if (a == null || a.length == 1) {
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log
                                     .info("Will not scatter split - insufficient data services discovered.");
                         
@@ -502,7 +492,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 putUsed(name, "willScatter(name=" + vmd + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will scatter: " + vmd);
 
                 continue;
@@ -536,7 +526,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * Joins are disabled.
              */
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(OverflowManager.Options.JOINS_ENABLED + "="
                         + resourceManager.joinsEnabled);
 
@@ -547,7 +537,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         // list of tasks that we create (if any).
         final List<AbstractTask> tasks = new LinkedList<AbstractTask>();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin: lastCommitTime=" + lastCommitTime);
 
         /*
@@ -612,7 +602,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                      * move.
                      */
 
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("Skipping index: name=" + name
                                 + ", reason=moveInProgress");
 
@@ -620,7 +610,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 }
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Considering join: name=" + name + ", rangeCount="
                             + vmd.getRangeCount() + ", pmd=" + pmd);
                 
@@ -662,7 +652,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     tmp.insert(pmd.getLeftSeparatorKey(), SerializerUtil
                             .serialize(pmd));
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("join candidate: " + name);
 
                     njoin++;
@@ -730,7 +720,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 // the name of the scale-out index.
                 final String scaleOutIndexName = entry.getKey();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Considering join candidates: "
                             + scaleOutIndexName);
 
@@ -756,7 +746,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * than any other index partition to recieve new writes.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Formulating rightSiblings query="
                             + scaleOutIndexName + ", #underutilized="
                             + ncandidates);
@@ -795,7 +785,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     
                 } // next underutilized index partition.
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Looking for rightSiblings: name="
                             + scaleOutIndexName + ", #underutilized="
                             + ncandidates);
@@ -882,7 +872,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                         // sorry.
                         if(isUsed(resources[1])) continue;
 
-                        if(INFO)
+                        if(log.isInfoEnabled())
                             log.info("Will JOIN: " + Arrays.toString(resources));
                         
                         final ViewMetadata vmd2 = overflowMetadata
@@ -1189,7 +1179,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         if (nactive <= minActiveIndexPartitions) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Preconditions for move not satisified: nactive="
                         + nactive + ", minActive=" + minActiveIndexPartitions);
             
@@ -1251,7 +1241,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         if (underUtilizedDataServiceUUIDs == null
                 || underUtilizedDataServiceUUIDs.length == 0) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Load balancer does not report any underutilized services.");
 
             return EMPTY_LIST;
@@ -1298,7 +1288,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
          * being split during an overflow and then we can move it.
          */
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Considering index partition moves: #targetServices="
                 + underUtilizedDataServiceUUIDs.length + ", maxMovesPerTarget="
                 + maxMovesPerTarget + ", nactive=" + nactive + ", maxMoves="
@@ -1343,7 +1333,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Since it is gone we skip over it here.
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + score.name + ", reason="
                             + reason);
                 
@@ -1363,7 +1353,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * is gone we skip over it here.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + name
                             + ", reason=dropped");
 
@@ -1378,7 +1368,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * it is NOT a candidate for a split, join, or move.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + name
                             + ", reason=moveInProgress");
 
@@ -1398,7 +1388,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * should be split before they are moved.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + name
                             + ", reason=shouldSplit");
 
@@ -1601,7 +1591,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // the highest priority candidate for a move.
             final ViewMetadata vmd = moveQueue.poll().v;
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Considering move candidate: " + vmd);
             
             /*
@@ -1666,7 +1656,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * can produce the necessary preconditions?. Maybe a FIFO queue?
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Will tailSplit " + vmd.name
                             + " and move the rightSibling to dataService="
                             + targetDataServiceName);
@@ -1696,7 +1686,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * be split until it was "overcapacity".
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log
                             .info("Will split "
                                     + vmd.name
@@ -1720,7 +1710,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Normal move (does not split first).
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Will move " + vmd.name + " to dataService="
                             + targetDataServiceName);
 
@@ -1739,7 +1729,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Will move " + nmove
                     + " index partitions based on utilization.");
 
@@ -1799,7 +1789,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * Since it is gone we skip over it here.
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + score.name + ", reason="
                             + reason);
                 
@@ -1819,7 +1809,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * is gone we skip over it here.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + name
                             + ", reason=dropped");
 
@@ -1834,7 +1824,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                  * it is NOT a candidate for a split, join, or move.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + name
                             + ", reason=moveInProgress");
 
@@ -1851,7 +1841,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     && vmd.indexMetadata.getScatterSplitConfiguration()
                             .isEnabled()) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Skipping index: name=" + name
                             + ", reason=preferScatterSplit");
 
@@ -1927,7 +1917,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
             // the highest priority candidate for a split.
             final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Considering hot split candidate: " + vmd);
 
             if (vmd.percentTailSplits >= resourceManager.tailSplitThreshold) {
@@ -1946,7 +1936,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 putUsed(name, "tailSplit(name=" + vmd + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will tailSpl: " + vmd);
 
                 continue;
@@ -2120,7 +2110,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
         final long oldJournalSize = oldJournal.size();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin: lastCommitTime=" + lastCommitTime
                     + ", compactingMerge=" + compactingMerge
                     + ", oldJournalSize=" + oldJournalSize);
@@ -2262,7 +2252,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              */
             if (isUsed(name)) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("was  handled: " + name);
 
                 nskip++;
@@ -2282,7 +2272,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 putUsed(name, "wasCopied(name=" + name + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("was  copied : " + vmd);
 
                 nskip++;
@@ -2309,7 +2299,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 putUsed(name, "willManditoryMerge(" + vmd + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will merge    : " + vmd);
 
                 nmerge++;
@@ -2355,7 +2345,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 putUsed(name, "tailSplit(name=" + vmd + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will tailSpl: " + vmd);
 
                 nsplit++;
@@ -2397,7 +2387,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 putUsed(name, "willSplit(name=" + vmd + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will split  : " + vmd);
 
                 nsplit++;
@@ -2460,7 +2450,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
                 putUsed(vmd.name, "willOptionalMerge(" + vmd + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will merge : " + vmd);
 
                 nmerge++;
@@ -2482,7 +2472,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 
                 putUsed(vmd.name, "willBuild(" + vmd + ")");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("will build: " + vmd);
 
                 nbuild++;
@@ -2548,7 +2538,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         
         try {
 
-            if(INFO) {
+            if(log.isInfoEnabled()) {
                 
                 // The pre-condition views.
                 log.info("\npre-condition views: overflowCounter="
@@ -2582,7 +2572,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     + ", elapsed=" + elapsed + "ms");
 
             // The post-condition views.
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("\npost-condition views: overflowCounter="
                     + resourceManager.asynchronousOverflowCounter.get() + "\n"
                     + resourceManager.listIndexPartitions(ITx.UNISOLATED));
@@ -2698,20 +2688,20 @@ public class PostProcessOldJournalTask implements Callable<Object> {
     protected void runTasks(final List<AbstractTask> tasks)
             throws InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin : will run " + tasks.size() + " update tasks");
 
-        if (resourceManager.overflowTasksConcurrent) {
-
-            runTasksConcurrent(tasks);
+        if (resourceManager.overflowTasksConcurrent == 1) {
+        
+            runTasksInSingleThread(tasks);
 
         } else {
 
-            runTasksInSingleThread(tasks);
-
+            runTasksConcurrent(tasks);
+            
         }
-        
-        if (INFO)
+
+        if (log.isInfoEnabled())
             log.info("end");
         
     }
@@ -2793,38 +2783,73 @@ public class PostProcessOldJournalTask implements Callable<Object> {
 
     /**
      * Runs the overflow tasks in parallel, cancelling any tasks which have not
-     * completed if we run out of time.
+     * completed if we run out of time. A dedicated thread pool is allocated for
+     * this purpose. Depending on the configuration, it will be either a cached
+     * thread pool (full parallelism) or a fixed thread pool (limited
+     * parallelism).
      * 
      * @param tasks
      * 
      * @throws InterruptedException
+     * 
+     * @see {@link OverflowManager#overflowTasksConcurrent}
      */
     protected void runTasksConcurrent(final List<AbstractTask> tasks)
         throws InterruptedException {
 
-        /*
-         * Note: On return tasks that are not completed are cancelled.
-         */
-        final List<Future> futures = resourceManager.getConcurrencyManager()
-                .invokeAll(tasks, resourceManager.overflowTimeout,
-                        TimeUnit.MILLISECONDS);
+        assert resourceManager.overflowTasksConcurrent >= 0;
+        
+        final ExecutorService executorService;
+        if (resourceManager.overflowTasksConcurrent == 0) {
 
-        // Note: list is 1:1 correlated with [futures].
-        final Iterator<AbstractTask> titr = tasks.iterator();
+            // run all tasks in parallel.
+            executorService = Executors
+                    .newCachedThreadPool(new DaemonThreadFactory(getClass()
+                            .getName()));
 
-        // verify that all tasks completed successfully.
-        for (Future<? extends Object> f : futures) {
+        } else {
 
-            // the task for that future.
-            final AbstractTask task = titr.next();
-
-            /*
-             * Non-blocking: all tasks have already either completed or been
-             * cancelled.
-             */
-
-            getFutureForTask(f, task, 0L, TimeUnit.NANOSECONDS);
+            // run with limited parallelism.
+            executorService = Executors.newFixedThreadPool(
+                    resourceManager.overflowTasksConcurrent,
+                    new DaemonThreadFactory(getClass().getName()));
             
+        }
+
+        try {
+            
+            /*
+             * Note: On return tasks that are not completed are cancelled.
+             */
+            final List<Future> futures = resourceManager
+                    .getConcurrencyManager().invokeAll(tasks,
+                            resourceManager.overflowTimeout,
+                            TimeUnit.MILLISECONDS);
+
+            // Note: list is 1:1 correlated with [futures].
+            final Iterator<AbstractTask> titr = tasks.iterator();
+
+            // verify that all tasks completed successfully.
+            for (Future<? extends Object> f : futures) {
+
+                // the task for that future.
+                final AbstractTask task = titr.next();
+
+                /*
+                 * Non-blocking: all tasks have already either completed or been
+                 * cancelled.
+                 */
+
+                getFutureForTask(f, task, 0L, TimeUnit.NANOSECONDS);
+
+            }
+
+        } finally {
+
+            executorService.shutdownNow();
+
+            //        executorService.awaitTermination(arg0, arg1)
+
         }
 
     }
@@ -2847,7 +2872,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                     .toMillis(task.nanoTime_finishedWork
                             - task.nanoTime_beginWork);
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Task complete: elapsed=" + elapsed + ", task=" + task);
 
         } catch (Throwable t) {

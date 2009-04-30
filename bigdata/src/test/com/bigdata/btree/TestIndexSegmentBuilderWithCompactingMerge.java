@@ -60,10 +60,6 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
     File outFile;
     File tmpDir;
     
-    /**
-     * Sets up the {@link #btree} and ensures that the {@link #outFile} on
-     * which the {@link IndexSegment} will be written does not exist.
-     */
     public void setUp() {
 
         outFile = new File(getName() + ".seg");

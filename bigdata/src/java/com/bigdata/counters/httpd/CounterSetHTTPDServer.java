@@ -57,18 +57,8 @@ import com.bigdata.util.httpd.NanoHTTPD;
  */
 public class CounterSetHTTPDServer implements Runnable {
     
-    final static protected Logger log = Logger.getLogger(NanoHTTPD.class);
+    final static protected transient Logger log = Logger.getLogger(NanoHTTPD.class);
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
     /**
      * Runs the httpd server. When the optional file(s) are given, they will be
      * read into a {@link CounterSet} on startup. This is useful for post-mortem
@@ -116,6 +106,11 @@ public class CounterSetHTTPDServer implements Runnable {
                     NanoHTTPD.log.setLevel(level);
                     
                 } else if( arg.equals("-events")) {
+
+                    /*
+                     * @todo support reading the events.jnl, which should be
+                     * opened in a read-only mode.
+                     */
                     
                     final File file = new File(args[++i]);
                     
@@ -225,7 +220,7 @@ public class CounterSetHTTPDServer implements Runnable {
                 
             } catch (InterruptedException ex) {
                 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info(ex);
                 
             } finally {
@@ -242,7 +237,7 @@ public class CounterSetHTTPDServer implements Runnable {
 
     synchronized public void shutdownNow() {
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("begin");
 
         if (httpd != null) {
@@ -253,7 +248,7 @@ public class CounterSetHTTPDServer implements Runnable {
         
         }
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("done");
 
     }
@@ -281,7 +276,7 @@ public class CounterSetHTTPDServer implements Runnable {
             
             try {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Running shutdown.");
 
                 /*

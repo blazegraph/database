@@ -107,15 +107,17 @@ public class IsolatedFusedView extends FusedView {
     
     /**
      * The isolated write set (the place where we record the intention of the
-     * transaction).  This is just a reference to the {@link BTree} at index zero(0)
-     * of {@link FusedView#srcs}.
+     * transaction). This is just a reference to the mutable {@link BTree} at
+     * index zero(0) of sources in the view.
      */
     private final BTree writeSet;
    
     /**
      * The isolated write set (the place where we record the intention of the
-     * transaction).  This is just a reference to the {@link BTree} at index zero(0)
-     * of {@link FusedView#srcs}.
+     * transaction). This is just a reference to the mutable {@link BTree} at
+     * index zero(0) of sources in the view.
+     * 
+     * @see FusedView#getMutableBTree()
      */
     public BTree getWriteSet() {
 
@@ -228,7 +230,8 @@ public class IsolatedFusedView extends FusedView {
              * key.
              */
             
-            srcs[0].insert(key, val, false/*delete*/, startTime, null/*tuple*/);
+//            srcs[0]
+            getMutableBTree().insert(key, val, false/*delete*/, startTime, null/*tuple*/);
             
             return null;
             
@@ -249,7 +252,8 @@ public class IsolatedFusedView extends FusedView {
             
             final long timestamp = tuple.getVersionTimestamp();
             
-            srcs[0].insert(key, val, false/*delete*/, timestamp, null/*tuple*/);
+//            srcs[0]
+            getMutableBTree().insert(key, val, false/*delete*/, timestamp, null/*tuple*/);
 
             return tuple.isNull() || tuple.isDeletedVersion() ? null : tuple
                     .getValue();
@@ -274,7 +278,8 @@ public class IsolatedFusedView extends FusedView {
              * key.
              */
             
-            srcs[0].insert(key, null, true/* delete */, startTime, null/*tuple*/);
+//            srcs[0]
+            getMutableBTree().insert(key, null, true/* delete */, startTime, null/*tuple*/);
             
             return null;
             
@@ -308,7 +313,8 @@ public class IsolatedFusedView extends FusedView {
                  * groundState.
                  */
                 
-                srcs[0].insert(key, null, true/* delete */, timestamp, null/* tuple */);
+//                srcs[0]
+                 getMutableBTree().insert(key, null, true/* delete */, timestamp, null/* tuple */);
                 
             }
 

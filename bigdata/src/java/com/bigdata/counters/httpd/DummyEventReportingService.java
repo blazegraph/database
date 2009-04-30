@@ -50,7 +50,8 @@ public class DummyEventReportingService extends EventReceiver implements
 //        System.err.println(header);
 //        System.err.println(Event.getHeader());
         
-        if (!(header+"\n").equals(Event.getHeader())) {
+//        if (!(header+"\n").equals(Event.getHeader())) {
+        if (!header.startsWith(Event.getHeader())) {
             throw new IOException("Invalid schema");
         }
         // create a temporary list in case the CSV rows are not ordered

@@ -96,15 +96,15 @@ public class ResourceEvents {
      */
     protected static final Logger log = Logger.getLogger(ResourceEvents.class);
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is log.isInfoEnabled() or less.
+//     */
+//    final protected static boolean log.isInfoEnabled() = log.isInfoEnabled();
 
     static NumberFormat cf;
 
@@ -144,7 +144,7 @@ public class ResourceEvents {
      */
     static public void openUnisolatedBTree(String name) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name);
 
     }
@@ -164,7 +164,7 @@ public class ResourceEvents {
      */
     static public void closeUnisolatedBTree(String name) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name);
 
     }
@@ -177,7 +177,7 @@ public class ResourceEvents {
      */
     static public void dropUnisolatedBTree(String name) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name);
 
     }
@@ -207,7 +207,7 @@ public class ResourceEvents {
 //    static public void openIndexSegment(String name, String filename,
 //            long nbytes) {
 //
-//        if (INFO)
+//        if (log.isInfoEnabled())
 //            log.info("name=" + name + ", filename=" + filename + ", #bytes="
 //                    + nbytes);
 //
@@ -223,7 +223,7 @@ public class ResourceEvents {
 //     */
 //    static public void closeIndexSegment(String filename) {
 //
-//        if (INFO)
+//        if (log.isInfoEnabled())
 //            log.info("filename=" + filename);
 //
 //    }
@@ -248,7 +248,7 @@ public class ResourceEvents {
      */
     static public void openTx(long startTime) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(TimestampUtility.toString(startTime));
 
     }
@@ -267,7 +267,7 @@ public class ResourceEvents {
      */
     static public void closeTx(long tx, long revisionTime, boolean aborted) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("tx=" + tx + ", revisionTime=" + revisionTime
                     + ", aborted=" + aborted + ", elapsed="
                     + (revisionTime - tx));
@@ -284,7 +284,7 @@ public class ResourceEvents {
      */
     static public void isolateIndex(long startTime, String name) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("tx=" + startTime + ", name=" + name);
 
         /*
@@ -317,7 +317,7 @@ public class ResourceEvents {
     static public void openJournal(String filename, long nbytes,
             BufferMode bufferMode) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("filename=" + filename + ", #bytes=" + nbytes + ", mode="
                     + bufferMode);
 
@@ -338,7 +338,7 @@ public class ResourceEvents {
      */
     static public void extendJournal(String filename, long nbytes) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("filename=" + filename + ", #bytes=" + nbytes);
 
     }
@@ -351,7 +351,7 @@ public class ResourceEvents {
      */
     static public void closeJournal(String filename) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("filename=" + filename);
 
     }
@@ -368,7 +368,7 @@ public class ResourceEvents {
      */
     static public void deleteJournal(String filename) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("filename=" + filename);
 
     }

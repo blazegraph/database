@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.lang.ref.WeakReference;
 import java.util.Arrays;
 import java.util.Iterator;
 
@@ -80,36 +81,43 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     protected static final Logger log = Logger.getLogger(FusedView.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * Error message if the view has more than {@link Long#MAX_VALUE} elements
      * and you requested an exact range count.
      */
     static protected transient final String ERR_RANGE_COUNT_EXCEEDS_MAX_LONG = "The range count can not be expressed as a 64-bit signed integer";
 
     /**
-     * Holds the various btrees that are the sources for the view.
+     * A hard reference to the mutable {@link BTree} from index zero of the
+     * sources specified to the ctor.
      */
-    protected final AbstractBTree[] srcs;
+    private final BTree btree;
+
+    /**
+     * Holds the various btrees that are the sources for the view.
+     * 
+     * FIXME Change this to assemble the AbstractBTree[] dynamically from the
+     * {@link #btree} hard reference and hard references to the
+     * {@link IndexSegmentStore} using
+     * {@link IndexSegmentStore#loadIndexSegment()}. We could actually use hard
+     * references for the index segments inside of a {@link WeakReference} to an
+     * array of those references.
+     */
+    private final AbstractBTree[] srcs;
 
     /**
      * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
      * associated with a key out of the btree during lookup operations.
+     * <p>
+     * Note: This field is NOT static. This limits the scope of the
+     * {@link ThreadLocal} {@link Tuple} to the containing {@link FusedView}
+     * instance.
      */
     protected final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
 
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(srcs[0],VALS);
+            return new Tuple(btree,VALS);
 
         }
 
@@ -122,13 +130,17 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      * <code>null</code>. When isolation is supported, the version metadata
      * is examined to determine if the matching entry is flagged as deleted in
      * which case contains() will report "false".
+     * <p>
+     * Note: This field is NOT static. This limits the scope of the
+     * {@link ThreadLocal} {@link Tuple} to the containing {@link FusedView}
+     * instance.
      */
     protected final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
 
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(srcs[0],0);
+            return new Tuple(btree, 0);
             
         }
         
@@ -165,7 +177,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     
     public BTree getMutableBTree() {
         
-        return (BTree) srcs[0];
+        return (BTree) btree;
         
     }
     
@@ -218,6 +230,8 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     public FusedView(final AbstractBTree[] srcs) {
         
         checkSources(srcs);
+        
+        this.btree = (BTree) srcs[0];
         
         this.srcs = srcs.clone();
         
@@ -283,7 +297,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     public IndexMetadata getIndexMetadata() {
         
-        return srcs[0].getIndexMetadata();
+        return btree.getIndexMetadata();
         
     }
     
@@ -331,7 +345,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      */
     public ICounter getCounter() {
         
-        return srcs[0].getCounter();
+        return btree.getCounter();
         
     }
     
@@ -343,7 +357,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
         final byte[] oldval = lookup(key);
         
-        srcs[0].insert(key, value);
+        btree.insert(key, value);
         
         return oldval;
 
@@ -358,7 +372,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         final ITuple tuple = lookup((byte[]) key, lookupTuple.get());
 
         // direct the write to the first source.
-        srcs[0].insert((byte[]) key, (byte[]) val);
+        btree.insert((byte[]) key, (byte[]) val);
         
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -404,7 +418,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         final byte[] oldval = tuple.getValue();
 
         // remove from the 1st source.
-        srcs[0].remove(key);
+        btree.remove(key);
         
         return oldval;
 
@@ -433,7 +447,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         }
 
         // remove from the 1st source.
-        srcs[0].remove(key);
+        btree.remove(key);
 
         return tuple.getObject();
 
@@ -888,7 +902,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
         final int n = srcs.length;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("nsrcs=" + n + ", flags=" + flags + ", readOnly="
                     + readOnly + ", deleted=" + deleted + ", reverseScan="
                     + reverseScan);
@@ -1118,6 +1132,8 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          */
         public boolean contains(final byte[] key) {
 
+            final AbstractBTree[] srcs = getSources();
+            
             for (int i = 0; i < srcs.length; i++) {
 
                 final IBloomFilter filter = srcs[i].getBloomFilter();
@@ -1145,7 +1161,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          */
         public void falsePos() {
 
-            final IBloomFilter filter = srcs[0].getBloomFilter();
+            final IBloomFilter filter = btree.getBloomFilter();
 
             if (filter != null) {
 

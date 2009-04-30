@@ -50,7 +50,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.ReadOnlyIndex;
-import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
@@ -77,6 +76,7 @@ import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -191,9 +191,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected static final Logger log = Logger.getLogger(IJournal.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
+//    final static protected boolean log.isInfoEnabled() = log.isInfoEnabled();
+//
+//    final static protected boolean log.isDebugEnabled() = log.isDebugEnabled();
 
     /**
      * The index of the root address containing the address of the persistent
@@ -1098,13 +1098,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         // Note: per contract for shutdown.
         if(!isOpen()) return;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         // close immediately.
         _close();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Shutdown complete.");
 
     }
@@ -1120,13 +1120,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         // Note: per contract for shutdownNow()
         if(!isOpen()) return;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         // close immediately.
         _close();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Shutdown complete.");
 
     }
@@ -1216,6 +1216,29 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 }
              });
 
+            counters.addCounter("historicalIndexCacheSize",
+                    new Instrument<Integer>() {
+                        public void sample() {
+                            final AbstractJournal jnl = ref.get();
+                            if (jnl != null) {
+                                setValue(jnl.historicalIndexCache.size());
+                            }
+                        }
+                    });
+
+            counters.addCounter("liveIndexCacheSize",
+                    new Instrument<Integer>() {
+                        public void sample() {
+                            final AbstractJournal jnl = ref.get();
+                            if (jnl != null) {
+                                final Name2Addr name2Addr = jnl.name2Addr;
+                                if (name2Addr != null) {
+                                    setValue(name2Addr.getIndexCacheSize());
+                                }
+                            }
+                        }
+                    });
+
             counters.attach(jnl._bufferStrategy.getCounters());
 
             return counters;
@@ -1224,26 +1247,26 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
 
-    /**
-     * Returns a {@link CounterSet} that it reflects the {@link Counter}s for
-     * the currently open unisolated named indices as reported by
-     * {@link Name2Addr#getIndexCounters()}.
-     */
-    public CounterSet getNamedIndexCounters() {
-
-        if (INFO)
-            log.info("Refreshing index counter set.");
-
-        /*
-         * @todo probably does not need to be synchronized any more.
-         */
-//        synchronized (name2Addr) {
-
-            return name2Addr.getIndexCounters();
-
-//        }
-            
-    }
+//    /**
+//     * Returns a {@link CounterSet} that it reflects the {@link Counter}s for
+//     * the currently open unisolated named indices as reported by
+//     * {@link Name2Addr#getIndexCounters()}.
+//     */
+//    public CounterSet getNamedIndexCounters() {
+//
+//        if (log.isInfoEnabled())
+//            log.info("Refreshing index counter set.");
+//
+//        /*
+//         * @todo probably does not need to be synchronized any more.
+//         */
+////        synchronized (name2Addr) {
+//
+//            return name2Addr.getIndexCounters();
+//
+////        }
+//            
+//    }
     
     final public File getFile() {
         
@@ -1258,7 +1281,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         assertOpen();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("file="+getFile());
         
         _bufferStrategy.close();
@@ -1293,7 +1316,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         if(isOpen()) throw new IllegalStateException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
         
         _bufferStrategy.deleteResources();
@@ -1327,7 +1350,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         backingBuffer.truncate(newExtent);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("oldExtent=" + oldExtent + ", newExtent=" + newExtent);
 
     }
@@ -1397,12 +1420,12 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         final long lastCommitTime = _rootBlock.getLastCommitTime();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Closing journal for further writes: closeTime="
                     + closeTime + ", lastCommitTime="
                     + lastCommitTime);
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("before: " + _rootBlock);
         
         final IRootBlockView old = _rootBlock;
@@ -1455,7 +1478,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         // replace the root block reference.
         _rootBlock = newRootBlock;
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("after: " + _rootBlock);
 
         // discard current commit record - can be re-read from the store.
@@ -1559,7 +1582,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         // Note: per contract for close().
         if(!isOpen()) throw new IllegalStateException();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
         
         shutdownNow();
@@ -1571,7 +1594,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         // Note: per contract for close().
         if(!isOpen()) throw new IllegalStateException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
         
         shutdownNow();
@@ -1742,7 +1765,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public void abort() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("start");
         
         /*
@@ -1790,7 +1813,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         // setup new committers, e.g., by reloading from their last root addr.
         setupCommitters();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("done");
         
     }
@@ -1912,7 +1935,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         assertOpen();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("commitTime=" + commitTime);
 
         if (commitTime <= _rootBlock.getLastCommitTime()) {
@@ -1947,7 +1970,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * any useful purpose.
              */
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Nothing to commit");
 
             return 0L;
@@ -2061,7 +2084,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Done: commitTime=" + commitTime + ", nextOffset="
                     + nextOffset);
 
@@ -2225,7 +2248,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * exception on the journal.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("New " + Name2Addr.class.getName());
             
             name2Addr = Name2Addr
@@ -2241,7 +2264,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * anyone else to have access to this same instance of the B+Tree.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Loading " + Name2Addr.class.getName() + " from "
                         + addr);
 
@@ -2335,7 +2358,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected CommitRecordIndex getCommitRecordIndex(final long addr) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("addr=" + toString(addr));
         
         final CommitRecordIndex ndx;
@@ -2434,7 +2457,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         if (commitRecord == null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("No commit record for timestamp=" + commitTime);
 
             return null;

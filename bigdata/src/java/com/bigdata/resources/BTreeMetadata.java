@@ -225,9 +225,8 @@ class BTreeMetadata {
         this.sourceSegmentCount = sourceSegmentCount;
 
         this.manditoryMerge //
-            =  sourceJournalCount > resourceManager.maximumJournalsPerView //
-            || sourceSegmentCount > resourceManager.maximumSegmentsPerView //
-//          || sourceCount > resourceManager.maximumSourcesPerView//
+            =  sourceJournalCount >= resourceManager.maximumJournalsPerView //
+            || sourceSegmentCount >= resourceManager.maximumSegmentsPerView //
         ;
         
         // BTree's directly maintained entry count (very fast).

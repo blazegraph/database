@@ -30,29 +30,31 @@ public class VerifyStatementBufferFactory implements IStatementBufferFactory {
     }
     
     /**
-     * Return the {@link ThreadLocal} {@link StatementBuffer} to be used for a
-     * task.
+     * Return the {@link StatementBuffer} to be used for a task.
      */
     public StatementBuffer newStatementBuffer() {
 
         /*
-         * Note: this is a thread-local so the same buffer object is always
-         * reused by the same thread.
+         * DO NOT use a thread-local here. That is likely to lead to a memory
+         * leak.
          */
 
-        return threadLocal.get();
+//        return threadLocal.get();
+
+        return new VerifyStatementBuffer(db, bufferCapacity, nterms,
+                ntermsNotFound, ntriples, ntriplesNotFound);
         
     }
     
-    private ThreadLocal<StatementBuffer> threadLocal = new ThreadLocal<StatementBuffer>() {
-
-        protected synchronized StatementBuffer initialValue() {
-
-            return new VerifyStatementBuffer(db, bufferCapacity, nterms,
-                    ntermsNotFound, ntriples, ntriplesNotFound);
-            
-        }
-
-    };
+//    private ThreadLocal<StatementBuffer> threadLocal = new ThreadLocal<StatementBuffer>() {
+//
+//        protected synchronized StatementBuffer initialValue() {
+//
+//            return new VerifyStatementBuffer(db, bufferCapacity, nterms,
+//                    ntermsNotFound, ntriples, ntriplesNotFound);
+//            
+//        }
+//
+//    };
     
 }
