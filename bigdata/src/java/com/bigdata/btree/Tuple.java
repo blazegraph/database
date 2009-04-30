@@ -36,25 +36,14 @@ package com.bigdata.btree;
  */
 public class Tuple<E> extends AbstractTuple<E> {
 
-//    private final WeakReference<AbstractBTree> btreeRef;
-//    
-//    /**
-//     * The {@link AbstractBTree} specified to the ctor.
-//     */
-//    final public AbstractBTree getBTree() {
-//        
-//        return btreeRef.get();
-//        
-//    }
-    
-    private final ITupleSerializer tupleSer;
-
     /**
-     * 
-     * Note: This was modified to not hold a reference to the
-     * {@link AbstractBTree} since we use {@link Tuple} in {@link ThreadLocal}
-     * constructions. Instead, it just obtains a reference to the
-     * {@link ITupleSerializer} and holds onto that.
+     * This is used to lazily obtain the {@link ITupleSerializer} since it often
+     * can not be immediately materialized in the context in which
+     * {@link Tuple#Tuple(AbstractBTree, int)} is invoked.
+     */
+    private final AbstractBTree btree;
+    
+    /**
      * 
      * @param btree
      * @param flags
@@ -66,7 +55,7 @@ public class Tuple<E> extends AbstractTuple<E> {
         if (btree == null)
             throw new IllegalArgumentException();
 
-        this.tupleSer = btree.getIndexMetadata().getTupleSerializer();
+        this.btree = btree;
         
     }
 
@@ -78,7 +67,7 @@ public class Tuple<E> extends AbstractTuple<E> {
     
     public ITupleSerializer getTupleSerializer() {
 
-        return tupleSer;
+        return btree.getIndexMetadata().getTupleSerializer();
         
     }
     
