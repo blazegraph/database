@@ -181,9 +181,6 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
     private AtomicInteger inc = new AtomicInteger();
     
     protected AbstractTripleStore getStore(Properties properties) {
-        
-        // connect to the database.
-//        return new ScaleOutTripleStore(client, "test", ITx.UNISOLATED);
     
         // Note: distinct namespace for each triple store created on the federation.
         final String namespace = "test"+inc.incrementAndGet();
@@ -191,7 +188,6 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         AbstractTripleStore store = new ScaleOutTripleStore(client
                 .getFederation(), namespace, ITx.UNISOLATED,
                 properties
-//                client.getProperties()
                 );
         
         store.create();

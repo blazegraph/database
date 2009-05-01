@@ -87,23 +87,223 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     static protected transient final String ERR_RANGE_COUNT_EXCEEDS_MAX_LONG = "The range count can not be expressed as a 64-bit signed integer";
 
     /**
-     * A hard reference to the mutable {@link BTree} from index zero of the
-     * sources specified to the ctor.
+     * Encapsulates the sources.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    private final BTree btree;
+    private interface ISources extends Iterable<AbstractBTree> {
+
+        /**
+         * The mutable {@link BTree} for the view.
+         */
+        public BTree getMutableBTree();
+
+        /**
+         * The #of sources in the view.
+         */
+        public int getSourceCount();
+
+        /**
+         * Visits the sources in order.
+         */
+        public Iterator<AbstractBTree> iterator();
+        
+        /**
+         * Cloned copy of the sources objects.
+         */
+        public AbstractBTree[] getSources();
+
+    }
+    
+    /**
+     * Implementation based on a hard reference array which directly captures
+     * the {@link AbstractBTree}[].
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class HardRefSources implements ISources {
+        
+        /**
+         * A hard reference to the mutable {@link BTree} from index zero of the
+         * sources specified to the ctor.
+         */
+        private final BTree btree;
+
+        public BTree getMutableBTree() {
+            return btree;
+        }
+        
+        public int getSourceCount() {
+            return srcs.length;
+        }
+
+        public Iterator<AbstractBTree> iterator() {
+       
+            return Arrays.asList(srcs).iterator();
+            
+        }
+
+        /**
+         * Holds the various btrees that are the sources for the view.
+         * 
+         * FIXME Change this to assemble the AbstractBTree[] dynamically from the
+         * {@link #btree} hard reference and hard references to the
+         * {@link IndexSegmentStore} using
+         * {@link IndexSegmentStore#loadIndexSegment()}. We could actually use hard
+         * references for the index segments inside of a {@link WeakReference} to an
+         * array of those references.
+         */
+        private final AbstractBTree[] srcs;
+
+        final public AbstractBTree[] getSources() {
+
+            // Note: clone the array to prevent modification.
+            return srcs.clone();
+            
+        }
+
+        public HardRefSources(final AbstractBTree[] a) {
+            
+            checkSources(a);
+            
+            this.btree = (BTree) a[0];
+            
+            this.srcs = a.clone();
+
+        }
+        
+    }
 
     /**
-     * Holds the various btrees that are the sources for the view.
+     * Implementation using a hard reference for the mutable {@link BTree} and
+     * any other {@link BTree}s in the view and hard references to the
+     * {@link IndexSegmentStore}s for the non-{@link BTree} sources in the
+     * view. and hard. The {@link IndexSegmentStore} internally uses a
+     * {@link WeakReference} to (re-)open the {@link IndexSegment} on demand.
      * 
-     * FIXME Change this to assemble the AbstractBTree[] dynamically from the
-     * {@link #btree} hard reference and hard references to the
-     * {@link IndexSegmentStore} using
-     * {@link IndexSegmentStore#loadIndexSegment()}. We could actually use hard
-     * references for the index segments inside of a {@link WeakReference} to an
-     * array of those references.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
      */
-    private final AbstractBTree[] srcs;
+    private static class WeakRefSources implements ISources {
 
+        /**
+         * The #of sources.
+         */
+        private final int count;
+        
+        /**
+         * A hard reference to the mutable {@link BTree} from index zero of the
+         * sources specified to the ctor.
+         */
+        private final BTree btree;
+        
+        /**
+         * A hard reference to any source which was a {@link BTree} with
+         * <code>null</code>s in the other elements of the array.
+         */
+        private final BTree[] btreeSources;
+
+        /**
+         * A hard reference to the {@link IndexSegmentStore} for any source that
+         * was an {@link IndexSegment} with <code>null</code>s in the other 
+         * elements of the array.
+         */
+        private final IndexSegmentStore[] segmentStores;
+        
+        public BTree getMutableBTree() {
+            return btree;
+        }
+        
+        public int getSourceCount() {
+            return count;
+        }
+
+        public AbstractBTree[] getSources() {
+
+            final AbstractBTree[] a = new AbstractBTree[count];
+
+            for (int i = 0; i < count; i++) {
+
+                if (btreeSources[i] != null) {
+
+                    a[i] = btreeSources[i];
+
+                } else {
+
+                    /*
+                     * Note: This provides a canonicalizing mapping using a weak
+                     * reference and thereby decouples the FusedView from a hard
+                     * reference to the IndexSegment.
+                     */
+
+                    a[i] = segmentStores[i].loadIndexSegment();
+
+                }
+
+            }
+
+            return a;
+
+        }
+
+        public Iterator<AbstractBTree> iterator() {
+
+            return Arrays.asList(getSources()).iterator();
+            
+        }
+
+        public WeakRefSources(final AbstractBTree[] a) {
+            
+            checkSources(a);
+
+            this.count = a.length;
+
+            this.btree = (BTree) a[0];
+
+            this.btreeSources = new BTree[count];
+
+            this.segmentStores = new IndexSegmentStore[count];
+
+            for (int i = 0; i < count; i++) {
+
+                if (a[i] instanceof BTree) {
+
+                    btreeSources[i] = (BTree) a[i];
+
+                } else {
+
+                    segmentStores[i] = ((IndexSegment) a[i]).getStore();
+
+                }
+                
+            }
+
+        }
+        
+    }
+    
+    private final ISources sources;
+    
+    final public AbstractBTree[] getSources() {
+
+        return sources.getSources();
+        
+    }
+
+    final public int getSourceCount() {
+        
+        return sources.getSourceCount();
+        
+    }
+    
+    final public BTree getMutableBTree() {
+        
+        return sources.getMutableBTree();
+        
+    }
+    
     /**
      * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
      * associated with a key out of the btree during lookup operations.
@@ -117,7 +317,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(btree,VALS);
+            return new Tuple(getMutableBTree(),VALS);
 
         }
 
@@ -140,7 +340,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         @Override
         protected com.bigdata.btree.Tuple initialValue() {
 
-            return new Tuple(btree, 0);
+            return new Tuple(getMutableBTree(), 0);
             
         }
         
@@ -154,30 +354,11 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
         sb.append("{ ");
 
-        sb.append(Arrays.toString(srcs));
+        sb.append(Arrays.toString(getSources()));
         
         sb.append("}");
         
         return sb.toString();
-        
-    }
-    
-    final public AbstractBTree[] getSources() {
-
-        // Note: clone the array to prevent modification.
-        return srcs.clone();
-        
-    }
-
-    public int getSourceCount() {
-        
-        return srcs.length;
-        
-    }
-    
-    public BTree getMutableBTree() {
-        
-        return (BTree) btree;
         
     }
     
@@ -194,11 +375,15 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     
     public IResourceMetadata[] getResourceMetadata() {
 
-        final IResourceMetadata[] resources = new IResourceMetadata[srcs.length];
+        final int n = getSourceCount();
+        
+        final IResourceMetadata[] resources = new IResourceMetadata[n];
 
-        for (int i = 0; i < srcs.length; i++) {
+        int i = 0;
+        for(AbstractBTree t : sources) {
+//        for (int i = 0; i < srcs.length; i++) {
 
-            resources[i] = srcs[i].getStore().getResourceMetadata();
+            resources[i++] = t.getStore().getResourceMetadata();
 
         }
 
@@ -228,20 +413,35 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      *                unless all sources support delete markers.
      */
     public FusedView(final AbstractBTree[] srcs) {
+
+        /*
+         * Note: This has been abstracted and modified to NOT hold a hard
+         * reference to the index segments in the view so that they may be
+         * closed even while the view itself is open. This was done in an
+         * attempt to reduce the memory demand associated with open index
+         * segments.
+         */
         
-        checkSources(srcs);
+        if(false) {
         
-        this.btree = (BTree) srcs[0];
-        
-        this.srcs = srcs.clone();
+            // hard reference to each source in the view.
+            sources = new HardRefSources(srcs);
+            
+        } else {
+            
+            // hard reference only to BTrees in the view.
+            sources = new WeakRefSources(srcs);
+            
+        }
         
     }
     
     /**
-     * Checks the sources to make sure that they are all either isolatable, 
-     * all non-null, and all have the same index UUID.
+     * Checks the sources to make sure that they all support delete markers
+     * (required for views), all non-null, and all have the same index UUID.
      * 
-     * @param srcs The sources for a view.
+     * @param srcs
+     *            The sources for a view.
      */
     static void checkSources(final AbstractBTree[] srcs) {
         
@@ -297,7 +497,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     public IndexMetadata getIndexMetadata() {
         
-        return btree.getIndexMetadata();
+        return getMutableBTree().getIndexMetadata();
         
     }
     
@@ -326,10 +526,12 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
             counterSet = new CounterSet();
 
-            for (int i = 0; i < srcs.length; i++) {
+            int i = 0;
+            for(AbstractBTree t : sources) {
                 
-                counterSet.makePath("view[" + i + "]").attach(
-                        srcs[i].getCounters());
+                counterSet.makePath("view[" + i + "]").attach(t.getCounters());
+                
+                i++;
             
             }
 
@@ -345,7 +547,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      */
     public ICounter getCounter() {
         
-        return btree.getCounter();
+        return getMutableBTree().getCounter();
         
     }
     
@@ -357,7 +559,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
         final byte[] oldval = lookup(key);
         
-        btree.insert(key, value);
+        getMutableBTree().insert(key, value);
         
         return oldval;
 
@@ -372,7 +574,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         final ITuple tuple = lookup((byte[]) key, lookupTuple.get());
 
         // direct the write to the first source.
-        btree.insert((byte[]) key, (byte[]) val);
+        getMutableBTree().insert((byte[]) key, (byte[]) val);
         
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -418,7 +620,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         final byte[] oldval = tuple.getValue();
 
         // remove from the 1st source.
-        btree.remove(key);
+        getMutableBTree().remove(key);
         
         return oldval;
 
@@ -447,7 +649,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         }
 
         // remove from the 1st source.
-        btree.remove(key);
+        getMutableBTree().remove(key);
 
         return tuple.getObject();
 
@@ -537,9 +739,9 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     final protected Tuple lookup(final int startIndex, final byte[] key,
             final Tuple tuple) {
 
-        for (int i = 0; i < srcs.length; i++) {
+        for(AbstractBTree t : sources) {
 
-            if( srcs[i].lookup(key, tuple) == null) {
+            if( t.lookup(key, tuple) == null) {
                 
                 // No match yet.
                 
@@ -651,9 +853,9 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
         long count = 0;
         
-        for (int i = 0; i < srcs.length; i++) {
+        for(AbstractBTree t : sources) {
 
-            final long inc = srcs[i].rangeCount(fromKey, toKey);
+            final long inc = t.rangeCount(fromKey, toKey);
 
             if (count + inc < count) {
 
@@ -900,7 +1102,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
         }
 
-        final int n = srcs.length;
+        final int n = sources.getSourceCount();
 
         if (log.isInfoEnabled())
             log.info("nsrcs=" + n + ", flags=" + flags + ", readOnly="
@@ -951,9 +1153,10 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
             final ITupleCursor[] itrs = new ITupleCursor[n];
 
-            for (int i = 0; i < n; i++) {
+            int i = 0;
+            for(AbstractBTree t : sources) {
 
-                itrs[i] = (ITupleCursor) srcs[i].rangeIterator(fromKey, toKey,
+                itrs[i++] = (ITupleCursor) t.rangeIterator(fromKey, toKey,
                         capacity, sourceFlags, null/* filter */);
 
             }
@@ -975,10 +1178,11 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
              */
 
             final ITupleIterator[] itrs = new ITupleIterator[n];
-            
-            for (int i = 0; i < n; i++) {
 
-               itrs[i] = srcs[i].rangeIterator(fromKey, toKey, capacity,
+            int i = 0;
+            for (AbstractBTree t : sources) {
+
+               itrs[i++] = t.rangeIterator(fromKey, toKey, capacity,
                         sourceFlags, null/* filter */);
 
             }
@@ -1089,8 +1293,10 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
     }
     
     @SuppressWarnings("unchecked")
-    final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    public void submit(final int fromIndex, final int toIndex,
+            final byte[][] keys, final byte[][] vals,
+            final AbstractKeyArrayIndexProcedureConstructor ctor,
+            final IResultHandler aggregator) {
 
         final Object result = ctor.newInstance(this, fromIndex, toIndex, keys,
                 vals).apply(this);
@@ -1161,7 +1367,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          */
         public void falsePos() {
 
-            final IBloomFilter filter = btree.getBloomFilter();
+            final IBloomFilter filter = getMutableBTree().getBloomFilter();
 
             if (filter != null) {
 

@@ -33,7 +33,7 @@ public class WriteTaskStats {
     /** time to insert terms into the text indexer. */
     long fullTextIndexTime;
 
-    /* The #of terms that could not be resolved (iff readOnly == true). */
+    /** The #of terms that could not be resolved (iff readOnly == true). */
     final AtomicInteger nunknown = new AtomicInteger();
 
 }

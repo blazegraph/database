@@ -2514,7 +2514,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     @SuppressWarnings("unchecked")
-    public void submit(byte[] fromKey, byte[] toKey,
+    public void submit(final byte[] fromKey, final byte[] toKey,
             final IKeyRangeIndexProcedure proc, final IResultHandler handler) {
 
         // conditional range check on the key.
@@ -2524,7 +2524,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (toKey != null)
             assert rangeCheck(toKey,true);
 
-        Object result = proc.apply(this);
+        final Object result = proc.apply(this);
 
         if (handler != null) {
 
@@ -2535,18 +2535,20 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     @SuppressWarnings("unchecked")
-    public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
-            AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
+    public void submit(final int fromIndex, final int toIndex,
+            final byte[][] keys, final byte[][] vals,
+            final AbstractKeyArrayIndexProcedureConstructor ctor,
+            final IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(this, fromIndex, toIndex, keys, vals)
-                .apply(this);
-        
+        final Object result = ctor.newInstance(this, fromIndex, toIndex, keys,
+                vals).apply(this);
+
         if (aggregator != null) {
 
             aggregator.aggregate(result, new Split(null, fromIndex, toIndex));
 
         }
-        
+
     }
     
     /**

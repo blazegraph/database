@@ -196,8 +196,6 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         
     }
 
-//    private boolean scaleOutTermIds;
-
     private int scaleOutTermIdBitsToReverse;
 
     /**
@@ -209,16 +207,13 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     
     protected Term2IdWriteProc(IDataSerializer keySer, int fromIndex,
             int toIndex, byte[][] keys, boolean readOnly,
-            boolean storeBlankNodes, //boolean scaleOutTermIds,
-            int scaleOutTermIdBitsToReverse) {
+            boolean storeBlankNodes, int scaleOutTermIdBitsToReverse) {
 
         super(keySer, null, fromIndex, toIndex, keys, null /* vals */);
 
         this.readOnly = readOnly;
 
         this.storeBlankNodes = storeBlankNodes;
-
-//        this.scaleOutTermIds = scaleOutTermIds;
 
         this.scaleOutTermIdBitsToReverse = scaleOutTermIdBitsToReverse;
 
@@ -229,7 +224,6 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         private final boolean readOnly;
         private final boolean storeBlankNodes;
-//        private final boolean scaleOutTermIds;
         private final int scaleOutTermIdBitsToReverse;
 
         /**
@@ -242,28 +236,24 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         }
 
         public Term2IdWriteProcConstructor(boolean readOnly,
-                boolean storeBlankNodes, //boolean  scaleOutTermIds,
-                int scaleOutTermIdBitsToReverse) {
-            
+                boolean storeBlankNodes, int scaleOutTermIdBitsToReverse) {
+
             this.readOnly = readOnly;
-            
+
             this.storeBlankNodes = storeBlankNodes;
-            
-//            this.scaleOutTermIds = scaleOutTermIds;
-            
+
             this.scaleOutTermIdBitsToReverse = scaleOutTermIdBitsToReverse;
-            
+
         }
-        
+
         public Term2IdWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer,int fromIndex, int toIndex,
+                IDataSerializer valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             assert vals == null;
-            
+
             return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys,
-                    readOnly, storeBlankNodes, //scaleOutTermIds,
-                    scaleOutTermIdBitsToReverse);
+                    readOnly, storeBlankNodes, scaleOutTermIdBitsToReverse);
 
         }
 

@@ -540,12 +540,13 @@ public class DataServiceIndex implements IClientIndex {
 
         try {
             
-            Object result = dataService.submit(timestamp, name, proc).get();
+            final Object result = dataService.submit(timestamp, name, proc)
+                    .get();
 
-            if(handler!=null) {
-                
-                handler.aggregate(result, new Split(null,0,0));
-                
+            if (handler != null) {
+
+                handler.aggregate(result, new Split(null, 0, 0));
+
             }
 
         } catch (Exception ex) {
@@ -562,14 +563,15 @@ public class DataServiceIndex implements IClientIndex {
 
         try {
 
-            Object result = dataService.submit(timestamp, name, ctor
-                    .newInstance(this,fromIndex, toIndex, keys, vals)).get();
-            
-            if(aggregator != null) {
+            final Object result = dataService.submit(timestamp, name,
+                    ctor.newInstance(this, fromIndex, toIndex, keys, vals))
+                    .get();
+
+            if (aggregator != null) {
 
                 aggregator.aggregate(result,
                         new Split(null, fromIndex, toIndex));
-                
+
             }
 
         } catch (Exception ex) {

@@ -35,7 +35,7 @@ public interface IAsynchronousWriteBufferFactory<S extends Statement>
      * which will detect any error(s), cancel the other {@link Future}s,
      * and throw an error back to you.
      */
-    public boolean isDone();
+    public boolean isAnyDone();
     
     /**
      * Close the buffers. Once closed, the buffers will not accept further

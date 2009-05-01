@@ -2,6 +2,7 @@ package com.bigdata.rdf.lexicon;
 
 import java.util.Arrays;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
@@ -200,48 +201,8 @@ public class Term2IdWriteTask implements
                         keys, null/* vals */, new Term2IdWriteProcConstructor(
                                 readOnly, r.storeBlankNodes,
                                 r.termIdBitsToReverse),
-                        new IResultHandler<Term2IdWriteProc.Result, Void>() {
-
-                            /**
-                             * Copy the assigned / discovered term identifiers
-                             * onto the corresponding elements of the terms[].
-                             */
-                            public void aggregate(
-                                    final Term2IdWriteProc.Result result,
-                                    final Split split) {
-
-                                for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
-
-                                    final long termId = result.ids[j];
-                                    
-                                    if (termId == IRawTripleStore.NULL) {
-
-                                        if (!readOnly)
-                                            throw new AssertionError();
-                                        
-                                        stats.nunknown.incrementAndGet();
-                                        
-                                    } else {
-                                        
-                                        a[i].obj.setTermId(termId);
-                                        
-                                        if(LexiconRelation.log.isDebugEnabled()) {
-                                            LexiconRelation.log.debug("termId="+termId+", term="+a[i].obj);
-                                        }
-                                        
-                                    }
-
-                                }
-
-                            }
-
-                            public Void getResult() {
-
-                                return null;
-
-                            }
-
-                        });
+                        new Term2IdWriteProcResultHandler(a, readOnly,
+                                stats.nunknown));
 
                 stats.indexTime = stats.forwardIndexTime = System.currentTimeMillis()
                         - _begin;
@@ -255,5 +216,99 @@ public class Term2IdWriteTask implements
         return KVO.dense(a, ndistinct);
         
     } // call
-    
+
+    /**
+     * Class applies the term identifiers assigned by the
+     * {@link Term2IdWriteProc} to the {@link BigdataValue} references in the
+     * {@link KVO} correlated with each {@link Split} of data processed by that
+     * procedure.
+     * <p>
+     * Note: Of necessity, this requires access to the {@link BigdataValue}s
+     * whose term identifiers are being resolved. This implementation presumes
+     * that the array specified to the ctor and the array returned for each
+     * chunk that is processed have correlated indices and that the offset into
+     * {@link #a} is given by {@link Split#fromIndex}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static private class Term2IdWriteProcResultHandler implements
+            IResultHandler<Term2IdWriteProc.Result, Void> {
+
+        private final KVO<BigdataValue>[] a;
+        private final boolean readOnly;
+        
+        /**
+         * @todo this could be the value returned by {@link #getResult()} which
+         *       would make the API simpler.
+         */ 
+        private final AtomicInteger nunknown;
+        
+        /**
+         * 
+         * @param a
+         *            A dense array of {@link KVO}s.
+         * @param readOnly
+         *            if readOnly was specified for the {@link Term2IdWriteProc}.
+         * @param nunknown
+         *            Incremeted as a side effect for each terms that could not
+         *            be resolved (iff readOnly == true).
+         */
+        public Term2IdWriteProcResultHandler(final KVO<BigdataValue>[] a,
+                final boolean readOnly, final AtomicInteger nunknown) {
+
+            if (a == null)
+                throw new IllegalArgumentException();
+
+            if (nunknown == null)
+                throw new IllegalArgumentException();
+
+            this.a = a;
+
+            this.readOnly = readOnly;
+            
+            this.nunknown = nunknown;
+            
+        }
+
+        /**
+         * Copy the assigned / discovered term identifiers onto the
+         * corresponding elements of the terms[].
+         */
+        public void aggregate(final Term2IdWriteProc.Result result,
+                final Split split) {
+
+            for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
+
+                final long termId = result.ids[j];
+
+                if (termId == IRawTripleStore.NULL) {
+
+                    if (!readOnly)
+                        throw new AssertionError();
+
+                    nunknown.incrementAndGet();
+
+                } else {
+
+                    a[i].obj.setTermId(termId);
+
+                    if (log.isDebugEnabled()) {
+                        log.debug("termId=" + termId + ", term=" + a[i].obj);
+                    }
+
+                }
+
+            }
+
+        }
+
+        public Void getResult() {
+
+            return null;
+
+        }
+
+    }
+
 }
