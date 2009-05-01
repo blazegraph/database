@@ -27,10 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.iris;
 
+import static org.deri.iris.factory.Factory.BASIC;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import org.deri.iris.api.IProgramOptimisation.Result;
 import org.deri.iris.api.basics.IAtom;
@@ -39,31 +41,44 @@ import org.deri.iris.api.basics.IQuery;
 import org.deri.iris.api.basics.IRule;
 import org.deri.iris.api.basics.ITuple;
 import org.deri.iris.api.factory.IBasicFactory;
+import org.deri.iris.api.factory.IBuiltinsFactory;
 import org.deri.iris.api.factory.ITermFactory;
 import org.deri.iris.api.terms.ITerm;
 import org.deri.iris.basics.BasicFactory;
+import org.deri.iris.builtins.BuiltinsFactory;
+import org.deri.iris.builtins.EqualBuiltin;
+import org.deri.iris.builtins.NotEqualBuiltin;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
 import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rules.AbstractInferenceEngineTestCase;
 import com.bigdata.rdf.rules.BaseClosure;
-import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.rules.FullClosure;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.rules.RuleRdfs11;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
-import com.bigdata.relation.rule.IConstant;
+import com.bigdata.relation.rule.Constant;
+import com.bigdata.relation.rule.EQ;
+import com.bigdata.relation.rule.EQConstant;
+import com.bigdata.relation.rule.IConstraint;
+import com.bigdata.relation.rule.IN;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.relation.rule.NE;
+import com.bigdata.relation.rule.NEConstant;
+import com.bigdata.relation.rule.OR;
+import com.bigdata.relation.rule.Rule;
+import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
@@ -110,6 +125,14 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
     
     final ITermFactory TERM = TermFactory.getInstance();
     
+    final IBuiltinsFactory BUILTINS = BuiltinsFactory.getInstance();
+    
+    final org.deri.iris.api.basics.IPredicate EQUAL = BASIC.createPredicate( "EQUAL", 2 );
+    
+    final org.deri.iris.api.basics.IPredicate NOT_EQUAL = BASIC.createPredicate( "NOT_EQUAL", 2 );
+    
+    final org.deri.iris.api.basics.IPredicate TRIPLE = BASIC.createPredicate("triple", 3);
+    
 
     
     /**
@@ -149,6 +172,9 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
         // override the default axiom model.
         properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
         
+        // override the default closure.
+        properties.setProperty(Options.CLOSURE_CLASS, SimpleClosure.class.getName());
+        
         AbstractTripleStore store = getStore(properties);
         
         try {
@@ -179,32 +205,51 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             // now get the program from the inference engine
             
-            final InferenceEngine inference = store.getInferenceEngine();
-            
-            final TruthMaintenance tm = new TruthMaintenance(inference);
-            
-            final TempTripleStore focusStore = tm.newTempTripleStore();
-
             BaseClosure closure = store.getClosureInstance();
             
             MappedProgram program = closure.getProgram(
                     store.getSPORelation().getNamespace(),
-                    focusStore.getSPORelation().getNamespace()
+                    null
                     );
             
+            log.info("bigdata program before magic sets:");
+            
+            Iterator<IStep> steps = program.steps();
+            
+            while (steps.hasNext()) {
+                
+                com.bigdata.relation.rule.IRule rule = 
+                    (com.bigdata.relation.rule.IRule) steps.next();
+                
+                log.info(rule);
+                
+            }
+
             // now we convert the bigdata program into an IRIS program
 
             Collection<IRule> rules = new LinkedList<IRule>();
             
             convertToIRISProgram(program, rules);
             
+            if (log.isInfoEnabled()) {
+                
+                log.info("prolog program before magic sets:");
+            
+                for (IRule rule : rules) {
+                    
+                    log.info(rule);
+                    
+                }
+                
+            }
+            
             // then we create a query for the fact we are looking for
             
             IAtom atom = BASIC.createAtom(
-                BASIC.createPredicate("stmt", 3),
+                TRIPLE,
                 BASIC.createTuple(
                     TERM.createString(String.valueOf(U.getTermId())), 
-                    TERM.createString(String.valueOf(sco.getTermId())), 
+                    TERM.createString(String.valueOf(V.getTermId())), 
                     TERM.createString(String.valueOf(X.getTermId()))
                     )
                 );
@@ -216,28 +261,57 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                     )
                 );
             
+            if (log.isInfoEnabled()) {
+                
+                log.info("query: " + query);
+                
+            }
+            
             // create the magic sets optimizer
             
             MagicSets magicSets = new MagicSets();
             
             Result result = magicSets.optimise(rules, query);
             
-            for (IRule rule : result.rules) {
+            if (log.isInfoEnabled()) {
                 
-                System.err.println("rule: " + rule);
+                log.info("prolog program after magic sets:");
+            
+                for (IRule rule : result.rules) {
+                    
+                    log.info(rule);
+                    
+                }
                 
             }
             
             // now we take the optimized set of rules and convert it back to a
             // bigdata program
             
-            MappedProgram magicProgram = program; // convertToBigdata(result.rules);
+            MappedProgram magicProgram = 
+                convertToBigdataProgram(store, result.rules);
+                // convertToBigdataProgram(store, rules);
+            
+            log.info("bigdata program after magic sets:");
+            
+            // log.info("bigdata program converted back from prolog program:");
+            
+            steps = magicProgram.steps();
+            
+            while (steps.hasNext()) {
+                
+                com.bigdata.relation.rule.IRule rule = 
+                    (com.bigdata.relation.rule.IRule) steps.next();
+                
+                log.info(rule);
+                
+            }
+
+            if (true) return;
             
             // then we somehow run the magic program and see if the fact in
             // question exists in the resulting closure, if it does, then the
             // statement is supported by other facts in the database
-            
-            final long begin = System.currentTimeMillis();
             
             // run the query as a native rule.
             final IEvaluationPlanFactory planFactory =
@@ -329,7 +403,9 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
         
         int tailCount = bigdataRule.getTailCount();
         
-        ILiteral[] body = new ILiteral[tailCount];
+        int constraintCount = bigdataRule.getConstraintCount();
+        
+        ILiteral[] body = new ILiteral[tailCount+constraintCount];
         
         for (int i = 0; i < tailCount; i++) {
             
@@ -337,10 +413,24 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
         }
         
-        return BASIC.createRule(
+        for (int i = 0; i < constraintCount; i++) {
+            
+            body[tailCount+i] = 
+                convertToIRISLiteral(bigdataRule.getConstraint(i));
+            
+        }
+        
+        IRule rule = BASIC.createRule(
             Arrays.asList(head), 
             Arrays.asList(body)
             );
+        /*
+        if (log.isInfoEnabled()) {
+            log.info("rule: " + bigdataRule);
+            log.info("converted to: " + rule);
+        }
+        */
+        return rule;
         
     }
     
@@ -374,9 +464,371 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
         
         return BASIC.createLiteral(
             true, 
-            BASIC.createPredicate("stmt", terms.length),
+            BASIC.createPredicate("triple", terms.length),
             BASIC.createTuple(terms)
             );
+        
+    }
+    
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(IConstraint constraint) {
+
+        if (constraint instanceof NE) {
+            
+            return convertToIRISLiteral((NE) constraint);
+               
+        } else if (constraint instanceof NEConstant) {
+            
+            return convertToIRISLiteral((NEConstant) constraint);
+            
+        } else if (constraint instanceof EQ) {
+            
+            return convertToIRISLiteral((EQ) constraint);
+            
+        } else if (constraint instanceof EQConstant) {
+            
+            return convertToIRISLiteral((EQConstant) constraint);
+            
+        } else if (constraint instanceof IN) {
+            
+            return convertToIRISLiteral((IN) constraint);
+            
+        } else if (constraint instanceof OR) {
+            
+            return convertToIRISLiteral((OR) constraint);
+            
+        }  
+        
+        throw new IllegalArgumentException(
+            "unrecognized constraint type: " + constraint.getClass()
+            );
+        
+    }
+        
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(NE constraint) {
+
+        ITerm t0 = TERM.createVariable(constraint.x.getName());
+        
+        ITerm t1 = TERM.createVariable(constraint.y.getName());
+        
+        return BASIC.createLiteral(
+            true, 
+            BUILTINS.createUnequal(t0, t1)
+            );
+        
+    }
+    
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(NEConstant constraint) {
+
+        ITerm t0 = TERM.createVariable(constraint.var.getName());
+        
+        ITerm t1 = TERM.createString(String.valueOf(constraint.val.get()));
+        
+        return BASIC.createLiteral(
+            true, 
+            BUILTINS.createUnequal(t0, t1)
+            );
+        
+    }
+    
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(EQ constraint) {
+
+        ITerm t0 = TERM.createVariable(constraint.x.getName());
+        
+        ITerm t1 = TERM.createVariable(constraint.y.getName());
+        
+        return BASIC.createLiteral(
+            true, 
+            BUILTINS.createEqual(t0, t1)
+            );
+        
+    }
+    
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(EQConstant constraint) {
+
+        ITerm t0 = TERM.createVariable(constraint.var.getName());
+        
+        ITerm t1 = TERM.createString(String.valueOf(constraint.val.get()));
+        
+        return BASIC.createLiteral(
+            true, 
+            BUILTINS.createEqual(t0, t1)
+            );
+        
+    }
+    
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(IN constraint) {
+
+        throw new UnsupportedOperationException("not yet implemented");
+        
+    }
+    
+    /**
+     * Convert a bigdata constraint to an IRIS literal.
+     * 
+     * @param constraint
+     *                  the bigdata constraint
+     * @return
+     *                  the IRIS literal
+     */
+    private ILiteral convertToIRISLiteral(OR constraint) {
+
+        throw new UnsupportedOperationException("not yet implemented");
+        
+    }
+    
+    /**
+     * Convert a set of IRIS rules into a bigdata program.
+     * 
+     * @param db
+     *                  the abstract triple store
+     * @param rules
+     *                  the IRIS rules
+     * @return
+     *                  the bigdata program
+     */
+    private MappedProgram convertToBigdataProgram(
+        AbstractTripleStore db, Collection<IRule> rules) {
+
+/*
+All IRIS rules seem to have one literal in the head and zero or more body 
+literals.  We need to make sure that a bigdata rule with no tails will
+automatically fire (create the head).  I'll need to check the literal in
+the body and create a bigdata predicate or constraint based on the literal
+type (triple vs. NOT_EQUAL for example).
+ */
+        MappedProgram program = new MappedProgram("magicProgram",
+                null/* focusStore */, true/* parallel */, true/* closure */
+                );
+        
+        int i = 0;
+        
+        for (IRule rule : rules) {
+            
+            assert(rule.getHead().size() == 1);
+            
+            IPredicate head = convertToBigdataPredicate(db, rule.getHead().get(0));
+            
+            Collection<IPredicate> tails = new LinkedList<IPredicate>();
+            
+            Collection<IConstraint> constraints = new LinkedList<IConstraint>();
+            
+            List<ILiteral> body = rule.getBody();
+            
+            for (ILiteral literal : body) {
+            
+                org.deri.iris.api.basics.IPredicate p = literal.getAtom().getPredicate();
+                
+                if (p.equals(EQUAL) || p.equals(NOT_EQUAL)) {
+                    
+                    constraints.add(convertToBigdataConstraint(literal));
+                    
+                } else {
+
+                    tails.add(convertToBigdataPredicate(db, literal));
+                    
+                }
+
+            }
+            
+            program.addStep(new Rule(
+                "magic"+i++,
+                head,
+                tails.toArray(new IPredicate[tails.size()]),
+                constraints.toArray(new IConstraint[constraints.size()])
+                ));
+            
+        }
+        
+        return program;
+        
+    }
+   
+    /**
+     * Convert an IRIS literal to a bigdata predicate.
+     * 
+     * @param literal
+     *              the IRIS literal
+     * @return
+     *              the bigdata predicate
+     */
+    private IPredicate convertToBigdataPredicate(
+        AbstractTripleStore db, ILiteral literal) {
+
+        if (TRIPLE.equals(literal.getAtom().getPredicate())) {
+            
+            ITuple tuple = literal.getAtom().getTuple();
+    
+            IVariableOrConstant<Long> s = convertToBigdataTerm(tuple.get(0));
+            
+            IVariableOrConstant<Long> p = convertToBigdataTerm(tuple.get(1));
+            
+            IVariableOrConstant<Long> o = convertToBigdataTerm(tuple.get(2));
+            
+            return new SPOPredicate(
+                db.getSPORelation().getNamespace(),
+                s, p, o
+                );
+
+        } else { // magic
+            
+            ITuple tuple = literal.getAtom().getTuple();
+            
+            org.deri.iris.api.basics.IPredicate predicate = 
+                literal.getAtom().getPredicate();
+            
+            IVariableOrConstant[] terms = 
+                new IVariableOrConstant[predicate.getArity()];
+            
+            for (int i = 0; i < terms.length; i++) {
+                
+                terms[i] = convertToBigdataTerm(tuple.get(i));
+                
+            }
+            
+            return new MagicPredicate(
+                db.getSPORelation().getNamespace(),
+                predicate.getPredicateSymbol(),
+                terms
+                );
+            
+        }
+    }
+    
+    /**
+     * Convert an IRIS term to a bigdata term (IVariableOrConstant).
+     * 
+     * @param term
+     *              the IRIS term
+     * @return
+     *              the bigdata term
+     */
+    private IVariableOrConstant<Long> convertToBigdataTerm(ITerm term) {
+     
+        String value = (String) term.getValue();
+        
+        if (term.isGround()) {
+            
+            return new Constant<Long>(Long.valueOf(value));
+            
+        } else {
+            
+            return Var.var(value);
+            
+        }
+        
+    }
+    
+    /**
+     * Convert an IRIS literal to a bigdata constraint.
+     * 
+     * @param literal
+     *              the IRIS literal
+     * @return
+     *              the bigdata constraint
+     */
+    private IConstraint convertToBigdataConstraint(ILiteral literal) {
+
+        ITuple tuple = literal.getAtom().getTuple();
+        
+        org.deri.iris.api.basics.IPredicate p = literal.getAtom().getPredicate(); 
+        
+        if (NOT_EQUAL.equals(p)) {
+
+            ITerm t0 = tuple.get(0);
+            
+            ITerm t1 = tuple.get(1);
+            
+            if (t1.isGround()) {
+                
+                return new NEConstant(
+                    Var.var((String)t0.getValue()),
+                    new Constant<Long>(Long.valueOf((String)t1.getValue()))
+                    );
+                
+            } else {
+                
+                return new NE(
+                    Var.var((String)t0.getValue()),
+                    Var.var((String)t1.getValue())
+                    );                    
+                
+            }
+
+        } else if (EQUAL.equals(p)) {
+
+            ITerm t0 = tuple.get(0);
+            
+            ITerm t1 = tuple.get(1);
+            
+            if (t1.isGround()) {
+                
+                return new EQConstant(
+                    Var.var((String)t0.getValue()),
+                    new Constant<Long>(Long.valueOf((String)t1.getValue()))
+                    );
+                
+            } else {
+                
+                return new EQ(
+                    Var.var((String)t0.getValue()),
+                    Var.var((String)t1.getValue())
+                    );                    
+                
+            }
+            
+        } else {
+            
+            throw new UnsupportedOperationException("unrecognized predicate: " + p);
+            
+        }
         
     }
     
