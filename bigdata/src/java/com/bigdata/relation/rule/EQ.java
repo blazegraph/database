@@ -37,8 +37,8 @@ public class EQ implements IConstraint {
      */
     private static final long serialVersionUID = -880242496108447671L;
     
-    private final IVariable x;
-    private final IVariable y;
+    public final IVariable x;
+    public final IVariable y;
     
     public EQ(IVariable x, IVariable y) {
         
