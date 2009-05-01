@@ -46,6 +46,7 @@ import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
 import com.bigdata.config.IntegerValidator;
+import com.bigdata.config.LongValidator;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.isolation.IConflictResolver;
@@ -347,7 +348,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * mean that nodes that are undergoing mutation will be serialized and
          * persisted prematurely leading to excessive writes on the backing
          * store. For append-only stores, this directly contributes to what are
-         * effectively redundent and thereafter unreachable copies of the
+         * effectively redundant and thereafter unreachable copies of the
          * intermediate state of nodes as only nodes that can be reached by
          * navigation from a {@link Checkpoint} will ever be read again. The
          * value <code>500</code> appears to be a good default. While it is
@@ -355,7 +356,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * leads to higher commit latency and can therefore have a broad impact
          * on performance.
          * <p>
-         * Note: The write rentention queue is used for both {@link BTree} and
+         * Note: The write retention queue is used for both {@link BTree} and
          * {@link IndexSegment}. Any touched node or leaf is placed onto this
          * queue. As nodes and leaves are evicted from this queue, they are then
          * placed onto the optional read-retention queue.
@@ -547,7 +548,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      
         /**
          * The size of the LRU cache backing the weak reference cache for leaves
-         * (default {@value #DEFAULT_LEAF_CACHE_SIZE}).
+         * (default {@value #DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY}).
          * <p>
          * While the {@link AbstractBTree} already provides caching for nodes
          * and leaves based on navigation down the hierarchy from the root node,
@@ -561,13 +562,38 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         String INDEX_SEGMENT_LEAF_CACHE_CAPACITY = IndexSegment.class.getName()
                 + ".leafCacheCapacity";
-        
+
         /**
          * 
          * @see #INDEX_SEGMENT_LEAF_CACHE_CAPACITY
          */
         String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY = "100";
-        
+
+        /**
+         * The timeout in nanoseconds for the LRU cache backing the weak
+         * reference cache for {@link IndexSegment} leaves (default
+         * {@value #DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT}).
+         * <p>
+         * While the {@link AbstractBTree} already provides caching for nodes
+         * and leaves based on navigation down the hierarchy from the root node,
+         * the {@link IndexSegment} uses an additional leaf cache to optimize
+         * access to leaves based on the double-linked list connecting the
+         * leaves.
+         * <p>
+         * A larger value will tend to retain leaves longer at the expense of
+         * consuming more RAM when many parts of the {@link IndexSegment} are
+         * hot.
+         */
+        String INDEX_SEGMENT_LEAF_CACHE_TIMEOUT = IndexSegment.class.getName()
+                + ".leafCacheTimeout";
+
+        /**
+         * 
+         * @see #INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
+         */
+        String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT = ""
+                + TimeUnit.SECONDS.toNanos(30);
+
         /*
          * Split handler properties.
          * 
@@ -904,6 +930,11 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private int indexSegmentLeafCacheCapacity;
     
     /**
+     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
+     */
+    private long indexSegmentLeafCacheTimeout;
+    
+    /**
      * The unique identifier for the (scale-out) index whose data is stored in
      * this B+Tree data structure.
      * <p>
@@ -1017,6 +1048,30 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         }
         
         this.indexSegmentLeafCacheCapacity = newValue;
+        
+    }
+    
+    /**
+     * Return the timeout in nanoseconds of the LRU cache of leaves of
+     * an {@link IndexSegment}.
+     * 
+     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
+     */
+    public final long getIndexSegmentLeafCacheTimeout() {
+        
+        return indexSegmentLeafCacheTimeout;
+        
+    }
+
+    public final void setIndexSegmentLeafCacheTimeout(final long nanos) {
+        
+        if (nanos <= 0) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        this.indexSegmentLeafCacheTimeout = nanos;
         
     }
     
@@ -1631,6 +1686,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY,
                 IntegerValidator.GT_ZERO);
 
+        this.indexSegmentLeafCacheTimeout = getProperty(indexManager,
+                properties, namespace,
+                Options.INDEX_SEGMENT_LEAF_CACHE_TIMEOUT,
+                Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT,
+                LongValidator.GT_ZERO);
+
         // Note: default assumes NOT an index partition.
         this.pmd = null;
         
@@ -1903,6 +1964,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
         sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
+        sb.append(", indexSegmentLeafCacheTimeout=" + indexSegmentLeafCacheTimeout);
         sb.append(", asynchronousIndexWriteConfiguration=" + asynchronousIndexWriteConfiguration);
         sb.append(", scatterSplitConfiguration=" + scatterSplitConfiguration);
 
@@ -1930,9 +1992,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private static transient final int VERSION2 = 0x2;
 
     /**
+     * This version introduced {@link #indexSegmentLeafCacheTimeout}. Reads of
+     * an earlier version use the
+     * {@link Options#DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT} for this field.
+     */
+    private static transient final int VERSION3 = 0x3;
+
+    /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION2;
+    private static transient final int CURRENT_VERSION = VERSION3;
     
     /**
      * @todo review generated record for compactness.
@@ -2002,6 +2071,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         indexSegmentBranchingFactor = (int)LongPacker.unpackLong(in);
 
         indexSegmentLeafCacheCapacity = (int)LongPacker.unpackLong(in);
+        
+        if (version < VERSION3) {
+
+            indexSegmentLeafCacheTimeout = Long
+                    .parseLong(Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT);
+            
+        } else {
+            
+            indexSegmentLeafCacheTimeout = (long)LongPacker.unpackLong(in);
+            
+        }
         
         indexSegmentBufferNodes = in.readBoolean();
 
@@ -2147,6 +2227,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         LongPacker.packLong(out, indexSegmentBranchingFactor);
 
         LongPacker.packLong(out, indexSegmentLeafCacheCapacity);
+
+        if (version >= VERSION3) {
+
+            LongPacker.packLong(out, indexSegmentLeafCacheTimeout);
+            
+        }
 
         out.writeBoolean(indexSegmentBufferNodes);
 

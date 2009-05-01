@@ -115,7 +115,11 @@ public class TestAsynchronousStatementBufferWithoutSids extends
 
             /*
              * FIXME We MUST specify the KB namespace so we can override this
-             * property.
+             * property. [Another approach is to override the idle timeout and
+             * have it be less than the chunk timeout such that the sink is
+             * closed if it becomes idle (no new chunks appearing) but continues
+             * to combine chunks as long as they are appearing before the idle
+             * timeout.
              */
             final String namespace = "test1";
 
