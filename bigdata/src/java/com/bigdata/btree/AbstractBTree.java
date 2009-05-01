@@ -1370,52 +1370,153 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * of the application object within the key can recover the application
      * object in {@link #insert(Object, Object)} and {@link #remove(Object)}.
      * <p>
+     * While the {@link Tuple} is not safe for use by concurrent threads, the
+     * mutation API is not safe for concurrent threads either.
+     */
+    public final Tuple getWriteTuple() {
+        return writeTuple;
+    }
+
+    /**
+     * <p>
      * Note: This field is NOT static. This limits the scope of the
      * {@link Tuple} to the containing {@link AbstractBTree} instance.
      */
-    public final Tuple writeTuple = new Tuple(this, KEYS | VALS);
+    private final Tuple writeTuple = new Tuple(this, KEYS | VALS);
 
     /**
-     * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
-     * associated with a key out of the btree during lookup operations.
+     * Return a {@link Tuple} that may be used to copy the value associated with
+     * a key out of the {@link AbstractBTree}.
      * <p>
-     * Note: This field is NOT static. This limits the scope of the
-     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
-     * instance.
+     * While the returned {@link Tuple} is not safe for use by concurrent
+     * threads, each instance returned by this method is safe for use by the
+     * thread in which it was obtained.
+     * 
+     * @see #lookup(byte[], Tuple)
      */
-    public final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
+    public final Tuple getLookupTuple() {
+
+        WeakReference<Tuple> ref = lookupTupleRef.get();
+
+        Tuple tuple = ref == null ? null : ref.get();
+
+        if (tuple == null) {
+
+            tuple = new Tuple(AbstractBTree.this, VALS);
+
+            ref = new WeakReference<Tuple>(tuple);
+
+            lookupTupleRef.set(ref);
+
+        }
+        
+        return tuple;
+        
+//        return lookupTuple.get();
+        
+    };
+
+    /**
+     * Return a {@link Tuple} that may be used to test for the existence of
+     * tuples having a given key within the {@link AbstractBTree}.
+     * <p>
+     * The tuple does not copy either the keys or the values. Contains is
+     * implemented as a lookup operation that either return this tuple or
+     * <code>null</code>. When isolation is supported, the version metadata is
+     * examined to determine if the matching entry is flagged as deleted in
+     * which case contains() will report "false".
+     * <p>
+     * While the returned {@link Tuple} is not safe for use by concurrent
+     * threads, each instance returned by this method is safe for use by the
+     * thread in which it was obtained.
+     * 
+     * @see #contains(byte[])
+     */
+    public final Tuple getContainsTuple() {
+
+        WeakReference<Tuple> ref = containsTupleRef.get();
+
+        Tuple tuple = ref == null ? null : ref.get();
+
+        if (tuple == null) {
+
+            tuple = new Tuple(AbstractBTree.this, 0/* neither keys nor values */);
+
+            ref = new WeakReference<Tuple>(tuple);
+
+            containsTupleRef.set(ref);
+
+        }
+        
+        return tuple;
+        
+        //return containsTuple.get();
+        
+    };
+
+    private final ThreadLocal<WeakReference<Tuple>> lookupTupleRef = new ThreadLocal<WeakReference<Tuple>>() {
 
         @Override
-        protected com.bigdata.btree.Tuple initialValue() {
+        protected WeakReference<Tuple> initialValue() {
 
-            return new Tuple(AbstractBTree.this, VALS);
+            return null;
             
         }
         
     };
 
-    /**
-     * A {@link ThreadLocal} {@link Tuple} that is used for contains() tests.
-     * The tuple does not copy either the keys or the values. Contains is
-     * implemented as a lookup operation that either return this tuple or
-     * <code>null</code>. When isolation is supported, the version metadata
-     * is examined to determine if the matching entry is flagged as deleted in
-     * which case contains() will report "false".
-     * <p>
-     * Note: This field is NOT static. This limits the scope of the
-     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
-     * instance.
-     */
-    public final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
+    private final ThreadLocal<WeakReference<Tuple>> containsTupleRef = new ThreadLocal<WeakReference<Tuple>>() {
 
         @Override
-        protected com.bigdata.btree.Tuple initialValue() {
+        protected WeakReference<Tuple> initialValue() {
 
-            return new Tuple(AbstractBTree.this, 0);
-
+            return null;
+            
         }
         
     };
+
+//    /**
+//     * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
+//     * associated with a key out of the btree during lookup operations.
+//     * <p>
+//     * Note: This field is NOT static. This limits the scope of the
+//     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
+//     * instance.
+//     */
+//    private final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
+//
+//        @Override
+//        protected Tuple initialValue() {
+//
+//            return new Tuple(AbstractBTree.this, VALS);
+//            
+//        }
+//        
+//    };
+//
+//    /**
+//     * A {@link ThreadLocal} {@link Tuple} that is used for contains() tests.
+//     * The tuple does not copy either the keys or the values. Contains is
+//     * implemented as a lookup operation that either return this tuple or
+//     * <code>null</code>. When isolation is supported, the version metadata
+//     * is examined to determine if the matching entry is flagged as deleted in
+//     * which case contains() will report "false".
+//     * <p>
+//     * Note: This field is NOT static. This limits the scope of the
+//     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
+//     * instance.
+//     */
+//    private final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
+//
+//        @Override
+//        protected Tuple initialValue() {
+//
+//            return new Tuple(AbstractBTree.this, 0);
+//
+//        }
+//        
+//    };
     
     final public Object insert(Object key, Object value) {
 
@@ -1424,7 +1525,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         value = metadata.getTupleSerializer().serializeVal(value);
         
         final ITuple tuple = insert((byte[]) key, (byte[]) value,
-                false/* delete */, 0L/* timestamp */, writeTuple);
+                false/* delete */, 0L/* timestamp */, getWriteTuple());
         
         if (tuple == null || tuple.isDeletedVersion()) {
             
@@ -1444,7 +1545,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             throw new IllegalArgumentException();
 
         final Tuple tuple = insert(key, value, false/* deleted */,
-                0L/* timestamp */, writeTuple);
+                0L/* timestamp */, getWriteTuple());
 
         return tuple == null || tuple.isDeletedVersion() ? null : tuple
                 .getValue();
@@ -1555,12 +1656,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
             // set the delete marker.
             tuple = insert((byte[]) key, null/* val */, true/* delete */,
-                    0L/* timestamp */, writeTuple);
+                    0L/* timestamp */, getWriteTuple());
             
         } else {
         
             // remove the tuple.
-            tuple = remove((byte[]) key, writeTuple);
+            tuple = remove((byte[]) key, getWriteTuple());
 
         }
 
@@ -1581,12 +1682,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             // set the delete marker.
             tuple = insert(key, null/* val */, true/* delete */,
-                    0L/* timestamp */, writeTuple);
+                    0L/* timestamp */, getWriteTuple());
             
         } else {
         
             // remove the tuple.
-            tuple = remove(key, writeTuple);
+            tuple = remove(key, getWriteTuple());
             
         }
 
@@ -1664,7 +1765,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         key = metadata.getTupleSerializer().serializeKey(key);
 
-        final ITuple tuple = lookup((byte[]) key, lookupTuple.get());
+        final ITuple tuple = lookup((byte[]) key, getLookupTuple());
 
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -1680,7 +1781,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     public byte[] lookup(byte[] key) {
 
-        final Tuple tuple = lookup(key, lookupTuple.get());
+        final Tuple tuple = lookup(key, getLookupTuple());
 
         return tuple == null || tuple.isDeletedVersion() ? null : tuple
                 .getValue();
@@ -1811,7 +1912,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
         }
 
-        final ITuple tuple = getRootOrFinger(key).lookup(key, containsTuple.get());
+        final ITuple tuple = getRootOrFinger(key).lookup(key,
+                getContainsTuple());
         
         if(tuple == null || tuple.isDeletedVersion()) {
             
@@ -1856,7 +1958,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     public byte[] valueAt(final int index) {
 
-        final Tuple tuple = lookupTuple.get();
+        final Tuple tuple = getLookupTuple();
         
         getRoot().valueAt(index, tuple);
 
@@ -2777,7 +2879,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *       the write reference queue at a minimium capacity).
      */
     synchronized
-    final protected void touch(final AbstractNode node) {
+//    final 
+    protected void touch(final AbstractNode node) {
 
         assert node != null;
 

@@ -351,6 +351,22 @@ public class IndexSegment extends AbstractBTree {
         }
         
     }
+
+    /**
+     * Extended to not place hard references to leaves into the
+     * {@link AbstractBTree#writeRetentionQueue} since {@link IndexSegment}
+     * leaves are normally held by the {@link #leafCache} for iterators and
+     * single-tuple operations do not require that we hold a hard reference to
+     * the leaf.
+     */
+    protected void touch(AbstractNode node) {
+
+        if (node.isLeaf())
+            return;
+
+        super.touch(node);
+
+    }
     
     @Override
     final public BloomFilter getBloomFilter() {

@@ -304,47 +304,47 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
     
-    /**
-     * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
-     * associated with a key out of the btree during lookup operations.
-     * <p>
-     * Note: This field is NOT static. This limits the scope of the
-     * {@link ThreadLocal} {@link Tuple} to the containing {@link FusedView}
-     * instance.
-     */
-    protected final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
-
-        @Override
-        protected com.bigdata.btree.Tuple initialValue() {
-
-            return new Tuple(getMutableBTree(),VALS);
-
-        }
-
-    };
-    
-    /**
-     * A {@link ThreadLocal} {@link Tuple} that is used for contains() tests.
-     * The tuple does not copy either the keys or the values. Contains is
-     * implemented as a lookup operation that either return this tuple or
-     * <code>null</code>. When isolation is supported, the version metadata
-     * is examined to determine if the matching entry is flagged as deleted in
-     * which case contains() will report "false".
-     * <p>
-     * Note: This field is NOT static. This limits the scope of the
-     * {@link ThreadLocal} {@link Tuple} to the containing {@link FusedView}
-     * instance.
-     */
-    protected final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
-
-        @Override
-        protected com.bigdata.btree.Tuple initialValue() {
-
-            return new Tuple(getMutableBTree(), 0);
-            
-        }
-        
-    };
+//    /**
+//     * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
+//     * associated with a key out of the btree during lookup operations.
+//     * <p>
+//     * Note: This field is NOT static. This limits the scope of the
+//     * {@link ThreadLocal} {@link Tuple} to the containing {@link FusedView}
+//     * instance.
+//     */
+//    protected final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
+//
+//        @Override
+//        protected Tuple initialValue() {
+//
+//            return new Tuple(getMutableBTree(),VALS);
+//
+//        }
+//
+//    };
+//    
+//    /**
+//     * A {@link ThreadLocal} {@link Tuple} that is used for contains() tests.
+//     * The tuple does not copy either the keys or the values. Contains is
+//     * implemented as a lookup operation that either return this tuple or
+//     * <code>null</code>. When isolation is supported, the version metadata
+//     * is examined to determine if the matching entry is flagged as deleted in
+//     * which case contains() will report "false".
+//     * <p>
+//     * Note: This field is NOT static. This limits the scope of the
+//     * {@link ThreadLocal} {@link Tuple} to the containing {@link FusedView}
+//     * instance.
+//     */
+//    protected final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
+//
+//        @Override
+//        protected com.bigdata.btree.Tuple initialValue() {
+//
+//            return new Tuple(getMutableBTree(), 0);
+//            
+//        }
+//        
+//    };
     
     public String toString() {
         
@@ -571,7 +571,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
         val = getTupleSerializer().serializeVal(val);
 
-        final ITuple tuple = lookup((byte[]) key, lookupTuple.get());
+        final ITuple tuple = lookup((byte[]) key, getMutableBTree().getLookupTuple());
 
         // direct the write to the first source.
         getMutableBTree().insert((byte[]) key, (byte[]) val);
@@ -604,7 +604,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          * already a deleted entry under that key).
          */
 
-        final Tuple tuple = lookup(key, lookupTuple.get());
+        final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
 
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -635,7 +635,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
          * there is no entry under that key for any source (or if there is
          * already a deleted entry under that key).
          */
-        final Tuple tuple = lookup((byte[])key, lookupTuple.get());
+        final Tuple tuple = lookup((byte[])key, getMutableBTree().getLookupTuple());
 
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -661,7 +661,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      */
     final public byte[] lookup(final byte[] key) {
 
-        final Tuple tuple = lookup(key, lookupTuple.get());
+        final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
 
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -681,7 +681,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
         key = getTupleSerializer().serializeKey(key);
 
-        final Tuple tuple = lookup((byte[]) key, lookupTuple.get());
+        final Tuple tuple = lookup((byte[]) key, getMutableBTree().getLookupTuple());
 
         if (tuple == null || tuple.isDeletedVersion()) {
 
@@ -766,7 +766,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
      */
     final public boolean contains(final byte[] key) {
 
-        final Tuple tuple = lookup(key, containsTuple.get());
+        final Tuple tuple = lookup(key, getMutableBTree().getContainsTuple());
         
         if (tuple == null || tuple.isDeletedVersion()) {
 

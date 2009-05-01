@@ -2803,9 +2803,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
         if (resourceManager.overflowTasksConcurrent == 0) {
 
             // run all tasks in parallel.
-            executorService = Executors
-                    .newCachedThreadPool(new DaemonThreadFactory(getClass()
-                            .getName()));
+            executorService = resourceManager.getFederation()
+                    .getExecutorService();
 
         } else {
 
