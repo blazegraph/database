@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
-import com.bigdata.journal.Journal;
+import com.bigdata.btree.IIndex;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -38,7 +38,7 @@ public class ThreadLocalKeyBuilderFactory implements IKeyBuilderFactory {
 
     private final IKeyBuilderFactory delegate;
     
-    public ThreadLocalKeyBuilderFactory(IKeyBuilderFactory delegate) {
+    public ThreadLocalKeyBuilderFactory(final IKeyBuilderFactory delegate) {
         
         if (delegate == null)
             throw new IllegalArgumentException();
@@ -46,7 +46,7 @@ public class ThreadLocalKeyBuilderFactory implements IKeyBuilderFactory {
         this.delegate = delegate;
         
     }
-    
+
     /**
      * A {@link ThreadLocal} variable providing access to thread-specific
      * instances of a {@link IKeyBuilder} as configured by the delegate
@@ -54,7 +54,7 @@ public class ThreadLocalKeyBuilderFactory implements IKeyBuilderFactory {
      * <p>
      * Note: this {@link ThreadLocal} is not static since we need configuration
      * properties from the constructor - those properties can be different for
-     * different {@link Journal}s on the same machine.
+     * different {@link IIndex}s on the same machine.
      */
     private ThreadLocal<IKeyBuilder> threadLocalKeyBuilder = new ThreadLocal<IKeyBuilder>() {
 

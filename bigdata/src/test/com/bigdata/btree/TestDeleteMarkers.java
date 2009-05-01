@@ -148,7 +148,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         assertEquals(null, btree.lookup(k1));
 
         // verify that the delete marker is present.
-        assertTrue(btree.lookup(k1, btree.lookupTuple.get()).isDeletedVersion());
+        assertTrue(btree.lookup(k1, btree.getLookupTuple()).isDeletedVersion());
 
         assertEquals(1, btree.getEntryCount());
 
@@ -266,7 +266,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
          */
         {
 
-            Tuple tuple = btree.lookupTuple.get();
+            Tuple tuple = btree.getLookupTuple();
             
             tuple = btree.lookup(k3, tuple);
             
@@ -277,7 +277,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         }
         {
 
-            Tuple tuple = btree.lookupTuple.get();
+            Tuple tuple = btree.getLookupTuple();
             
             tuple = btree.lookup(k5, tuple);
             
@@ -288,7 +288,7 @@ public class TestDeleteMarkers extends AbstractBTreeTestCase {
         }
         {
 
-            Tuple tuple = btree.lookupTuple.get();
+            Tuple tuple = btree.getLookupTuple();
             
             tuple = btree.lookup(k7, tuple);
             

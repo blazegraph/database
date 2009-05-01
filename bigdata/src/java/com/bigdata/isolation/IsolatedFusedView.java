@@ -220,7 +220,7 @@ public class IsolatedFusedView extends FusedView {
      */
     public byte[] insert(final byte[] key, final byte[] val) {
 
-        final Tuple tuple = lookup(key, lookupTuple.get());
+        final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
 
         if (tuple == null) {
             
@@ -250,7 +250,6 @@ public class IsolatedFusedView extends FusedView {
              * this transaction (the code branch above).
              */
             
-            
             final long timestamp = tuple.getVersionTimestamp();
             
 //            srcs[0]
@@ -268,7 +267,7 @@ public class IsolatedFusedView extends FusedView {
      */
     public byte[] remove(byte[] key) {
 
-        final Tuple tuple = lookup(key, lookupTuple.get());
+        final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
         
         if (tuple == null) {
             

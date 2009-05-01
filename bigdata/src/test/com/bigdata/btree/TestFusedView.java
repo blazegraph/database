@@ -573,12 +573,12 @@ public class TestFusedView extends AbstractBTreeTestCase {
             assertFalse(btree1.contains(k3)); // not found in btree1
             assertTrue(btree2.contains(k3)); // found in btree2
             // tuple not found in btree1.
-            assertNull(btree1.lookup(k3, btree1.lookupTuple.get()));
+            assertNull(btree1.lookup(k3, btree1.getLookupTuple()));
             itr.remove();
             assertFalse(btree1.contains(k3)); // not found in btree1
             assertTrue(btree2.contains(k3)); // found in btree2
             // deleted tuple now found in btree1.
-            assertTrue(btree1.lookup(k3, btree1.lookupTuple.get()).isDeletedVersion());
+            assertTrue(btree1.lookup(k3, btree1.getLookupTuple()).isDeletedVersion());
 
             // k5 : found in btree1, write delete marker in btree1.
             assertTrue(itr.hasNext());
@@ -588,12 +588,12 @@ public class TestFusedView extends AbstractBTreeTestCase {
             assertTrue(btree1.contains(k5)); // found in btree1
             assertFalse(btree2.contains(k5)); // not found in btree2
             // undeleted tuple found in btree1.
-            assertFalse(btree1.lookup(k5, btree1.lookupTuple.get()).isDeletedVersion());
+            assertFalse(btree1.lookup(k5, btree1.getLookupTuple()).isDeletedVersion());
             itr.remove();
             assertFalse(btree1.contains(k5)); // not found in btree1
             assertFalse(btree2.contains(k5)); // not found in btree2
             // deleted tuple found in btree1.
-            assertTrue(btree1.lookup(k5, btree1.lookupTuple.get()).isDeletedVersion());
+            assertTrue(btree1.lookup(k5, btree1.getLookupTuple()).isDeletedVersion());
             
         }
 
@@ -682,10 +682,10 @@ public class TestFusedView extends AbstractBTreeTestCase {
          * of the original keys regardles of which of the source indices that
          * tuple was in before it was deleted.
          */
-        assertTrue(btree1.lookup(k3, btree1.lookupTuple.get()).isDeletedVersion());
-        assertTrue(btree1.lookup(k5, btree1.lookupTuple.get()).isDeletedVersion());
-        assertTrue(btree1.lookup(k7, btree1.lookupTuple.get()).isDeletedVersion());
-        assertTrue(btree1.lookup(k9, btree1.lookupTuple.get()).isDeletedVersion());
+        assertTrue(btree1.lookup(k3, btree1.getLookupTuple()).isDeletedVersion());
+        assertTrue(btree1.lookup(k5, btree1.getLookupTuple()).isDeletedVersion());
+        assertTrue(btree1.lookup(k7, btree1.getLookupTuple()).isDeletedVersion());
+        assertTrue(btree1.lookup(k9, btree1.getLookupTuple()).isDeletedVersion());
         
     }
 

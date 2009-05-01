@@ -237,7 +237,7 @@ public class MetadataIndexView extends DelegateIndex implements IMetadataIndex {
     private PartitionLocator getLocatorAtIndex(int index) {
 
         final ITuple<PartitionLocator> tuple = delegate.valueAt(index,
-                delegate.lookupTuple.get());
+                delegate.getLookupTuple());
 
         return tuple.getObject();
         

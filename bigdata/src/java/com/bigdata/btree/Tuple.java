@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.lang.ref.WeakReference;
+
 
 /**
  * A key-value pair used to facilitate some iterator constructs.
@@ -41,7 +43,7 @@ public class Tuple<E> extends AbstractTuple<E> {
      * can not be immediately materialized in the context in which
      * {@link Tuple#Tuple(AbstractBTree, int)} is invoked.
      */
-    private final AbstractBTree btree;
+    private final WeakReference<AbstractBTree> btreeRef;
     
     /**
      * 
@@ -55,7 +57,7 @@ public class Tuple<E> extends AbstractTuple<E> {
         if (btree == null)
             throw new IllegalArgumentException();
 
-        this.btree = btree;
+        this.btreeRef = new WeakReference<AbstractBTree>(btree);
         
     }
 
@@ -64,11 +66,39 @@ public class Tuple<E> extends AbstractTuple<E> {
         return 0;
         
     }
-    
+
+    /**
+     * This is lazily resolved from a {@link WeakReference} to the
+     * {@link AbstractBTree}. It is a runtime error if the {@link AbstractBTree}
+     * reference has been cleared, but then you should not be using a
+     * {@link Tuple} instance after the {@link AbstractBTree} for which it was
+     * created has been cleared.
+     */
     public ITupleSerializer getTupleSerializer() {
 
-        return btree.getIndexMetadata().getTupleSerializer();
+        if (tupleSer == null) {
+
+            synchronized (this) {
+
+                final AbstractBTree btree = btreeRef.get();
+
+                if (btree == null) {
+
+                    throw new AssertionError("Reference cleared");
+
+                }
+
+                tupleSer = btree.getIndexMetadata().getTupleSerializer();
+
+            }
+            
+        }
+
+        return tupleSer;
         
     }
+
+    // used by double-checked locking pattern.
+    private volatile ITupleSerializer tupleSer = null;
     
 }
