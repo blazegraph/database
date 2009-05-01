@@ -593,7 +593,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final IndexMetadata metadata//
             ) {
 
-        // show the copyright banner during statup.
+        // show the copyright banner during startup.
         Banner.banner();
 
         // Note: MAY be null (implies a transient BTree).
@@ -662,7 +662,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     /**
-     * Note: Method is package private since it must be overriden for some unit
+     * Note: Method is package private since it must be overridden for some unit
      * tests.
      */
     HardReferenceQueue<PO> newWriteRetentionQueue() {

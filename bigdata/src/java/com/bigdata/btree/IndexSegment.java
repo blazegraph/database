@@ -27,8 +27,7 @@ import java.io.IOException;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.cache.WeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
@@ -64,7 +63,8 @@ public class IndexSegment extends AbstractBTree {
      * fact that the {@link LeafIterator} can read leaves without navigating
      * down the node hierarchy.
      */
-    private WeakValueCache<Long, ImmutableLeaf> leafCache;
+//    private WeakValueCache<Long, ImmutableLeaf> leafCache;
+    private ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> leafCache;
 
     final public int getHeight() {
 
@@ -262,10 +262,15 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-            this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
-                    new LRUCache<Long, ImmutableLeaf>(fileStore
+//            this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
+//                    new LRUCache<Long, ImmutableLeaf>(fileStore
+//                            .getIndexMetadata()
+//                            .getIndexSegmentLeafCacheCapacity()));
+            this.leafCache = new ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf>(
+                    fileStore.getIndexMetadata()
+                            .getIndexSegmentLeafCacheCapacity(), fileStore
                             .getIndexMetadata()
-                            .getIndexSegmentLeafCacheCapacity()));
+                            .getIndexSegmentLeafCacheTimeout());
 
             // the checkpoint record (read when the backing store is opened).
             final IndexSegmentCheckpoint checkpoint = fileStore.getCheckpoint();
@@ -478,7 +483,7 @@ public class IndexSegment extends AbstractBTree {
 
                 if (leafCache.get(tmp) == null) {
 
-                    leafCache.put(tmp, leaf, false/* dirty */);
+                    leafCache.put(tmp, leaf);//, false/* dirty */);
 
                 }
 
