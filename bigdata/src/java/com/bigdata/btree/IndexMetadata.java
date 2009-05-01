@@ -2015,6 +2015,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION0:
         case VERSION1:
         case VERSION2:
+        case VERSION3:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
