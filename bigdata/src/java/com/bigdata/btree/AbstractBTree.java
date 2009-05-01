@@ -604,6 +604,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         // save a reference to the immutable metadata record.
         this.metadata = metadata;
+
+        this.writeTuple = new Tuple(this, KEYS | VALS);
         
         this.branchingFactor = metadata.getBranchingFactor();
 
@@ -1374,15 +1376,16 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * mutation API is not safe for concurrent threads either.
      */
     public final Tuple getWriteTuple() {
+        
         return writeTuple;
+        
     }
 
     /**
-     * <p>
      * Note: This field is NOT static. This limits the scope of the
      * {@link Tuple} to the containing {@link AbstractBTree} instance.
      */
-    private final Tuple writeTuple = new Tuple(this, KEYS | VALS);
+    private final Tuple writeTuple;
 
     /**
      * Return a {@link Tuple} that may be used to copy the value associated with
@@ -1396,23 +1399,23 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     public final Tuple getLookupTuple() {
 
-        WeakReference<Tuple> ref = lookupTupleRef.get();
-
-        Tuple tuple = ref == null ? null : ref.get();
-
-        if (tuple == null) {
-
-            tuple = new Tuple(AbstractBTree.this, VALS);
-
-            ref = new WeakReference<Tuple>(tuple);
-
-            lookupTupleRef.set(ref);
-
-        }
+//        WeakReference<Tuple> ref = lookupTupleRef.get();
+//
+//        Tuple tuple = ref == null ? null : ref.get();
+//
+//        if (tuple == null) {
+//
+//            tuple = new Tuple(AbstractBTree.this, VALS);
+//
+//            ref = new WeakReference<Tuple>(tuple);
+//
+//            lookupTupleRef.set(ref);
+//
+//        }
+//        
+//        return tuple;
         
-        return tuple;
-        
-//        return lookupTuple.get();
+        return lookupTuple.get();
         
     };
 
@@ -1434,89 +1437,89 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     public final Tuple getContainsTuple() {
 
-        WeakReference<Tuple> ref = containsTupleRef.get();
-
-        Tuple tuple = ref == null ? null : ref.get();
-
-        if (tuple == null) {
-
-            tuple = new Tuple(AbstractBTree.this, 0/* neither keys nor values */);
-
-            ref = new WeakReference<Tuple>(tuple);
-
-            containsTupleRef.set(ref);
-
-        }
+//        WeakReference<Tuple> ref = containsTupleRef.get();
+//
+//        Tuple tuple = ref == null ? null : ref.get();
+//
+//        if (tuple == null) {
+//
+//            tuple = new Tuple(AbstractBTree.this, 0/* neither keys nor values */);
+//
+//            ref = new WeakReference<Tuple>(tuple);
+//
+//            containsTupleRef.set(ref);
+//
+//        }
+//        
+//        return tuple;
         
-        return tuple;
-        
-        //return containsTuple.get();
-        
-    };
-
-    private final ThreadLocal<WeakReference<Tuple>> lookupTupleRef = new ThreadLocal<WeakReference<Tuple>>() {
-
-        @Override
-        protected WeakReference<Tuple> initialValue() {
-
-            return null;
-            
-        }
+        return containsTuple.get();
         
     };
 
-    private final ThreadLocal<WeakReference<Tuple>> containsTupleRef = new ThreadLocal<WeakReference<Tuple>>() {
-
-        @Override
-        protected WeakReference<Tuple> initialValue() {
-
-            return null;
-            
-        }
-        
-    };
-
-//    /**
-//     * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
-//     * associated with a key out of the btree during lookup operations.
-//     * <p>
-//     * Note: This field is NOT static. This limits the scope of the
-//     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
-//     * instance.
-//     */
-//    private final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
+//    private final ThreadLocal<WeakReference<Tuple>> lookupTupleRef = new ThreadLocal<WeakReference<Tuple>>() {
 //
 //        @Override
-//        protected Tuple initialValue() {
+//        protected WeakReference<Tuple> initialValue() {
 //
-//            return new Tuple(AbstractBTree.this, VALS);
+//            return null;
 //            
 //        }
 //        
 //    };
 //
-//    /**
-//     * A {@link ThreadLocal} {@link Tuple} that is used for contains() tests.
-//     * The tuple does not copy either the keys or the values. Contains is
-//     * implemented as a lookup operation that either return this tuple or
-//     * <code>null</code>. When isolation is supported, the version metadata
-//     * is examined to determine if the matching entry is flagged as deleted in
-//     * which case contains() will report "false".
-//     * <p>
-//     * Note: This field is NOT static. This limits the scope of the
-//     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
-//     * instance.
-//     */
-//    private final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
+//    private final ThreadLocal<WeakReference<Tuple>> containsTupleRef = new ThreadLocal<WeakReference<Tuple>>() {
 //
 //        @Override
-//        protected Tuple initialValue() {
+//        protected WeakReference<Tuple> initialValue() {
 //
-//            return new Tuple(AbstractBTree.this, 0);
-//
+//            return null;
+//            
 //        }
 //        
 //    };
+
+    /**
+     * A {@link ThreadLocal} {@link Tuple} that is used to copy the value
+     * associated with a key out of the btree during lookup operations.
+     * <p>
+     * Note: This field is NOT static. This limits the scope of the
+     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
+     * instance.
+     */
+    private final ThreadLocal<Tuple> lookupTuple = new ThreadLocal<Tuple>() {
+
+        @Override
+        protected Tuple initialValue() {
+
+            return new Tuple(AbstractBTree.this, VALS);
+            
+        }
+        
+    };
+
+    /**
+     * A {@link ThreadLocal} {@link Tuple} that is used for contains() tests.
+     * The tuple does not copy either the keys or the values. Contains is
+     * implemented as a lookup operation that either return this tuple or
+     * <code>null</code>. When isolation is supported, the version metadata
+     * is examined to determine if the matching entry is flagged as deleted in
+     * which case contains() will report "false".
+     * <p>
+     * Note: This field is NOT static. This limits the scope of the
+     * {@link ThreadLocal} {@link Tuple} to the containing {@link AbstractBTree}
+     * instance.
+     */
+    private final ThreadLocal<Tuple> containsTuple = new ThreadLocal<Tuple>() {
+
+        @Override
+        protected Tuple initialValue() {
+
+            return new Tuple(AbstractBTree.this, 0);
+
+        }
+        
+    };
     
     final public Object insert(Object key, Object value) {
 

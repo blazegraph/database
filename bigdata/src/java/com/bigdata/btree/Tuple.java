@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.lang.ref.WeakReference;
 
 
 /**
@@ -38,12 +37,12 @@ import java.lang.ref.WeakReference;
  */
 public class Tuple<E> extends AbstractTuple<E> {
 
-    /**
-     * This is used to lazily obtain the {@link ITupleSerializer} since it often
-     * can not be immediately materialized in the context in which
-     * {@link Tuple#Tuple(AbstractBTree, int)} is invoked.
-     */
-    private final WeakReference<AbstractBTree> btreeRef;
+//    /**
+//     * This is used to lazily obtain the {@link ITupleSerializer} since it often
+//     * can not be immediately materialized in the context in which
+//     * {@link Tuple#Tuple(AbstractBTree, int)} is invoked.
+//     */
+//    private final WeakReference<AbstractBTree> btreeRef;
     
     /**
      * 
@@ -57,7 +56,13 @@ public class Tuple<E> extends AbstractTuple<E> {
         if (btree == null)
             throw new IllegalArgumentException();
 
-        this.btreeRef = new WeakReference<AbstractBTree>(btree);
+        assert btree.getIndexMetadata() != null;
+
+        assert btree.getIndexMetadata().getTupleSerializer() != null;
+
+        tupleSer = btree.getIndexMetadata().getTupleSerializer();
+        
+//        this.btreeRef = new WeakReference<AbstractBTree>(btree);
         
     }
 
@@ -67,38 +72,45 @@ public class Tuple<E> extends AbstractTuple<E> {
         
     }
 
-    /**
-     * This is lazily resolved from a {@link WeakReference} to the
-     * {@link AbstractBTree}. It is a runtime error if the {@link AbstractBTree}
-     * reference has been cleared, but then you should not be using a
-     * {@link Tuple} instance after the {@link AbstractBTree} for which it was
-     * created has been cleared.
-     */
+//    /**
+//     * This is lazily resolved from a {@link WeakReference} to the
+//     * {@link AbstractBTree}. It is a runtime error if the {@link AbstractBTree}
+//     * reference has been cleared, but then you should not be using a
+//     * {@link Tuple} instance after the {@link AbstractBTree} for which it was
+//     * created has been cleared.
+//     */
+//    public ITupleSerializer getTupleSerializer() {
+//
+//        if (tupleSer == null) {
+//
+//            synchronized (this) {
+//
+//                final AbstractBTree btree = btreeRef.get();
+//
+//                if (btree == null) {
+//
+//                    throw new AssertionError("Reference cleared");
+//
+//                }
+//
+//                tupleSer = btree.getIndexMetadata().getTupleSerializer();
+//
+//            }
+//            
+//        }
+//
+//        return tupleSer;
+//        
+//    }
+
+//    // used by double-checked locking pattern.
+//    private volatile ITupleSerializer tupleSer = null;
+    private final ITupleSerializer tupleSer;
+
     public ITupleSerializer getTupleSerializer() {
-
-        if (tupleSer == null) {
-
-            synchronized (this) {
-
-                final AbstractBTree btree = btreeRef.get();
-
-                if (btree == null) {
-
-                    throw new AssertionError("Reference cleared");
-
-                }
-
-                tupleSer = btree.getIndexMetadata().getTupleSerializer();
-
-            }
-            
-        }
-
+        
         return tupleSer;
         
     }
-
-    // used by double-checked locking pattern.
-    private volatile ITupleSerializer tupleSer = null;
     
 }
