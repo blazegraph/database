@@ -27,10 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.rules;
 
 import org.openrdf.model.vocabulary.OWL;
-
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.rule.IConstraint;
+import com.bigdata.relation.rule.NE;
+import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.Rule;
 
 /**
@@ -65,8 +66,9 @@ public class RuleOwlSameAs2 extends Rule  {
                     /*
                      * Reject (y sameAs z) as the head.
                      */
-                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),vocab.getConstant(OWL.SAMEAS))
-//                    , new NEConstant(var("a"),inf.owlSameAs.id)
+//                    new RejectAnythingSameAsItself(var("y"),var("a"),var("z"),vocab.getConstant(OWL.SAMEAS))
+                    new NEConstant(var("a"),vocab.getConstant(OWL.SAMEAS)),
+                    new NE(var("x"),var("y"))
                 }
         );
        
