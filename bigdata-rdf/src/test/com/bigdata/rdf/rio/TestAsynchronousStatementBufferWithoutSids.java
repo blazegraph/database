@@ -30,8 +30,12 @@ package com.bigdata.rdf.rio;
 
 import java.io.File;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.RDFFileLoadTask;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
@@ -73,6 +77,12 @@ public class TestAsynchronousStatementBufferWithoutSids extends
         super(name);
     }
 
+    // FIXME chunkSize parameter.
+    final int chunkSize = 20000;
+
+    // FIXME syncRPCForTERM2ID parameter.
+    final boolean syncRPCForTERM2ID = true;
+    
     /**
      * SHOULD be <code>true</code> since the whole point of this is higher
      * concurrency. If you set this to <code>false</code> to explore some
@@ -101,6 +111,24 @@ public class TestAsynchronousStatementBufferWithoutSids extends
         properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
                 NoVocabulary.class.getName());
 
+        if(!syncRPCForTERM2ID) {
+
+            /*
+             * FIXME We MUST specify the KB namespace so we can override this
+             * property.
+             */
+            final String namespace = "test1";
+
+            // Put a timeout on the chunks of 1s.
+            properties.setProperty(com.bigdata.config.Configuration
+                    .getOverrideProperty(namespace + "."
+                            + LexiconRelation.NAME_LEXICON_RELATION + "."
+                            + LexiconKeyOrder.TERM2ID,
+                            IndexMetadata.Options.SINK_CHUNK_TIMEOUT_NANOS), ""
+                    + TimeUnit.SECONDS.toNanos(1));
+            
+        }
+        
         // @todo comment out or will fail during verify.
 //        properties.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
 
@@ -225,11 +253,8 @@ public class TestAsynchronousStatementBufferWithoutSids extends
             final String resource, final boolean parallel)
             throws Exception {
 
-        // FIXME chunkSize parameter.
-        final int chunkSize = 20000;
-
         final AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement> factory = new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
-                (ScaleOutTripleStore) store, chunkSize);
+                (ScaleOutTripleStore) store, chunkSize, syncRPCForTERM2ID);
 
         try {
 

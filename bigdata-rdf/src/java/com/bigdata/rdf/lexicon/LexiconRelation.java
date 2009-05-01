@@ -377,6 +377,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     final int termIdBitsToReverse;
 
     /**
+     * The #of low bits from the term identifier that are reversed and
+     * rotated into the high bits when it is assigned.
+     * 
+     * @see AbstractTripleStore.Options#TERMID_BITS_TO_REVERSE
+     */
+    final public int getTermIdBitsToReverse() {
+        
+        return termIdBitsToReverse;
+        
+    }
+    
+    /**
      * <code>true</code> iff blank nodes are being stored in the lexicon's
      * forward index.
      * 

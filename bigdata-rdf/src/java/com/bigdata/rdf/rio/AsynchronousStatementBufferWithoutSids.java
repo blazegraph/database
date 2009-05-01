@@ -49,16 +49,22 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.proc.IAsyncResultHandler;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.KVOTermIdComparator;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
+import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.lexicon.Term2IdWriteTask;
 import com.bigdata.rdf.lexicon.WriteTaskStats;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
+import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
+import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -79,8 +85,10 @@ import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedUnboundedChunkBuffer;
+import com.bigdata.service.Split;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.DefaultDuplicateRemover;
+import com.bigdata.service.ndx.pipeline.KVOC;
 import com.bigdata.service.ndx.pipeline.KVOLatch;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -699,40 +707,28 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     + statementCount);
         }
 
-        if (statementBufferFactory.isDone()) {
+        if (statementBufferFactory.isAnyDone()) {
 
             throw new RuntimeException("Factory closed?");
 
         }
         
         /*
-         * Synchronous RPC.
-         * 
          * Note: This is responsible for assigning the TIDs (term identifiers)
          * to the {@link BigdataValue}s. We CAN NOT write on the other indices
          * until we have those TIDs.
          */
+        if(statementBufferFactory.syncRPCForTERM2ID)
         {
 
             /*
-             * FIXME Modify to use KVOLatch. The Term2ID task can use the same
-             * ctor, but must create KVOC instances, so we need to pass in the
-             * latch.
+             * Synchronous RPC.
              * 
-             * @todo We could feed in a chunked iterator wrapping
-             * values#iterator() rather than materializing the Value[].
-             * 
-             * @todo If there is not enough load being placed the async index
-             * write then it can wait up to its timeout. For that reason the
-             * TERM2ID async writer should use a shorter timeout or it can live
-             * lock. Ideally, there should be some explicit notice when we are
-             * done queueing writes on TERM2ID across all source documents. Even
-             * then we can live lock if the input queue is not large enough.
+             * Note: I do not use a chunked iterator to feed to sync RPC
+             * operations because the larger the chunk size the better it will
+             * do when the operation is scattered over a number of index
+             * partitions.
              */
-//            final KVOLatch latch = new KVOLatch();
-//
-//            // pre-increment to avoid notice on transient zeros.
-//            latch.inc();
             
             // dense array of the distinct terms.
             final BigdataValue[] values = this.values.values().toArray(
@@ -743,13 +739,47 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     false/* readOnly */, values.length, values,
                     new WriteTaskStats()).call();
             
-//            // decrement now that all chunks have been queued for asynchronous
-//            // writes.
-//            latch.dec();
-//            
-//            // wait for the latch.
-//            latch.await();
-            
+        } else {
+
+            /*
+             * Run task which will queue BigdataValue[] chunks onto the
+             * TERM2ID async write buffer.
+             * 
+             * FIXME If there is not enough load being placed the async index
+             * write then it can wait up to its timeout. For that reason the
+             * TERM2ID async writer should use a shorter timeout or it can live
+             * lock. Ideally, there should be some explicit notice when we are
+             * done queueing writes on TERM2ID across all source documents. Even
+             * then we can live lock if the input queue is not large enough.
+             */
+            final KVOLatch latch = new KVOLatch();
+
+            // pre-increment to avoid notice on transient zeros.
+            latch.inc();
+
+            try {
+
+                // queue chunks onto the write buffer.
+                new AsyncTerm2IdIndexWriteTask(latch,
+                        statementBufferFactory.lexiconRelation,
+                        newT2IdIterator(values.values().iterator(),
+                                statementBufferFactory.producerChunkSize),
+                        statementBufferFactory.buffer_t2id).call();
+                
+            } finally {
+
+                /*
+                 * Decrement now that all chunks have been queued for
+                 * asynchronous writes.
+                 */
+                
+                latch.dec();
+
+            }
+
+            // wait for the latch.
+            latch.await();
+
         }
 
         /*
@@ -834,6 +864,18 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
     }
 
     /**
+     * Wrap a {@link BigdataValue}[] with a chunked iterator.
+     */
+    @SuppressWarnings("unchecked")
+    static <V extends BigdataValue> IChunkedIterator<V> newT2IdIterator(
+            final Iterator<V> itr, final int chunkSize) {
+
+        return new ChunkedWrappedIterator(new Striterator(itr), chunkSize,
+                BigdataValue.class);
+
+    }
+    
+    /**
      * Wrap a {@link BigdataValue}[] with a chunked iterator which filters out
      * blank nodes (blank nodes are not written onto the reverse index).
      */
@@ -859,6 +901,118 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
                 }), chunkSize, BigdataValue.class);
 
+    }
+    
+    /**
+     * Asynchronous writes on the TERM2ID index.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     * 
+     * @todo something similar for the SIDs
+     */
+    static class AsyncTerm2IdIndexWriteTask implements Callable<Void> {
+
+        final protected transient static Logger log = Logger
+                .getLogger(AsyncTerm2IdIndexWriteTask.class);
+
+        private final KVOLatch latch;
+        
+        private final Term2IdTupleSerializer tupleSer;
+
+        private final IChunkedIterator<BigdataValue> src;
+
+        private final BlockingBuffer<KVO<BigdataValue>[]> buffer;
+
+        /**
+         * 
+         * @param latch
+         * @param r
+         * @param src
+         *            The visits chunks of distinct {@link Value}s.
+         * @param buffer
+         */
+        public AsyncTerm2IdIndexWriteTask(
+                final KVOLatch latch,
+                final LexiconRelation r,
+                final IChunkedIterator<BigdataValue> src,
+                final BlockingBuffer<KVO<BigdataValue>[]> buffer) {
+
+            if (latch == null)
+                throw new IllegalArgumentException();
+            
+            if (r == null)
+                throw new IllegalArgumentException();
+            
+            if (src == null)
+                throw new IllegalArgumentException();
+            
+            if (buffer == null)
+                throw new IllegalArgumentException();
+            
+            this.latch = latch;
+            
+            this.tupleSer = (Term2IdTupleSerializer) r.getIndex(
+                    LexiconKeyOrder.TERM2ID).getIndexMetadata()
+                    .getTupleSerializer();
+
+            this.src = src;
+            
+            this.buffer = buffer;
+
+        }
+
+        /**
+         * Reshapes the {@link #src} into {@link KVOC}[]s a chunk at a time and
+         * submits each chunk to the write buffer for the TERM2ID index.
+         */
+        public Void call() throws Exception {
+
+            /*
+             * This is a thread-local instance, which is why we defer obtaining
+             * this object until call() is executing.
+             */
+            final LexiconKeyBuilder keyBuilder = tupleSer.getLexiconKeyBuilder();
+            
+            latch.inc();
+
+            try {
+
+                while (src.hasNext()) {
+
+                    final BigdataValue[] chunkIn = src.nextChunk();
+
+                    final KVO<BigdataValue>[] chunkOut = new KVO[chunkIn.length];
+
+                    int i = 0;
+
+                    for (BigdataValue v : chunkIn) {
+
+                        // Assign a sort key to each Value.
+                        chunkOut[i++] = new KVOC<BigdataValue>(keyBuilder
+                                .value2Key(v), null/* val */, v, latch);
+
+                    }
+
+                    // Place in KVO sorted order (by the byte[] keys).
+                    Arrays.sort(chunkOut);
+
+                    // add chunk to async write buffer
+                    buffer.add(chunkOut);
+
+                }
+
+            } finally {
+
+                latch.dec();
+
+            }
+
+            // Done.
+            return null;
+            
+        }
+        
     }
     
     /**
@@ -1120,6 +1274,12 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          */
         final int producerChunkSize;
 
+        /**
+         * Whether or not to use synchronous RPC for the TERM2ID index.
+         */
+        final boolean syncRPCForTERM2ID;
+        
+        private final BlockingBuffer<KVO<BigdataValue>[]> buffer_t2id;
         private final BlockingBuffer<KVO<BigdataValue>[]> buffer_id2t;
         private final BlockingBuffer<KVO<BigdataValue>[]> buffer_text;
         private final BlockingBuffer<KVO<ISPO>[]> buffer_spo;
@@ -1166,9 +1326,14 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          *            The master and sink configuration is specified via the
          *            {@link IndexMetadata} when the triple store indices are
          *            created.
+         * @param syncRPCForTERM2ID
+         *            This flag indicates whether or not synchronous RPC will be
+         *            used for the TERM2ID index.
+         * 
+         * @todo javadoc for async option on TERM2ID.
          */
         public AsynchronousWriteBufferFactoryWithoutSids(final ScaleOutTripleStore tripleStore,
-                final int producerChunkSize) {
+                final int producerChunkSize, final boolean syncRPCForTERM2ID) {
 
             if (tripleStore == null)
                 throw new IllegalArgumentException();
@@ -1180,11 +1345,32 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             this.spoRelation = tripleStore.getSPORelation();
 
             this.producerChunkSize = producerChunkSize;
+
+            this.syncRPCForTERM2ID = syncRPCForTERM2ID;
             
             if (tripleStore.isStatementIdentifiers()) {
 
                 throw new UnsupportedOperationException("SIDs not supported");
                 
+            }
+
+            if(syncRPCForTERM2ID) {
+                
+                this.buffer_t2id = null;
+                
+            } else {
+
+                this.buffer_t2id = ((IScaleOutClientIndex) lexiconRelation
+                        .getTerm2IdIndex())
+                        .newWriteBuffer(
+                                new Term2IdWriteProcAsyncResultHandler(false/* readOnly */),
+                                new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
+                                new Term2IdWriteProcConstructor(
+                                        false/* readOnly */, lexiconRelation
+                                                .isStoreBlankNodes(),
+                                        lexiconRelation
+                                                .getTermIdBitsToReverse()));
+
             }
             
             this.buffer_id2t = ((IScaleOutClientIndex) lexiconRelation
@@ -1251,8 +1437,12 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         }
 
-        public boolean isDone() {
-            
+        public boolean isAnyDone() {
+
+            if (buffer_t2id != null)
+                if (buffer_t2id.getFuture().isDone())
+                    return true;
+
             if (buffer_id2t.getFuture().isDone())
                 return true;
 
@@ -1280,6 +1470,9 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             if(log.isInfoEnabled())
                 log.info("Cancelling futures.");
 
+            if (buffer_t2id != null)
+                buffer_t2id.getFuture().cancel(mayInterruptIfRunning);
+
             buffer_id2t.getFuture().cancel(mayInterruptIfRunning);
 
             if (buffer_text != null)
@@ -1299,7 +1492,10 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             
             if(log.isInfoEnabled())
                 log.info("Closing buffers.");
-            
+
+            if (buffer_t2id != null)
+                buffer_t2id.close();
+
             buffer_id2t.close();
             
             if (buffer_text != null)
@@ -1323,6 +1519,9 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             // Await futures.
             if(log.isInfoEnabled())
                 log.info("Awaiting futures.");
+
+            if (buffer_t2id != null)
+                buffer_t2id.getFuture().get();
 
             buffer_id2t.getFuture().get();
 
@@ -1349,11 +1548,9 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             
             final CounterSet root = new CounterSet();
            
-            // sync RPC API
             root.makePath("TERM2ID").attach(
                     lexiconRelation.getTerm2IdIndex().getCounters());
 
-            // async API
             root.makePath("ID2TERM").attach(
                     lexiconRelation.getId2TermIndex().getCounters());
 
@@ -1377,6 +1574,86 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             
         }
         
+    }
+
+    /**
+     * Class applies the term identifiers assigned by the
+     * {@link Term2IdWriteProc} to the {@link BigdataValue} references in the
+     * {@link KVO} correlated with each {@link Split} of data processed by that
+     * procedure.
+     * <p>
+     * Note: Of necessity, this requires access to the {@link BigdataValue}s
+     * whose term identifiers are being resolved. This implementation presumes
+     * that the array specified to the ctor and the array returned for each
+     * chunk that is processed have correlated indices and that the offset into
+     * {@link #a} is given by {@link Split#fromIndex}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static private class Term2IdWriteProcAsyncResultHandler
+            implements
+            IAsyncResultHandler<Term2IdWriteProc.Result, Void, BigdataValue, KVO<BigdataValue>> {
+
+        private final boolean readOnly;
+        
+        /**
+         * 
+         * @param readOnly
+         *            if readOnly was specified for the {@link Term2IdWriteProc}.
+         */
+        public Term2IdWriteProcAsyncResultHandler(final boolean readOnly) {
+
+            this.readOnly = readOnly;
+            
+        }
+
+        /**
+         * NOP
+         */
+        public void aggregate(final Term2IdWriteProc.Result result,
+                final Split split) {
+
+        }
+
+        /**
+         * Copy the assigned / discovered term identifiers onto the
+         * corresponding elements of the terms[].
+         */
+        public void aggregateAsync(final KVO<BigdataValue>[] chunk,
+                final Term2IdWriteProc.Result result, final Split split) {
+
+            for (int i = 0; i < chunk.length; i++) {
+
+                final long termId = result.ids[i];
+
+                if (termId == IRawTripleStore.NULL) {
+
+                    if (!readOnly)
+                        throw new AssertionError();
+
+                } else {
+
+                    chunk[i].obj.setTermId(termId);
+
+                    if (log.isDebugEnabled()) {
+                        log
+                                .debug("termId=" + termId + ", term="
+                                        + chunk[i].obj);
+                    }
+
+                }
+
+            }
+
+        }
+
+        public Void getResult() {
+
+            return null;
+
+        }
+
     }
 
 }

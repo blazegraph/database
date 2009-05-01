@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import com.bigdata.btree.keys.KVO;
+import com.bigdata.btree.proc.IAsyncResultHandler;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -203,6 +204,15 @@ A//
                 master.resultHandler.aggregate(result, new Split(locator,
                         0/* fromIndex */, chunkSize/* toIndex */));
 
+                if(master.resultHandler instanceof IAsyncResultHandler) {
+
+                    // aggregate results.
+                    ((IAsyncResultHandler<R, A, O, KVO<O>>) master.resultHandler)
+                            .aggregateAsync(chunk, result, new Split(locator,
+                                    0/* fromIndex */, chunkSize/* toIndex */));
+
+                }
+                
             }
 
             if (log.isDebugEnabled())

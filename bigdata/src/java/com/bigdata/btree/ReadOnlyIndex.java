@@ -144,7 +144,7 @@ public class ReadOnlyIndex extends DelegateIndex {
     final public void submit(byte[] fromKey, byte[] toKey,
             final IIndexProcedure proc, final IResultHandler handler) {
 
-        Object result = proc.apply(this);
+        final Object result = proc.apply(this);
         
         if (handler != null) {
             
@@ -162,7 +162,7 @@ public class ReadOnlyIndex extends DelegateIndex {
     final public void submit(int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
             AbstractKeyArrayIndexProcedureConstructor ctor, IResultHandler aggregator) {
 
-        Object result = ctor.newInstance(this,fromIndex, toIndex, keys, vals)
+        final Object result = ctor.newInstance(this,fromIndex, toIndex, keys, vals)
                 .apply(this);
         
         if(aggregator != null) {

@@ -35,6 +35,7 @@ import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.FusedView;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -459,8 +460,10 @@ public class IsolatedFusedView extends FusedView {
 
         // tuple for reading from the groundState index.
         final Tuple groundStateTuple = new Tuple(
-                (groundState instanceof AbstractBTree ? (AbstractBTree) groundState
-                        : ((FusedView) groundState).getSources()[0]), KEYS | VALS);
+                ((ILocalBTreeView)groundState).getMutableBTree(),
+//                (groundState instanceof AbstractBTree ? (AbstractBTree) groundState
+//                        : ((FusedView) groundState).getSources()[0]), 
+                        KEYS | VALS);
 
         while (itr.hasNext()) {
 

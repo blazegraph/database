@@ -132,6 +132,11 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         String ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE = "asynchronousWriteProducerChunkSize";
         
         /**
+         * @todo javadoc
+         */
+        String SYNC_RPC_FOR_TERM2ID = "syncRPCForTERM2ID";
+        
+        /**
          * When <code>true</code>, the master will create the
          * {@link ITripleStore} identified by {@link #NAMESPACE } if it does not
          * exist.
@@ -263,6 +268,11 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         public final int asynchronousWritesProducerChunkSize;
         
         /**
+         * @see ConfigurationOptions#SYNC_RPC_FOR_TERM2ID
+         */
+        public final boolean syncRPCForTERM2ID;
+        
+        /**
          * When <code>true</code>, the master will create the
          * {@link ITripleStore} identified by {@link #namespace} if it does not
          * exist.
@@ -342,7 +352,10 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
             
             sb.append(", " + ConfigurationOptions.ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE+ "="
                     + asynchronousWritesProducerChunkSize);
-            
+
+            sb.append(", " + ConfigurationOptions.SYNC_RPC_FOR_TERM2ID + "="
+                    + syncRPCForTERM2ID);
+
             sb.append(", " + ConfigurationOptions.CREATE + "=" + create);
             
             sb.append(", " + ConfigurationOptions.LOAD_DATA + "=" + loadData);
@@ -392,6 +405,9 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
                             component,
                             ConfigurationOptions.ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE,
                             Integer.TYPE);
+
+            syncRPCForTERM2ID = (Boolean) config.getEntry(component,
+                    ConfigurationOptions.SYNC_RPC_FOR_TERM2ID, Boolean.TYPE);
 
             create = (Boolean) config.getEntry(component,
                     ConfigurationOptions.CREATE, Boolean.TYPE);
