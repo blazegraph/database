@@ -37,8 +37,8 @@ public class NEConstant implements IConstraint {
      */
     private static final long serialVersionUID = -2267584965908057945L;
     
-    private final IVariable var;
-    private final IConstant val;
+    public final IVariable var;
+    public final IConstant val;
 
     public NEConstant(IVariable var, IConstant val) {
 

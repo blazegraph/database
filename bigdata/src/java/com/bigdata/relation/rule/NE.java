@@ -37,8 +37,8 @@ public class NE implements IConstraint {
      */
     private static final long serialVersionUID = -880242496108447671L;
     
-    private final IVariable x;
-    private final IVariable y;
+    public final IVariable x;
+    public final IVariable y;
     
     public NE(IVariable x, IVariable y) {
         
