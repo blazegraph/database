@@ -87,6 +87,7 @@ import com.bigdata.service.Event;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.jini.util.DumpFederation;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.util.NT;
 
@@ -227,21 +228,63 @@ abstract public class IndexManager extends StoreManager {
          * are listed.
          */
         String Indices = "indices";
-        
+
+        /**
+         * The capacity of the cache of stale locators.
+         * 
+         * @see StaleLocatorException
+         */
         String StaleLocatorCacheCapacity = "Stale Locator Cache Capacity";
 
+        /**
+         * The #of stale locators in the cache.
+         * 
+         * @see StaleLocatorException
+         */
         String StaleLocatorCacheSize = "Stale Locator Cache Size";
 
+        /**
+         * The stale locators, including the {@link StaleLocatorReason} for each
+         * one.
+         */
         String StaleLocators = "Stale Locators";
 
+        /**
+         * The capacity of the index cache.
+         */
         String IndexCacheCapacity = "Index Cache Capacity";
 
+        /**
+         * The approximate #of open indices.
+         */
         String IndexCacheSize = "Index Cache Size";
 
+        /**
+         * The capacity of the {@link IndexSegment} cache.
+         */
         String IndexSegmentCacheCapacity = "Index Segment Cache Capacity";
 
+        /**
+         * The approximate #of open {@link IndexSegment}.
+         */
         String IndexSegmentCacheSize = "Index Segment Cache Size";
 
+        /**
+         * The approximate #of {@link IndexSegment} leaves that are buffered in
+         * memory.
+         */
+        String IndexSegmentOpenLeafCount = "Index Segment Open Leaf Count";
+
+        /**
+         * The #of bytes on disk occupied by the {@link IndexSegment} leaves
+         * which are currently loaded into memory (their in-memory profile can
+         * not be directly captured by the java runtime, but you can get it from
+         * a heap dump). Likewise, you can directly obtain the #of bytes on disk
+         * per leaf from the {@link IndexSegmentCheckpoint} or from
+         * {@link DumpFederation}.
+         */
+        String IndexSegmentOpenLeafByteCount = "Index Segment Open Leaf Byte Count";
+        
     }
 
     /**
@@ -524,7 +567,7 @@ abstract public class IndexManager extends StoreManager {
      * @see Options#INDEX_SEGMENT_CACHE_CAPACITY
      * @see Options#INDEX_SEGMENT_CACHE_TIMEOUT
      */
-    final private ConcurrentWeakValueCache<UUID, IndexSegment> indexSegmentCache;
+    final private ConcurrentWeakValueCacheWithTimeout<UUID, IndexSegment> indexSegmentCache;
 
     /**
      * Provides locks on a per-{name+timestamp} basis for higher concurrency.
@@ -588,6 +631,76 @@ abstract public class IndexManager extends StoreManager {
     public int getIndexSegmentCacheCapacity() {
         
         return indexSegmentCache.capacity();
+        
+    }
+    
+    /**
+     * Statistics about the {@link IndexSegment}s open in the cache.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class IndexSegmentStats {
+
+        public long leafCount;
+        
+        public long leafByteCount;
+
+    }
+
+    /**
+     * The approximate #of {@link IndexSegment} leaves in memory.
+     */
+    public int getIndexSegmentOpenLeafCount() {
+
+        final Iterator<WeakReference<IndexSegment>> itr = indexSegmentCache
+                .iterator();
+
+        int leafCount = 0;
+        
+        while (itr.hasNext()) {
+
+            final IndexSegment seg = itr.next().get();
+
+            if (seg != null) {
+
+                leafCount += seg.getOpenLeafCount();
+                
+            }
+            
+        }
+        
+        return leafCount;
+        
+    }
+
+    /**
+     * The #of bytes on disk occupied by the {@link IndexSegment} leaves which
+     * are currently loaded into memory (their in-memory profile can not be
+     * directly captured by the java runtime, but you can get it from a heap
+     * dump). Likewise, you can directly obtain the #of bytes on disk per leaf
+     * from the {@link IndexSegmentCheckpoint} or from {@link DumpFederation}.
+     */
+    public long getIndexSegmentOpenLeafByteCount() {
+
+        final Iterator<WeakReference<IndexSegment>> itr = indexSegmentCache
+                .iterator();
+
+        long leafByteCount = 0;
+        
+        while (itr.hasNext()) {
+
+            final IndexSegment seg = itr.next().get();
+
+            if (seg != null) {
+
+                leafByteCount += seg.getOpenLeafByteCount();
+                
+            }
+            
+        }
+        
+        return leafByteCount;
         
     }
     
@@ -1921,8 +2034,8 @@ abstract public class IndexManager extends StoreManager {
 
     /**
      * Return a {@link CounterSet} reflecting use of the named indices. When an
-     * index partition is in use, it {@link CounterSet} is reported under a path
-     * formed from name of the scale-out index and partition identifier.
+     * index partition is in use, its {@link CounterSet} is reported under a
+     * path formed from name of the scale-out index and partition identifier.
      * 
      * @return A new {@link CounterSet} reflecting the use of the named indices.
      */

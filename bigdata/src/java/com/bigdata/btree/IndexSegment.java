@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.util.Iterator;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
@@ -61,11 +63,61 @@ public class IndexSegment extends AbstractBTree {
     /**
      * An LRU for {@link ImmutableLeaf}s. This cache takes advantage of the
      * fact that the {@link LeafIterator} can read leaves without navigating
-     * down the node hierarchy.
+     * down the node hierarchy.  This reference is set to <code>null</code> 
+     * if the {@link IndexSegment} is {@link #close()}d.
      */
 //    private WeakValueCache<Long, ImmutableLeaf> leafCache;
     private ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> leafCache;
 
+    /**
+     * Return the approximate #of open leaves and zero if the
+     * {@link IndexSegment} is not open.
+     */
+    final public int getOpenLeafCount() {
+
+        final ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> tmp = leafCache;
+
+        if (tmp == null) {
+
+            return 0;
+            
+        }
+        
+        return tmp.size();
+        
+    }
+
+    /**
+     * The approximate #of bytes in the in-memory {@link IndexSegment} leaves
+     * -or- ZERO (0) if the {@link IndexSegment} is closed.
+     */
+    public long getOpenLeafByteCount() {
+
+        final ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> tmp = leafCache;
+
+        if (tmp == null)
+            return 0L;
+
+        final Iterator<WeakReference<ImmutableLeaf>> itr = tmp.iterator();
+
+        long leafByteCount = 0;
+
+        while (itr.hasNext()) {
+
+            final ImmutableLeaf leaf = itr.next().get();
+
+            if (leaf != null) {
+
+                leafByteCount += fileStore.getByteCount(leaf.identity);
+
+            }
+
+        }
+
+        return leafByteCount;
+        
+    }
+    
     final public int getHeight() {
 
         reopen();
@@ -209,7 +261,7 @@ public class IndexSegment extends AbstractBTree {
     }
 
     /**
-     * Overriden to a more constrained type.
+     * Overridden to a more constrained type.
      */
     final public IndexSegmentStore getStore() {
         
@@ -218,7 +270,7 @@ public class IndexSegment extends AbstractBTree {
     }
 
     /**
-     * Extended to explictly close the {@link IndexSegment} and the backing
+     * Extended to explicitly close the {@link IndexSegment} and the backing
      * {@link IndexSegmentStore}. A finalizer is necessary for this class
      * because we maintain {@link IndexSegment}s in a weak value cache and do
      * not explicitly close then before their reference is cleared. This leads
@@ -424,7 +476,7 @@ public class IndexSegment extends AbstractBTree {
     }
     
     /**
-     * Typesafe method reads the leaf from the backing file given the address of
+     * Type-safe method reads the leaf from the backing file given the address of
      * that leaf. This method is suitable for ad-hoc examination of the leaf or
      * for a low-level iterator based on the prior/next leaf addresses.
      * <p>

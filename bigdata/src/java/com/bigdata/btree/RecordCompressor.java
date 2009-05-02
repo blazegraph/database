@@ -41,14 +41,13 @@ import java.util.zip.InflaterInputStream;
 
 import com.bigdata.io.ByteBufferInputStream;
 
-
 /**
  * Bulk data (de-)compressor used for leaves in {@link IndexSegment}s. The
  * compression and decompression operations of a given {@link RecordCompressor}
  * reuse a shared instance buffer. Any decompression result is valid only until
  * the next compression or decompression operation performed by that
- * {@link RecordCompressor}. When used in a single-threaded context this
- * reduces allocation while maximizing the opportunity for bulk transfers.
+ * {@link RecordCompressor}. When used in a single-threaded context this reduces
+ * allocation while maximizing the opportunity for bulk transfers.
  * <p>
  * This class is NOT thread-safe.
  * 
@@ -56,7 +55,9 @@ import com.bigdata.io.ByteBufferInputStream;
  *       compressor used into the {@link IndexSegmentCheckpoint} so that we can
  *       experiment with other compression schemes in a backward compatible
  *       manner. If the compressor has parameters then those can be capture by
- *       subclassing or instance data.
+ *       subclassing or instance data. We know the maximum record size when we
+ *       load an existing index segment, so we could specify that as an
+ *       optimization.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -99,7 +100,7 @@ public class RecordCompressor implements Externalizable {
      * @see Deflater#BEST_SPEED
      * @see Deflater#BEST_COMPRESSION
      */
-    public RecordCompressor(int level) {
+    public RecordCompressor(final int level) {
 
         _deflater = new Deflater(level);
 
@@ -124,27 +125,28 @@ public class RecordCompressor implements Externalizable {
      * @param os
      *            The stream onto which the compressed data are written.
      */
-    public void compress(ByteBuffer bin, OutputStream os) {
+    public void compress(final ByteBuffer bin, final OutputStream os) {
 
-        if(bin.hasArray() && bin.position()==0 && bin.limit() == bin.capacity()) {
+        if (bin.hasArray() && bin.position() == 0
+                && bin.limit() == bin.capacity()) {
 
             /*
              * The source buffer is backed by an array so we delegate using the
              * position() and limit() of the source buffer and the backing
              * array.
              */
-            
-            compress(bin.array(),bin.position(),bin.limit(),os);
-            
+
+            compress(bin.array(), bin.position(), bin.limit(), os);
+
             // Advance the position to the limit.
             bin.position(bin.limit());
-            
+
         } else {
 
             /*
              * Figure out how much data needs to be written.
              */
-            int size = bin.remaining();
+            final int size = bin.remaining();
 
             /*
              * If the shared buffer is not large enough then reallocate it as a
@@ -179,9 +181,9 @@ public class RecordCompressor implements Externalizable {
      * @param os
      *            The stream onto which the compressed data are written.
      */
-    public void compress(byte[] bytes,OutputStream os) {
-        
-        compress(bytes,0,bytes.length,os);
+    public void compress(final byte[] bytes, final OutputStream os) {
+
+        compress(bytes, 0, bytes.length, os);
         
     }
     
@@ -199,7 +201,8 @@ public class RecordCompressor implements Externalizable {
      * @param os
      *            The stream onto which the compressed data are written.
      */
-    public void compress(byte[] bytes, int off, int len, OutputStream os) {
+    public void compress(final byte[] bytes, final int off, final int len,
+            final OutputStream os) {
 
         _deflater.reset(); // required w/ instance reuse.
 
@@ -217,7 +220,7 @@ public class RecordCompressor implements Externalizable {
              * 
              * Note: The caller is unable to do this as they do not have access
              * to the {@link Deflator}. However, if this flushes through to the
-             * underlying sink then that could drive IOs with the application
+             * underlying sink then that could drive IOs without the application
              * being aware that synchronous IO was occurring.
              */
             dos.flush();
@@ -244,13 +247,13 @@ public class RecordCompressor implements Externalizable {
      *         are valid only until the next compression or decompression
      *         request.
      */
-    public ByteBuffer decompress(ByteBuffer bin) {
+    public ByteBuffer decompress(final ByteBuffer bin) {
 
         _inflater.reset(); // reset required by reuse.
 
         final int size = bin.limit();
 
-        InflaterInputStream iis = new InflaterInputStream(
+        final InflaterInputStream iis = new InflaterInputStream(
                 new ByteBufferInputStream(bin), _inflater, size);
 
         return decompress(iis);
@@ -270,7 +273,7 @@ public class RecordCompressor implements Externalizable {
      *         decompression request. The position will be zero. The limit will
      *         be the #of decompressed bytes.
      */
-    public ByteBuffer decompress(byte[] bin) {
+    public ByteBuffer decompress(final byte[] bin) {
      
         _inflater.reset(); // reset required by reuse.
 
@@ -297,7 +300,7 @@ public class RecordCompressor implements Externalizable {
      *         decompression request. The position will be zero. The limit will
      *         be the #of decompressed bytes.
      */
-    protected ByteBuffer decompress(InflaterInputStream iis) {
+    protected ByteBuffer decompress(final InflaterInputStream iis) {
 
         int off = 0;
         
@@ -309,7 +312,7 @@ public class RecordCompressor implements Externalizable {
 
                 if (capacity == 0) {
 
-                    byte[] tmp = new byte[_buf.length * 2];
+                    final byte[] tmp = new byte[_buf.length * 2];
 
                     System.arraycopy(_buf, 0, tmp, 0, off);
 
@@ -319,7 +322,7 @@ public class RecordCompressor implements Externalizable {
 
                 }
 
-                int nread = iis.read(_buf, off, capacity);
+                final int nread = iis.read(_buf, off, capacity);
 
                 if (nread == -1)
                     break; // EOF.
@@ -352,18 +355,19 @@ public class RecordCompressor implements Externalizable {
 
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
 
         level = in.readInt();
-        
+
         _deflater = new Deflater(level);
 
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeInt(level);
-        
+
     }
 
 }

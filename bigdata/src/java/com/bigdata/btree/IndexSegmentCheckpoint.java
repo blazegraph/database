@@ -64,8 +64,6 @@ public class IndexSegmentCheckpoint {
      */
     protected static final Logger log = Logger
             .getLogger(IndexSegmentCheckpoint.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * The file is empty.
@@ -466,7 +464,7 @@ public class IndexSegmentCheckpoint {
         buf.rewind();
         this.buf = buf.asReadOnlyBuffer();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(this.toString());
 
     }
@@ -564,7 +562,7 @@ public class IndexSegmentCheckpoint {
         
         buf = createView();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(this.toString());
         
     }
@@ -887,7 +885,7 @@ public class IndexSegmentCheckpoint {
 
         FileChannelUtility.writeAll(raf.getChannel(), asReadOnlyBuffer(), 0L);
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("wrote checkpoint record: " + this);
             
@@ -901,7 +899,7 @@ public class IndexSegmentCheckpoint {
      */
     public String toString() {
  
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         sb.append("magic="+Integer.toHexString(MAGIC));
         sb.append(", segmentUUID="+segmentUUID);

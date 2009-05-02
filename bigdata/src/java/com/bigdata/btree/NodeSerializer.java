@@ -52,28 +52,28 @@ import com.bigdata.rawstore.IAddressManager;
 /**
  * <p>
  * An instance of this class is used to serialize and de-serialize the
- * {@link INodeData}s and {@link ILeafData}s of an {@link AbstractBTree}.
- * Leaf and non-leaf records have different serialization formats, but their
- * leading bytes use the same format so that you can tell by inspection whether
- * a buffer contains a leaf or a non-leaf node. The header of the record uses a
- * fixed length format so that some fields can be tested without full
+ * {@link INodeData}s and {@link ILeafData}s of an {@link AbstractBTree}. Leaf
+ * and non-leaf records have different serialization formats, but their leading
+ * bytes use the same format so that you can tell by inspection whether a buffer
+ * contains a leaf or a non-leaf node. The header of the record uses a fixed
+ * length format so that some fields can be tested without full
  * de-serialization, especially whether the record contains a leaf vs a node.
  * This fixed record also makes it possible to update some fields in the header
  * once the entire record has been serialized, including the checksum, the #of
  * bytes in the serialized record, and the prior/next addresses for leaves.
  * </p>
  * <p>
- * The methods defined by this class all work with {@link ByteBuffer}s. On
- * read, the buffer must be positioned to the start of the data to be read.
- * After a read, the buffer will be positioned to the first byte after the data
- * read. If there is insufficient data available in the buffer then an
+ * The methods defined by this class all work with {@link ByteBuffer}s. On read,
+ * the buffer must be positioned to the start of the data to be read. After a
+ * read, the buffer will be positioned to the first byte after the data read. If
+ * there is insufficient data available in the buffer then an
  * {@link BufferUnderflowException} will be thrown. On write, the data will be
  * written on an internal buffer whose size is automatically extended. The write
  * buffer is reused for each write and quickly achieves a maximum size for any
  * given {@link BTree}.
  * </p>
  * <p>
- * The {@link IDataSerializer} for keys and values hides the use of
+ * The {@link IDataSerializer}s for the keys and the values hide the use of
  * {@link ByteBuffer}s from the application. The use of compression or packing
  * techniques within the implementations of this interface is encouraged.
  * </p>
@@ -680,7 +680,7 @@ public class NodeSerializer {
      *         instance of this class. The position will be zero and the limit
      *         will be the #of bytes in the serialized representation.
      */
-    public ByteBuffer putLeaf(ILeafData leaf) {
+    public ByteBuffer putLeaf(final ILeafData leaf) {
 
         if( _writeBuffer == null ) {
             
@@ -735,7 +735,8 @@ public class NodeSerializer {
      * 
      * @see IndexSegmentBuilder
      */
-    public void updateLeaf(ByteBuffer b, long priorAddr, long nextAddr) {
+    public void updateLeaf(final ByteBuffer b, final long priorAddr,
+            final long nextAddr) {
 
         if (isNode(b.get(OFFSET_NODE_TYPE))) {
             

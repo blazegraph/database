@@ -45,7 +45,8 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
      * as much compression as possible and since access during decompression is
      * serial.
      */
-    public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
+    public void write(final DataOutput out, final IRandomAccessByteArray raba)
+            throws IOException {
 
         /*
          * The ratio as defined by {@link ByteArrayFrontCodedList}. If you
@@ -107,7 +108,7 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
 
     }
 
-    public void read(DataInput in, IRandomAccessByteArray raba)
+    public void read(final DataInput in, final IRandomAccessByteArray raba)
             throws IOException {
 
         final int nkeys = in.readInt();
@@ -184,15 +185,16 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
     }
 
     public void writeExternal(ObjectOutput out) throws IOException {
-        
-        // NOP - this class has no state.
-        
-    }
-    
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 
         // NOP - this class has no state.
-        
+
+    }
+
+    public void readExternal(ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        // NOP - this class has no state.
+
     }
 
 }

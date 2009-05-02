@@ -1189,7 +1189,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Object used to (de-)serialize/(de-)compress the keys in a node.
      * <p>
      * Note: The keys for nodes are separator keys for the leaves. Since they
-     * are choosen to be the minimum length separator keys dynamically when a
+     * are chosen to be the minimum length separator keys dynamically when a
      * leaf is split or joined the keys in the node typically DO NOT conform to
      * application expectations and are normally assigned a different serializer
      * for that reason.
@@ -1209,7 +1209,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * keys and values when stored in a leaf or {@link ResultSet}.
      * <p>
      * Note: If you change this value in a manner that is not backward
-     * compatable once entries have been written on the index then you may be
+     * compatible once entries have been written on the index then you may be
      * unable to any read data already written.
      */
     public final ITupleSerializer getTupleSerializer() {return tupleSer;}
@@ -1281,7 +1281,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setIsolatable(boolean isolatable) {
+    public void setIsolatable(final boolean isolatable) {
 
         setDeleteMarkers(isolatable);
         
@@ -1289,13 +1289,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setPartitionMetadata(LocalPartitionMetadata pmd) {
+    public void setPartitionMetadata(final LocalPartitionMetadata pmd) {
         
         this.pmd = pmd;
         
     }
 
-    public void setAddressSerializer(IAddressSerializer addrSer) {
+    public void setAddressSerializer(final IAddressSerializer addrSer) {
         
         if (addrSer == null)
             throw new IllegalArgumentException();
@@ -1304,7 +1304,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setNodeKeySerializer(IDataSerializer nodeKeySer) {
+    public void setNodeKeySerializer(final IDataSerializer nodeKeySer) {
         
         if (nodeKeySer == null)
             throw new IllegalArgumentException();
@@ -1313,7 +1313,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setTupleSerializer(ITupleSerializer tupleSer) {
+    public void setTupleSerializer(final ITupleSerializer tupleSer) {
 
         if (tupleSer == null)
             throw new IllegalArgumentException();
@@ -1328,7 +1328,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * 
      * @param branchingFactor
      */
-    public void setBranchingFactor(int branchingFactor) {
+    public void setBranchingFactor(final int branchingFactor) {
         
         if(branchingFactor < Options.MIN_BRANCHING_FACTOR) {
             
@@ -1340,7 +1340,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setIndexSegmentBranchingFactor(int branchingFactor) {
+    public void setIndexSegmentBranchingFactor(final int branchingFactor) {
 
         if(branchingFactor < Options.MIN_BRANCHING_FACTOR) {
             
@@ -1361,7 +1361,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setConflictResolver(IConflictResolver conflictResolver) {
+    public void setConflictResolver(final IConflictResolver conflictResolver) {
 
         this.conflictResolver = conflictResolver;
         
@@ -1406,7 +1406,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * 
      * @see BloomFilterFactory#DEFAULT
      */
-    public void setBloomFilterFactory(BloomFilterFactory bloomFilterFactory) {
+    public void setBloomFilterFactory(final BloomFilterFactory bloomFilterFactory) {
         
         this.bloomFilterFactory = bloomFilterFactory;
         
@@ -1422,7 +1422,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setOverflowHandler(IOverflowHandler overflowHandler) {
+    public void setOverflowHandler(final IOverflowHandler overflowHandler) {
         
         this.overflowHandler = overflowHandler;
         
@@ -1444,7 +1444,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
     
-    public void setSplitHandler(ISplitHandler splitHandler) {
+    public void setSplitHandler(final ISplitHandler splitHandler) {
         
         this.splitHandler = splitHandler;
         
@@ -1463,7 +1463,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Set the asynchronous index write API configuration for this index.
      */
     public void getAsynchronousIndexWriteConfiguration(
-            AsynchronousIndexWriteConfiguration newVal) {
+            final AsynchronousIndexWriteConfiguration newVal) {
 
         if (newVal == null)
             throw new IllegalArgumentException();
@@ -1481,18 +1481,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setScatterSplitConfiguration(final ScatterSplitConfiguration newVal) {
+    public void setScatterSplitConfiguration(
+            final ScatterSplitConfiguration newVal) {
 
         if (newVal == null)
             throw new IllegalArgumentException();
 
         this.scatterSplitConfiguration = newVal;
-        
+
     }
-    
+
     /**
-     * <strong>De-serialization constructor only</strong> - DO NOT use this
-     * ctor for creating a new instance!
+     * <strong>De-serialization constructor only</strong> - DO NOT use this ctor
+     * for creating a new instance!
      */
     public IndexMetadata() {
         
@@ -2351,21 +2352,22 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         try {
             
-            Class cl = Class.forName(getCheckpointClassName());
+            final Class cl = Class.forName(getCheckpointClassName());
             
             /*
              * Note: A NoSuchMethodException thrown here means that you did not
              * declare the required public constructor.
              */
             
-            Constructor ctor = cl.getConstructor(new Class[] {
+            final Constructor ctor = cl.getConstructor(new Class[] {
                     IndexMetadata.class, //
                     Checkpoint.class//
                     });
 
-            Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
-                    this, //
-                    oldCheckpoint//
+            final Checkpoint checkpoint = (Checkpoint) ctor
+                    .newInstance(new Object[] { //
+                            this, //
+                            oldCheckpoint //
                     });
             
             // sanity check makes sure the counter is propagated to the new store.
@@ -2403,19 +2405,20 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         try {
             
-            Class cl = Class.forName(getCheckpointClassName());
+            final Class cl = Class.forName(getCheckpointClassName());
             
             /*
              * Note: A NoSuchMethodException thrown here means that you did not
              * declare the required public constructor.
              */
             
-            Constructor ctor = cl.getConstructor(new Class[] {
+            final Constructor ctor = cl.getConstructor(new Class[] {
                     BTree.class //
                     });
 
-            Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
-                    btree //
+            final Checkpoint checkpoint = (Checkpoint) ctor
+                    .newInstance(new Object[] { //
+                            btree //
                     });
             
             return checkpoint;
