@@ -32,6 +32,8 @@ import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.zip.Deflater;
 
+import com.bigdata.io.SerializerUtil;
+
 import junit.framework.TestCase2;
 
 
@@ -62,8 +64,8 @@ public class TestRecordCompressor extends TestCase2 {
 
     /**
      * A bunch of words derived from a stopwords list that are used to generate
-     * random strings comprised of a redundent set of terms. This approach was
-     * choosen in order to give the compression algorithm some realistic data on
+     * random strings comprised of a redundant set of terms. This approach was
+     * chosen in order to give the compression algorithm some realistic data on
      * which to work.
      */
     private static String[] words = new String[] {
@@ -702,7 +704,7 @@ public class TestRecordCompressor extends TestCase2 {
 //        return compressed.length;
 //
 //    }
-    
+
     /**
      * Test helper applies the compression algorithm to the data and then
      * verifies that the expected data can be recovered by applying the
@@ -715,16 +717,17 @@ public class TestRecordCompressor extends TestCase2 {
      * 
      * @return The #of bytes in the compressed record.
      */
-    protected int doCompressionTest(RecordCompressor c, final byte[] expected,int off,int len) {
+    protected int doCompressionTest(RecordCompressor c, final byte[] expected,
+            int off, int len) {
 
         // default output buffer to something that will be large enough.
-        ByteArrayOutputStream baos = new ByteArrayOutputStream(expected.length);
-        
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream(expected.length);
+
         // wrap up in a ByteBuffer.
-        ByteBuffer wrapper = ByteBuffer.wrap(expected,off,len);
-        assertEquals(off+len,wrapper.limit());
-        assertEquals(off,wrapper.position());
-        
+        final ByteBuffer wrapper = ByteBuffer.wrap(expected, off, len);
+        assertEquals(off + len, wrapper.limit());
+        assertEquals(off, wrapper.position());
+
         // compress the data onto the buffer.
         c.compress(wrapper, baos);
 
@@ -732,21 +735,21 @@ public class TestRecordCompressor extends TestCase2 {
          * verify that the position() was advanced to the limit() and that the
          * limit was not changed.
          */
-        assertEquals(len+off,wrapper.limit());
-        assertEquals(len+off,wrapper.position());
-        
+        assertEquals(len + off, wrapper.limit());
+        assertEquals(len + off, wrapper.position());
+
         // obtain a copy of the compressed data.
         final byte[] compressed = baos.toByteArray();
-        
+
         /*
          * Decompress the compressed data. This returns a view onto a shared
          * buffer. The data between position() and limit() are the decompressed
          * data.
          */
         final ByteBuffer decompressed = c.decompress(compressed);
-        assertEquals(0,decompressed.position());
-        assertEquals(len,decompressed.limit());
-        assertEquals(len,decompressed.remaining());
+        assertEquals(0, decompressed.position());
+        assertEquals(len, decompressed.limit());
+        assertEquals(len, decompressed.remaining());
 
         /*
          * Copy the decompressed data into an exact fit buffer so that we can
@@ -759,39 +762,55 @@ public class TestRecordCompressor extends TestCase2 {
         /*
          * Verify the decompressed data.
          */
-        for(int i=off,j=0; i<len; i++,j++ ) {
+        for (int i = off, j = 0; i < len; i++, j++) {
             if (expected[i] != actual[j])
                 fail("bytes differ at offset=" + j + " in decompressed data.");
         }
-        
+
         return compressed.length;
 
     }
-    
+
     /**
      * Test ability to compress and decompress data.
      */
     public void test_recordCompressor01() {
-        
+
         final RecordCompressor c = new RecordCompressor(Deflater.BEST_SPEED);
 
         final byte[] expected = getRandomRecord(10000);
 
-        doCompressionTest(c,expected,0,expected.length);
-        
+        doCompressionTest(c, expected, 0, expected.length);
+
     }
-    
+
+    /**
+     * Test ability to compress and decompress data using a de-serialized
+     * compression provider.
+     */
+    public void test_recordCompressor02() {
+
+        final RecordCompressor c = (RecordCompressor) SerializerUtil
+                .deserialize(SerializerUtil.serialize(new RecordCompressor(
+                        Deflater.BEST_SPEED)));
+
+        final byte[] expected = getRandomRecord(10000);
+
+        doCompressionTest(c, expected, 0, expected.length);
+
+    }
+
     /**
      * Test ability to compress and decompress zero-length data.
      */
-    public void test_recordCompressor02() {
-        
+    public void test_recordCompressor03() {
+
         final RecordCompressor c = new RecordCompressor(Deflater.BEST_SPEED);
 
-        final byte[] expected = new byte[]{};
+        final byte[] expected = new byte[] {};
 
-        doCompressionTest(c,expected,0,expected.length);
-        
+        doCompressionTest(c, expected, 0, expected.length);
+
     }
     
     /**
@@ -805,24 +824,34 @@ public class TestRecordCompressor extends TestCase2 {
         long sumBytes = 0l;
         long sumCompressed = 0l;
         
-        final RecordCompressor c = new RecordCompressor(Deflater.BEST_SPEED);
+        RecordCompressor c = new RecordCompressor(Deflater.BEST_SPEED);
 
         final byte[] expected = getRandomRecord(10000);
-        
-        for( int i=0; i<limit; i++ ) {
 
-            int off = r.nextInt(expected.length/2);
+        for (int i = 0; i < limit; i++) {
 
-            int len = r.nextInt(expected.length-off);
-            
+            int off = r.nextInt(expected.length / 2);
+
+            int len = r.nextInt(expected.length - off);
+
             sumBytes += len;
 
-            sumCompressed += doCompressionTest(c,expected,off,len);
+            sumCompressed += doCompressionTest(c, expected, off, len);
+
+            if (i % 100 == 0) {
+             
+                // every so often, we (de-)serialize the compressor itself.
+                c = (RecordCompressor) SerializerUtil
+                        .deserialize(SerializerUtil.serialize(c));
+                
+            }
             
         }
 
-        System.err.println("Compressed "+limit+" records totalling "+sumBytes+" bytes into "+sumCompressed+" bytes: ratio="+((double)sumCompressed/(double)sumBytes));
-        
+        System.err.println("Compressed " + limit + " records totaling "
+                + sumBytes + " bytes into " + sumCompressed + " bytes: ratio="
+                + ((double) sumCompressed / (double) sumBytes));
+
     }
 
 }

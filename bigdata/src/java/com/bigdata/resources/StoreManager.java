@@ -537,7 +537,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @see Options#STORE_CACHE_TIMEOUT
      */
 //    final protected WeakValueCache<UUID, IRawStore> storeCache;
-    final protected ConcurrentWeakValueCache<UUID, IRawStore> storeCache;
+    final protected ConcurrentWeakValueCacheWithTimeout<UUID, IRawStore> storeCache;
 
     /**
      * Provides locks on a per-{resourceUUID} basis for higher concurrency.

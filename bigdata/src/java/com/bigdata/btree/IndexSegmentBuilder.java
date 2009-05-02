@@ -1275,7 +1275,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * counters of the #of entries spanned by a node.
      * </p>
      */
-    protected void flush(AbstractSimpleNodeData node) throws IOException {
+    protected void flush(final AbstractSimpleNodeData node) throws IOException {
 
         final int h = node.level;
 
@@ -1512,7 +1512,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * Serialize and write the leaf onto the {@link #leafBuffer}.
      * <p>
      * Note: For leaf addresses we know the absolute offset into the
-     * {@link IndexSegmentStore} where the leaf will wind up so we encoded the
+     * {@link IndexSegmentStore} where the leaf will wind up so we encode the
      * address of the leaf using the {@link IndexSegmentRegion#BASE} region.
      * <p>
      * Note: In order to write out the leaves using a double-linked list with
@@ -1524,7 +1524,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * {@link #nleavesWritten}) then we patch the serialized representation of
      * the prior leaf and write it on the store at the previously obtained
      * address, thereby linking the leaves together in both directions. It is
-     * definately confusing.
+     * definitely confusing.
      * 
      * @return The address that may be used to read the leaf from the file
      *         backing the {@link IndexSegmentStore}.

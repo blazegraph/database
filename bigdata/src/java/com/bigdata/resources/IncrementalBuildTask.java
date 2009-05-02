@@ -103,7 +103,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
                 /*
                  * Figure out which sources will be used in the build operation.
-                 * The sources are choosen in order. The first source is always
+                 * The sources are chosen in order. The first source is always
                  * a BTree on a journal and is always in the accepted view.
                  * 
                  * Note: The order of the sources MUST be maintained. This
@@ -111,7 +111,7 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                  * the most recently written tuple (or delete marker) for each
                  * tuple in the accepted view. We are only permitted to purge
                  * deleted tuples when all sources are accepted in the build
-                 * view since that is the only time we have a guarentee that
+                 * view since that is the only time we have a guarantee that
                  * there is not a delete version of that tuple further back in
                  * history which would reemerge if we dropped the delete marker.
                  */
@@ -147,22 +147,28 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 if (INFO)
                     log.info("buildResult=" + buildResult);
 
-                /*
-                 * Verify that the resource manager can open the new index
-                 * segment. This provides verification both that the index
-                 * segment is registered with the store manager and that the
-                 * index segment can be read. However, we do not actually read
-                 * the leaves of the index segment here so there still could be
-                 * errors on the disk.
-                 */
-                final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
-                        .openStore(buildResult.segmentMetadata.getUUID());
+                {
 
-                assert segStore != null;
+                    /*
+                     * Verify that the resource manager can open the new index
+                     * segment. This provides verification both that the index
+                     * segment is registered with the store manager and that the
+                     * index segment can be read. However, we do not actually
+                     * read the leaves of the index segment here so there still
+                     * could be errors on the disk.
+                     */
+
+                    final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
+                            .openStore(buildResult.segmentMetadata.getUUID());
+
+                    assert segStore != null;
+
+                    if (INFO)
+                        log.info("indexSegmentStore="
+                                + segStore.loadIndexSegment());
+
+                }
                 
-                if (INFO)
-                    log.info("indexSegmentStore=" + segStore.loadIndexSegment());
-                    
             } finally {
 
                 /*

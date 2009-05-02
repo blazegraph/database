@@ -552,22 +552,28 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
         return map.remove(k);
         
     }
-    
+
     /**
      * An iterator that visits the weak reference values in the map. You must
      * test each weak reference in order to determine whether its value has been
-     * cleared as of the moment that you request that value.
+     * cleared as of the moment that you request that value. The entries visited
+     * by the iterator are not "touched" so the use of the iterator will not
+     * cause them to be retained any longer than they otherwise would have been
+     * retained.
      */
     public Iterator<WeakReference<V>> iterator() {
 
         return map.values().iterator();
         
     }
-    
+
     /**
      * An iterator that visits the entries in the map. You must test the weak
      * reference for each entry in order to determine whether its value has been
-     * cleared as of the moment that you request that value.
+     * cleared as of the moment that you request that value. The entries visited
+     * by the iterator are not "touched" so the use of the iterator will not
+     * cause them to be retained any longer than they otherwise would have been
+     * retained.
      */
     public Iterator<Map.Entry<K,WeakReference<V>>> entryIterator() {
 
