@@ -29,6 +29,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Properties;
@@ -38,8 +39,10 @@ import java.util.concurrent.TimeUnit;
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.compression.DefaultDataSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.PrefixSerializer;
+import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.config.Configuration;
@@ -49,6 +52,7 @@ import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -382,6 +386,44 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         String DEFAULT_WRITE_RETENTION_QUEUE_SCAN = "20";
 
+        /**
+         * Override the {@link IKeyBuilderFactory} used by the
+         * {@link DefaultTupleSerializer} (the default is a
+         * {@link DefaultKeyBuilderFactory} initialized with an empty
+         * {@link Properties} object).
+         * 
+         * FIXME Support for this has not been finished yet.
+         */
+        String KEY_BUILDER_FACTORY = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + "keyBuilderFactory";
+
+        /**
+         * Override the {@link IDataSerializer} used for the keys in the nodes
+         * of a B+Tree (the default is {@link PrefixSerializer}).
+         */
+        String NODE_KEY_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + "nodeKeySerializer";
+
+        /**
+         * Override the {@link IDataSerializer} used for the keys of leaves in
+         * B+Trees (the default is {@link PrefixSerializer}). This is set using
+         * {@link DefaultTupleSerializer#setLeafKeySerializer(IDataSerializer)}.
+         */
+        String LEAF_KEY_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + ".leafKeySerializer";
+
+        /**
+         * Override the {@link IDataSerializer} used for the values of leaves in
+         * B+Trees (default is {@link DefaultDataSerializer}). This is set using
+         * {@link DefaultTupleSerializer#setLeafValueSerializer(IDataSerializer)}.
+         */
+        String LEAF_VALUE_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+                .getPackage().getName()
+                + ".leafValueSerializer";
+        
         /*
          * Options that are valid for any AbstractBTree but which are not
          * defined for a FusedView.
@@ -459,7 +501,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * will disable the read-retention queue. This queue ONLY applies to
          * {@link BTree}s (vs {@link IndexSegment}s).
          * 
-         * @todo The size of the read rentention queue should be set dynamically
+         * @todo The size of the read retention queue should be set dynamically
          *       as a function of the depth of the BTree (or the #of nodes and
          *       leaves), the branching factor, and the RAM available to the
          *       HOST (w/o swapping) and to the JVM. For a mutable {@link BTree}
@@ -493,6 +535,22 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         String DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN = "20";
 
+        /**
+         * An optional factory providing record-level compression for the nodes
+         * and leaves of an {@link IndexSegment} (default
+         * {@value #DEFAULT_BTREE_RECORD_COMPRESSOR_FACTORY}).
+         * 
+         * @see #INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
+         */
+        String BTREE_RECORD_COMPRESSOR_FACTORY = BTree.class.getName()
+                + ".recordCompressorFactory";
+
+        /**
+         * 
+         * @see #BTREE_RECORD_COMPRESSOR_FACTORY
+         */
+        String DEFAULT_BTREE_RECORD_COMPRESSOR_FACTORY = null;
+        
         /*
          * Options that are specific to IndexSegment.
          * 
@@ -594,6 +652,22 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT = ""
                 + TimeUnit.SECONDS.toNanos(30);
 
+        /**
+         * An optional factory providing record-level compression for the nodes
+         * and leaves of an {@link IndexSegment} (default
+         * {@value #DEFAULT_INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY}).
+         * 
+         * @see #BTREE_RECORD_COMPRESSOR_FACTORY
+         */
+        String INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY = IndexSegment.class.getName()
+                + ".recordCompressorFactory";
+
+        /**
+         * 
+         * @see #INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
+         */
+        String DEFAULT_INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY = null;
+        
         /*
          * Split handler properties.
          * 
@@ -607,23 +681,44 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * 
          * final int entryCountPerSplit = 5 * Bytes.megabyte32; (or 50k)
          */
-        
+
+        /**
+         * An index partition which has no more than this many tuples should be
+         * joined with its rightSibling (if any).
+         */
         String SPLIT_HANDLER_MIN_ENTRY_COUNT = DefaultSplitHandler.class
                 .getName()
                 + ".minimumEntryCount";
 
+        /**
+         * The target #of tuples for an index partition.
+         */
         String SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT = DefaultSplitHandler.class
                 .getName()
                 + ".entryCountPerSplit";
 
+        /**
+         * The index partition will be split when its actual entry count is GTE
+         * to <code>overCapacityMultiplier * entryCountPerSplit</code>
+         */
         String SPLIT_HANDLER_OVER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
                 .getName()
                 + ".overCapacityMultiplier";
 
+        /**
+         * When an index partition will be split, the #of new index partitions
+         * will be chosen such that each index partition is approximately
+         * <i>underCapacityMultiplier</i> full.
+         */
         String SPLIT_HANDLER_UNDER_CAPACITY_MULTIPLIER = DefaultSplitHandler.class
                 .getName()
                 + ".underCapacityMultiplier";
 
+        /**
+         * The #of samples to take per estimated split (non-negative, and
+         * generally on the order of 10s of samples). The purpose of the samples
+         * is to accommodate the actual distribution of the keys in the index.
+         */
         String SPLIT_HANDLER_SAMPLE_RATE = DefaultSplitHandler.class.getName()
                 + ".sampleRate";
 
@@ -900,6 +995,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private IAddressSerializer addrSer;
     private IDataSerializer nodeKeySer;
     private ITupleSerializer tupleSer;
+    private IRecordCompressorFactory btreeRecordCompressorFactory;
+    private IRecordCompressorFactory indexSegmentRecordCompressorFactory;
     private IConflictResolver conflictResolver;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
@@ -1026,7 +1123,41 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         this.indexSegmentBufferNodes = newValue;
         
     }
-    
+
+    /**
+     * Return the record-level compression provider for a {@link BTree} (may be
+     * null, which implies no compression).
+     */
+    public IRecordCompressorFactory getBtreeRecordCompressorFactory() {
+        
+        return btreeRecordCompressorFactory;
+        
+    }
+
+    public void setBtreeRecordCompressorFactory(
+            final IRecordCompressorFactory btreeRecordCompressorFactory) {
+        
+        this.btreeRecordCompressorFactory = btreeRecordCompressorFactory;
+        
+    }
+
+    /**
+     * Return the record-level compression provider for an {@link IndexSegment}
+     * (may be null, which implies no compression).
+     */
+    public IRecordCompressorFactory getIndexSegmentRecordCompressorFactory() {
+       
+        return indexSegmentRecordCompressorFactory;
+        
+    }
+
+    public void setIndexSegmentRecordCompressorFactory(
+            final IRecordCompressorFactory segmentRecordCompressorFactory) {
+        
+        this.indexSegmentRecordCompressorFactory = segmentRecordCompressorFactory;
+        
+    }
+
     /**
      * Return the capacity of the LRU cache of leaves for an
      * {@link IndexSegment}.
@@ -1492,6 +1623,44 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
 
     /**
+     * Create an instance of a class known to implement the specified interface
+     * from a class name.
+     * 
+     * @param className
+     *            The class name.
+     * 
+     * @return An instance of that class.
+     * 
+     * @throws RuntimeException
+     *             if the class does not implement that interface or for any
+     *             other reason.
+     */
+    static private <T> T newInstance(final String className,
+            final Class<T> iface) {
+
+        try {
+
+            final Class cls = Class.forName(className);
+
+            if (!iface.isAssignableFrom(cls)) {
+
+                throw new IllegalArgumentException("Does not implement "
+                        + IDataSerializer.class + " : " + className);
+
+            }
+
+            return (T) cls.getConstructor(new Class[] {}).newInstance(
+                    new Object[] {});
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(e);
+
+        }
+
+    }
+    
+    /**
      * <strong>De-serialization constructor only</strong> - DO NOT use this ctor
      * for creating a new instance!
      */
@@ -1709,10 +1878,39 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         this.addrSer = AddressSerializer.INSTANCE;
         
-//        this.nodeKeySer = SimplePrefixSerializer.INSTANCE;
-        this.nodeKeySer = PrefixSerializer.INSTANCE;
-        
-        this.tupleSer = DefaultTupleSerializer.newInstance();
+//        this.nodeKeySer = PrefixSerializer.INSTANCE;
+        this.nodeKeySer = newInstance(getProperty(indexManager,
+                properties, namespace, Options.NODE_KEY_SERIALIZER,
+                PrefixSerializer.class.getName()), IDataSerializer.class);
+
+        // this.tupleSer = DefaultTupleSerializer.newInstance();
+        {
+
+            /*
+             * FIXME allow override of the keyBuilderFactory.
+             * 
+             * FIXME there are a bunch of subclasses of DefaultTupleSerializer.
+             * In order to be able to override the specific key/value
+             * serialization providers we need to make the tupleSer instance
+             * itself a configuration parameter.
+             */
+            final IKeyBuilderFactory keyBuilderFactory = DefaultTupleSerializer
+                    .getDefaultKeyBuilderFactory();
+
+            final IDataSerializer leafKeySerializer = newInstance(getProperty(
+                    indexManager, properties, namespace,
+                    Options.LEAF_KEY_SERIALIZER, PrefixSerializer.class
+                            .getName()), IDataSerializer.class);
+
+            final IDataSerializer valueSerializer = newInstance(getProperty(
+                    indexManager, properties, namespace,
+                    Options.LEAF_VALUE_SERIALIZER, DefaultDataSerializer.class
+                            .getName()), IDataSerializer.class);
+
+            this.tupleSer = new DefaultTupleSerializer(keyBuilderFactory,
+                    leafKeySerializer, valueSerializer);
+            
+        }
 
         this.conflictResolver = null;
         
@@ -1931,7 +2129,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     public String toString() {
         
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
 
         // transient
         sb.append("addrMetadata=" + addrMetadata);
@@ -1948,6 +2146,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", checkpointClass=" + checkpointClassName);
         sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
+        sb.append(", btreeRecordCompressorFactory="
+                + (btreeRecordCompressorFactory == null ? "N/A"
+                        : btreeRecordCompressorFactory));
         sb.append(", tupleSerializer=" + tupleSer.getClass().getName());
         sb.append(", conflictResolver="
                 + (conflictResolver == null ? "N/A" : conflictResolver
@@ -1966,6 +2167,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
         sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
         sb.append(", indexSegmentLeafCacheTimeout=" + indexSegmentLeafCacheTimeout);
+        sb.append(", indexSegmentRecordCompressorFactory="
+                + (indexSegmentRecordCompressorFactory == null ? "N/A"
+                        : indexSegmentRecordCompressorFactory));
         sb.append(", asynchronousIndexWriteConfiguration=" + asynchronousIndexWriteConfiguration);
         sb.append(", scatterSplitConfiguration=" + scatterSplitConfiguration);
 
@@ -2000,9 +2204,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private static transient final int VERSION3 = 0x3;
 
     /**
+     * This version introduced {@link #btreeRecordCompressorFactory} and
+     * {@link #indexSegmentRecordCompressorFactory}. Both of these fields are
+     * optional, which implies no compression provider. Reads of prior versions
+     * set these fields to <code>null</code>.
+     */
+    private static transient final int VERSION4 = 0x04;
+    
+    /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION3;
+    private static transient final int CURRENT_VERSION = VERSION4;
     
     /**
      * @todo review generated record for compactness.
@@ -2017,6 +2229,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION1:
         case VERSION2:
         case VERSION3:
+        case VERSION4:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2054,6 +2267,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         tupleSer = (ITupleSerializer)in.readObject();
         
+        if (version < VERSION4) {
+
+            btreeRecordCompressorFactory = null;
+
+        } else {
+
+            btreeRecordCompressorFactory = (IRecordCompressorFactory) in
+                    .readObject();
+
+        }
+        
         conflictResolver = (IConflictResolver)in.readObject();
         
         deleteMarkers = in.readBoolean();
@@ -2087,6 +2311,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         indexSegmentBufferNodes = in.readBoolean();
 
+        if (version < VERSION4) {
+
+            indexSegmentRecordCompressorFactory = null;
+
+        } else {
+
+            indexSegmentRecordCompressorFactory = (IRecordCompressorFactory) in
+                    .readObject();
+
+        }
+        
         if (version < VERSION1) {
 
             /*
@@ -2207,9 +2442,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         out.writeObject(addrSer);
         
         out.writeObject(nodeKeySer);
-
+        
         out.writeObject(tupleSer);
         
+        if (version >= VERSION4) {
+            
+            out.writeObject(btreeRecordCompressorFactory);
+            
+        }
+
         out.writeObject(conflictResolver);
 
         out.writeBoolean(deleteMarkers);
@@ -2237,6 +2478,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         }
 
         out.writeBoolean(indexSegmentBufferNodes);
+
+        if (version >= VERSION4) {
+            
+            out.writeObject(btreeRecordCompressorFactory);
+            
+        }
 
         if (version >= VERSION1) {
 

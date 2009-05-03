@@ -59,6 +59,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.CompactTask;
@@ -590,7 +591,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final IRawStore store,//
             final INodeFactory nodeFactory,//
             final boolean readOnly,
-            final IndexMetadata metadata//
+            final IndexMetadata metadata,//
+            final IRecordCompressorFactory recordCompressorFactory
             ) {
 
         // show the copyright banner during startup.
@@ -656,7 +658,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                     branchingFactor,//
                     0, //initialBufferCapacity
                     metadata,//
-                    readOnly
+                    readOnly,//
+                    recordCompressorFactory
                     );
             
         }

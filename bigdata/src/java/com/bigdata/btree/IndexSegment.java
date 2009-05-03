@@ -207,10 +207,11 @@ public class IndexSegment extends AbstractBTree {
      */
     public IndexSegment(final IndexSegmentStore fileStore) {
 
-        super(fileStore,
-                ImmutableNodeFactory.INSTANCE,
+        super(fileStore,//
+                ImmutableNodeFactory.INSTANCE,//
                 true, // always read-only
-                fileStore.getIndexMetadata()
+                fileStore.getIndexMetadata(),//
+                fileStore.getIndexMetadata().getIndexSegmentRecordCompressorFactory()
                 );
 
         // Type-safe reference to the backing store.

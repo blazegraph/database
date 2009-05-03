@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Dec 17, 2006
  */
 
-package com.bigdata.btree;
+package com.bigdata.io.compression;
 
 import java.io.ByteArrayInputStream;
 import java.io.Externalizable;
@@ -39,6 +39,7 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.io.ByteBufferInputStream;
 
 /**
@@ -51,18 +52,10 @@ import com.bigdata.io.ByteBufferInputStream;
  * <p>
  * This class is NOT thread-safe.
  * 
- * @todo define an interface for a record compressor and write the class of the
- *       compressor used into the {@link IndexSegmentCheckpoint} so that we can
- *       experiment with other compression schemes in a backward compatible
- *       manner. If the compressor has parameters then those can be capture by
- *       subclassing or instance data. We know the maximum record size when we
- *       load an existing index segment, so we could specify that as an
- *       optimization.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RecordCompressor implements Externalizable {
+public class RecordCompressor implements Externalizable, IRecordCompressor {
 
     /**
      * 
@@ -70,7 +63,7 @@ public class RecordCompressor implements Externalizable {
     private static final long serialVersionUID = -2028159717578047153L;
 
     /**
-     * A huge portion of the cost associated with using {@link Deflator} is
+     * A huge portion of the cost associated with using {@link Deflater} is
      * the initialization of a new instance. Since this code is designed to
      * operate within a single-threaded environment, we just reuse the same
      * instance for each invocation.
@@ -90,6 +83,12 @@ public class RecordCompressor implements Externalizable {
      * The level specified to the ctor.
      */
     private int level;
+
+    public String toString() {
+        
+        return getClass().getName() + "{level=" + level + "}";
+        
+    }
     
     /**
      * Create a record compressor.
@@ -115,16 +114,6 @@ public class RecordCompressor implements Externalizable {
         
     }
 
-    /**
-     * Compresses data onto the output stream.
-     * 
-     * @param bin
-     *            The data. The data from the position to the limit will be
-     *            compressed. The position will be advanced to the limit as a
-     *            side effect.
-     * @param os
-     *            The stream onto which the compressed data are written.
-     */
     public void compress(final ByteBuffer bin, final OutputStream os) {
 
         if (bin.hasArray() && bin.position() == 0
@@ -173,40 +162,18 @@ public class RecordCompressor implements Externalizable {
 
     }
 
-    /**
-     * Compresses data onto the output stream.
-     * 
-     * @param bytes
-     *            The data.
-     * @param os
-     *            The stream onto which the compressed data are written.
-     */
     public void compress(final byte[] bytes, final OutputStream os) {
 
         compress(bytes, 0, bytes.length, os);
         
     }
     
-    /**
-     * Compresses data onto the output stream.
-     * 
-     * @param bytes
-     *            The source data.
-     * @param off
-     *            The offset of the first source byte that will be compressed
-     *            onto the output stream.
-     * @param len
-     *            The #of source bytes that will be compressed onto the output
-     *            stream.
-     * @param os
-     *            The stream onto which the compressed data are written.
-     */
     public void compress(final byte[] bytes, final int off, final int len,
             final OutputStream os) {
 
         _deflater.reset(); // required w/ instance reuse.
 
-        DeflaterOutputStream dos = new DeflaterOutputStream(os, _deflater);
+        final DeflaterOutputStream dos = new DeflaterOutputStream(os, _deflater);
 
         try {
 
@@ -235,18 +202,6 @@ public class RecordCompressor implements Externalizable {
 
     }
 
-    /**
-     * Decompresses a {@link ByteBuffer} containing the record and return the
-     * uncompressed state.
-     * 
-     * @param bin
-     *            The compressed data.
-     * 
-     * @return A view onto a shared buffer. The data between position() and
-     *         limit() are the decompressed data. The contents of this buffer
-     *         are valid only until the next compression or decompression
-     *         request.
-     */
     public ByteBuffer decompress(final ByteBuffer bin) {
 
         _inflater.reset(); // reset required by reuse.
@@ -260,29 +215,16 @@ public class RecordCompressor implements Externalizable {
 
     }
 
-    /**
-     * Decompress a <code>byte[]</code> containing the record and return the
-     * uncompressed state.
-     * 
-     * @param bin
-     *            The compressed data.
-     * 
-     * @return A read-only view onto a shared buffer. The data between
-     *         position() and limit() are the decompressed data. The contents of
-     *         this buffer are valid only until the next compression or
-     *         decompression request. The position will be zero. The limit will
-     *         be the #of decompressed bytes.
-     */
     public ByteBuffer decompress(final byte[] bin) {
      
         _inflater.reset(); // reset required by reuse.
 
         final int size = bin.length;
         
-        InflaterInputStream iis = new InflaterInputStream(
+        final InflaterInputStream iis = new InflaterInputStream(
                 new ByteArrayInputStream(bin), _inflater, size);
 
-        return decompress( iis );
+        return decompress(iis);
         
     }
 

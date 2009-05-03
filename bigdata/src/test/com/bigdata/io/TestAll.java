@@ -59,7 +59,8 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("IO");
+        final TestSuite suite = new TestSuite(TestAll.class.getPackage()
+                .getName());
 
         // test suite for the direct buffer pool.
         suite.addTestSuite(TestDirectBufferPool.class);
@@ -83,6 +84,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestDataOutputBuffer.class);
         suite.addTestSuite(TestShortPacker.class);
         suite.addTestSuite(TestLongPacker.class);
+        
+        suite.addTest(com.bigdata.io.compression.TestAll.suite());
         
         return suite;
         

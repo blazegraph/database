@@ -835,7 +835,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     plan.m,//
                     0, // initialBufferCapacity - will be estimated.
                     metadata, //
-                    false // NOT read-only (we are using it for writing).
+                    false, // NOT read-only (we are using it for writing).
+                    metadata.getIndexSegmentRecordCompressorFactory()
                     );
 
         }

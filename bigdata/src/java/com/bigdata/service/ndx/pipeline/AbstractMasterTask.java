@@ -177,7 +177,7 @@ L>//
      * The time in nanoseconds that the {@link AbstractSubtask sink} will wait
      * inside of the {@link IAsynchronousIterator} when it polls the iterator
      * for a chunk. If this value is too large then the sink will block for
-     * noticable lengths of time and will be less responsive to interrupts.
+     * noticeable lengths of time and will be less responsive to interrupts.
      * Something in the 10s of milliseconds is appropriate.
      */
     protected final long sinkPollTimeoutNanos;
@@ -199,7 +199,7 @@ L>//
      *            The time in nanoseconds that the {@link AbstractSubtask sink}
      *            will wait inside of the {@link IAsynchronousIterator} when it
      *            polls the iterator for a chunk. If this value is too large
-     *            then the sink will block for noticable lengths of time and
+     *            then the sink will block for noticeable lengths of time and
      *            will be less responsive to interrupts. Something in the 10s of
      *            milliseconds is appropriate.
      */

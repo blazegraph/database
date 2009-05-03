@@ -65,6 +65,8 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
     /**
      * The default for {@link IKeyBuilderFactory}.
+     * 
+     * @deprecated by {@link IndexMetadata.Options#KEY_BUILDER_FACTORY}
      */
     static public final IKeyBuilderFactory getDefaultKeyBuilderFactory() {
         
@@ -74,10 +76,11 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
     /**
      * The default for {@link #getLeafKeySerializer()} (compression for the keys
      * stored in a leaf).
+     * 
+     * @deprecated by {@link IndexMetadata.Options#LEAF_KEY_SERIALIZER}
      */
     static public final IDataSerializer getDefaultLeafKeySerializer() {
         
-//        return SimplePrefixSerializer.INSTANCE;
         return PrefixSerializer.INSTANCE;
         
     }
@@ -85,6 +88,8 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
     /**
      * The default for {@link #getLeafValueSerializer()} (compression for
      * the values stored in a leaf).
+     * 
+     * @deprecated by {@link IndexMetadata.Options#LEAF_VALUE_SERIALIZER}
      */
     static public final IDataSerializer getDefaultValueKeySerializer() {
         
@@ -115,7 +120,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * @param leafKeySer
      *            The new value.
      */
-    final public void setLeafKeySerializer(IDataSerializer leafKeySer) {
+    final public void setLeafKeySerializer(final IDataSerializer leafKeySer) {
 
         if (leafKeySer == null)
             throw new IllegalArgumentException();
@@ -132,7 +137,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * @param valueSer
      *            The new value.
      */
-    final public void setLeafValueSerializer(IDataSerializer valueSer) {
+    final public void setLeafValueSerializer(final IDataSerializer valueSer) {
         
         if (valueSer == null)
             throw new IllegalArgumentException();

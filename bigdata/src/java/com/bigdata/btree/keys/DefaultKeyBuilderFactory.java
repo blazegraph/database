@@ -56,9 +56,9 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
     protected static final transient Logger log = Logger.getLogger(DefaultKeyBuilderFactory.class);
     
-    protected static final transient boolean INFO = log.isInfoEnabled();
-
-    protected static final transient boolean DEBUG = log.isDebugEnabled();
+//    protected static final transient boolean INFO = log.isInfoEnabled();
+//
+//    protected static final transient boolean log.isDebugEnabled() = log.isDebugEnabled();
     
     /**
      * 
@@ -180,7 +180,8 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
      * 
      * @return The value -or- <code>null</code> if no value was found.
      */
-    static private String getProperty(Properties properties, String key) {
+    static private String getProperty(final Properties properties,
+            final String key) {
 
         return getProperty(properties, key, null);
 
@@ -201,8 +202,8 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
      * 
      * @return The value -or- <i>def</i> if no value was found.
      */
-    static private String getProperty(Properties properties, String key,
-            String def) {
+    static private String getProperty(final Properties properties,
+            final String key, final String def) {
 
         String val = null;
         
@@ -218,7 +219,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
         }
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("name=" + key + ",val=" + val);
             
@@ -233,7 +234,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
      * to the specified <i>properties</i>. Any properties NOT explicitly given
      * will be defaulted from {@link System#getProperties()}. The pre-defined
      * properties {@link Options#USER_LANGUAGE}, {@link Options#USER_COUNTRY},
-     * and {@link Options#USER_VARIANT} MAY be overriden. The factory will
+     * and {@link Options#USER_VARIANT} MAY be overridden. The factory will
      * support Unicode unless {@link CollatorEnum#ASCII} is explicitly specified
      * for the {@link Options#COLLATOR} property.
      * 
@@ -255,14 +256,14 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
      *             for Windows and Un*x.
      *             </p>
      */
-    public DefaultKeyBuilderFactory(Properties properties) {
+    public DefaultKeyBuilderFactory(final Properties properties) {
 
         // default capacity : @todo config by property.
         this.initialCapacity = 0;
         
         icu_avail = isICUAvailable();
 
-        if(INFO) {
+        if(log.isInfoEnabled()) {
 
             log.info("ICU library is" + (icu_avail ? "" : " not") + " available.");
             
@@ -292,7 +293,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
                  * by a property.
                  */
 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
 
                     log.info("Defaulting: " + Options.COLLATOR + "="
                             + collator);
@@ -337,7 +338,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
             }
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("Using default locale: " + locale.getDisplayName());
 
@@ -369,7 +370,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
             }
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.STRENGTH + "=" + strength);
 
             /*
@@ -393,7 +394,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
                 mode = DecompositionEnum.valueOf(getProperty(properties,
                         Options.DECOMPOSITION));
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(Options.DECOMPOSITION + "=" + mode);
 
             }
@@ -406,7 +407,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
         }
 
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info(toString());
             
@@ -416,7 +417,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
 
     public IKeyBuilder getKeyBuilder() {
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug(toString());
             

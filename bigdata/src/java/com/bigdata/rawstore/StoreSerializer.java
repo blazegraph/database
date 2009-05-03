@@ -180,11 +180,11 @@ public class StoreSerializer implements IStoreSerializer {
 
         if (buf.hasArray()) {
 
-            int off = buf.arrayOffset();
+            final int off = buf.arrayOffset() + buf.position();
 
-            int len = buf.remaining();
+            final int len = buf.remaining();
 
-            Object ret = deserialize(buf.array(), off, len);
+            final Object ret = deserialize(buf.array(), off, len);
 
             buf.position(buf.limit());
 

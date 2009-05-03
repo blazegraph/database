@@ -106,7 +106,7 @@ import cutthecrap.utils.striterators.Striterator;
  * for each of the three possible access paths for a triple store. The key is
  * formed from the corresponding permutation of the subject, predicate, and
  * object, e.g., {s,p,o}, {p,o,s}, and {o,s,p}. The statement type (inferred,
- * axiom, or explicit) and the optional statement identifer are stored under the
+ * axiom, or explicit) and the optional statement identifier are stored under the
  * key. All state for a statement is replicated in each of the statement
  * indices.
  * 
@@ -115,7 +115,7 @@ import cutthecrap.utils.striterators.Striterator;
  *       have all indices resolved eager. The {@link AbstractTask} will actually
  *       return <code>null</code> rather than throwing an exception, but eager
  *       resolution of the indices will force {@link IClientIndex}s to spring
- *       into existance when we might only want a single index for the relation.
+ *       into existence when we might only want a single index for the relation.
  * 
  * @todo integration with package providing magic set rewrites of rules in order
  *       to test whether or not a statement is still provable when it is

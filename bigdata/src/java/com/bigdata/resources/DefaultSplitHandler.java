@@ -131,12 +131,12 @@ public class DefaultSplitHandler implements ISplitHandler {
      *            <code>overCapacityMultiplier * entryCountPerSplit</code>
      * @param underCapacityMultiplier
      *            When an index partition will be split, the #of new index
-     *            partitions will be choosen such that each index partition is
+     *            partitions will be chosen such that each index partition is
      *            approximately <i>underCapacityMultiplier</i> full.
      * @param sampleRate
      *            The #of samples to take per estimated split (non-negative, and
      *            generally on the order of 10s of samples). The purpose of the
-     *            samples is to accomodate the actual distribution of the keys
+     *            samples is to accommodate the actual distribution of the keys
      *            in the index.
      * 
      * @throws IllegalArgumentException
