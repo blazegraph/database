@@ -46,6 +46,9 @@ import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.compression.IRecordCompressor;
+import com.bigdata.io.compression.IRecordCompressorFactory;
+import com.bigdata.io.compression.NOPRecordCompressor;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 
@@ -137,6 +140,35 @@ public class NodeSerializer {
     private final IDataSerializer valueSerializer;
     
     /**
+     * Factory for record-level (de-)compression of nodes and leaves (optional).
+     */
+    private final IRecordCompressorFactory recordCompressorFactory;
+    
+    /**
+     * An object that knows how to (de-)compress a node or leaf (optional).
+     */
+    private IRecordCompressor getRecordCompressor() {
+        
+        if (recordCompressorFactory == null) {
+            
+            return NOPRecordCompressor.INSTANCE;
+            
+        }
+
+        if (!readOnly) {
+            
+            assert _writeCompressor != null;
+            
+            // Instance used for writes, which are single threaded.
+            return _writeCompressor;
+            
+        }
+        
+        return recordCompressorFactory.getInstance();
+        
+    }
+
+    /**
      * Used to serialize the nodes and leaves of the tree. This is pre-allocated
      * based on the estimated maximum size of a node or leaf and grows as
      * necessary when it overflows. The same buffer instance is used to
@@ -153,11 +185,17 @@ public class NodeSerializer {
      * @see #close()
      */
     private DataOutputBuffer _writeBuffer;
+
+    /**
+     * Instance used for writes - this keeps a hard reference since writes are
+     * single threaded.
+     */
+    private IRecordCompressor _writeCompressor;
     
     private final int initialBufferCapacity;
 
     /**
-     * The default initial capacity multipler for the (de-)serialization buffer.
+     * The default initial capacity multiplier for the (de-)serialization buffer.
      * The total initial buffer capacity is this value times the
      * {@link #branchingFactor}.
      */
@@ -229,16 +267,16 @@ public class NodeSerializer {
      */
     private static short VERSION0 = (short) 0;
 
-    private boolean isNode(byte b) {
-        
+    final private boolean isNode(final byte b) {
+
         return (b & 0x1) == 0;
-        
+
     }
-    
-    private boolean isLeaf(byte b) {
-        
+
+    final private boolean isLeaf(final byte b) {
+
         return (b & 0x1) == 1;
-        
+
     }
 
     /**
@@ -284,7 +322,8 @@ public class NodeSerializer {
             final int branchingFactor,
             final int initialBufferCapacity, //
             final IndexMetadata indexMetadata,//
-            final boolean readOnly
+            final boolean readOnly,//
+            final IRecordCompressorFactory recordCompressorFactory
             ) {
 
         assert addressManager != null;
@@ -317,6 +356,9 @@ public class NodeSerializer {
 
         this.valueSerializer = indexMetadata.getTupleSerializer().getLeafValueSerializer();
 
+        // MAY be null
+        this.recordCompressorFactory = recordCompressorFactory;
+        
         if (readOnly) {
 
             this.initialBufferCapacity = 0;
@@ -350,6 +392,8 @@ public class NodeSerializer {
     public void close() {
 
         _writeBuffer = null;
+        
+        _writeCompressor = null;
 
     }
 
@@ -369,7 +413,12 @@ public class NodeSerializer {
 
         assert _writeBuffer == null;
 
+        assert _writeCompressor == null;
+
         _writeBuffer = new DataOutputBuffer(initialBufferCapacity);
+        
+        _writeCompressor = recordCompressorFactory == null ? NOPRecordCompressor.INSTANCE
+                : recordCompressorFactory.getInstance();
 
     }
 
@@ -749,21 +798,37 @@ public class NodeSerializer {
         b.putLong(OFFSET_NEXT, nextAddr);
         
     }
-    
+
     private ByteBuffer putLeaf2(final ILeafData leaf) throws IOException {
 
         assert _writeBuffer != null;
         assert _writeBuffer.pos() == 0;
         assert leaf != null;
-        
-        final int nkeys = leaf.getKeyCount();
         assert branchingFactor == leaf.getBranchingFactor();
-        final IKeyBuffer keys = leaf.getKeys();
-        final byte[][] vals = leaf.getValues();
-        
+
         /*
-         * common data.
+         * Either (a) no compression and we can write the body bytes directly
+         * after the header; or (b) we write the body into a DataOutputBuffer
+         * and then compress it and write it onto the target output buffer.
          */
+        
+        putLeafHeader(leaf);
+
+        final int nbytes = putLeafBody(_writeBuffer, leaf);
+        
+        final ByteBuffer buf2 = ByteBuffer.wrap(_writeBuffer.array(), 0, nbytes
+                + SIZEOF_LEAF_HEADER);
+
+        /*
+         * Note: The position will be zero(0). The limit will be the #of bytes
+         * in the buffer.
+         */
+
+        return buf2;
+
+    }
+
+    private void putLeafHeader(final ILeafData leaf) throws IOException {
         
         // nodeType
         _writeBuffer.writeByte(1); // this is a leaf.
@@ -777,6 +842,24 @@ public class NodeSerializer {
         // next leaf address.  Note: -1L indicates UNKNOWN.
         _writeBuffer.writeLong(-1L);
 
+    }
+
+    /**
+     * 
+     * @param _writeBuffer
+     * @param leaf
+     * @return The #of bytes written in the leaf body.
+     * @throws IOException
+     */
+    private int putLeafBody(DataOutputBuffer _writeBuffer, final ILeafData leaf)
+            throws IOException {
+        
+        final int nkeys = leaf.getKeyCount();
+        final IKeyBuffer keys = leaf.getKeys();
+        final byte[][] vals = leaf.getValues();
+        
+        final int pos0 = _writeBuffer.pos();
+        
         try {
             
             // keys.
@@ -813,20 +896,12 @@ public class NodeSerializer {
         }
 
         // #of bytes actually written.
-        final int nbytes = _writeBuffer.pos();
+        final int nbytes = _writeBuffer.pos() - pos0;
         
-        assert nbytes > SIZEOF_LEAF_HEADER;
+//        assert nbytes > SIZEOF_LEAF_HEADER;
+        
+        return nbytes;
 
-        final ByteBuffer buf2 = ByteBuffer
-                .wrap(_writeBuffer.array(), 0, nbytes);
-        
-        /*
-         * Note: The position will be zero(0).  The limit will be the #of bytes
-         * in the buffer.
-         */
-        
-        return buf2;
-                
     }
 
     /**
@@ -978,7 +1053,7 @@ public class NodeSerializer {
      * 
      * @todo customizable serializer interface configured in {@link IndexMetadata}.
      */
-    protected void putChildEntryCounts(DataOutput os,
+    static protected void putChildEntryCounts(DataOutput os,
             int[] childEntryCounts, int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {
@@ -1014,7 +1089,7 @@ public class NodeSerializer {
      * 
      * @todo customizable serializer interface configured in {@link IndexMetadata}.
      */
-    protected void getChildEntryCounts(DataInput is,
+    static protected void getChildEntryCounts(DataInput is,
             int[] childEntryCounts, int nchildren) throws IOException {
 
         for (int i = 0; i < nchildren; i++) {
@@ -1046,7 +1121,7 @@ public class NodeSerializer {
      * 
      * @todo customizable serializer interface configured in {@link ITupleSerializer}.
      */
-    protected void putDeleteMarkers(DataOutputBuffer os, ILeafData leaf)
+    static protected void putDeleteMarkers(DataOutputBuffer os, ILeafData leaf)
             throws IOException {
 
         final int n = leaf.getKeyCount();
@@ -1078,7 +1153,7 @@ public class NodeSerializer {
      * 
      * @throws IOException
      */
-    protected void getDeleteMarkers(DataInput is, int n, boolean[] deleteMarkers)
+    static protected void getDeleteMarkers(DataInput is, int n, boolean[] deleteMarkers)
             throws IOException {
 
         if (n == 0)
@@ -1115,7 +1190,7 @@ public class NodeSerializer {
      *       coding). this should be configured in the IndexMetadata. it will
      *       need to have its own interface since the data are not byte[]s.
      */
-    protected void putVersionTimestamps(DataOutputBuffer os, ILeafData leaf)
+    static protected void putVersionTimestamps(DataOutputBuffer os, ILeafData leaf)
             throws IOException {
 
         final int n = leaf.getKeyCount();
@@ -1133,7 +1208,7 @@ public class NodeSerializer {
 
     }
 
-    protected void getVersionTimestamps(DataInput is, int n,
+    static protected void getVersionTimestamps(DataInput is, int n,
             long[] versionTimestamps) throws IOException {
 
         if (n == 0)

@@ -313,7 +313,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
                  * sure at this point.
                  */
                 false, // read-only
-                metadata
+                metadata,//
+                metadata.getBtreeRecordCompressorFactory()
                 );
         
         if (checkpoint == null) {

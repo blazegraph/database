@@ -59,7 +59,7 @@ public class AsynchronousIndexWriteConfiguration implements Externalizable {
 
     /**
      * The time in nanoseconds that the master will combine smaller chunks so
-     * that it can satisify the desired <i>masterChunkSize</i>.
+     * that it can satisfy the desired <i>masterChunkSize</i>.
      */
     public long getMasterChunkTimeoutNanos() {
         return masterChunkTimeoutNanos;
@@ -134,7 +134,7 @@ public class AsynchronousIndexWriteConfiguration implements Externalizable {
 
     /**
      * The maximum amount of time in nanoseconds that a sink will combine
-     * smaller chunks so that it can satisify the desired <i>sinkChunkSize</i>.
+     * smaller chunks so that it can satisfy the desired <i>sinkChunkSize</i>.
      */
     public long getSinkChunkTimeoutNanos() {
         return sinkChunkTimeoutNanos;
@@ -193,7 +193,7 @@ public class AsynchronousIndexWriteConfiguration implements Externalizable {
      *            The desired size of the chunks that the master will process.
      * @param masterChunkTimeoutNanos
      *            The time in nanoseconds that the master will combine smaller
-     *            chunks so that it can satisify the desired <i>masterChunkSize</i>.
+     *            chunks so that it can satisfy the desired <i>masterChunkSize</i>.
      * @param sinkIdleTimeoutNanos
      *            The time in nanoseconds after which an idle sink will be
      *            closed. Any buffered writes are flushed when the sink is

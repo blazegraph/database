@@ -41,14 +41,14 @@ import com.bigdata.resources.StaleLocatorException;
  * Abstract base class providing statistics for the {@link AbstractMasterTask}
  * and a factory for the statistics for the subtasks.
  * <p>
- * Note: Since there are concurent threads which need to write on the counters
+ * Note: Since there are concurrent threads which need to write on the counters
  * on this class the practice is to be <code>synchronized</code> on this
  * reference before you update those counters. Without this, the counters might
  * not update correctly as thing like <code>a += 2</code> may not produce the
  * correct result.
  * 
  * @param <L>
- *            The generic type of the key used to lookup subtasks in the interal
+ *            The generic type of the key used to lookup subtasks in the internal
  *            map.
  * @param <HS>
  *            The generic type of the subtask statistics.

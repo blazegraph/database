@@ -55,8 +55,9 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("BTree");
-        
+        final TestSuite suite = new TestSuite(TestAll.class.getPackage()
+                .getName());
+
         // test low level variable length byte[] operations.
         suite.addTestSuite( TestBytesUtil.class );
         
@@ -72,12 +73,6 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestImmutableKeyBuffer.class);
         // test key search routines on the key buffer implementations.
         suite.addTestSuite(TestKeyBufferSearch.class);
-
-        /*
-         * test record compression support.
-         */
-        // test bulk data compression.
-        suite.addTestSuite(TestRecordCompressor.class);
 
         /*
          * test btree fundementals.

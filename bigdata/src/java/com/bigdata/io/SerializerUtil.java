@@ -209,7 +209,7 @@ public class SerializerUtil {
     }
 
     /**
-     * De-serialize an object using the Java serialization mechansisms.
+     * De-serialize an object using the Java serialization mechanisms.
      * 
      * @param b
      *            A byte[] containing a serialized object.
@@ -281,7 +281,7 @@ public class SerializerUtil {
 
         if (true && buf.hasArray()) {
 
-            final int off = buf.arrayOffset();
+            final int off = buf.arrayOffset() + buf.position();
 
             final int len = buf.remaining();
 

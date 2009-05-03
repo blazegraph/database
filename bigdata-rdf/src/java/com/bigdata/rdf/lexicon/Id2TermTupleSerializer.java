@@ -55,6 +55,8 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.compression.HuffmanSerializer;
+import com.bigdata.btree.compression.WrapSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.DataOutputBuffer;
@@ -110,9 +112,18 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      *            A factory that does not support unicode and has an
      *            initialCapacity of {@value Bytes#SIZEOF_LONG}.
      */
-    public Id2TermTupleSerializer(String namespace) {
+    public Id2TermTupleSerializer(final String namespace) {
         
-        super(new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG));
+        super(//
+                new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
+                getDefaultLeafKeySerializer(),//
+                new WrapSerializer(
+                        getDefaultValueKeySerializer(),
+                        HuffmanSerializer.INSTANCE,
+                        33/*btreeBranchingFactor+1*/
+                        )
+//                getDefaultValueKeySerializer()//
+        );
 
         if (namespace == null)
             throw new IllegalArgumentException();

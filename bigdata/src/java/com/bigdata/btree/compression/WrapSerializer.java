@@ -18,9 +18,9 @@ import org.apache.log4j.Logger;
  */
 public class WrapSerializer implements IDataSerializer, Externalizable {
 
-    protected final static Logger log = Logger.getLogger(WrapSerializer.class);
+    protected final static transient Logger log = Logger.getLogger(WrapSerializer.class);
     
-    protected final static boolean INFO = log.isInfoEnabled();
+    protected final static transient boolean INFO = log.isInfoEnabled();
     
     /**
      * 
@@ -32,7 +32,14 @@ public class WrapSerializer implements IDataSerializer, Externalizable {
     private int numkeys;
     
     /**
-     * Sole constructor (handles de-serialization also).
+     * De-serialization ctor.
+     */
+    public WrapSerializer() {
+        
+    }
+    
+    /**
+     * Ctor.
      */
     public WrapSerializer(IDataSerializer small, IDataSerializer big, int numkeys) {
 
@@ -89,13 +96,17 @@ public class WrapSerializer implements IDataSerializer, Externalizable {
 
     public void writeExternal(ObjectOutput out) throws IOException {
 
-        // NOP
+        out.writeInt(numkeys);
+        out.writeObject(small);
+        out.writeObject(big);
         
     }
 
     public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
         
-        // NOP
+        numkeys = in.readInt();
+        small = (IDataSerializer) in.readObject();
+        big = (IDataSerializer) in.readObject();
         
     }
 

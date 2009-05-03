@@ -385,7 +385,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     private AbstractStatisticsCollector statisticsCollector;
     
     /**
-     * Adds a task which will run until cancelled, until it throws an exception,
+     * Adds a task which will run until canceled, until it throws an exception,
      * or until the federation is {@link #shutdown()}.
      * <p>
      * Note: Tasks run on this service generally update sampled values on

@@ -71,10 +71,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * An array of objects used to provide a per-child lock in order to allow
      * maximum concurrency in {@link #getChild(int)}.
      * <p>
-     * Note: this array is not allocate for a mutable btree since the caller
+     * Note: this array is not allocated for a mutable btree since the caller
      * will be single threaded and locking is therefore not required in
      * {@link #getChild(int)}. We only need locking for read-only btrees since
      * they allow concurrent readers.
+     * <p>
+     * Note: There is a lot of overhead to creating all these objects.  They
+     * are only really useful in high concurrent read scenarios such as highly
+     * concurrent query against an index.
      */
     private Object[] childLocks;
     
@@ -224,10 +228,10 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            over capacity during a split.
      */
     @SuppressWarnings("unchecked")
-    protected Node(AbstractBTree btree, long addr, int branchingFactor,
-            int nentries, IKeyBuffer keys, long[] childAddr,
-            int[] childEntryCounts
-            ) {
+    protected Node(final AbstractBTree btree, final long addr,
+            final int branchingFactor, final int nentries,
+            final IKeyBuffer keys, final long[] childAddr,
+            final int[] childEntryCounts) {
 
         super( btree, branchingFactor, false /* The node is NOT dirty */ );
 
@@ -253,7 +257,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         childRefs = new Reference[branchingFactor+1];
 
-        childLocks = newChildLocks(btree);
+        childLocks = newChildLocks(btree, nkeys);
         
 //        // must clear the dirty flag since we just de-serialized this node.
 //        setDirty(false);
@@ -264,7 +268,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * Used to create a new node when a node is split.
      */
     @SuppressWarnings("unchecked")
-    protected Node(BTree btree) {
+    protected Node(final BTree btree) {
 
         super(btree, btree.branchingFactor, true /*dirty*/ );
 
@@ -274,7 +278,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         childRefs = new Reference[branchingFactor+1];
 
-        childLocks = newChildLocks(btree);
+        childLocks = newChildLocks(btree, nkeys);
 
         childAddr = new long[branchingFactor+1];
 
@@ -298,7 +302,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            split.
      */
     @SuppressWarnings("unchecked")
-    protected Node(BTree btree, AbstractNode oldRoot, int nentries) {
+    protected Node(final BTree btree, final AbstractNode oldRoot,
+            final int nentries) {
 
         super(btree, btree.branchingFactor, true /*dirty*/ );
 
@@ -311,11 +316,14 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // #of entries spanned by the old root _before_ this split.
         this.nentries = nentries;
         
-        keys = new MutableKeyBuffer( branchingFactor );
+        keys = new MutableKeyBuffer(branchingFactor);
 
-        childRefs = new Reference[branchingFactor+1];
+        childRefs = new Reference[branchingFactor + 1];
 
-        childLocks = newChildLocks(btree);
+        // Note: child locks are only for read-only btrees and this ctor is only
+        // for a split of the root leaf so we never use child locks for this case.
+        assert !btree.isReadOnly(); 
+        childLocks = null; // newChildLocks(btree);
 
         childAddr = new long[branchingFactor+1];
 
@@ -2264,7 +2272,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         return child;
         
     }
-    
+
     /**
      * Static helper method allocates the per-child lock objects.
      * <p>
@@ -2276,12 +2284,16 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * @param btree
      *            The owning B+Tree.
      * 
-     * @return The array of lock objects -or- <code>null</code> if the btree
-     *         is mutable.
+     * @param nkeys
+     *            The #of keys, which is used to dimension the array.
+     * 
+     * @return The array of lock objects -or- <code>null</code> if the btree is
+     *         mutable.
      * 
      * @see #childLocks
      */
-    static private final Object[] newChildLocks(final AbstractBTree btree) {
+    static private final Object[] newChildLocks(final AbstractBTree btree,
+            final int nkeys) {
         
         /*
          * Note: Uncommenting this has the effect of disabling per-child
@@ -2307,7 +2319,10 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * only used during node overflow/underflow operations. Those operations
          * do not occur for a read-only B+Tree.
          */
-        final int n = btree.branchingFactor + 1;
+//        final int n = btree.branchingFactor + 1;
+        
+        // Note: We only need locks for the child entries that exist!
+        final int n = nkeys + 1;
         
         final Object[] a = new Object[n];
         
