@@ -14,6 +14,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.io.OutputStream;
 
 import org.apache.log4j.Logger;
 
@@ -184,7 +185,10 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         final ByteArrayOutputStream data = new ByteArrayOutputStream();
         
         final OutputBitStream obs = new OutputBitStream(data);
-
+        // Use this ctor variant directly on the [out] arg - it is much faster.
+//        new OutputBitStream((OutputStream) out,
+//                0/* unbuffered */, false/*reflectionTest*/);
+        
         for (byte b : bytes) {
 
             coder.encode(byte2symbol.get(b), obs);
