@@ -1,11 +1,11 @@
 package com.bigdata.btree.compression;
 
-import it.unimi.dsi.compression.CodeWordCoder;
-import it.unimi.dsi.compression.Decoder;
-import it.unimi.dsi.compression.HuffmanCodec;
 import it.unimi.dsi.fastutil.bytes.Byte2IntOpenHashMap;
-import it.unimi.dsi.io.InputBitStream;
-import it.unimi.dsi.io.OutputBitStream;
+import it.unimi.dsi.mg4j.compression.Coder;
+import it.unimi.dsi.mg4j.compression.Decoder;
+import it.unimi.dsi.mg4j.compression.HuffmanCodec;
+import it.unimi.dsi.mg4j.io.InputBitStream;
+import it.unimi.dsi.mg4j.io.OutputBitStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
@@ -25,9 +25,9 @@ import org.apache.log4j.Logger;
  */
 public class HuffmanSerializer implements IDataSerializer, Externalizable {
     
-    protected static final Logger log = Logger.getLogger(HuffmanSerializer.class);
+    protected static final transient Logger log = Logger.getLogger(HuffmanSerializer.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
+    protected static final transient boolean INFO = log.isInfoEnabled();
     
     /**
      * 
@@ -54,7 +54,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         // example: [ mike ], [ personick ]
         // 2 4 9 10 c 1 e 2 i 2 k 2 m 1 n 1 o 1 p 1 r 1 s 1 <num compressed bytes> <compressed bytes> 
         
-        StringBuilder info = new StringBuilder();
+        final StringBuilder info = new StringBuilder();
         
         final int n = raba.getKeyCount();
 
@@ -76,7 +76,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
 
         // concatenate all the bytes into one byte[], makes life easier
         
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         
         for (byte[] bytes : raba) {
 
@@ -92,16 +92,16 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
             
         }
         
-        byte[] bytes = baos.toByteArray(); 
+        final byte[] bytes = baos.toByteArray(); 
         
         // create a frequency table for every possible value of a byte
         // 256 possible values
         
-        int[] frequency = new int[Byte.MAX_VALUE-Byte.MIN_VALUE+1];
+        final int[] frequency = new int[Byte.MAX_VALUE - Byte.MIN_VALUE + 1];
         
         for (byte b : bytes) {
-            
-            frequency[b-Byte.MIN_VALUE]++;
+
+            frequency[b - Byte.MIN_VALUE]++;
             
         }
         
@@ -121,30 +121,30 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         /* Now we remap used bytes, building at the same time maps from 
          * symbol to bytes and from bytes to symbols. */
         
-        int[] packedFrequency = new int[count];
+        final int[] packedFrequency = new int[count];
         
-        byte[] symbol2byte = new byte[count];
+        final byte[] symbol2byte = new byte[count];
         
-        Byte2IntOpenHashMap byte2symbol = new Byte2IntOpenHashMap(count);
-        
+        final Byte2IntOpenHashMap byte2symbol = new Byte2IntOpenHashMap(count);
+
         byte2symbol.defaultReturnValue(-1);
-        
+
         for (int i = frequency.length, k = count; i-- != 0;) {
-            
+
             if (frequency[i] != 0) {
-                
+
                 packedFrequency[--k] = frequency[i];
-                
-                byte b = (byte)(i+Byte.MIN_VALUE);
-                
+
+                final byte b = (byte) (i + Byte.MIN_VALUE);
+
                 symbol2byte[k] = b;
-                
+
                 byte2symbol.put(b, k);
-                
+
             }
-            
+
         }
-        
+
         byte2symbol.trim();
         
         // write the number of symbols
@@ -179,24 +179,24 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         final HuffmanCodec codec = new HuffmanCodec(packedFrequency);
         
-        final CodeWordCoder coder = codec.coder();
+        final Coder coder = codec.getCoder();
 
-        ByteArrayOutputStream data = new ByteArrayOutputStream();
+        final ByteArrayOutputStream data = new ByteArrayOutputStream();
         
-        OutputBitStream obs = new OutputBitStream(data);
-        
+        final OutputBitStream obs = new OutputBitStream(data);
+
         for (byte b : bytes) {
 
             coder.encode(byte2symbol.get(b), obs);
-            
+
         }
-        
+
         obs.close();
-        
+
         // write the size of the compressed byte[]
-        
+
         out.writeInt(data.size());
-        
+
         if (INFO) {
             
             info.append(data.size()); 
@@ -235,7 +235,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
 
         }
 
-        StringBuilder info = new StringBuilder();
+        final StringBuilder info = new StringBuilder();
         
         if (INFO) {
             
@@ -271,7 +271,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         // for each symbol, read the byte value and frequency
         
-        byte[] symbol2byte = new byte[numSymbols];
+        final byte[] symbol2byte = new byte[numSymbols];
         
         final int[] frequency = new int[numSymbols];
         
@@ -303,18 +303,18 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         // read the compressed data
         
-        byte[] data = new byte[dataLen];
+        final byte[] data = new byte[dataLen];
         
         in.readFully(data);
         
         // decode the compressed data using the serialized frequency and 
         // symbol dictionary
         
-        HuffmanCodec codec = new HuffmanCodec(frequency);
+        final HuffmanCodec codec = new HuffmanCodec(frequency);
 
-        Decoder decoder = codec.decoder();
+        final Decoder decoder = codec.getDecoder();
         
-        InputBitStream ibs = new InputBitStream(data);
+        final InputBitStream ibs = new InputBitStream(data);
         
         for (int i = 0; i < nkeys; i++) {
             
@@ -322,7 +322,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
             
             for (int j = 0; j < keyLens[i]; j++) {
             
-                int symbol = decoder.decode(ibs);
+                final int symbol = decoder.decode(ibs);
 
                 key[j] = (byte) symbol2byte[symbol]; 
                 

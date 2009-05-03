@@ -37,11 +37,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 
-import org.apache.log4j.Logger;
+import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-
-import junit.framework.TestCase;
 
 /**
  * Test suite for {@link HuffmanSerializer}.
@@ -49,9 +47,9 @@ import junit.framework.TestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHuffmanSerializer extends TestCase {
+public class TestHuffmanSerializer extends TestCase2 {
 
-    protected final Logger log = Logger.getLogger(TestHuffmanSerializer.class);
+//    protected final Logger log = Logger.getLogger(TestHuffmanSerializer.class);
     
     /**
      * 
@@ -107,31 +105,31 @@ public class TestHuffmanSerializer extends TestCase {
 
     public void testStress() throws IOException {
         
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1000; i++) {
 
             // #of elements.
-            final int n = r.nextInt(100) + 1;
+            final int n = r.nextInt(100) + 0;
 
             // capacity of the array.
-            final int capacity = n + r.nextInt(n); 
-            
-            doRandomRoundTripTest(n,capacity);
+            final int capacity = n + r.nextInt(n + 1);
+
+            doRandomRoundTripTest(n, capacity);
 
         }
 
     }
 
-    private byte[] makeKey(String s) {
+    private byte[] makeKey(final String s) {
     
-        int len = s.length();
+        final int len = s.length();
         
         //ensureFree(len);
         
-        byte[] buf = new byte[len];
+        final byte[] buf = new byte[len];
         
         for(int j=0; j<len; j++) {
             
-            char ch = s.charAt(j);
+            final char ch = s.charAt(j);
             
     //        append((byte)(ch & 0xff));
     
@@ -163,7 +161,7 @@ public class TestHuffmanSerializer extends TestCase {
 
         final byte[][] data = new byte[100][];
         
-        String ns = "http://www.bigdata.com/rdf#";
+        final String ns = "http://www.bigdata.com/rdf#";
         
         for (int i = 0; i < 100; i++) {
             
@@ -272,7 +270,10 @@ public class TestHuffmanSerializer extends TestCase {
              * Note: this is for compression of sorted random data, you can
              * expect to do better for real data.
              */
-            log.info("original: "+nbytes+", compressed serializer: "+data.length+", default serializer: "+uncompressed.length);
+            if (log.isInfoEnabled())
+                log.info("original: " + nbytes + ", compressed serializer: "
+                        + data.length + ", default serializer: "
+                        + uncompressed.length);
             
         }
         
