@@ -14,8 +14,8 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.io.OutputStream;
 
+import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
 /**
@@ -59,7 +59,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         final int n = raba.getKeyCount();
 
-        out.writeInt(n);
+        LongPacker.packLong(out, n);
         
         if (INFO) {
             
@@ -77,11 +77,9 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
 
         // concatenate all the bytes into one byte[], makes life easier
         
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        
         for (byte[] bytes : raba) {
 
-            out.writeInt(bytes.length);
+            LongPacker.packLong(out, bytes.length);
             
             if (INFO) {
                 
@@ -89,20 +87,20 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
                 
             }
 
-            baos.write(bytes);
-            
         }
-        
-        final byte[] bytes = baos.toByteArray(); 
         
         // create a frequency table for every possible value of a byte
         // 256 possible values
         
         final int[] frequency = new int[Byte.MAX_VALUE - Byte.MIN_VALUE + 1];
         
-        for (byte b : bytes) {
+        for (byte[] bytes : raba) {
 
-            frequency[b - Byte.MIN_VALUE]++;
+            for (byte b : bytes) {
+
+                frequency[b - Byte.MIN_VALUE]++;
+                
+            }
             
         }
         
@@ -150,7 +148,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         // write the number of symbols
         
-        out.writeInt(symbol2byte.length);
+        LongPacker.packLong(out, symbol2byte.length);
         
         if (INFO) {
             
@@ -158,17 +156,27 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
             
         }
         
-        // for each symbol, write the byte and the frequency
+        // for each symbol, write the byte
+        
+        out.write(symbol2byte);
+        
+        if (INFO) {
+
+            for (byte b : symbol2byte) {
+                
+                info.append(b).append(" ");
+                
+            }
+            
+        }
+            
+        // for each symbol, write the frequency
         
         for (int i = 0; i < packedFrequency.length; i++) {
             
-            out.writeByte(symbol2byte[i]);
-            
-            out.writeInt(packedFrequency[i]);
+            LongPacker.packLong(out, packedFrequency[i]);
             
             if (INFO) {
-                
-                info.append(symbol2byte[i]).append(" "); 
                 
                 info.append(packedFrequency[i]).append(" ");
                 
@@ -189,9 +197,13 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
 //        new OutputBitStream((OutputStream) out,
 //                0/* unbuffered */, false/*reflectionTest*/);
         
-        for (byte b : bytes) {
+        for (byte[] bytes : raba) {
 
-            coder.encode(byte2symbol.get(b), obs);
+            for (byte b : bytes) {
+
+                coder.encode(byte2symbol.get(b), obs);
+                
+            }
 
         }
 
@@ -199,7 +211,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
 
         // write the size of the compressed byte[]
 
-        out.writeInt(data.size());
+        LongPacker.packLong(out, data.size());
 
         if (INFO) {
             
@@ -227,7 +239,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
 
         // read the # of keys
         
-        final int nkeys = in.readInt();
+        final int nkeys = (int) LongPacker.unpackLong(in);
 
         if (nkeys == 0) {
 
@@ -253,7 +265,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         for (int i = 0; i < nkeys; i++) {
             
-            keyLens[i] = in.readInt();
+            keyLens[i] = (int) LongPacker.unpackLong(in);
             
             if (INFO) {
                 
@@ -265,7 +277,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         // read the # of symbols
         
-        final int numSymbols = in.readInt();
+        final int numSymbols = (int) LongPacker.unpackLong(in);
         
         if (INFO) {
             
@@ -273,21 +285,31 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
             
         }
         
-        // for each symbol, read the byte value and frequency
+        // for each symbol, read the byte value
         
         final byte[] symbol2byte = new byte[numSymbols];
+        
+        in.readFully(symbol2byte);
+        
+        if (INFO) {
+
+            for (byte b : symbol2byte) {
+                
+                info.append(b).append(" ");
+                
+            }
+            
+        }
+            
+        // for each symbol, read the frequency
         
         final int[] frequency = new int[numSymbols];
         
         for (int i = 0; i < numSymbols; i++) {
             
-            symbol2byte[i] = in.readByte();
-
-            frequency[i] = in.readInt();
+            frequency[i] = (int) LongPacker.unpackLong(in);
             
             if (INFO) {
-            
-                info.append(symbol2byte[i]).append(" "); 
                 
                 info.append(frequency[i]).append(" ");
                 
@@ -297,7 +319,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         // read the size of the compressed data
         
-        final int dataLen = in.readInt();
+        final int dataLen = (int) LongPacker.unpackLong(in);
         
         if (INFO) {
             
