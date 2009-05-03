@@ -50,10 +50,11 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         // write number of keys
         // write that many key lengths
         // write the number of symbols
-        // write each symbol's byte value and frequency
+        // write each symbol's byte values
+        // write each symbol's frequency
         // write the encoded byte array
         // example: [ mike ], [ personick ]
-        // 2 4 9 10 c 1 e 2 i 2 k 2 m 1 n 1 o 1 p 1 r 1 s 1 <num compressed bytes> <compressed bytes> 
+        // 2 4 9 10 c e i k m n o p r s 1 2 2 2 1 1 1 1 1 1 <num compressed bytes> <compressed bytes> 
         
         final StringBuilder info = new StringBuilder();
         
