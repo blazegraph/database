@@ -28,19 +28,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.httpd;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.DefaultInstrumentFactory;
+import com.bigdata.counters.PeriodEnum;
+import com.bigdata.counters.query.QueryUtil;
+import com.bigdata.service.Event;
 import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.NanoHTTPD;
@@ -58,25 +58,62 @@ import com.bigdata.util.httpd.NanoHTTPD;
 public class CounterSetHTTPDServer implements Runnable {
     
     final static protected transient Logger log = Logger.getLogger(NanoHTTPD.class);
-    
+
     /**
      * Runs the httpd server. When the optional file(s) are given, they will be
      * read into a {@link CounterSet} on startup. This is useful for post-mortem
-     * analysis.
+     * analysis. The usage is
+     * 
+     * <pre>
+     * [-p port] [-d {debug,info,warn,error,fatal}] [-filter filter]* [-regex regex]* [-events file] file(s)
+     * </pre>
+     * 
+     * where
+     * <dl>
+     * <dt>-p</dt>
+     * <dd>The port at which httpd server will answer queries</dt>
+     * <dt>-filter</dt>
+     * <dd>Each instance of this argument specifies a string to be matched and
+     * is used to generate a {@link Pattern} which will filter the counters read
+     * from the file(s). If there are multiple instances they are combined
+     * together by an OR.</dd>
+     * <dt>-regex</dt>
+     * <dd>Each instance of this argument specifies a regular expression to be
+     * matched and is used to generate a {@link Pattern} which will filter the
+     * counters read from the file(s). If there are multiple instances they are
+     * combined together by an OR.</dd>
+     * <dt>-events</dt>
+     * <dd>An optional file of {@link Event} s logged in a tab-delimited format</dd>
+     * <dt>-events</dt>
+     * <dd>An optional file of {@link Event} s logged in a tab-delimited format</dd>
+     * <dt>file(s)</dt>
+     * <dd>XML representations of logged {@link CounterSet}s</dd>
+     * </dl>
      * 
      * @param args
-     *            [-p port] [-d {debug,info,warn,error,fatal}] <i>file(s)</i>
+     *            The command line arguments.
      * 
      * @throws IOException
      */
+
     public static void main(final String[] args) throws Exception {
 
         // default port.
         int port = 8080;
 
+        // @todo args
+        final int unitsToRetain = 1000;
+        final PeriodEnum unit = PeriodEnum.Minutes;
+        
         final CounterSet counterSet = new CounterSet();
         
         final DummyEventReportingService service = new DummyEventReportingService();
+
+        // any -filter arguments.
+        final Collection<String> filter = new LinkedList<String>();
+
+        // any -regex arguments.
+        final Collection<String> regex = new LinkedList<String>();
 
         for (int i = 0; i < args.length; i++) {
 
@@ -105,38 +142,17 @@ public class CounterSetHTTPDServer implements Runnable {
                     // set logging level on the service.
                     NanoHTTPD.log.setLevel(level);
                     
-                } else if( arg.equals("-events")) {
+                } else if (arg.equals("-events")) {
 
-                    /*
-                     * @todo support reading the events.jnl, which should be
-                     * opened in a read-only mode.
-                     */
+                    QueryUtil.readEvents(service, new File(args[++i]));
                     
-                    final File file = new File(args[++i]);
+                } else if( arg.equals("-filter")) {
                     
-                    System.out.println("reading events file: " + file);
+                    filter.add(args[++i]);
+
+                } else if( arg.equals("-regex")) {
                     
-                    BufferedReader reader = null;
-
-                    try {
-
-                        reader = new BufferedReader(new FileReader(file));
-
-                        service.readCSV(reader);
-
-                        System.out.println("read "
-                                + service.rangeCount(0L, Long.MAX_VALUE)
-                                + " events from file: " + file);
-
-                    } finally {
-
-                        if (reader != null) {
-
-                            reader.close();
-
-                        }
-                        
-                    }
+                    regex.add(args[++i]);
 
                 } else {
                     
@@ -148,39 +164,27 @@ public class CounterSetHTTPDServer implements Runnable {
                 
             } else {
 
-                final File file = new File(arg);
-                
-                System.out.println("reading file: "+file);
-                
-                InputStream is = null;
+                /*
+                 * Compute the optional filter to be applied when reading this
+                 * file.
+                 */
+                final Pattern pattern = QueryUtil.getPattern(filter, regex);
 
-                try {
-
-                    is = new BufferedInputStream(new FileInputStream(file));
-
-                    counterSet
-                            .readXML(is,
-                                    DefaultInstrumentFactory.OVERWRITE_60M,
-                                    null/* filter */);
-
-                } finally {
-
-                    if (is != null) {
-
-                        is.close();
-
-                    }
-                    
-                }
+                /*
+                 * Read counters accepted by the optional filter into the
+                 * counter set to be served.
+                 */
+                QueryUtil.readCountersFromFile(new File(arg), counterSet,
+                        pattern, unitsToRetain, unit);
 
             }
 
         }
-        
-        System.out.println("starting httpd server on port="+port);
+
+        System.out.println("Starting httpd server on port=" + port);
 
         // new server.
-        CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
+        final CounterSetHTTPDServer server = new CounterSetHTTPDServer(port,
                 counterSet, service);
 
         // run server.

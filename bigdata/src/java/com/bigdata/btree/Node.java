@@ -129,7 +129,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * The appropriate element in this array is incremented on all ancestor
      * nodes by {@link Leaf#insert(Object, Object)} and decremented on all
      * ancestors nodes by {@link Leaf#remove(Object)}. Since the ancestors are
-     * guarenteed to be mutable as preconditions for those operations we are
+     * guaranteed to be mutable as preconditions for those operations we are
      * able to traverse the {@link AbstractNode#parent} reference in a straight
      * forward manner.
      */

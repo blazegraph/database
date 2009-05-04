@@ -821,18 +821,18 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      *            The XML will be written on this object.
      * @param filter
      *            The optional filter.
-     *            
+     * 
      * @throws IOException
      */
-    public void asXML(Writer w, Pattern filter) throws IOException  {
-    
+    public void asXML(Writer w, Pattern filter) throws IOException {
+
         XMLUtility.INSTANCE.writeXML(this, w, filter);
-        
+
     }
 
-    public void readXML(InputStream is, IInstrumentFactory instrumentFactory,
-            Pattern filter) throws IOException, ParserConfigurationException,
-            SAXException {
+    public void readXML(final InputStream is,
+            final IInstrumentFactory instrumentFactory, final Pattern filter)
+            throws IOException, ParserConfigurationException, SAXException {
 
         XMLUtility.INSTANCE.readXML(this, is, instrumentFactory, filter);
 

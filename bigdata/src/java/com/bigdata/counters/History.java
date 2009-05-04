@@ -22,16 +22,6 @@ public class History<T> {
     protected static final Logger log = Logger.getLogger(History.class);
     
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * The period in milliseconds between each sample in the buffer. The buffer
      * will not accept the next sample until this period has elapsed.
      */
@@ -723,7 +713,7 @@ public class History<T> {
      */
     synchronized public void add(final long timestamp, final T value) {
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("timestamp=" + timestamp + ", value="
                 + value);
 
@@ -777,7 +767,7 @@ public class History<T> {
                  * the exception can be re-enabled.
                  */
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Timestamp out of order?",
                             new TimestampOrderException("timestamp="
                                     + timestamp + ", value=" + value));
@@ -833,7 +823,7 @@ public class History<T> {
 //                 * the same logicalSlot.
 //                 */
 //
-//                if (INFO)
+//                if (log.isInfoEnabled())
 //                    log.info("overwrite ignored: t=" + timestamp + ", value="
 //                            + value);
 //
@@ -855,7 +845,7 @@ public class History<T> {
 //                 * some reason. Those cases should be logged at WARN.
 //                 */
 //                
-//                if (INFO)
+//                if (log.isInfoEnabled())
 //                    log.info("Time goes backwards: lastModified="
 //                            + lastModified + ", but timestamp=" + timestamp);
 //
@@ -885,7 +875,7 @@ public class History<T> {
 
                     final T avg = getAverage();
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("overflow: t=" + t + ", avg=" + avg);
 
                     sink.add(t, avg);

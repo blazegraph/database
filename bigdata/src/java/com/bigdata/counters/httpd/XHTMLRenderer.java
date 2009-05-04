@@ -41,6 +41,7 @@ import com.bigdata.counters.query.CSet;
 import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.HistoryTable;
 import com.bigdata.counters.query.PivotTable;
+import com.bigdata.counters.query.QueryUtil;
 import com.bigdata.counters.render.HTMLHistoryTableRenderer;
 import com.bigdata.counters.render.PivotTableRenderer;
 import com.bigdata.counters.render.ValueFormatter;
@@ -63,11 +64,7 @@ import com.bigdata.util.HTMLUtility;
 public class XHTMLRenderer {
     
     final static protected Logger log = Logger.getLogger(XHTMLRenderer.class);
-
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
+    
     final public static String ps = ICounterSet.pathSeparator;
 
     public static class Model {
@@ -405,12 +402,12 @@ public class XHTMLRenderer {
 
             this.path = getProperty(params, PATH, ps);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(PATH + "=" + path);
 
             this.depth = Integer.parseInt(getProperty(params, DEPTH, "2"));
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(DEPTH + "=" + depth);
             
             if (depth <= 0)
@@ -424,84 +421,12 @@ public class XHTMLRenderer {
              */
             fromTime = 0L;
             toTime = Long.MAX_VALUE;
-            
-            {
-            
-                // the regex that we build up (if any).
-                final StringBuilder sb = new StringBuilder();
 
-                if ((Collection<String>) params.get(FILTER) != null) {
-
-                    /*
-                     * Joins multiple values for ?filter together in OR of
-                     * quoted patterns.
-                     */
-                    final Collection<String> filter = (Collection<String>) params
-                            .get(FILTER);
-
-                    for (String val : filter) {
-
-                        if (INFO)
-                            log.info(FILTER + "=" + val);
-
-                        if (sb.length() > 0) {
-
-                            // OR of previous pattern and this pattern.
-                            sb.append("|");
-
-                        }
-
-                        // non-capturing group.
-                        sb.append("(?:.*" + Pattern.quote(val) + ".*)");
-
-                    }
-
-                }
-
-                if ((Collection<String>) params.get(REGEX) != null) {
-
-                    /*
-                     * Joins multiple values for ?regex together in OR of
-                     * patterns.
-                     */
-                    final Collection<String> filter = (Collection<String>) params
-                            .get(REGEX);
-
-                    for (String val : filter) {
-
-                        if (INFO)
-                            log.info(REGEX + "=" + val);
-
-                        if (sb.length() > 0) {
-
-                            // OR of previous pattern and this pattern.
-                            sb.append("|");
-
-                        }
-
-                        // Non-capturing group.
-                        sb.append("(?:" + val + ")");
-
-                    }
-
-                }
-
-                if (sb.length() > 0) {
-
-                    final String regex = sb.toString();
-
-                    if (INFO)
-                        log.info("effective regex filter=" + regex);
-
-                    this.pattern = Pattern.compile(regex);
-
-                } else {
-
-                    this.pattern = null;
-
-                }
-
-            }
+            // assemble the optional filter.
+            this.pattern = QueryUtil.getPattern(//
+                    params.get(FILTER),//
+                    params.get(REGEX)//
+                    );
 
             if (service != null && service instanceof IEventReportingService) {
 
@@ -527,7 +452,7 @@ public class XHTMLRenderer {
                 this.reportType = ReportEnum.valueOf(getProperty(
                     params, REPORT, ReportEnum.hierarchy.toString()));
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(REPORT + "=" + reportType);
                 
             } else {
@@ -535,7 +460,7 @@ public class XHTMLRenderer {
                 final boolean correlated = Boolean.parseBoolean(getProperty(
                         params, CORRELATED, "false"));
             
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(CORRELATED + "=" + correlated);
 
                 this.reportType = correlated ? ReportEnum.correlated
@@ -601,7 +526,7 @@ public class XHTMLRenderer {
                     
                 }
 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
                     final StringBuilder sb = new StringBuilder();
                     for (Field f : eventFilters.keySet()) {
                         sb.append(f.getName() + "=" + eventFilters.get(f));
@@ -655,7 +580,7 @@ public class XHTMLRenderer {
 
                 }
                
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(EVENT_ORDER_BY + "="
                             + Arrays.toString(eventOrderBy));
 
@@ -683,19 +608,19 @@ public class XHTMLRenderer {
             this.category = params.containsKey(CATEGORY) ? params.get(CATEGORY)
                     .toArray(new String[0]) : null;
 
-            if (INFO && category != null)
+            if (log.isInfoEnabled() && category != null)
                 log.info(CATEGORY + "=" + Arrays.toString(category));
 
             this.timestampFormat = TimestampFormatEnum.valueOf(getProperty(
                     params, TIMESTAMP_FORMAT, TimestampFormatEnum.dateTime.toString()));
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(TIMESTAMP_FORMAT + "=" + timestampFormat);
 
             this.period = PeriodEnum.valueOf(getProperty(params, PERIOD,
                     PeriodEnum.Minutes.toString()/* defaultValue */));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(PERIOD + "=" + period);
 
             /*
@@ -1245,7 +1170,7 @@ public class XHTMLRenderer {
         // depth of the hierarchy at the point where we are starting.
         final int ourDepth = counterSet.getDepth();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("path=" + counterSet.getPath() + ", depth=" + depth
                     + ", ourDepth=" + ourDepth);
 
@@ -1280,7 +1205,7 @@ public class XHTMLRenderer {
 
             final ICounterNode node = itr.next();
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("considering: " + node.getPath());
             
             if(depth != 0) { 
@@ -1292,7 +1217,7 @@ public class XHTMLRenderer {
                 if((counterDepth - ourDepth) > depth) {
                 
                     // prune rendering
-                    if (DEBUG)
+                    if (log.isDebugEnabled())
                         log.debug("skipping: " + node.getPath());
                     
                     continue;
@@ -1980,7 +1905,7 @@ public class XHTMLRenderer {
 
                         }
 
-                        if (DEBUG && valueCountForColumn > 0)
+                        if (log.isDebugEnabled() && valueCountForColumn > 0)
                             log.debug("vcol=" + vcol + ", vcol#="
                                     + valueColumnIndex + ", #values="
                                     + valueCountForColumn + ", val=" + val);
@@ -2210,7 +2135,7 @@ public class XHTMLRenderer {
 
             if (!pattern.matcher(val).matches()) {
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Rejected event: fld=" + fld.getName()
                             + " : val=" + val);
                 
