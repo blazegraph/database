@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.counters.query;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.text.DateFormat;
@@ -45,6 +46,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.log4j.Logger;
 import org.xml.sax.SAXException;
 
+import com.bigdata.Banner;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.IHostCounters;
@@ -203,6 +205,8 @@ public class CounterSetQuery {
     public static void main(final String[] args) throws IOException,
             SAXException, ParserConfigurationException {
 
+        Banner.banner();
+        
         if (true) {
 
             /*
@@ -326,10 +330,39 @@ public class CounterSetQuery {
                      */
                     final int nslots = 1000; // @todo arg
                     
-                    QueryUtil
-                            .readCountersFromFile(new File(arg), counterSet,
+                    final File file = new File(arg);
+                    
+                    if(file.isDirectory()) {
+                    
+                        System.err.println("Reading directory: "+file);
+                        
+                        final File[] files = file
+                                .listFiles(new FilenameFilter() {
+
+                                    public boolean accept(File dir, String name) {
+                                        return name.endsWith(".xml");
+                                    }
+                                });
+
+                        for (File f : files) {
+
+                            System.err.println("Reading file: "+f);
+
+                            QueryUtil.readCountersFromFile(f, counterSet,
                                     QueryUtil.getPattern(filter, regex),
                                     nslots, period);
+                            
+                        }
+                        
+                    } else {
+
+                        System.err.println("Reading file: "+file);
+
+                        QueryUtil
+                            .readCountersFromFile( file, counterSet,
+                                    QueryUtil.getPattern(filter, regex),
+                                    nslots, period);
+                    }
 
                 }
 
