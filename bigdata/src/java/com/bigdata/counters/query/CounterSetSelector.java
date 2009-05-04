@@ -37,7 +37,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
-import com.bigdata.counters.ICounterNode;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.httpd.ICounterSelector;
 
@@ -83,46 +82,59 @@ public class CounterSetSelector implements ICounterSelector {
         if (log.isInfoEnabled())
             log.info("path=" + counterSet.getPath() + ", depth=" + depth);
 
-        final Iterator<ICounterNode> itr = counterSet.getNodes(pattern);
-
         final Vector<ICounter> counters = new Vector<ICounter>();
         
-        while(itr.hasNext()) {
+        final Iterator<ICounter> itr = counterSet.getCounters(pattern);
 
-            final ICounterNode node = itr.next();
+        int nscanned = 0;
+        int nskipped = 0;
+        
+        while (itr.hasNext()) {
 
+            final ICounter c = itr.next();
+
+            nscanned++;
+            
+            if(!(c.getInstrument() instanceof HistoryInstrument)) {
+
+                // prune non-history counters.
+                if (log.isDebugEnabled())
+                    log.debug("skipping: " + c.getPath());
+
+                nskipped++;
+                
+                continue;
+                
+            }
+            
             if (log.isDebugEnabled())
-                log.debug("considering: " + node.getPath());
+                log.debug("considering: " + c.getPath());
             
             if (depth != 0) {
 
-                final int counterDepth = node.getDepth();
+                final int counterDepth = c.getDepth();
 
                 if (counterDepth > depth) {
 
-                    // prune rendering
+                    // prune by depth
                     if (log.isDebugEnabled())
-                        log.debug("skipping: " + node.getPath());
-                    
+                        log.debug("skipping: " + c.getPath());
+
+                    nskipped++;
+
                     continue;
                     
                 }
                 
             }
             
-            if(node instanceof ICounter) {
-
-                final ICounter c = (ICounter) node;
-                
-                if(c.getInstrument() instanceof HistoryInstrument) {
-
-                    counters.add( c );
-                    
-                }
-                
-            }
+            counters.add( c );
             
         }
+
+        if (log.isInfoEnabled())
+            log.info("Matched " + counters.size() + " counters; nscanned="
+                    + nscanned + ", nskipped=" + nskipped);
         
         final ICounter[] a = counters.toArray(new ICounter[counters.size()]);
 

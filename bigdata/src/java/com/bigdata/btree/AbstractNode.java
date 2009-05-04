@@ -302,7 +302,8 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            a copy-on-write will create a mutable node or leaf from the
      *            immutable one and that node or leaf will be dirty.
      */
-    protected AbstractNode(AbstractBTree btree, int branchingFactor, boolean dirty) {
+    protected AbstractNode(final AbstractBTree btree,
+            final int branchingFactor, final boolean dirty) {
 
         assert btree != null;
 
@@ -319,7 +320,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
          * Compute the minimum #of children/values. this is the same whether
          * this is a Node or a Leaf.
          */
-        final int minChildren = (branchingFactor+1)>>1;
+        final int minChildren = (branchingFactor + 1) >> 1;
         
         this.minKeys = isLeaf() ? minChildren : minChildren - 1;
         

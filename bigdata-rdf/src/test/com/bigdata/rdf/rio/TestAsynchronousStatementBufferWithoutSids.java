@@ -79,6 +79,8 @@ public class TestAsynchronousStatementBufferWithoutSids extends
 
     // FIXME chunkSize parameter.
     final int chunkSize = 20000;
+    final int valuesInitialCapacity = 10000;
+    final int bnodesInitialCapacity = 16;
 
     // FIXME syncRPCForTERM2ID parameter.
     final boolean syncRPCForTERM2ID = true;
@@ -258,7 +260,8 @@ public class TestAsynchronousStatementBufferWithoutSids extends
             throws Exception {
 
         final AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement> factory = new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
-                (ScaleOutTripleStore) store, chunkSize, syncRPCForTERM2ID);
+                (ScaleOutTripleStore) store, chunkSize, valuesInitialCapacity,
+                bnodesInitialCapacity, syncRPCForTERM2ID);
 
         try {
 

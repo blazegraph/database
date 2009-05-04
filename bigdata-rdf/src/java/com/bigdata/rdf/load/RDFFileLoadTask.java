@@ -110,6 +110,8 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
         final IAsynchronousWriteBufferFactory<BigdataStatement> statementfactory = jobState.asynchronousWrites ? new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
                 (ScaleOutTripleStore) tripleStore,
                 jobState.asynchronousWritesProducerChunkSize,
+                jobState.bufferCapacity,//valuesInitialCapacity
+                16, // @todo jobState.bnodesInitialCapacity,
                 jobState.syncRPCForTERM2ID)
                 : null;
         final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(

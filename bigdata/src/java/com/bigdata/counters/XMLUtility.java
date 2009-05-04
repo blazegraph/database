@@ -232,30 +232,31 @@ public class XMLUtility {
 
     }
     
-    public void readXML(CounterSet root, InputStream is, IInstrumentFactory instrumentFactory,
-            Pattern filter) throws IOException, ParserConfigurationException, SAXException {
+    public void readXML(final CounterSet root, final InputStream is,
+            final IInstrumentFactory instrumentFactory, final Pattern filter)
+            throws IOException, ParserConfigurationException, SAXException {
 
         if (is == null)
             throw new IllegalArgumentException();
 
         if (instrumentFactory == null)
             throw new IllegalArgumentException();
-        
+
         final SAXParser p;
         {
-            
-            SAXParserFactory f = SAXParserFactory.newInstance();
-        
+
+            final SAXParserFactory f = SAXParserFactory.newInstance();
+
             f.setNamespaceAware(true);
-            
+
             p = f.newSAXParser();
-            
+
         }
-        
-        MyHandler handler = new MyHandler(root, instrumentFactory, filter);
-        
-        p.parse(is, handler /*@todo set validating and pass in systemId*/);
-        
+
+        final MyHandler handler = new MyHandler(root, instrumentFactory, filter);
+
+        p.parse(is, handler /* @todo set validating and pass in systemId */);
+
     }
     
     /**
@@ -275,8 +276,8 @@ public class XMLUtility {
 
         private final Pattern filter;
         
-        public MyHandler(AbstractCounterSet root, IInstrumentFactory instrumentFactory,
-                Pattern filter) {
+        public MyHandler(final AbstractCounterSet root,
+                final IInstrumentFactory instrumentFactory, final Pattern filter) {
 
             if (root == null)
                 throw new IllegalArgumentException();
@@ -324,33 +325,52 @@ public class XMLUtility {
         public void startElement(String uri, String localName, String qName,
                 Attributes attributes) throws SAXException {
 
-            if (log.isInfoEnabled())
-            log.info("uri=" + uri + ",localName=" + localName + ", qName="
-                    + qName);
+            if (log.isDebugEnabled())
+                log.debug("uri=" + uri + ",localName=" + localName + ", qName="
+                        + qName);
 
-            if(qName.equals("counters")) {
-              
+            if (qName.equals("counters")) {
+
                 // ignore.
-                
-            } else if(qName.equals(cs)) {
-                
+
+            } else if (qName.equals(cs)) {
+
                 path = attributes.getValue("path");
-                
+
                 if (log.isInfoEnabled())
-                log.info("path="+path);
+                    log.info("path=" + path);
                 
-            } else if(qName.equals(c)) {
-                
+            } else if (qName.equals(c)) {
+
                 final String name = attributes.getValue("name");
 
+                if (filter != null) {
+
+                    final String fqn = path + ICounterSet.pathSeparator + name;
+
+                    if (!filter.matcher(fqn).matches()) {
+
+                        if (log.isInfoEnabled())
+                            log.info("Does not match filter: " + fqn);
+
+                        // will not process this counter.
+                        counter = null;
+                        
+                        return;
+                        
+                    }
+
+                }
+                
                 final String type = attributes.getValue("type");
-                
+
                 final long time = Long.parseLong(attributes.getValue("time"));
-                
+
                 final String value = attributes.getValue("value");
 
                 if (log.isInfoEnabled())
-                log.info("path="+path+", name="+name+", type="+type+", value="+value+", time="+time);
+                    log.info("path=" + path + ", name=" + name + ", type="
+                            + type + ", value=" + value + ", time=" + time);
 
                 // determine value class from XSD attribute.
                 final Class typ = getType(type);
@@ -359,9 +379,9 @@ public class XMLUtility {
                 final ICounter counter = getCounter(path, name, typ);
 
                 if (counter == null) {
-                
-                    log.warn("Conflict: path="+path+", name="+name);
-                    
+
+                    log.warn("Conflict: path=" + path + ", name=" + name);
+
                 } else {
 
                     // set the value on the counter.
@@ -490,7 +510,7 @@ public class XMLUtility {
             }
             
         }
-  
+
         /**
          * Find/create a counter given its path, name, and value class.
          * 
@@ -502,7 +522,8 @@ public class XMLUtility {
          *         identify a pre-existing {@link CounterSet}, which conflicts
          *         with the described {@link ICounter}.
          */
-        protected ICounter getCounter(final String path, final String name, Class typ) {
+        protected ICounter getCounter(final String path, final String name,
+                Class typ) {
             
             final ICounter counter;
 

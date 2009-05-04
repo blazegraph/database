@@ -1259,13 +1259,13 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          * The initial capacity of the canonicalizing mapping for RDF
          * {@link Value}.
          */
-        final int valuesInitialCapacity = 100000 * 3;
+        final int valuesInitialCapacity;
 
         /**
          * The initial capacity of the canonicalizing mapping for RDF
          * {@link BNode}s.
          */
-        final int bnodesInitialCapacity = 10000;
+        final int bnodesInitialCapacity;
         
         /**
          * The chunk size used by the producer to break the terms and statements
@@ -1333,7 +1333,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          * @todo javadoc for async option on TERM2ID.
          */
         public AsynchronousWriteBufferFactoryWithoutSids(final ScaleOutTripleStore tripleStore,
-                final int producerChunkSize, final boolean syncRPCForTERM2ID) {
+                final int producerChunkSize, final int valuesInitialCapacity,
+                final int bnodesInitialCapacity, final boolean syncRPCForTERM2ID) {
 
             if (tripleStore == null)
                 throw new IllegalArgumentException();
@@ -1346,6 +1347,10 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
             this.producerChunkSize = producerChunkSize;
 
+            this.valuesInitialCapacity = valuesInitialCapacity;
+            
+            this.bnodesInitialCapacity = bnodesInitialCapacity;
+            
             this.syncRPCForTERM2ID = syncRPCForTERM2ID;
             
             if (tripleStore.isStatementIdentifiers()) {

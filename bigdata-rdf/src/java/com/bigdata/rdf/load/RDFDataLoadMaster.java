@@ -35,6 +35,7 @@ import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
+import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.btree.IndexMetadata;
@@ -251,7 +252,9 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         public final int nthreads;
 
         /**
-         * The capacity of the buffers used to hold the parsed RDF data.
+         * The capacity of the buffers used to hold the parsed RDF data -or- the
+         * initial capacity of the RDF {@link Value}s hash map when
+         * {@link #asynchronousWrites} is <code>true</code>.
          * 
          * @see ConfigurationOptions#BUFFER_CAPACITY
          */
