@@ -51,7 +51,14 @@ public class Banner {
         
         if(!didBanner) {
         
-            System.out.println(banner);
+            final boolean quiet = Boolean.parseBoolean(System.getProperty(
+                    "com.bigdata.Banner.quiet", "false"));
+
+            if (!quiet) {
+
+                System.out.println(banner);
+
+            }
          
             didBanner = true;
             
@@ -65,13 +72,14 @@ public class Banner {
                 
                 log.setLevel(Level.WARN);
 
-                log.warn("Defaulting log level to WARN: "+log.getName());
+                if (!quiet)
+                    log.warn("Defaulting log level to WARN: " + log.getName());
 
             }
 
             try {
 
-                // Optionally register a lo4j MBean.
+                // Optionally register a log4j MBean.
                 JMXLog4jMBeanUtil.registerLog4jMBeans();
                 
             } catch (Throwable t) {

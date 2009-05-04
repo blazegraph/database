@@ -259,7 +259,8 @@ public class QueryUtil {
             final int nslots, final PeriodEnum unit) throws IOException,
             SAXException, ParserConfigurationException {
         
-        log.warn("reading file: " + file);
+        if (log.isInfoEnabled())
+            log.info("reading file: " + file);
         
         InputStream is = null;
 
