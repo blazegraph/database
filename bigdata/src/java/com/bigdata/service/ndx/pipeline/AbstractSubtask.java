@@ -98,13 +98,24 @@ L>//
      * The statistics used by this task.
      */
     protected final HS stats;
-    
+
     /**
-     * The timestamp at which a chunk was last written on the output buffer for
-     * this sink by the master.
+     * The timestamp at which a chunk was last written on the buffer for this
+     * sink by the master. This is used to help determine whether or not a sink
+     * has become idle. A sink on which a master has recently written a chunk is
+     * not idle even if the sink has not read any chunks from its buffer.
      */
     protected volatile long lastChunkNanos = System.nanoTime();
 
+    /**
+     * The timestamp at {@link IAsynchronousIterator#hasNext(long, TimeUnit)}
+     * last returned true when queried with a timeout of
+     * {@link AbstractMasterTask#sinkPollTimeoutNanos} nanoseconds. This tests
+     * whether or not a chunk is available and is used to help decide if the
+     * sink has become idle. (A sink with an available chunk is never idle.)
+     */
+    protected volatile long lastChunkAvailableNanos = lastChunkNanos;
+    
     public AbstractSubtask(final M master, final L locator,
             final BlockingBuffer<E[]> buffer) {
 
@@ -301,10 +312,15 @@ L>//
                 // elapsed since the master last wrote a chunk on this sink.
                 final long elapsedSinceLastChunk = now - lastChunkNanos;
 
+                // elapsed since src.hasNext(0L,NANOS) last return true.
+                final long elapsedSinceLastChunkAvailable = now - lastChunkAvailableNanos;
+
                 // true iff the sink has become idle.
-                final boolean idle = elapsedSinceLastChunk > master.sinkIdleTimeoutNanos;
+//                final boolean idle = elapsedSinceLastChunk > master.sinkIdleTimeoutNanos;
+                final boolean idle = elapsedSinceLastChunk > master.sinkIdleTimeoutNanos
+                        && elapsedSinceLastChunkAvailable > master.sinkIdleTimeoutNanos;
                 
-                if ((idle || (master.src.isExhausted()) && buffer.isOpen())) {
+                if ((idle || master.src.isExhausted()) && buffer.isOpen()) {
                     master.lock.lockInterruptibly();
                     try {
                         if (buffer.isEmpty()) {
@@ -352,7 +368,8 @@ L>//
                      */
                     if (log.isInfoEnabled())
                         log.info("Full chunk: " + chunkSize + ", elapsed="
-                                + TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
+                                + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+                                + " : "+this);
                     return true;
                 }
 
@@ -366,7 +383,8 @@ L>//
                      */
                     if (log.isInfoEnabled())
                         log.info("Partial chunk: " + chunkSize + ", elapsed="
-                                + TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
+                                + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+                                + " : "+this);
                     // Done.
                     return true;
                 }
@@ -392,6 +410,9 @@ L>//
                     // track the #of elements available across those chunks.
                     chunkSize += a.length;
 
+                    // reset the available aspect of the idle timeout.
+                    lastChunkAvailableNanos = System.nanoTime();
+                    
                     if (log.isDebugEnabled())
                         log.debug("Combining chunks: chunkSize="
                                 + a.length
@@ -436,6 +457,7 @@ L>//
             }
 
             // Dynamic instantiation of array of the same component type.
+            @SuppressWarnings("unchecked")
             final E[] a = (E[]) java.lang.reflect.Array.newInstance(chunks
                     .get(0)[0].getClass(), chunkSize);
 

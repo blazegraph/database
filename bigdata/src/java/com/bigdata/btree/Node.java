@@ -2291,6 +2291,19 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *         mutable.
      * 
      * @see #childLocks
+     * 
+     * @todo Per-child locks will only be useful on nodes with a relatively high
+     *       probability of concurrent access. Therefore they should be
+     *       conditionally enabled only to a depth of 0 (for the root's direct
+     *       children) or 1 (for the children of the root's direct children).
+     *       There is just not going to be any utility to this beyond that
+     *       point, especially not on an {@link IndexSegment} with a relatively
+     *       high branching factor. We could directly compute the probability of
+     *       access to any given child based on the branching factor and the
+     *       depth of the node in the B+Tree and the assumption of a uniform
+     *       distribution of reads by concurrent threads [in fact, in many
+     *       benchmark situations we are more likely to content for the same
+     *       child unless the queries are parameterized].
      */
     static private final Object[] newChildLocks(final AbstractBTree btree,
             final int nkeys) {
@@ -2301,12 +2314,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
          */
         // if(true) return null;
         
-        if(!btree.isReadOnly()) {
-            
+        if (!btree.isReadOnly() || !btree.getIndexMetadata().getChildLocks()) {
+
             /*
-             * The mutable B+Tree has a single threaded constraint so we do not
-             * need to do any locking for that case and therefore we do not
-             * allocate the per-child locks here.
+             * Either The mutable B+Tree has a single threaded constraint so we
+             * do not need to do any locking for that case and therefore we do
+             * not allocate the per-child locks here -or- child locks were
+             * disabled as a configuration option.
              */
             
             return null;

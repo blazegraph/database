@@ -38,6 +38,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -742,15 +743,24 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         } else {
 
             /*
-             * Run task which will queue BigdataValue[] chunks onto the
-             * TERM2ID async write buffer.
+             * Run task which will queue BigdataValue[] chunks onto the TERM2ID
+             * async write buffer.
              * 
-             * FIXME If there is not enough load being placed the async index
-             * write then it can wait up to its timeout. For that reason the
-             * TERM2ID async writer should use a shorter timeout or it can live
-             * lock. Ideally, there should be some explicit notice when we are
-             * done queueing writes on TERM2ID across all source documents. Even
-             * then we can live lock if the input queue is not large enough.
+             * Note: If there is not enough load being placed the async index
+             * write then it can wait up to its idle/chunk timeout. Normally we
+             * want to use an infinite chunk timeout so that all chunks written
+             * on the index partitions are as full as possible. Therefore, the
+             * TERM2ID async writer should use a shorter idle timeout or it can
+             * live lock. Ideally, there should be some explicit notice when we
+             * are done queuing writes on TERM2ID across all source documents.
+             * Even then we can live lock if the input queue is not large
+             * enough.
+             */
+
+            /*
+             * Latch notifies us when all writes for _this_ document on TERM2ID
+             * are complete such that we have the assigned term identifiers for
+             * all BigdataValues appearing in the document.
              */
             final KVOLatch latch = new KVOLatch();
 
@@ -779,6 +789,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
             // wait for the latch.
             latch.await();
+            log.warn("Latch done: "
+                    + statementBufferFactory.term2IdLatchDoneCount.incrementAndGet());
 
         }
 
@@ -794,7 +806,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          * on the asynchronous write buffer for the appropriate index. It DOES
          * NOT mean that those writes are complete.
          * 
-         * Note: These tasks all process iterators. This approach was choosen to
+         * Note: These tasks all process iterators. This approach was chosen to
          * isolate the tasks (which queue data for asynchronous writes) from the
          * data structures in this IStatementBuffer implementation. An example
          * of something which WOULD NOT work is if these tasks were inner
@@ -997,6 +1009,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     // Place in KVO sorted order (by the byte[] keys).
                     Arrays.sort(chunkOut);
 
+                    log.warn("Adding chunk to TERM2ID master: chunkSize="+chunkOut.length);
+                    
                     // add chunk to async write buffer
                     buffer.add(chunkOut);
 
@@ -1254,6 +1268,12 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         private final LexiconRelation lexiconRelation;
 
         private final SPORelation spoRelation;
+
+        /**
+         * Used for debugging to indicate how many documents have completed
+         * their asynchronous writes on TERM2ID.
+         */
+        private final AtomicLong term2IdLatchDoneCount = new AtomicLong(0L);
         
         /**
          * The initial capacity of the canonicalizing mapping for RDF
@@ -1365,11 +1385,18 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                 
             } else {
 
+                /*
+                 * Note: A duplicate remover MUST NOT eliminate duplicates for
+                 * when one or the other has KVOLatch not shared by the other.
+                 * Eliminating a duplicate in this case would cause a KVOLatch
+                 * to be "lost" and would result in non-termination since the
+                 * count for the "lost" latch would never reach zero.
+                 */
                 this.buffer_t2id = ((IScaleOutClientIndex) lexiconRelation
                         .getTerm2IdIndex())
                         .newWriteBuffer(
                                 new Term2IdWriteProcAsyncResultHandler(false/* readOnly */),
-                                new DefaultDuplicateRemover<BigdataValue>(true/* testRefs */),
+                                null, // NO DUPLICATE REMOVER !!!
                                 new Term2IdWriteProcConstructor(
                                         false/* readOnly */, lexiconRelation
                                                 .isStoreBlankNodes(),
@@ -1615,6 +1642,9 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         /**
          * NOP
+         * 
+         * @see #aggregateAsync(KVO[],
+         *      com.bigdata.rdf.lexicon.Term2IdWriteProc.Result, Split)
          */
         public void aggregate(final Term2IdWriteProc.Result result,
                 final Split split) {

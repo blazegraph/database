@@ -139,7 +139,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
          */
         try {
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("Submitting " + proc.getClass() + " to partition"
                         + locator);
@@ -185,7 +185,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
         // true iff the procedure is known to be parallelizable.
         final boolean parallel = proc instanceof IParallelizableIndexProcedure;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Procedure " + proc.getClass().getName()
                     + " will be mapped across index partitions in "
                     + (parallel ? "parallel" : "sequence"));
@@ -249,7 +249,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
 
         } // next (chunk of) locators.
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Procedure " + proc.getClass().getName()
                     + " mapped across " + nparts + " index partitions in "
                     + (parallel ? "parallel" : "sequence"));
@@ -312,7 +312,7 @@ abstract public class AbstractScaleOutClientIndexView2 extends
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Procedures created by " + ctor.getClass().getName()
                     + " will run on " + nsplits + " index partitions in "
                     + (parallel ? "parallel" : "sequence"));

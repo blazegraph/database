@@ -69,7 +69,7 @@ public class DefaultDuplicateRemover<O> implements IDuplicateRemover<O> {
                     if (log.isTraceEnabled())
                         log.trace("duplicate key: "
                                 + BytesUtil.toString(src[i].key));
-
+                    
                     if (testRefs && src[i].obj != null
                             && src[i].obj == src[i - 1].obj) {
 

@@ -51,7 +51,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME varient to test w/ and w/o the full text index (with lookup by tokens).
+ * FIXME variant to test w/ and w/o the full text index (with lookup by tokens).
  * 
  * FIXME variant to test async w/ sids (once written).
  * 
@@ -83,7 +83,7 @@ public class TestAsynchronousStatementBufferWithoutSids extends
     final int bnodesInitialCapacity = 16;
 
     // FIXME syncRPCForTERM2ID parameter.
-    final boolean syncRPCForTERM2ID = true;
+    final boolean syncRPCForTERM2ID = false;
     
     /**
      * SHOULD be <code>true</code> since the whole point of this is higher
@@ -93,7 +93,7 @@ public class TestAsynchronousStatementBufferWithoutSids extends
     final boolean parallel = true;
     
     /**
-     * Note: This is overriden to turn off features not supported by this
+     * Note: This is overridden to turn off features not supported by this
      * loader.
      */
     protected AbstractTripleStore getStore() {
@@ -125,12 +125,12 @@ public class TestAsynchronousStatementBufferWithoutSids extends
              */
             final String namespace = "test1";
 
-            // Put a timeout on the chunks of 1s.
+            // Put an idle timeout on the sink of 1s.
             properties.setProperty(com.bigdata.config.Configuration
                     .getOverrideProperty(namespace + "."
                             + LexiconRelation.NAME_LEXICON_RELATION + "."
                             + LexiconKeyOrder.TERM2ID,
-                            IndexMetadata.Options.SINK_CHUNK_TIMEOUT_NANOS), ""
+                            IndexMetadata.Options.SINK_IDLE_TIMEOUT_NANOS), ""
                     + TimeUnit.SECONDS.toNanos(1));
             
         }

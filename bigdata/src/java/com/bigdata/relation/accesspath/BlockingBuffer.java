@@ -640,6 +640,26 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public void add(final E e) {
 
+        add(e, Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        
+    }
+
+    /**
+     * Add element to the buffer.
+     * 
+     * @param e
+     *            The element.
+     * @param timeout
+     *            The timeout.
+     * @param unit
+     *            The unit in which the timeout is expressed.
+     * 
+     * @return <code>true</code> iff the element was added to the buffer (
+     *         <code>false</code> indicates that the timout expired before the
+     *         element could be added to the buffer).
+     */
+    public boolean add(final E e, final long timeout, final TimeUnit unit) {
+        
         assertOpen();
 
         if (e == null)
@@ -653,20 +673,23 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     log.info("Empty chunk.");
                 
                 // empty chunk.
-                return;
+                return true;
 
             }
             
         }
-        
+
         final long begin = System.nanoTime();
         
         // wait if the queue is full.
         int ntries = 0;
         // initial delay before the 1st log message.
         long logTimeout = initialLogTimeout;
+        
+        // nanoseconds remaining until the timeout.
+        long nanos;
 
-        while (true) {
+        while ((nanos = (System.nanoTime() - begin)) > 0) {
 
             /*
              * Note: While not the only explanation, a timeout here can occur if
@@ -690,12 +713,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             } else {
 
-                final long timeout = getTimeoutMillis(ntries);
+                final long offerTimeoutNanos = Math
+                        .min(nanos, TimeUnit.MILLISECONDS
+                                .toNanos(getTimeoutMillis(ntries)));
 
                 try {
 
-                    // offer (staged timeout).
-                    added = queue.offer(e, timeout, TimeUnit.MILLISECONDS);
+                    // offer (staged timeout, not to exceed the time remaining).
+                    added = queue.offer(e, offerTimeoutNanos,
+                            TimeUnit.NANOSECONDS);
 
                 } catch (InterruptedException ex) {
 
@@ -764,9 +790,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             }
 
-            return;
+            // success.
+            return true;
 
         }
+
+        // timeout
+        return false;
         
     }
 

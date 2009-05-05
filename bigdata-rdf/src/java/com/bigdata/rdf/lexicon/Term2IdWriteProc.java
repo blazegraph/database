@@ -56,7 +56,7 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * the reverse mapping from id to term is defined before any statements are
  * inserted using the assigned term identifiers. The client MUST NOT make
  * assertions using the assigned term identifiers until the corresponding
- * {@link Id2TermWriteProc} operation has suceeded.
+ * {@link Id2TermWriteProc} operation has succeeded.
  * <p>
  * In order for the lexicon to remain consistent if the client fails for any
  * reason after the forward mapping has been made restart-safe and before the
@@ -75,7 +75,7 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * consistent with the assignments made/discovered by the forward mapping.
  * <p>
  * Note: The {@link Term2IdWriteProc} and {@link Id2TermWriteProc} operations
- * may be analyzed as a batch variant of the following pseudocode.
+ * may be analyzed as a batch variant of the following pseudo code.
  * 
  * <pre>
  *  
@@ -111,17 +111,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
     
     protected static final Logger log = Logger.getLogger(Term2IdWriteProc.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
+    
 //    static {
 //        if(DEBUG) {
 //         
@@ -140,11 +130,11 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * Flag enables optional ground truth verification. It is only enabled at
      * the DEBUG level IFF this flag is ALSO set.
      * <p>
-     * <strong>WARNING: This IS NOT scaleable! </strong>
+     * <strong>WARNING: This IS NOT scalable! </strong>
      * <p>
      * <strong>WARNING: This option IS NOT safe when using more than one triple
      * store either concurrently or in sequence! For example, you can use it to
-     * examine a single unit test for inconsistences, but not a sequence of unit
+     * examine a single unit test for inconsistencies, but not a sequence of unit
      * tests since the data will be kept within the same global map and hence
      * confound the test!</strong>
      */
@@ -153,7 +143,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
     private static ConcurrentHashMap<byte[],Long> groundTruthTerm2Id;
     static {
         
-        if (DEBUG && enableGroundTruth) {
+        if (log.isDebugEnabled() && enableGroundTruth) {
         
             log.warn("Will track ground truth assignments");
             
@@ -252,6 +242,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             assert vals == null;
 
+            log.error("TERM2ID Proc Ctor: n=" + (toIndex-fromIndex));
+            
             return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys,
                     readOnly, storeBlankNodes, scaleOutTermIdBitsToReverse);
 
@@ -290,7 +282,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 //        // true iff this is an unpartitioned index.
 //        final boolean scaleOut = counter instanceof BTree.PartitionedCounter;
         
-        // used to serialize term identifers.
+        // used to serialize term identifiers.
         final DataOutputBuffer idbuf = new DataOutputBuffer(Bytes.SIZEOF_LONG);
         
         final TermIdEncoder encoder = new TermIdEncoder(//scaleOutTermIds,

@@ -135,16 +135,6 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
             .toInt();
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * Error message used if we were unable to start a new transaction in order
      * to provide read-consistent semantics for an {@link ITx#READ_COMMITTED}
      * view or for a read-only operation on an {@link ITx#UNISOLATED} view.
@@ -842,8 +832,9 @@ abstract public class AbstractScaleOutClientIndexView implements IScaleOutClient
                         
                     }
 
-                    if(DEBUG) log.debug("Exact match on rightSeparator: pos=" + pos
-                            + ", key=" + BytesUtil.toString(keys[pos]));
+                    if (log.isDebugEnabled())
+                        log.debug("Exact match on rightSeparator: pos=" + pos
+                                + ", key=" + BytesUtil.toString(keys[pos]));
 
                 } else if (pos < 0) {
 

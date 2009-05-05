@@ -254,8 +254,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     /**
      * An optional bloom filter that will be used to filter point tests against
      * <i>this</i> {@link AbstractBTree}. A bloom filter provides a strong
-     * guarentee when it reports that a key was not found, but only a weak
-     * guarentee when it reports that a key was found. Therefore a positive
+     * guarantee when it reports that a key was not found, but only a weak
+     * guarantee when it reports that a key was found. Therefore a positive
      * report by the bloom filter MUST be confirmed by testing against the index
      * to verify that the key was in fact present in the index. Since bloom
      * filters do not support removal of keys, any key that is deleted from the

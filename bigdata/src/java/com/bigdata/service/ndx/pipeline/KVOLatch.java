@@ -53,11 +53,11 @@ import org.apache.log4j.Logger;
  * pre-incrementing the counter, the threads will not be released until the
  * asynchronous write operations are successfully completed.
  * <p>
- * The notification is based on {@link KVOCounter}, which associates an atomic
+ * The notification is based on {@link KVOC}, which associates an atomic
  * counter and a user-defined key with each tuple. Notices are generated when
  * the atomic counter is zero on decrement. Notices are aligned with the
  * appropriate scope by creating an instance of the {@link KVOScope} with that
- * scope and then pairing it with each {@link KVOCounter}.
+ * scope and then pairing it with each {@link KVOC}.
  * <P>
  * For any significant workload, notification should be quite fast. However, if
  * GC is not being driven by heap churn then notification may not occur. In
@@ -66,6 +66,8 @@ import org.apache.log4j.Logger;
  * <p>
  * Note: This class is very similar to a {@link CountDownLatch}, however the
  * counter maximum is not specified in advance.
+ * 
+ * @see KVOC
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -109,7 +111,12 @@ public class KVOLatch {
      */
     public void inc() {
         
-        if (this.counter.incrementAndGet() <= 0) {
+        final long c = this.counter.incrementAndGet();
+
+        if (log.isDebugEnabled())
+            log.debug("counter=" + c);
+
+        if (c <= 0) {
             
             // counter is/was negative.
             throw new AssertionError();
@@ -127,6 +134,9 @@ public class KVOLatch {
     public void dec() {
 
         final long c = this.counter.decrementAndGet();
+
+        if (log.isDebugEnabled())
+            log.debug("counter=" + c);
 
         if (c < 0) {
 
@@ -146,6 +156,9 @@ public class KVOLatch {
 
             lock.lockInterruptibly();
             try {
+
+                if (log.isInfoEnabled())
+                    log.info("signalAll()");
 
                 // release anyone awaiting our signal.
                 cond.signalAll();
@@ -177,6 +190,13 @@ public class KVOLatch {
 
     /**
      * Await the counter to become zero, but no longer than the timeout.
+     * <p>
+     * Note: A duplicate remover MUST NOT eliminate "duplicate" {@link KVOC}s
+     * when one or the other has {@link KVOLatch} not shared by the other.
+     * Eliminating a "duplicate" in this case would cause a
+     * {@link KVOLatch#dec()} to be "lost" and generally results in
+     * non-termination of {@link KVOLatch#await()} since the count for the
+     * "lost" latch would never reach zero.
      * 
      * @param timeout
      *            The timeout.
@@ -184,8 +204,8 @@ public class KVOLatch {
      *            The unit in which the timeout is expressed.
      * 
      * @return <code>true</code> if the counter reached zero and
-     *         <code>false</code> if the timeout was exceeded before the
-     *         counter reached zero.
+     *         <code>false</code> if the timeout was exceeded before the counter
+     *         reached zero.
      * 
      * @throws InterruptedException
      */
@@ -193,6 +213,9 @@ public class KVOLatch {
             throws InterruptedException {
 
         if (counter.get() == 0) {
+
+            if (log.isInfoEnabled())
+                log.info("Not waiting");
 
             // don't wait.
             return true;
@@ -203,11 +226,17 @@ public class KVOLatch {
         try {
 
             if(cond.await(timeout, unit)) {
-                
+
+                if (log.isInfoEnabled())
+                    log.info("Done waiting (true)");
+
                 return true;
                 
             }
-            
+
+            if (log.isInfoEnabled())
+                log.info("Done waiting (false)");
+
             return false;
             
         } finally {
