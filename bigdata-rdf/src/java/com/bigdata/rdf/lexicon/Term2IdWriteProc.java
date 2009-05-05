@@ -242,7 +242,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
             assert vals == null;
 
-            log.error("TERM2ID Proc Ctor: n=" + (toIndex-fromIndex));
+            if(log.isInfoEnabled())
+                log.info("TERM2ID Proc Ctor: ntuples=" + (toIndex-fromIndex));
             
             return new Term2IdWriteProc(keySer, fromIndex, toIndex, keys,
                     readOnly, storeBlankNodes, scaleOutTermIdBitsToReverse);
