@@ -545,8 +545,9 @@ L>//
 
         if (reopen && sink != null && !sink.buffer.isOpen()) {
 
-            if (log.isDebugEnabled())
-                log.debug("Reopening sink (was closed): " + locator);
+            if (log.isInfoEnabled())
+                log.info("Reopening sink (was closed): " + this + ", locator="
+                        + locator);
 
             // wait for the sink to terminate normally.
             awaitSink(sink);
@@ -557,8 +558,9 @@ L>//
 
         if (sink == null) {
 
-            if (log.isDebugEnabled())
-                log.debug("Creating output buffer: " + locator);
+            if (log.isInfoEnabled())
+                log.info("Creating output buffer: " + this + ", locator="
+                        + locator);
 
             final BlockingBuffer<E[]> out = newSubtaskBuffer();
 
@@ -774,16 +776,38 @@ L>//
             // add the dense split to the appropriate output buffer.
             final S sink = getSink(locator, reopen);
 
-            if (reopen) {
+            final long begin = System.nanoTime();
+            
+            final long offerTimeoutNanos = TimeUnit.SECONDS.toNanos(5);
+            
+            boolean added = false;
+            
+            while (!added) {
 
-                // stack trace through here if [reopen == true]
-                sink.buffer.add(b);
+                if (reopen) {
 
-            } else {
-             
-                // stack trace through here if [reopen == false]
-                sink.buffer.add(b);
+                    // stack trace through here if [reopen == true]
+                    added = sink.buffer.add(b, offerTimeoutNanos,
+                            TimeUnit.NANOSECONDS);
+
+                } else {
+
+                    // stack trace through here if [reopen == false]
+                    added = sink.buffer.add(b, offerTimeoutNanos,
+                            TimeUnit.NANOSECONDS);
+
+                }
                 
+                if (!added) {
+
+                    log.warn("Master blocking: sink="
+                            + sink
+                            + ", elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
+                                    - begin) + "ms, reopen=" + reopen);
+                    
+                }
+
             }
             
             // update timestamp of the last chunk written on that sink.

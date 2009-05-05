@@ -178,7 +178,7 @@ public class ClientIndexViewRefactor extends AbstractScaleOutClientIndexView2 {
      */
     private void runOne(final AbstractDataServiceProcedureTask task) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running one task (#active="
                     + getThreadPool().getActiveCount() + ", queueSize="
                     + getThreadPool().getQueue().size() + ") : "
@@ -193,7 +193,7 @@ public class ClientIndexViewRefactor extends AbstractScaleOutClientIndexView2 {
 
         } catch (Exception e) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Execution failed: task=" + task, e);
 
             throw new ClientException("Execution failed: " + task,e);
@@ -214,7 +214,7 @@ public class ClientIndexViewRefactor extends AbstractScaleOutClientIndexView2 {
 
         final long begin = System.currentTimeMillis();
         
-        if(INFO)
+        if(log.isInfoEnabled())
         log.info("Running " + tasks.size() + " tasks in parallel (#active="
                 + getThreadPool().getActiveCount() + ", queueSize="
                 + getThreadPool().getQueue().size() + ") : "
@@ -278,7 +278,7 @@ public class ClientIndexViewRefactor extends AbstractScaleOutClientIndexView2 {
             
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Ran " + tasks.size() + " tasks in parallel: elapsed="
                 + (System.currentTimeMillis() - begin));
 
@@ -295,7 +295,7 @@ public class ClientIndexViewRefactor extends AbstractScaleOutClientIndexView2 {
      */
     private void runSequence(final ArrayList<AbstractDataServiceProcedureTask> tasks) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running " + tasks.size() + " tasks in sequence (#active="
                     + getThreadPool().getActiveCount() + ", queueSize="
                     + getThreadPool().getQueue().size() + ") : "
@@ -316,7 +316,7 @@ public class ClientIndexViewRefactor extends AbstractScaleOutClientIndexView2 {
 
             } catch (Exception e) {
         
-                if(INFO) log.info("Execution failed: task=" + task, e);
+                if(log.isInfoEnabled()) log.info("Execution failed: task=" + task, e);
 
                 throw new ClientException("Execution failed: " + task, e, task.causes);
 
@@ -357,7 +357,7 @@ public class ClientIndexViewRefactor extends AbstractScaleOutClientIndexView2 {
                 
             } catch (Exception e) {
 
-//                if (INFO)
+//                if (log.isInfoEnabled())
 //                    log.info("Execution failed: task=" + task, e);
 
                 throw new ClientException("Execution failed: recursionDepth="

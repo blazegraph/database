@@ -163,17 +163,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      */
     final protected boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
             .toInt();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
+    
     /**
      * Error message used if we were unable to start a new transaction in order
      * to provide read-consistent semantics for an {@link ITx#READ_COMMITTED}
@@ -790,7 +780,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
          */
         try {
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("Submitting " + proc.getClass() + " to partition"
                         + locator);
@@ -909,7 +899,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         // true iff the procedure is known to be parallelizable.
         final boolean parallel = proc instanceof IParallelizableIndexProcedure;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Procedure " + proc.getClass().getName()
                     + " will be mapped across index partitions in "
                     + (parallel ? "parallel" : "sequence"));
@@ -973,7 +963,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         } // next (chunk of) locators.
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Procedure " + proc.getClass().getName()
                     + " mapped across " + nparts + " index partitions in "
                     + (parallel ? "parallel" : "sequence"));
@@ -1142,7 +1132,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Procedures created by " + ctor.getClass().getName()
                     + " will run on " + nsplits + " index partitions in "
                     + (parallel ? "parallel" : "sequence"));
@@ -1226,7 +1216,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      */
     protected void runOne(final Callable<Void> task) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running one task (#active="
                     + getThreadPool().getActiveCount() + ", queueSize="
                     + getThreadPool().getQueue().size() + ") : "
@@ -1241,7 +1231,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         } catch (Exception e) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Execution failed: task=" + task, e);
 
             throw new ClientException("Execution failed: " + task,e);
@@ -1262,7 +1252,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         final long begin = System.currentTimeMillis();
         
-        if(INFO)
+        if(log.isInfoEnabled())
         log.info("Running " + tasks.size() + " tasks in parallel (#active="
                 + getThreadPool().getActiveCount() + ", queueSize="
                 + getThreadPool().getQueue().size() + ") : "
@@ -1326,7 +1316,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Ran " + tasks.size() + " tasks in parallel: elapsed="
                 + (System.currentTimeMillis() - begin));
 
@@ -1343,7 +1333,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      */
     protected void runSequence(final ArrayList<AbstractDataServiceProcedureTask> tasks) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running " + tasks.size() + " tasks in sequence (#active="
                     + getThreadPool().getActiveCount() + ", queueSize="
                     + getThreadPool().getQueue().size() + ") : "
@@ -1364,7 +1354,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
             } catch (Exception e) {
         
-                if(INFO) log.info("Execution failed: task=" + task, e);
+                if(log.isInfoEnabled()) log.info("Execution failed: task=" + task, e);
 
                 throw new ClientException("Execution failed: " + task, e, task.causes);
 
@@ -1405,7 +1395,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                 
             } catch (Exception e) {
 
-//                if (INFO)
+//                if (log.isInfoEnabled())
 //                    log.info("Execution failed: task=" + task, e);
 
                 throw new ClientException("Execution failed: recursionDepth="
@@ -1553,7 +1543,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
                         
                     }
 
-                    if(DEBUG) log.debug("Exact match on rightSeparator: pos=" + pos
+                    if(log.isDebugEnabled()) log.debug("Exact match on rightSeparator: pos=" + pos
                             + ", key=" + BytesUtil.toString(keys[pos]));
 
                 } else if (pos < 0) {

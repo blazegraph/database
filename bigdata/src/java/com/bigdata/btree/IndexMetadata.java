@@ -29,7 +29,6 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Properties;
@@ -62,6 +61,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.DefaultSplitHandler;
 import com.bigdata.resources.OverflowManager;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -423,6 +423,27 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         String LEAF_VALUE_SERIALIZER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
                 + ".leafValueSerializer";
+
+        /**
+         * Option determines whether or not per-child locks are used by
+         * {@link Node} for a <em>read-only</em> {@link AbstractBTree} (default
+         * {@value #DEFAULT_CHILD_LOCKS}). This option effects synchronization
+         * in {@link Node#getChild(int)}. Synchronization is not required for
+         * mutable {@link BTree}s as they already impose the constraint that the
+         * caller is single threaded. Synchronization is required in this method
+         * to ensure that the data structure remains coherent when concurrent
+         * threads demand access to the same child of a given {@link Node}.
+         * Per-child locks have higher potential concurrency since locking is
+         * done on a distinct {@link Object} for each child rather than on a
+         * shared {@link Object} for all children of a given {@link Node}.
+         * However, per-child locks require more {@link Object} allocation (for
+         * the locks) and thus contribute to heap demand.
+         */
+        String CHILD_LOCKS = com.bigdata.btree.AbstractBTree.class.getPackage()
+                .getName()
+                + ".childLocks";
+
+        String DEFAULT_CHILD_LOCKS = "true";
         
         /*
          * Options that are valid for any AbstractBTree but which are not
@@ -821,15 +842,22 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         String DEFAULT_SINK_CHUNK_TIMEOUT_NANOS = "" + Long.MAX_VALUE;
 
         /**
-         * The time in nanoseconds after which an idle sink will be closed. Any
-         * buffered writes are flushed when the sink is closed (default
-         * {@value #DEFAULT_SINK_IDLE_TIMEOUT_NANOS}). This must be GTE the
-         * <i>sinkChunkTimeout</i> otherwise the sink will decide that it is
-         * idle when it was just waiting for enough data to prepare a full
-         * chunk. The default is an infinite timeout which means that sinks are
-         * closed only by an index partition has been split/move/join or by
-         * closing the master on which the application is writing, in which case
-         * all sinks are flushed and closed.
+         * The time in nanoseconds after which an idle sink will be closed
+         * (default {@value #DEFAULT_SINK_IDLE_TIMEOUT_NANOS}). Any buffered
+         * writes are flushed when the sink is closed. The idle timeout is reset
+         * (a) if a chunk is available to be drained by the sink; or (b) if a
+         * chunk is drained from the sink. If no chunks become available the the
+         * sink will eventually decide that it is idle, will flush any buffered
+         * writes, and will close itself.
+         * <p>
+         * If the idle timeout is LT the {@link #SINK_CHUNK_TIMEOUT_NANOS} then
+         * a sink will remain open as long as new chunks appear and are combined
+         * within idle timeout, otherwise the sink will decide that it is idle
+         * and will flush its last chunk and close itself. If this is
+         * {@link Long#MAX_VALUE} then the sink will identify itself as idle and
+         * will only be closed if the master is closed or the sink has received
+         * a {@link StaleLocatorException} for the index partition on which the
+         * sink is writing.
          */
         // GTE chunkTimeout
         String SINK_IDLE_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
@@ -998,6 +1026,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private IRecordCompressorFactory btreeRecordCompressorFactory;
     private IRecordCompressorFactory indexSegmentRecordCompressorFactory;
     private IConflictResolver conflictResolver;
+    private boolean childLocks;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
     private BloomFilterFactory bloomFilterFactory;
@@ -1364,6 +1393,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     public final IConflictResolver getConflictResolver() {return conflictResolver;}
     
     /**
+     * @see Options#CHILD_LOCKS
+     */
+    public final boolean getChildLocks() {return childLocks;}
+    
+    public final void setChildLocks(final boolean newValue) {
+
+        this.childLocks = childLocks;
+        
+    }
+
+    /**
      * When <code>true</code> the index will write a delete marker when an
      * attempt is made to delete the entry under a key. Delete markers will be
      * retained until a compacting merge of an index partition. When
@@ -1629,7 +1669,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * @param className
      *            The class name.
      * 
-     * @return An instance of that class.
+     * @return An instance of that class -or- <code>null</code> iff the class
+     *         name is <code>null</code>.
      * 
      * @throws RuntimeException
      *             if the class does not implement that interface or for any
@@ -1638,6 +1679,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     static private <T> T newInstance(final String className,
             final Class<T> iface) {
 
+        if (iface == null)
+            throw new IllegalArgumentException();
+
+        if (className == null) {
+
+            return null;
+            
+        }
+        
         try {
 
             final Class cls = Class.forName(className);
@@ -1839,6 +1889,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN,
                 IntegerValidator.GTE_ZERO);
 
+        this.btreeRecordCompressorFactory = newInstance(getProperty(
+                indexManager, properties, namespace,
+                Options.BTREE_RECORD_COMPRESSOR_FACTORY,
+                Options.DEFAULT_BTREE_RECORD_COMPRESSOR_FACTORY/* default */),
+                IRecordCompressorFactory.class);
+
         this.indexSegmentBranchingFactor = getProperty(indexManager,
                 properties, namespace, Options.INDEX_SEGMENT_BRANCHING_FACTOR,
                 Options.DEFAULT_INDEX_SEGMENT_BRANCHING_FACTOR,
@@ -1862,6 +1918,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT,
                 LongValidator.GT_ZERO);
 
+        this.indexSegmentRecordCompressorFactory = newInstance(
+                getProperty(indexManager, properties, namespace,
+                        Options.INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY,
+                        Options.DEFAULT_INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY/* default */),
+                IRecordCompressorFactory.class);
+        
         // Note: default assumes NOT an index partition.
         this.pmd = null;
         
@@ -1913,6 +1975,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         }
 
         this.conflictResolver = null;
+
+        this.childLocks = Boolean.parseBoolean(getProperty(
+                indexManager, properties, namespace, Options.CHILD_LOCKS,
+                Options.DEFAULT_CHILD_LOCKS));
         
         this.deleteMarkers = false;
         
@@ -2208,13 +2274,24 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * {@link #indexSegmentRecordCompressorFactory}. Both of these fields are
      * optional, which implies no compression provider. Reads of prior versions
      * set these fields to <code>null</code>.
+     * 
+     * @see Options#BTREE_RECORD_COMPRESSOR_FACTORY
+     * @see Options#INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
      */
     private static transient final int VERSION4 = 0x04;
+
+    /**
+     * This version introduced {@link #childLocks}. Reads of prior versions set
+     * this field to <code>true</code>.
+     * 
+     * @see Options#CHILD_LOCKS
+     */
+    private static transient final int VERSION5 = 0x05;
     
     /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION4;
+    private static transient final int CURRENT_VERSION = VERSION5;
     
     /**
      * @todo review generated record for compactness.
@@ -2230,6 +2307,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION2:
         case VERSION3:
         case VERSION4:
+        case VERSION5:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2279,6 +2357,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         }
         
         conflictResolver = (IConflictResolver)in.readObject();
+
+        if (version < VERSION5) {
+
+            childLocks = true;
+            
+        } else {
+            
+            childLocks = in.readBoolean();
+            
+        }
         
         deleteMarkers = in.readBoolean();
         
@@ -2452,6 +2540,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         }
 
         out.writeObject(conflictResolver);
+
+        if (version >= VERSION5) {
+
+            out.writeBoolean(childLocks);
+            
+        }
 
         out.writeBoolean(deleteMarkers);
         

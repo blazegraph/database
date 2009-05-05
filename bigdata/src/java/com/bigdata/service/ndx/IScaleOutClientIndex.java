@@ -54,6 +54,7 @@ import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
+import com.bigdata.service.ndx.pipeline.KVOLatch;
 
 /**
  * A client-side view of a scale-out index.
@@ -201,7 +202,7 @@ public interface IScaleOutClientIndex extends IClientIndex {
      */
     LinkedList<Split> splitKeys(final long ts, final int fromIndex,
             final int toIndex, final KVO[] a);
-    
+
     /**
      * Asynchronous write API (streaming writes).
      * <p>
@@ -222,13 +223,14 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * the completion of the consumer, to cancel the consumer, etc. The
      * {@link Future} will not terminate (other than by error) until the buffer
      * has been {@link IBlockingBuffer#close() closed}. The {@link Future}
-     * evaluates to an {@link IndexAsyncWriteStats} object. Those statistics are also
-     * reported to the {@link ILoadBalancerService} via the
+     * evaluates to an {@link IndexAsyncWriteStats} object. Those statistics are
+     * also reported to the {@link ILoadBalancerService} via the
      * {@link IBigdataFederation}.
      * <p>
      * Note: Each buffer returned by this method is independent. However, all
      * the performance counters for all asynchronous write buffers for a given
-     * client and scale-out index are aggregated by an {@link ScaleOutIndexCounters}.
+     * client and scale-out index are aggregated by an
+     * {@link ScaleOutIndexCounters}.
      * 
      * @param <T>
      *            The generic type of the procedure used to write on the index.
@@ -244,7 +246,15 @@ public interface IScaleOutClientIndex extends IClientIndex {
      *            Used to aggregate results.
      * @param duplicateRemover
      *            Used to filter out duplicates in an application specified
-     *            manner (optional).
+     *            manner (optional). A duplicate remover MUST NOT be used to
+     *            eliminate duplicates in combination with {@link KVOC} and
+     *            {@link KVOLatch}. If a {@link KVOC} having the same key,
+     *            value, and ref but a distinct {@link KVOLatch} reference is
+     *            eliminated as a duplicate that would cause a
+     *            {@link KVOLatch#dec()} invocation to be "lost" and would
+     *            result in non-termination since the count for the "lost" latch
+     *            would never reach zero.
+     * 
      * @param ctor
      *            Used to create instances of the procedure that will execute a
      *            write on an individual index partition (this implies that

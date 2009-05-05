@@ -64,10 +64,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestDefaultDuplicateRemover.class);
         
         suite.addTestSuite(TestMasterTask.class);
+
+        suite.addTestSuite(TestMasterTaskIdleTimeout.class);
         
         suite.addTestSuite(TestMasterTaskWithErrors.class);
-        
-        suite.addTestSuite(TestMasterTaskWithInfiniteTimeout.class);
         
         suite.addTestSuite(TestMasterTaskWithRedirect.class);
         

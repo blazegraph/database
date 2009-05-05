@@ -1584,14 +1584,30 @@ abstract public class LoadBalancerService extends AbstractService
 
             try {
 
-                final HistoryInstrument inst = (HistoryInstrument) c
-                        .getInstrument();
+                if (c.getInstrument() instanceof HistoryInstrument) {
 
-                final double val = ((Number) inst.getHistory().getAverage(
-                        minutes)).doubleValue();
+                    final HistoryInstrument inst = (HistoryInstrument) c
+                            .getInstrument();
 
-                return val;
+                    final double val = ((Number) inst.getHistory().getAverage(
+                            minutes)).doubleValue();
 
+                    return val;
+                    
+                } else {
+
+                    /*
+                     * When the LBS is run as an embedded process it can wind up
+                     * having the performance counters collected within its
+                     * process in which case it will not have histories for the
+                     * data and we just return the current value.
+                     */
+                    log.warn("Not a history: " + c);
+                    
+                    return ((Number)c.getValue()).doubleValue();
+                    
+                }
+                
             } catch (Exception ex) {
 
                 log.warn("Could not read: counterSet=" + counterSet.getPath()

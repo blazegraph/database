@@ -8,6 +8,7 @@ import java.io.ObjectOutput;
 import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.AbstractMasterTask;
 import com.bigdata.service.ndx.pipeline.AbstractSubtask;
@@ -73,10 +74,20 @@ public class AsynchronousIndexWriteConfiguration implements Externalizable {
 
     /**
      * The time in nanoseconds after which an idle sink will be closed. Any
-     * buffered writes are flushed when the sink is closed. This must be GTE the
-     * <i>sinkChunkTimeout</i> otherwise the sink will decide that it is idle
-     * when it was just waiting for enough data to prepare a full chunk.
-     * 
+     * buffered writes are flushed when the sink is closed. The idle timeout is
+     * reset (a) if a chunk is available to be drained by the sink; or (b) if a
+     * chunk is drained from the sink. If no chunks become available the the
+     * sink will eventually decide that it is idle, will flush any buffered
+     * writes, and will close itself.
+     * <p>
+     * If the idle timeout is LT the {@link #getSinkChunkTimeoutNanos()} then a
+     * sink will remain open as long as new chunks appear and are combined
+     * within idle timeout, otherwise the sink will decide that it is idle and
+     * will flush its last chunk and close itself. If the idle timeout is
+     * {@link Long#MAX_VALUE} then the sink will identify itself as idle and
+     * will only be closed if the master is closed or the sink has received a
+     * {@link StaleLocatorException} for the index partition on which the sink
+     * is writing.
      */
     public long getSinkIdleTimeoutNanos() {
         return sinkIdleTimeoutNanos;
@@ -186,20 +197,33 @@ public class AsynchronousIndexWriteConfiguration implements Externalizable {
      * @param masterQueueCapacity
      *            The capacity of the queue on which the application writes.
      *            Chunks are drained from this queue by the
-     *            {@link AbstractTaskMaster}, broken into splits, and each
-     *            split is written onto the {@link AbstractSubtask} sink
-     *            handling writes for the associated index partition.
+     *            {@link AbstractTaskMaster}, broken into splits, and each split
+     *            is written onto the {@link AbstractSubtask} sink handling
+     *            writes for the associated index partition.
      * @param masterChunkSize
      *            The desired size of the chunks that the master will process.
      * @param masterChunkTimeoutNanos
      *            The time in nanoseconds that the master will combine smaller
-     *            chunks so that it can satisfy the desired <i>masterChunkSize</i>.
+     *            chunks so that it can satisfy the desired
+     *            <i>masterChunkSize</i>.
      * @param sinkIdleTimeoutNanos
      *            The time in nanoseconds after which an idle sink will be
      *            closed. Any buffered writes are flushed when the sink is
-     *            closed. This must be GTE the <i>sinkChunkTimeout</i>
-     *            otherwise the sink will decide that it is idle when it was
-     *            just waiting for enough data to prepare a full chunk.
+     *            closed. The idle timeout is reset (a) if a chunk is available
+     *            to be drained by the sink; or (b) if a chunk is drained from
+     *            the sink. If no chunks become available the the sink will
+     *            eventually decide that it is idle, will flush any buffered
+     *            writes, and will close itself.
+     *            <p>
+     *            If the idle timeout is LT the
+     *            {@link #getSinkChunkTimeoutNanos()} then a sink will remain
+     *            open as long as new chunks appear and are combined within idle
+     *            timeout, otherwise the sink will decide that it is idle and
+     *            will flush its last chunk and close itself. If this is
+     *            {@link Long#MAX_VALUE} then the sink will identify itself as
+     *            idle and will only be closed if the master is closed or the
+     *            sink has received a {@link StaleLocatorException} for the
+     *            index partition on which the sink is writing.
      * @param sinkPollTimeoutNanos
      *            The time in nanoseconds that the {@link AbstractSubtask sink}
      *            will wait inside of the {@link IAsynchronousIterator} when it
@@ -250,7 +274,7 @@ public class AsynchronousIndexWriteConfiguration implements Externalizable {
         if (sinkChunkTimeoutNanos <= 0)
             throw new IllegalArgumentException();
         
-        if (sinkIdleTimeoutNanos < sinkChunkTimeoutNanos)
+        if (sinkIdleTimeoutNanos <= 0)
             throw new IllegalArgumentException();
 
         this.masterQueueCapacity = masterQueueCapacity;
