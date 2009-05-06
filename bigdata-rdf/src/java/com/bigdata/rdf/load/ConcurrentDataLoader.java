@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.load;
 
-import java.io.File;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -133,16 +132,6 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     final protected boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
             .toInt();
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
     /**
      * Thread pool provinding concurrent load services.
      */
@@ -297,6 +286,11 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                 queue = new LinkedBlockingQueue<Runnable>();
                 break;
             default:
+                /*
+                 * Note: CDL handles RejectedExecutionExceptions and will retry
+                 * the submission of the task. This allows us to use a bounded
+                 * queue in combination with a bounded thread pool.
+                 */
                 queue = new LinkedBlockingQueue<Runnable>(queueCapacity);
                 break;
             }
@@ -450,7 +444,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
         if (errorTask != null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Re-submitting task=" + errorTask.target);
 
             // re-submit a task that produced an error.
@@ -510,7 +504,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     public boolean awaitCompletion(final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(counters.toString());
         
         final long beginWait = System.currentTimeMillis();
@@ -529,7 +523,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
                 final long now = System.currentTimeMillis();
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("Awaiting completion" //
                             + ": loadActiveCount=" + loadActiveCount //
@@ -548,7 +542,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                 if (loadActiveCount == 0 && loadQueueSize == 0
                         && errorQueueSize == 0) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("complete");
 
                     return true;
@@ -570,7 +564,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
                 }
 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
 
                     final long elapsed = now - lastNoticeMillis;
 
@@ -625,7 +619,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
             final ITaskFactory<T> taskFactory) throws InterruptedException,
             Exception {
         
-        if(DEBUG) log.debug("Processing: resource=" + resource);
+        if(log.isDebugEnabled()) log.debug("Processing: resource=" + resource);
         
         final T target = taskFactory.newTask(resource);
         
@@ -696,7 +690,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                     // reset 
                     begin = now;
                     
-                    if(INFO)
+                    if(log.isInfoEnabled())
                     log.info("loadService queue full"//
                         + ": queueSize="+ loadService.getQueue().size()//
                         + ", poolSize=" + loadService.getPoolSize()//
