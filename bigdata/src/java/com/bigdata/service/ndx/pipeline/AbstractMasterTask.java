@@ -800,6 +800,18 @@ L>//
                 
                 if (!added) {
 
+                    /*
+                     * Normally, each index partition of a given scale-out index
+                     * will proceed at nearly the same write rate. If you are
+                     * seeing this message for many partitions of the same index
+                     * then the client has filled its queues and is blocking.
+                     * This is OK. However, if you are seeing it for only one or
+                     * two index partitions out of 10s or 100s then those index
+                     * partitions are bottlenecks. Such bottlenecks SHOULD be
+                     * addressed automatically by splitting or moving an index
+                     * partition.
+                     */
+                    
                     log.warn("Master blocking: sink="
                             + sink
                             + ", elapsed="
