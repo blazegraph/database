@@ -110,23 +110,16 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
         final IAsynchronousWriteBufferFactory<BigdataStatement> statementfactory = jobState.asynchronousWrites ? new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
                 (ScaleOutTripleStore) tripleStore,
                 jobState.asynchronousWritesProducerChunkSize,
-                jobState.bufferCapacity,//valuesInitialCapacity
-                16, // @todo jobState.bnodesInitialCapacity,
+                jobState.valuesInitialCapacity,
+                jobState.bnodesInitialCapacity,
                 jobState.syncRPCForTERM2ID)
                 : null;
+                
+        // Setup the task factory.
         final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
                 tripleStore, 
                 jobState.parserValidates, jobState.deleteAfter,
                 jobState.fallback, statementfactory);
-
-//        final BlockingBuffer<ISPO[]> writeBuffer = null;//@todo drop this
-//        final BlockingBuffer<ISPO[]> writeBuffer = jobState.writeBufferChunkSize != 0 ? tripleStore
-//        .getSPORelation().newWriteBuffer(jobState.writeBufferChunkSize)
-//        : null;
-//        final RDFLoadTaskFactory taskFactory = new RDFLoadTaskFactory(
-//                tripleStore, jobState.bufferCapacity, writeBuffer,
-//                jobState.parserValidates, jobState.deleteAfter,
-//                jobState.fallback);
 
         // Setup loader.
         final ConcurrentDataLoader loader = new ConcurrentDataLoader(fed,
@@ -183,19 +176,6 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
                 
             }
 
-//            if (writeBuffer != null) {
-//
-//                if (log.isInfoEnabled())
-//                    log.info("Closing the write buffer.");
-//                
-//                // done with this buffer. 
-//                writeBuffer.close();
-//                
-//                // await the completion of the task draining the buffer.
-//                writeBuffer.getFuture().get();
-//                
-//            }
-
         } catch (Throwable t) {
 
             log.error("Task failed: " + t, t);
@@ -206,10 +186,6 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
                     statementfactory
                             .cancelAll(true/* mayInterruptIfRunning */);
                 }
-//                if (writeBuffer != null) {
-//                    writeBuffer.getFuture()
-//                            .cancel(true/* mayInterruptIfRunning */);
-//                }
             } catch (Throwable t2) {
                 log.warn(this, t2);
             }

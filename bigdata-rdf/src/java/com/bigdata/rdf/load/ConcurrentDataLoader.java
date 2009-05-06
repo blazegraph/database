@@ -26,13 +26,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.load;
 
+import java.io.File;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,6 +50,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
@@ -220,14 +224,19 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     }
 
     /**
-     * Ctor for a concurrent data loader.
+     * Ctor for a concurrent data loader. When used in combination with the
+     * asynchronous write API, an unbounded thread pool should be used to feed
+     * the asynchronous write {@link BlockingBuffer}s.
      * 
      * @param fed
      *            The federation.
      * @param nthreads
-     *            The #of threads that will process load tasks in parallel.
+     *            The #of threads that will process load tasks in parallel -or-
+     *            {@link Integer#MAX_VALUE} to use an unbounded thread pool fed
+     *            by a {@link SynchronousQueue}.
      * @param queueCapacity
-     *            The capacity of the queue of jobs awaiting execution.
+     *            The capacity of the queue of jobs awaiting execution (ignored
+     *            when using an unbounded thread pool).
      * @param rejectedExecutionDelay
      *            The delay in milliseconds between resubmits of a task when the
      *            queue of tasks awaiting execution is at capacity.
@@ -242,10 +251,10 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         if (fed == null)
             throw new IllegalArgumentException();
         
-        if (nthreads < 1)
+        if (nthreads <= 0)
             throw new IllegalArgumentException();
 
-        if (queueCapacity < 1)
+        if (queueCapacity < 0)
             throw new IllegalArgumentException();
 
         if (rejectedExecutionDelay < 1)
@@ -265,20 +274,37 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         /*
          * Setup the load service. We will run the tasks that read the data and
          * load it into the database on this service.
-         * 
-         * Note: we limit the #of tasks waiting in the queue so that we don't
-         * let the file scan get too far ahead of the executing tasks. This
-         * reduces the latency for startup and the memory overhead significantly
-         * when reading a large collection of files. There is a minimum queue
-         * size so that we can be efficient for the file system reads.
          */
 
-        final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(
-                queueCapacity);
-        
-        loadService = new ThreadPoolExecutor(nthreads, nthreads,
-                Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
-                new DaemonThreadFactory(getClass().getName() + ".loadService"));
+        if (nthreads == Integer.MAX_VALUE) {
+            /*
+             * Unbounded thread pool using a synchronous queue.
+             */
+            loadService = (ThreadPoolExecutor) Executors
+                    .newCachedThreadPool(new DaemonThreadFactory(getClass()
+                            .getName()
+                            + ".loadService"));
+        } else {
+            /*
+             * Fixed capacity thread pool using caller's choice of queue.
+             */
+            final BlockingQueue<Runnable> queue;
+            switch (queueCapacity) {
+            case 0:
+                queue = new SynchronousQueue<Runnable>();
+                break;
+            case Integer.MAX_VALUE:
+                queue = new LinkedBlockingQueue<Runnable>();
+                break;
+            default:
+                queue = new LinkedBlockingQueue<Runnable>(queueCapacity);
+                break;
+            }
+            loadService = new ThreadPoolExecutor(nthreads, nthreads,
+                    Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
+                    new DaemonThreadFactory(getClass().getName()
+                            + ".loadService"));
+        }
         
         /*
          * Setup reporting to the load balancer.
