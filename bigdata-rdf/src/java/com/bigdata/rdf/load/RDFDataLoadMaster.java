@@ -109,13 +109,21 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         String ONTOLOGY = "ontology";
 
         /**
-         * #of threads to use on each client.
+         * The #of {@link ConcurrentDataLoader} threads that each client will
+         * Use {@link Integer#MAX_VALUE} for an unbounded thread pool.
          */
         String NTHREADS = "nthreads";
 
         /**
+         * The capacity of the queue of jobs awaiting execution (ignored when
+         * {@link #NTHREADS} is {@link Integer#MAX_VALUE}).
+         */
+        String QUEUE_CAPACITY = "queueCapacity";
+        
+        /**
          * The buffer capacity for parsed RDF statements (not used when
-         * {@link #ASYNCHRONOUS_WRITES} are enabled).
+         * {@link #ASYNCHRONOUS_WRITES} are enabled). 3x this gives the initial
+         * capacity of the RDF {@link Value}s hash map.
          */
         String BUFFER_CAPACITY = "bufferCapacity";
 
@@ -131,11 +139,25 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
          * asynchronous write API (10k to 20k should be fine).
          */
         String ASYNCHRONOUS_WRITE_PRODUCER_CHUNK_SIZE = "asynchronousWriteProducerChunkSize";
-        
+
         /**
-         * @todo javadoc
+         * When <code>true</code> synchronous RPC is used for writes on the
+         * TERM2ID index. When <code>false</code> asynchronous writes are used
+         * on that index.  Asynchronous writes have much better throughput.
          */
         String SYNC_RPC_FOR_TERM2ID = "syncRPCForTERM2ID";
+        
+        /**
+         * The initial capacity of the hash map used to store RDF {@link Value}s
+         * when processing a document (asynchronous writes only).
+         */
+        String VALUES_INITIAL_CAPACITY = "valuesInitialCapacity";
+        
+        /**
+         * The initial capacity of the hash map used to store RDF {@link Value}s
+         * when processing a document (asynchronous writes only).
+         */
+        String BNODES_INITIAL_CAPACITY = "bnodesInitialCapacity";
         
         /**
          * When <code>true</code>, the master will create the
@@ -189,11 +211,6 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         boolean DEFAULT_PARSER_VALIDATES = false;
 
         /**
-         * The capacity of the queue of jobs awaiting execution.
-         */
-        String QUEUE_CAPACITY = "queueCapacity";
-        
-        /**
          * The delay in milliseconds between resubmits of a task when the queue
          * of tasks awaiting execution is at capacity.
          */
@@ -245,12 +262,15 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         public final File ontology;
 
         /**
-         * The #of concurrent threads to use to load the data. A single thread
-         * will be used to scan the file system, but this many threads will be
-         * used to read, parse, and write the data onto the {@link ITripleStore}.
+         * @see ConfigurationOptions#NTHREADS
          */
         public final int nthreads;
 
+        /**
+         * @see ConfigurationOptions#QUEUE_CAPACITY
+         */
+        final public int queueCapacity;
+        
         /**
          * The capacity of the buffers used to hold the parsed RDF data -or- the
          * initial capacity of the RDF {@link Value}s hash map when
@@ -274,6 +294,16 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
          * @see ConfigurationOptions#SYNC_RPC_FOR_TERM2ID
          */
         public final boolean syncRPCForTERM2ID;
+
+        /**
+         * @see ConfigurationOptions#VALUES_INITIAL_CAPACITY
+         */
+        public final int valuesInitialCapacity;
+
+        /**
+         * @see ConfigurationOptions#BNODES_INITIAL_CAPACITY
+         */
+        public final int bnodesInitialCapacity;
         
         /**
          * When <code>true</code>, the master will create the
@@ -312,11 +342,6 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         final public boolean parserValidates;
 
         /**
-         * @see ConfigurationOptions#QUEUE_CAPACITY
-         */
-        final public int queueCapacity;
-        
-        /**
          * @see ConfigurationOptions#REJECTED_EXECUTION_DELAY
          */
         final public long rejectedExecutionDelay;
@@ -347,6 +372,9 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
             sb.append(", " + ConfigurationOptions.NTHREADS + "="
                     + nthreads);
             
+            sb.append(", " + ConfigurationOptions.QUEUE_CAPACITY + "="
+                    + queueCapacity);
+            
             sb.append(", " + ConfigurationOptions.BUFFER_CAPACITY+ "="
                     + bufferCapacity);
         
@@ -358,6 +386,12 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
 
             sb.append(", " + ConfigurationOptions.SYNC_RPC_FOR_TERM2ID + "="
                     + syncRPCForTERM2ID);
+
+            sb.append(", " + ConfigurationOptions.VALUES_INITIAL_CAPACITY + "="
+                    + valuesInitialCapacity);
+
+            sb.append(", " + ConfigurationOptions.BNODES_INITIAL_CAPACITY + "="
+                    + bnodesInitialCapacity);
 
             sb.append(", " + ConfigurationOptions.CREATE + "=" + create);
             
@@ -397,6 +431,9 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
             nthreads = (Integer) config.getEntry(component,
                     ConfigurationOptions.NTHREADS, Integer.TYPE);
 
+            queueCapacity = (Integer) config.getEntry(component,
+                    ConfigurationOptions.QUEUE_CAPACITY, Integer.TYPE);
+            
             bufferCapacity = (Integer) config.getEntry(component,
                     ConfigurationOptions.BUFFER_CAPACITY, Integer.TYPE);
 
@@ -411,6 +448,12 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
 
             syncRPCForTERM2ID = (Boolean) config.getEntry(component,
                     ConfigurationOptions.SYNC_RPC_FOR_TERM2ID, Boolean.TYPE);
+
+            valuesInitialCapacity = (Integer) config.getEntry(component,
+                    ConfigurationOptions.VALUES_INITIAL_CAPACITY, Integer.TYPE);
+
+            bnodesInitialCapacity = (Integer) config.getEntry(component,
+                    ConfigurationOptions.BNODES_INITIAL_CAPACITY, Integer.TYPE);
 
             create = (Boolean) config.getEntry(component,
                     ConfigurationOptions.CREATE, Boolean.TYPE);
@@ -436,10 +479,6 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
                     ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE,
                     ConfigurationOptions.DEFAULT_PARSER_VALIDATES);
 
-            queueCapacity = (Integer) config.getEntry(
-                    component,
-                    ConfigurationOptions.QUEUE_CAPACITY, Integer.TYPE);
-            
             rejectedExecutionDelay = (Long) config.getEntry(
                     component,
                     ConfigurationOptions.REJECTED_EXECUTION_DELAY, Long.TYPE,

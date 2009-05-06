@@ -160,6 +160,11 @@ public class TestAll extends TestCase {
         suite.addTest(TestAll_IndexSegment.suite());
 
         /*
+         * test of storing null values under a key with persistence.
+         */
+        suite.addTestSuite(TestNullValues.class);
+
+        /*
          * test fused views, including iterators for the fused view.
          */
         suite.addTestSuite( TestFusedView.class );
