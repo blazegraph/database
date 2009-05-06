@@ -789,8 +789,10 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
             // wait for the latch.
             latch.await();
-            log.warn("Latch done: "
-                    + statementBufferFactory.term2IdLatchDoneCount.incrementAndGet());
+            if (log.isInfoEnabled())
+                log.info("Latch done: "
+                        + statementBufferFactory.term2IdLatchDoneCount
+                                .incrementAndGet());
 
         }
 
@@ -1009,7 +1011,9 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     // Place in KVO sorted order (by the byte[] keys).
                     Arrays.sort(chunkOut);
 
-                    log.warn("Adding chunk to TERM2ID master: chunkSize="+chunkOut.length);
+                    if (log.isInfoEnabled())
+                        log.info("Adding chunk to TERM2ID master: chunkSize="
+                                + chunkOut.length);
                     
                     // add chunk to async write buffer
                     buffer.add(chunkOut);
