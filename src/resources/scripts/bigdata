@@ -96,23 +96,23 @@ if [ "$MASTER" == "`hostname`" ]; then
     if [ ! -f "$eventLog" ]; then
 	echo $"`date` : `hostname` : creating event log."
 	touch $eventLog
-	chown $logUserAndGroup $eventLog
-	chmod $logPermissions $eventLog
+	chgrp @INSTALL_GROUP@ $eventLog
+	chmod g+rw $eventLog
     fi
 # Error log (where ERROR and above is logged by each service or client).
     if [ ! -f "$errorLog" ]; then
 	echo $"`date` : `hostname` : creating error log."
 	touch $errorLog
-	chown $logUserAndGroup $errorLog
-	chmod $logPermissions $errorLog
+	chgrp @INSTALL_GROUP@ $errorLog
+	chmod g+rw $errorLog
     fi
 # Detail log (all aggregated log messages from each service or client).
 # Note that a single runLog4jServer.sh must be running to log on this file.
     if [ ! -f "$detailLog" ]; then
 	echo $"`date` : `hostname` : creating detail log."
 	touch $detailLog
-	chown $logUserAndGroup $detailLog
-	chmod $logPermissions" $detailLog
+	chgrp @INSTALL_GROUP@ $detailLog
+	chmod g+rw $detailLog
     fi
 else
     if [ ! -w "$eventLog" ]; then
