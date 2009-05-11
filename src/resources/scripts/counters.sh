@@ -5,8 +5,8 @@
 
 # usage: counters.sh [-p port] [-events events.log] counterFile(s)
 
-source /nas/scripts/env.sh
+source `dirname $0`/bigdataenv
 
 java -cp ${CLASSPATH}\
     -Dlog4j.configuration=file:/nas/config/log4j.properties\
-    com.bigdata.counters.httpd.CounterSetHTTPDServer -p 8080 $1 
+    com.bigdata.counters.httpd.CounterSetHTTPDServer $* 

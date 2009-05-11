@@ -1,10 +1,11 @@
 #!/bin/bash
 
-source /opt2/scripts/env.sh
-
+#
 # Dump out some stuff for a bigdata federation.
 #
 # usage: configFile
+
+source `dirname $0`/bigdataenv
 
 java ${JAVA_OPTS} \
     -cp ${CLASSPATH} \

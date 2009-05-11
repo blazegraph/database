@@ -1,12 +1,12 @@
 #!/bin/bash
 
-source `dirname $0`/bigdataenv
-
 # Runs the LUBM queries as configured using the LUBM test harness.
 #
 # Pre-conditions: jini is running; services are running.
 #
 # usage: namespace (of the KB)
+
+source `dirname $0`/bigdataenv
 
 java ${JAVA_OPTS} \
     -Dlubm.warmUp=false \
