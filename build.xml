@@ -295,6 +295,8 @@
 	<!-- 
  	     @todo Set permissions on the installation directories?
  	     
+ 	     @todo Setup cron job with 'file @NAS@/state' on the minute.
+ 	     
  	     @todo parameter substitution for log4j files?
  	     
  	     @todo classServer setup : The following are somewhat dated notes on using jini with downloadable
@@ -448,7 +450,10 @@
      	    <replacefilter token="@CLASSPATH@" value="${myclasspath}"/>
     	</replace>
 		<!-- set execute bit for scripts. -->
-		<chmod dir="${install.bin.dir}" perm="ug+rx,o-r"/>
+		<chmod perm="ug+rx,o-r">
+			<fileset dir="${install.bin.dir}">
+			</fileset>
+		</chmod>
 	</target>
 	
 	<!-- Note: we must fork the JVM to get the jvmarg overrides. -->
