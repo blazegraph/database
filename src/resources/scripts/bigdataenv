@@ -142,7 +142,7 @@ export JAVA_OPTS="-server -ea \
 # $logUserAndGroup - The "user.group" for log files (must be writable by all hosts).
 # $logPermissions - The permissions for lof files (msut be writable by all hosts).
 # 
-export lockFile=/var/lock/subsys/bigdata
+export lockFile=@LOCK_FILE@
 export pidFile=${LAS}/pid
 export eventLog=${NAS}/bigdata-event.log
 export errorLog=${NAS}/bigdata-error.log

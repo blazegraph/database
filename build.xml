@@ -423,6 +423,7 @@
     	    <replacefilter token="@LIB_DIR@" value="${install.lib.dir}"/>
     	    <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}"/>
      	    <replacefilter token="@INSTALL_GROUP@" value="${install.group}"/>
+     	    <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}"/>
      	    <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}"/>
      	    <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}"/>
      	    <replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}"/>
@@ -444,6 +445,7 @@
     	    <replacefilter token="@LIB_DIR@" value="${install.lib.dir}"/>
     	    <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}"/>
      	    <replacefilter token="@INSTALL_GROUP@" value="${install.group}"/>
+     	    <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}"/>
      	    <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}"/>
      	    <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}"/>
      	    <replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}"/>
