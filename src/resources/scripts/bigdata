@@ -90,20 +90,24 @@ fi
 # Verify site-specific preconditions.
 ./bigdataprecond
 
+# @todo not permitted to change the owner or _group_ unless root. Also,
+# when run as root we can use the standard subsystem lock file but not
+# when run as a normal user.
+#
 # Figure out if this is the master (can create files and set their perms)
 if [ "$MASTER" == "`hostname`" ]; then
 # Event log (where events are written by each service or client).
     if [ ! -f "$eventLog" ]; then
 	echo $"`date` : `hostname` : creating event log."
 	touch $eventLog
-	chgrp $INSTALL_GROUP $eventLog
+#	chgrp $INSTALL_GROUP $eventLog
 	chmod g+rw $eventLog
     fi
 # Error log (where ERROR and above is logged by each service or client).
     if [ ! -f "$errorLog" ]; then
 	echo $"`date` : `hostname` : creating error log."
 	touch $errorLog
-	chgrp $INSTALL_GROUP $errorLog
+#	chgrp $INSTALL_GROUP $errorLog
 	chmod g+rw $errorLog
     fi
 # Detail log (all aggregated log messages from each service or client).
@@ -111,7 +115,7 @@ if [ "$MASTER" == "`hostname`" ]; then
     if [ ! -f "$detailLog" ]; then
 	echo $"`date` : `hostname` : creating detail log."
 	touch $detailLog
-	chgrp $INSTALL_GROUP $detailLog
+#	chgrp $INSTALL_GROUP $detailLog
 	chmod g+rw $detailLog
     fi
 else
@@ -141,7 +145,7 @@ case "$1" in
 #
 # Start the services manager if not running.
 #
-	if [ -f "$lockFile"]; then
+	if [ -f "$lockFile" ]; then
 	    if [ -f "$pidFile" ]; then
 		read pid < "$pidFile"
 		pidno=$( ps ax | grep $pid | awk '{ print $1 }' | grep $pid )
