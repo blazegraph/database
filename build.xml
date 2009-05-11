@@ -295,10 +295,6 @@
 	<!-- 
  	     @todo Set permissions on the installation directories?
  	     
- 	     @todo Setup cron job with 'file @NAS@/state' on the minute.
- 	     
- 	     @todo parameter substitution for log4j files?
- 	     
  	     @todo classServer setup : The following are somewhat dated notes on using jini with downloadable
 	     code.
 	
