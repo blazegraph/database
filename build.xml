@@ -376,6 +376,8 @@
 		<mkdir dir="${install.doc.dir}"/>
 		<mkdir dir="${install.lib.dir}"/>
 		<mkdir dir="${install.bin.dir}"/>
+		<mkdir dir="${NAS}"/>
+		<mkdir dir="${LAS}"/>
 		<!-- install configuration files. -->
 		<copy toDir="${install.config.dir}">
     		<fileset dir="${bigdata.dir}/src/resources/config">
