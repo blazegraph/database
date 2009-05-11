@@ -74,7 +74,7 @@ cd `dirname $0`
 source ./bigdataenv
 
 # Verify critical environment variables.
-if[ -z "${MASTER}"]; then
+if[ -z "$MASTER"]; then
 	echo -n $"$0 : environment not setup."
 	exit 1
 fi
