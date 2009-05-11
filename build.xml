@@ -451,7 +451,7 @@
     	</replace>
 		<!-- fix newlines (otherwise substitutions cause things to break). -->
         <fixcrlf srcDir="${install.bin.dir}"/>
-		<!-- set execute bit for scripts (must be the last step!). -->
+		<!-- set execute bit for scripts (must be the last step). -->
 		<chmod perm="ug+rx,o-r">
 			<fileset dir="${install.bin.dir}">
 			</fileset>
