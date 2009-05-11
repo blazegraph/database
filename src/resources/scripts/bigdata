@@ -196,7 +196,7 @@ case "$1" in
 	    echo $"`date` : `hostname` : destroying data."
 	    rm -rf "$LAS"
 	fi
-	if [ "$MASTER" -eq "`hostname`" ]; then
+	if [ "$MASTER" == "`hostname`" ]; then
 # Move the event log out of the way (exists and is not empty).
 	    random=`date +%N | sed -e 's/000$//' -e 's/^0//'`
 	    if [ -s "$eventLog" ]; then
