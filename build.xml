@@ -376,7 +376,7 @@
 		<mkdir dir="${install.bin.dir}"/>
 		<!-- install configuration files. -->
 		<copy toDir="${install.config.dir}">
-    		<fileset dir="src/resources/config">
+    		<fileset dir="${bigdata.dir}/src/resources/config">
     		</fileset>
 		</copy>
 		<!-- install documentation. -->

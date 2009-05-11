@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#
+# This provides an extensible hook for site-specific setup of the
+# hosts in a cluster.
+#
+# @todo verify that we are passing on any additional arguments from
+# 'bigdata'.  E.g., 'bigdata setup ntp'.
+
+# Setup the environment.
+cd `dirname $0`
+source ./bigdataenv
+
+#
+# uncomment to stop ntpd on other hosts and set the time using
+# ntpdate. when you have the clocks synchronized, re-comment the [ntpd
+# stop] and [ntpdate] commands and then uncomment the [ntdp start]
+# command.  Once ntpd is running on all the hosts recomment [ntpd
+# start].  You can see if the clocks are modestly synchronized just by
+# watching the 'date' output or uncomment the [ntpdate -q] line to get
+# some exact information.. Unfortunately this is not more automatic.
+#
+# See http://www.cis.udel.edu/~mills/ntp/html/ntpdate.html
+#
+# See http://www.brennan.id.au/09-Network_Time_Protocol.html
+#
+#   action $"`date` : `hostname` : stopping ntpd: " /etc/init.d/ntpd stop
+#   if [ ! -f /etc/ntp.conf.backup ]; then
+#       cp /etc/ntp.conf /etc/ntp.conf.backup
+#   fi
+#   cp --backup --update /opt2/scripts/ntp-client.conf /etc/ntp.conf
+#   chown root.root /etc/ntp.conf
+#   chmod u+rw,go+r-wx /etc/ntp.conf
+#   action $"`date` : `hostname` : setting clock: " /usr/sbin/ntpdate 192.168.6.21
+#
+#   action $"`date` : `hostname` : starting ntpd: " /etc/init.d/ntpd start
+#
+#   action $"`date` : `hostname` : clock status " /usr/sbin/ntpdate -q 192.168.6.21
+
+# ensure that sysstat is installed
+#
+# @todo using 'which' does not work as it reports an error when no
+# such file is found.  If there is a declared location then check that
+# first.  Otherwise, use which but check the return code in order to
+# decide if the file could be located.
+#if [ ! -x `which pidstat` ]; then
+#    echo $"`date` : `hostname` : installing sysstat."
+#    cd /opt2/install/sysstat-8.0.4.1
+#    make install
+#fi
+#
+#yum -y install sysstat
+
+exit 0
