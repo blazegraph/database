@@ -132,20 +132,18 @@ export JAVA_OPTS="-server -ea \
 	-classpath ${CLASSPATH}"
 
 #
-# Various things required by the 'bigdata' script.
+# Other things required by the 'bigdata' script.
 #
 # $lockFile - The bigdata subsystem lock file.
 # $pidFile  - The bigdata services manager pid is written on this file.
-# $eventLog - Bigdata events are logged on this file. 
-# $errorLog - Bigdata messages at ERROR or above are logged on this file.
-# $detailLog - Bigdata messages at INFO or above (or as configured) are logged on this file.
-# $logUserAndGroup - The "user.group" for log files (must be writable by all hosts).
-# $logPermissions - The permissions for lof files (msut be writable by all hosts).
 # 
 export lockFile=@LOCK_FILE@
 export pidFile=${LAS}/pid
-export eventLog=${NAS}/bigdata-event.log
-export errorLog=${NAS}/bigdata-error.log
-export detailLog=${NAS}/bigdata-detail.log
-export logUserAndGroup="$USER.users"
-export logPermissions="u+rw,g+w,o-rw"
+
+#
+# Location of the various log files. 
+#
+export logDir=@LOG_DIR@
+export eventLog=@EVENT_LOG@
+export errorLog=@ERROR_LOG@
+export detailLog=@DETAIL_LOG@
