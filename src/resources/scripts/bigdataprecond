@@ -1,0 +1,21 @@
+#!/bin/bash
+
+#
+# This provides an extensible hook for verifying per-conditions or taking
+# other site-specific action each time the 'bigdata' script is executed.
+#
+
+# Setup the environment.
+cd `dirname $0`
+source ./bigdataenv
+
+# Ensure that the mount point exists.  Note: this is a pre-condition
+# for executing any child scripts since they will not be accessible if
+# the shared volume is not mounted!
+#
+#if [ ! -d /opt2 ]; then
+#    echo $"`date` : `hostname` : mounting share."
+#    mount -t nfs 192.168.6.21:/opt /opt2
+#fi
+
+exit 0

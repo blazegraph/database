@@ -1,0 +1,148 @@
+##
+# Sets the environment variables required to run the other scripts in
+# this directory.
+# 
+# Run as "source ./bigdataenv"
+#
+# Note: The original form of this script is a template containing parameters
+# of the form @XXX@ - the value for those parameters are substituted in when
+# the script is installed by ant.  The values to be used are specified in the
+# build.properties file when you run ant.
+#
+
+#
+# The name of the configured bigdata federation instance.
+#
+export FED=@FED@
+
+#
+# A directory on a shared volume that will be used to store JARs, scripts,
+# log files, etc.
+# 
+export NAS=@NAS@
+
+#
+# A directory on a local volume that will be used to store persistent state
+# of bigdata services on each host, including index files, transaction logs,
+# etc.  This directory will be created if it does not exist.  If a bigdata
+# instance is destroyed, then this directory will be destroyed as well.
+#
+export LAS=@LAS@
+
+#
+# The hostname of the master as reported by 'hostname' on that host.
+# 
+# @todo The master is used to manage log files on the shared volume
+# but we should be able to get by without this concept. 
+#
+export MASTER=@MASTER@
+
+#
+# The directory where sysstat is installed (open-source package for 
+# reporting on host and process performance counters).
+#
+export SYSSTAT_HOME=@SYSSTAT_HOME@
+
+#
+# The directory where ant is installed (ant is required to build
+# bigdata).
+#
+export ANT_HOME=@ANT_HOME@
+
+#
+# The directory where java is installed.
+#
+export JAVA_HOME=@JAVA_HOME@
+
+##
+# Various configuration files.
+##
+
+#
+# The main configuration file.  This is a jini-style configuration. The
+# configuration can be stored in a file accessible to all hosts or in a
+# URL. 
+#
+export BIGDATA_CONFIG=@BIGDATA_CONFIG@
+
+#
+# Optional overrides for that configuration file (per jini).  
+#
+export BIGDATA_CONFIG_OVERRIDES=
+
+#
+# The policy file used to grant permissions for Java services.  The default
+# policy grants ALL permissions.  This makes setup easy but is less secure.
+#
+export BIGDATA_POLICY=@POLICY_FILE@
+
+#
+# The java.util.logging configuration file (jini uses java.util.logging).
+#
+export BIGDATA_LOGGING_CONFIG=@LOGGING_CONFIG@
+
+#
+# The log4j configuration for the bigdata clients and services.  You MUST
+# edit this configuration and specify WHERE it should write its log files.
+# 
+# This configuration also shows how to setup a simple socket logger. This
+# makes it easy to aggregate log messages from all services in a cluster
+# onto a single host.
+#
+# Note: The log4j.configuration property is a URL.  If you are identifying
+# a file resource use "file:" in front of the filename!
+#
+export BIGDATA_LOG4J_CONFIG=@LOG4J_CONFIG@
+
+#
+# A sample configuration for the simple socket logger.  In order to use this
+# you MUST edit this configuration file to specify WHERE the log messages will
+# be written.  Make sure that the clients/services log configuration (above)
+# is setup to rely messages to the simple socket logger.  Finally, make sure
+# that you start the simple socket logger using [runLog4jServer.sh].
+#
+export BIGDATA_LOG4J_SERVER_CONFIG=@LOG4J_SERVER_CONFIG@
+
+#
+# Setup the path.
+#
+export PATH=${ANT_HOME}/bin:${JAVA_HOME}/bin:@BIN_DIR@:${PATH}
+
+#
+# Setup the classpath.
+#
+export CLASSPATH=@CLASSPATH@
+
+#
+# Java options used to start utility classes.  The utility classes
+# typically do not have large heap demands. 
+#
+# Note: The java options for the services are configured in the main
+# configuration file.
+#
+export JAVA_OPTS=-server -ea \
+    "-Dcom.sun.jini.jeri.tcp.useNIO=@USE_NIO@" \
+    "-Djava.security.policy=${BIGDATA_POLICY}" \
+    "-Dlog4j.configuration=${BIGDATA_LOG4J_CONFIG}" \
+    "-Djava.util.logging.config.file=${BIGDATA_LOGGING_CONFIG}" \
+	"-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME}" \
+	-classpath ${CLASSPATH}
+
+#
+# Various things required by the 'bigdata' script.
+#
+# $lockFile - The bigdata subsystem lock file.
+# $pidFile  - The bigdata services manager pid is written on this file.
+# $eventLog - Bigdata events are logged on this file. 
+# $errorLog - Bigdata messages at ERROR or above are logged on this file.
+# $detailLog - Bigdata messages at INFO or above (or as configured) are logged on this file.
+# $logUserAndGroup - The "user.group" for log files (must be writable by all hosts).
+# $logPermissions - The permissions for lof files (msut be writable by all hosts).
+# 
+export lockFile=/var/lock/subsys/bigdata
+export pidFile=${LAS}/pid
+export eventLog=${NAS}/bigdata-event.log
+export errorLog=${NAS}/bigdata-error.log
+export detailLog=${NAS}/bigdata-detail.log
+export logUserAndGroup="$USER.users"
+export logPermissions="u+rw,g+w,o-rw"

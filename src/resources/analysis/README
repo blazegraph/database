@@ -1,0 +1,31 @@
+This directory contains some tools which are useful for inspecting the
+performance counters for a live (or post-mortem) bigdata instance.
+
+bigdataServices_0h.xls
+
+	An Excel worksheet.  The worksheet has several tabs. Each tab has one
+	or more built-in HTTP requests which can be executed on demand.  The
+	HTTP requests will fetch the current performance counters for a variety
+	of different aspects of the system, update a table on the worksheet and
+	update any graphs which depend on that table.
+	
+	This worksheet can be quite convenient to use once you have it setup
+	for your cluster.  However, getting it setup for your cluster means
+	that you need to review and possibly edit the queries (they are issued
+	to localhost:8080 with the presumption that you are using SSH to port
+	forward that request to the machine on the cluster running the load
+	balancer), the data source ranges for the charts, and the various
+	formulae which compute averages, maximums, etc.
+	
+	The "_0h" is my notation for the zeroth hour of a run.  I change the
+	suffix over the course of a run to be "1h", "1d", etc.
+	
+clientIndices_0h.xls
+
+	A worksheet which provides insight into the performance counters 
+	maintained by the clients for their scale-out indices.  Among other
+	things this provides an overview of the asynchronous writes by clients
+	on the scale-out indices.  The performance counters are referred by
+	clients to the load balancer and this worksheet resolves those performance
+	counters against the load balancer in exactly the same manner as described
+	above.
