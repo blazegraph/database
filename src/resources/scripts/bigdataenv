@@ -54,9 +54,10 @@ export ANT_HOME=@ANT_HOME@
 #
 export JAVA_HOME=@JAVA_HOME@
 
-##
-# Various configuration files.
-##
+#
+# The group on all hosts that can read the scripts, read/write the log files, etc.
+#
+export INSTALL_GROUP=@INSTALL_GROUP@
 
 #
 # The main configuration file.  This is a jini-style configuration. The
