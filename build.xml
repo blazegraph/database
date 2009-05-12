@@ -4,116 +4,108 @@
 <!-- @todo maven2 setup so we can run and publish unit tests results. -->
 <project name="bigdata" default="jar" basedir=".">
 
-    <property file="build.properties"/>
+	<property file="build.properties" />
 
 	<!-- build-time classpath. -->
-    <path id="build.classpath">
-        <fileset dir="${bigdata.dir}/bigdata/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-jini/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-rdf/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-sails/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-    </path>
+	<path id="build.classpath">
+		<fileset dir="${bigdata.dir}/bigdata/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bigdata.dir}/bigdata-jini/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bigdata.dir}/bigdata-sails/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
 
 	<!-- runtime classpath w/o install. -->
-    <path id="runtime.classpath">
-        <pathelement location="${build.dir}"/>
-        <path refid="build.classpath"/>
-    </path>
+	<path id="runtime.classpath">
+		<pathelement location="${build.dir}" />
+		<path refid="build.classpath" />
+	</path>
 
 	<!-- classpath as installed (you can add your application jars here). -->
 	<!-- @todo bigdata-lubm/bigdata-lubm.jar; @todo configure classServer -->
 	<!-- @todo .so and .dll -->
-    <path id="install.classpath">
-        <fileset dir="${install.lib.dir}">
-            <include name="**/*.jar"/>
-        </fileset>
-    </path>
-	
-    <target name="clean" description="cleans everything in [build.dir], but not the releases.">
-        <delete dir="${build.dir}"/>
-    </target>
+	<path id="install.classpath">
+		<fileset dir="${install.lib.dir}">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
 
-    <target name="prepare">
-    	<!-- setup ${version} for regular or snapshot. -->
-	 	<tstamp>
-    	   <format property="today" pattern="ddMMyy" locale="en,US"/>
-    	</tstamp>
-	  	<condition property="version"
-  				value="bigdata-${build.ver}-${today}"
-		  		else="bigdata-${build.ver}">
-	  		<istrue value="${snapshot}"/>
-  		</condition>
+	<target name="clean" description="cleans everything in [build.dir], but not the releases.">
+		<delete dir="${build.dir}" />
+	</target>
+
+	<target name="prepare">
+		<!-- setup ${version} for regular or snapshot. -->
+		<tstamp>
+			<format property="today" pattern="ddMMyy" locale="en,US" />
+		</tstamp>
+		<condition property="version" value="bigdata-${build.ver}-${today}" else="bigdata-${build.ver}">
+			<istrue value="${snapshot}" />
+		</condition>
 		<!--<echo message="today=${today}"/>-->
-		<echo message="version=${version}"/>
-    	<!-- create directories. -->
-        <mkdir dir="${build.dir}"/>
-        <mkdir dir="${build.dir}/classes"/>
-	    <mkdir dir="${build.dir}/docs"/>
-	    <mkdir dir="${build.dir}/lib"/>
-	    <mkdir dir="${build.dir}/src"/>
-    </target>
+		<echo message="version=${version}" />
+		<!-- create directories. -->
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${build.dir}/classes" />
+		<mkdir dir="${build.dir}/docs" />
+		<mkdir dir="${build.dir}/lib" />
+		<mkdir dir="${build.dir}/src" />
+	</target>
 
 	<!-- Note: javac error results often if verbose is disabled. -->
 	<!-- I was able to perform a build with 1.6.0_07. -->
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
-    <target name="compile" depends="prepare">
-        <mkdir dir="${build.dir}"/>
-        <javac destdir="${build.dir}/classes" 
-               classpathref="build.classpath"
-        	   verbose="off"
-        	   target="1.5"
-        	   debug="${debug}" debuglevel="${debuglevel}"
-       		>
-            <src path="${bigdata.dir}/bigdata/src/java"/>
-            <src path="${bigdata.dir}/bigdata-jini/src/java"/>
-            <src path="${bigdata.dir}/bigdata-rdf/src/java"/>
-            <src path="${bigdata.dir}/bigdata-sails/src/java"/>
-        	<!-- Do not include the unit tests.
+	<target name="compile" depends="prepare">
+		<mkdir dir="${build.dir}" />
+		<javac destdir="${build.dir}/classes" classpathref="build.classpath" verbose="off" target="1.5" debug="${debug}" debuglevel="${debuglevel}">
+			<src path="${bigdata.dir}/bigdata/src/java" />
+			<src path="${bigdata.dir}/bigdata-jini/src/java" />
+			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
+			<src path="${bigdata.dir}/bigdata-sails/src/java" />
+			<!-- Do not include the unit tests.
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test"/>
             <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
             <src path="${bigdata.dir}/bigdata-sails/src/test"/>
             -->
-        </javac>
-    	<!-- copy resources. -->
-        <copy toDir="${build.dir}/classes">
-            <fileset dir="${bigdata.dir}/bigdata/src/java">
-                <exclude name="**/*.java"/>
-                <exclude name="**/package.html"/>
-                <exclude name="**/BytesUtil.c"/>
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-jini/src/java">
-                <exclude name="**/*.java"/>
-                <exclude name="**/package.html"/>
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-rdf/src/java">
-                <exclude name="**/*.java"/>
-                <exclude name="**/package.html"/>
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-sails/src/java">
-                <exclude name="**/*.java"/>
-                <exclude name="**/package.html"/>
-            </fileset>
-        </copy>
-    </target>
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/classes">
+			<fileset dir="${bigdata.dir}/bigdata/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+				<exclude name="**/BytesUtil.c" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-jini/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-rdf/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+		</copy>
+	</target>
 
-    <target name="jar" depends="compile"
-    	description="generates the jar.">
-        <jar destfile="${build.dir}/${version}.jar">
-            <fileset dir="${build.dir}/classes"/>
-            <manifest>
-                <!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
-            </manifest>
-        </jar>
-    </target>
+	<target name="jar" depends="compile" description="generates the jar.">
+		<jar destfile="${build.dir}/${version}.jar">
+			<fileset dir="${build.dir}/classes" />
+			<manifest>
+				<!--<attribute name="Main-Class" value="com/bigdata/rdf/rio/TestRioIntegration"/>-->
+			</manifest>
+		</jar>
+	</target>
 
 	<!-- Note: the javadoc requires a LOT of RAM, but runs quickly on a
 		 server	class machine. 
@@ -122,177 +114,178 @@
  	     
 		 -->
 	<target name="javadoc" depends="prepare" if="javadoc">
-        <mkdir dir="${build.dir}/docs/api"/>
-        <javadoc destdir="${build.dir}/docs/api"
-        	defaultexcludes="yes"
-        	         author="true"
-        	        version="true"
-        	            use="true"
-        		   overview="../bigdata/overview.html"
-				windowtitle="bigdata&#174;"
-               classpathref="build.classpath">
-            <packageset dir="${bigdata.dir}/bigdata/src/java"/>
-            <packageset dir="${bigdata.dir}/bigdata-jini/src/java"/>
-            <packageset dir="${bigdata.dir}/bigdata-rdf/src/java"/>
-            <packageset dir="${bigdata.dir}/bigdata-sails/src/java"/>
-			<doctitle><![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
-	    	<bottom><![CDATA[<i>Copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
-    		<tag name="todo" scope="all" description="TODO:"/>
-    		<tag name="issue" scope="all" description="ISSUE:"/>
-    		<!--tag name="FIXME" scope="all" description="FIXME:"/-->
-		    <link href="http://java.sun.com/j2se/1.5.0/docs/api/"/>
-		    <link href="http://openrdf.org/doc/sesame/api/"/>
-        </javadoc>
-    </target>
+		<mkdir dir="${build.dir}/docs/api" />
+		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" overview="../bigdata/overview.html" windowtitle="bigdata&#174;" classpathref="build.classpath">
+			<packageset dir="${bigdata.dir}/bigdata/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-jini/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
+			<doctitle>
+				<![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
+		<bottom>
+			<![CDATA[<i>Copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.</i>]]></bottom>
+	<tag name="todo" scope="all" description="TODO:" />
+	<tag name="issue" scope="all" description="ISSUE:" />
+	<!--tag name="FIXME" scope="all" description="FIXME:"/-->
+	<link href="http://java.sun.com/j2se/1.5.0/docs/api/" />
+	<link href="http://openrdf.org/doc/sesame/api/" />
+</javadoc>
+</target>
 
-	<target name="bundle"
-		description="Bundles all dependencies for easier deployments and releases.">
-		<copy toDir="${build.dir}/lib">
-        <fileset dir="${bigdata.dir}/bigdata/lib">
-            <include name="**/*.jar"/>
-            <include name="**/*.so"/>
-            <include name="**/*.dll"/>
-        	<!-- ICU4JNI is not a supported configuration at this time. -->
-			<exclude name="**/icu4jni.jar" />
-			<exclude name="**/icu*.dll" />
-			<exclude name="**/ICU*.dll" />
-			<!-- The BytesUtil JNI class is not recommended at this time (no performance gain). -->
-			<exclude name="**/*BytesUtil*" />
-        </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-jini/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-rdf/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-sails/lib">
-            <include name="**/*.jar"/>
-        </fileset>
-		</copy>
-	</target>
+<target name="bundle" description="Bundles all dependencies for easier deployments and releases.">
+<copy toDir="${build.dir}/lib">
+	<fileset dir="${bigdata.dir}/bigdata/lib">
+		<include name="**/*.jar" />
+		<include name="**/*.so" />
+		<include name="**/*.dll" />
+		<!-- ICU4JNI is not a supported configuration at this time. -->
+		<exclude name="**/icu4jni.jar" />
+		<exclude name="**/icu*.dll" />
+		<exclude name="**/ICU*.dll" />
+		<!-- The BytesUtil JNI class is not recommended at this time (no performance gain). -->
+		<exclude name="**/*BytesUtil*" />
+	</fileset>
+	<fileset dir="${bigdata.dir}/bigdata-jini/lib">
+		<include name="**/*.jar" />
+	</fileset>
+	<fileset dir="${bigdata.dir}/bigdata-rdf/lib">
+		<include name="**/*.jar" />
+	</fileset>
+	<fileset dir="${bigdata.dir}/bigdata-sails/lib">
+		<include name="**/*.jar" />
+	</fileset>
+</copy>
+</target>
 
-    <target name="release-prepare" depends="jar, bundle, javadoc"
-			description="create a release.">
-    	<!-- The source tree. -->
-		<copy toDir="${build.dir}/src">
-	        <fileset dir="${bigdata.dir}/bigdata/src"/>
-            <fileset dir="${bigdata.dir}/bigdata-jini/src"/>
-            <fileset dir="${bigdata.dir}/bigdata-rdf/src"/>
-            <fileset dir="${bigdata.dir}/bigdata-sails/src"/>
-		</copy>
-		<!-- common files for the root of the archive. -->
-		<copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt"/>
-		<copy tofile="${build.dir}/overview.html" file="overview.html"/>
-		<copy tofile="${build.dir}/README-JINI" file="README-JINI"/>
-		<copy toDir="${build.dir}/LEGAL" flatten="true">
-			<fileset dir="${bigdata.dir}">
-				<include name="**/LEGAL/*"/>
-    		</fileset>
-		</copy>
-    </target>
+<target name="release-prepare" depends="jar, bundle, javadoc" description="create a release.">
+<!-- The source tree. -->
+<copy toDir="${build.dir}/src">
+	<fileset dir="${bigdata.dir}/bigdata/src" />
+	<fileset dir="${bigdata.dir}/bigdata-jini/src" />
+	<fileset dir="${bigdata.dir}/bigdata-rdf/src" />
+	<fileset dir="${bigdata.dir}/bigdata-sails/src" />
+</copy>
+<!-- common files for the root of the archive. -->
+<copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
+<copy tofile="${build.dir}/overview.html" file="overview.html" />
+<copy tofile="${build.dir}/README-JINI" file="README-JINI" />
+<copy toDir="${build.dir}/LEGAL" flatten="true">
+	<fileset dir="${bigdata.dir}">
+		<include name="**/LEGAL/*" />
+	</fileset>
+</copy>
+</target>
 
-	<target name="release" depends="release-prepare"
-    		description="create source and binary tarballs.">
-		<mkdir dir="${release.dir}"/>
-		<!-- binary distribution. -->
-		<tar destfile="${release.dir}/${version}-bin.tgz"
-			 compression="gzip"
-		>
-			<!-- binary distribution (docs, but no source). -->
-			<tarfileset dir="${build.dir}" prefix="${version}">
-				 <!-- common files from the root of the archive. -->
-				 <include name="LICENSE.txt"/>
-				 <include name="overview.html"/>
-				 <include name="README-JINI"/>
-				 <include name="LEGAL/*"/>
-				 <!-- src, classes, jar, lib, docs. -->
-				 <exclude name="src/**"/>
-				 <exclude name="classes/**"/>
-				 <include name="${version}.jar"/>
-				 <include name="lib/**"/>
-				 <include name="docs/**"/>
-			</tarfileset>
-		</tar>
-		<!-- source distribution. -->
-		<!-- Note: use GNU long file names for paths GT 100 characters. -->
-		<tar destfile="${release.dir}/${version}-src.tgz"
-			 compression="gzip"
-		>
-			<!-- source, but no jar, compiled, docs, etc. -->
-			<tarfileset dir="${build.dir}" prefix="${version}">
-				 <!-- common files from the root of the archive. -->
-				 <include name="LICENSE.txt"/>
-				 <include name="overview.html"/>
-				 <include name="README-JINI"/>
-				 <include name="LEGAL/*"/>
-				 <!-- src, classes, jar, lib, docs. -->
-				 <include name="src/**"/>
-				 <exclude name="classes/**"/>
-				 <exclude name="${version}.jar"/>
-				 <exclude name="lib/**"/>
-				 <exclude name="docs/**"/>
-			</tarfileset>
-		</tar>
-	</target>
-	
-	<!-- Note: I use a public/private key to do this.  You can uncomment the
+<target name="release" depends="release-prepare" description="create source and binary tarballs.">
+<mkdir dir="${release.dir}" />
+<!-- binary distribution. -->
+<tar destfile="${release.dir}/${version}-bin.tgz" compression="gzip">
+	<!-- binary distribution (docs, but no source). -->
+	<tarfileset dir="${build.dir}" prefix="${version}">
+		<!-- common files from the root of the archive. -->
+		<include name="LICENSE.txt" />
+		<include name="overview.html" />
+		<include name="README-JINI" />
+		<include name="LEGAL/*" />
+		<!-- src, classes, jar, lib, docs. -->
+		<exclude name="src/**" />
+		<exclude name="classes/**" />
+		<include name="${version}.jar" />
+		<include name="lib/**" />
+		<include name="docs/**" />
+	</tarfileset>
+</tar>
+<!-- source distribution. -->
+<!-- Note: use GNU long file names for paths GT 100 characters. -->
+<tar destfile="${release.dir}/${version}-src.tgz" compression="gzip">
+	<!-- source, but no jar, compiled, docs, etc. -->
+	<tarfileset dir="${build.dir}" prefix="${version}">
+		<!-- common files from the root of the archive. -->
+		<include name="LICENSE.txt" />
+		<include name="overview.html" />
+		<include name="README-JINI" />
+		<include name="LEGAL/*" />
+		<!-- src, classes, jar, lib, docs. -->
+		<include name="src/**" />
+		<exclude name="classes/**" />
+		<exclude name="${version}.jar" />
+		<exclude name="lib/**" />
+		<exclude name="docs/**" />
+	</tarfileset>
+</tar>
+</target>
+
+<!-- Note: I use a public/private key to do this.  You can uncomment the
 	     ssh.password lines if you are going to authenticate directly.
 	     
 	     Note: If you do not have the public key for frs.sourceforge.net cached
 	     in your SSH repository then this will not work since it requests that
 	     you confirm the public key interactively.
 	     -->
-	<target name="upload" depends="release"
-			description="copy release files to server.">
-		<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}"/>
-		<!-- unless automated by public/private key
+<target name="upload" depends="release" description="copy release files to server.">
+<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}" />
+<!-- unless automated by public/private key
 		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
 		-->
-		<exec executable="${ssh.scp}">
-			<arg value="-v"/> <!-- verbose protocol. -->
-			<arg value="-C"/> <!-- compression. -->
-			<!--
+<exec executable="${ssh.scp}">
+	<arg value="-v" />
+	<!-- verbose protocol. -->
+	<arg value="-C" />
+	<!-- compression. -->
+	<!--
 			<arg value="-l"/><arg value="${ssh.username}"/>
 			<arg value="-pw"/><arg value="${ssh.password}"/>
 			-->
-			<arg value="${release.dir}/${version}-bin.tgz"/> <!-- from -->
-			<arg value="${ssh.username}@frs.sourceforge.net:uploads"/> <!-- to -->
-		</exec>
-		<exec executable="${ssh.scp}">
-			<arg value="-v"/> <!-- verbose protocol. -->
-			<arg value="-C"/> <!-- compression. -->
-			<!--
+	<arg value="${release.dir}/${version}-bin.tgz" />
+	<!-- from -->
+	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
+	<!-- to -->
+</exec>
+<exec executable="${ssh.scp}">
+	<arg value="-v" />
+	<!-- verbose protocol. -->
+	<arg value="-C" />
+	<!-- compression. -->
+	<!--
 			<arg value="-l"/><arg value="${ssh.username}"/>
 			<arg value="-pw"/><arg value="${ssh.password}"/>
 			-->
-			<arg value="${release.dir}/${version}-src.tgz"/> <!-- from -->
-			<arg value="${ssh.username}@frs.sourceforge.net:uploads"/> <!-- to -->
-		</exec>
-	</target>
-	
-	<target name="publish-api" depends="javadoc"
-			description="copy javadoc to server.">
-		<fail message="Javadoc not generated.">
-		  	<condition>
-		  		<not>
-					<available file="docs/api" type="dir"/>
-				</not>
-	  		</condition>
-		</fail>
-		<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}"/>
-		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
-		<exec executable="${ssh.scp}">
-			<arg value="-r"/> <!-- recursive. -->
-			<arg value="-v"/> <!-- verbose protocol. -->
-			<arg value="-C"/> <!-- compression. -->
-			<arg value="-l"/><arg value="${ssh.username}"/>
-			<arg value="-pw"/><arg value="${ssh.password}"/>
-			<arg value="${build.dir}/docs"/> <!-- from -->
-			<arg value="shell.speakeasy.net:systap.com/bigdata/"/> <!-- to -->
-		</exec>
-	</target>
+	<arg value="${release.dir}/${version}-src.tgz" />
+	<!-- from -->
+	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
+	<!-- to -->
+</exec>
+</target>
 
-	<!-- Note: To remove a bigdata installation, first change the run state to
+<target name="publish-api" depends="javadoc" description="copy javadoc to server.">
+<fail message="Javadoc not generated.">
+	<condition>
+		<not>
+			<available file="docs/api" type="dir" />
+		</not>
+	</condition>
+</fail>
+<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}" />
+<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}" />
+<exec executable="${ssh.scp}">
+	<arg value="-r" />
+	<!-- recursive. -->
+	<arg value="-v" />
+	<!-- verbose protocol. -->
+	<arg value="-C" />
+	<!-- compression. -->
+	<arg value="-l" />
+	<arg value="${ssh.username}" />
+	<arg value="-pw" />
+	<arg value="${ssh.password}" />
+	<arg value="${build.dir}/docs" />
+	<!-- from -->
+	<arg value="shell.speakeasy.net:systap.com/bigdata/" />
+	<!-- to -->
+</exec>
+</target>
+
+<!-- Note: To remove a bigdata installation, first change the run state to
 		 'destroy' and wait for all services to halt.  Then remove the shared
 		 NAS directory and the LAS directory on each host running the bigdata
 		 instance.
@@ -369,450 +362,376 @@
 	for the dirty on the jini Service Browser.
 	
 	-->
-	<target name="install" depends="jar, javadoc, bundle" description="Install bigdata.">
-		<!-- create NAS/LAS directories. -->
-		<mkdir dir="${NAS}"/>
-		<mkdir dir="${LAS}"/>
-		<!-- NAS/LAS directories must be read/write for the group. -->
-		<chmod perm="ug+rw,o-rw">
-			<fileset dir="${NAS}"/>
-		</chmod>
-		<chmod perm="ug+rw,o-rw">
-			<fileset dir="${LAS}"/>
-		</chmod>
-		<!-- create subdirectories of NAS - should inherit permissions. -->
-		<mkdir dir="${install.config.dir}"/>
-		<mkdir dir="${install.doc.dir}"/>
- 		<mkdir dir="${install.lib.dir}"/>
-		<mkdir dir="${install.bin.dir}"/>
-		<mkdir dir="${install.log.dir}"/>
-		<!-- install configuration files. -->
-		<copy toDir="${install.config.dir}">
-    		<fileset dir="${bigdata.dir}/src/resources/config">
-    		</fileset>
-		</copy>
-		<!-- install documentation. -->
-		<copy toDir="${install.doc.dir}">
-			<!-- javadoc. -->
-        	<fileset dir="${build.dir}/docs"/>
- 			<!-- common files from the root of the archive. -->
-			<!-- @todo cleanup LEGAL into one directory off the root in the src tree? -->
-			<fileset dir="${bigdata.dir}">
-				 <include name="LICENSE.txt"/>
-				 <include name="overview.html"/>
-				 <include name="README-JINI"/>
-				 <include name="bigdata/LEGAL/*"/>
-				 <include name="bigdata-jini/LEGAL/*"/>
-				 <include name="bigdata-rdf/LEGAL/*"/>
-				 <include name="bigdata-sails/LEGAL/*"/>
-			</fileset>
-		</copy>
-		<!-- install JARs. -->
-		<copy toDir="${install.lib.dir}">
-        	<fileset dir="${build.dir}/lib"/>
-			<fileset file="${build.dir}/${version}.jar"/>
-		</copy>
-		<!-- install scripts. -->
-		<copy toDir="${install.bin.dir}">
-        	<fileset dir="src/resources/scripts">
-        </fileset>
-		</copy>
-		<!-- parameter substitution. -->
-		<property name="myclasspath" refid="install.classpath"/>
-		<replace dir="${install.bin.dir}" summary="true">
-     	    <replacefilter token="@FED@" value="${FED}"/>
-     	    <replacefilter token="@NAS@" value="${NAS}"/>
-     	    <replacefilter token="@LAS@" value="${LAS}"/>
-     	    <replacefilter token="@MASTER@" value="${MASTER}"/>
-     	    <replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}"/>
-     	    <replacefilter token="@ANT_HOME@" value="${ANT_HOME}"/>
-     	    <replacefilter token="@JINI_HOME@" value="${JINI_HOME}"/>
-     	    <replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}"/>
-     	    <replacefilter token="@USE_NIO@" value="${USE_NIO}"/>
-    	    <replacefilter token="@BIN_DIR@" value="${install.bin.dir}"/>
-    	    <replacefilter token="@LIB_DIR@" value="${install.lib.dir}"/>
-    	    <replacefilter token="@LOG_DIR@" value="${install.log.dir}"/>
-    	    <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}"/>
-     	    <replacefilter token="@INSTALL_USER@" value="${install.user}"/>
-     	    <replacefilter token="@INSTALL_GROUP@" value="${install.group}"/>
-     	    <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}"/>
-     	    <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}"/>
-     	    <replacefilter token="@JINI_CONFIG@" value="${jini.config}"/>
-     	    <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}"/>
-     	    <replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}"/>
-     	    <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}"/>
-     	    <replacefilter token="@POLICY_FILE@" value="${policyFile}"/>
-     	    <replacefilter token="@EVENT_LOG@" value="${eventLog}"/>
-     	    <replacefilter token="@ERROR_LOG@" value="${errorLog}"/>
-     	    <replacefilter token="@DETAIL_LOG@" value="${detailLog}"/>
- 	    	<replacefilter token="@STATE_LOG@" value="${stateLog}"/>
-     	    <replacefilter token="@STATE_FILE@" value="${stateFile}"/>
-     	    <replacefilter token="@CLASSPATH@" value="${myclasspath}"/>
-    	</replace>
-    	<replace dir="${install.config.dir}" summary="true">
-     	    <replacefilter token="@FED@" value="${FED}"/>
-     	    <replacefilter token="@NAS@" value="${NAS}"/>
-     	    <replacefilter token="@LAS@" value="${LAS}"/>
-     	    <replacefilter token="@MASTER@" value="${MASTER}"/>
-     	    <replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}"/>
-     	    <replacefilter token="@ANT_HOME@" value="${ANT_HOME}"/>
-     	    <replacefilter token="@JINI_HOME@" value="${JINI_HOME}"/>
-     	    <replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}"/>
-     	    <replacefilter token="@USE_NIO@" value="${USE_NIO}"/>
-    	    <replacefilter token="@BIN_DIR@" value="${install.bin.dir}"/>
-    	    <replacefilter token="@LIB_DIR@" value="${install.lib.dir}"/>
-    	    <replacefilter token="@LOG_DIR@" value="${install.log.dir}"/>
-    	    <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}"/>
-     	    <replacefilter token="@INSTALL_USER@" value="${install.user}"/>
-     	    <replacefilter token="@INSTALL_GROUP@" value="${install.group}"/>
-     	    <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}"/>
-     	    <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}"/>
-     	    <replacefilter token="@JINI_CONFIG@" value="${jini.config}"/>
-     	    <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}"/>
-     	    <replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}"/>
-     	    <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}"/>
-     	    <replacefilter token="@POLICY_FILE@" value="${policyFile}"/>
-     	    <replacefilter token="@EVENT_LOG@" value="${eventLog}"/>
-     	    <replacefilter token="@ERROR_LOG@" value="${errorLog}"/>
-     	    <replacefilter token="@DETAIL_LOG@" value="${detailLog}"/>
- 	    	<replacefilter token="@STATE_LOG@" value="${stateLog}"/>
-     	    <replacefilter token="@STATE_FILE@" value="${stateFile}"/>
-     	    <replacefilter token="@CLASSPATH@" value="${myclasspath}"/>
-    	</replace>
-		<!-- fix newlines (otherwise substitutions cause things to break). -->
-        <fixcrlf srcDir="${install.bin.dir}"/>
-		<!-- set execute bit for scripts in this directory (must be the last step). -->
-		<chmod perm="u+x,g+rx,o-rwx">
-			<fileset dir="${install.bin.dir}"/>
-		</chmod>
-		<!-- Setup the status file which will be read by the bigdata script and
+<target name="install" depends="jar, javadoc, bundle" description="Install bigdata.">
+<!-- create NAS/LAS directories. -->
+<mkdir dir="${NAS}" />
+<mkdir dir="${LAS}" />
+<!-- NAS/LAS directories must be read/write for the group. -->
+<chmod perm="ug+rw,o-rw">
+	<fileset dir="${NAS}" />
+</chmod>
+<chmod perm="ug+rw,o-rw">
+	<fileset dir="${LAS}" />
+</chmod>
+<!-- create subdirectories of NAS - should inherit permissions. -->
+<mkdir dir="${install.config.dir}" />
+<mkdir dir="${install.doc.dir}" />
+<mkdir dir="${install.lib.dir}" />
+<mkdir dir="${install.bin.dir}" />
+<mkdir dir="${install.log.dir}" />
+<!-- install configuration files. -->
+<copy toDir="${install.config.dir}">
+	<fileset dir="${bigdata.dir}/src/resources/config">
+	</fileset>
+</copy>
+<!-- install documentation. -->
+<copy toDir="${install.doc.dir}">
+	<!-- javadoc. -->
+	<fileset dir="${build.dir}/docs" />
+	<!-- common files from the root of the archive. -->
+	<!-- @todo cleanup LEGAL into one directory off the root in the src tree? -->
+	<fileset dir="${bigdata.dir}">
+		<include name="LICENSE.txt" />
+		<include name="overview.html" />
+		<include name="README-JINI" />
+		<include name="bigdata/LEGAL/*" />
+		<include name="bigdata-jini/LEGAL/*" />
+		<include name="bigdata-rdf/LEGAL/*" />
+		<include name="bigdata-sails/LEGAL/*" />
+	</fileset>
+</copy>
+<!-- install JARs. -->
+<copy toDir="${install.lib.dir}">
+	<fileset dir="${build.dir}/lib" />
+	<fileset file="${build.dir}/${version}.jar" />
+</copy>
+<!-- install scripts. -->
+<copy toDir="${install.bin.dir}">
+	<fileset dir="src/resources/scripts">
+	</fileset>
+</copy>
+<!-- parameter substitution. -->
+<property name="myclasspath" refid="install.classpath" />
+<replace dir="${install.bin.dir}" summary="true">
+	<replacefilter token="@FED@" value="${FED}" />
+	<replacefilter token="@NAS@" value="${NAS}" />
+	<replacefilter token="@LAS@" value="${LAS}" />
+	<replacefilter token="@MASTER@" value="${MASTER}" />
+	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+	<replacefilter token="@ANT_HOME@" value="${ANT_HOME}" />
+	<replacefilter token="@JINI_HOME@" value="${JINI_HOME}" />
+	<replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+	<replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+	<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+	<replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+	<replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+	<replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+	<replacefilter token="@INSTALL_USER@" value="${install.user}" />
+	<replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+	<replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+	<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+	<replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+	<replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
+	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
+	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+</replace>
+<replace dir="${install.config.dir}" summary="true">
+	<replacefilter token="@FED@" value="${FED}" />
+	<replacefilter token="@NAS@" value="${NAS}" />
+	<replacefilter token="@LAS@" value="${LAS}" />
+	<replacefilter token="@MASTER@" value="${MASTER}" />
+	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
+	<replacefilter token="@ANT_HOME@" value="${ANT_HOME}" />
+	<replacefilter token="@JINI_HOME@" value="${JINI_HOME}" />
+	<replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
+	<replacefilter token="@USE_NIO@" value="${USE_NIO}" />
+	<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+	<replacefilter token="@LIB_DIR@" value="${install.lib.dir}" />
+	<replacefilter token="@LOG_DIR@" value="${install.log.dir}" />
+	<replacefilter token="@CONFIG_DIR@" value="${install.config.dir}" />
+	<replacefilter token="@INSTALL_USER@" value="${install.user}" />
+	<replacefilter token="@INSTALL_GROUP@" value="${install.group}" />
+	<replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
+	<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+	<replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
+	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+	<replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
+	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
+	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
+	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
+	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
+	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+</replace>
+<!-- fix newlines (otherwise substitutions cause things to break). -->
+<fixcrlf srcDir="${install.bin.dir}" />
+<!-- set execute bit for scripts in this directory (must be the last step). -->
+<chmod perm="u+x,g+rx,o-rwx">
+	<fileset dir="${install.bin.dir}" />
+</chmod>
+<!-- Setup the status file which will be read by the bigdata script and
 		     the log on which that script will write its output.  This is used
 		     if cron, or a similar process, will execute the script on a periodic
 		     basis.  The initial state is always 'status'.  The initial stateLog
 		     is always empty.  The state file must be readable by the group, but
 		     could be restricted to write by a specific user. The stateLog must be
 		     read/write for the group. -->
-		<echo file="${stateFile}">status</echo>
-		<echo file="${stateLog}"></echo>
-		<chmod perm="g+r,o-rw" file="${stateFile}"/>
-		<chmod perm="g+rw,o-rw" file="${stateLog}"/>
-		<loadfile property="postInstallMessage"
-		      srcFile="${install.bin.dir}/POST-INSTALL"/>
-		<echo>\n\n${postInstallMessage}</echo> 
-	</target>
-	
-	<!-- Note: we must fork the JVM to get the jvmarg overrides. -->
-	<!-- Note: We suppress the bigdata banner so it does not get written into output file. -->
-	<!-- Note: We disable registration of log4j MBeans since that requires policy file. -->
-	<target name="analysis" depends="jar"
-		description="Extracts performance counters from logged XML files.">
-	<mkdir dir="${analysis.out.dir}"/>
-	<mkdir dir="${analysis.out.dir}/cpu"/>
-	<mkdir dir="${analysis.out.dir}/disk"/>
-	<mkdir dir="${analysis.out.dir}/memory"/>
-	<mkdir dir="${analysis.out.dir}/service"/>
-	<mkdir dir="${analysis.out.dir}/service/cs"/>
-	<mkdir dir="${analysis.out.dir}/service/ds"/>
+<echo file="${stateFile}">status</echo>
+<echo file="${stateLog}">
+</echo>
+<chmod perm="g+r,o-rw" file="${stateFile}" />
+<chmod perm="g+rw,o-rw" file="${stateLog}" />
+<loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
+<echo>
 
-		<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/service/cs/chunksIn.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-			<classpath refid="runtime.classpath"/>
-			<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-			<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-			<arg value="-regex"/>
-			<arg value="/([^/]*)/.*IClientService/.*/Indices/([^/]*)/asynchronous/chunksIn"/>
-			<arg value="-report"/>
-			<arg value="correlated"/>
-			<arg value="-period"/>
-			<arg value="Minutes"/>
-			<arg value="-depth"/>
-			<arg value="14"/>
-			<arg file="${analysis.counters.dir}"/>
-		</java>
+${postInstallMessage}</echo>
+</target>
 
-		<java classname="com.bigdata.counters.query.CounterSetQuery"
-					  		  output="${analysis.out.dir}/service/cs/chunksOut.txt"
-					  			failonerror="true"
-								fork="true"
-								logerror="true"
-					>
-				<classpath refid="runtime.classpath"/>
-				<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-				<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-				<arg value="-regex"/>
-			    <arg value="/([^/]*)/.*IClientService/.*/Indices/([^/]*)/asynchronous/chunksOut"/>
-				<arg value="-report"/>
-				<arg value="correlated"/>
-				<arg value="-period"/>
-				<arg value="Minutes"/>
-				<arg value="-depth"/>
-				<arg value="14"/>
-				<arg file="${analysis.counters.dir}"/>
-			</java>
+<!-- Note: we must fork the JVM to get the jvmarg overrides. -->
+<!-- Note: We suppress the bigdata banner so it does not get written into output file. -->
+<!-- Note: We disable registration of log4j MBeans since that requires policy file. -->
+<target name="analysis" depends="jar" description="Extracts performance counters from logged XML files.">
+<mkdir dir="${analysis.out.dir}" />
+<mkdir dir="${analysis.out.dir}/cpu" />
+<mkdir dir="${analysis.out.dir}/disk" />
+<mkdir dir="${analysis.out.dir}/memory" />
+<mkdir dir="${analysis.out.dir}/service" />
+<mkdir dir="${analysis.out.dir}/service/cs" />
+<mkdir dir="${analysis.out.dir}/service/ds" />
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-			  		  output="${analysis.out.dir}/service/cs/toldTriplesPerSec.txt"
-			  			failonerror="true"
-						fork="true"
-						logerror="true"
-			>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/.*/U.*/Concurrent Data Loader/toldTriplesPerSec"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="7"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/chunksIn.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IClientService/.*/Indices/([^/]*)/asynchronous/chunksIn" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="14" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/service/cs/toldTriplesLoaded.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/.*/U.*/Concurrent Data Loader/toldTriplesLoaded"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="7"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/chunksOut.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IClientService/.*/Indices/([^/]*)/asynchronous/chunksOut" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="14" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/memory/bytesFree.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/Memory/Bytes Free"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="3"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/toldTriplesPerSec.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*/U.*/Concurrent Data Loader/toldTriplesPerSec" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="7" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/memory/majorPageFaultsPerSecond.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/Memory/Major Page Faults Per Second"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="3"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/toldTriplesLoaded.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*/U.*/Concurrent Data Loader/toldTriplesLoaded" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="7" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-					  		  output="${analysis.out.dir}/cpu/processorTime.txt"
-					  			failonerror="true"
-								fork="true"
-								logerror="true"
-					>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/CPU/% Processor Time"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="5"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/memory/bytesFree.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/Memory/Bytes Free" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="3" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-					  		  output="${analysis.out.dir}/cpu/IOWait.txt"
-					  			failonerror="true"
-								fork="true"
-								logerror="true"
-					>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/CPU/% IO Wait"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="5"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/memory/majorPageFaultsPerSecond.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/Memory/Major Page Faults Per Second" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="3" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/disk/bytesWrittenPerSec.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/PhysicalDisk/Bytes Written Per Second"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="3"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/cpu/processorTime.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/CPU/% Processor Time" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="5" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/disk/bytesReadPerSecond.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/PhysicalDisk/Bytes Read Per Second"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="3"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/cpu/IOWait.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/CPU/% IO Wait" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="5" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/service/ds/indexSegmentCacheSize.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/.*IDataService/.*Index Manager/Index Segment Cache Size"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="12"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/disk/bytesWrittenPerSec.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/PhysicalDisk/Bytes Written Per Second" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="3" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafCount.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/.*IDataService/.*Index Manager/Index Segment Open Leaf Count"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="12"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/disk/bytesReadPerSecond.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/PhysicalDisk/Bytes Read Per Second" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="3" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafByteCount.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/.*IDataService/.*Index Manager/Index Segment Open Leaf Byte Count"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="12"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/indexSegmentCacheSize.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IDataService/.*Index Manager/Index Segment Cache Size" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/service/ds/bytesUnderManagement.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/.*/Bytes Under Management"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="10"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafCount.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IDataService/.*Index Manager/Index Segment Open Leaf Count" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
 
-	<java classname="com.bigdata.counters.query.CounterSetQuery"
-				  		  output="${analysis.out.dir}/service/ds/managedSegmentStoreCount.txt"
-				  			failonerror="true"
-							fork="true"
-							logerror="true"
-				>
-		<classpath refid="runtime.classpath"/>
-		<jvmarg value="-Dcom.bigdata.Banner.quiet=true"/>
-		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true"/>
-		<arg value="-regex"/>
-		<arg value="/([^/]*)/.*IDataService/.*Store Manager/Managed Segment Store Count"/>
-		<arg value="-report"/>
-		<arg value="correlated"/>
-		<arg value="-period"/>
-		<arg value="Minutes"/>
-		<arg value="-depth"/>
-		<arg value="12"/>
-		<arg file="${analysis.counters.dir}"/>
-	</java>
-	</target>
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafByteCount.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IDataService/.*Index Manager/Index Segment Open Leaf Byte Count" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/bytesUnderManagement.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*/Bytes Under Management" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="10" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+
+<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/managedSegmentStoreCount.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IDataService/.*Store Manager/Managed Segment Store Count" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+</target>
 
 </project>
