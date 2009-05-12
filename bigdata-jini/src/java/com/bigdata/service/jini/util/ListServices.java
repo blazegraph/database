@@ -250,8 +250,9 @@ public class ListServices {
             sb.append("Zookeeper: is " + (foundZooKeeper ? "" : "not ")
                     + "running.\n");
 
-            sb.append("Discovered " + registrars.length
-                    + " service registrars.\n");
+            sb.append("Jini is " + (registrars.length > 0 ? "" : "not ")
+                    + " running (discovered " + registrars.length
+                    + " jini service registrars).\n");
 
             sb.append("Discovered " + bigdataServiceCount
                     + " bigdata services.\n");
