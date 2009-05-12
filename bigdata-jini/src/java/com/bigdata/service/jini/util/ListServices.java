@@ -268,7 +268,7 @@ public class ListServices {
                     .entrySet()) {
 
                 sb.append("There are " + e.getValue().size()
-                        + " instances of " + e.getKey().getName());
+                        + " instances of " + e.getKey().getName()+"\n");
 
                 if (showServiceItems)
                     for (ServiceItem t : e.getValue()) {
