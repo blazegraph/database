@@ -1,0 +1,9 @@
+This directory contains the configuration for the various Jini services.
+
+DO NOT attempt to start the Jini browser service from the bigdata
+script.  The browser service requires a GUI.  An attempt to start
+the browser from the bigdata script will cause the jini service
+start to fail.
+
+You can always install jini in the normal manner when logged in
+with a GUI and then run the service browser from there.
