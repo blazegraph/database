@@ -201,17 +201,17 @@ case "$1" in
 	    random=`date +%N | sed -e 's/000$//' -e 's/^0//'`
 	    if [ -s "$eventLog" ]; then
 		echo $"`date` : `hostname` : renaming old event log."
-		mv "$eventLog" "/opt2/bigdata-event-`date +%F`$random.log"
+		mv "$eventLog" "$eventLog-`date +%F`$random.old"
 	    fi
 # Move the error log out of the way (exists and is not empty).
 	    if [ -s "$errorLog" ]; then
 		echo $"`date` : `hostname` : renaming old error log."
-		mv "$errorLog" "/opt2/bigdata-error-`date +%F`$random.log"
+		mv "$errorLog" "$errorLog-`date +%F`$random.old"
 	    fi
 # Move the services log out of the way (exists and is not empty).
 	    if [ -s "$detailLog" ]; then
 		echo $"`date` : `hostname` : renaming old services log."
-		mv "$detailLog" "/opt2/bigdata-services-`date +%F`$random.log"
+		mv "$detailLog" "$detailLog-`date +%F`$random.old"
 	    fi
 # Delete performance counter snapshots from the load balancer.
 	    if [ -d "/opt2/var/log/bigdata" ]; then
