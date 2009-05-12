@@ -72,6 +72,11 @@ export BIGDATA_CONFIG="@BIGDATA_CONFIG@"
 export BIGDATA_CONFIG_OVERRIDES=
 
 #
+# The jini services configuration file.
+#
+export JINI_CONFIG="@JINI_CONFIG@"
+
+#
 # The policy file used to grant permissions for Java services.  The default
 # policy grants ALL permissions.  This makes setup easy but is less secure.
 #
