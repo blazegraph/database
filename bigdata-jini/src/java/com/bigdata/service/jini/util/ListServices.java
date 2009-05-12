@@ -186,9 +186,6 @@ public class ListServices {
 
             final StringBuilder sb = new StringBuilder();
             
-            sb.append("Found " + a.length + " services after " + discoveryDelay
-                    + "ms\n");
-
             // Aggregate the bigdata services by their most interesting interfaces.
             final Map<Class<? extends IService>, List<ServiceItem>> bigdataServices = new HashMap<Class<? extends IService>, List<ServiceItem>>(
                     a.length);
@@ -253,6 +250,9 @@ public class ListServices {
             sb.append("Jini is " + (registrars.length > 0 ? "" : "not ")
                     + " running (discovered " + registrars.length
                     + " jini service registrars).\n");
+
+            sb.append("Discovered " + a.length + " services after "
+                    + discoveryDelay + "ms\n");
 
             sb.append("Discovered " + bigdataServiceCount
                     + " bigdata services.\n");
