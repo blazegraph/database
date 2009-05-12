@@ -244,12 +244,15 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
         }
 
         protected void addCommandArgs(final List<String> cmds) {
+
+            // essentially the JVM args.
+            super.addCommandArgs(cmds);
             
+            // the class name.
             cmds.add(ServiceStarter.class.getName());
             
+            // the config file.
             cmds.add(configFile.toString());
-            
-            super.addCommandArgs(cmds);
             
         }
         
