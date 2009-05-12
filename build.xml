@@ -498,7 +498,7 @@
 		<chmod perm="g+rw,o-rw" file="${stateLog}"/>
 		<loadfile property="postInstallMessage"
 		      srcFile="${install.bin.dir}/POST-INSTALL"/>
-		<echo>${postInstallMessage}</echo> 
+		<echo>\n\n${postInstallMessage}</echo> 
 	</target>
 	
 	<!-- Note: we must fork the JVM to get the jvmarg overrides. -->
