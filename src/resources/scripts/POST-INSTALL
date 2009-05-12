@@ -28,6 +28,3 @@ tail -f @ERROR_LOG@
 You can use list the discovered services using:
 
 @BIN_DIR@/listServices.sh
-
-Performance counters will be reported by whichever host is running the
-load balancer once that service comes online.  
