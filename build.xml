@@ -292,7 +292,10 @@
 		</exec>
 	</target>
 
-	<!-- 
+	<!-- Note: To remove a bigdata installation, first change the run state to
+		 'destroy' and wait for all services to halt.  Then remove the shared
+		 NAS directory and the LAS directory on each host running the bigdata
+		 instance.
  	     
  	     @todo classServer setup : The following are somewhat dated notes on using jini with downloadable
 	     code.
@@ -475,7 +478,9 @@
 		<!-- fix newlines (otherwise substitutions cause things to break). -->
         <fixcrlf srcDir="${install.bin.dir}"/>
 		<!-- set execute bit for scripts in this directory (must be the last step). -->
-		<chmod perm="u+x,g+rx,o-rwx" dir="${install.bin.dir}"/>
+		<chmod perm="u+x,g+rx,o-rwx">
+			<fileset dir="${install.bin.dir}"/>
+		</chmod>
 		<!-- Setup the status file which will be read by the bigdata script and
 		     the log on which that script will write its output.  This is used
 		     if cron, or a similar process, will execute the script on a periodic
