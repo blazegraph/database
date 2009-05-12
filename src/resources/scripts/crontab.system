@@ -1,4 +1,14 @@
-# This is a sample system crontab for running bigdata. 
+# This crontab will execute the bigdata script once per minute, logging all
+# output onto a file in the NAS directory.  To change the run state of the
+# bigdata instance, you edit
+# 
+#    @STATE_FILE@
+#
+# and then watch
+#
+#    @STATE_LOG@
+#
+# until the hosts converge on the new run state.
 #
 # To use this crontab, you must register edit /etc/crontab on each host.  The
 # user
@@ -15,18 +25,6 @@
 #    @LAS@
 #
 # on each host.
-#
-# This crontab will execute the bigdata script once per minute, logging all
-# output onto a file in the NAS directory.  To change the run state of the
-# bigdata instance, you edit
-# 
-#    @stateFile@
-#
-# and then watch
-#
-#    @stateLog@
-#
-# until the hosts converge on the new run state.
 
 # Run once per minute
 * * * * * @INSTALL_USER@ @BIN_DIR@/bigdata file @stateFile@ >> @stateLog@ 2>&1
