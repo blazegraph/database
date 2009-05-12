@@ -178,11 +178,13 @@ public class ListServices {
             System.out.println("Waiting " + discoveryDelay
                     + "ms for service discovery.");
 
-            Thread.sleep(discoveryDelay/* ms */);
-
-            final ServiceItem[] a = fed.getServicesManagerClient()
-                    .getServiceCache()
-                    .getServiceItems(0/* maxCount */, null/* filter */);
+            final ServiceItem[] a = fed.getServiceDiscoveryManager().lookup(//
+                    null,// serviceTemplate
+                    Integer.MAX_VALUE,// minMatches
+                    Integer.MAX_VALUE,// maxMatches
+                    null,// filter
+                    discoveryDelay// waitDur(ms)
+                    );
 
             final StringBuilder sb = new StringBuilder();
             
@@ -205,19 +207,20 @@ public class ListServices {
 
                     }
 
-                    final Class<?extends IService> serviceIface = ((IService) serviceItem.service)
-                    .getServiceIface();
-                    
-                    List<ServiceItem> lst = bigdataServices.get(serviceIface); 
-                    if(lst == null) {
+                    final Class<? extends IService> serviceIface = ((IService) serviceItem.service)
+                            .getServiceIface();
 
-                        lst = new LinkedList<ServiceItem>();
+                    List<ServiceItem> list = bigdataServices.get(serviceIface);
+
+                    if (list == null) {
+
+                        list = new LinkedList<ServiceItem>();
                         
-                        bigdataServices.put(serviceIface, lst);
+                        bigdataServices.put(serviceIface, list);
                         
                     }
 
-                    lst.add(serviceItem);
+                    list.add(serviceItem);
 
                     bigdataServiceCount++;
 
@@ -229,7 +232,8 @@ public class ListServices {
              * Figure out if zookeeper is running.
              * 
              * Note: We don't wait long here since we already waited for service
-             * discovery above.
+             * discovery above and the zookeeper discover was running
+             * asynchronously with that (the federation object handles this).
              */
             final boolean foundZooKeeper = fed.getZookeeperAccessor()
                     .awaitZookeeperConnected(10, TimeUnit.MILLISECONDS);
