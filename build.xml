@@ -476,7 +476,10 @@
 <fixcrlf srcDir="${install.bin.dir}" />
 <!-- set execute bit for scripts in this directory (must be the last step). -->
 <chmod perm="u+x,g+rx,o-rwx">
-	<fileset dir="${install.bin.dir}" />
+	<fileset dir="${install.bin.dir}">
+	<exclude name="README"/>
+	<exclude name="POST-INSTALL"/>
+	</fileset>
 </chmod>
 <!-- Setup the status file which will be read by the bigdata script and
 		     the log on which that script will write its output.  This is used
