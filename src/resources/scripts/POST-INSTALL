@@ -20,15 +20,28 @@ SERVICE.
 
 Next, edit @STATE_FILE@ and change the bigdata run state to 'start'.
 If everything was configured correctly, the bigdata services will
-soon start on all hosts in the cluster.  You can watch the progress
-using 
+soon start on all hosts in the cluster.
 
-tail -f @STATE_LOG@
+You can watch the progress using:
 
-Likewise, you can look for errors using:
-
-tail -f @ERROR_LOG@
+@BIN_DIR@/listServices.sh
 
 You can use list the discovered services using:
 
-@BIN_DIR@/listServices.sh
+tail -f @STATE_LOG@
+
+You can look for errors using:
+
+tail -f @ERROR_LOG@
+
+You will typically see errors initially as some services can not start.
+For example, if jini or zookeeper can not be discovered.  However, those
+errors should go away once these services are running.
+
+A good practice is to debug your configuration by running 'bigdata start'
+directly from the appropriate user account on the individual machines,
+especially those which will run jini, zookeeper, the bigdata transaction
+service, the bigdata load balancer service, and the bigdata metadata
+service.  Once you know that the basic services on those machines can
+be started, you can change the run state for the entire federation and
+the rest of your services should also come online.
