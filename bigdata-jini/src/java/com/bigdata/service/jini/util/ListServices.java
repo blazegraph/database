@@ -38,8 +38,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.config.ConfigurationException;
+import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
+import net.jini.core.lookup.ServiceTemplate;
 
 import org.apache.log4j.Logger;
 
@@ -178,8 +180,13 @@ public class ListServices {
             System.out.println("Waiting " + discoveryDelay
                     + "ms for service discovery.");
 
+            // match all services.
             final ServiceItem[] a = fed.getServiceDiscoveryManager().lookup(//
-                    null,// serviceTemplate
+                    new ServiceTemplate(//
+                            null, //serviceID
+                            new Class[0],// serviceTypes[]
+                            new Entry[0] // attributes
+                            ),
                     Integer.MAX_VALUE,// minMatches
                     Integer.MAX_VALUE,// maxMatches
                     null,// filter
