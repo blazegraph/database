@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.jini.util;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -202,14 +203,19 @@ public class ListServices {
             final Map<Class<? extends IService>, List<ServiceItem>> bigdataServices = new HashMap<Class<? extends IService>, List<ServiceItem>>(
                     a.length);
 
+            // Aggregate the bigdata services by the host on which they are
+            // running.
+            final Map<String, List<ServiceItem>> bigdataServicesByHost = new HashMap<String, List<ServiceItem>>(
+                    a.length);
+
             // A list of bigdata services where RMI failed.
             final List<ServiceItem> staleServices = new LinkedList<ServiceItem>();
 
             // The #of live bigdata services (where RMI succeeds).
             int bigdataServiceCount = 0;
-            
+
             {
-                
+
                 for (ServiceItem serviceItem : a) {
 
                     if (!(serviceItem.service instanceof IService)) {
@@ -221,32 +227,60 @@ public class ListServices {
                     }
 
                     final Class<? extends IService> serviceIface;
+                    final String hostname;
                     try {
 
                         serviceIface = ((IService) serviceItem.service)
                                 .getServiceIface();
-                        
+
+                        hostname = ((IService) serviceItem.service)
+                                .getHostname();
+
                     } catch (IOException ex) {
-                        
+
                         log.warn("RMI error: " + ex + " for " + serviceItem);
-                        
+
                         staleServices.add(serviceItem);
-                        
+
                         continue;
-                        
+
                     }
 
-                    List<ServiceItem> list = bigdataServices.get(serviceIface);
+                    // aggregate by serviceIface
+                    {
 
-                    if (list == null) {
+                        List<ServiceItem> list = bigdataServices
+                                .get(serviceIface);
 
-                        list = new LinkedList<ServiceItem>();
-                        
-                        bigdataServices.put(serviceIface, list);
-                        
+                        if (list == null) {
+
+                            list = new LinkedList<ServiceItem>();
+
+                            bigdataServices.put(serviceIface, list);
+
+                        }
+
+                        list.add(serviceItem);
+
                     }
 
-                    list.add(serviceItem);
+                    // aggregate by hostname
+                    {
+
+                        List<ServiceItem> list = bigdataServicesByHost
+                                .get(hostname);
+
+                        if (list == null) {
+
+                            list = new LinkedList<ServiceItem>();
+
+                            bigdataServicesByHost.put(hostname, list);
+
+                        }
+
+                        list.add(serviceItem);
+
+                    }
 
                     bigdataServiceCount++;
 
@@ -292,20 +326,64 @@ public class ListServices {
             sb.append("Discovered " + otherServices.size()
                     + " other services.\n");
 
-            for (Map.Entry<Class<? extends IService>, List<ServiceItem>> e : bigdataServices
-                    .entrySet()) {
+            // aggregation by serviceIface
+            {
 
-                sb.append("There are " + e.getValue().size()
-                        + " instances of " + e.getKey().getName()+"\n");
+                sb.append("Bigdata services by serviceIface:\n");
 
-                if (showServiceItems)
-                    for (ServiceItem t : e.getValue()) {
+                final Class<? extends IService>[] keys = bigdataServices
+                        .keySet().toArray(new Class[] {});
+                
+                Arrays.sort(keys);
+                
+                for (Class<?extends IService> serviceIface : keys) {
 
-                        sb.append(t.toString());
-                        
-                        sb.append("\n");
+                    final List<ServiceItem> list = bigdataServices
+                            .get(serviceIface);
+                    
+                    sb.append("\tThere are " + list.size()
+                            + " instances of " + serviceIface + "\n");
 
-                    }
+                    if (showServiceItems)
+                        for (ServiceItem t : list) {
+
+                            sb.append(t.toString());
+
+                            sb.append("\n");
+
+                        }
+
+                }
+            }
+
+            // aggregation by hostname
+            {
+            
+                sb.append("Bigdata services by hostname:\n");
+
+                final String[] keys = bigdataServicesByHost.keySet().toArray(
+                        new String[] {});
+        
+                Arrays.sort(keys);
+        
+                for (String hostname : keys) {
+
+                    final List<ServiceItem> list = bigdataServicesByHost
+                            .get(hostname);
+
+                    sb.append("\tThere are " + list.size()
+                            + " instances on " + hostname + "\n");
+
+                    if (false && showServiceItems)
+                        for (ServiceItem t : list) {
+
+                            sb.append(t.toString());
+
+                            sb.append("\n");
+
+                        }
+
+                }
 
             }
 
@@ -313,15 +391,15 @@ public class ListServices {
                 for (ServiceItem t : otherServices) {
 
                     sb.append(t.toString());
-                    
+
                     sb.append("\n");
 
                 }
 
             return sb.toString();
-            
+
         }
-        
+
     } // class DiscoveryAndListTask
-    
+
 }
