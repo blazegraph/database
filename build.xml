@@ -374,8 +374,12 @@
 		<mkdir dir="${NAS}"/>
 		<mkdir dir="${LAS}"/>
 		<!-- NAS/LAS directories must be read/write for the group. -->
-		<chmod perm="ug+rw,o-rw" file="${NAS}"/>
-		<chmod perm="ug+rw,o-rw" file="${LAS}"/>
+		<chmod perm="ug+rw,o-rw">
+			<fileset dir="${NAS}"/>
+		</chmod>
+		<chmod perm="ug+rw,o-rw">
+			<fileset dir="${LAS}"/>
+		</chmod>
 		<!-- create subdirectories of NAS - should inherit permissions. -->
 		<mkdir dir="${install.config.dir}"/>
 		<mkdir dir="${install.doc.dir}"/>
