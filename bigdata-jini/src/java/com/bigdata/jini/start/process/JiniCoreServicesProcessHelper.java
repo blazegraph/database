@@ -178,23 +178,23 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
 
     }
 
-    /**
-     * Not supported.
-     * 
-     * FIXME I have not worked out yet how to destroy the jini core services. In
-     * fact, there are generally 6 services started (reggie is only one). By
-     * default they are started in the same activation group. [Note that using
-     * {@link Process#destroy()} DOES NOT work.]
-     * 
-     * @see http://www.dancres.org/cottage/doc/api/com/sun/jini/reggie/package-summary.html
-     */
-    public int kill(boolean immediateShutdown) {
-       
-        log.error("Can not kill jini");
-        
-        return 1;
-        //throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * Not supported.
+//     * 
+//     * FIXME I have not worked out yet how to destroy the jini core services. In
+//     * fact, there are generally 6 services started (reggie is only one). By
+//     * default they are started in the same activation group. [Note that using
+//     * {@link Process#destroy()} DOES NOT work.]
+//     * 
+//     * @see http://www.dancres.org/cottage/doc/api/com/sun/jini/reggie/package-summary.html
+//     */
+//    public int kill(boolean immediateShutdown) {
+//       
+//        log.error("Can not kill jini");
+//        
+//        return 1;
+//        //throw new UnsupportedOperationException();
+//        
+//    }
     
 }
