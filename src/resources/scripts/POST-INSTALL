@@ -1,12 +1,12 @@
 Note: This presumes that you have successfully installed bigdata using
 the 'ant install' target.
 
-In order to manage the bigdata run state you need to modify the
-crontab so that it will automatically execute:
+In order to manage the bigdata run state you need to modify crontab
+so that it will automatically execute:
 
 @BIN_DIR@/bigdata
 
-script once per minute, reading the desired run state from:
+once per minute, reading the desired run state from:
 
 @STATE_FILE@
 
