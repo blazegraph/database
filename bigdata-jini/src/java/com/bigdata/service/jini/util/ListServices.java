@@ -244,7 +244,7 @@ public class ListServices {
              * Write out a summary of the discovered services.
              */
 
-            sb.append("Zookeeper: is " + (foundZooKeeper ? "" : "not ")
+            sb.append("Zookeeper is " + (foundZooKeeper ? "" : "not ")
                     + "running.\n");
 
             sb.append("Jini is " + (registrars.length > 0 ? "" : "not ")
