@@ -112,10 +112,6 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 public class ZooKeeperAccessor {
 
     protected static final Logger log = Logger.getLogger(ZooKeeperAccessor.class);
-
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
     
     private volatile ZooKeeper zookeeper;
 
@@ -174,7 +170,7 @@ public class ZooKeeperAccessor {
 
                 if (zookeeper != null && zookeeper.getState().isAlive()) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("success: ntries="
                                 + ntries
                                 + ", elapsed="
@@ -293,7 +289,7 @@ public class ZooKeeperAccessor {
 
             if(!open) return;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(e.toString());
 
             lock.lock();
@@ -387,7 +383,7 @@ public class ZooKeeperAccessor {
             switch (state = getZookeeper().getState()) {
 
             case CONNECTED:
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("connected: elapsed="
                             + TimeUnit.NANOSECONDS
                                     .toMillis((System.nanoTime() - begin)));
@@ -442,7 +438,7 @@ public class ZooKeeperAccessor {
         if (w == null)
             throw new IllegalArgumentException();
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("watcher="+w);
         
         watchers.add(w);
@@ -460,7 +456,7 @@ public class ZooKeeperAccessor {
         if (w == null)
             throw new IllegalArgumentException();
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("watcher="+w);
 
         watchers.remove(w);

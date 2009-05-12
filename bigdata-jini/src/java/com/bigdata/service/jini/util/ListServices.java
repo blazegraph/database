@@ -32,6 +32,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.config.ConfigurationException;
@@ -69,137 +72,223 @@ public class ListServices {
      * 
      * <dt>showServiceItems</dt>
      * <dd>When <code>true</code> the {@link ServiceItem} will be written out
-     * for each discovered service.</dd>
+     * for each discovered service (default <code>false</code>).</dd>
+     * 
+     * <dt>repeatCount</dt>
+     * <dd>The #of times to repeat the discovery process and list the discovered
+     * services before terminating (default <code>1</code>). When ZERO (0), the
+     * utility will repeatedly discover and list the discovered processes until
+     * killed.</dd>
      * 
      * </dl>
      * 
      * @param args
      *            Configuration file and optional overrides.
      * 
-     * @throws InterruptedException
      * @throws ConfigurationException
-     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException 
      */
     public static void main(final String[] args) throws InterruptedException,
-            ConfigurationException, IOException {
+            ConfigurationException, IOException, ExecutionException {
 
         final JiniFederation fed = JiniClient.newInstance(args).connect();
 
-        final long discoveryDelay = (Long) fed
+        final int repeatCount = (Integer) fed
                 .getClient()
                 .getConfiguration()
-                .getEntry(COMPONENT, "discoveryDelay", Long.TYPE, 5000L/* default */);
+                .getEntry(COMPONENT, "repeatCount", Integer.TYPE, 1/* default */);
 
-        final boolean showServiceItems = (Boolean) fed.getClient()
-                .getConfiguration().getEntry(COMPONENT, "showServiceItems",
-                        Boolean.TYPE, false/* default */);
+        /*
+         * Install a shutdown hook (normal kill will trigger this hook).
+         */
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+
+            public void run() {
+
+                fed.shutdownNow();
+
+            }
+
+        });
         
-        System.out.println("Waiting " + discoveryDelay
-                + "ms for service discovery.");
+        if (repeatCount == 0) {
+         
+            while(true) {
 
-        Thread.sleep(discoveryDelay/* ms */);
-
-        final ServiceItem[] a = fed.getServicesManagerClient()
-                .getServiceCache()
-                .getServiceItems(0/* maxCount */, null/* filter */);
-
-        System.out.println("Found " + a.length + " services after "
-                + discoveryDelay + "ms");
-
-        // Aggregate the bigdata services by their most interesting interfaces.
-        final Map<Class<? extends IService>, List<ServiceItem>> bigdataServices = new HashMap<Class<? extends IService>, List<ServiceItem>>(
-                a.length);
-
-        int bigdataServiceCount = 0;
-        
-        final List<ServiceItem> otherServices = new LinkedList<ServiceItem>();
-        {
-            
-            for (ServiceItem serviceItem : a) {
-
-                if (!(serviceItem.service instanceof IService)) {
-
-                    otherServices.add(serviceItem);
-
-                    continue;
-
-                }
-
-                final Class<?extends IService> serviceIface = ((IService) serviceItem.service)
-                .getServiceIface();
+                final Future<String> f = fed.getExecutorService().submit(
+                        new DiscoverAndListTask(fed));
+             
+                System.out.println(f.get());
                 
-                List<ServiceItem> lst = bigdataServices.get(serviceIface); 
-                if(lst == null) {
+            }
+            
+        } else {
+            
+            for(int i=0; i<repeatCount; i++) {
 
-                    lst = new LinkedList<ServiceItem>();
-                    
-                    bigdataServices.put(serviceIface, lst);
-                    
-                }
-
-                lst.add(serviceItem);
-
-                bigdataServiceCount++;
+                final Future<String> f = fed.getExecutorService().submit(
+                        new DiscoverAndListTask(fed));
+             
+                System.out.println(f.get());
 
             }
-
+            
         }
 
-        /*
-         * Figure out if zookeeper is running.
-         * 
-         * Note: We don't wait long here since we already waited for service
-         * discovery above.
-         */
-        final boolean foundZooKeeper = fed.getZookeeperAccessor()
-                .awaitZookeeperConnected(10, TimeUnit.MILLISECONDS);
-
-        /*
-         * Figure out how many service registrars have been discovered.
-         */
-        final ServiceRegistrar[] registrars = fed.getDiscoveryManagement()
-                .getRegistrars();
+        fed.shutdown();
         
-        /*
-         * Write out a summary of the discovered services.
-         */
-
-        System.out.println("Zookeeper: is " + (foundZooKeeper ? "" : "not ")
-                + "running");
-
-        System.out.println("Discovered " + registrars.length
-                + " service registrars.");
-
-        System.out.println("Discovered " + bigdataServiceCount
-                + " bigdata services.");
-
-        System.out.println("Discovered " + otherServices.size()
-                + " other services.");
-
-        for (Map.Entry<Class<? extends IService>, List<ServiceItem>> e : bigdataServices
-                .entrySet()) {
-
-            System.out.println("There are " + e.getValue().size()
-                    + " instances of " + e.getKey().getName());
-
-            if (showServiceItems)
-                for (ServiceItem t : e.getValue()) {
-
-                    System.out.println(t.toString());
-
-                }
-
-        }
-
-        if (showServiceItems)
-            for (ServiceItem t : otherServices) {
-
-                System.out.println(t.toString());
-
-            }
-
         System.exit(0);
 
     }
 
+    /**
+     * Task waits service discovery and then lists out the discovered services.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    static class DiscoverAndListTask implements Callable<String> {
+        
+        final JiniFederation fed;
+
+        final long discoveryDelay;
+
+        final boolean showServiceItems;
+
+        public DiscoverAndListTask(final JiniFederation fed)
+                throws ConfigurationException {
+
+            this.fed = fed;
+
+            discoveryDelay = (Long) fed
+                    .getClient()
+                    .getConfiguration()
+                    .getEntry(COMPONENT, "discoveryDelay", Long.TYPE, 5000L/* default */);
+
+            showServiceItems = (Boolean) fed.getClient().getConfiguration()
+                    .getEntry(COMPONENT, "showServiceItems", Boolean.TYPE,
+                            false/* default */);
+
+        }
+
+        public String call() throws Exception {
+
+            System.out.println("Waiting " + discoveryDelay
+                    + "ms for service discovery.");
+
+            Thread.sleep(discoveryDelay/* ms */);
+
+            final ServiceItem[] a = fed.getServicesManagerClient()
+                    .getServiceCache()
+                    .getServiceItems(0/* maxCount */, null/* filter */);
+
+            final StringBuilder sb = new StringBuilder();
+            
+            sb.append("Found " + a.length + " services after " + discoveryDelay
+                    + "ms\n");
+
+            // Aggregate the bigdata services by their most interesting interfaces.
+            final Map<Class<? extends IService>, List<ServiceItem>> bigdataServices = new HashMap<Class<? extends IService>, List<ServiceItem>>(
+                    a.length);
+
+            int bigdataServiceCount = 0;
+            
+            final List<ServiceItem> otherServices = new LinkedList<ServiceItem>();
+            {
+                
+                for (ServiceItem serviceItem : a) {
+
+                    if (!(serviceItem.service instanceof IService)) {
+
+                        otherServices.add(serviceItem);
+
+                        continue;
+
+                    }
+
+                    final Class<?extends IService> serviceIface = ((IService) serviceItem.service)
+                    .getServiceIface();
+                    
+                    List<ServiceItem> lst = bigdataServices.get(serviceIface); 
+                    if(lst == null) {
+
+                        lst = new LinkedList<ServiceItem>();
+                        
+                        bigdataServices.put(serviceIface, lst);
+                        
+                    }
+
+                    lst.add(serviceItem);
+
+                    bigdataServiceCount++;
+
+                }
+
+            }
+
+            /*
+             * Figure out if zookeeper is running.
+             * 
+             * Note: We don't wait long here since we already waited for service
+             * discovery above.
+             */
+            final boolean foundZooKeeper = fed.getZookeeperAccessor()
+                    .awaitZookeeperConnected(10, TimeUnit.MILLISECONDS);
+
+            /*
+             * Figure out how many service registrars have been discovered.
+             */
+            final ServiceRegistrar[] registrars = fed.getDiscoveryManagement()
+                    .getRegistrars();
+            
+            /*
+             * Write out a summary of the discovered services.
+             */
+
+            sb.append("Zookeeper: is " + (foundZooKeeper ? "" : "not ")
+                    + "running.\n");
+
+            sb.append("Discovered " + registrars.length
+                    + " service registrars.\n");
+
+            sb.append("Discovered " + bigdataServiceCount
+                    + " bigdata services.\n");
+
+            sb.append("Discovered " + otherServices.size()
+                    + " other services.\n");
+
+            for (Map.Entry<Class<? extends IService>, List<ServiceItem>> e : bigdataServices
+                    .entrySet()) {
+
+                sb.append("There are " + e.getValue().size()
+                        + " instances of " + e.getKey().getName());
+
+                if (showServiceItems)
+                    for (ServiceItem t : e.getValue()) {
+
+                        sb.append(t.toString());
+                        
+                        sb.append("\n");
+
+                    }
+
+            }
+
+            if (showServiceItems)
+                for (ServiceItem t : otherServices) {
+
+                    sb.append(t.toString());
+                    
+                    sb.append("\n");
+
+                }
+
+            return sb.toString();
+            
+        }
+        
+    } // class DiscoveryAndListTask
+    
 }
