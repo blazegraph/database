@@ -29,8 +29,8 @@ public class ZookeeperRunningConstraint extends
             return true;
 
         default:
-            if (ServiceDependencyConstraint.INFO)
-                ServiceDependencyConstraint.log.info("Zookeeper not connected: state=" + state);
+            if (log.isInfoEnabled())
+                log.info("Zookeeper not connected: state=" + state);
 
             return false;
 

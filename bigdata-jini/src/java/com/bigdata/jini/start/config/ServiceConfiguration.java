@@ -97,7 +97,7 @@ abstract public class ServiceConfiguration implements Serializable {
         /**
          * The #of physical instances of the service which should be maintained
          * for a given logical instance. If the service is comprised of peers,
-         * like zookeeper or jini, then this value MUST be ONE (1) and you wil
+         * like zookeeper or jini, then this value MUST be ONE (1) and you will
          * specify the #of peers as the {@link #SERVICE_COUNT}. If the service
          * supports a failover chain with a master and secondaries then this
          * value may be one or more.
@@ -117,19 +117,6 @@ abstract public class ServiceConfiguration implements Serializable {
          */
         String TIMEOUT = "timeout";
         
-//        /**
-//         * A immutable set of property names whose values are not directly
-//         * copied from a {@link Configuration}.
-//         * 
-//         * @todo this is pretty kludgy.
-//         */
-//        Set<String> reserved = Collections
-//                .unmodifiableSet(new HashSet<String>(Arrays
-//                        .asList(new String[] { ARGS,
-//                                JavaServiceConfiguration.Options.CLASSPATH,
-//                                JavaServiceConfiguration.Options.LOG4J,
-//                                SERVICE_DIR })));
-
     }
     
     /**
@@ -718,7 +705,7 @@ abstract public class ServiceConfiguration implements Serializable {
          * 
          * @return
          */
-        protected ProcessBuilder newProcessBuilder(List<String> cmds) {
+        protected ProcessBuilder newProcessBuilder(final List<String> cmds) {
 
             return new ProcessBuilder(cmds);
 
@@ -736,7 +723,7 @@ abstract public class ServiceConfiguration implements Serializable {
          * 
          * @param cmds
          */
-        protected void addCommandArgs(List<String> cmds) {
+        protected void addCommandArgs(final List<String> cmds) {
 
             for (String arg : args) {
 
@@ -751,7 +738,7 @@ abstract public class ServiceConfiguration implements Serializable {
          * 
          * @param cmds
          */
-        protected void addServiceOptions(List<String> cmds) {
+        protected void addServiceOptions(final List<String> cmds) {
 
             for (String arg : options) {
 

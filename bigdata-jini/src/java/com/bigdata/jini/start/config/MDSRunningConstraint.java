@@ -20,16 +20,15 @@ public class MDSRunningConstraint extends ServiceDependencyConstraint {
 
         if (fed.getMetadataService() == null) {
         
-            if (ServiceDependencyConstraint.INFO)
-                ServiceDependencyConstraint.log.info("Not discovered: "
-                        + IMetadataService.class.getName());
-            
+            if (log.isInfoEnabled())
+                log.info("Not discovered: " + IMetadataService.class.getName());
+
             return false;
-            
+
         }
-        
+
         return true;
-        
+
     }
-    
+
 }

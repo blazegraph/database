@@ -20,16 +20,16 @@ public class TXRunningConstraint extends ServiceDependencyConstraint {
 
         if (fed.getTransactionService() == null) {
         
-            if(ServiceDependencyConstraint.INFO)
-                ServiceDependencyConstraint.log.info("Not discovered: "
+            if(log.isInfoEnabled())
+                log.info("Not discovered: "
                         + ITransactionService.class.getName());
-            
+
             return false;
-            
+
         }
-        
+
         return true;
-        
+
     }
-    
+
 }

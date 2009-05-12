@@ -20,8 +20,8 @@ public class JiniRunningConstraint extends ServiceDependencyConstraint {
 
         if (fed.getDiscoveryManagement().getRegistrars().length == 0) {
 
-            if (ServiceDependencyConstraint.INFO)
-                ServiceDependencyConstraint.log.info("No registrars have been discovered");
+            if (log.isInfoEnabled())
+                log.info("No registrars have been discovered");
 
             return false;
 

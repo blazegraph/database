@@ -41,31 +41,4 @@ abstract public class ServiceDependencyConstraint implements IServiceConstraint 
     protected static final Logger log = Logger
             .getLogger(ServiceDependencyConstraint.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    /*
-     * Note: You can't access these constants from a Jini configuration.
-     */
-    
-//    /**
-//     * JINI must be running.
-//     */
-//    public static transient final IServiceConstraint JINI = new JiniRunningConstraint();
-//
-//    /**
-//     * Zookeeper must be running.
-//     */
-//    public static transient final IServiceConstraint ZOOKEEPER = new JiniRunningConstraint();
-//
-//    /**
-//     * The {@link TransactionServer} must be running - note this service also
-//     * provides the {@link ITimestampService} implementation.
-//     */
-//    public static transient final IServiceConstraint TX = new TXRunningConstraint();
-//
-//    /**
-//     * The {@link MetadataServer} must be running.
-//     */
-//    public static transient final IServiceConstraint MDS = new JiniRunningConstraint();
-
 }

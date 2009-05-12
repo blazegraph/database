@@ -43,6 +43,7 @@ import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.jini.TransactionServer;
+import com.sun.jini.start.ServiceStarter;
 import com.sun.jini.tool.ClassServer;
 
 /**
@@ -123,11 +124,9 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
      * @todo the resolution of the {@link ServiceConfiguration} class to
      *       instantiate from the (class) name is completely hacked in the code
      *       here. Nothing declarative about it.
-     * 
-     * @todo support the {@link ClassServer}.
      */
-    public ServiceConfiguration[] getServiceConfigurations(final Configuration config)
-            throws ConfigurationException {
+    public ServiceConfiguration[] getServiceConfigurations(
+            final Configuration config) throws ConfigurationException {
 
         final List<ServiceConfiguration> v = new LinkedList<ServiceConfiguration>();
 
@@ -140,6 +139,15 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
             if (a.equals("jini")) {
 
                 v.add(new JiniCoreServicesConfiguration(config));
+
+            } else if (a.equals(ServiceStarter.class.getName())) {
+
+                /*
+                 * Service starter for arbitrary non-activatable service
+                 * descriptions.
+                 */
+                v.add(new JavaServiceConfiguration(ServiceStarter.class
+                        .getName(), config));
 
             } else if (a.equals(QuorumPeerMain.class.getName())) {
 

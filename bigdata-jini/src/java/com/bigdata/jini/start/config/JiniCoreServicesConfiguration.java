@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.jini.start.config;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -43,6 +44,8 @@ import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.JiniServicesHelper;
+import com.sun.jini.start.NonActivatableServiceDescriptor;
+import com.sun.jini.start.ServiceStarter;
 
 /**
  * Somewhat specialized configuration for starting the core jini services
@@ -77,26 +80,32 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
          * The namespace for this component.
          */
         String NAMESPACE = "jini";
-        
-        /**
-         * The location where jini was installed.
-         */
-        String SERVICE_DIR = ServiceConfiguration.Options.SERVICE_DIR;
 
         /**
-         * The file used to start jini. if not specified, then the appropriate
-         * file in the <i>serviceDir</i>/"installverify/support" will be used.
+         * The main configuration file for the jini services. This is the file
+         * which has the {@link NonActivatableServiceDescriptor}[] for the
+         * services which you wish to start when you start jini.
          */
-        String CMD = "cmd";
+        String CONFIG_FILE = "configFile";
+
+//        /**
+//         * The command used to start jini.
+//         */
+//        String CMD = "cmd";
         
     }
 
+//    /**
+//     * The command used to start jini.
+//     * 
+//     * @see Options#CMD
+//     */
+//    public final File cmd;
+
     /**
-     * The file used to start jini.
-     * 
-     * @see Options#CMD
+     * The main configuration file for the jini services.
      */
-    public final File cmd;
+    public final File configFile;
     
     /**
      * @param config
@@ -108,8 +117,8 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
         super(Options.NAMESPACE, config);
         
-        cmd = (File) config.getEntry(Options.NAMESPACE, Options.CMD,
-                File.class, null/* default */);
+        configFile = (File) config.getEntry(Options.NAMESPACE,
+                Options.CONFIG_FILE, File.class, null/* default */);
 
     }
 
@@ -165,8 +174,8 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
     public class JiniCoreServicesStarter<V extends JiniCoreServicesProcessHelper>
             extends AbstractServiceStarter<V> {
 
-        final File supportDir = new File(serviceDir + File.separator
-                + "installverify" + File.separator + "support");
+//        final File supportDir = new File(serviceDir + File.separator
+//                + "installverify" + File.separator + "support");
 
         final JiniClientConfig clientConfig;
 
@@ -180,12 +189,6 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
             this.clientConfig = clientConfig;
             
-            if(!serviceDir.exists()) {
-                
-                throw new RuntimeException("jini not installed: " + serviceDir);
-
-            }
-            
         }
 
         @SuppressWarnings("unchecked")
@@ -193,6 +196,12 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
         protected V newProcessHelper(String className,
                 ProcessBuilder processBuilder, IServiceListener listener)
                 throws IOException {
+            
+            if(!configFile.exists()) {
+                
+                throw new FileNotFoundException(configFile.toString());
+
+            }
 
             return (V) new JiniCoreServicesProcessHelper(className,
                     processBuilder, listener);
@@ -206,51 +215,61 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
         @Override
         protected void addCommand(final List<String> cmds) {
 
-            // the executable.
+//            // the executable.
+//            
+//            File cmd = JiniCoreServicesConfiguration.this.cmd;
+//            
+//            if (cmd == null) {
+//
+//                cmd = new File(supportDir, "launch-all.exe");
+//
+//                if (!cmd.exists()) {
+//
+//                    cmd = new File(supportDir, "launch-all");
+//                    
+//                } else if (!cmd.exists()) {
+//
+//                    throw new RuntimeException("Could not locate executable: "
+//                            + supportDir);
+//                    
+//                }
+//
+//            }
+//
+//            if (log.isInfoEnabled())
+//                log.info("Will run: " + cmd);
             
-            File cmd = JiniCoreServicesConfiguration.this.cmd;
-            
-            if (cmd == null) {
-
-                cmd = new File(supportDir, "launch-all.exe");
-
-                if (!cmd.exists()) {
-
-                    cmd = new File(supportDir, "launch-all");
-                    
-                } else if (!cmd.exists()) {
-
-                    throw new RuntimeException("Could not locate executable: "
-                            + supportDir);
-                    
-                }
-
-            }
-
-            if (log.isInfoEnabled())
-                log.info("Will run: " + cmd);
-            
-            cmds.add(cmd.toString());
+            cmds.add("java");
 
         }
 
-        @Override
-        protected void setUp() throws Exception {
+        protected void addCommandArgs(final List<String> cmds) {
             
-            if (!serviceDir.exists())
-                throw new RuntimeException("Directory does not exist: "
-                        + serviceDir);
-
-            if (!supportDir.exists())
-                throw new RuntimeException("Directory does not exist: "
-                        + supportDir);
-
-            super.setUp();
-
+            cmds.add(ServiceStarter.class.getName());
+            
+            cmds.add(configFile.toString());
+            
+            super.addCommandArgs(cmds);
+            
         }
         
+//        @Override
+//        protected void setUp() throws Exception {
+//            
+//            if (!serviceDir.exists())
+//                throw new RuntimeException("Directory does not exist: "
+//                        + serviceDir);
+//
+//            if (!supportDir.exists())
+//                throw new RuntimeException("Directory does not exist: "
+//                        + supportDir);
+//
+//            super.setUp();
+//
+//        }
+        
         /**
-         * Overriden to monitor for the discovery of the service registrar on
+         * Overridden to monitor for the discovery of the service registrar on
          * the localhost using the groups specified in the
          * {@link JiniClientConfig} and of the {@link LookupLocator}s specified
          * in the {@link JiniClientConfig} which are locators for the local
@@ -321,20 +340,6 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
                         + "ms, locators=" + locators);
 
             }
-
-//            final LookupLocator locator = new LookupLocator("jini://localhost");
-//
-//            if (!JiniCoreServicesHelper.isJiniRunning(
-//                    LookupDiscovery.ALL_GROUPS,
-//                    new LookupLocator[] { locator }, timeout, unit)) {
-//
-//                throw new TimeoutException("Registrar not found: timeout="
-//                        + timeout + "ms, locator=" + locator);
-//
-//            }
-//            
-//            if(INFO)
-//                log.info("Discovered registrar: locator="+locator);
 
         }
 
