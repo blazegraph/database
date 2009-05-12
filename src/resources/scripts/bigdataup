@@ -46,8 +46,7 @@ rm -f "$pidFile"
 # Touch the subsystem lock file.
 touch "$lockFile"
 
-# @TODO this command must be generated and then executed in order to
-# have the Configuration file applied.
+# Start the services manager on this host.
 java ${JAVA_OPTS} \
 	 com.bigdata.jini.start.ServicesManagerServer \
 	 ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES} &

@@ -293,7 +293,6 @@
 	</target>
 
 	<!-- 
- 	     @todo Set permissions on the installation directories?
  	     
  	     @todo classServer setup : The following are somewhat dated notes on using jini with downloadable
 	     code.
@@ -368,13 +367,18 @@
 	
 	-->
 	<target name="install" depends="jar, javadoc, bundle" description="Install bigdata.">
-		<mkdir dir="${install.config.dir}"/>
-		<mkdir dir="${install.doc.dir}"/>
-		<mkdir dir="${install.lib.dir}"/>
-		<mkdir dir="${install.bin.dir}"/>
-		<mkdir dir="${install.log.dir}"/>
+		<!-- create NAS/LAS directories. -->
 		<mkdir dir="${NAS}"/>
 		<mkdir dir="${LAS}"/>
+		<!-- NAS/LAS directories must be read/write for the group. -->
+		<chmod perm="ug+rw,o-rw" file="${NAS}"/>
+		<chmod perm="ug+rw,o-rw" file="${LAS}"/>
+		<!-- create subdirectories of NAS - should inherit permissions. -->
+		<mkdir dir="${install.config.dir}"/>
+		<mkdir dir="${install.doc.dir}"/>
+ 		<mkdir dir="${install.lib.dir}"/>
+		<mkdir dir="${install.bin.dir}"/>
+		<mkdir dir="${install.log.dir}"/>
 		<!-- install configuration files. -->
 		<copy toDir="${install.config.dir}">
     		<fileset dir="${bigdata.dir}/src/resources/config">
@@ -408,7 +412,7 @@
 		</copy>
 		<!-- parameter substitution. -->
 		<property name="myclasspath" refid="install.classpath"/>
-    	<replace file="${install.bin.dir}/bigdataenv" summary="true">
+		<replace dir="${install.bin.dir}" summary="true">
      	    <replacefilter token="@FED@" value="${FED}"/>
      	    <replacefilter token="@NAS@" value="${NAS}"/>
      	    <replacefilter token="@LAS@" value="${LAS}"/>
@@ -422,9 +426,11 @@
     	    <replacefilter token="@LIB_DIR@" value="${install.lib.dir}"/>
     	    <replacefilter token="@LOG_DIR@" value="${install.log.dir}"/>
     	    <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}"/>
+     	    <replacefilter token="@INSTALL_USER@" value="${install.user}"/>
      	    <replacefilter token="@INSTALL_GROUP@" value="${install.group}"/>
      	    <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}"/>
      	    <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}"/>
+     	    <replacefilter token="@JINI_CONFIG@" value="${jini.config}"/>
      	    <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}"/>
      	    <replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}"/>
      	    <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}"/>
@@ -432,9 +438,11 @@
      	    <replacefilter token="@EVENT_LOG@" value="${eventLog}"/>
      	    <replacefilter token="@ERROR_LOG@" value="${errorLog}"/>
      	    <replacefilter token="@DETAIL_LOG@" value="${detailLog}"/>
+ 	    	<replacefilter token="@STATE_LOG@" value="${stateLog}"/>
+     	    <replacefilter token="@STATE_FILE@" value="${stateFile}"/>
      	    <replacefilter token="@CLASSPATH@" value="${myclasspath}"/>
     	</replace>
-    	<replace dir="${install.config.dir}" summary="true"><!-- includes="bigdataCluster.config"-->
+    	<replace dir="${install.config.dir}" summary="true">
      	    <replacefilter token="@FED@" value="${FED}"/>
      	    <replacefilter token="@NAS@" value="${NAS}"/>
      	    <replacefilter token="@LAS@" value="${LAS}"/>
@@ -448,9 +456,11 @@
     	    <replacefilter token="@LIB_DIR@" value="${install.lib.dir}"/>
     	    <replacefilter token="@LOG_DIR@" value="${install.log.dir}"/>
     	    <replacefilter token="@CONFIG_DIR@" value="${install.config.dir}"/>
+     	    <replacefilter token="@INSTALL_USER@" value="${install.user}"/>
      	    <replacefilter token="@INSTALL_GROUP@" value="${install.group}"/>
      	    <replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}"/>
      	    <replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}"/>
+     	    <replacefilter token="@JINI_CONFIG@" value="${jini.config}"/>
      	    <replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}"/>
      	    <replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}"/>
      	    <replacefilter token="@LOGGING_CONFIG@" value="${logging.config}"/>
@@ -458,15 +468,25 @@
      	    <replacefilter token="@EVENT_LOG@" value="${eventLog}"/>
      	    <replacefilter token="@ERROR_LOG@" value="${errorLog}"/>
      	    <replacefilter token="@DETAIL_LOG@" value="${detailLog}"/>
+ 	    	<replacefilter token="@STATE_LOG@" value="${stateLog}"/>
+     	    <replacefilter token="@STATE_FILE@" value="${stateFile}"/>
      	    <replacefilter token="@CLASSPATH@" value="${myclasspath}"/>
     	</replace>
 		<!-- fix newlines (otherwise substitutions cause things to break). -->
         <fixcrlf srcDir="${install.bin.dir}"/>
-		<!-- set execute bit for scripts (must be the last step). -->
-		<chmod perm="ug+rx,o-r">
-			<fileset dir="${install.bin.dir}">
-			</fileset>
-		</chmod>
+		<!-- set execute bit for scripts in this directory (must be the last step). -->
+		<chmod perm="u+x,g+rx,o-rwx" dir="${install.bin.dir}"/>
+		<!-- Setup the status file which will be read by the bigdata script and
+		     the log on which that script will write its output.  This is used
+		     if cron, or a similar process, will execute the script on a periodic
+		     basis.  The initial state is always 'status'.  The initial stateLog
+		     is always empty.  The state file must be readable by the group, but
+		     could be restricted to write by a specific user. The stateLog must be
+		     read/write for the group. -->
+		<echo file="${stateFile}">status</echo>
+		<echo file="${stateLog}"></echo>
+		<chmod perm="g+r,o-rw" file="${stateFile}"/>
+		<chmod perm="g+rw,o-rw" file="${stateLog}"/>
 	</target>
 	
 	<!-- Note: we must fork the JVM to get the jvmarg overrides. -->

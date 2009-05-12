@@ -1,0 +1,20 @@
+# This is a sample user crontab for running bigdata. 
+#
+# To use this crontab, you must register it on each host for the user
+#
+#    @INSTALL_USER@
+#
+# That user must have sufficient permissions to execute the bigdata
+# script and read/write access to the necessary files in the shared
+# volume
+#
+#    @NAS@
+#
+# and the local storage directory
+#
+#    @LAS@
+#
+# on each host.
+
+# Run once per minute
+* * * * * @BIN_DIR@/bigdata file @stateFile@ >> @stateLog@ 2>&1

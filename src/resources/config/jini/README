@@ -1,9 +1,19 @@
 This directory contains the configuration for the various Jini services.
 
+The various services are:
+
+  browser: A visualization tool for exploring Jini(TM) Network Technology communities. 
+   reggie: Provides implementations of ServiceRegistrar. 
+  fiddler: Provides the server side of an implementation of the lookup discovery service.
+   mahalo: Provides implementations of the TransactionManager service.
+  mercury: Provides implementations of the EventMailbox service.
+     norm: Provides implementations of LeaseRenewalService.
+outrigger: Provides implementation of a JavaSpaces(TM) technology-enabled service.
+
 DO NOT attempt to start the Jini browser service from the bigdata
 script.  The browser service requires a GUI.  An attempt to start
-the browser from the bigdata script will cause the jini service
+the browser from the bigdata script will cause the Jini service
 start to fail.
 
-You can always install jini in the normal manner when logged in
+You can always install Jini in the normal manner when logged in
 with a GUI and then run the service browser from there.
