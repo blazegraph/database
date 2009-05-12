@@ -294,7 +294,7 @@ case "$1" in
 		echo "$0 : 'file' option requires additional argument."
 		exit 1
 	fi
-	read $file < "$2"
+	read file < "$2"
 	$0 "$file"
 	;;
     *)

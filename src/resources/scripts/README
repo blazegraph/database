@@ -2,9 +2,13 @@ This directory contains some scripts which may be useful on a un*x platform.
 
 bigdataenv
  
-          The configuration file for the shell environment.  This MUST be modified
-          to reflect the local installation.  The other scripts in this directory
-          rely on this script to setup their environment.
+          The configuration file for the shell environment.  The other
+          scripts in this directory rely on this script to setup their
+          environment.  This is configured by editing the
+          build.properties file before running 'ant install'.  Once
+          installed, you MAY edit the file but be aware that parameter
+          substitution has taken place for files in both this
+          directory and the config directory.
  
 bigdata   
 
@@ -35,12 +39,29 @@ bigdata
             zookeeper) and may cause new services to be started based on the updated
             configuration.
 
+     file <file>
+          - Reads the desired run state from the specified file.
+
 bigdataup
 bigdatadown 
 bigdataprecond
 bigdatasetup
           
           These scripts are invoked automatically by the bigdata script.
+
+crontab.user
+
+		  A sample user crontab.  If installed, it will execute the 'bigdata' script
+		  once per minute specifying the desired run state indirectly using the 'file'
+		  argument and passing @stateFile@ as the file containing the desired run state.
+		  This is not installed by default.
+
+crontab.system
+
+		  A sample system crontab.  If installed, it will execute the 'bigdata' script
+		  once per minute specifying the desired run state indirectly using the 'file'
+		  argument and passing @stateFile@ as the file containing the desired run state.
+		  This is not installed by default.
 
 dumpZoo.sh
 
