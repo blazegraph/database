@@ -180,7 +180,7 @@ public class ListServices {
                 .entrySet()) {
 
             System.out.println("There are " + e.getValue().size()
-                    + " instances of " + e.getClass().getName());
+                    + " instances of " + e.getKey().getName());
 
             if (showServiceItems)
                 for (ServiceItem t : e.getValue()) {
