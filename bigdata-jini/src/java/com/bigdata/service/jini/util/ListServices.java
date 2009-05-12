@@ -164,7 +164,7 @@ public class ListServices {
          * Write out a summary of the discovered services.
          */
 
-        System.out.println("Zookeeper: is " + (foundZooKeeper ? "" : " not ")
+        System.out.println("Zookeeper: is " + (foundZooKeeper ? "" : "not ")
                 + "running");
 
         System.out.println("Discovered " + registrars.length
