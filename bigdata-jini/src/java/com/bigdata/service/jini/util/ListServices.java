@@ -195,13 +195,19 @@ public class ListServices {
 
             final StringBuilder sb = new StringBuilder();
             
+            // A list of non-bigdata services.
+            final List<ServiceItem> otherServices = new LinkedList<ServiceItem>();
+            
             // Aggregate the bigdata services by their most interesting interfaces.
             final Map<Class<? extends IService>, List<ServiceItem>> bigdataServices = new HashMap<Class<? extends IService>, List<ServiceItem>>(
                     a.length);
 
+            // A list of bigdata services where RMI failed.
+            final List<ServiceItem> staleServices = new LinkedList<ServiceItem>();
+
+            // The #of live bigdata services (where RMI succeeds).
             int bigdataServiceCount = 0;
             
-            final List<ServiceItem> otherServices = new LinkedList<ServiceItem>();
             {
                 
                 for (ServiceItem serviceItem : a) {
@@ -214,8 +220,21 @@ public class ListServices {
 
                     }
 
-                    final Class<? extends IService> serviceIface = ((IService) serviceItem.service)
-                            .getServiceIface();
+                    final Class<? extends IService> serviceIface;
+                    try {
+
+                        serviceIface = ((IService) serviceItem.service)
+                                .getServiceIface();
+                        
+                    } catch (IOException ex) {
+                        
+                        log.warn("RMI error: " + ex + " for " + serviceItem);
+                        
+                        staleServices.add(serviceItem);
+                        
+                        continue;
+                        
+                    }
 
                     List<ServiceItem> list = bigdataServices.get(serviceIface);
 
@@ -262,11 +281,13 @@ public class ListServices {
                     + "running (discovered " + registrars.length
                     + " jini service registrars).\n");
 
-            sb.append("Discovered " + a.length + " services after "
-                    + discoveryDelay + "ms\n");
+            sb.append("Discovered " + a.length + " services\n");
+
+            sb.append("Discovered " + staleServices.size()
+                    + " stale bigdata services.\n");
 
             sb.append("Discovered " + bigdataServiceCount
-                    + " bigdata services.\n");
+                    + " live bigdata services.\n");
 
             sb.append("Discovered " + otherServices.size()
                     + " other services.\n");
