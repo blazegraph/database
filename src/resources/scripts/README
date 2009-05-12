@@ -63,6 +63,11 @@ crontab.system
 		  argument and passing @stateFile@ as the file containing the desired run state.
 		  This is not installed by default.
 
+POST-INSTALL
+
+		  Some notes on how to get started once you have run the 'ant install'
+		  target.
+
 dumpZoo.sh
 
 		  Dumps the zookeeper state onto stdout.

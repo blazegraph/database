@@ -496,7 +496,9 @@
 		<echo file="${stateLog}"></echo>
 		<chmod perm="g+r,o-rw" file="${stateFile}"/>
 		<chmod perm="g+rw,o-rw" file="${stateLog}"/>
-		<echo>You can overwrite the ${install.user} crontab on each host using: [crontab ${install.bin.dir}/crontab.user].  Then edit ${stateFile} to change the bigdata state to 'start' and watch the ${stateLog}.  You can inspect ${errorLog} for errors and ${detailLog} for more detailed information log messages.  Performance counters will be reported by whichever host is running the load balancer once that service comes online.  You can use ${install.bin.dir}/listServices.sh to list the discovered services.</echo> 
+		<loadfile property="postInstallMessage"
+		      srcFile="${install.bin.dir}/POST-INSTALL"/>
+		<echo>${postInstallMessage}</echo> 
 	</target>
 	
 	<!-- Note: we must fork the JVM to get the jvmarg overrides. -->
