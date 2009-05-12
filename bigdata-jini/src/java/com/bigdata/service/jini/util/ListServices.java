@@ -248,7 +248,7 @@ public class ListServices {
                     + "running.\n");
 
             sb.append("Jini is " + (registrars.length > 0 ? "" : "not ")
-                    + " running (discovered " + registrars.length
+                    + "running (discovered " + registrars.length
                     + " jini service registrars).\n");
 
             sb.append("Discovered " + a.length + " services after "
