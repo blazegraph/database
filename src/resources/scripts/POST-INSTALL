@@ -1,0 +1,33 @@
+This presumes that you have successfully installed bigdata using the
+'ant install' target.
+
+In order to manage the bigdata run state you need to modify the
+crontab so that it will automatically execute the @BIN_DIR@/bigdata
+script once per minute, reading the desired run state from
+@STATE_FILE@ each time.
+
+You can destructively overwrite the @INSTALL_USER@ crontab on the
+localhost using:
+
+crontab @BIN_DIR@/crontab.user
+
+YOU MUST DO THIS FOR EACH HOST IN THE CLUSTER WHICH WILL RUN A BIGDATA
+SERVICE.
+
+Next, edit @STATE_FILE@ and change the bigdata run state to 'start'.
+If everything was configured correctly, the bigdata services will
+soon start on all hosts in the cluster.  You can watch the progress
+using 
+
+tail -f @STATE_LOG@
+
+Likewise, you can look for errors using:
+
+tail -f @ERROR_LOG@
+
+You can use list the discovered services using:
+
+@BIN_DIR@/listServices.sh
+
+Performance counters will be reported by whichever host is running the
+load balancer once that service comes online.  
