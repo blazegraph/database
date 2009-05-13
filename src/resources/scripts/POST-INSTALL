@@ -24,15 +24,11 @@ soon start on all hosts in the cluster.
 
 You can watch the progress using:
 
-@BIN_DIR@/listServices.sh
+@BIN_DIR@/listServices.sh com.bigdata.service.jini.util.ListServices.repeatCount=0
 
-You can use list the discovered services using:
+You can look for errors using.
 
-tail -f @STATE_LOG@
-
-You can look for errors using:
-
-tail -f @ERROR_LOG@
+tail -f @STATE_LOG@ @ERROR_LOG@
 
 You will typically see errors initially as some services can not start.
 For example, if jini or zookeeper can not be discovered.  However, those
