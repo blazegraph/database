@@ -423,6 +423,8 @@ public class ListServices {
                             
                             sb.append(serviceType2.get(serviceIfaceName).size());
                             
+                            sb.append(" ");
+                            
                             sb.append(serviceIfaceName);
                             
                             sb.append(" services");
