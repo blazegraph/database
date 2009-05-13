@@ -583,6 +583,8 @@ public class ThroughputMaster
 
             }
 
+            setupClientState();
+            
             // unisolated view of the scale-out index.
             final IScaleOutClientIndex ndx = getFederation().getIndex(jobState.namespace,
                     ITx.UNISOLATED);
