@@ -540,7 +540,7 @@ public class ThroughputMaster
      *       scale-out index (simulates writes onto a distributed index).
      */
     static class ClientTask extends
-            com.bigdata.service.jini.master.AbstractClientTask<JobState, Void, Serializable> {
+            com.bigdata.service.jini.master.AbstractClientTask<JobState, Void, ClientState> {
 
         /**
          * 
@@ -566,15 +566,15 @@ public class ThroughputMaster
         }
 
         @Override
-        protected Serializable newClientState() {
+        protected ClientState newClientState() {
 
             return new ClientState(nops);
             
         }
 
         @Override
-        protected Void runWithZLock() throws Exception, KeeperException,
-                InterruptedException {
+        protected Void runWithZLock(ClientState clientState) throws Exception,
+                KeeperException, InterruptedException {
             
             if (r == null) {
 
@@ -583,8 +583,6 @@ public class ThroughputMaster
 
             }
 
-            setupClientState();
-            
             // unisolated view of the scale-out index.
             final IScaleOutClientIndex ndx = getFederation().getIndex(jobState.namespace,
                     ITx.UNISOLATED);

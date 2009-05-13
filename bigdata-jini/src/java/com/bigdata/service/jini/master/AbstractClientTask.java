@@ -144,6 +144,8 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
         if (log.isInfoEnabled())
             log.info("Running: client#=" + clientNum + ", " + jobState);
 
+        final V clientState = setupClientState();
+        
         while (true) {
 
             zlock = ZLockImpl.getLock(getFederation().getZookeeper(), jobState
@@ -152,7 +154,7 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
             zlock.lock();
             try {
 
-                final U ret = runWithZLock();
+                final U ret = runWithZLock(clientState);
 
                 if (log.isInfoEnabled())
                     log.info("Finished: client#=" + clientNum + ", "
@@ -182,9 +184,9 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
     }
 
     /**
-     * Do work while holding the {@link ZLock}. The implementation SHOULD
-     * verify from time to time that it in fact holds the {@link ZLock}
-     * using {@link ZLock#isLockHeld()}.
+     * Do work while holding the {@link ZLock}. The implementation SHOULD verify
+     * from time to time that it in fact holds the {@link ZLock} using
+     * {@link ZLock#isLockHeld()}.
      * 
      * @return The result.
      * 
@@ -192,16 +194,21 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
      * @throws KeeperException
      * @throws InterruptedException
      */
-    abstract protected U runWithZLock() throws Exception, KeeperException,
-            InterruptedException;
+    abstract protected U runWithZLock(V clientState) throws Exception,
+            KeeperException, InterruptedException;
 
     /**
-     * Method should be invoked from within {@link #runWithZLock()} if the
-     * client wishes to store state in zookeeper under the zpath returned by
-     * {@link JobState#getClientZPath(JiniFederation, int)}. If there is no
-     * state in zookeeper, then {@link #newClientState()} is invoked and the
-     * result will be stored in zookeeper. You can update the client's state
-     * from time to time using #writeClientState(). If the client looses the
+     * The method invoked {@link #newClientState()} and attempts to create the
+     * client's znode with the serialized state as its data and that state will
+     * be returned to the caller. If there is an existing znode for the client,
+     * then the data of the znode is de-serialized and returned by this method.
+     * <p>
+     * This method is invoked automatically from within {@link #call()} before
+     * the client attempts to obtain the {@link ZLock} (the zlock is a child of
+     * the client's znode).
+     * <p>
+     * You can update the client's state from time to time using
+     * {@link #writeClientState(Serializable)}. If the client looses the
      * {@link ZLock}, it can read the client state from zookeeper using this
      * method and pick up processing more or less where it left off (depending
      * on when you last updated the client state in zookeeper).
@@ -216,15 +223,9 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
     @SuppressWarnings("unchecked")
     protected V setupClientState() throws InterruptedException, KeeperException {
 
-        /*
-         * Note: This is assuming that the zlock is held, but not checking in
-         * case the client decides not to rely on the zlock for some reason.
-         */
-//        if (!zlock.isLockHeld())
-//            throw new InterruptedException("Lost ZLock");
+        final ZooKeeper zookeeper = getFederation().getZookeeperAccessor()
+                .getZookeeper();
 
-        final ZooKeeper zookeeper = getFederation().getZookeeperAccessor().getZookeeper();
-        
         final String clientZPath = jobState.getClientZPath(getFederation(),
                 clientNum);
 
@@ -239,7 +240,8 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
                     CreateMode.PERSISTENT);
 
             if (log.isInfoEnabled())
-                log.info("Running: " + clientState);
+                log.info("Created: clientZPath=" + clientZPath + ", state="
+                        + clientState);
 
         } catch (NodeExistsException ex) {
 
@@ -247,7 +249,8 @@ abstract public class AbstractClientTask<S extends TaskMaster.JobState, U, V ext
                     clientZPath, false, new Stat()));
 
             if (log.isInfoEnabled())
-                log.info("Client will restart: " + clientState);
+                log.info("Existing: clientZPath=" + clientZPath + ", state="
+                        + clientState);
 
         }
 

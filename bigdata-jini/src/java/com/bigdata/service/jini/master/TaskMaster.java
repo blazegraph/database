@@ -95,10 +95,6 @@ import com.bigdata.zookeeper.ZooHelper;
  * @param <U>
  *            The generic type of the value returned by the client task.
  * 
- * FIXME Update the configuration files. Several properties have disappeared,
- * one has been renamed (generateQueueCapacity), and the LUBM properties are now
- * a pure superset of the {@link RDFDataLoadMaster} properties.
- * 
  * @todo could refactor the task to a task sequence easily enough, perhaps using
  *       some of the rule step logic. That would be an interesting twist on a
  *       parallel datalog.
@@ -730,7 +726,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         if (log.isInfoEnabled())
             log.info("Will run " + jobState.nclients);
-        
+
         final Map<Integer/* client# */, Future<U>> futures = new LinkedHashMap<Integer, Future<U>>(
                 jobState.nclients/* initialCapacity */);
 
@@ -1113,7 +1109,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         return zlock;
 
     }
-
+    
     /**
      * Make stable assignments of each client to a specific data service.
      * 
