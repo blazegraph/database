@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 
 import net.jini.config.ConfigurationException;
 import net.jini.core.entry.Entry;
+import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.core.lookup.ServiceTemplate;
@@ -202,7 +203,7 @@ public class ListServices {
             final List<ServiceItem> otherServices = new LinkedList<ServiceItem>();
             
             // Aggregate the bigdata services by their most interesting interfaces.
-            final Map<Class<? extends IService>, List<ServiceItem>> bigdataServices = new HashMap<Class<? extends IService>, List<ServiceItem>>(
+            final Map<Class<? extends IService>, List<ServiceItem>> bigdataServicesByIface = new HashMap<Class<? extends IService>, List<ServiceItem>>(
                     a.length);
 
             // Aggregate the bigdata services by the host on which they are
@@ -210,6 +211,10 @@ public class ListServices {
             final Map<String, List<ServiceItem>> bigdataServicesByHost = new HashMap<String, List<ServiceItem>>(
                     a.length);
 
+            // maps caches the ServiceID to serviceIface relationship.
+            final Map<ServiceID, Class<? extends IService>> serviceId2serviceIface = new HashMap<ServiceID, Class<? extends IService>>(
+                    a.length);
+            
             // A list of bigdata services where RMI failed.
             final List<ServiceItem> staleServices = new LinkedList<ServiceItem>();
 
@@ -251,14 +256,14 @@ public class ListServices {
                     // aggregate by serviceIface
                     {
 
-                        List<ServiceItem> list = bigdataServices
+                        List<ServiceItem> list = bigdataServicesByIface
                                 .get(serviceIface);
 
                         if (list == null) {
 
                             list = new LinkedList<ServiceItem>();
 
-                            bigdataServices.put(serviceIface, list);
+                            bigdataServicesByIface.put(serviceIface, list);
 
                         }
 
@@ -283,6 +288,9 @@ public class ListServices {
                         list.add(serviceItem);
 
                     }
+
+                    serviceId2serviceIface.put(serviceItem.serviceID,
+                            serviceIface);
 
                     bigdataServiceCount++;
 
@@ -335,7 +343,7 @@ public class ListServices {
 
                 final SortedMap<String, Class<? extends IService>> sortedMap = new TreeMap<String, Class<? extends IService>>();
 
-                for (Class<? extends IService> serviceIface : bigdataServices
+                for (Class<? extends IService> serviceIface : bigdataServicesByIface
                         .keySet()) {
 
                     sortedMap.put(serviceIface.getName(), serviceIface);
@@ -345,11 +353,11 @@ public class ListServices {
                 for (Class<? extends IService> serviceIface : sortedMap
                         .values()) {
 
-                    final List<ServiceItem> list = bigdataServices
+                    final List<ServiceItem> list = bigdataServicesByIface
                             .get(serviceIface);
 
-                    sb.append("\tThere are " + list.size() + " instances of "
-                            + serviceIface + "\n");
+                    sb.append("  There are " + list.size() + " instances of "
+                            + serviceIface.getName() + "\n");
 
                     if (showServiceItems)
                         for (ServiceItem t : list) {
@@ -378,17 +386,52 @@ public class ListServices {
                     final List<ServiceItem> list = bigdataServicesByHost
                             .get(hostname);
 
-                    sb.append("\tThere are " + list.size()
-                            + " instances on " + hostname + "\n");
+                    sb.append("  There are " + list.size()
+                            + " live bigdata services on " + hostname);
 
-                    if (false && showServiceItems)
+                    {
+
+                        /*
+                         * Summary the #of each type of bigdata service on the
+                         * host using a cached serviceID:serviceIface mapping.
+                         */
+                        final SortedMap<String, List<ServiceItem>> serviceType2 = new TreeMap<String, List<ServiceItem>>();
+
                         for (ServiceItem t : list) {
 
-                            sb.append(t.toString());
+                            final Class<? extends IService> serviceIface = serviceId2serviceIface
+                                    .get(t.serviceID);
 
-                            sb.append("\n");
+                            List<ServiceItem> list2 = serviceType2
+                                    .get(serviceIface.getName());
 
+                            if (list2 == null) {
+
+                                list2 = new LinkedList<ServiceItem>();
+
+                            }
+
+                            list2.add(t);
+                            
                         }
+
+                        sb.append(" : {");
+
+                        for(String serviceIfaceName : serviceType2.keySet()) {
+                            
+                            sb.append(serviceIfaceName);
+                            
+                            sb.append("=");
+                            
+                            sb.append(serviceType2.get(serviceIfaceName).size());
+                            
+                        }
+                        
+                        sb.append("}");
+
+                    }
+                    
+                    sb.append("\n");
 
                 }
 
