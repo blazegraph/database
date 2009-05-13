@@ -149,6 +149,7 @@ export pidFile=${LAS}/pid
 # Location of the various log files. 
 #
 export logDir=@LOG_DIR@
+export stateLog=@STATE_LOG@
 export eventLog=@EVENT_LOG@
 export errorLog=@ERROR_LOG@
 export detailLog=@DETAIL_LOG@

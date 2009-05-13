@@ -11,16 +11,17 @@ source ./bigdataenv
 # Verify critical environment variables.
 if [ -z "$lockFile" ]; then
     echo $"`date` : `hostname` : environment not setup."
-	exit 1;
+    exit 1;
 fi
 if [ -z "$pidFile" ]; then
     echo $"`date` : `hostname` : environment not setup."
-	exit 1;
+    exit 1;
 fi
 
+# Verify subsystem lock.
 if [ ! -f "$lockFile" ]; then
     echo $"`date` : `hostname` : lock file not found."
-	exit 1;
+    exit 1;
 fi
 
 if [ -f "$pidFile" ]; then
