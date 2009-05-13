@@ -53,7 +53,18 @@
 #
 # Note: Children must do "exit 0" to indicate success.
 #
-# @todo rollover log files every day and keep only N days worth.
+# Note: "lockfile -r 1 -1 '$lockFile'" will create the named lock file
+# atomically iff it does not exist within one second (one retry of one
+# second).  The exit code will be 0 iff it succeeds.  The incantation
+#
+# lockfile -r 1 -1 test; if [ 0 == $? ]; then echo "locked"; fi
+#
+# will echo 'locked' iff the lock was obtained.  The test can be changed
+# to if [ 0 != $? ] to reverse the semantics.
+#
+# @todo rollover log files every day and keep only N days worth (probably
+# needs to be done within log4j for its log files and in cron for the state.log
+# file.
 #
 # @todo could use nc (netcat) to read the argument file a url and thus define
 # a 'url' as well the 'file' option for this script.
@@ -155,10 +166,12 @@ case "$1" in
 		    echo $"`date` : `hostname` : $pid died?"
 		    rm -f "$pidFile"
 		    rm -f "$lockFile"
-		fi
+		    fi
 	    fi
 	fi
-	action $"`date` : `hostname` : bringing up services: " ./bigdataup 
+	if [ ! -f "$lockFile" ]; then
+		action $"`date` : `hostname` : bringing up services: " ./bigdataup
+	fi 
         ;;
     stop)
 #
@@ -188,11 +201,11 @@ case "$1" in
 # certainly does NOT play nice with anything else!  This needs to be
 # removed once we can destroy the running ServiceManagers and their
 # children without missing anything.
-	if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
-	    echo $"`date` : `hostname` : killing java processes."
-	    echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
-	    killall -v -9 java
-	fi
+#	if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
+#	    echo $"`date` : `hostname` : killing java processes."
+#	    echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
+#	    killall -v -9 java
+#	fi
 	if [ -d "$LAS" ]; then
 	    echo $"`date` : `hostname` : destroying data."
 	    rm -rf "$LAS"
@@ -228,11 +241,11 @@ case "$1" in
 #		rm -rf /opt2/trials/indexDumps
 #	    fi
 	fi
-# Remove the subsystem lock file.
-	if [ -f "$lockFile" ]; then
-	    echo $"`date` : `hostname` : destroying lock."
-	    rm -f "$lockFile"
-	fi
+# Remove the subsystem lock file (done by bigdatadown).
+#	if [ -f "$lockFile" ]; then
+#	    echo $"`date` : `hostname` : destroying lock."
+#	    rm -f "$lockFile"
+#	fi
         ;;
     hup)
 #

@@ -152,3 +152,4 @@ export logDir=@LOG_DIR@
 export eventLog=@EVENT_LOG@
 export errorLog=@ERROR_LOG@
 export detailLog=@DETAIL_LOG@
+
