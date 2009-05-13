@@ -29,10 +29,12 @@ package com.bigdata.rdf.load;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,6 +49,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
@@ -130,17 +133,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
             .toInt();
     
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * Thread pool provinding concurrent load services.
+     * Thread pool providing concurrent load services.
      */
     protected final ThreadPoolExecutor loadService;
 
@@ -220,14 +213,19 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     }
 
     /**
-     * Ctor for a concurrent data loader.
+     * Ctor for a concurrent data loader. When used in combination with the
+     * asynchronous write API, an unbounded thread pool should be used to feed
+     * the asynchronous write {@link BlockingBuffer}s.
      * 
      * @param fed
      *            The federation.
      * @param nthreads
-     *            The #of threads that will process load tasks in parallel.
+     *            The #of threads that will process load tasks in parallel -or-
+     *            {@link Integer#MAX_VALUE} to use an unbounded thread pool fed
+     *            by a {@link SynchronousQueue}.
      * @param queueCapacity
-     *            The capacity of the queue of jobs awaiting execution.
+     *            The capacity of the queue of jobs awaiting execution (ignored
+     *            when using an unbounded thread pool).
      * @param rejectedExecutionDelay
      *            The delay in milliseconds between resubmits of a task when the
      *            queue of tasks awaiting execution is at capacity.
@@ -242,10 +240,10 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         if (fed == null)
             throw new IllegalArgumentException();
         
-        if (nthreads < 1)
+        if (nthreads <= 0)
             throw new IllegalArgumentException();
 
-        if (queueCapacity < 1)
+        if (queueCapacity < 0)
             throw new IllegalArgumentException();
 
         if (rejectedExecutionDelay < 1)
@@ -265,20 +263,46 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         /*
          * Setup the load service. We will run the tasks that read the data and
          * load it into the database on this service.
-         * 
-         * Note: we limit the #of tasks waiting in the queue so that we don't
-         * let the file scan get too far ahead of the executing tasks. This
-         * reduces the latency for startup and the memory overhead significantly
-         * when reading a large collection of files. There is a minimum queue
-         * size so that we can be efficient for the file system reads.
          */
 
-        final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(
-                queueCapacity);
-        
-        loadService = new ThreadPoolExecutor(nthreads, nthreads,
-                Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
-                new DaemonThreadFactory(getClass().getName() + ".loadService"));
+        if (nthreads == Integer.MAX_VALUE) {
+            /*
+             * Unbounded thread pool using a synchronous queue.
+             */
+            loadService = (ThreadPoolExecutor) Executors
+                    .newCachedThreadPool(new DaemonThreadFactory(getClass()
+                            .getName()
+                            + ".loadService"));
+        } else {
+            /*
+             * Fixed capacity thread pool using caller's choice of queue.
+             */
+            final BlockingQueue<Runnable> queue;
+            switch (queueCapacity) {
+            case 0:
+                queue = new SynchronousQueue<Runnable>();
+                break;
+            case Integer.MAX_VALUE:
+                /*
+                 * Note: NOT a good idea as the provider can run without blocking
+                 * and fill the queue faster than the data can be loaded.
+                 */
+                queue = new LinkedBlockingQueue<Runnable>();
+                break;
+            default:
+                /*
+                 * Note: CDL handles RejectedExecutionExceptions and will retry
+                 * the submission of the task. This allows us to use a bounded
+                 * queue in combination with a bounded thread pool.
+                 */
+                queue = new LinkedBlockingQueue<Runnable>(queueCapacity);
+                break;
+            }
+            loadService = new ThreadPoolExecutor(nthreads, nthreads,
+                    Integer.MAX_VALUE, TimeUnit.NANOSECONDS, queue,
+                    new DaemonThreadFactory(getClass().getName()
+                            + ".loadService"));
+        }
         
         /*
          * Setup reporting to the load balancer.
@@ -424,7 +448,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
         if (errorTask != null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Re-submitting task=" + errorTask.target);
 
             // re-submit a task that produced an error.
@@ -484,7 +508,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
     public boolean awaitCompletion(final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(counters.toString());
         
         final long beginWait = System.currentTimeMillis();
@@ -503,7 +527,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
                 final long now = System.currentTimeMillis();
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("Awaiting completion" //
                             + ": loadActiveCount=" + loadActiveCount //
@@ -522,7 +546,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                 if (loadActiveCount == 0 && loadQueueSize == 0
                         && errorQueueSize == 0) {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("complete");
 
                     return true;
@@ -544,7 +568,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
 
                 }
 
-                if (INFO) {
+                if (log.isInfoEnabled()) {
 
                     final long elapsed = now - lastNoticeMillis;
 
@@ -599,7 +623,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
             final ITaskFactory<T> taskFactory) throws InterruptedException,
             Exception {
         
-        if(DEBUG) log.debug("Processing: resource=" + resource);
+        if(log.isDebugEnabled()) log.debug("Processing: resource=" + resource);
         
         final T target = taskFactory.newTask(resource);
         
@@ -670,7 +694,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
                     // reset 
                     begin = now;
                     
-                    if(INFO)
+                    if(log.isInfoEnabled())
                     log.info("loadService queue full"//
                         + ": queueSize="+ loadService.getQueue().size()//
                         + ", poolSize=" + loadService.getPoolSize()//
