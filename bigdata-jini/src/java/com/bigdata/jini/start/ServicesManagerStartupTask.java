@@ -167,12 +167,10 @@ public class ServicesManagerStartupTask implements Callable<Void> {
          */
         {
 
-            // @todo configure timeout
-            final long timeout = 10000;
-
             final long begin = System.nanoTime();
 
-            long nanos = TimeUnit.MILLISECONDS.toNanos(timeout);
+            long nanos = TimeUnit.MILLISECONDS
+                    .toNanos(selfConfig.zookeeperDiscoveryTimeoutNanos);
 
             // await zookeeper connection.
             if (!fed.getZookeeperAccessor().awaitZookeeperConnected(nanos,

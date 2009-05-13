@@ -29,6 +29,7 @@ package com.bigdata.jini.start.config;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -84,13 +85,40 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
          */
         String SERVICES = "services";
 
+        /**
+         * The time in nanoseconds that the {@link ServicesManagerServer} will
+         * wait the discovery of the zookeeper ensemble before throwing a fatal
+         * exception (default
+         * {@value #DEFAULT_ZOOKEEPER_DISCOVERY_TIMEOUT_NANOS}).
+         * <p>
+         * The default is relatively long (a few minutes) so service managers
+         * will normally wait around long enough for zookeeper to start.  However,
+         * zookeeper discovery is event driven so the services manager will only
+         * wait as long as necessary.
+         */
+        String ZOOKEEPER_DISCOVERY_TIMEOUT_NANOS = "zookeeperDiscoveryTimeout";
+
+        long DEFAULT_ZOOKEEPER_DISCOVERY_TIMEOUT_NANOS = TimeUnit.MINUTES
+                .toNanos(3);
+        
     }
 
+    /**
+     * @see Options#SERVICES
+     */
     public final String[] services;
 
+    /**
+     * @see Options#ZOOKEEPER_DISCOVERY_TIMEOUT_NANOS
+     */
+    public final long zookeeperDiscoveryTimeoutNanos;
+    
     protected void toString(StringBuilder sb) {
 
         sb.append(", " + Options.SERVICES + "=" + Arrays.toString(services));
+
+        sb.append(", " + Options.ZOOKEEPER_DISCOVERY_TIMEOUT_NANOS + "="
+                + zookeeperDiscoveryTimeoutNanos);
         
     }
 
@@ -106,6 +134,12 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
 
         services = (String[]) config.getEntry(ServicesManagerServer.class
                 .getName(), Options.SERVICES, String[].class);
+
+        zookeeperDiscoveryTimeoutNanos = (Long) config.getEntry(
+                ServicesManagerServer.class.getName(),
+                Options.ZOOKEEPER_DISCOVERY_TIMEOUT_NANOS,
+                Long.TYPE,
+                Options.DEFAULT_ZOOKEEPER_DISCOVERY_TIMEOUT_NANOS);
         
     }
 
