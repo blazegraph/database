@@ -386,7 +386,7 @@ public class ListServices {
                             .get(hostname);
 
                     sb.append("  There are " + servicesOnHostList.size()
-                            + " live bigdata services on " + hostname);
+                            + " live bigdata services on " + hostname+"\n");
 
                     {
 
@@ -417,23 +417,21 @@ public class ListServices {
                             
                         }
 
-                        sb.append(" : {");
-
                         for(String serviceIfaceName : serviceType2.keySet()) {
-                            
-                            sb.append(serviceIfaceName);
-                            
-                            sb.append("=");
+
+                            sb.append("    There are ");
                             
                             sb.append(serviceType2.get(serviceIfaceName).size());
                             
+                            sb.append(serviceIfaceName);
+                            
+                            sb.append(" services");
+                            
+                            sb.append("\n");
+
                         }
                         
-                        sb.append("}");
-
                     }
-                    
-                    sb.append("\n");
 
                 }
 
