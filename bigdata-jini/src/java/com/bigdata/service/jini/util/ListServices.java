@@ -321,9 +321,8 @@ public class ListServices {
             sb.append("Zookeeper is " + (foundZooKeeper ? "" : "not ")
                     + "running.\n");
 
-            sb.append("Jini is " + (registrars.length > 0 ? "" : "not ")
-                    + "running (discovered " + registrars.length
-                    + " jini service registrars).\n");
+            sb.append("Discovered " + registrars.length
+                    + " jini service registrars.\n");
 
             sb.append("Discovered " + a.length + " services\n");
 
@@ -383,10 +382,10 @@ public class ListServices {
         
                 for (String hostname : keys) {
 
-                    final List<ServiceItem> list = bigdataServicesByHost
+                    final List<ServiceItem> servicesOnHostList = bigdataServicesByHost
                             .get(hostname);
 
-                    sb.append("  There are " + list.size()
+                    sb.append("  There are " + servicesOnHostList.size()
                             + " live bigdata services on " + hostname);
 
                     {
@@ -397,21 +396,24 @@ public class ListServices {
                          */
                         final SortedMap<String, List<ServiceItem>> serviceType2 = new TreeMap<String, List<ServiceItem>>();
 
-                        for (ServiceItem t : list) {
+                        for (ServiceItem serviceItemOnHost : servicesOnHostList) {
 
                             final Class<? extends IService> serviceIface = serviceId2serviceIface
-                                    .get(t.serviceID);
+                                    .get(serviceItemOnHost.serviceID);
 
-                            List<ServiceItem> list2 = serviceType2
+                            List<ServiceItem> servicesByTypeOnHostList = serviceType2
                                     .get(serviceIface.getName());
 
-                            if (list2 == null) {
+                            if (servicesByTypeOnHostList == null) {
 
-                                list2 = new LinkedList<ServiceItem>();
+                                servicesByTypeOnHostList = new LinkedList<ServiceItem>();
 
+                                serviceType2.put(serviceIface.getName(),
+                                        servicesByTypeOnHostList);
+                                
                             }
 
-                            list2.add(t);
+                            servicesByTypeOnHostList.add(serviceItemOnHost);
                             
                         }
 
