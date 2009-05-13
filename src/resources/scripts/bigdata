@@ -214,18 +214,19 @@ case "$1" in
 		echo $"`date` : `hostname` : renaming old services log."
 		mv "$detailLog" "$detailLog-`date +%F`$random.old"
 	    fi
+# @todo add a bigdatadestroy hook and then this stuff can go into that file.
 # Delete performance counter snapshots from the load balancer.
-	    if [ -d "/opt2/var/log/bigdata" ]; then
-		echo $"`date` : `hostname` : removing LBS logs."
-		rm -f /opt2/var/log/bigdata/events.jnl
-		rm -f /opt2/var/log/bigdata/counters*
-		rmdir /opt2/var/log/bigdata/
-	    fi
+#	    if [ -d "/opt2/var/log/bigdata" ]; then
+#		echo $"`date` : `hostname` : removing LBS logs."
+#		rm -f /opt2/var/log/bigdata/events.jnl
+#		rm -f /opt2/var/log/bigdata/counters*
+#		rmdir /opt2/var/log/bigdata/
+#	    fi
 # Delete index partition metadata dumps from the data loader.
-	    if [ -d /opt2/trials/indexDumps ]; then
-		echo $"`date` : `hostname` : removing index dumps."
-		rm -rf /opt2/trials/indexDumps
-	    fi
+#	    if [ -d /opt2/trials/indexDumps ]; then
+#		echo $"`date` : `hostname` : removing index dumps."
+#		rm -rf /opt2/trials/indexDumps
+#	    fi
 	fi
 # Remove the subsystem lock file.
 	if [ -f "$lockFile" ]; then
