@@ -35,7 +35,7 @@ export LAS=@LAS@
 # @todo The master is used to manage log files on the shared volume
 # but we should be able to get by without this concept. 
 #
-export MASTER=@MASTER@
+#export MASTER=@MASTER@
 
 #
 # The directory where sysstat is installed (open-source package for 
