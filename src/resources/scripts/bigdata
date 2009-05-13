@@ -57,7 +57,7 @@
 # atomically iff it does not exist within one second (one retry of one
 # second).  The exit code will be 0 iff it succeeds.  The incantation
 #
-# lockfile -r 1 -1 test; if [ 0 == $? ]; then echo "locked"; fi
+# lockfile -r 1 -1 "$lockFile"; if [ 0 == $? ]; then echo "locked"; fi
 #
 # will echo 'locked' iff the lock was obtained.  The test can be changed
 # to if [ 0 != $? ] to reverse the semantics.
@@ -306,8 +306,8 @@ case "$1" in
 # bigdata script will be run from a cron job ever 30-60 seconds.
 #
 	if [ -z "$2" ]; then
-		echo "$0 : 'file' option requires additional argument."
-		exit 1
+	    echo "$0 : 'file' option requires additional argument."
+	    exit 1
 	fi
 	read file < "$2"
 	$0 "$file"
