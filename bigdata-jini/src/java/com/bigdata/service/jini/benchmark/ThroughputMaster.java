@@ -573,7 +573,7 @@ public class ThroughputMaster
         }
 
         @Override
-        protected Void runWithZLock(ClientState clientState) throws Exception,
+        protected Void runWithZLock(final ClientState clientState) throws Exception,
                 KeeperException, InterruptedException {
             
             if (r == null) {
@@ -688,7 +688,7 @@ public class ThroughputMaster
             
             if(jobState.asynchronous) {
                 
-                // close the asychronous write buffers.
+                // close the asynchronous write buffers.
                 insert.close();
                 remove.close();
                 

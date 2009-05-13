@@ -154,3 +154,5 @@ export eventLog=@EVENT_LOG@
 export errorLog=@ERROR_LOG@
 export detailLog=@DETAIL_LOG@
 
+# Option to use "killall -9 java" for 'bigdata destroy'.
+export FORCE_KILL_ALL=@FORCE_KILL_ALL@
