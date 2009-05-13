@@ -1,9 +1,8 @@
 #!/bin/bash
 
-#
+##
 # Script brings up the bigdata services on a host.
 #
-# @todo use 'lockfile' rather than 'touch'?
 
 # Setup the environment.
 cd `dirname $0`
@@ -11,40 +10,45 @@ source ./bigdataenv
 
 # Verify critical environment variables.
 if [ -z "$lockFile" ]; then
-	echo -n $"$0 : environment not setup."
+	echo $"`date` : hostname : environment not setup."
 	exit 1;
 fi
 if [ -z "$pidFile" ]; then
-	echo -n $"$0 : environment not setup."
+	echo $"`date` : hostname : environment not setup."
 	exit 1;
 fi
 if [ -z "$LAS" ]; then
-	echo -n $"$0 : environment not setup."
+	echo $"`date` : hostname : environment not setup."
 	exit 1;
 fi
 if [ -z "$JAVA_OPTS" ]; then
-	echo -n $"$0 : environment not setup."
+	echo $"`date` : hostname : environment not setup."
 	exit 1;
 fi
 if [ -z "$BIGDATA_CONFIG" ]; then
-	echo -n $"$0 : environment not setup."
+	echo $"`date` : hostname : environment not setup."
 	exit 1;
 fi
 
-#
+if [ -f "$pidFile" ]; then
+    echo $"`date` : `hostname` : process running? $pidFile."
+    exit 1;
+fi
+
+# Create the subsystem lock file IFF it does not exist.
+lockfile -r 1 -1 test;
+if [ 0 != $? ]; then
+    echo $"`date` : `hostname` : could not obtain lock."
+	exit 1;
+fi
+echo $"`date` : `hostname` : created lock file."
+
 # Create a local directory in which to execute the services and within
 # which they will store their persistent state.
-#
 if [ ! -d "$LAS" ]; then
     echo $"`date` : `hostname` : creating data directory."
     mkdir "$LAS"
 fi
-
-# Clear out old pid (presumed stale)
-rm -f "$pidFile"
-
-# Touch the subsystem lock file.
-touch "$lockFile"
 
 # Start the services manager on this host.
 java ${JAVA_OPTS} \
