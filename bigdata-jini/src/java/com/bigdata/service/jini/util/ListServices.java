@@ -33,6 +33,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -331,18 +333,23 @@ public class ListServices {
 
                 sb.append("Bigdata services by serviceIface:\n");
 
-                final Class<? extends IService>[] keys = bigdataServices
-                        .keySet().toArray(new Class[] {});
-                
-                Arrays.sort(keys);
-                
-                for (Class<?extends IService> serviceIface : keys) {
+                final SortedMap<String, Class<? extends IService>> sortedMap = new TreeMap<String, Class<? extends IService>>();
+
+                for (Class<? extends IService> serviceIface : bigdataServices
+                        .keySet()) {
+
+                    sortedMap.put(serviceIface.getName(), serviceIface);
+
+                }
+
+                for (Class<? extends IService> serviceIface : sortedMap
+                        .values()) {
 
                     final List<ServiceItem> list = bigdataServices
                             .get(serviceIface);
-                    
-                    sb.append("\tThere are " + list.size()
-                            + " instances of " + serviceIface + "\n");
+
+                    sb.append("\tThere are " + list.size() + " instances of "
+                            + serviceIface + "\n");
 
                     if (showServiceItems)
                         for (ServiceItem t : list) {
