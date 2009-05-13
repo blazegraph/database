@@ -182,12 +182,16 @@ case "$1" in
 	else
 	    echo $"`date` : `hostname` : not running?"
 	fi
-# Force kill of all java processes (sure, but surely not nice).
-#	if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
-#	    echo $"`date` : `hostname` : killing java processes."
-#	    echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
-#	    killall -v -9 java
-#	fi
+	if [ "$FORCE_KILL_ALL" == "true" ]; then
+# Note: This is a "sure kill" but it does not play nice with other
+# java components.  This option is configured in build.properties
+# and may be overwritten in bigdataenv.
+	    if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
+		echo $"`date` : `hostname` : killing all java processes."
+		echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
+		killall -v -9 java
+	    fi
+	fi
         ;;
  destroy)
 #
@@ -197,15 +201,16 @@ case "$1" in
 	if [ -f "$lockFile" ]; then
 	    action $"`date` : `hostname` : bringing down services: " ./bigdatadown
 	fi
-# FIXME This makes sure that we kill all the parts of the system but
-# certainly does NOT play nice with anything else!  This needs to be
-# removed once we can destroy the running ServiceManagers and their
-# children without missing anything.
-#	if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
-#	    echo $"`date` : `hostname` : killing java processes."
-#	    echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
-#	    killall -v -9 java
-#	fi
+	if [ "$FORCE_KILL_ALL" == "true" ]; then
+# Note: This is a "sure kill" but it does not play nice with other
+# java components.  This option is configured in build.properties
+# and may be overwritten in bigdataenv.
+	    if [ `ps ax | grep java | grep -v grep | wc -l` -ne 0 ]; then
+		echo $"`date` : `hostname` : killing all java processes."
+		echo $"`date` : `hostname` : `ps ax | grep java | grep -v grep`"
+		killall -v -9 java
+	    fi
+	fi
 	if [ -d "$LAS" ]; then
 	    echo $"`date` : `hostname` : destroying data."
 	    rm -rf "$LAS"

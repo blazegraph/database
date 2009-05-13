@@ -35,6 +35,17 @@ if [ -f "$pidFile" ]; then
     exit 1;
 fi
 
+# Create a local directory in which to execute the services and within
+# which they will store their persistent state.  Note: When installed
+# by a normal use the lock file is typically located within this
+# directory so we MUST create the directory (if it does not exist)
+# before attempting to create the lock file.
+
+if [ ! -d "$LAS" ]; then
+    echo $"`date` : `hostname` : creating data directory."
+    mkdir -p "$LAS"
+fi
+
 # Create the subsystem lock file IFF it does not exist.
 lockfile -r 1 -1 "$lockFile"
 if [ 0 != $? ]; then
@@ -42,13 +53,6 @@ if [ 0 != $? ]; then
     exit 1;
 fi
 echo $"`date` : `hostname` : created lock file."
-
-# Create a local directory in which to execute the services and within
-# which they will store their persistent state.
-if [ ! -d "$LAS" ]; then
-    echo $"`date` : `hostname` : creating data directory."
-    mkdir "$LAS"
-fi
 
 # Start the services manager on this host.
 java ${JAVA_OPTS} \
