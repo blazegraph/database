@@ -28,17 +28,23 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.1.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/classserver.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jini-core.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jini-ext.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jsk-lib.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jsk-platform.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/jsk-resources.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/reggie.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/start.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/sun-util.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/tools.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/iris-0.58.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/jgrapht-jdk1.5-0.7.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/browser.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/classserver.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/fiddler.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jini-core.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jini-ext.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jsk-lib.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jsk-platform.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jsk-resources.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/mahalo.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/mercury.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/norm.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/outrigger.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/reggie.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/start.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/sun-util.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/tools.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

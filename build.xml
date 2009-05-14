@@ -421,8 +421,8 @@
 	<replacefilter token="@LAS@" value="${LAS}" />
 	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
 	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
-	<replacefilter token="@ANT_HOME@" value="${ANT_HOME}" />
-	<replacefilter token="@JINI_HOME@" value="${JINI_HOME}" />
+	<replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+	<replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
 	<replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
 	<replacefilter token="@USE_NIO@" value="${USE_NIO}" />
 	<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
@@ -451,8 +451,8 @@
 	<replacefilter token="@LAS@" value="${LAS}" />
 	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
 	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
-	<replacefilter token="@ANT_HOME@" value="${ANT_HOME}" />
-	<replacefilter token="@JINI_HOME@" value="${JINI_HOME}" />
+	<replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
+	<replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
 	<replacefilter token="@SYSSTAT_HOME@" value="${SYSSTAT_HOME}" />
 	<replacefilter token="@USE_NIO@" value="${USE_NIO}" />
 	<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
