@@ -28,8 +28,7 @@
 		<path refid="build.classpath" />
 	</path>
 
-	<!-- classpath as installed (you can add your application jars here). -->
-	<!-- @todo bigdata-lubm/bigdata-lubm.jar; @todo configure classServer -->
+	<!-- classpath as installed. -->
 	<!-- @todo .so and .dll -->
 	<path id="install.classpath">
 		<fileset dir="${install.lib.dir}">
@@ -69,7 +68,7 @@
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
 			<src path="${bigdata.dir}/bigdata-sails/src/java" />
-			<!-- Do not include the unit tests.
+			<!-- Do not include the unit tests @todo conditionally include?
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test"/>
             <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
@@ -98,7 +97,11 @@
 		</copy>
 	</target>
 
-	<target name="jar" depends="compile" description="generates the jar.">
+	<target name="bundleJar" depends="bundle, jar" description="Generates the jar and bundles all the dependencies and adds 'bigdata.jar' into the output lib directory (without any version info).">
+		<copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib"/>
+	</target>
+
+	<target name="jar" depends="compile" description="Generates the jar.">
 		<jar destfile="${build.dir}/${version}.jar">
 			<fileset dir="${build.dir}/classes" />
 			<manifest>
@@ -132,7 +135,7 @@
 </javadoc>
 </target>
 
-<target name="bundle" description="Bundles all dependencies for easier deployments and releases.">
+<target name="bundle" description="Bundles all dependencies for easier deployments and releases (does not bundle the bigdata jar).">
 <copy toDir="${build.dir}/lib">
 	<fileset dir="${bigdata.dir}/bigdata/lib">
 		<include name="**/*.jar" />

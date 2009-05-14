@@ -14,6 +14,7 @@
 source `dirname $0`/bigdataenv
 
 java ${JAVA_OPTS} \
+	-cp ${CLASSPATH} \
     org.apache.log4j.net.SimpleSocketServer \
     4445 \
     ${BIGDATA_LOG4J_SERVER_CONFIG}

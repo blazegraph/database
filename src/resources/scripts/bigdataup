@@ -25,6 +25,10 @@ if [ -z "$JAVA_OPTS" ]; then
     echo $"`date` : hostname : environment not setup."
     exit 1;
 fi
+if [ -z "$CLASSPATH" ]; then
+    echo $"`date` : hostname : environment not setup."
+    exit 1;
+fi
 if [ -z "$BIGDATA_CONFIG" ]; then
     echo $"`date` : hostname : environment not setup."
     exit 1;
@@ -56,6 +60,7 @@ echo $"`date` : `hostname` : created lock file."
 
 # Start the services manager on this host.
 java ${JAVA_OPTS} \
+	 -cp ${CLASSPATH} \
 	 com.bigdata.jini.start.ServicesManagerServer \
 	 ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES} &
 
