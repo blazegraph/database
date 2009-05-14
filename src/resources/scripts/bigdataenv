@@ -123,7 +123,9 @@ export CLASSPATH="@CLASSPATH@"
 
 #
 # Java options used to start utility classes.  The utility classes
-# typically do not have large heap demands. 
+# typically do not have large heap demands.  This does NOT include
+# the CLASSPATH so it is easier to extend the classpath for 3rd
+# party components.
 #
 # Note: The java options for the services are configured in the main
 # configuration file.
@@ -134,7 +136,7 @@ export JAVA_OPTS="-server -ea \
     -Dlog4j.configuration=${BIGDATA_LOG4J_CONFIG} \
     -Djava.util.logging.config.file=${BIGDATA_LOGGING_CONFIG} \
 	-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME} \
-	-classpath ${CLASSPATH}"
+"
 
 #
 # Other things required by the 'bigdata' script.

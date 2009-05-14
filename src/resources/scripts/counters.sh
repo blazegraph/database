@@ -7,6 +7,6 @@
 
 source `dirname $0`/bigdataenv
 
-java -cp ${CLASSPATH}\
-    -Dlog4j.configuration=file:/nas/config/log4j.properties\
+java ${JAVA_OPTS} \
+	-cp ${CLASSPATH}\
     com.bigdata.counters.httpd.CounterSetHTTPDServer $* 
