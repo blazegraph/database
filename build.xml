@@ -419,7 +419,7 @@
 	<replacefilter token="@FED@" value="${FED}" />
 	<replacefilter token="@NAS@" value="${NAS}" />
 	<replacefilter token="@LAS@" value="${LAS}" />
-	<replacefilter token="@MASTER@" value="${MASTER}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
 	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
 	<replacefilter token="@ANT_HOME@" value="${ANT_HOME}" />
 	<replacefilter token="@JINI_HOME@" value="${JINI_HOME}" />
@@ -449,7 +449,7 @@
 	<replacefilter token="@FED@" value="${FED}" />
 	<replacefilter token="@NAS@" value="${NAS}" />
 	<replacefilter token="@LAS@" value="${LAS}" />
-	<replacefilter token="@MASTER@" value="${MASTER}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
 	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
 	<replacefilter token="@ANT_HOME@" value="${ANT_HOME}" />
 	<replacefilter token="@JINI_HOME@" value="${JINI_HOME}" />
@@ -481,8 +481,8 @@
 <!-- set execute bit for scripts in this directory (must be the last step). -->
 <chmod perm="u+x,g+rx,o-rwx">
 	<fileset dir="${install.bin.dir}">
-	<exclude name="README"/>
-	<exclude name="POST-INSTALL"/>
+		<exclude name="README"/>
+		<exclude name="POST-INSTALL"/>
 	</fileset>
 </chmod>
 <!-- Setup the status file which will be read by the bigdata script and
