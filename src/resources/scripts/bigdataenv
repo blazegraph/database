@@ -148,6 +148,13 @@ export lockFile=@LOCK_FILE@
 export pidFile=${LAS}/pid
 
 #
+# Export the location of the libraries, configuration files, etc.
+#
+export binDir=@BIN_DIR@
+export libDir=@LIB_DIR@
+export configDir=@CONFIG_DIR@
+
+#
 # Location of the various log files. 
 #
 export logDir=@LOG_DIR@
