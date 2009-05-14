@@ -44,12 +44,6 @@ export LAS=@LAS@
 export SYSSTAT_HOME=@SYSSTAT_HOME@
 
 #
-# The directory where ant is installed (ant is required to build
-# bigdata).
-#
-export ANT_HOME=@ANT_HOME@
-
-#
 # The directory where java is installed.
 #
 export JAVA_HOME=@JAVA_HOME@
@@ -114,7 +108,7 @@ export BIGDATA_LOG4J_SERVER_CONFIG="@LOG4J_SERVER_CONFIG@"
 #
 # Setup the path.
 #
-export PATH=${ANT_HOME}/bin:${JAVA_HOME}/bin:@BIN_DIR@:${PATH}
+export PATH=${JAVA_HOME}/bin:@BIN_DIR@:${PATH}
 
 #
 # Setup the classpath.
