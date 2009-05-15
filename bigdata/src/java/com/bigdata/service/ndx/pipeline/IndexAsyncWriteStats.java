@@ -64,31 +64,53 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
      */
     private class StatisticsTask implements Runnable {
 
-        /**
-         * The moving average of the #of buffered elements across the master and
-         * the sinks. 
+        /*
+         * Note: this does not work for two reasons. First, it does not account
+         * for eliminated duplicates. Second, redirects can cause
+         * double-counting of elements since they are written more than once -
+         * one to the original index partition and then once to the redirected
+         * index partition.
          */
-        final MovingAverageTask averageBufferedElements = new MovingAverageTask(
-                "averageBufferedElements", new Callable<Long>() {
-                    public Long call() {
-                        final IndexAsyncWriteStats stats = IndexAsyncWriteStats.this;
-                        final long delta;
-                        synchronized (stats) {
-                            delta = stats.elementsIn - stats.elementsOut;
-                        }
-                        return delta;
-                    }
-                });
+//        /**
+//         * The moving average of the #of buffered elements across the master and
+//         * the sinks. 
+//         */
+//        final MovingAverageTask averageBufferedElements = new MovingAverageTask(
+//                "averageBufferedElements", new Callable<Long>() {
+//                    public Long call() {
+//                        final IndexAsyncWriteStats stats = IndexAsyncWriteStats.this;
+//                        final long delta;
+//                        synchronized (stats) {
+//                            delta = stats.elementsIn - stats.elementsOut;
+//                        }
+//                        return delta;
+//                    }
+//                });
 
+        
         /**
-         * The moving average nanoseconds the master spends offering a chunk
-         * for transfer to a sink.
+         * The moving average of the nanoseconds the master spends offering a
+         * chunk for transfer to a sink.
          */
         final MovingAverageTask averageSinkOfferNanos = new MovingAverageTask(
                 "averageSinkOfferNanos", new Callable<Double>() {
                     public Double call() {
                         return (chunksTransferred == 0L ? 0
                                 : elapsedSinkOfferNanos
+                                        / (double) chunksTransferred);
+                    }
+                });
+
+        /**
+         * The moving average of the chunks size when chunks drained from the
+         * master queue are split and the splits transferred to the appropriate
+         * output sink(s).
+         */
+        final MovingAverageTask averageTransferChunkSize = new MovingAverageTask(
+                "averageTransferChunkSize", new Callable<Double>() {
+                    public Double call() {
+                        return (chunksTransferred == 0L ? 0
+                                : elementsTransferred
                                         / (double) chunksTransferred);
                     }
                 });
@@ -131,8 +153,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
  
         public void run() {
  
-            averageBufferedElements.run();
+//            averageBufferedElements.run();
             averageSinkOfferNanos.run();
+            averageTransferChunkSize.run();
             averageNanosPerWait.run();
             averageNanosPerWrite.run();
             averageElementsPerWrite.run();
@@ -168,24 +191,37 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * moving averages.
          */
         
-        t.addCounter("averageBufferedElements", new Instrument<Double>() {
-            @Override
-            public void sample() {
-                setValue(statisticsTask.averageBufferedElements
-                        .getMovingAverage());
-            }
-        });
+//        t.addCounter("averageBufferedElements", new Instrument<Double>() {
+//            @Override
+//            public void sample() {
+//                setValue(statisticsTask.averageBufferedElements
+//                        .getMovingAverage());
+//            }
+//        });
 
         /*
          * The moving average milliseconds the master spends offering a chunk
          * for transfer to a sink.
          */
-        t.addCounter("averageSinkOfferNanos", new Instrument<Double>() {
+        t.addCounter("averageSinkOfferMillis", new Instrument<Double>() {
             @Override
             protected void sample() {
                 setValue(statisticsTask.averageSinkOfferNanos
                         .getMovingAverage()
                         * scalingFactor);
+            }
+        });
+
+        /*
+         * The moving average of the chunks size when chunks drained from the
+         * master queue are split and the splits transferred to the appropriate
+         * output sink(s).
+         */
+        t.addCounter("averageTransferChunkSize", new Instrument<Double>() {
+            @Override
+            protected void sample() {
+                setValue(statisticsTask.averageTransferChunkSize
+                        .getMovingAverage());
             }
         });
 
