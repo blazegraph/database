@@ -131,7 +131,7 @@ public class TestMasterTaskWithErrors extends AbstractMasterTestCase {
 
         assertEquals("elementsIn", a.length, masterStats.elementsIn);
         assertEquals("chunksIn", 1, masterStats.chunksIn);
-        assertEquals("partitionCount", 2, masterStats.partitionCount);
+        assertEquals("partitionCount", 2, masterStats.getMaximumPartitionCount());
 
         /*
          * Note: There is no way to predict whether any chunks will have been

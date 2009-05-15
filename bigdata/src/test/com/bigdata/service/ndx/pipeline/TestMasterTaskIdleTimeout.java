@@ -111,7 +111,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("chunksIn", 1, masterStats.chunksIn);
         assertEquals("elementsOut", 1, masterStats.elementsOut);
         assertEquals("chunksOut", 1, masterStats.chunksOut);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
         
         // make sure that the subtask is still running.
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
@@ -172,7 +172,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("chunksIn", 2, masterStats.chunksIn);
         assertEquals("elementsOut", 2, masterStats.elementsOut);
         assertEquals("chunksOut", 2, masterStats.chunksOut);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         // verify that another subtask was started by the 2nd write.
         assertEquals("subtaskStartCount", 2, masterStats.subtaskStartCount);
@@ -261,7 +261,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("chunksIn", 1, masterStats.chunksIn);
         assertEquals("elementsOut", 1, masterStats.elementsOut);
         assertEquals("chunksOut", 1, masterStats.chunksOut);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
         
         // verify the sink was closed by an idle timeout.
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
@@ -521,7 +521,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
             assertEquals("elementsOut", counter.get(), masterStats.elementsOut);
 
             // only a single sink key was used (one index partition).
-            assertEquals("partitionCount", 1, masterStats.partitionCount);
+            assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
             /*
              * verify that the sink was not closed by an idle timeout before the
@@ -666,7 +666,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("elementsOut", 2, masterStats.elementsOut);
         assertEquals("chunksOut", 1, masterStats.chunksOut);
         
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
     }
 
@@ -737,7 +737,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
         assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount);
         assertEquals("subtaskIdleTimeout", 0, masterStats.subtaskIdleTimeout);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         // write another chunk on the master (distinct values).
         {
@@ -764,7 +764,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
         assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount);
         assertEquals("subtaskIdleTimeout", 0, masterStats.subtaskIdleTimeout);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         /*
          * Sleep long enough for the subtask idle timeout to be exceeded. The
@@ -787,7 +787,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
         assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
         assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         // close the master.
         masterBuffer.close();
@@ -817,7 +817,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
         assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
         assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
     }
     

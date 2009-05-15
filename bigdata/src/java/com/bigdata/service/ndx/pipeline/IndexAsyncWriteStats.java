@@ -16,9 +16,7 @@ import com.bigdata.util.concurrent.MovingAverageTask;
  * @version $Id$
  * 
  * @todo average time the master waits for a chunk to transfer (I believe that
- *       this is deliberately a short timeout); average size of the chunk
- *       transferred to a sink? (~#elementsIn/#chunksTransferred or exactly
- *       #elementsTransferred/#chunksTransferred).
+ *       this is deliberately a short timeout);
  * 
  * @todo average time to handle a redirect? That might be an indication of a
  *       stall during a redirect.
@@ -26,8 +24,6 @@ import com.bigdata.util.concurrent.MovingAverageTask;
  * @todo average master queue length
  * 
  * @todo average sink queue length
- * 
- * @todo average sink chunk size (#elementsOnQueue/size).
  */
 public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extends
         AbstractMasterStats<L, HS> {

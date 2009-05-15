@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
+import java.lang.ref.WeakReference;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -74,18 +76,22 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * The #of subtasks which were closed due to an idle timeout.
      */
     public long subtaskIdleTimeout = 0L;
-    
+
     /**
-     * The #of distinct partitions for which the master has caused subtasks to
-     * be created. You can compute the #of active subtasks as
-     * {@link #subtaskStartCount} - {@link #subtaskEndCount}, which is also
-     * reported by {@link #getCounterSet()}.
-     * 
-     * @todo if {@link #partitions} is made into a weak value hash map then we
-     *       need to change how this is maintained and add another counter which
-     *       is the maximum #of partitions at any given time (high tide).
+     * The maximum #of distinct partitions for which the master has caused
+     * subtasks to be created at any given time.
      */
-    public int partitionCount = 0;
+    private int maximumPartitionCount = 0;
+
+    /**
+     * The maximum #of distinct partitions for which the master has caused
+     * subtasks to be created at any given time.
+     */
+    public int getMaximumPartitionCount() {
+
+        return maximumPartitionCount;
+        
+    }
     
     /**
      * The #of redirects ({@link StaleLocatorException}s) that were handled.
@@ -153,7 +159,8 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * Map for the per-index partition statistics. This ensures that we can
      * report the aggregate statistics in detail.
      */
-    private final Map<L, HS> partitions = new LinkedHashMap<L, HS>();
+    private final ConcurrentWeakValueCache<L, HS> currentPartitionStats = new ConcurrentWeakValueCache<L, HS>(
+            1/* queueCapacity */);
 
     /**
      * Return the statistics object for the specified index partition and never
@@ -166,17 +173,18 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      */
     public HS getSubtaskStats(final L locator) {
 
-        synchronized (partitions) {
+        synchronized (currentPartitionStats) {
          
-            HS t = partitions.get(locator);
+            HS t = currentPartitionStats.get(locator);
 
             if (t == null) {
 
                 t = newSubtaskStats(locator);
 
-                partitions.put(locator, t);
+                currentPartitionStats.put(locator, t);
 
-                partitionCount++;
+                maximumPartitionCount = Math.max(maximumPartitionCount,
+                        currentPartitionStats.size());
                 
             }
 
@@ -195,17 +203,36 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * @return The statistics for the subtask.
      */
     protected abstract HS newSubtaskStats(L locator);
-    
+
     /**
      * Return a snapshot of the statistics for each index partition.
      */
-    public Map<L,HS> getSubtaskStats() {
+    public Map<L, HS> getSubtaskStats() {
 
-        synchronized (partitions) {
+        final Map<L, HS> m = new LinkedHashMap<L, HS>(currentPartitionStats
+                .size());
 
-            return new LinkedHashMap<L,HS>(partitions);
-            
+        final Iterator<Map.Entry<L, WeakReference<HS>>> itr = currentPartitionStats
+                .entryIterator();
+
+        while (itr.hasNext()) {
+
+            final Map.Entry<L, WeakReference<HS>> e = itr.next();
+
+            final HS subtaskStats = e.getValue().get();
+
+            if (subtaskStats == null) {
+
+                // weak reference was cleared.
+                continue;
+
+            }
+
+            m.put(e.getKey(), subtaskStats);
+
         }
+
+        return m;
 
     }
 
@@ -243,21 +270,17 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             }
         });
 
-        t.addCounter("partitionCount", new Instrument<Integer>() {
+        t.addCounter("maximumPartitionCount", new Instrument<Integer>() {
             @Override
             protected void sample() {
-                setValue(partitionCount);
+                setValue(maximumPartitionCount);
             }
         });
 
-        /**
-         * @todo this does not work and will report small negative as well as
-         *       positive values for some reason that I have not determined.
-         */
-        t.addCounter("activePartitionCount", new Instrument<Long>() {
+        t.addCounter("activePartitionCount", new Instrument<Integer>() {
             @Override
             protected void sample() {
-                setValue(subtaskStartCount - subtaskEndCount);
+                setValue(currentPartitionStats.size());
             }
         });
 
@@ -398,7 +421,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 + ", subtaskIdleTimeout="
                 + subtaskIdleTimeout
                 + ", partitionCount="
-                + partitionCount
+                + maximumPartitionCount
                 + ", activePartitionCount="
                 + (subtaskStartCount-subtaskEndCount)
                 + ", redirectCount="
