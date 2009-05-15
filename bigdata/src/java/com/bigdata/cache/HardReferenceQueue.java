@@ -46,7 +46,7 @@ import org.apache.log4j.Logger;
  * is nevertheless used to drive persistence of the object. Since an object may
  * be evicted multiple times without being updated in between evictions, this
  * requires the object to implement a protocol for determining whether or not it
- * is dirty. Eviction is then contigent on that protocol and the dirty state of
+ * is dirty. Eviction is then contingent on that protocol and the dirty state of
  * the object is reset when it is serialized for eviction. In combination with
  * the object's dirty protocol, the hard reference cache can substitute for a
  * commit list.
@@ -76,8 +76,8 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      */
     protected final int capacity;
     /**
-     * The hard references. There is no guarentee that the references are
-     * distinct. Unused enties are cleared to null so that we do not hold onto
+     * The hard references. There is no guarantee that the references are
+     * distinct. Unused entries are cleared to null so that we do not hold onto
      * hard references after they have been evicted.
      */
     protected final T[] refs;
@@ -108,7 +108,7 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      *            The listener on which cache evictions are reported.
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
-     *            There is no guarentee that all stored references are distinct.
+     *            There is no guarantee that all stored references are distinct.
      */
     public HardReferenceQueue(final HardReferenceQueueEvictionListener<T> listener,
             final int capacity) {
@@ -124,13 +124,13 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      *            The listener on which cache evictions are reported (optional).
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
-     *            There is no guarentee that all stored references are distinct.
+     *            There is no guarantee that all stored references are distinct.
      * @param nscan
      *            The #of references to scan from the MRU position before
      *            appended a reference to the cache. Scanning is used to reduce
      *            the chance that references that are touched several times in
      *            near succession from entering the cache more than once. The
-     *            #of reference tests trads off against the latency of adding a
+     *            #of reference tests trades off against the latency of adding a
      *            reference to the cache.
      */
     public HardReferenceQueue(
@@ -346,7 +346,7 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      *            This may be false to force persistence of the references in
      *            the cache without actually clearing the cache.
      */
-    final public void evictAll(boolean clearRefs) {
+    final public void evictAll(final boolean clearRefs) {
 
         if( clearRefs ) {
 
@@ -440,7 +440,7 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      *            
      * @return True iff we found <i>ref</i> in the scanned queue positions.
      */
-    final public boolean scanHead(int nscan, T ref) {
+    final public boolean scanHead(final int nscan, final T ref) {
         assert nscan > 0;
         assert ref != null;
         /*
@@ -495,7 +495,7 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      * 
      * FIXME Write unit tests for this method.
      */
-    final public boolean scanTail(int nscan, T ref) {
+    final public boolean scanTail(final int nscan, final T ref) {
 
         assert nscan > 0 ;
         
