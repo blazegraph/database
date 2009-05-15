@@ -134,7 +134,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         assertEquals("chunksIn", 1, masterStats.chunksIn);
         assertEquals("elementsOut", a.length, masterStats.elementsOut);
         assertEquals("chunksOut", 2, masterStats.chunksOut);
-        assertEquals("partitionCount", 3, masterStats.partitionCount);
+        assertEquals("partitionCount", 3, masterStats.getMaximumPartitionCount());
 
         // verify writes on each expected partition.
         {
@@ -331,7 +331,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         assertEquals("chunksIn", 2, masterStats.chunksIn);
         assertEquals("elementsOut", 3, masterStats.elementsOut);
         assertEquals("chunksOut", 3, masterStats.chunksOut);
-        assertEquals("partitionCount", 3, masterStats.partitionCount);
+        assertEquals("partitionCount", 3, masterStats.getMaximumPartitionCount());
 
         // verify writes on each expected partition.
         {

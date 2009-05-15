@@ -73,7 +73,7 @@ public class TestMasterTask extends AbstractMasterTestCase {
         assertEquals("chunksIn", 0, masterStats.chunksIn);
         assertEquals("elementsOut", 0, masterStats.elementsOut);
         assertEquals("chunksOut", 0, masterStats.chunksOut);
-        assertEquals("partitionCount", 0, masterStats.partitionCount);
+        assertEquals("partitionCount", 0, masterStats.getMaximumPartitionCount());
 
     }
 
@@ -102,7 +102,7 @@ public class TestMasterTask extends AbstractMasterTestCase {
         assertEquals("chunksIn", 0, masterStats.chunksIn);
         assertEquals("elementsOut", 0, masterStats.elementsOut);
         assertEquals("chunksOut", 0, masterStats.chunksOut);
-        assertEquals("partitionCount", 0, masterStats.partitionCount);
+        assertEquals("partitionCount", 0, masterStats.getMaximumPartitionCount());
 
     }
 
@@ -134,7 +134,7 @@ public class TestMasterTask extends AbstractMasterTestCase {
         assertEquals("chunksIn", 1, masterStats.chunksIn);
         assertEquals("elementsOut", a.length, masterStats.elementsOut);
         assertEquals("chunksOut", 1, masterStats.chunksOut);
-        assertEquals("partitionCount", 1, masterStats.partitionCount);
+        assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         // verify writes on each expected partition.
         {
@@ -184,7 +184,7 @@ public class TestMasterTask extends AbstractMasterTestCase {
         assertEquals("chunksIn", 1, masterStats.chunksIn);
         assertEquals("elementsOut", a.length, masterStats.elementsOut);
         assertEquals("chunksOut", 2, masterStats.chunksOut);
-        assertEquals("partitionCount", 2, masterStats.partitionCount);
+        assertEquals("partitionCount", 2, masterStats.getMaximumPartitionCount());
 
         // verify writes on each expected partition.
         {
@@ -261,7 +261,7 @@ public class TestMasterTask extends AbstractMasterTestCase {
         assertEquals("chunksIn", 2, masterStats.chunksIn);
         assertEquals("elementsOut", 5, masterStats.elementsOut);
         assertEquals("chunksOut", 4, masterStats.chunksOut);
-        assertEquals("partitionCount", 2, masterStats.partitionCount);
+        assertEquals("partitionCount", 2, masterStats.getMaximumPartitionCount());
 
         // verify writes on each expected partition.
         {
