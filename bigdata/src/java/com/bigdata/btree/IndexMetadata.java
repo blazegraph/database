@@ -784,7 +784,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         /**
          * The time in nanoseconds that the master will combine smaller chunks
-         * so that it can satisify the desired <i>masterChunkSize</i>.
+         * so that it can satisfy the desired <i>masterChunkSize</i>.
          */
         String MASTER_CHUNK_TIMEOUT_NANOS = AsynchronousIndexWriteConfiguration.class
                 .getName()

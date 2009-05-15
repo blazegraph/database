@@ -101,7 +101,7 @@ public class TestHardReferenceQueue extends TestCase2 {
                 listener, 100, 2 );
 
         try {
-            cache.append(null);
+            cache.add(null);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
             System.err.println("Ignoring expectedRefs exception: " + ex);
@@ -138,61 +138,61 @@ public class TestHardReferenceQueue extends TestCase2 {
         final String ref5 = "5";
         
         assertEquals("size",0,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",0,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",0,cache.getHeadIndex());
         assertTrue("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{},cache.toArray());
+        assertEquals("order",new String[]{},cache.toArray(new String[0]));
         
-        assertTrue(cache.append(ref0));
+        assertTrue(cache.add(ref0));
         assertEquals("size",1,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",1,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",1,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0},cache.toArray());
+        assertEquals("order",new String[]{ref0},cache.toArray(new String[0]));
         
-        assertTrue(cache.append(ref1));
+        assertTrue(cache.add(ref1));
         assertEquals("size",2,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",2,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",2,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1},cache.toArray(new String[0]));
         
-        assertTrue(cache.append(ref2));
+        assertTrue(cache.add(ref2));
         assertEquals("size",3,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",3,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",3,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1,ref2},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1,ref2},cache.toArray(new String[0]));
         
-        assertTrue(cache.append(ref3));
+        assertTrue(cache.add(ref3));
         assertEquals("size",4,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",4,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",4,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1,ref2,ref3},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1,ref2,ref3},cache.toArray(new String[0]));
         
-        assertTrue(cache.append(ref4));
+        assertTrue(cache.add(ref4));
         assertEquals("size",5,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",0,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",0,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1,ref2,ref3,ref4},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1,ref2,ref3,ref4},cache.toArray(new String[0]));
 
         listener.setExpectedRef(ref0);
-        assertTrue(cache.append(ref5));
+        assertTrue(cache.add(ref5));
         listener.assertEvicted();
         assertEquals("size",5,cache.size());
-        assertEquals("tail",1,cache.tail());
-        assertEquals("head",1,cache.head());
+        assertEquals("tail",1,cache.getTailIndex());
+        assertEquals("head",1,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref1,ref2,ref3,ref4,ref5},cache.toArray());
+        assertEquals("order",new String[]{ref1,ref2,ref3,ref4,ref5},cache.toArray(new String[0]));
 
         /*
          * Evict the LRU reference and verify that the cache size goes down by
@@ -202,36 +202,36 @@ public class TestHardReferenceQueue extends TestCase2 {
         assertTrue(cache.evict());
         listener.assertEvicted();
         assertEquals("size",4,cache.size());
-        assertEquals("tail",2,cache.tail());
-        assertEquals("head",1,cache.head());
+        assertEquals("tail",2,cache.getTailIndex());
+        assertEquals("head",1,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref2,ref3,ref4,ref5},cache.toArray());
+        assertEquals("order",new String[]{ref2,ref3,ref4,ref5},cache.toArray(new String[0]));
 
         /*
          * add a reference - no eviction since the cache was not at capacity. As
          * a post-condition, the cache is once again at capacity.
          */
-        assertTrue(cache.append(ref4));
+        assertTrue(cache.add(ref4));
         assertEquals("size",5,cache.size());
-        assertEquals("tail",2,cache.tail());
-        assertEquals("head",2,cache.head());
+        assertEquals("tail",2,cache.getTailIndex());
+        assertEquals("head",2,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref2,ref3,ref4,ref5,ref4},cache.toArray());
+        assertEquals("order",new String[]{ref2,ref3,ref4,ref5,ref4},cache.toArray(new String[0]));
 
         /*
          * Add another reference and verify that an eviction occurs.
          */
         listener.setExpectedRef(ref2);
-        assertTrue(cache.append(ref2));
+        assertTrue(cache.add(ref2));
         listener.assertEvicted();
         assertEquals("size",5,cache.size());
-        assertEquals("tail",3,cache.tail());
-        assertEquals("head",3,cache.head());
+        assertEquals("tail",3,cache.getTailIndex());
+        assertEquals("head",3,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref3,ref4,ref5,ref4,ref2},cache.toArray());
+        assertEquals("order",new String[]{ref3,ref4,ref5,ref4,ref2},cache.toArray(new String[0]));
 
         /*
          * Test evictAll(false) (does not change the cache state).
@@ -241,11 +241,11 @@ public class TestHardReferenceQueue extends TestCase2 {
         cache.evictAll(false);
         listener.assertEvictionCount(nevicted+5);
         assertEquals("size",5,cache.size());
-        assertEquals("tail",3,cache.tail());
-        assertEquals("head",3,cache.head());
+        assertEquals("tail",3,cache.getTailIndex());
+        assertEquals("head",3,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref3,ref4,ref5,ref4,ref2},cache.toArray());
+        assertEquals("order",new String[]{ref3,ref4,ref5,ref4,ref2},cache.toArray(new String[0]));
 
         /*
          * Test evictAll(false) (actually evicts the references from the cache).
@@ -255,11 +255,11 @@ public class TestHardReferenceQueue extends TestCase2 {
         cache.evictAll(true);
         listener.assertEvictionCount(nevicted+5);
         assertEquals("size",0,cache.size());
-        assertEquals("tail",3,cache.tail());
-        assertEquals("head",3,cache.head());
+        assertEquals("tail",3,cache.getTailIndex());
+        assertEquals("head",3,cache.getHeadIndex());
         assertTrue("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{},cache.toArray());
+        assertEquals("order",new String[]{},cache.toArray(new String[0]));
         
     }
     
@@ -283,90 +283,90 @@ public class TestHardReferenceQueue extends TestCase2 {
 
         // initial conditions.
         assertEquals("size",0,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",0,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",0,cache.getHeadIndex());
         assertTrue("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{},cache.toArray());
+        assertEquals("order",new String[]{},cache.toArray(new String[0]));
 
         // append and check post-conditions.
-        assertTrue(cache.append(ref0));
+        assertTrue(cache.add(ref0));
         assertEquals("size",1,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",1,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",1,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0},cache.toArray());
+        assertEquals("order",new String[]{ref0},cache.toArray(new String[0]));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref0));
+        assertFalse(cache.add(ref0));
 
         // append and check post-conditions.
-        assertTrue(cache.append(ref1));
+        assertTrue(cache.add(ref1));
         assertEquals("size",2,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",2,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",2,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1},cache.toArray(new String[0]));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref1));
+        assertFalse(cache.add(ref1));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref0));
+        assertFalse(cache.add(ref0));
         
         // append and check post-conditions.
-        assertTrue(cache.append(ref2));
+        assertTrue(cache.add(ref2));
         assertEquals("size",3,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",3,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",3,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1,ref2},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1,ref2},cache.toArray(new String[0]));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref2));
+        assertFalse(cache.add(ref2));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref1));
+        assertFalse(cache.add(ref1));
         
         /*
          * Verify scan does NOT find ref. The reference is still in the cache
          * but the scan does not reach back that far.
          */
-        assertTrue(cache.append(ref0));
+        assertTrue(cache.add(ref0));
         assertEquals("size",4,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",4,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",4,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertFalse("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1,ref2,ref0},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1,ref2,ref0},cache.toArray(new String[0]));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref0));
+        assertFalse(cache.add(ref0));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref2));
+        assertFalse(cache.add(ref2));
         
         /*
          * Verify scan does NOT find ref. The reference is still in the cache
          * but the scan does not reach back that far.  At this point the cache
          * is at capacity.
          */
-        assertTrue(cache.append(ref1));
+        assertTrue(cache.add(ref1));
         assertEquals("size",5,cache.size());
-        assertEquals("tail",0,cache.tail());
-        assertEquals("head",0,cache.head());
+        assertEquals("tail",0,cache.getTailIndex());
+        assertEquals("head",0,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref0,ref1,ref2,ref0,ref1},cache.toArray());
+        assertEquals("order",new String[]{ref0,ref1,ref2,ref0,ref1},cache.toArray(new String[0]));
         
         // verify scan finds ref.
-        assertFalse(cache.append(ref1));
+        assertFalse(cache.add(ref1));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref0));
+        assertFalse(cache.add(ref0));
         
         /*
          * Verify scan does NOT find ref. The reference is still in the cache
@@ -374,31 +374,31 @@ public class TestHardReferenceQueue extends TestCase2 {
          * overflows and evicts the LRU reference.
          */
         listener.setExpectedRef(ref0);
-        assertTrue(cache.append(ref2));
+        assertTrue(cache.add(ref2));
         listener.assertEvicted();
         assertEquals("size",5,cache.size());
-        assertEquals("tail",1,cache.tail());
-        assertEquals("head",1,cache.head());
+        assertEquals("tail",1,cache.getTailIndex());
+        assertEquals("head",1,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref1,ref2,ref0,ref1,ref2},cache.toArray());
+        assertEquals("order",new String[]{ref1,ref2,ref0,ref1,ref2},cache.toArray(new String[0]));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref2));
+        assertFalse(cache.add(ref2));
 
         // verify scan finds ref.
-        assertFalse(cache.append(ref1));
+        assertFalse(cache.add(ref1));
 
         // verify scan does NOT find ref.
         listener.setExpectedRef(ref1);
-        assertTrue(cache.append(ref0));
+        assertTrue(cache.add(ref0));
         listener.assertEvicted();
         assertEquals("size",5,cache.size());
-        assertEquals("tail",2,cache.tail());
-        assertEquals("head",2,cache.head());
+        assertEquals("tail",2,cache.getTailIndex());
+        assertEquals("head",2,cache.getHeadIndex());
         assertFalse("empty",cache.isEmpty());
         assertTrue("full",cache.isFull());
-        assertEquals("order",new String[]{ref2,ref0,ref1,ref2,ref0},cache.toArray());
+        assertEquals("order",new String[]{ref2,ref0,ref1,ref2,ref0},cache.toArray(new String[0]));
 
     }
 
@@ -515,7 +515,7 @@ public class TestHardReferenceQueue extends TestCase2 {
          *             if the evicted reference is not the next expected
          *             eviction reference or if no eviction is expected.
          */
-        public void evicted(HardReferenceQueue<T> cache, T ref) {
+        public void evicted(final HardReferenceQueue<T> cache, final T ref) {
 
             assertNotNull("cache", cache);
             assertNotNull("ref", ref);

@@ -29,6 +29,8 @@
 package com.bigdata.cache;
 
 /**
+ * Interface for a hard reference queue.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * @param <T>
@@ -37,7 +39,7 @@ package com.bigdata.cache;
 public interface IHardReferenceQueue<T> {
 
     /**
-     * A resonable default for the #of references on the head of the queue that
+     * A reasonable default for the #of references on the head of the queue that
      * should be tested before a reference is appended to the queue.
      */
     int DEFAULT_NSCAN = 10;
@@ -53,7 +55,7 @@ public interface IHardReferenceQueue<T> {
     int nscan();
 
     /**
-     * The #of references in the cache.  Note that there is no guarentee that
+     * The #of references in the cache.  Note that there is no guarantee that
      * the references are distinct.
      */
     int size();
@@ -80,7 +82,7 @@ public interface IHardReferenceQueue<T> {
      * @return True iff the reference was added to the cache and false iff the
      *         reference was found in a scan of the nscan MRU cache entries.
      */
-    boolean append(final T ref);
+    boolean add(final T ref);
 
     /**
      * Evict the LRU reference. This is a NOP iff the cache is empty.
@@ -116,6 +118,6 @@ public interface IHardReferenceQueue<T> {
      * The reference at the tail of the queue. This is the next reference that
      * will be evicted from the queue.
      */
-    T getTail();
+    T peek();
 
 }

@@ -62,7 +62,7 @@ import com.bigdata.service.ndx.pipeline.KVOLatch;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IScaleOutClientIndex extends IClientIndex {
+public interface IScaleOutClientIndex extends IClientIndex, ISplitter {
 
     /**
      * Resolve the data service to which the index partition is mapped.
@@ -154,54 +154,6 @@ public interface IScaleOutClientIndex extends IClientIndex {
      * federation.
      */
     AbstractScaleOutFederation getFederation();
-
-    /**
-     * Identify the {@link Split}s for an ordered array of keys such that there
-     * is one {@link Split} per index partition spanned by the data.
-     * 
-     * @param ts
-     *            The timestamp for the {@link IMetadataIndex} view that will be
-     *            applied to choose the {@link Split}s.
-     * @param fromIndex
-     *            The index of the first key in <i>keys</i> to be processed
-     *            (inclusive).
-     * @param toIndex
-     *            The index of the last key in <i>keys</i> to be processed.
-     * @param keys
-     *            An array of keys. Each key is an interpreted as an unsigned
-     *            byte[]. All keys must be non-null. The keys must be in sorted
-     *            order.
-     * 
-     * @return The {@link Split}s that you can use to form requests based on
-     *         the identified first/last key and partition identified by this
-     *         process.
-     */
-    LinkedList<Split> splitKeys(final long ts, final int fromIndex,
-            final int toIndex, final byte[][] keys);
-
-    /**
-     * Identify the {@link Split}s for an ordered {@link KVO}[] such that
-     * there is one {@link Split} per index partition spanned by the data.
-     * 
-     * @param ts
-     *            The timestamp for the {@link IMetadataIndex} view that will be
-     *            applied to choose the {@link Split}s.
-     * @param fromIndex
-     *            The index of the first key in <i>keys</i> to be processed
-     *            (inclusive).
-     * @param toIndex
-     *            The index of the last key in <i>keys</i> to be processed.
-     * @param keys
-     *            An array of keys. Each key is an interpreted as an unsigned
-     *            byte[]. All keys must be non-null. The keys must be in sorted
-     *            order.
-     * 
-     * @return The {@link Split}s that you can use to form requests based on
-     *         the identified first/last key and partition identified by this
-     *         process.
-     */
-    LinkedList<Split> splitKeys(final long ts, final int fromIndex,
-            final int toIndex, final KVO[] a);
 
     /**
      * Asynchronous write API (streaming writes).

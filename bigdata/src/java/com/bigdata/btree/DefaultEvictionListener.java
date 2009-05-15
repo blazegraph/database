@@ -118,7 +118,7 @@ public class DefaultEvictionListener implements
 
                 if (btree.readRetentionQueue != null) {
 
-                    btree.readRetentionQueue.append(ref);
+                    btree.readRetentionQueue.add(ref);
 
                 }
                 

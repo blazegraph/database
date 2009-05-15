@@ -108,12 +108,26 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * partitions (not including any eliminated duplicates).
      */
     public long elementsOut = 0L;
+
+    /**
+     * The #of chunks transferred from the master to the sinks. Where there is
+     * more than one index partition, there will be more than one sink and each
+     * chunk written on the master will be divided among the sinks based on the
+     * key-ranges of the tuples in the chunks.
+     */
+    public long chunksTransferred = 0L;
     
     /**
      * The #of chunks written onto index partitions using RMI.
      */
     public long chunksOut = 0L;
-    
+
+    /**
+     * Elapsed nanoseconds the master spends offering a chunk for transfer to a
+     * sink.
+     */
+    public long elapsedSinkOfferNanos = 0L;
+
     /**
      * Elapsed time across sinks waiting for another chunk to be ready so that
      * it can be written onto the index partition.
@@ -230,7 +244,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("activePartitionCount", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(subtaskStartCount-subtaskEndCount);
+                setValue(subtaskStartCount - subtaskEndCount);
             }
         });
 
@@ -269,6 +283,13 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             }
         });
 
+        t.addCounter("chunksTransferred", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(chunksTransferred);
+            }
+        });
+        
         t.addCounter("elapsedChunkWaitingNanos", new Instrument<Long>() {
             @Override
             protected void sample() {
@@ -283,62 +304,62 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             }
         });
 
-        t.addCounter("averageMillisPerWait", new Instrument<Long>() {
-            @Override
-            protected void sample() {
-                setValue(TimeUnit.NANOSECONDS
-                        .toMillis((long) getAverageNanosPerWait()));
-            }
-        });
-
-        t.addCounter("averageMillisPerWrite", new Instrument<Long>() {
-            @Override
-            protected void sample() {
-                setValue(TimeUnit.NANOSECONDS
-                        .toMillis((long) getAverageNanosPerWrite()));
-            }
-        });
-
-        t.addCounter("averageElementsPerWrite", new Instrument<Double>() {
-            @Override
-            protected void sample() {
-                setValue(getAverageElementsPerWrite());
-            }
-        });
+//        t.addCounter("averageMillisPerWait", new Instrument<Long>() {
+//            @Override
+//            protected void sample() {
+//                setValue(TimeUnit.NANOSECONDS
+//                        .toMillis((long) getAverageNanosPerWait()));
+//            }
+//        });
+//
+//        t.addCounter("averageMillisPerWrite", new Instrument<Long>() {
+//            @Override
+//            protected void sample() {
+//                setValue(TimeUnit.NANOSECONDS
+//                        .toMillis((long) getAverageNanosPerWrite()));
+//            }
+//        });
+//
+//        t.addCounter("averageElementsPerWrite", new Instrument<Double>() {
+//            @Override
+//            protected void sample() {
+//                setValue(getAverageElementsPerWrite());
+//            }
+//        });
 
         return t;
 
     }
 
-    /**
-     * The average #of nanoseconds waiting for a chunk to become ready so that
-     * it can be written on an output sink.
-     */
-    public double getAverageNanosPerWait() {
-
-        return (chunksOut == 0L ? 0 : elapsedChunkWaitingNanos
-                / (double) chunksOut);
-
-    }
-
-    /**
-     * The average #of nanoseconds per chunk written on an output sink.
-     */
-    public double getAverageNanosPerWrite() {
-
-        return (chunksOut == 0L ? 0 : elapsedChunkWritingNanos
-                / (double) chunksOut);
-
-    }
-
-    /**
-     * The average #of elements (tuples) per chunk written on an output sink.
-     */
-    public double getAverageElementsPerWrite() {
-
-        return (chunksOut == 0L ? 0 : elementsOut / (double) chunksOut);
-
-    }
+//    /**
+//     * The average #of nanoseconds waiting for a chunk to become ready so that
+//     * it can be written on an output sink.
+//     */
+//    public double getAverageNanosPerWait() {
+//
+//        return (chunksOut == 0L ? 0 : elapsedChunkWaitingNanos
+//                / (double) chunksOut);
+//
+//    }
+//
+//    /**
+//     * The average #of nanoseconds per chunk written on an output sink.
+//     */
+//    public double getAverageNanosPerWrite() {
+//
+//        return (chunksOut == 0L ? 0 : elapsedChunkWritingNanos
+//                / (double) chunksOut);
+//
+//    }
+//
+//    /**
+//     * The average #of elements (tuples) per chunk written on an output sink.
+//     */
+//    public double getAverageElementsPerWrite() {
+//
+//        return (chunksOut == 0L ? 0 : elementsOut / (double) chunksOut);
+//
+//    }
 
     public String toString() {
 
@@ -363,17 +384,19 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 + chunksOut
                 + ", elementsOut="
                 + elementsOut
+                + ", chunksTransferred="
+                + chunksTransferred
                 + ", elapsedChunkWaitingNanos="
                 + elapsedChunkWaitingNanos
                 + ", elapsedChunkWritingNanos="
                 + elapsedChunkWritingNanos
-                + ", averageMillisPerWait="
-                + TimeUnit.NANOSECONDS
-                        .toMillis((long) getAverageNanosPerWait())
-                + ", averageMillisPerWrite="
-                + TimeUnit.NANOSECONDS
-                        .toMillis((long) getAverageNanosPerWrite())
-                + ", averageElementsPerWrite=" + getAverageElementsPerWrite()
+//                + ", averageMillisPerWait="
+//                + TimeUnit.NANOSECONDS
+//                        .toMillis((long) getAverageNanosPerWait())
+//                + ", averageMillisPerWrite="
+//                + TimeUnit.NANOSECONDS
+//                        .toMillis((long) getAverageNanosPerWrite())
+//                + ", averageElementsPerWrite=" + getAverageElementsPerWrite()
                 + "}";
 
     }

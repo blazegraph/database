@@ -142,7 +142,7 @@ L>//
      * (re-)opening an {@link IndexPartitionWriteTask} even during
      * {@link #awaitAll()}.</dd>
      * <dt>{@link #cancelAll()}</dt>
-     * <dd>Cancelling the task and its subtask(s).</dd>
+     * <dd>Canceling the task and its subtask(s).</dd>
      * <dt>{@link #awaitAll()}</dt>
      * <dd>Awaiting the successful completion of the task and its subtask(s).</dd>
      * </ol>
@@ -642,8 +642,9 @@ L>//
 
             while (!f.isDone()) {
 
+                // yield the lock until a subtask completes 
                 subtask.await(
-                        // @todo config
+                        // @todo config - should be ~10 - 50 ms.
                         BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
                         BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT);
 
@@ -778,12 +779,15 @@ L>//
 
             final long begin = System.nanoTime();
             
-            final long offerTimeoutNanos = TimeUnit.SECONDS.toNanos(5);
-            
             boolean added = false;
             
             while (!added) {
 
+                halted();
+                
+                // track offer time.
+                final long beforeOffer = System.nanoTime();
+                
                 if (reopen) {
 
                     // stack trace through here if [reopen == true]
@@ -820,10 +824,22 @@ L>//
                     
                 }
 
+                synchronized(stats) {
+                    
+                    stats.elapsedSinkOfferNanos += (System.nanoTime() - beforeOffer);
+                    
+                }
+                
             }
             
             // update timestamp of the last chunk written on that sink.
             sink.lastChunkNanos = System.nanoTime();
+            
+            synchronized(stats) {
+
+                stats.chunksTransferred += 1;
+                
+            }
 
         } finally {
 
@@ -832,5 +848,9 @@ L>//
         }
 
     }
+
+    // @todo review timeout : config?
+    private final static long offerTimeoutNanos = TimeUnit.MILLISECONDS
+            .toNanos(1000);
 
 }

@@ -127,8 +127,8 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  *       a time). This facility could be used to give priority to distributed
  *       transactions over local unisolated operations and to priviledge certain
  *       operations that have low latency requirements. This is not quite a
- *       "real-time" guarentee since the VM is not (normally) providing
- *       real-time guarentees and since we are not otherwise attempting to
+ *       "real-time" guarantee since the VM is not (normally) providing
+ *       real-time guarantees and since we are not otherwise attempting to
  *       ensure anything except lower latency when compared to other operations
  *       awaiting their own locks.
  */

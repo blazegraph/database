@@ -1131,7 +1131,7 @@ public class KeyBuilder implements IKeyBuilder {
      * @return The corresponding long integer value that maintains the same
      *         total ordering.
      */
-    public static long d2l(double d) {
+    public static long d2l(final double d) {
 
         long aLong = Double.doubleToLongBits(d);
         
@@ -1163,7 +1163,7 @@ public class KeyBuilder implements IKeyBuilder {
      * @return The corresponding integer value that maintains the same total
      *         ordering.
      */
-    public static int f2i(float f) {
+    public static int f2i(final float f) {
 
         int aInt = Float.floatToIntBits(f);
         
@@ -1187,7 +1187,7 @@ public class KeyBuilder implements IKeyBuilder {
      *            
      * @return The signed long value.
      */
-    static public long decodeLong(byte[] buf,int off) {
+    static public long decodeLong(final byte[] buf, int off) {
 
         long v = 0L;
         
@@ -1225,7 +1225,7 @@ public class KeyBuilder implements IKeyBuilder {
      *            
      * @return The signed int value.
      */
-    static public int decodeInt(byte[] buf,int off) {
+    static public int decodeInt(final byte[] buf, int off) {
 
         int v = 0;
         

@@ -16,10 +16,6 @@ public class MovingAverageTask implements Runnable {
     protected static final Logger log = Logger
             .getLogger(MovingAverageTask.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-
     /**
      * The label used in log messages.
      */
@@ -54,11 +50,11 @@ public class MovingAverageTask implements Runnable {
         
     }
 
-    /**
-     * Scaling factor converts nanoseconds to milliseconds.
-     */
-    static protected final double scalingFactor = 1d / TimeUnit.NANOSECONDS
-            .convert(1, TimeUnit.MILLISECONDS);
+//    /**
+//     * Scaling factor converts nanoseconds to milliseconds.
+//     */
+//    static protected final double scalingFactor = 1d / TimeUnit.NANOSECONDS
+//            .convert(1, TimeUnit.MILLISECONDS);
 
     /**
      * The weight used to compute the moving average.
@@ -107,7 +103,8 @@ public class MovingAverageTask implements Runnable {
      *            The weight to be used by
      *            {@link #getMovingAverage(double, double, double)}
      */
-    public MovingAverageTask(String name, Callable<? extends Number> sampleTask, double w) {
+    public MovingAverageTask(String name,
+            Callable<? extends Number> sampleTask, double w) {
 
         if (name == null)
             throw new IllegalArgumentException();

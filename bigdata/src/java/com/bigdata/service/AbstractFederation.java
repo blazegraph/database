@@ -52,6 +52,7 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
@@ -319,6 +320,20 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     /**
      * Counters for each scale-out index accessed by the client.
+     * 
+     * @todo A hard reference map is used to prevent the counters from being
+     *       finalized so that they will reflect the use by the client over the
+     *       life of its operations. However, this could be a problem for an
+     *       {@link IDataService} or {@link IClientService} since any number of
+     *       clients could run over time. If there were a large #of distinct
+     *       scale-out indices then this would effectively represent a memory
+     *       leak. The other way to handle this would be a
+     *       {@link ConcurrentWeakValueCacheWithTimeout} where the timeout was
+     *       relatively long - 10m or more.
+     * 
+     * @todo indices isolated by a read-write tx will need their own counters
+     *       for each isolated view or we can just let the counters indicates
+     *       the unisolated writes.
      */
     private final Map<String, ScaleOutIndexCounters> scaleOutIndexCounters = new HashMap<String, ScaleOutIndexCounters>();
     
@@ -356,7 +371,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
             if (t == null) {
         
-                t = new ScaleOutIndexCounters();
+                t = new ScaleOutIndexCounters(this);
                 
                 scaleOutIndexCounters.put(name, t);
                 
