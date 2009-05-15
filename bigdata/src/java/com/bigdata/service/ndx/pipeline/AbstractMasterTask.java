@@ -838,6 +838,7 @@ L>//
             synchronized(stats) {
 
                 stats.chunksTransferred += 1;
+                stats.elementsTransferred += b.length;
                 
             }
 

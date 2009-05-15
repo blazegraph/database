@@ -102,10 +102,10 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * the producer.
      */
     public long elementsIn = 0L;
-    
+
     /**
-     * The #of elements in the output chunks written onto the index
-     * partitions (not including any eliminated duplicates).
+     * The #of elements in the output chunks written onto the index partitions
+     * (not including any eliminated duplicates).
      */
     public long elementsOut = 0L;
 
@@ -116,6 +116,15 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * key-ranges of the tuples in the chunks.
      */
     public long chunksTransferred = 0L;
+
+    /**
+     * The #of elements transferred from the master to the sinks. Where there is
+     * more than one index partition, there will be more than one sink and each
+     * chunk written on the master will be divided among the sinks based on the
+     * key-ranges of the tuples in the chunks.  This reduces the average chunk
+     * size entering the sink accordingly.
+     */
+    public long elementsTransferred = 0L;
     
     /**
      * The #of chunks written onto index partitions using RMI.
@@ -241,6 +250,10 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             }
         });
 
+        /**
+         * @todo this does not work and will report small negative as well as
+         *       positive values for some reason that I have not determined.
+         */
         t.addCounter("activePartitionCount", new Instrument<Long>() {
             @Override
             protected void sample() {
@@ -287,6 +300,20 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             @Override
             protected void sample() {
                 setValue(chunksTransferred);
+            }
+        });
+
+        t.addCounter("elementsTransferred", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(elementsTransferred);
+            }
+        });
+        
+        t.addCounter("elapsedSinkOfferNanos", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(elapsedSinkOfferNanos);
             }
         });
         
@@ -386,6 +413,8 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 + elementsOut
                 + ", chunksTransferred="
                 + chunksTransferred
+                + ", elementsTransferred="
+                + elementsTransferred
                 + ", elapsedChunkWaitingNanos="
                 + elapsedChunkWaitingNanos
                 + ", elapsedChunkWritingNanos="

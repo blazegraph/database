@@ -58,7 +58,8 @@ public class AbstractSubtaskStats {
 
     /**
      * The average #of nanoseconds for a chunk to become ready so that it can be
-     * written on the sink.
+     * written on the sink (this is an average of the totals to date, not a
+     * moving average).
      */
     public double getAverageNanosPerWait() {
 
@@ -68,7 +69,8 @@ public class AbstractSubtaskStats {
     }
 
     /**
-     * The average #of nanoseconds per chunk written on the sink.
+     * The average #of nanoseconds per chunk written on the sink (this is an
+     * average of the totals to date, not a moving average).
      */
     public double getAverageNanosPerWrite() {
 
@@ -78,7 +80,8 @@ public class AbstractSubtaskStats {
     }
 
     /**
-     * The average #of elements (tuples) per chunk written on the sink.
+     * The average #of elements (tuples) per chunk written on the sink (this is
+     * an average of the totals to date, not a moving average).
      */
     public double getAverageElementsPerWrite() {
 
