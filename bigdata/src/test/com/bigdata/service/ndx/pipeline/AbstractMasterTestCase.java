@@ -354,10 +354,10 @@ public class AbstractMasterTestCase extends TestCase2 {
         }
         
         /**
-         * This method may be overriden to simulate the latency of the
+         * This method may be overridden to simulate the latency of the
          * write operation.  The default is a NOP.
          */
-        protected void writeData() throws Exception {
+        protected void writeData(final KVO<O>[] chunk) throws Exception {
             
         }
         
@@ -366,7 +366,7 @@ public class AbstractMasterTestCase extends TestCase2 {
 
             final long begin = System.nanoTime();
             
-            writeData();
+            writeData(chunk);
             
             final long elapsed = System.nanoTime() - begin;
             

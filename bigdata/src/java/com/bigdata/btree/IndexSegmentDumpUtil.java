@@ -29,6 +29,8 @@ public class IndexSegmentDumpUtil {
             
             IndexSegmentStore store = new IndexSegmentStore(file);
             
+            System.err.println("checkpoint: "+store.getCheckpoint());
+            
             IndexSegment ndxSegment = store.loadIndexSegment();
             
             // wait for enter

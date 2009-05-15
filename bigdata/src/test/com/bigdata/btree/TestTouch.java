@@ -134,7 +134,7 @@ public class TestTouch extends AbstractBTreeTestCase {
 
         assertEquals(1,a.referenceCount);
         
-        assertEquals(new PO[]{a}, leafQueue.toArray());
+        assertEquals(new PO[]{a}, leafQueue.toArray(new PO[0]));
         
         /*
          * touch the leaf. since we are not scanning the queue, another
@@ -145,7 +145,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         assertEquals(2,a.referenceCount);
         
-        assertEquals(new PO[]{a,a}, leafQueue.toArray());
+        assertEquals(new PO[]{a,a}, leafQueue.toArray(new PO[0]));
         
         /*
          * touch the leaf. since the queue is at capacity, the leaf is evicted.
@@ -160,7 +160,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         assertEquals(2,a.referenceCount);
         
-        assertEquals(new PO[]{a,a}, leafQueue.toArray());
+        assertEquals(new PO[]{a,a}, leafQueue.toArray(new PO[0]));
 
         assertFalse(a.isPersistent());
         
@@ -240,7 +240,7 @@ public class TestTouch extends AbstractBTreeTestCase {
 
         assertEquals(1,a.referenceCount);
         
-        assertEquals(new PO[]{a}, leafQueue.toArray());
+        assertEquals(new PO[]{a}, leafQueue.toArray(new PO[0]));
         
         /*
          * touch the leaf. since we are scanning the queue, this does NOT cause
@@ -252,7 +252,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         assertEquals(1,a.referenceCount);
         
-        assertEquals(new PO[]{a}, leafQueue.toArray());
+        assertEquals(new PO[]{a}, leafQueue.toArray(new PO[0]));
 
         assertFalse(a.isPersistent());
 
@@ -346,7 +346,7 @@ public class TestTouch extends AbstractBTreeTestCase {
 
         assertEquals(1,a.referenceCount);
         
-        assertEquals(new PO[]{a}, leafQueue.toArray());
+        assertEquals(new PO[]{a}, leafQueue.toArray(new PO[0]));
 
         assertFalse(a.isPersistent());
 
@@ -393,7 +393,7 @@ public class TestTouch extends AbstractBTreeTestCase {
         
         while(true) {
 
-            ref = (AbstractNode) leafQueue.getTail();
+            ref = (AbstractNode) leafQueue.peek();
 
             if(ref.referenceCount == 1 ) break;
             

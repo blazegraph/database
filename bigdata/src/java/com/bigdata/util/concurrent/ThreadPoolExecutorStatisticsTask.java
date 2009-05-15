@@ -36,10 +36,6 @@ import com.bigdata.util.concurrent.IQueueCounters.IWriteServiceExecutorCounters;
 public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
     protected static final Logger log = Logger.getLogger(ThreadPoolExecutorStatisticsTask.class);
-
-    protected static final boolean INFO = log.isInfoEnabled();
-    
-    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The service that is being monitored.
@@ -731,7 +727,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
             if (nsamples % period == 0) {
 
                 // todo log all counter values using counterSet.asXML()?
-                if(INFO)
+                if(log.isInfoEnabled())
                 log.info(name + ":\naverageQueueLength=" + averageQueueLength
                         + " (activeCountAverage=" + averageActiveCount
                         + ",queueSizeAverage=" + averageQueueSize

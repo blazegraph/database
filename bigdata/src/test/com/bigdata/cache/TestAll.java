@@ -54,23 +54,25 @@ public class TestAll extends TestCase {
 
     public static junit.framework.Test suite() {
         
-        TestSuite retval = new TestSuite("cache");
+        final TestSuite suite = new TestSuite("cache");
         
-        retval.addTestSuite(TestHardReferenceQueue.class);
+        suite.addTestSuite(TestRingBuffer.class);
+        
+        suite.addTestSuite(TestHardReferenceQueue.class);
         
 //        // Test all ICacheEntry implementations.
 //        retval.addTestSuite( TestCacheEntry.class );
 
         // Test LRU semantics.
-        retval.addTestSuite( TestLRUCache.class );
+        suite.addTestSuite( TestLRUCache.class );
         
         // Test cache semantics with weak/soft reference values.
-        retval.addTestSuite( TestWeakValueCache.class );
+        suite.addTestSuite( TestWeakValueCache.class );
         
 //        // Generic test of cache policy.
 //        retval.addTestSuite( TestCachePolicy.class );
 
-        return retval;
+        return suite;
     }
 
 }

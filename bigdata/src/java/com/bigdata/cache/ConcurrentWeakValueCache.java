@@ -254,7 +254,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
                 
                 synchronized (queue) {
 
-                    queue.append(v);
+                    queue.add(v);
 
                 }
 
@@ -304,7 +304,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
 
                 synchronized (queue) {
 
-                    queue.append(v);
+                    queue.add(v);
 
                 }
 
@@ -351,7 +351,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
             synchronized (queue) {
 
                 // put onto the hard reference queue.
-                if(queue.append(v) && DEBUG) {
+                if(queue.add(v) && DEBUG) {
 
                     log.debug("put: key=" + k + ", val=" + v);
                     
@@ -416,7 +416,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
                     synchronized (queue) {
 
                         // put the new value onto the hard reference queue.
-                        if(queue.append(v) && DEBUG) {
+                        if(queue.add(v) && DEBUG) {
 
                             log.debug("put: key=" + k + ", val=" + v);
                             
@@ -437,7 +437,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
                 synchronized (queue) {
 
                     // put it onto the hard reference queue.
-                    if (queue.append(v) && DEBUG) {
+                    if (queue.add(v) && DEBUG) {
 
                         log.debug("put: key=" + k + ", val=" + v);
                         

@@ -244,7 +244,9 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * is no parent of a and that we need to create one).
          */
         
-        assertEquals(new PO[]{a,b,c}, ((MyHardReferenceQueue<PO>)btree.writeRetentionQueue).toArray());
+        assertEquals(new PO[] { a, b, c },
+                ((MyHardReferenceQueue<PO>) btree.writeRetentionQueue)
+                        .toArray(new PO[0]));
         
         /*
          * force (b) to be evicted. since its reference count is one(1) it will
@@ -326,11 +328,13 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
          * allowed into the queue more than once (because the scan parameter is
          * equal to the queue capacity) and because we know the node creation
          * order (a is created when the tree is created; b is created when a is
-         * split; and c is created after the split when we discovert that there
+         * split; and c is created after the split when we discover that there
          * is no parent of a and that we need to create one).
          */
         
-        assertEquals(new PO[]{a,b,c}, ((MyHardReferenceQueue<PO>)btree.writeRetentionQueue).toArray());
+        assertEquals(new PO[] { a, b, c },
+                ((MyHardReferenceQueue<PO>) btree.writeRetentionQueue)
+                        .toArray(new PO[0]));
         
         /*
          * force (c) to be evicted. since its reference count is one(1) it will

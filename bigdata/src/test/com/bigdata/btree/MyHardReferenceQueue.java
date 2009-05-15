@@ -44,10 +44,4 @@ public class MyHardReferenceQueue<T> extends HardReferenceQueue<T> {
         super(listener, capacity,nscan);
     }
     
-    public T[] toArray() {
-        
-        return super.toArray();
-        
-    }
-    
 }

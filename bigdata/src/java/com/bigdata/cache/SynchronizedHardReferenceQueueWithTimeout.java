@@ -61,9 +61,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
 
     protected static final Logger log = Logger.getLogger(SynchronizedHardReferenceQueueWithTimeout.class);
     
-    protected static final boolean INFO = log.isInfoEnabled(); 
-
-    protected static final boolean DEBUG = log.isDebugEnabled(); 
+    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * Note: Synchronization for the inner {@link #queue} is realized using the
@@ -76,7 +74,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * 
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
-     *            There is no guarentee that all stored references are distinct.
+     *            There is no guarantee that all stored references are distinct.
      * @param timeout
      *            The timeout (in nanoseconds) for an entry in the queue. When
      *            ZERO (0L), the timeout is disabled. See {@link IValueAge}.
@@ -95,13 +93,13 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * 
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
-     *            There is no guarentee that all stored references are distinct.
+     *            There is no guarantee that all stored references are distinct.
      * @param nscan
      *            The #of references to scan from the MRU position before
      *            appended a reference to the cache. Scanning is used to reduce
      *            the chance that references that are touched several times in
      *            near succession from entering the cache more than once. The
-     *            #of reference tests trads off against the latency of adding a
+     *            #of reference tests trades off against the latency of adding a
      *            reference to the cache.
      * @param timeout
      *            The timeout (in nanoseconds) for an entry in the queue. When
@@ -156,8 +154,10 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
         }
 
         @Override
-        protected final void prepareAppend(final T ref) {
+        protected final void beforeOffer(final T ref) {
 
+            super.beforeOffer(ref);
+            
             if (timeout != 0L) {
 
                 // touch the new reference
@@ -185,9 +185,12 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
 
             int ncleared = 0;
 
-            while (count > 0) {
+            while (!isEmpty()) {
 
-                final long timestamp = ((ValueAge) refs[tail]).timestamp();
+                @SuppressWarnings("unchecked")
+                final ValueAge v = (ValueAge) peek();
+
+                final long timestamp = v.timestamp();
 
                 final long age = now - timestamp;
 
@@ -197,7 +200,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
                         log.debug("Stopping at age="
                                 + TimeUnit.NANOSECONDS.toMillis(age)
                                 + " : #ncleared=" + ncleared + ", size="
-                                + count);
+                                + size());
 
                     break;
 
@@ -205,8 +208,7 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
 
                 if (DEBUG)
                     log.debug("Clearing reference: age="
-                            + TimeUnit.NANOSECONDS.toMillis(age) + ", "
-                            + refs[tail]);
+                            + TimeUnit.NANOSECONDS.toMillis(age) + ", " + v);
 
                 // evict the tail.
                 evict();
@@ -270,9 +272,9 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
      * Methods which DO require synchronization.
      */
     
-    synchronized public boolean append(final T ref) {
+    synchronized public boolean add(final T ref) {
 
-        return queue.append(new ValueAge<T>(ref));
+        return queue.add(new ValueAge<T>(ref));
         
     }
 
@@ -294,9 +296,9 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
         
     }
 
-    synchronized public T getTail() {
+    synchronized public T peek() {
         
-        final ValueAge<T> age = queue.getTail();
+        final ValueAge<T> age = queue.peek();
 
         return age == null ? null : age.get();
 
@@ -395,15 +397,16 @@ public class SynchronizedHardReferenceQueueWithTimeout<T> implements
                      */
                     synchronized (queue) {
 
-                        ncleared += ((InnerHardReferenceQueue)queue.queue).evictStaleRefs();
+                        ncleared += ((InnerHardReferenceQueue) queue.queue)
+                                .evictStaleRefs();
 
                     }
-                    
+
                     nqueues++;
 
                 }
                 
-                if (INFO && ncleared > 0)
+                if (ncleared > 0 && log.isInfoEnabled())
                     log.info("Cleared " + ncleared + " stale references from "
                             + nqueues + " queues");
                 

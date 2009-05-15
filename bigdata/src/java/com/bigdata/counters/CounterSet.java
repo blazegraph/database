@@ -722,7 +722,7 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
         return p;
         
     }
-        
+
     /**
      * Add a counter.
      * 
@@ -733,35 +733,35 @@ public class CounterSet extends AbstractCounterSet implements ICounterSet {
      *            The object that is used to take the measurements from which
      *            the counter's value will be determined.
      */
-    synchronized public ICounter addCounter(final String path, final IInstrument instrument) {
+    synchronized public ICounter addCounter(final String path,
+            final IInstrument instrument) {
 
         if (path == null) {
 
             throw new IllegalArgumentException();
-            
+
         }
-        
+
         final int indexOf = path.lastIndexOf(pathSeparator);
-        
+
         if (indexOf == -1) {
-            
+
             return addCounter2(path, instrument);
-            
+
         }
-        
+
         final String name = path.substring(indexOf + 1, path.length());
 
         final String ppath = path.substring(0, indexOf);
 
         final CounterSet parent = (CounterSet) makePath(ppath);
-        
+
         return parent.addCounter2(name, instrument);
-        
+
     }
-    
+
     @SuppressWarnings("unchecked")
-    private ICounter addCounter2(String name,
-            final IInstrument instrument) {
+    private ICounter addCounter2(final String name, final IInstrument instrument) {
 
         if (name == null)
             throw new IllegalArgumentException();

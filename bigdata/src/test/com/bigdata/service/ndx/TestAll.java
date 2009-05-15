@@ -61,6 +61,8 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("scale-out indices");
 
+        suite.addTestSuite(TestSplitter.class);
+
         suite.addTest(com.bigdata.service.ndx.pipeline.TestAll.suite());
 
         return suite;

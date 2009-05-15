@@ -655,10 +655,10 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                 return new S(this, locator, out) {
 
                     /**
-                     * Overriden to simulate the latency of the write operation.
+                     * Overridden to simulate the latency of the write operation.
                      */
                     @Override
-                    protected void writeData() throws Exception {
+                    protected void writeData(final KVO<O>[] chunk) throws Exception {
 
                         final long delayMillis = (long) (r.nextDouble() * maxWriteDelay);
                         

@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
+import java.util.NoSuchElementException;
+
 import org.apache.log4j.Logger;
 
 /**
@@ -61,39 +63,40 @@ import org.apache.log4j.Logger;
  * @param <T>
  *            The reference type stored in the cache.
  */
-public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
+public class HardReferenceQueue<T> extends RingBuffer<T> implements IHardReferenceQueue<T> {
 
-    protected static final Logger log = Logger.getLogger(HardReferenceQueue.class);
+//    protected static final Logger log = Logger.getLogger(HardReferenceQueue.class);
     
-    protected static final boolean INFO = log.isInfoEnabled(); 
+//    protected static final boolean INFO = log.isInfoEnabled(); 
     
     /**
      * The listener to which cache eviction notices are reported.
      */
     private final HardReferenceQueueEvictionListener<T> listener;
-    /**
-     * The capacity of the cache.
-     */
-    protected final int capacity;
-    /**
-     * The hard references. There is no guarantee that the references are
-     * distinct. Unused entries are cleared to null so that we do not hold onto
-     * hard references after they have been evicted.
-     */
-    protected final T[] refs;
-    /**
-     * The head (the insertion point for the next reference).
-     */
-    protected int head = 0;
-    /**
-     * The tail (LRU position).
-     */
-    protected int tail = 0;
-    /**
-     * The #of references in the cache. The cache is empty when this field is
-     * zero. The cache is full when this field equals the {@link #capacity}.
-     */
-    protected int count = 0;
+
+//    /**
+//     * The capacity of the cache.
+//     */
+//    protected final int capacity;
+//    /**
+//     * The hard references. There is no guarantee that the references are
+//     * distinct. Unused entries are cleared to null so that we do not hold onto
+//     * hard references after they have been evicted.
+//     */
+//    protected final T[] refs;
+//    /**
+//     * The head (the insertion point for the next reference).
+//     */
+//    protected int head = 0;
+//    /**
+//     * The tail (LRU position).
+//     */
+//    protected int tail = 0;
+//    /**
+//     * The #of references in the cache. The cache is empty when this field is
+//     * zero. The cache is full when this field equals the {@link #capacity}.
+//     */
+//    protected int count = 0;
 
     /**
      * The #of references to scan backwards from the LRU position when testing
@@ -137,22 +140,17 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
             final HardReferenceQueueEvictionListener<T> listener,
             final int capacity, final int nscan) {
 
+        super(capacity);
+        
 // if (listener == null)
 //            throw new IllegalArgumentException();
-
-        if (capacity <= 0)
-            throw new IllegalArgumentException();
 
         if (nscan < 0 || nscan > capacity)
             throw new IllegalArgumentException();
 
         this.listener = listener;
         
-        this.capacity = capacity;
-        
         this.nscan = nscan;
-        
-        this.refs = (T[])new Object[capacity];
         
     }
 
@@ -166,50 +164,11 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
     }
     
     /**
-     * The cache capacity specified to the constructor.
-     */
-    final public int capacity() {
-        
-        return capacity;
-        
-    }
-
-    /**
      * The #of references that are tested on append requests.
      */
     final public int nscan() {
         
         return nscan;
-        
-    }
-    
-    /**
-     * The #of references in the cache.  Note that there is no guarentee that
-     * the references are distinct.
-     * 
-     * @return
-     */
-    final public int size() {
-
-        return count;
-        
-    }
-    
-    /**
-     * True iff the cache is empty.
-     */
-    final public boolean isEmpty() {
-        
-        return count == 0;
-        
-    }
-
-    /**
-     * True iff the cache is full.
-     */
-    final public boolean isFull() {
-        
-        return count == capacity;
         
     }
     
@@ -225,7 +184,8 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      * @return True iff the reference was added to the cache and false iff the
      *         reference was found in a scan of the nscan MRU cache entries.
      */
-    final public boolean append(final T ref) {
+    @Override
+    public boolean add(final T ref) {
         
         if (ref == null)
             throw new IllegalArgumentException();
@@ -240,44 +200,33 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
 
         }
         
-        prepareAppend( ref );
-        
-        if (count == capacity) {
-
-            /*
-             * If at capacity, evict the LRU reference.
-             */
-            
-            evict();
-            
-        }
-        
-        /*
-         * append the reference.
-         */
-
-        assert (count < capacity);
-        
-        refs[head] = ref;
-        
-        head = (head + 1) % capacity;
-        
-        count++;
+        super.add(ref);
         
         return true;
         
     }
 
     /**
-     * Hook used to realize the stale reference protocol in
-     * {@link SynchronizedHardReferenceQueue}.
+     * Extended to evict the element at the tail of the buffer iff the buffer is
+     * full.
+     * <p>
+     * Note: This hook is further extended to realize the stale reference
+     * protocol in {@link SynchronizedHardReferenceQueue}.
      */
-    protected void prepareAppend(final T ref) {
-        
-        // NOP
-        
+    protected void beforeOffer(final T ref) {
+
+        if (isFull()) {
+
+            /*
+             * If at capacity, evict the LRU reference.
+             */
+
+            evict();
+
+        }
+
     }
-    
+
     /**
      * Evict the LRU reference. This is a NOP iff the cache is empty.
      * 
@@ -286,57 +235,27 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      * @see HardReferenceQueueEvictionListener
      */
     final public boolean evict() {
-        
-        // The cache must not be empty.
-        if( count <= 0 ) return false;
 
-        final T ref = refs[tail]; // LRU reference.
-        refs[tail] = null; // drop reference.
-        count--; // update #of references.
-        tail = (tail + 1) % capacity; // update tail.
+        final T ref = poll();
 
-        // report eviction notice to listener.
-        if (listener != null)
-            listener.evicted(this, ref);
-        
-        return true;
-        
-    }
+        if (ref == null) {
 
-    /**
-     * Clears the cache (sets the head, tail and count to zero) without
-     * generating eviction notices.
-     * 
-     * @param clearRefs
-     *            When <code>true</code> the references are explicitly set to
-     *            <code>null</code> which can facilitate garbage collection.
-     */
-    final public void clear(final boolean clearRefs) {
-     
-        if( clearRefs ) {
+            // buffer is empty.
+            return false;
 
-            /*
-             * Evict all references, clearing each as we go.
-             */
-
-            while( count > 0 ) {
-                
-                refs[tail] = null; // drop LRU reference.
-                
-                count--; // update #of references.
-                
-                tail = (tail + 1) % capacity; // update tail.
-                
-            }
-            
         }
-        
-        // reset to initial conditions.
-        
-        head = tail = count = 0;
-        
+
+        if (listener != null) {
+
+            // report eviction notice to listener.
+            listener.evicted(this, ref);
+
+        }
+
+        return true;
+
     }
-    
+
     /**
      * Evict all references, starting with the LRU reference and proceeding to
      * the MRU reference.
@@ -348,194 +267,68 @@ public class HardReferenceQueue<T> implements IHardReferenceQueue<T> {
      */
     final public void evictAll(final boolean clearRefs) {
 
-        if( clearRefs ) {
+        if (clearRefs) {
 
             /*
              * Evict all references, clearing each as we go.
              */
-            while( count > 0 ) {
-                
+
+            while (!isEmpty()) { // count > 0 ) {
+
                 evict();
-                
+
             }
-            
+
         } else {
 
             /*
-             * Generate eviction notices but do NOT clear the references.
-             * 
-             * Note: This uses local variables to shadow the instance variables
-             * so that we do not modify the state of the cache as a side effect.
+             * Generate eviction notices in LRU to MRU order but do NOT clear
+             * the references.
              */
-            
-            int tail = this.tail;
-            
-            int count = this.count;
-            
-            while (count > 0) {
-                
-                final T ref = refs[tail]; // LRU reference.
-                
-                count--; // update #of references.
-                
-                tail = (tail + 1) % capacity; // update tail.
 
-                // report eviction notice to listener.
-                if (listener != null)
+            final int size = size();
+
+            for (int n = 0; n < size; n++) {
+
+                final T ref = get(n); 
+
+                if (listener != null) {
+
+                    // report eviction notice to listener.
                     listener.evicted(this, ref);
-                
-            }
-            
-        }
-        
-    }
-
-    /*
-     * package private methods used to write the unit tests.
-     */
-
-    /**
-     * The head index (the insertion point).
-     */
-    final int head() {
-        return head;
-    }
-    
-    /**
-     * The tail index (the LRU position).
-     */
-    final int tail() {
-        return tail;
-    }
-    
-    /**
-     * The backing array.
-     */
-    final T[] array() {
-        return refs;
-    }
-    
-    /**
-     * The reference at the tail of the queue. This is the next reference that
-     * will be evicted from the queue.
-     * 
-     * @todo We can also write getHead(), but note that the {@link #head} is the
-     *       insertion point NOT the index of the last reference inserted.
-     */
-    final public T getTail() {
-        
-        return refs[tail];
-        
-    }
-
-    /**
-     * Scan the last nscan references for this reference. If found, return
-     * immediately.
-     * 
-     * @param nscan
-     *            The #of positions to scan, starting with the most recently
-     *            added reference.
-     * @param ref
-     *            The reference for which we are scanning.
-     *            
-     * @return True iff we found <i>ref</i> in the scanned queue positions.
-     */
-    final public boolean scanHead(final int nscan, final T ref) {
-        assert nscan > 0;
-        assert ref != null;
-        /*
-         * Note: This loop goes backwards from the head.  Since the head is the
-         * insertion point, we decrement the head position before testing the
-         * reference.  If the head is zero, then we wrap around.  This carries
-         * the head back to the last index in the array (capacity-1).
-         *
-         * Note: This uses local variables to shadow the instance variables
-         * so that we do not modify the state of the cache as a side effect.
-         */
-        {
-
-            int head = this.head;
-
-            int count = this.count;
-
-            for (int i = 0; i < nscan && count > 0; i++) {
-
-                head = (head == 0 ? capacity-1 : head - 1); // update head.
-
-                count--; // update #of references.
-
-                if( refs[head] == ref ) {
-                
-                    // Found a match.
-
-                    return true;
-
+                    
                 }
 
             }
-
-            return false;
+            
+//            /*
+//             * Note: This uses local variables to shadow the instance variables
+//             * so that we do not modify the state of the cache as a side effect.
+//             */
+//
+//            int tail = this.tail;
+//
+//            int count = this.size;
+//
+//            while (count > 0) {
+//
+//                final T ref = refs[tail]; // LRU reference.
+//
+//                count--; // update #of references.
+//
+//                tail = (tail + 1) % capacity(); // update tail.
+//
+//                if (listener != null) {
+//
+//                    // report eviction notice to listener.
+//                    listener.evicted(this, ref);
+//                    
+//                }
+//
+//            }
 
         }
-        
-    }
-    
-    /**
-     * Return true iff the reference is found in the first N positions scanning
-     * backwards from the tail of the queue.
-     * 
-     * @param nscan
-     *            The #of positions to be scanned. When one (1) only the tail of
-     *            the queue is scanned.
-     * @param ref
-     *            The reference to scan for.
-     * 
-     * @return True iff the reference is found in the last N queue positions
-     *         counting backwards from the tail.
-     * 
-     * FIXME Write unit tests for this method.
-     */
-    final public boolean scanTail(final int nscan, final T ref) {
 
-        assert nscan > 0 ;
-        
-        assert ref != null;
-        
-        for( int n=0, i=tail; n<nscan; n++ ) {
-            
-            if( ref == refs[ i ] ) return true;
-            
-            i = (i + 1) % capacity; // update index.
-            
-        }
-        
-        return false;
-
-    }
-    
-    /**
-     * The references in the cache in order from LRU to MRU. This is a copy of
-     * the relevant references from the backing array. Changes to this array
-     * have NO effect on the state of the cache.
-     */
-    protected T[] toArray() {
-        
-        final T[] ary = (T[])new Object[count];
-        
-        for (int n = 0, i = tail; n < count; n++) {
-            
-            final T ref = refs[ i ];
-            
-            assert ref != null;
-            
-            ary[ n ] = ref;
-            
-            i = (i + 1) % capacity; // update index.
-            
-        }
-                
-        return ary;
-        
     }
 
 }

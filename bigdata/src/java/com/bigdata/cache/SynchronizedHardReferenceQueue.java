@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
-import org.apache.log4j.Logger;
 
 /**
  * Thread-safe version.
@@ -37,12 +36,6 @@ import org.apache.log4j.Logger;
  * @version $Id$
  */
 public class SynchronizedHardReferenceQueue<T> implements IHardReferenceQueue<T> {
-
-    protected static final Logger log = Logger.getLogger(SynchronizedHardReferenceQueue.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled(); 
-
-    protected static final boolean DEBUG = log.isDebugEnabled(); 
 
     /**
      * Note: Synchronization for the inner {@link #queue} is realized using the
@@ -118,8 +111,8 @@ public class SynchronizedHardReferenceQueue<T> implements IHardReferenceQueue<T>
      * Methods which DO require synchronization.
      */
     
-    synchronized public boolean append(T ref) {
-        return queue.append(ref);
+    synchronized public boolean add(T ref) {
+        return queue.add(ref);
     }
 
     synchronized public void clear(boolean clearRefs) {
@@ -134,8 +127,8 @@ public class SynchronizedHardReferenceQueue<T> implements IHardReferenceQueue<T>
         queue.evictAll(clearRefs);
     }
 
-    synchronized public T getTail() {
-        return queue.getTail();
+    synchronized public T peek() {
+        return queue.peek();
     }
 
     synchronized public boolean isEmpty() {

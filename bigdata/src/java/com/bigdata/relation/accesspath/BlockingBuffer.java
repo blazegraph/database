@@ -450,6 +450,20 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         sb.append(", chunkCount=" + chunkCount);
 
+        if (true || log.isInfoEnabled()) {
+
+            /*
+             * Note: These data are only approximate and most BlockingQueue
+             * implementations will obtain a when when you call size() or
+             * remainingCapacity().
+             */
+
+            sb.append(", size~=" + queue.size());
+
+            sb.append(", remainingCapacity~=" + queue.remainingCapacity());
+            
+        }
+        
         if (cause != null)
             sb.append(", cause=" + cause);
 

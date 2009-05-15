@@ -268,6 +268,11 @@ public class ClientIndexView implements IScaleOutClientIndex {
         return fed.getMetadataService();
         
     }
+
+    /**
+     * Knows how to break down key[][]s into {@link Split}s. 
+     */
+    private final ISplitter splitter;
     
     /**
      * Return a view of the metadata index for the scale-out index as of the
@@ -385,6 +390,17 @@ public class ClientIndexView implements IScaleOutClientIndex {
         this.metadataIndex = metadataIndex;
         
         this.metadataIndexMetadata = metadataIndex.getIndexMetadata();
+        
+        this.splitter = new AbstractSplitter() {
+
+            @Override
+            protected IMetadataIndex getMetadataIndex(final long ts) {
+                
+                return fed.getMetadataIndex(name, ts);
+                
+            }
+            
+        };
         
         this.capacity = fed.getClient().getDefaultRangeQueryCapacity();
         
@@ -1407,267 +1423,281 @@ public class ClientIndexView implements IScaleOutClientIndex {
         }
 
     }
-    
-    /**
-     * {@inheritDoc}
-     * 
-     * Find the partition for the first key. Check the last key, if it is in the
-     * same partition then then this is the simplest case and we can just send
-     * the data along.
-     * <p>
-     * Otherwise, perform a binary search on the remaining keys looking for the
-     * index of the first key GTE the right separator key for that partition.
-     * The batch for this partition is formed from all keys from the first key
-     * for that partition up to but excluding the index position identified by
-     * the binary search (if there is a match; if there is a miss, then the
-     * binary search result needs to be converted into a key index and that will
-     * be the last key for the current partition).
-     * <p>
-     * Examine the next key and repeat the process until all keys have been
-     * allocated to index partitions.
-     * <p>
-     * Note: Split points MUST respect the "row" identity for a sparse row
-     * store, but we get that constraint by maintaining the index partition
-     * boundaries in agreement with the split point constraints for the index.
-     * 
-     * @see Arrays#sort(Object[], int, int, java.util.Comparator)
-     * 
-     * @see BytesUtil#compareBytes(byte[], byte[])
-     * 
-     * @todo Caching? This procedure performs the minimum #of lookups using
-     *       {@link IMetadataIndex#find(byte[])} since that operation will be an
-     *       RMI in a distributed federation. The find(byte[] key) operation is
-     *       difficult to cache since it locates the index partition that would
-     *       span the key and many, many different keys could fit into that same
-     *       index partition. The only effective cache technique may be an LRU
-     *       that scans ~10 caches locators to see if any of them is a match
-     *       before reaching out to the remote {@link IMetadataService}. Or
-     *       perhaps the locators can be cached in a local BTree and a miss
-     *       there would result in a read through to the remote
-     *       {@link IMetadataService} but then we have the problem of figuring
-     *       out when to release locators if the client is long-lived.
-     */
-    public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
-            final int toIndex, final byte[][] keys) {
 
-        assert keys != null;
-        
-        assert fromIndex >= 0;
-        assert fromIndex < toIndex;
+    public LinkedList<Split> splitKeys(long ts, int fromIndex, int toIndex,
+            byte[][] keys) {
 
-        assert toIndex <= keys.length;
-        
-        final LinkedList<Split> splits = new LinkedList<Split>();
-        
-        // start w/ the first key.
-        int currentIndex = fromIndex;
-        
-        while (currentIndex < toIndex) {
-                
-            /*
-             * This is partition spanning the current key (RMI)
-             * 
-             * Note: Using the caller's timestamp here!
-             */
-            final PartitionLocator locator = fed.getMetadataIndex(name, ts)
-                    .find(keys[currentIndex]);
-
-            if (locator == null)
-                throw new RuntimeException("No index partitions?: name=" + name);
-            
-            final byte[] rightSeparatorKey = locator.getRightSeparatorKey();
-
-            if (rightSeparatorKey == null) {
-
-                /*
-                 * The last index partition does not have an upper bound and
-                 * will absorb any keys that order GTE to its left separator
-                 * key.
-                 */
-
-                assert isValidSplit( locator, currentIndex, toIndex, keys );
-                
-                splits.add(new Split(locator, currentIndex, toIndex));
-
-                // done.
-                currentIndex = toIndex;
-
-            } else {
-
-                /*
-                 * Otherwise this partition has an upper bound, so figure out
-                 * the index of the last key that would go into this partition.
-                 * 
-                 * We do this by searching for the rightSeparator of the index
-                 * partition itself.
-                 */
-                
-                int pos = BytesUtil.binarySearch(keys, currentIndex, toIndex
-                        - currentIndex, rightSeparatorKey);
-
-                if (pos >= 0) {
-
-                    /*
-                     * There is a hit on the rightSeparator key. The index
-                     * returned by the binarySearch is the exclusive upper bound
-                     * for the split. The key at that index is excluded from the
-                     * split - it will be the first key in the next split.
-                     * 
-                     * Note: There is a special case when the keys[] includes
-                     * duplicates of the key that corresponds to the
-                     * rightSeparator. This causes a problem where the
-                     * binarySearch returns the index of ONE of the keys that is
-                     * equal to the rightSeparator key and we need to back up
-                     * until we have found the FIRST ONE.
-                     * 
-                     * Note: The behavior of the binarySearch is effectively
-                     * under-defined here and sometimes it will return the index
-                     * of the first key EQ to the rightSeparator while at other
-                     * times it will return the index of the second or greater
-                     * key that is EQ to the rightSeparatoer.
-                     */
-                    
-                    while (pos > currentIndex) {
-                        
-                        if (BytesUtil.bytesEqual(keys[pos - 1],
-                                rightSeparatorKey)) {
-
-                            // keep backing up.
-                            pos--;
-
-                            continue;
-
-                        }
-                        
-                        break;
-                        
-                    }
-
-                    if(log.isDebugEnabled()) log.debug("Exact match on rightSeparator: pos=" + pos
-                            + ", key=" + BytesUtil.toString(keys[pos]));
-
-                } else if (pos < 0) {
-
-                    /*
-                     * There is a miss on the rightSeparator key (it is not
-                     * present in the keys that are being split). In this case
-                     * the binary search returns the insertion point. We then
-                     * compute the exclusive upper bound from the insertion
-                     * point.
-                     */
-                    
-                    pos = -pos - 1;
-
-                    assert pos > currentIndex && pos <= toIndex : "Expected pos in ["
-                        + currentIndex + ":" + toIndex + ") but pos=" + pos;
-
-                }
-
-                /*
-                 * Note: this test can be enabled if you are having problems
-                 * with KeyAfterPartition or KeyBeforePartition. It will go
-                 * through more effort to validate the constraints on the split.
-                 * However, due to the additional byte[] comparisons, this
-                 * SHOULD be disabled except when tracking a bug.
-                 */
-//                assert validSplit( locator, currentIndex, pos, keys );
-
-                splits.add(new Split(locator, currentIndex, pos));
-
-                currentIndex = pos;
-
-            }
-
-        }
-
-        return splits;
-
-    }
-
-    public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
-            final int toIndex, final KVO[] a) {
-
-        /*
-         * Change the shape of the data so that we can split it.
-         */
-
-        final byte[][] keys = new byte[a.length][];
-
-        for (int i = 0; i < a.length; i++) {
-
-            keys[i] = a[i].key;
-
-        }
-
-        return splitKeys(ts, fromIndex, toIndex, keys);
-
-    }
-
-    /**
-     * Paranoia testing for generated splits.
-     * 
-     * @param locator
-     * @param fromIndex
-     * @param toIndex
-     * @param keys
-     * @return
-     */
-    private boolean isValidSplit(final PartitionLocator locator,
-            final int fromIndex, final int toIndex, final byte[][] keys) {
-
-        assert fromIndex <= toIndex : "fromIndex=" + fromIndex + ", toIndex="
-                + toIndex;
-
-        assert fromIndex >= 0 : "fromIndex=" + fromIndex;
-
-        assert toIndex <= keys.length : "toIndex=" + toIndex + ", keys.length="
-                + keys.length;
-
-        // begin with the left separator on the index partition.
-        byte[] lastKey = locator.getLeftSeparatorKey();
-        
-        assert lastKey != null;
-
-        for (int i = fromIndex; i < toIndex; i++) {
-
-            final byte[] key = keys[i];
-
-            assert key != null;
-
-            if (lastKey != null) {
-
-                final int ret = BytesUtil.compareBytes(lastKey, key);
-
-                assert ret <= 0 : "keys out of order: i=" + i + ", lastKey="
-                        + BytesUtil.toString(lastKey) + ", key="
-                        + BytesUtil.toString(key)+", keys="+BytesUtil.toString(keys);
-                
-            }
-            
-            lastKey = key;
-            
-        }
-
-        // Note: Must be strictly LT the rightSeparator key (when present).
-        {
-
-            final byte[] key = locator.getRightSeparatorKey();
-
-            if (key != null) {
-
-                int ret = BytesUtil.compareBytes(lastKey, key);
-
-                assert ret < 0 : "keys out of order: lastKey="
-                        + BytesUtil.toString(lastKey) + ", rightSeparator="
-                        + BytesUtil.toString(key)+", keys="+BytesUtil.toString(keys);
-
-            }
-            
-        }
-        
-        return true;
+        return splitter.splitKeys(ts, fromIndex, toIndex, keys);
         
     }
+
+    public LinkedList<Split> splitKeys(long ts, int fromIndex, int toIndex,
+            KVO[] a) {
+
+        return splitter.splitKeys(ts, fromIndex, toIndex, a);
+        
+    }
+
+//    /**
+//     * {@inheritDoc}
+//     * 
+//     * Find the partition for the first key. Check the last key, if it is in the
+//     * same partition then then this is the simplest case and we can just send
+//     * the data along.
+//     * <p>
+//     * Otherwise, perform a binary search on the remaining keys looking for the
+//     * index of the first key GTE the right separator key for that partition.
+//     * The batch for this partition is formed from all keys from the first key
+//     * for that partition up to but excluding the index position identified by
+//     * the binary search (if there is a match; if there is a miss, then the
+//     * binary search result needs to be converted into a key index and that will
+//     * be the last key for the current partition).
+//     * <p>
+//     * Examine the next key and repeat the process until all keys have been
+//     * allocated to index partitions.
+//     * <p>
+//     * Note: Split points MUST respect the "row" identity for a sparse row
+//     * store, but we get that constraint by maintaining the index partition
+//     * boundaries in agreement with the split point constraints for the index.
+//     * 
+//     * @see Arrays#sort(Object[], int, int, java.util.Comparator)
+//     * 
+//     * @see BytesUtil#compareBytes(byte[], byte[])
+//     * 
+//     * @todo Caching? This procedure performs the minimum #of lookups using
+//     *       {@link IMetadataIndex#find(byte[])} since that operation will be an
+//     *       RMI in a distributed federation. The find(byte[] key) operation is
+//     *       difficult to cache since it locates the index partition that would
+//     *       span the key and many, many different keys could fit into that same
+//     *       index partition. The only effective cache technique may be an LRU
+//     *       that scans ~10 caches locators to see if any of them is a match
+//     *       before reaching out to the remote {@link IMetadataService}. Or
+//     *       perhaps the locators can be cached in a local BTree and a miss
+//     *       there would result in a read through to the remote
+//     *       {@link IMetadataService} but then we have the problem of figuring
+//     *       out when to release locators if the client is long-lived.
+//     */
+//    public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
+//            final int toIndex, final byte[][] keys) {
+//
+//        assert keys != null;
+//        
+//        assert fromIndex >= 0;
+//        assert fromIndex < toIndex;
+//
+//        assert toIndex <= keys.length;
+//        
+//        final LinkedList<Split> splits = new LinkedList<Split>();
+//        
+//        // start w/ the first key.
+//        int currentIndex = fromIndex;
+//        
+//        while (currentIndex < toIndex) {
+//                
+//            /*
+//             * This is partition spanning the current key (RMI)
+//             * 
+//             * Note: Using the caller's timestamp here!
+//             */
+//            final PartitionLocator locator = fed.getMetadataIndex(name, ts)
+//                    .find(keys[currentIndex]);
+//
+//            if (locator == null)
+//                throw new RuntimeException("No index partitions?: name=" + name);
+//            
+//            final byte[] rightSeparatorKey = locator.getRightSeparatorKey();
+//
+//            if (rightSeparatorKey == null) {
+//
+//                /*
+//                 * The last index partition does not have an upper bound and
+//                 * will absorb any keys that order GTE to its left separator
+//                 * key.
+//                 */
+//
+//                assert isValidSplit( locator, currentIndex, toIndex, keys );
+//                
+//                splits.add(new Split(locator, currentIndex, toIndex));
+//
+//                // done.
+//                currentIndex = toIndex;
+//
+//            } else {
+//
+//                /*
+//                 * Otherwise this partition has an upper bound, so figure out
+//                 * the index of the last key that would go into this partition.
+//                 * 
+//                 * We do this by searching for the rightSeparator of the index
+//                 * partition itself.
+//                 */
+//                
+//                int pos = BytesUtil.binarySearch(keys, currentIndex, toIndex
+//                        - currentIndex, rightSeparatorKey);
+//
+//                if (pos >= 0) {
+//
+//                    /*
+//                     * There is a hit on the rightSeparator key. The index
+//                     * returned by the binarySearch is the exclusive upper bound
+//                     * for the split. The key at that index is excluded from the
+//                     * split - it will be the first key in the next split.
+//                     * 
+//                     * Note: There is a special case when the keys[] includes
+//                     * duplicates of the key that corresponds to the
+//                     * rightSeparator. This causes a problem where the
+//                     * binarySearch returns the index of ONE of the keys that is
+//                     * equal to the rightSeparator key and we need to back up
+//                     * until we have found the FIRST ONE.
+//                     * 
+//                     * Note: The behavior of the binarySearch is effectively
+//                     * under-defined here and sometimes it will return the index
+//                     * of the first key EQ to the rightSeparator while at other
+//                     * times it will return the index of the second or greater
+//                     * key that is EQ to the rightSeparatoer.
+//                     */
+//                    
+//                    while (pos > currentIndex) {
+//                        
+//                        if (BytesUtil.bytesEqual(keys[pos - 1],
+//                                rightSeparatorKey)) {
+//
+//                            // keep backing up.
+//                            pos--;
+//
+//                            continue;
+//
+//                        }
+//                        
+//                        break;
+//                        
+//                    }
+//
+//                    if(log.isDebugEnabled()) log.debug("Exact match on rightSeparator: pos=" + pos
+//                            + ", key=" + BytesUtil.toString(keys[pos]));
+//
+//                } else if (pos < 0) {
+//
+//                    /*
+//                     * There is a miss on the rightSeparator key (it is not
+//                     * present in the keys that are being split). In this case
+//                     * the binary search returns the insertion point. We then
+//                     * compute the exclusive upper bound from the insertion
+//                     * point.
+//                     */
+//                    
+//                    pos = -pos - 1;
+//
+//                    assert pos > currentIndex && pos <= toIndex : "Expected pos in ["
+//                        + currentIndex + ":" + toIndex + ") but pos=" + pos;
+//
+//                }
+//
+//                /*
+//                 * Note: this test can be enabled if you are having problems
+//                 * with KeyAfterPartition or KeyBeforePartition. It will go
+//                 * through more effort to validate the constraints on the split.
+//                 * However, due to the additional byte[] comparisons, this
+//                 * SHOULD be disabled except when tracking a bug.
+//                 */
+////                assert validSplit( locator, currentIndex, pos, keys );
+//
+//                splits.add(new Split(locator, currentIndex, pos));
+//
+//                currentIndex = pos;
+//
+//            }
+//
+//        }
+//
+//        return splits;
+//
+//    }
+//
+//    public LinkedList<Split> splitKeys(final long ts, final int fromIndex,
+//            final int toIndex, final KVO[] a) {
+//
+//        /*
+//         * Change the shape of the data so that we can split it.
+//         */
+//
+//        final byte[][] keys = new byte[a.length][];
+//
+//        for (int i = 0; i < a.length; i++) {
+//
+//            keys[i] = a[i].key;
+//
+//        }
+//
+//        return splitKeys(ts, fromIndex, toIndex, keys);
+//
+//    }
+//
+//    /**
+//     * Paranoia testing for generated splits.
+//     * 
+//     * @param locator
+//     * @param fromIndex
+//     * @param toIndex
+//     * @param keys
+//     * @return
+//     */
+//    private boolean isValidSplit(final PartitionLocator locator,
+//            final int fromIndex, final int toIndex, final byte[][] keys) {
+//
+//        assert fromIndex <= toIndex : "fromIndex=" + fromIndex + ", toIndex="
+//                + toIndex;
+//
+//        assert fromIndex >= 0 : "fromIndex=" + fromIndex;
+//
+//        assert toIndex <= keys.length : "toIndex=" + toIndex + ", keys.length="
+//                + keys.length;
+//
+//        // begin with the left separator on the index partition.
+//        byte[] lastKey = locator.getLeftSeparatorKey();
+//        
+//        assert lastKey != null;
+//
+//        for (int i = fromIndex; i < toIndex; i++) {
+//
+//            final byte[] key = keys[i];
+//
+//            assert key != null;
+//
+//            if (lastKey != null) {
+//
+//                final int ret = BytesUtil.compareBytes(lastKey, key);
+//
+//                assert ret <= 0 : "keys out of order: i=" + i + ", lastKey="
+//                        + BytesUtil.toString(lastKey) + ", key="
+//                        + BytesUtil.toString(key)+", keys="+BytesUtil.toString(keys);
+//                
+//            }
+//            
+//            lastKey = key;
+//            
+//        }
+//
+//        // Note: Must be strictly LT the rightSeparator key (when present).
+//        {
+//
+//            final byte[] key = locator.getRightSeparatorKey();
+//
+//            if (key != null) {
+//
+//                int ret = BytesUtil.compareBytes(lastKey, key);
+//
+//                assert ret < 0 : "keys out of order: lastKey="
+//                        + BytesUtil.toString(lastKey) + ", rightSeparator="
+//                        + BytesUtil.toString(key)+", keys="+BytesUtil.toString(keys);
+//
+//            }
+//            
+//        }
+//        
+//        return true;
+//        
+//    }
     
     public IDataService getDataService(final PartitionLocator pmd) {
 

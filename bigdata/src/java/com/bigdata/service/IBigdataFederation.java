@@ -60,7 +60,7 @@ public interface IBigdataFederation<T> extends IIndexManager, IFederationDelegat
      *             if the client disconnected and this object is no longer
      *             valid.
      */
-    public IBigdataClient getClient();
+    public IBigdataClient<T> getClient();
     
     /**
      * The URL that may be used to access the local httpd service for this

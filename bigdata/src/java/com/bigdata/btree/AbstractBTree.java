@@ -365,9 +365,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * traversal. If a hard reference queue eviction drives the serialization of
      * a node and we touch the hard reference queue during the post-order
      * traversal then we break down the semantics of
-     * {@link HardReferenceQueue#append(Object)} as the eviction does not
+     * {@link HardReferenceQueue#add(Object)} as the eviction does not
      * necessarily cause the queue to reduce in length. Another way to handle
-     * this is to have {@link HardReferenceQueue#append(Object)} begin to evict
+     * this is to have {@link HardReferenceQueue#add(Object)} begin to evict
      * objects before is is actually at capacity, but that is also a bit
      * fragile.
      * 
@@ -2857,7 +2857,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *       Note: I have since seen an exception where the evicted node
      *       reference was [null]. The problem is that the
      *       {@link HardReferenceQueue} is NOT thread-safe. Concurrent readers
-     *       driving {@link HardReferenceQueue#append(Object)} can cause the
+     *       driving {@link HardReferenceQueue#add(Object)} can cause the
      *       data structure to become inconsistent. This is not much of a
      *       problem for readers since the queue is being used to retain hard
      *       references - effectively a cache and the null reference could be
@@ -2917,7 +2917,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         node.referenceCount++;
 
-        if (!writeRetentionQueue.append(node)) {
+        if (!writeRetentionQueue.add(node)) {
 
             /*
              * A false return indicates that the node was found on a scan of the

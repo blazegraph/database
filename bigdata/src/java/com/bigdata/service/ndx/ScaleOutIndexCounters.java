@@ -29,8 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
-import com.bigdata.util.concurrent.TaskCounters;
 
 /**
  * Counters pertaining to a scale-out index. The {@link IScaleOutClientIndex}
@@ -43,7 +43,22 @@ import com.bigdata.util.concurrent.TaskCounters;
  */
 public class ScaleOutIndexCounters {
 
-    public ScaleOutIndexCounters() {
+    /**
+     * These counters are used only for the asynchronous write pipeline.
+     */
+    @SuppressWarnings("unchecked")
+    final public IndexAsyncWriteStats asynchronousStats;
+
+    /**
+     * These counters are used for the synchronous RPC calls (reads and writes).
+     */
+    final public IndexSyncRPCCounters synchronousCounters;
+
+    public ScaleOutIndexCounters(AbstractFederation fed) {
+
+        asynchronousStats = new IndexAsyncWriteStats(fed);
+
+        synchronousCounters = new IndexSyncRPCCounters();
         
     }
 
@@ -52,9 +67,9 @@ public class ScaleOutIndexCounters {
      * {@link IndexSyncRPCCounters} and the {@link IndexAsyncWriteStats} for
      * this index.
      * 
-     * @todo While this reports several averages, those are not moving averages
-     *       but averages over the life of the client. They should be sampled
-     *       and converted into moving averages.
+     * @todo While this reports several averages, most of them are not moving
+     *       averages but averages over the life of the client. They should be
+     *       sampled and converted into moving averages.
      */
     public CounterSet getCounters() {
 
@@ -71,16 +86,6 @@ public class ScaleOutIndexCounters {
         return counterSet;
         
     }
-
-    /**
-     * These counters are used only for the asynchronous write pipeline.
-     */
-    final public IndexAsyncWriteStats asynchronousStats = new IndexAsyncWriteStats();
-
-    /**
-     * These counters are used for the synchronous RPC calls (reads and writes).
-     */
-    final public IndexSyncRPCCounters synchronousCounters = new IndexSyncRPCCounters();
 
     public String toString() {
         
