@@ -37,8 +37,8 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
  * asynchronous write buffer.
  * 
  * @param <H>
- *            The generic type of the value returned by {@link Callable#call()}
- *            for the master (the statistics object).
+ *            The generic type of the value returned by the {@link Callable} for
+ *            the master (the statistics object).
  * @param <E>
  *            The generic type of the elements in the chunks stored in the
  *            {@link BlockingBuffer}.
@@ -46,7 +46,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IMasterTask<E,H> {
+public interface IMasterTask<E, H> {
 
     /**
      * The top-level buffer on which the application is writing.

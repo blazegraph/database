@@ -47,7 +47,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
 
     /**
      * Used to ensure that the [cacheCapacity] MRU weak references are not
-     * finalized.
+     * finalized (optional).
      */
     final private IHardReferenceQueue<V> queue;
 
@@ -75,23 +75,29 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
      * The capacity of the backing hard reference queue.
      */
     public int capacity() {
+
+        if (queue == null)
+            return 0;
         
         return queue.capacity();
         
     }
     
-    public void clear()
-    {
+    public void clear() {
 
-        // synchronize on the queue so that this operation is atomic.
-        synchronized (queue) {
+        if (queue != null) {
 
-            // clear hard references so that we don't hold onto things.
-            queue.clear(true);
-            
-            // clear the map entries (atomic).
-            map.clear();
+            // synchronize on the queue so that this operation is atomic.
+            synchronized (queue) {
 
+                // clear hard references so that we don't hold onto things.
+                queue.clear(true);
+
+                // clear the map entries (atomic).
+                map.clear();
+
+            }
+        
         }
         
         /*
@@ -121,7 +127,8 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
      * Uses the default load factor (0.75) and concurrency level (16).
      * 
      * @param queueCapacity
-     *            The {@link HardReferenceQueue} capacity.
+     *            The {@link HardReferenceQueue} capacity. When ZERO (0), there
+     *            will not be a backing hard reference queue.
      */
     public ConcurrentWeakValueCache(final int queueCapacity) {
 
@@ -133,7 +140,8 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
      * Uses the specified values.
      * 
      * @param queueCapacity
-     *            The {@link HardReferenceQueue} capacity.
+     *            The {@link HardReferenceQueue} capacity. When ZERO (0), there
+     *            will not be a backing hard reference queue.
      * @param loadFactor
      *            The load factor.
      * @param concurrencyLevel
@@ -151,15 +159,16 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
      * without a timeout.
      * 
      * @param queueCapacity
-     *            The {@link HardReferenceQueue} capacity.
+     *            The {@link HardReferenceQueue} capacity. When ZERO (0), there
+     *            will not be a backing hard reference queue.
      * @param loadFactor
      *            The load factor.
      * @param concurrencyLevel
      *            The concurrency level.
      * @param removeClearedReferences
      *            When <code>true</code> the cache will remove entries for
-     *            cleared references. When <code>false</code> those entries
-     *            will remain in the cache.
+     *            cleared references. When <code>false</code> those entries will
+     *            remain in the cache.
      */
     public ConcurrentWeakValueCache(final int queueCapacity,
             final float loadFactor, final int concurrencyLevel,
@@ -175,7 +184,7 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
      * Uses the specified values.
      * 
      * @param queue
-     *            The {@link HardReferenceQueue} capacity.
+     *            The {@link HardReferenceQueue} (optional).
      * @param loadFactor
      *            The load factor.
      * @param concurrencyLevel
@@ -190,8 +199,8 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
             final boolean removeClearedReferences
             ) {
 
-        if (queue == null)
-            throw new IllegalArgumentException();
+//        if (queue == null)
+//            throw new IllegalArgumentException();
         
         this.queue = queue;
         
@@ -252,9 +261,13 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
                  * longer (a touch).
                  */
                 
-                synchronized (queue) {
+                if (queue != null) {
+                    
+                    synchronized (queue) {
 
-                    queue.add(v);
+                        queue.add(v);
+
+                    }
 
                 }
 
@@ -302,12 +315,16 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
                  * longer (a touch).
                  */
 
-                synchronized (queue) {
+                if (queue != null) {
 
-                    queue.add(v);
+                    synchronized (queue) {
+
+                        queue.add(v);
+
+                    }
 
                 }
-
+                
                 return true;
 
             }
@@ -340,21 +357,24 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
             // new reference.
             final WeakReference<V> ref = referenceQueue == null //
                 ? new WeakReference<V>(v)
-                : new WeakRef<K, V>(k, v, referenceQueue)
-                ;
-            
+                : new WeakRef<K, V>(k, v, referenceQueue);
+
             // add to cache.
             final WeakReference<V> oldRef = map.put(k, ref);
-    
+
             final V oldVal = oldRef == null ? null : oldRef.get();
 
-            synchronized (queue) {
+            if (queue != null) {
 
-                // put onto the hard reference queue.
-                if(queue.add(v) && DEBUG) {
+                synchronized (queue) {
 
-                    log.debug("put: key=" + k + ", val=" + v);
-                    
+                    // put onto the hard reference queue.
+                    if (queue.add(v) && DEBUG) {
+
+                        log.debug("put: key=" + k + ", val=" + v);
+
+                    }
+
                 }
 
             }
@@ -412,18 +432,22 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
 
                 if (map.replace(k, oldRef, ref)) {
 
-                    // no reference under that key.
-                    synchronized (queue) {
+                    if (queue != null) {
 
-                        // put the new value onto the hard reference queue.
-                        if(queue.add(v) && DEBUG) {
+                        // no reference under that key.
+                        synchronized (queue) {
 
-                            log.debug("put: key=" + k + ", val=" + v);
-                            
+                            // put the new value onto the hard reference queue.
+                            if (queue.add(v) && DEBUG) {
+
+                                log.debug("put: key=" + k + ", val=" + v);
+
+                            }
+
                         }
 
                     }
-
+                    
                     // the old value for the key was a cleared reference.
                     return null;
 
@@ -433,18 +457,22 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
 
             if (oldVal == null) {
 
-                // no reference under that key.
-                synchronized (queue) {
+                if (queue != null) {
 
-                    // put it onto the hard reference queue.
-                    if (queue.add(v) && DEBUG) {
+                    // no reference under that key.
+                    synchronized (queue) {
 
-                        log.debug("put: key=" + k + ", val=" + v);
-                        
+                        // put it onto the hard reference queue.
+                        if (queue.add(v) && DEBUG) {
+
+                            log.debug("put: key=" + k + ", val=" + v);
+
+                        }
+
                     }
 
                 }
-
+                
                 return null;
 
             }

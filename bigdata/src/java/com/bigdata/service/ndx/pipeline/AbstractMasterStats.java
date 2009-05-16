@@ -32,6 +32,9 @@ import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.logging.Logger;
+
+import sun.awt.windows.ThemeReader;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -59,7 +62,7 @@ import com.bigdata.resources.StaleLocatorException;
  * @version $Id$
  */
 abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
-
+    
     /**
      * The #of subtasks which have started.
      */
@@ -99,13 +102,20 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     public long redirectCount = 0L;
 
     /**
-     * The #of chunks written on the {@link BlockingBuffer} by the producer.
+     * Elapsed nanoseconds in
+     * {@link AbstractMasterTask#handleRedirect(AbstractSubtask, Object[])}.
+     */
+    public long elapsedRedirectNanos = 0L;
+    
+    /**
+     * The #of chunks drained from the {@link BlockingBuffer} by the
+     * {@link AbstractMasterTask}.
      */
     public long chunksIn = 0L;
 
     /**
-     * The #of elements in the chunks written on the {@link BlockingBuffer} by
-     * the producer.
+     * The #of elements drained from the {@link BlockingBuffer} by the
+     * {@link AbstractMasterTask}.
      */
     public long elementsIn = 0L;
 
@@ -157,11 +167,63 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
 
     /**
      * Map for the per-index partition statistics. This ensures that we can
-     * report the aggregate statistics in detail.
+     * report the aggregate statistics in detail. A weak value hash map is used
+     * so that the statistics for inactive index partitions can be discarded.
+     * The backing hard reference queue is not used since the
+     * {@link AbstractSubtask sink task}s are strongly held until they are
+     * closed so we don't really need a backing hard reference queue at all in
+     * this case.
      */
     private final ConcurrentWeakValueCache<L, HS> currentPartitionStats = new ConcurrentWeakValueCache<L, HS>(
-            1/* queueCapacity */);
+            0/* queueCapacity */);
 
+    /**
+     * Weak value hash map of the active masters.
+     */
+    protected final ConcurrentWeakValueCache<Integer, AbstractMasterTask> masters = new ConcurrentWeakValueCache<Integer, AbstractMasterTask>(
+            0/* queueCapacity */);
+
+    /**
+     * The #of master tasks which have been created for the index whose
+     * asynchronous write statistics are reported on by this object.
+     */
+    public int masterCreateCount = 0;
+
+    /**
+     * The approximate #of active master tasks. This is based on a weak value
+     * hash map.  The size of that map is reported.
+     */
+    public int getMasterActiveCount() {
+
+        /*
+         * Note: Map entries for cleared weak references are removed from the
+         * map before the size of that map is reported.
+         */
+        return masters.size();
+
+    }
+
+    /**
+     * A new master task declares itself to this statistics object using this
+     * method. This allows the statistics object to report on the #of master
+     * tasks, their queue sizes, and the sizes of their sink queues.
+     * 
+     * @param master
+     */
+    @SuppressWarnings("unchecked")
+    void addMaster(final AbstractMasterTask master) {
+
+        if (master == null)
+            throw new IllegalArgumentException();
+        
+        if (masters.putIfAbsent(master.hashCode(), master) == null) {
+
+            masterCreateCount++;
+            
+        }
+        
+    }
+    
     /**
      * Return the statistics object for the specified index partition and never
      * <code>null</code> (a new instance is created if none exists).
@@ -249,6 +311,20 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         
         final CounterSet t = new CounterSet();
         
+        t.addCounter("masterCreateCount", new Instrument<Integer>() {
+            @Override
+            protected void sample() {
+                setValue(masterCreateCount);
+            }
+        });
+
+        t.addCounter("masterActiveCount", new Instrument<Integer>() {
+            @Override
+            protected void sample() {
+                setValue(getMasterActiveCount());
+            }
+        });
+
         t.addCounter("subtaskStartCount", new Instrument<Long>() {
             @Override
             protected void sample() {
@@ -288,6 +364,13 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
             @Override
             protected void sample() {
                 setValue(redirectCount);
+            }
+        });
+
+        t.addCounter("elapsedRedirectNanos", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(elapsedRedirectNanos);
             }
         });
 

@@ -54,6 +54,7 @@ import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
+import com.bigdata.service.ndx.pipeline.KVOC;
 import com.bigdata.service.ndx.pipeline.KVOLatch;
 
 /**
@@ -158,17 +159,24 @@ public interface IScaleOutClientIndex extends IClientIndex, ISplitter {
     /**
      * Asynchronous write API (streaming writes).
      * <p>
-     * The returned buffer provides a streaming API which is highly efficient if
-     * you do not need to have synchronous notification or directly consume the
-     * returned values. The caller writes ordered {@link KVO}[] chunks onto the
+     * The returned buffer provides a streaming API which is highly efficient.
+     * The caller writes ordered {@link KVO}[] chunks onto the thread-safe
      * {@link BlockingBuffer}. Those chunks are dynamically combined and then
      * split into per-index partition chunks which are written on internally
      * managed {@link BlockingBuffer}s for each index partition which will be
-     * touched by a write operation. The splits are are slices of ordered chunks
-     * for a specific index partition. The {@link BlockingBuffer} uses a merge
-     * sort when it combines ordered chunks so that the combined chunks remain
-     * fully ordered. Once a chunk is ready, it is re-shaped for the CTOR and
-     * sent to the target data service using RMI.
+     * touched by a write operation. The splits are slices of ordered chunks for
+     * a specific index partition. The {@link BlockingBuffer} uses a merge sort
+     * when it combines ordered chunks so that the combined chunks remain fully
+     * ordered. Once a chunk is ready, it is re-shaped for the CTOR and sent to
+     * the target data service using RMI.
+     * <p>
+     * Since this API is asynchronous, you will not have synchronous access to
+     * values returned by asynchronous writes. However, patterns can be created
+     * using {@link KVOC} and {@link KVOLatch} which provide notification when
+     * application defined sets of results have become available. Such patterns
+     * are created by associated the {@link KVOLatch} with the set of results
+     * and using {@link IResultHandler} and the object reference on the
+     * {@link KVOC} to capture the side-effect of the write.
      * <p>
      * {@link BlockingBuffer#getFuture()} may be used to obtain the
      * {@link Future} of the consumer. You can use {@link Future#get()} to await
@@ -179,10 +187,15 @@ public interface IScaleOutClientIndex extends IClientIndex, ISplitter {
      * also reported to the {@link ILoadBalancerService} via the
      * {@link IBigdataFederation}.
      * <p>
-     * Note: Each buffer returned by this method is independent. However, all
-     * the performance counters for all asynchronous write buffers for a given
-     * client and scale-out index are aggregated by an
-     * {@link ScaleOutIndexCounters}.
+     * Each buffer returned by this method is independent, and writes onto
+     * independent sinks which write through to the index partitions. This is
+     * necessary in order for the caller to retain control over the life cycle
+     * of their write operations. The {@link BlockingBuffer} is thread-safe so
+     * it may be the target for concurrent producers can be can utilized to
+     * create very high throughput designs. While the returned buffers are
+     * independent, the performance counters for all asynchronous write buffers
+     * for a given client and scale-out index are aggregated by a single
+     * {@link ScaleOutIndexCounters} instance.
      * 
      * @param <T>
      *            The generic type of the procedure used to write on the index.
@@ -206,7 +219,6 @@ public interface IScaleOutClientIndex extends IClientIndex, ISplitter {
      *            {@link KVOLatch#dec()} invocation to be "lost" and would
      *            result in non-termination since the count for the "lost" latch
      *            would never reach zero.
-     * 
      * @param ctor
      *            Used to create instances of the procedure that will execute a
      *            write on an individual index partition (this implies that
