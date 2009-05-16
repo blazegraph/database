@@ -249,13 +249,21 @@ A//
     protected void handleChunk(final E[] a, final boolean reopen)
             throws InterruptedException {
 
+        final long begin = System.nanoTime();
+        
+        long splitNanos = -1;
+        
         lock.lockInterruptibly();
         try {
 
+            final long beforeSplit = System.nanoTime();
+            
             // Split the ordered chunk.
             final LinkedList<Split> splits = ndx.splitKeys(ndx.getTimestamp(),
                     0/* fromIndex */, a.length/* toIndex */, a);
-
+            
+            splitNanos = System.nanoTime() - beforeSplit;
+            
             // Break the chunk into the splits
             for (Split split : splits) {
 
@@ -269,6 +277,20 @@ A//
         } finally {
 
             lock.unlock();
+            
+            synchronized (stats) {
+             
+                stats.handledChunkCount++;
+                
+                if (splitNanos != -1) {
+                
+                    stats.elapsedSplitChunkNanos += splitNanos;
+                    
+                }
+                
+                stats.elapsedHandleChunkNanos += System.nanoTime() - begin;
+                
+            }
             
         }
 

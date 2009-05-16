@@ -70,17 +70,14 @@ import com.bigdata.util.concurrent.AbstractHaltableProcess;
  * @version $Id$
  */
 public abstract class AbstractMasterTask<//
-H extends AbstractMasterStats<L, ? extends AbstractSubtaskStats>,//
-E,//
+H extends AbstractMasterStats<L, ? extends AbstractSubtaskStats>, //
+E, //
 S extends AbstractSubtask,//
 L>//
         extends AbstractHaltableProcess implements Callable<H>, IMasterTask<E,H> {
 
     static protected transient final Logger log = Logger
             .getLogger(AbstractMasterTask.class);
-
-//    protected transient final boolean INFO = log.isInfoEnabled(); 
-//    protected transient final boolean log.isDebugEnabled() = log.isDebugEnabled(); 
 
     /**
      * The top-level buffer on which the application is writing.
@@ -110,6 +107,35 @@ L>//
      */
     private final Map<L, S> subtasks;
 
+    /**
+     * Maps an operation across the subtasks. A lock is held across this
+     * operation, therefore the operation should be light weight.
+     * 
+     * @param op
+     *            The operation.
+     *            
+     * @throws InterruptedException
+     */
+    public void mapOperationOverSubtasks(final SubtaskOp<S> op)
+            throws InterruptedException, Exception {
+
+        lock.lockInterruptibly();
+        try {
+
+            for (S subtask : subtasks.values()) {
+
+                op.call(subtask);
+                
+            }
+            
+        } finally {
+
+            lock.unlock();
+            
+        }
+        
+    }
+    
     /**
      * Lock used to ensure consistency of the overall operation. There are
      * several ways in which an inconsistency could arise. Some examples
@@ -229,6 +255,8 @@ L>//
         this.src = buffer.iterator();
 
         this.subtasks = new LinkedHashMap<L, S>();
+        
+        stats.addMaster(this);
 
     }
 
@@ -329,8 +357,12 @@ L>//
         if(!lock.isHeldByCurrentThread())
             throw new IllegalMonitorStateException();
         
+        final long begin = System.nanoTime();
+        
         synchronized (stats) {
+        
             stats.redirectCount++;
+            
         }
 
         /*
@@ -377,6 +409,12 @@ L>//
 
         }
 
+        synchronized(stats) {
+            
+            stats.elapsedRedirectNanos += System.nanoTime() - begin;
+            
+        }
+        
     }
     
     /**
