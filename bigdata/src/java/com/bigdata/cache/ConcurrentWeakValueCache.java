@@ -175,8 +175,9 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
             final boolean removeClearedReferences
             ) {
         
-        this(new HardReferenceQueue<V>(null/* listener */, queueCapacity),
-                loadFactor, concurrencyLevel, removeClearedReferences);
+        this(queueCapacity == 0 ? null : new HardReferenceQueue<V>(
+                null/* listener */, queueCapacity), loadFactor,
+                concurrencyLevel, removeClearedReferences);
         
     }
 
