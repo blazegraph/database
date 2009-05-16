@@ -116,7 +116,7 @@ public class HardReferenceQueue<T> extends RingBuffer<T> implements IHardReferen
     public HardReferenceQueue(final HardReferenceQueueEvictionListener<T> listener,
             final int capacity) {
         
-        this( listener, capacity, DEFAULT_NSCAN);
+        this(listener, capacity, Math.min(capacity, DEFAULT_NSCAN));
         
     }
     
