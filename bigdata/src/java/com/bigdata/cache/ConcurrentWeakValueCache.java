@@ -211,8 +211,8 @@ public class ConcurrentWeakValueCache<K, V> implements IConcurrentWeakValueCache
          * resizing the ConcurrentHashMap, which is relatively expensive.
          */
 
-        map = new ConcurrentHashMap<K, WeakReference<V>>(queue.capacity() * 2,
-                loadFactor, concurrencyLevel);
+        map = new ConcurrentHashMap<K, WeakReference<V>>((queue == null ? 16
+                : (queue.capacity() * 2)), loadFactor, concurrencyLevel);
 
         if (removeClearedReferences) {
             
