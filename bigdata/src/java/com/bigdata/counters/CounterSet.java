@@ -78,6 +78,12 @@ import cutthecrap.utils.striterators.Striterator;
  *       modified rather than the root for better concurrency.
  * 
  * @todo the syntax "." and ".." are not recognized.
+ * 
+ * @todo should declare the units and the counter description with the counter
+ *       but only propagate the description once (alternatively, specify a
+ *       counter description interface and pass that along). The more difficult
+ *       question is how to limit the transfer of the full description. Perhaps
+ *       by having the LBS query for it?
  */
 public class CounterSet extends AbstractCounterSet implements ICounterSet {
 

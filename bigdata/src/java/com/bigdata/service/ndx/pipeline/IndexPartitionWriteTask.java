@@ -279,7 +279,7 @@ A//
                 master.stats.chunksOut++;
                 master.stats.elementsOut += chunkSize;
                 master.stats.duplicateCount += duplicateCount;
-                master.stats.elapsedChunkWritingNanos += elapsedNanos;
+                master.stats.elapsedSinkChunkWritingNanos += elapsedNanos;
             }
 
         }

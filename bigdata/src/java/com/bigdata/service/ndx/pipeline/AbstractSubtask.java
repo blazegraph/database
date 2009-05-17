@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
@@ -163,7 +164,7 @@ L>//
                 final long elapsedChunkWaitNanos = System.nanoTime() - lastHandledChunkNanos;
 
                 synchronized (master.stats) {
-                    master.stats.elapsedChunkWaitingNanos += elapsedChunkWaitNanos;
+                    master.stats.elapsedSinkChunkWaitingNanos += elapsedChunkWaitNanos;
                 }
                 stats.elapsedChunkWaitingNanos += elapsedChunkWaitNanos;
                 
@@ -225,20 +226,21 @@ L>//
         }
 
     }
-    
+
     /**
-     * Inner class is responsible for combining chunks as they become avaiable
+     * Inner class is responsible for combining chunks as they become available
      * from the {@link IAsynchronousIterator} while maintaining liveness. It
      * works with the {@link IAsynchronousIterator} API internally and polls the
-     * {@link AbstractSubtask#src}. If a chunk is available, then it is added
-     * to an ordered list of chunks which is maintained internally by this
-     * class. {@link #next()} combines those chunks, using a merge sort to
-     * maintain their order, and returns their data in a single chunk.
+     * {@link AbstractSubtask#src}. If a chunk is available, then it is added to
+     * an ordered list of chunks which is maintained internally by this class.
+     * {@link #next()} combines those chunks, using a merge sort to maintain
+     * their order, and returns their data in a single chunk.
      * <p>
-     * Note: This does not implement {@link Iterable} since its methods throw
+     * Note: This does not implement {@link Iterator} since its methods throw
      * {@link InterruptedException}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     private class NonBlockingChunkedIterator {
@@ -409,6 +411,12 @@ L>//
 
                     // track the #of elements available across those chunks.
                     chunkSize += a.length;
+                    
+                    synchronized (master.stats) {
+
+                        master.stats.elementsOnSinkQueues -= a.length;
+                        
+                    }
 
                     // reset the available aspect of the idle timeout.
                     lastChunkAvailableNanos = System.nanoTime();

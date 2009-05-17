@@ -877,6 +877,7 @@ L>//
 
                 stats.chunksTransferred += 1;
                 stats.elementsTransferred += b.length;
+                stats.elementsOnSinkQueues += b.length;
                 
             }
 
