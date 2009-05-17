@@ -80,6 +80,20 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         protected final transient Logger log = Logger.getLogger(StatisticsTask.class);
 
         /**
+         * The moving average of the #of elements on the sink queues.  This does
+         * not count the #of elements on the master queues nor does it count the
+         * #of elements which have been drained from a sink queue and are either
+         * being prepared for or awaiting completion of a write on an index
+         * partition.
+         */
+        final MovingAverageTask averageElementsOnSinkQueues = new MovingAverageTask(
+                "averageElementsOnSinkQueues", new Callable<Long>() {
+                    public Long call() {
+                        return elementsOnSinkQueues;
+                    }
+                });
+
+        /**
          * The moving average of the nanoseconds the master spends handling a
          * chunk which it has drained from its input queue.
          */
@@ -136,10 +150,10 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * The moving average of nanoseconds waiting for a chunk to become ready
          * so that it can be written on an output sink.
          */
-        final MovingAverageTask averageNanosPerWait = new MovingAverageTask(
-                "averageNanosPerWait", new Callable<Double>() {
+        final MovingAverageTask averageSinkChunkWaitingNanos = new MovingAverageTask(
+                "averageSinkChunkWaitingNanos", new Callable<Double>() {
                     public Double call() {
-                        return (chunksOut == 0L ? 0 : elapsedChunkWaitingNanos
+                        return (chunksOut == 0L ? 0 : elapsedSinkChunkWaitingNanos
                                 / (double) chunksOut);
                     }
                 });
@@ -148,10 +162,10 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * The moving average of nanoseconds per write for chunks written on an
          * index partition by an output sink.
          */
-        final MovingAverageTask averageNanosPerWrite = new MovingAverageTask(
-                "averageNanosPerWrite", new Callable<Double>() {
+        final MovingAverageTask averageSinkChunkWritingNanos = new MovingAverageTask(
+                "averageSinkChunkWritingNanos", new Callable<Double>() {
                     public Double call() {
-                        return (chunksOut == 0L ? 0 : elapsedChunkWritingNanos
+                        return (chunksOut == 0L ? 0 : elapsedSinkChunkWritingNanos
                                 / (double) chunksOut);
                     }
                 });
@@ -160,8 +174,8 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * The moving average #of elements (tuples) per chunk written on an output
          * sink.
          */
-        final MovingAverageTask averageElementsPerWrite = new MovingAverageTask(
-                "averageElementsPerWrite", new Callable<Double>() {
+        final MovingAverageTask averageSinkWriteChunkSize = new MovingAverageTask(
+                "averageSinkWriteChunkSize", new Callable<Double>() {
                     public Double call() {
                         return (chunksOut == 0L ? 0 : elementsOut
                                 / (double) chunksOut);
@@ -191,15 +205,6 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         /**
          * The moving average of the #of chunks on the input queue for each sink
          * for all masters for this index.
-         * 
-         * @todo This times the {@link #averageTransferChunkSize} gives a
-         *       reasonable estimate of the magnitude of the #of elements queued
-         *       on the sinks. To do better than that we could have to actually
-         *       scan the sink queues and report the #of elements across those
-         *       queues. If {@link BlockingBuffer} were to track the #of
-         *       elements outstanding on the buffer then we could report that
-         *       and it would be an exact count. We could then also report that
-         *       value for the input queue for each master.
          */
         final MovingAverageTask averageTotalSinkQueueSize = new MovingAverageTask(
                 "averageTotalSinkQueueSize", new Callable<Integer>() {
@@ -231,14 +236,14 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
 
         public void run() {
  
-//            averageBufferedElements.run();
+            averageElementsOnSinkQueues.run();
             averageSplitChunkNanos.run();
             averageHandleChunkNanos.run();
             averageSinkOfferNanos.run();
             averageTransferChunkSize.run();
-            averageNanosPerWait.run();
-            averageNanosPerWrite.run();
-            averageElementsPerWrite.run();
+            averageSinkChunkWaitingNanos.run();
+            averageSinkChunkWritingNanos.run();
+            averageSinkWriteChunkSize.run();
             averageMasterQueueSize.run();
             averageTotalSinkQueueSize.run();
             
@@ -294,13 +299,20 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * moving averages.
          */
         
-//        t.addCounter("averageBufferedElements", new Instrument<Double>() {
-//            @Override
-//            public void sample() {
-//                setValue(statisticsTask.averageBufferedElements
-//                        .getMovingAverage());
-//            }
-//        });
+        /*
+         * The moving average of the #of elements on the sink queues.  This does
+         * not count the #of elements on the master queues nor does it count the
+         * #of elements which have been drained from a sink queue and are either
+         * being prepared for or awaiting completion of a write on an index
+         * partition.
+         */
+        t.addCounter("averageElementOnSinkQueus", new Instrument<Double>() {
+            @Override
+            public void sample() {
+                setValue(statisticsTask.averageElementsOnSinkQueues
+                        .getMovingAverage());
+            }
+        });
 
         /*
          * The moving average of the nanoseconds the master spends handling a
@@ -361,7 +373,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         t.addCounter("averageMillisPerWait", new Instrument<Double>() {
             @Override
             protected void sample() {
-                setValue(statisticsTask.averageNanosPerWait.getMovingAverage()
+                setValue(statisticsTask.averageSinkChunkWaitingNanos.getMovingAverage()
                         * scalingFactor);
             }
         });
@@ -373,8 +385,43 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         t.addCounter("averageMillisPerWrite", new Instrument<Double>() {
             @Override
             protected void sample() {
-                setValue(statisticsTask.averageNanosPerWrite.getMovingAverage()
+                setValue(statisticsTask.averageSinkChunkWritingNanos.getMovingAverage()
                         * scalingFactor);
+            }
+        });
+
+        /*
+         * The ratio of the average consumption time (time to write on an index
+         * partition) to the average production time (time to generate a full
+         * chunk for an output sink). consumerFaster < 1.0 < producerFaster.
+         * 
+         * Note: If there is no data (producerRate==0) then the value will be
+         * reported as zero, but this does not indicate that the consumer is
+         * faster but rather than there is nothing going on for that index.
+         */
+        t.addCounter("consumerProducerRatio", new Instrument<Double>() {
+            @Override
+            protected void sample() {
+
+                final double consumerRate = statisticsTask.averageSinkChunkWritingNanos
+                        .getMovingAverage();
+
+                final double producerRate = statisticsTask.averageSinkChunkWaitingNanos
+                        .getMovingAverage();
+
+                final double rateRatio;
+                if (producerRate == 0) {
+
+                    // avoid divide by zero.
+                    rateRatio = 0d;
+
+                } else {
+
+                    rateRatio = consumerRate / producerRate;
+
+                }
+
+                setValue(rateRatio);
             }
         });
 
@@ -385,7 +432,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         t.addCounter("averageElementsPerWrite", new Instrument<Double>() {
             @Override
             protected void sample() {
-                setValue(statisticsTask.averageElementsPerWrite
+                setValue(statisticsTask.averageSinkWriteChunkSize
                         .getMovingAverage());
             }
         });

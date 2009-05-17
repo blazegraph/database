@@ -126,6 +126,18 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     public long elementsOut = 0L;
 
     /**
+     * The #of elements on the output sink queues. This is incremented when a
+     * chunk of elements is transferred onto an output sink queue and
+     * decremented when a chunk of elements is drained from an output sink
+     * queue. It does not reflect the #of elements on the master queue, which
+     * can be approximated as {@link #elementsTransferred}/
+     * {@link #chunksTransferred} X the averageMasterQueueSize). Neither does it
+     * include the #of elements in a prepared or outstanding write on an index
+     * partition.
+     */
+    public long elementsOnSinkQueues = 0L;
+
+    /**
      * The #of chunks transferred from the master to the sinks. Where there is
      * more than one index partition, there will be more than one sink and each
      * chunk written on the master will be divided among the sinks based on the
@@ -157,13 +169,13 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * Elapsed time across sinks waiting for another chunk to be ready so that
      * it can be written onto the index partition.
      */
-    public long elapsedChunkWaitingNanos = 0L;
+    public long elapsedSinkChunkWaitingNanos = 0L;
 
     /**
      * Elapsed nanoseconds across sinks writing chunks on an index partition
      * (RMI requests).
      */
-    public long elapsedChunkWritingNanos = 0L;
+    public long elapsedSinkChunkWritingNanos = 0L;
 
     /**
      * Map for the per-index partition statistics. This ensures that we can
@@ -426,14 +438,14 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("elapsedChunkWaitingNanos", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(elapsedChunkWaitingNanos);
+                setValue(elapsedSinkChunkWaitingNanos);
             }
         });
 
         t.addCounter("elapsedChunkWritingNanos", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(elapsedChunkWritingNanos);
+                setValue(elapsedSinkChunkWritingNanos);
             }
         });
 
@@ -517,14 +529,16 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 + chunksOut
                 + ", elementsOut="
                 + elementsOut
+                + ", elementsOnSinkQueues="
+                + elementsOnSinkQueues
                 + ", chunksTransferred="
                 + chunksTransferred
                 + ", elementsTransferred="
                 + elementsTransferred
                 + ", elapsedChunkWaitingNanos="
-                + elapsedChunkWaitingNanos
+                + elapsedSinkChunkWaitingNanos
                 + ", elapsedChunkWritingNanos="
-                + elapsedChunkWritingNanos
+                + elapsedSinkChunkWritingNanos
 //                + ", averageMillisPerWait="
 //                + TimeUnit.NANOSECONDS
 //                        .toMillis((long) getAverageNanosPerWait())

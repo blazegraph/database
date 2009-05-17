@@ -569,7 +569,7 @@ public class AbstractKeyRangeMasterTestCase extends TestCase2 {
 
                 master.stats.chunksOut++;
                 master.stats.elementsOut += chunk.length;
-                master.stats.elapsedChunkWritingNanos += elapsed;
+                master.stats.elapsedSinkChunkWritingNanos += elapsed;
 
             }
 
