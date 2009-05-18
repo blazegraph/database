@@ -45,6 +45,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.service.ndx.pipeline.AbstractKeyRangeMasterTestCase.L;
 
 /**
  * Test ability to handle a redirect (subtask learns that the target service no
@@ -63,6 +64,24 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         super(name);
     }
 
+    /**
+     * Mock stale locator exception.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class MockStaleLocatorException extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        public MockStaleLocatorException(L locator) {
+            
+            super(locator.toString());
+            
+        }
+
+    }
+    
     /**
      * Unit test verifies correct redirect of a write.
      * 
@@ -95,7 +114,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                             
                             lock.lockInterruptibly();
                             try {
-                            handleRedirect(this, chunk);
+                                handleRedirect(chunk,
+                                        new MockStaleLocatorException(locator));
                             } finally {
                                 lock.unlock();
                             }
@@ -136,39 +156,37 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         assertEquals("chunksOut", 2, masterStats.chunksOut);
         assertEquals("partitionCount", 3, masterStats.getMaximumPartitionCount());
 
+        final HS subtaskStats_L1 = masterStats.getSubtaskStats(new L(1));
+        final HS subtaskStats_L13 = masterStats.getSubtaskStats(new L(13));
+        final HS subtaskStats_L14 = masterStats.getSubtaskStats(new L(14));
+        
         // verify writes on each expected partition.
         {
-            
-            final HS subtaskStats = masterStats.getSubtaskStats(new L(1));
 
-            assertNotNull(subtaskStats);
+            assertNotNull(subtaskStats_L1);
             
-            assertEquals("chunksOut", 1, subtaskStats.chunksOut);
-            assertEquals("elementsOut", 1, subtaskStats.elementsOut);
+            assertEquals("chunksOut", 1, subtaskStats_L1.chunksOut);
+            assertEquals("elementsOut", 1, subtaskStats_L1.elementsOut);
             
         }
         
         // verify writes on each expected partition.
         {
             
-            final HS subtaskStats = masterStats.getSubtaskStats(new L(13));
-
-            assertNotNull(subtaskStats);
+            assertNotNull(subtaskStats_L13);
             
-            assertEquals("chunksOut", 0, subtaskStats.chunksOut);
-            assertEquals("elementsOut", 0, subtaskStats.elementsOut);
+            assertEquals("chunksOut", 0, subtaskStats_L13.chunksOut);
+            assertEquals("elementsOut", 0, subtaskStats_L13.elementsOut);
             
         }
 
         // verify writes on each expected partition.
         {
             
-            final HS subtaskStats = masterStats.getSubtaskStats(new L(14));
-
-            assertNotNull(subtaskStats);
+            assertNotNull(subtaskStats_L14);
             
-            assertEquals("chunksOut", 1, subtaskStats.chunksOut);
-            assertEquals("elementsOut", 1, subtaskStats.elementsOut);
+            assertEquals("chunksOut", 1, subtaskStats_L14.chunksOut);
+            assertEquals("elementsOut", 1, subtaskStats_L14.elementsOut);
             
         }
 
@@ -266,10 +284,11 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
                             // the write will be redirected into partition#14.
                             redirects.put(13, 14);
-                            
+
                             lock.lockInterruptibly();
                             try {
-                                handleRedirect(this, chunk);
+                                handleRedirect(chunk,
+                                        new MockStaleLocatorException(locator));
                             } finally {
                                 lock.unlock();
                             }
@@ -443,7 +462,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         final long maxWriteDelay = 1000;
         
         // duration of the stress test.
-        final long timeout = TimeUnit.SECONDS.toNanos(20/* seconds to run */);
+        final long timeout = TimeUnit.SECONDS.toNanos(10/* seconds to run */);
 
         /*
          * Stress test impl.

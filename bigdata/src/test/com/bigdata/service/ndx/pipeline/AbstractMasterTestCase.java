@@ -391,6 +391,12 @@ public class AbstractMasterTestCase extends TestCase2 {
             
         }
 
+        @Override
+        protected void notifyClientOfRedirect(L locator, Throwable cause) {
+            // TODO Auto-generated method stub
+            
+        }
+
     }
 
     final int masterQueueCapacity = 100;

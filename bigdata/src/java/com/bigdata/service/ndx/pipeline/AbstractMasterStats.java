@@ -102,12 +102,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     public long redirectCount = 0L;
 
     /**
-     * Elapsed nanoseconds in
-     * {@link AbstractMasterTask#handleRedirect(AbstractSubtask, Object[])}.
-     * 
-     * @todo probably should also report elapsed nanoseconds in
-     *       {@link IndexWriteTask#handleStaleLocator(IndexPartitionWriteTask, com.bigdata.btree.keys.KVO[], StaleLocatorException)}
-     *       which spans this measure.
+     * Elapsed nanoseconds handling a redirect.
      */
     public long elapsedRedirectNanos = 0L;
     
