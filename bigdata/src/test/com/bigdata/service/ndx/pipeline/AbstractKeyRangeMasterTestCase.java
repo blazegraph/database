@@ -94,7 +94,7 @@ public class AbstractKeyRangeMasterTestCase extends TestCase2 {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class MockStaleLocatorException extends RuntimeException {
+    static class MockStaleLocatorException extends RuntimeException {
 
         private static final long serialVersionUID = 1L;
 
@@ -404,60 +404,65 @@ public class AbstractKeyRangeMasterTestCase extends TestCase2 {
             
         }
 
-        /**
-         * Handle a stale locator per {@link IndexWriteTask}.
-         */
-        @SuppressWarnings("unchecked")
-        protected void handleStaleLocator(final S sink, final KVO<O>[] chunk,
-                final MockStaleLocatorException cause) throws InterruptedException {
-
-            if (sink == null)
-                throw new IllegalArgumentException();
-            
-            if (chunk == null)
-                throw new IllegalArgumentException();
-            
-            if (cause == null)
-                throw new IllegalArgumentException();
-
-            lock.lockInterruptibly();
-            try {
-
-                stats.redirectCount++;
-
-                /*
-                 * Note: We do not need to notify the "client" because the
-                 * master is directly accessing the MDI object.
-                 */
-//                /*
-//                 * Notify the client so it can refresh the information for this
-//                 * locator.
-//                 */
-//                ndx.staleLocator(ndx.getTimestamp(), (L) sink.locator, cause);
-
-                /*
-                 * Redirect the chunk and anything in the buffer to the appropriate
-                 * output sinks.
-                 */
-                handleRedirect(sink, chunk);
-
-                /*
-                 * Remove the buffer from the map
-                 * 
-                 * Note: This could cause a concurrent modification error if we are
-                 * awaiting the various output buffers to be closed. In order to
-                 * handle that code that modifies or traverses the [buffers] map
-                 * MUST be MUTEX or synchronized.
-                 */
-                removeOutputBuffer((L) sink.locator, sink);
-
-            } finally {
-
-                lock.unlock();
-                
-            }
-
-        }
+//        /**
+//         * Handle a stale locator per {@link IndexWriteTask}.
+//         * 
+//         * @deprecated by the use of the redirect queue.
+//         */
+//        @SuppressWarnings("unchecked")
+//        protected void handleStaleLocator(final S sink, final KVO<O>[] chunk,
+//                final MockStaleLocatorException cause) throws InterruptedException {
+//
+//            // FIXME remove this method and rewrite the tests.
+//            throw new UnsupportedOperationException();
+//            
+////            if (sink == null)
+////                throw new IllegalArgumentException();
+////            
+////            if (chunk == null)
+////                throw new IllegalArgumentException();
+////            
+////            if (cause == null)
+////                throw new IllegalArgumentException();
+////
+////            lock.lockInterruptibly();
+////            try {
+////
+////                stats.redirectCount++;
+////
+////                /*
+////                 * Note: We do not need to notify the "client" because the
+////                 * master is directly accessing the MDI object.
+////                 */
+//////                /*
+//////                 * Notify the client so it can refresh the information for this
+//////                 * locator.
+//////                 */
+//////                ndx.staleLocator(ndx.getTimestamp(), (L) sink.locator, cause);
+////
+////                /*
+////                 * Redirect the chunk and anything in the buffer to the appropriate
+////                 * output sinks.
+////                 */
+////                handleRedirect(sink, chunk);
+////
+////                /*
+////                 * Remove the buffer from the map
+////                 * 
+////                 * Note: This could cause a concurrent modification error if we are
+////                 * awaiting the various output buffers to be closed. In order to
+////                 * handle that code that modifies or traverses the [buffers] map
+////                 * MUST be MUTEX or synchronized.
+////                 */
+////                removeOutputBuffer((L) sink.locator, sink);
+////
+////            } finally {
+////
+////                lock.unlock();
+////                
+////            }
+//
+//        }
 
         /**
          * Identifies splits using the {@link IMetadataIndex} and assigns those
@@ -539,24 +544,14 @@ public class AbstractKeyRangeMasterTestCase extends TestCase2 {
             final long begin = System.nanoTime();
 
             try {
+                
                 writeData(chunk);
+                
             } catch (MockStaleLocatorException ex) {
 
-                /*
-                 * Handle a stale locator.
-                 * 
-                 * Note: The master has to (a) close the output buffer for this
-                 * subtask; (b) update its locator cache such that no more work
-                 * is assigned to this output buffer; (c) re-split the chunk
-                 * which failed with the StaleLocatorException; and (d) re-split
-                 * all the data remaining in the output buffer since it all
-                 * needs to go into different output buffer(s).
-                 */
+                log.warn("Stale locator: "+ex);
 
-//                if (log.isInfoEnabled())
-                    log.warn("Stale locator: "+ex);
-
-                master.handleStaleLocator((S)this, chunk, ex);
+                handleRedirect(chunk, ex);
 
                 // done.
                 return true;

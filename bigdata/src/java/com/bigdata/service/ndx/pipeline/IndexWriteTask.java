@@ -294,78 +294,78 @@ A//
 
     }
 
-    /**
-     * The master has to: (a) update its locator cache such that no more work is
-     * assigned to this output buffer; (b) re-split the chunk which failed with
-     * the StaleLocatorException; and (c) re-split all the data remaining in the
-     * output buffer since it all needs to go into different output buffer(s).
-     * <p>
-     * Note: The handling of a {@link StaleLocatorException} MUST be MUTEX with
-     * respect to adding data to an output buffer using
-     * {@link #addToOutputBuffer(Split, KVO[])}. This provides a guarantee that
-     * no more data will be added to a given output buffer once this method
-     * holds the monitor. Since a single thread drains any given output buffer
-     * we will never observe more than one {@link StaleLocatorException} for a
-     * given index partition within the context of the same
-     * {@link IndexWriteTask}. Together this allows us to decisively handle the
-     * {@link StaleLocatorException} and close out the output buffer on which it
-     * was received.
-     * 
-     * @param sink
-     *            The class draining the output buffer.
-     * @param chunk
-     *            The chunk which it was writing when it received the
-     *            {@link StaleLocatorException}.
-     * @param cause
-     *            The {@link StaleLocatorException}.
-     */
-    @SuppressWarnings("unchecked")
-    protected void handleStaleLocator(final S sink, final E[] chunk,
-            final StaleLocatorException cause) throws InterruptedException {
-
-        if (sink == null)
-            throw new IllegalArgumentException();
-        
-        if (chunk == null)
-            throw new IllegalArgumentException();
-        
-        if (cause == null)
-            throw new IllegalArgumentException();
-
-        lock.lockInterruptibly();
-        try {
-
-            stats.redirectCount++;
-
-            /*
-             * Notify the client so it can refresh the information for this
-             * locator.
-             */
-            ndx.staleLocator(ndx.getTimestamp(), (L) sink.locator, cause);
-
-            /*
-             * Redirect the chunk and anything in the buffer to the appropriate
-             * output sinks.
-             */
-            handleRedirect(sink, chunk);
-
-            /*
-             * Remove the buffer from the map
-             * 
-             * Note: This could cause a concurrent modification error if we are
-             * awaiting the various output buffers to be closed. In order to
-             * handle that code that modifies or traverses the [buffers] map
-             * MUST be MUTEX or synchronized.
-             */
-            removeOutputBuffer((L) sink.locator, sink);
-
-        } finally {
-
-            lock.unlock();
-            
-        }
-
-    }
+//    /**
+//     * The master has to: (a) update its locator cache such that no more work is
+//     * assigned to this output buffer; (b) re-split the chunk which failed with
+//     * the StaleLocatorException; and (c) re-split all the data remaining in the
+//     * output buffer since it all needs to go into different output buffer(s).
+//     * <p>
+//     * Note: The handling of a {@link StaleLocatorException} MUST be MUTEX with
+//     * respect to adding data to an output buffer using
+//     * {@link #addToOutputBuffer(Split, KVO[])}. This provides a guarantee that
+//     * no more data will be added to a given output buffer once this method
+//     * holds the monitor. Since a single thread drains any given output buffer
+//     * we will never observe more than one {@link StaleLocatorException} for a
+//     * given index partition within the context of the same
+//     * {@link IndexWriteTask}. Together this allows us to decisively handle the
+//     * {@link StaleLocatorException} and close out the output buffer on which it
+//     * was received.
+//     * 
+//     * @param sink
+//     *            The class draining the output buffer.
+//     * @param chunk
+//     *            The chunk which it was writing when it received the
+//     *            {@link StaleLocatorException}.
+//     * @param cause
+//     *            The {@link StaleLocatorException}.
+//     */
+//    @SuppressWarnings("unchecked")
+//    protected void handleStaleLocator(final S sink, final E[] chunk,
+//            final StaleLocatorException cause) throws InterruptedException {
+//
+//        if (sink == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (chunk == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (cause == null)
+//            throw new IllegalArgumentException();
+//
+//        lock.lockInterruptibly();
+//        try {
+//
+//            stats.redirectCount++;
+//
+//            /*
+//             * Notify the client so it can refresh the information for this
+//             * locator.
+//             */
+//            ndx.staleLocator(ndx.getTimestamp(), (L) sink.locator, cause);
+//
+//            /*
+//             * Redirect the chunk and anything in the buffer to the appropriate
+//             * output sinks.
+//             */
+//            handleRedirect(sink, chunk);
+//
+//            /*
+//             * Remove the buffer from the map
+//             * 
+//             * Note: This could cause a concurrent modification error if we are
+//             * awaiting the various output buffers to be closed. In order to
+//             * handle that code that modifies or traverses the [buffers] map
+//             * MUST be MUTEX or synchronized.
+//             */
+//            removeOutputBuffer((L) sink.locator, sink);
+//
+//        } finally {
+//
+//            lock.unlock();
+//            
+//        }
+//
+//    }
 
     @SuppressWarnings("unchecked")
     @Override

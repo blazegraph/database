@@ -223,6 +223,26 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                 });
 
         /**
+         * The moving average of the #of chunks on the master's redirect queue
+         * for all masters for this index.
+         */
+        final MovingAverageTask averageMasterRedirectQueueSize = new MovingAverageTask(
+                "averageMasterRedirectQueueSize", new Callable<Integer>() {
+                    public Integer call() {
+                        int n = 0;
+                        final Iterator<WeakReference<AbstractMasterTask>> itr = masters
+                                .iterator();
+                        while (itr.hasNext()) {
+                            final AbstractMasterTask master = itr.next().get();
+                            if (master == null)
+                                continue;
+                            n += master.redirectQueue.size();
+                        }
+                        return n;
+                    }
+                });
+
+        /**
          * The moving average of the #of chunks on the input queue for each sink
          * for all masters for this index. If there are no index partitions for
          * some index (that is, if the asynchronous write API is not in use for
@@ -274,6 +294,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             averageSinkChunkWritingNanos.run();
             averageSinkWriteChunkSize.run();
             averageMasterQueueSize.run();
+            averageMasterRedirectQueueSize.run();
             averageSinkQueueSize.run();
             
         }
@@ -488,6 +509,18 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             @Override
             protected void sample() {
                 setValue(statisticsTask.averageMasterQueueSize
+                        .getMovingAverage());
+            }
+        });
+
+        /*
+         * The moving average of the #of chunks on the master's redirect queue
+         * for all masters for this index.
+         */
+        t.addCounter("averageMasterRedirectQueueSize", new Instrument<Double>() {
+            @Override
+            protected void sample() {
+                setValue(statisticsTask.averageMasterRedirectQueueSize
                         .getMovingAverage());
             }
         });

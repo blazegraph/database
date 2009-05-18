@@ -39,6 +39,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.ChunkMergeSortHelper;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Abstract implementation of a subtask for the {@link AbstractMasterTask}
@@ -498,12 +499,122 @@ L>//
         }
 
     }
-    
+
+    /**
+     * This method MUST be invoked if a sink receives a
+     * "stale locator exception" within {@link #handleChunk(Object[])}.
+     * <p>
+     * This method asynchronously closes the <i>sink</i>, so that no further
+     * data may be written on it by setting the <i>cause</i> on
+     * {@link BlockingBuffer#abort(Throwable)}. Next, the current chunk is
+     * placed onto the master's {@link AbstractMasterTask#redirectQueue} and the
+     * sink's {@link #buffer} is drained, transferring all chunks which can be
+     * read from that buffer onto the master's redirect queue.
+     * 
+     * @param chunk
+     *            The chunk which the sink was processing when it discovered
+     *            that it need to redirect its outputs to a different sink (that
+     *            is, a chunk which it had already read from its buffer and
+     *            hence which needs to be redirected now).
+     * @param cause
+     *            The stale locator exception.
+     * 
+     * @throws InterruptedException
+     */
+    protected void handleRedirect(final E[] chunk, final Throwable cause)
+            throws InterruptedException {
+
+        if (chunk == null)
+            throw new IllegalArgumentException();
+
+        if (cause == null)
+            throw new IllegalArgumentException();
+        
+        final long begin = System.nanoTime();
+        
+        /*
+         * Close the output buffer for this sink - nothing more may
+         * written onto it now that we have seen the
+         * StaleLocatorException.
+         * 
+         * Note: We DO NOT seek the master's lock first since that can
+         * cause a deadlock if the master is currently blocking trying
+         * to write on this sink. Instead, we set the stale locator
+         * exception as the cause when we close the sink's buffer and
+         * then handled that exception in addToOutputBuffer() in the
+         * master.
+         */
+        buffer.abort(cause);
+        
+        /*
+         * Handle the chunk for which we got the stale locator exception by
+         * feeding it back into the master.
+         * 
+         * Note: In this case we may re-open an output buffer for the index
+         * partition. The circumstances under which this can occur are subtle.
+         * However, if data had already been assigned to the output buffer for
+         * the index partition and written through to the index partition and
+         * the output buffer closed because awaitAll() was invoked before we
+         * received the stale locator exception for an outstanding RMI, then it
+         * is possible for the desired output buffer to already be closed. In
+         * order for this condition to arise either the stale locator exception
+         * must have been received in response to a different index operation or
+         * the client is not caching the index partition locators.
+         */
+        master.redirectQueue.put(chunk);
+
+        /*
+         * Drain the rest of the buffered chunks from the closed sink, feeding
+         * them back into the master which will assign them to the new sink(s).
+         * Again, we will 'reopen' the output buffer if it has been closed.
+         */
+        final IAsynchronousIterator<E[]> itr = src;
+
+        while (src.hasNext()) {
+
+            master.redirectQueue.put(src.next());
+
+        }
+        
+        /*
+         * Notify the client so it can refresh the information for this locator.
+         */
+        notifyClientOfRedirect(locator, cause);
+
+        /*
+         * Remove the buffer from the map.
+         * 
+         * Note: This could cause a concurrent modification error if we are
+         * awaiting the various output buffers to be closed. In order to
+         * handle that code that modifies or traverses the [buffers] map
+         * MUST be MUTEX or synchronized.
+         */
+        master.removeOutputBuffer(locator, this);
+        
+        synchronized (master.stats) {
+
+            master.stats.elapsedRedirectNanos += System.nanoTime() - begin;
+            master.stats.redirectCount++;
+
+        }
+        
+    }
+
     /**
      * Process a chunk from the buffer.
      * 
      * @return <code>true</code> iff the task should exit immediately.
      */
     abstract protected boolean handleChunk(E[] chunk) throws Exception;
+
+    /**
+     * Notify the client that the locator is stale.
+     * 
+     * @param locator
+     *            The locator.
+     * @param cause
+     *            The cause.
+     */
+    abstract protected void notifyClientOfRedirect(L locator, Throwable cause);
 
 }

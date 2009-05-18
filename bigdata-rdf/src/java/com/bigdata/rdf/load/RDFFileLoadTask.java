@@ -29,7 +29,7 @@ import com.bigdata.service.jini.JiniFederation;
  * If the writes succeed then the client knows that the data are on stable
  * storage and may safely delete the source files. This task may be used in
  * conjunction with any process that writes files into a known directory on the
- * hosts of a cluster. The task will continue until cancelled.
+ * hosts of a cluster. The task will continue until canceled.
  * <p>
  * Note: Counters reporting the progress of this task will be attached to the
  * data service on which this task is executing.

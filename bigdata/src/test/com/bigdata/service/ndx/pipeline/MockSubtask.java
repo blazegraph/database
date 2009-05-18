@@ -30,6 +30,7 @@ package com.bigdata.service.ndx.pipeline;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.service.ndx.pipeline.AbstractKeyRangeMasterTestCase.L;
 
 /**
  * Class exists solely to make it easier to write the unit tests by aligning the
@@ -58,6 +59,15 @@ M extends MockMaster<H, O, E, S, L, HS>//
             BlockingBuffer<E[]> buffer) {
 
         super(master, locator, buffer);
+        
+    }
+
+    /** NOP. */
+    @Override
+    protected void notifyClientOfRedirect(L locator, Throwable cause) {
+
+        if (log.isInfoEnabled())
+            log.info("locator=" + locator + ", cause=" + cause);
         
     }
 

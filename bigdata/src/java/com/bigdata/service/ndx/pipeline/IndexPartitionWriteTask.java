@@ -37,6 +37,7 @@ import com.bigdata.btree.proc.IAsyncResultHandler;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -238,24 +239,24 @@ A//
 
             if (cause != null) {
 
-                /*
-                 * Handle a stale locator.
-                 * 
-                 * Note: The master has to (a) close the output buffer for
-                 * this subtask; (b) update its locator cache such that no
-                 * more work is assigned to this output buffer; (c) re-split
-                 * the chunk which failed with the StaleLocatorException;
-                 * and (d) re-split all the data remaining in the output
-                 * buffer since it all needs to go into different output
-                 * buffer(s).
-                 */
+//                /*
+//                 * Handle a stale locator.
+//                 * 
+//                 * Note: The master has (a) update its locator cache such that
+//                 * no more work is assigned to this output buffer; (b) re-split
+//                 * the chunk which failed with the StaleLocatorException; and
+//                 * (c) re-split all the data remaining in the output buffer
+//                 * since it all needs to go into different output buffer(s).
+//                 */
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Stale locator: name=" + cause.getName()
+//                            + ", reason=" + cause.getReason());
+//
+//                master.handleStaleLocator((S) this, (E[]) chunk, cause);
 
-                if (log.isInfoEnabled())
-                    log.info("Stale locator: name=" + cause.getName()
-                            + ", reason=" + cause.getReason());
-
-                master.handleStaleLocator((S) this, (E[]) chunk, cause);
-
+                handleRedirect((E[]) chunk, cause);
+                
                 // done.
                 return true;
 
@@ -286,4 +287,14 @@ A//
 
     }
 
+    /**
+     * Notifies the client that the locator is stale.
+     */
+    protected void notifyClientOfRedirect(L locator, Throwable cause) {
+
+        master.ndx.staleLocator(master.ndx.getTimestamp(), (L) locator,
+                (StaleLocatorException) cause);
+
+    }
+    
 }
