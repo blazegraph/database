@@ -29,11 +29,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx.pipeline;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -43,6 +46,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.Split;
@@ -83,6 +87,19 @@ L>//
      * The top-level buffer on which the application is writing.
      */
     protected final BlockingBuffer<E[]> buffer;
+
+    /**
+     * A buffer of chunks for which a {@link StaleLocatorException} was
+     * received. When this buffer is not empty, it is drained by preference over
+     * the {@link #buffer}.
+     * <p>
+     * This design allows us to avoid deadlocks when a sink is full and the
+     * master is blocked attempting to add another chunk to that sink. If a
+     * {@link StaleLocatorException} is thrown for the outstanding write by that
+     * sink, then this situation would deadlock since the {@link #lock} is
+     * already held and the sink is unable to drain.
+     */
+    protected final BlockingQueue<E[]> redirectQueue = new LinkedBlockingQueue<E[]>(/* unbounded */);
 
     public BlockingBuffer<E[]> getBuffer() {
 
@@ -388,7 +405,7 @@ L>//
          * is possible for the desired output buffer to already be closed. In
          * order for this condition to arise either the stale locator exception
          * must have been received in response to a different index operation or
-         * the the client is not caching the index partition locators.
+         * the client is not caching the index partition locators.
          */
         handleChunk(chunk, true/* reopen */);
 
@@ -825,19 +842,40 @@ L>//
                 
                 // track offer time.
                 final long beforeOffer = System.nanoTime();
-                
-                if (reopen) {
 
-                    // stack trace through here if [reopen == true]
-                    added = sink.buffer.add(b, offerTimeoutNanos,
-                            TimeUnit.NANOSECONDS);
+                try {
 
-                } else {
+                    if (reopen) {
 
-                    // stack trace through here if [reopen == false]
-                    added = sink.buffer.add(b, offerTimeoutNanos,
-                            TimeUnit.NANOSECONDS);
+                        // stack trace through here if [reopen == true]
+                        added = sink.buffer.add(b, offerTimeoutNanos,
+                                TimeUnit.NANOSECONDS);
 
+                    } else {
+
+                        // stack trace through here if [reopen == false]
+                        added = sink.buffer.add(b, offerTimeoutNanos,
+                                TimeUnit.NANOSECONDS);
+
+                    }
+                } catch (BufferClosedException ex) {
+                    if (ex.getCause() instanceof StaleLocatorException) {
+                        /*
+                         * FIXME set the exception when closing the buffer when
+                         * handling the stale locator exception and transfer the
+                         * outstanding and all queued chunks to the
+                         * redirectQueue.
+                         * 
+                         * FIXME when we trap the stale locator exception here
+                         * we need to transfer the chunk to the redirectQueue
+                         * since the buffer was closed (and drained)
+                         * asynchronously.
+                         * 
+                         * FIXME write the unit test for the deadlock before I
+                         * make the code changes.
+                         */
+                        throw new UnsupportedOperationException();
+                    }
                 }
                 
                 if (!added) {

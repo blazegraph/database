@@ -447,9 +447,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         sb.append(", hasFuture=" + (future != null));
 
-        sb.append(", elementCount=" + elementCount);
+        sb.append(", elementsAddedCount=" + elementsAddedCount);
 
-        sb.append(", chunkCount=" + chunkCount);
+        sb.append(", chunksAddedCount=" + chunksAddedCount);
+
+        sb.append(", chunksDrainedCount=" + chunksDrainedCount);
+
+        sb.append(", elementsDrainedCount=" + elementsDrainedCount);
 
         if (true || log.isInfoEnabled()) {
 
@@ -620,35 +624,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * The #of chunks {@link #add(Object)ed} to the buffer. This will be ZERO
      * unless the generic type of the buffer is an array type.
      */
-    private long chunkCount = 0L;
-
-    /**
-     * The #of chunks {@link #add(Object)ed} to the buffer. This will be ZERO
-     * unless the generic type of the buffer is an array type.
-     */
-    public long getChunkCount() {
-        
-        return chunkCount;
-        
-    }
+    private long chunksAddedCount = 0L;
 
     /**
      * The #of elements {@link #add(Object)ed} to the buffer. When the generic
      * type of the buffer is an array type, this will be the sum of the length
      * of the arrays {@link #add(Object)ed} to the buffer.
      */
-    private long elementCount = 0L;
-
-    /**
-     * The #of elements {@link #add(Object)ed} to the buffer. When the generic
-     * type of the buffer is an array type, this will be the sum of the length
-     * of the arrays {@link #add(Object)ed} to the buffer.
-     */
-    public long getElementCount() {
-        
-        return elementCount;
-        
-    }
+    private long elementsAddedCount = 0L;
 
     /**
      * The #of elements on the queue.  When the queue uses a scalar element 
@@ -658,6 +641,39 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     private AtomicLong elementsOnQueueCount = new AtomicLong(0L);
     
+    /**
+     * The #of chunks read so far from the iterator (aka drained from the
+     * buffer).
+     */
+    private long chunksDrainedCount = 0L;
+    
+    /**
+     * The #of elements read so far from the iterator (aka drained from the
+     * buffer).
+     */
+    private long elementsDrainedCount = 0L;
+
+    /**
+     * The #of chunks {@link #add(Object)ed} to the buffer. This will be ZERO
+     * unless the generic type of the buffer is an array type.
+     */
+    public long getChunksAddedCount() {
+        
+        return chunksAddedCount;
+        
+    }
+
+    /**
+     * The #of elements {@link #add(Object)ed} to the buffer. When the generic
+     * type of the buffer is an array type, this will be the sum of the length
+     * of the arrays {@link #add(Object)ed} to the buffer.
+     */
+    public long getElementsAddedCount() {
+        
+        return elementsAddedCount;
+        
+    }
+
     /**
      * The #of elements on the queue.  When the queue uses a scalar element 
      * type this will track the {@link #size()} very closely.  However, when
@@ -700,8 +716,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public boolean add(final E e, final long timeout, final TimeUnit unit) {
         
-        assertOpen();
-
         if (e == null)
             throw new IllegalArgumentException();
 
@@ -731,6 +745,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         while ((nanos = (System.nanoTime() - begin)) > 0) {
 
+            /*
+             * Note: This is done inside of the loop so that we will notice if
+             * the buffer is closed asynchronously. Otherwise we would just spin
+             * forever once we made it past the guard the first time.
+             */
+            assertOpen();
+            
             /*
              * Note: While not the only explanation, a timeout here can occur if
              * you have nested JOINs. The outer JOIN can timeout waiting on the
@@ -815,8 +836,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             if (e.getClass().getComponentType() != null) {
 
-                chunkCount++;
-                elementCount += ((Object[]) e).length;
+                chunksAddedCount++;
+                elementsAddedCount += ((Object[]) e).length;
                 elementsOnQueueCount.addAndGet(((Object[]) e).length);
 
                 if (log.isDebugEnabled())
@@ -824,7 +845,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             } else {
 
-                elementCount++;
+                elementsAddedCount++;
                 elementsOnQueueCount.incrementAndGet();
                 
                 if (log.isDebugEnabled())
@@ -927,16 +948,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         private E nextE = null;
 
         /**
-         * The #of chunks read so far.
-         */
-        private long nchunks = 0L;
-        
-        /**
-         * The #of elements read so far.
-         */
-        private long nelements = 0L;
-
-        /**
          * Safe non-blocking representation of the iterator state.
          */
         public String toString() {
@@ -952,10 +963,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             sb.append(", bufferIsOpen=" + BlockingBuffer.this.open);
 
             sb.append(", nextE=" + (nextE != null));
-
-            sb.append(", chunkCount=" + chunkCount);
-
-            sb.append(", elementCount=" + elementCount);
 
             sb.append("}");
 
@@ -1676,13 +1683,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
             if (e.getClass().getComponentType() != null) {
 
-                nchunks++;
-                nelements += ((Object[]) e).length;
+                chunksDrainedCount++;
+                elementsDrainedCount += ((Object[]) e).length;
                 elementsOnQueueCount.addAndGet(-((Object[]) e).length);
                 
             } else {
                 
-                nelements++;
+                elementsDrainedCount++;
                 elementsOnQueueCount.decrementAndGet();
                 
             }

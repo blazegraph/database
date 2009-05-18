@@ -57,9 +57,9 @@ import com.bigdata.service.jini.master.TaskMaster;
 /**
  * Distributed bulk loader for RDF data. Creates/(re-)opens the
  * {@link AbstractTripleStore}, loads the optional ontology, and starts the
- * clients. The clients will run until the master is cancelled loading any data
+ * clients. The clients will run until the master is canceled loading any data
  * found in the {@link JobState#dataDir}. Files are optionally deleted after
- * they have been succesfully loaded. Closure may be optionally computed.
+ * they have been successfully loaded. Closure may be optionally computed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

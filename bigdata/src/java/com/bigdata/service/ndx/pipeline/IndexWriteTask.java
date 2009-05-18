@@ -251,8 +251,6 @@ A//
 
         final long begin = System.nanoTime();
         
-        long splitNanos = -1;
-        
         lock.lockInterruptibly();
         try {
 
@@ -262,7 +260,13 @@ A//
             final LinkedList<Split> splits = ndx.splitKeys(ndx.getTimestamp(),
                     0/* fromIndex */, a.length/* toIndex */, a);
             
-            splitNanos = System.nanoTime() - beforeSplit;
+            final long splitNanos = System.nanoTime() - beforeSplit;
+
+            synchronized (stats) {
+
+                stats.elapsedSplitChunkNanos += splitNanos;
+
+            }
             
             // Break the chunk into the splits
             for (Split split : splits) {
@@ -282,12 +286,6 @@ A//
              
                 stats.handledChunkCount++;
                 
-                if (splitNanos != -1) {
-                
-                    stats.elapsedSplitChunkNanos += splitNanos;
-                    
-                }
-                
                 stats.elapsedHandleChunkNanos += System.nanoTime() - begin;
                 
             }
@@ -304,12 +302,12 @@ A//
      * <p>
      * Note: The handling of a {@link StaleLocatorException} MUST be MUTEX with
      * respect to adding data to an output buffer using
-     * {@link #addToOutputBuffer(Split, KVO[])}. This provides a guarentee that
+     * {@link #addToOutputBuffer(Split, KVO[])}. This provides a guarantee that
      * no more data will be added to a given output buffer once this method
-     * holds the monitor. Since the output buffer is single threaded we will
-     * never observe more than one {@link StaleLocatorException} for a given
-     * index partition within the context of the same {@link IndexWriteTask}.
-     * Together this allows us to decisively handle the
+     * holds the monitor. Since a single thread drains any given output buffer
+     * we will never observe more than one {@link StaleLocatorException} for a
+     * given index partition within the context of the same
+     * {@link IndexWriteTask}. Together this allows us to decisively handle the
      * {@link StaleLocatorException} and close out the output buffer on which it
      * was received.
      * 

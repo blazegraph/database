@@ -92,8 +92,8 @@ public class TestBlockingBuffer extends TestCase2 {
         // buffer is empty.
         assertTrue(buffer.isOpen());
         assertTrue(buffer.isEmpty());
-        assertEquals("chunkCount", 0L, buffer.getChunkCount());
-        assertEquals("elementCount", 0L, buffer.getElementCount());
+        assertEquals("chunkCount", 0L, buffer.getChunksAddedCount());
+        assertEquals("elementCount", 0L, buffer.getElementsAddedCount());
 
         final IAsynchronousIterator<Object> itr = buffer.iterator();
 
@@ -107,8 +107,8 @@ public class TestBlockingBuffer extends TestCase2 {
         // should be one element in the buffer and zero chunks since not array type.
         assertTrue(buffer.isOpen());
         assertFalse(buffer.isEmpty());
-        assertEquals("chunkCount", 0L, buffer.getChunkCount());
-        assertEquals("elementCount", 1L, buffer.getElementCount());
+        assertEquals("chunkCount", 0L, buffer.getChunksAddedCount());
+        assertEquals("elementCount", 1L, buffer.getElementsAddedCount());
 
         // something should be available now (non-blocking).
         assertTrue(itr.hasNext(1, TimeUnit.NANOSECONDS));
@@ -122,8 +122,8 @@ public class TestBlockingBuffer extends TestCase2 {
         // should be two elements in the buffer and zero chunks
         assertTrue(buffer.isOpen());
         assertFalse(buffer.isEmpty());
-        assertEquals("chunkCount", 0L, buffer.getChunkCount());
-        assertEquals("elementCount", 2L, buffer.getElementCount());
+        assertEquals("chunkCount", 0L, buffer.getChunksAddedCount());
+        assertEquals("elementCount", 2L, buffer.getElementsAddedCount());
 
         // future of task writing a 3rd element on the buffer.
         final Future producerFuture = service.submit(new Runnable() {
