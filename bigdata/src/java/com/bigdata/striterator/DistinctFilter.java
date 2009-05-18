@@ -60,12 +60,12 @@ import com.bigdata.relation.rule.eval.ISolution;
  * 
  * @todo A statistical distinct filter can be implemented using bloom filter
  *       INSTEAD of a {@link BTree} but the bloom filter parameters MUST be
- *       choosen so as to make the possibility of a false positive sufficiently
- *       unlikely to satisify the application criteria. However, such a filter
+ *       chosen so as to make the possibility of a false positive sufficiently
+ *       unlikely to satisfy the application criteria. However, such a filter
  *       will always have a non-zero chance of incorrectly rejecting a solution
  *       when that solution has NOT been seen by the filter. Since the bloom
- *       filter can undergenerate, it could only be applied in very specialized
- *       circumstances, e.g., it might be Ok for text search.
+ *       filter can under-generate, it could only be applied in very specialized
+ *       circumstances, e.g., it might be OK for text search.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
