@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -519,6 +520,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
     }
 
+    /**
+     * This reports the #of items in the queue. 
+     * 
+     * @see #getElementsOnQueueCount()
+     */
     public int size() {
 
         return queue.size();
@@ -644,6 +650,26 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
     }
 
+    /**
+     * The #of elements on the queue.  When the queue uses a scalar element 
+     * type this will track the {@link #size()} very closely.  However, when
+     * the queue uses an array element type, this will be the sum of the #of
+     * elements across all arrays on the queue.
+     */
+    private AtomicLong elementsOnQueueCount = new AtomicLong(0L);
+    
+    /**
+     * The #of elements on the queue.  When the queue uses a scalar element 
+     * type this will track the {@link #size()} very closely.  However, when
+     * the queue uses an array element type, this will be the sum of the #of
+     * elements across all arrays on the queue.
+     */
+    public long getElementsOnQueueCount() {
+       
+        return elementsOnQueueCount.get();
+        
+    }
+    
     /**
      * @throws BufferClosedException
      *             if the buffer has been {@link #close()}d.
@@ -791,6 +817,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 chunkCount++;
                 elementCount += ((Object[]) e).length;
+                elementsOnQueueCount.addAndGet(((Object[]) e).length);
 
                 if (log.isDebugEnabled())
                     log.debug("added chunk: len=" + ((Object[])e).length);
@@ -798,6 +825,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             } else {
 
                 elementCount++;
+                elementsOnQueueCount.incrementAndGet();
                 
                 if (log.isDebugEnabled())
                     log.debug("added: " + e.toString());
@@ -1650,10 +1678,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 nchunks++;
                 nelements += ((Object[]) e).length;
+                elementsOnQueueCount.addAndGet(-((Object[]) e).length);
                 
             } else {
                 
                 nelements++;
+                elementsOnQueueCount.decrementAndGet();
                 
             }
             
