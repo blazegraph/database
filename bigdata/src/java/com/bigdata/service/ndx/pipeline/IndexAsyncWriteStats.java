@@ -10,7 +10,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.util.concurrent.MovingAverageTask;
 
@@ -78,6 +77,27 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
     private class StatisticsTask implements Runnable {
 
         protected final transient Logger log = Logger.getLogger(StatisticsTask.class);
+
+        /**
+         * The moving average of the #of elements on the master queues. This
+         * does not count the #of elements which have been drained from a master
+         * queue and are being transferred to a sink queue.
+         */
+        final MovingAverageTask averageElementsOnMasterQueues = new MovingAverageTask(
+                "averageElementsOnMasterQueues", new Callable<Long>() {
+                    public Long call() {
+                        long n = 0;
+                        final Iterator<WeakReference<AbstractMasterTask>> itr = masters
+                                .iterator();
+                        while (itr.hasNext()) {
+                            final AbstractMasterTask master = itr.next().get();
+                            if (master == null)
+                                continue;
+                            n += master.buffer.getElementsOnQueueCount();
+                        }
+                        return n;
+                    }
+                });
 
         /**
          * The moving average of the #of elements on the sink queues.  This does
@@ -206,9 +226,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * The moving average of the #of chunks on the input queue for each sink
          * for all masters for this index.
          */
-        final MovingAverageTask averageTotalSinkQueueSize = new MovingAverageTask(
-                "averageTotalSinkQueueSize", new Callable<Integer>() {
-                    public Integer call() {
+        final MovingAverageTask averageSinkQueueSize = new MovingAverageTask(
+                "averageSinkQueueSize", new Callable<Double>() {
+                    public Double call() {
                         final AtomicInteger n = new AtomicInteger(0);
                         final SubtaskOp op = new SubtaskOp() {
                             public void call(AbstractSubtask subtask) {
@@ -217,12 +237,14 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                         };
                         final Iterator<WeakReference<AbstractMasterTask>> itr = masters
                                 .iterator();
+                        int partitionCount = 0;
                         while (itr.hasNext()) {
                             final AbstractMasterTask master = itr.next().get();
                             if (master == null)
                                 continue;
                             try {
                                 master.mapOperationOverSubtasks(op);
+                                partitionCount++;
                             } catch(InterruptedException ex) {
                                 break;
                             } catch(Exception ex) {
@@ -230,22 +252,23 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                                 break;
                             }
                         }
-                        return n.get();
+                        return n.get()/(double)partitionCount;
                     }
                 });
 
         public void run() {
  
+            averageElementsOnMasterQueues.run();
             averageElementsOnSinkQueues.run();
-            averageSplitChunkNanos.run();
             averageHandleChunkNanos.run();
+            averageSplitChunkNanos.run();
             averageSinkOfferNanos.run();
             averageTransferChunkSize.run();
             averageSinkChunkWaitingNanos.run();
             averageSinkChunkWritingNanos.run();
             averageSinkWriteChunkSize.run();
             averageMasterQueueSize.run();
-            averageTotalSinkQueueSize.run();
+            averageSinkQueueSize.run();
             
         }
         
@@ -298,7 +321,21 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         /*
          * moving averages.
          */
-        
+
+        /*
+         * The moving average of the #of elements on the master queues. This
+         * does not count the #of elements which have been drained from a master
+         * queue and are being transferred to a sink queue.
+         */
+        t.addCounter("averageElementsOnMasterQueues", new Instrument<Double>() {
+            @Override
+            public void sample() {
+                setValue(statisticsTask.averageElementsOnMasterQueues
+                        .getMovingAverage());
+            }
+        });
+
+
         /*
          * The moving average of the #of elements on the sink queues.  This does
          * not count the #of elements on the master queues nor does it count the
@@ -306,7 +343,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * being prepared for or awaiting completion of a write on an index
          * partition.
          */
-        t.addCounter("averageElementOnSinkQueus", new Instrument<Double>() {
+        t.addCounter("averageElementsOnSinkQueues", new Instrument<Double>() {
             @Override
             public void sample() {
                 setValue(statisticsTask.averageElementsOnSinkQueues
@@ -453,11 +490,10 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * The moving average of the #of chunks on the input queue for each sink
          * for all masters for this index.
          */
-        t.addCounter("averageTotalSinkQueueSize", new Instrument<Double>() {
+        t.addCounter("averageSinkQueueSize", new Instrument<Double>() {
             @Override
             protected void sample() {
-                setValue(statisticsTask.averageTotalSinkQueueSize
-                        .getMovingAverage());
+                setValue(statisticsTask.averageSinkQueueSize.getMovingAverage());
             }
         });
 

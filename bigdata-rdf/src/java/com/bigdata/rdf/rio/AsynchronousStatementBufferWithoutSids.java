@@ -1112,7 +1112,13 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     // Serialize the term.
                     final byte[] val = ser.serialize(v, out.reset());
 
-                    chunkOut[i++] = new KVO<BigdataValue>(key, val, v);
+                    /*
+                     * Note: The BigdataValue instance is NOT supplied to the
+                     * KVO since we do not want it to be retained and since
+                     * there is no side-effect on the BigdataValue for writes on
+                     * ID2TERM (unlike the writes on TERM2ID).
+                     */
+                    chunkOut[i++] = new KVO<BigdataValue>(key, val, null/* v */);
                     
                 }
 
@@ -1219,7 +1225,15 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                     // generate value for the index.
                     final byte[] val = spo.serializeValue(vbuf);
 
-                    a[i] = new KVO<ISPO>(key, val, spo);
+                    /*
+                     * Note: The SPO is deliberately not provided to the KVO
+                     * instance since it is not required (there is nothing being
+                     * passed back from the write via a side-effect on the
+                     * BigdataStatementImpl) and since it otherwise will force
+                     * the retention of the RDF Value objects in its s/p/o/c
+                     * positions.
+                     */
+                    a[i] = new KVO<ISPO>(key, val, null/*spo*/);
 
                 }
 

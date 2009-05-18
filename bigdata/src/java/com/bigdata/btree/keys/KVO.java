@@ -132,7 +132,7 @@ public class KVO<O> implements Comparable<KVO<O>>{
      * 
      * @return The keys.
      */
-    static public byte[][] getKeys(final KVO[] chunk) {
+    static public byte[][] getKeys(final KVO<?>[] chunk) {
 
         if (chunk == null)
             throw new IllegalArgumentException();
@@ -158,7 +158,7 @@ public class KVO<O> implements Comparable<KVO<O>>{
      * 
      * @return The values.
      */
-    static public byte[][] getVals(final KVO[] chunk) {
+    static public byte[][] getVals(final KVO<?>[] chunk) {
 
         if (chunk == null)
             throw new IllegalArgumentException();
