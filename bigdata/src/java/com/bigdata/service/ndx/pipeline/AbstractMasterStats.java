@@ -32,9 +32,6 @@ import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.logging.Logger;
-
-import sun.awt.windows.ThemeReader;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
