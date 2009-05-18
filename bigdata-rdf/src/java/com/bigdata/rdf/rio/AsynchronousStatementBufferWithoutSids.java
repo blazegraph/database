@@ -1126,13 +1126,12 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                 final KVO<BigdataValue>[] dense = KVO.dense(chunkOut, i);
 
                 /*
-                 * Put into term identifier order in preparation for writing on
-                 * the reverse index.
+                 * Put into key order in preparation for writing on the reverse
+                 * index.
                  */
-                Arrays.sort(dense, 0, dense.length,
-                        KVOTermIdComparator.INSTANCE);
+                Arrays.sort(dense);
 
-                // add chunk to async write buffer
+                // add chunk to asynchronous write buffer
                 buffer.add(dense);
                 
             }
