@@ -73,7 +73,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             ExecutionException {
 
         /*
-         * Note: The master is overriden so that the 1st chunk written onto
+         * Note: The master is overridden so that the 1st chunk written onto
          * locator(13) will cause an StaleLocatorException to be thrown.
          */
         
@@ -176,7 +176,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
     /**
      * Unit test verifies correct redirect of a write arising during awaitAll()
-     * in the master and occuring after there has already been a write on the
+     * in the master and occurring after there has already been a write on the
      * partition which is the target of the redirect. This explores the ability
      * of the master to correctly re-open a sink which had been closed.
      * 
@@ -242,8 +242,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                 if (locator.locator == 13) {
 
                     /*
-                     * The L(13) sink will wait until it is signalled before
-                     * issueing an L(13) => L(14) redirect.
+                     * The L(13) sink will wait until it is signaled before
+                     * issuing an L(13) => L(14) redirect.
                      */
                     
                     return new S(this, locator, out) {
@@ -370,6 +370,26 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         }
 
     }
+
+    /* @todo unit test was never written since changing BB#add() to notice when
+     * it was asynchronously closed converted the problem from a deadlock into
+     * an untrapped exception and it was then resolved by adding the redirectQueue.
+     */
+//    /**
+//     * Unit test for a deadlock scenario. The deadlock occurred when the input
+//     * queue for a sink was full, the master was blocked waiting to add another
+//     * chunk to the sink, and a stale locator exception was thrown for the
+//     * outstanding write by that sink. Under this scenario a deadlock would
+//     * arise.  The situation was resolved by transferring the chunks from
+//     * the  
+//     * 
+//     * @throws InterruptedException
+//     * @throws ExecutionException
+//     */
+//    public void test_startWriteRedirectWithDeadlockScenario() throws InterruptedException,
+//            ExecutionException {
+//       
+//    }
 
     /**
      * Stress test for redirects.

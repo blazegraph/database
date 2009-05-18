@@ -663,7 +663,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * the solution count.
              */
 
-            solutionCount = ((BlockingBuffer) solutionBuffer).getElementCount();
+            solutionCount = ((BlockingBuffer) solutionBuffer).getElementsAddedCount();
 
         } else {
 

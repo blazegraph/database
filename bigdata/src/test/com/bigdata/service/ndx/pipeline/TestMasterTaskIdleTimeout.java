@@ -506,9 +506,9 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
             
             // chunks/elements in for the buffer.
             assertEquals("masterBuffer.elementsIn", counter.get(), masterBuffer
-                    .getElementCount());
+                    .getElementsAddedCount());
             assertEquals("masterBuffer.chunksIn", counter.get(), masterBuffer
-                    .getChunkCount());
+                    .getChunksAddedCount());
 
             /*
              * Note: chunks/elements in for the master can not be known since

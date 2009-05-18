@@ -111,8 +111,8 @@ public class TestBlockingBufferWithChunks extends TestCase2 {
         // buffer is empty.
         assertTrue(buffer.isOpen());
         assertTrue(buffer.isEmpty());
-        assertEquals("chunkCount", 0L, buffer.getChunkCount());
-        assertEquals("elementCount", 0L, buffer.getElementCount());
+        assertEquals("chunkCount", 0L, buffer.getChunksAddedCount());
+        assertEquals("elementCount", 0L, buffer.getElementsAddedCount());
 
         final IAsynchronousIterator<Integer[]> itr = buffer.iterator();
 
@@ -126,8 +126,8 @@ public class TestBlockingBufferWithChunks extends TestCase2 {
         // should be one element and one chunk accepted by the buffer.
         assertTrue(buffer.isOpen());
         assertFalse(buffer.isEmpty());
-        assertEquals("chunkCount", 1L, buffer.getChunkCount());
-        assertEquals("elementCount", 1L, buffer.getElementCount());
+        assertEquals("chunkCount", 1L, buffer.getChunksAddedCount());
+        assertEquals("elementCount", 1L, buffer.getElementsAddedCount());
 
         // something should be available now (non-blocking).
         assertTrue(itr.hasNext(1, TimeUnit.NANOSECONDS));
@@ -141,8 +141,8 @@ public class TestBlockingBufferWithChunks extends TestCase2 {
         // should be two elements and two chunks accepted into the buffer
         assertTrue(buffer.isOpen());
         assertFalse(buffer.isEmpty());
-        assertEquals("chunkCount", 2L, buffer.getChunkCount());
-        assertEquals("elementCount", 2L, buffer.getElementCount());
+        assertEquals("chunkCount", 2L, buffer.getChunksAddedCount());
+        assertEquals("elementCount", 2L, buffer.getElementsAddedCount());
 
         final ReentrantLock lock = new ReentrantLock();
         final Condition cond = lock.newCondition();
