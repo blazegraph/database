@@ -224,7 +224,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
 
         /**
          * The moving average of the #of chunks on the input queue for each sink
-         * for all masters for this index.
+         * for all masters for this index. If there are no index partitions for
+         * some index (that is, if the asynchronous write API is not in use for
+         * that index) then this will report ZERO (0.0).
          */
         final MovingAverageTask averageSinkQueueSize = new MovingAverageTask(
                 "averageSinkQueueSize", new Callable<Double>() {
@@ -252,7 +254,11 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                                 break;
                             }
                         }
-                        return n.get()/(double)partitionCount;
+                        if (partitionCount == 0) {
+                            // avoid divide by zero.
+                            return 0d;
+                        }
+                        return n.get() / (double) partitionCount;
                     }
                 });
 
