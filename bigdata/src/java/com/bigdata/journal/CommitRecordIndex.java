@@ -637,7 +637,7 @@ public class CommitRecordIndex extends BTree {
         /**
          * Return the byte[] value an {@link Entry}.
          * 
-         * @param obj
+         * @param entry
          *            An Entry.
          */
         public byte[] serializeVal(Entry entry) {
