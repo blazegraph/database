@@ -27,4 +27,4 @@
 # on each host.
 
 # Run once per minute
-* * * * * @INSTALL_USER@ @BIN_DIR@/bigdata file @stateFile@ >> @stateLog@ 2>&1
+* * * * * @INSTALL_USER@ @BIN_DIR@/bigdata file @STATE_FILE@ >> @STATE_LOG@ 2>&1

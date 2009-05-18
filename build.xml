@@ -442,6 +442,7 @@
 	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
 	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
 	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
+	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
 	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
 </replace>
