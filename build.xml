@@ -436,7 +436,7 @@
 	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
 	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
 	<replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
-	<replacefilter token="@LOG4J_SOCKET_SERVER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
 	<replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
 	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
 	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
@@ -470,7 +470,7 @@
 	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
 	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
 	<replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
-	<replacefilter token="@LOG4J_SOCKET_SERVER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_CONFIG@" value="${log4jServer.config}" />
 	<replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
 	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
 	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
