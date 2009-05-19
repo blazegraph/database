@@ -117,21 +117,6 @@ export configDir=@CONFIG_DIR@
 # Log and Logger configuration.
 ##
 
-# 
-# The host and port for the log4j socket-based logger service.
-#
-export LOG4J_SOCKET_LOGGER_HOST="@LOG4J_SOCKET_LOGGER_HOST"
-export LOG4J_SOCKET_LOGGER_PORT="@LOG4J_SOCKET_LOGGER_PORT"
-#
-# A sample configuration for the simple socket logger.  In order to use this
-# you MUST edit this configuration file to specify WHERE the log messages will
-# be written.  Make sure that the clients/services log configuration (above)
-# is setup to rely messages to the simple socket logger.  Finally, make sure
-# that you start the simple socket logger using [runLog4jServer.sh].
-#
-export BIGDATA_LOG4J_SERVER_CONFIG="@LOG4J_SERVER_CONFIG@"
-
-#
 # The log4j configuration for the bigdata clients and services.  You MUST
 # edit this configuration and specify WHERE it should write its log files.
 # 
