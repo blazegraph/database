@@ -9,12 +9,13 @@
 # so that you don't spam the network with log events that will not be
 # logged by the server.
 #
-# @todo configure the port (for the clients also?)
+# @deprecated I am modifying the configuration to start this automatically
+# on the configured host.
 
 source `dirname $0`/bigdataenv
 
 java ${JAVA_OPTS} \
 	-cp ${CLASSPATH} \
     org.apache.log4j.net.SimpleSocketServer \
-    4445 \
+    ${LOG4J_SOCKET_LOGGER_PORT} \
     ${BIGDATA_LOG4J_SERVER_CONFIG}

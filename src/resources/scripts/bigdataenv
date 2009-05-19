@@ -30,14 +30,6 @@ export NAS=@NAS@
 export LAS=@LAS@
 
 #
-# The hostname of the master as reported by 'hostname' on that host.
-# 
-# @todo The master is used to manage log files on the shared volume
-# but we should be able to get by without this concept. 
-#
-#export MASTER=@MASTER@
-
-#
 # The directory where sysstat is installed (open-source package for 
 # reporting on host and process performance counters).
 #
@@ -75,35 +67,6 @@ export JINI_CONFIG="@JINI_CONFIG@"
 # policy grants ALL permissions.  This makes setup easy but is less secure.
 #
 export BIGDATA_POLICY=@POLICY_FILE@
-
-#
-# The java.util.logging configuration file (jini uses java.util.logging).
-#
-export BIGDATA_LOGGING_CONFIG=@LOGGING_CONFIG@
-
-#
-# The log4j configuration for the bigdata clients and services.  You MUST
-# edit this configuration and specify WHERE it should write its log files.
-# 
-# This configuration also shows how to setup a simple socket logger. This
-# makes it easy to aggregate log messages from all services in a cluster
-# onto a single host.
-#
-# Note: The log4j.configuration property is a URL.  If you are identifying
-# a file resource use "file:" in front of the filename!
-# 
-# Note: The value is quoted since it may have a leading file: or httpd:
-#
-export BIGDATA_LOG4J_CONFIG="@LOG4J_CONFIG@"
-
-#
-# A sample configuration for the simple socket logger.  In order to use this
-# you MUST edit this configuration file to specify WHERE the log messages will
-# be written.  Make sure that the clients/services log configuration (above)
-# is setup to rely messages to the simple socket logger.  Finally, make sure
-# that you start the simple socket logger using [runLog4jServer.sh].
-#
-export BIGDATA_LOG4J_SERVER_CONFIG="@LOG4J_SERVER_CONFIG@"
 
 #
 # Setup the path.
@@ -150,14 +113,52 @@ export binDir=@BIN_DIR@
 export libDir=@LIB_DIR@
 export configDir=@CONFIG_DIR@
 
+##
+# Log and Logger configuration.
+##
+
+# 
+# The host and port for the log4j socket-based logger service.
 #
-# Location of the various log files. 
+export LOG4J_SOCKET_LOGGER_HOST="@LOG4J_SOCKET_LOGGER_HOST"
+export LOG4J_SOCKET_LOGGER_PORT="@LOG4J_SOCKET_LOGGER_PORT"
 #
+# A sample configuration for the simple socket logger.  In order to use this
+# you MUST edit this configuration file to specify WHERE the log messages will
+# be written.  Make sure that the clients/services log configuration (above)
+# is setup to rely messages to the simple socket logger.  Finally, make sure
+# that you start the simple socket logger using [runLog4jServer.sh].
+#
+export BIGDATA_LOG4J_SERVER_CONFIG="@LOG4J_SERVER_CONFIG@"
+
+#
+# The log4j configuration for the bigdata clients and services.  You MUST
+# edit this configuration and specify WHERE it should write its log files.
+# 
+# This configuration also shows how to setup a simple socket logger. This
+# makes it easy to aggregate log messages from all services in a cluster
+# onto a single host.
+#
+# Note: The log4j.configuration property is a URL.  If you are identifying
+# a file resource use "file:" in front of the filename!
+# 
+# Note: The value is quoted since it may have a leading file: or httpd:
+#
+export BIGDATA_LOG4J_CONFIG="@LOG4J_CONFIG@"
+
+#
+# The java.util.logging configuration file (jini uses java.util.logging).
+#
+export BIGDATA_LOGGING_CONFIG=@LOGGING_CONFIG@
+
+#
+# Location of the various log files.
+# 
 export logDir=@LOG_DIR@
-export stateLog=@STATE_LOG@
 export eventLog=@EVENT_LOG@
 export errorLog=@ERROR_LOG@
 export detailLog=@DETAIL_LOG@
+export stateLog=@STATE_LOG@
 
 # Option to use "killall -9 java" for 'bigdata destroy'.
 export FORCE_KILL_ALL=@FORCE_KILL_ALL@
