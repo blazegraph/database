@@ -419,7 +419,6 @@
 	<replacefilter token="@FED@" value="${FED}" />
 	<replacefilter token="@NAS@" value="${NAS}" />
 	<replacefilter token="@LAS@" value="${LAS}" />
-	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
 	<replacefilter token="@JAVA_HOME@" value="${JAVA_HOME}" />
 	<replacefilter token="@JINI_CLASS_SERVER_PORT@" value="${JINI_CLASS_SERVER_PORT}" />
 	<replacefilter token="@LOAD_BALANCER_PORT@" value="${LOAD_BALANCER_PORT}" />
@@ -434,13 +433,16 @@
 	<replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
 	<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
 	<replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
-	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
-	<replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}" />
-	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
 	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
-	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+	<replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+	<replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
 	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
 	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
 	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
@@ -465,13 +467,16 @@
 	<replacefilter token="@LOCK_FILE@" value="${LOCK_FILE}" />
 	<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
 	<replacefilter token="@JINI_CONFIG@" value="${jini.config}" />
-	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
-	<replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}" />
-	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
 	<replacefilter token="@POLICY_FILE@" value="${policyFile}" />
-	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_HOST@" value="${LOG4J_SOCKET_LOGGER_HOST}" />
+	<replacefilter token="@LOG4J_SOCKET_LOGGER_PORT@" value="${LOG4J_SOCKET_LOGGER_PORT}" />
+	<replacefilter token="@LOG4J_DATE_PATTERN@" value="${LOG4J_DATE_PATTERN}" />
+	<replacefilter token="@LOG4J_SERVER_CONFIG@" value="${log4jServer.config}" />
+	<replacefilter token="@LOG4J_CONFIG@" value="${log4j.config}" />
+	<replacefilter token="@LOGGING_CONFIG@" value="${logging.config}" />
 	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
 	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
+	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
 	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
@@ -496,7 +501,7 @@
 <echo file="${stateFile}">status</echo>
 <echo file="${stateLog}">
 </echo>
-<chmod perm="g+r,o-rw" file="${stateFile}" />
+<chmod perm="g+rw,o-rw" file="${stateFile}" />
 <chmod perm="g+rw,o-rw" file="${stateLog}" />
 <loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
 <echo>

@@ -65,18 +65,11 @@
 # Note: when run as root we can use the standard subsystem lock file
 # but not when run as a normal user.
 #
-# @todo rollover log files every day and keep only N days worth (probably
-# needs to be done within log4j for its log files and in cron for the state.log
-# file.
+# @todo rollover the stateLog file.  The log4j log files are rolled over by
+# the log4jServer.properties configuration.
 #
 # @todo could use nc (netcat) to read the argument file a url and thus define
 # a 'url' as well the 'file' option for this script.
-#
-# @todo Add an option to push the application codebase.  How we do
-# that depends on whether or not we are running a classserver.  If
-# not, then we need to restart all services managers.  Otherwise we
-# can just push the classes to the class servers.  The code will need
-# to be (re-)built in one location and then pushed to another.
 
 # Source function library (just used for 'action').
 . /etc/init.d/functions
@@ -91,10 +84,6 @@ source ./bigdataenv
 logLockFile="$logDir/.lock"
 
 # Verify critical environment variables.
-#if [ -z "$MASTER" ]; then
-#	echo -n $"$0 : environment not setup."
-#	exit 1
-#fi
 if [ -z "$lockFile" ]; then
 	echo -n $"$0 : environment not setup."
 	exit 1;
@@ -113,7 +102,6 @@ fi
 # not root as some users are not allowed to change the group
 # associated with a file.
 #
-#if [ "$MASTER" == "`hostname`" ]; then
 if [ ! -f "$eventLog" -o ! -f "$errorLog" -o ! -f "$detailLog" ]; then
     lockfile -r 1 -1 "$logLockFile"
     if [ 0 == $? ]; then
@@ -138,15 +126,6 @@ if [ ! -f "$eventLog" -o ! -f "$errorLog" -o ! -f "$detailLog" ]; then
 	    chgrp $INSTALL_GROUP $detailLog
 	    chmod g+rw $detailLog
 	fi
-#else
-#    if [ ! -w "$eventLog" ]; then
-#	echo $"`date` : `hostname` : warning: can not write event log."
-##	exit 1
-#    fi
-#    if [ ! -w "$errorLog" ]; then
-#	echo $"`date` : `hostname` : warning: can not write error log."
-##	exit 1
-#    fi
 	rm -f "$logLockFile"
     fi
 fi
