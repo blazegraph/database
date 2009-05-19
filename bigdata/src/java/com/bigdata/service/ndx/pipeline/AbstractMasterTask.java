@@ -124,32 +124,40 @@ L>//
     private final Map<L, S> subtasks;
 
     /**
-     * Maps an operation across the subtasks. A lock is held across this
-     * operation, therefore the operation should be light weight.
+     * Maps an operation across the subtasks.
      * 
      * @param op
-     *            The operation.
-     *            
+     *            The operation, which should be light weight
+     * 
      * @throws InterruptedException
      */
     public void mapOperationOverSubtasks(final SubtaskOp<S> op)
             throws InterruptedException, Exception {
 
+        /*
+         * Note: by grabbing the values as an array we avoid the possibility
+         * that the operation might request any locks and therefore avoid the
+         * possibility that map() could cause a deadlock based on the choice of
+         * the op to be mapped.
+         */
+        final AbstractSubtask[] sinks;
         lock.lockInterruptibly();
         try {
 
-            for (S subtask : subtasks.values()) {
+            sinks = subtasks.values().toArray(new AbstractSubtask[0]);
 
-                op.call(subtask);
-                
-            }
-            
         } finally {
 
             lock.unlock();
-            
+
         }
-        
+
+        for (S subtask : subtasks.values()) {
+
+            op.call(subtask);
+
+        }
+
     }
     
     /**
@@ -889,93 +897,24 @@ L>//
             final S sink = getSink(locator, reopen);
 
             final long begin = System.nanoTime();
-            
+
             boolean added = false;
-            
+
             while (!added) {
 
-                halted();
-                
-                // track offer time.
-                final long beforeOffer = System.nanoTime();
+                added = offerChunk(sink, b, reopen);
 
-                try {
-
-                    if (reopen) {
-
-                        // stack trace through here if [reopen == true]
-                        added = sink.buffer.add(b, offerTimeoutNanos,
-                                TimeUnit.NANOSECONDS);
-
-                    } else {
-
-                        // stack trace through here if [reopen == false]
-                        added = sink.buffer.add(b, offerTimeoutNanos,
-                                TimeUnit.NANOSECONDS);
-
-                    }
-                } catch (BufferClosedException ex) {
-                    if (ex.getCause() instanceof StaleLocatorException) {
-                        /*
-                         * Note: The sinks sets the exception when closing the
-                         * buffer when handling the stale locator exception and
-                         * transfers the outstanding and all queued chunks to
-                         * the redirectQueue.
-                         * 
-                         * When we trap the stale locator exception here we need
-                         * to transfer the chunk to the redirectQueue since the
-                         * buffer was closed (and drained) asynchronously.
-                         */
-                        if (log.isInfoEnabled())
-                            log
-                                    .info("Sink closed asynchronously by stale locator exception: "
-                                            + sink);
-                        redirectQueue.put(b);
-                        added = true;
-                    } else {
-                        // anything else is a problem.
-                        throw ex;
-                    }
-                }
-                
-                if (!added) {
-
-                    /*
-                     * Normally, each index partition of a given scale-out index
-                     * will proceed at nearly the same write rate. If you are
-                     * seeing this message for many partitions of the same index
-                     * then the client has filled its queues and is blocking.
-                     * This is OK. However, if you are seeing it for only one or
-                     * two index partitions out of 10s or 100s then those index
-                     * partitions are bottlenecks. Such bottlenecks SHOULD be
-                     * addressed automatically by splitting or moving an index
-                     * partition.
-                     */
-                    
-                    log.warn("Master blocking: sink="
-                            + sink
-                            + ", elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
-                                    - begin) + "ms, reopen=" + reopen);
-                    
-                }
-
-                synchronized(stats) {
-                    
-                    stats.elapsedSinkOfferNanos += (System.nanoTime() - beforeOffer);
-                    
-                }
-                
             }
-            
+
             // update timestamp of the last chunk written on that sink.
             sink.lastChunkNanos = System.nanoTime();
-            
-            synchronized(stats) {
+
+            synchronized (stats) {
 
                 stats.chunksTransferred += 1;
                 stats.elementsTransferred += b.length;
                 stats.elementsOnSinkQueues += b.length;
+                stats.elapsedSinkOfferNanos += (System.nanoTime() - begin);
                 
             }
 
@@ -987,8 +926,152 @@ L>//
 
     }
 
-    // @todo review timeout : config?
+    /**
+     * Add a dense chunk to the sink's input queue. This is method deliberately
+     * yields the {@link #lock} if it blocks while attempting to added the chunk
+     * to the sink's input queue. This is done to prevent deadlocks from arising
+     * where the caller owns the {@link #lock} but the sink's input queue is
+     * full and the sink can not gain the {@link #lock} in order to drain a
+     * chunk.
+     * 
+     * @param sink
+     *            The sink.
+     * @param dense
+     *            A dense chunk to be transferred to the sink's input queue.
+     * @param reopen
+     * 
+     * @return <code>true</code> iff the chunk was added to the sink's input
+     *         queue.
+     * 
+     * @throws InterruptedException
+     */
+    @SuppressWarnings("unchecked")
+    private final boolean offerChunk(final S sink, E[] dense,
+            final boolean reopen) throws InterruptedException {
+
+        // track offer time.
+        final long begin = System.nanoTime();
+
+        boolean added = false;
+
+        while (!added) {
+
+            halted();
+
+            try {
+
+                /*
+                 * Offer the chunk with a fast timeout. If the sink's input
+                 * queue is full the offer will not be accepted and [added] will
+                 * remain [false].
+                 */
+                
+                if (reopen) {
+
+                    // stack trace through here if [reopen == true]
+                    added = sink.buffer.add(dense, offerTimeoutNanos,
+                            TimeUnit.NANOSECONDS);
+
+                } else {
+
+                    // stack trace through here if [reopen == false]
+                    added = sink.buffer.add(dense, offerTimeoutNanos,
+                            TimeUnit.NANOSECONDS);
+
+                }
+
+                if(!added) {
+
+                    /*
+                     * The subtask's input queue is full so we await this
+                     * condition. When the subtask drains a chunk the master
+                     * will be signaled and can resume.
+                     * 
+                     * Note: The sink require's the master's lock in order to
+                     * notify the master so the sinks are all contending for the
+                     * master's lock when they drain a chunk.
+                     */
+                    
+                    if (!sink.drainedChunk.await(offerWarningTimeoutNanos,
+                            TimeUnit.NANOSECONDS)) {
+
+                        /*
+                         * Normally, each index partition of a given scale-out
+                         * index will proceed at nearly the same write rate. If
+                         * you are seeing this message for many partitions of
+                         * the same index then the client has filled its queues
+                         * and is blocking. This is OK. However, if you are
+                         * seeing it for only one or two index partitions out of
+                         * 10s or 100s then those index partitions are
+                         * bottlenecks. Such bottlenecks SHOULD be addressed
+                         * automatically by splitting or moving an index
+                         * partition.
+                         */
+
+                        log
+                                .warn("Master blocking on sink: sink="
+                                + sink
+                                + ", elapsed="
+                                + TimeUnit.NANOSECONDS.toMillis(System
+                                        .nanoTime()
+                                        - begin) + "ms, reopen=" + reopen);
+
+                    }
+
+                }
+                
+            } catch (BufferClosedException ex) {
+
+                if (ex.getCause() instanceof StaleLocatorException) {
+
+                    /*
+                     * Note: The sinks sets the exception when closing the
+                     * buffer when handling the stale locator exception and
+                     * transfers the outstanding and all queued chunks to the
+                     * redirectQueue.
+                     * 
+                     * When we trap the stale locator exception here we need to
+                     * transfer the chunk to the redirectQueue since the buffer
+                     * was closed (and drained) asynchronously.
+                     */
+
+                    if (log.isInfoEnabled())
+                        log
+                                .info("Sink closed asynchronously by stale locator exception: "
+                                        + sink);
+
+                    redirectQueue.put(dense);
+
+                    added = true;
+
+                } else {
+
+                    // anything else is a problem.
+                    throw ex;
+
+                }
+
+            }
+
+        }
+
+        return added;
+
+    }
+    
+    /**
+     * This is a fast timeout since we want to avoid the possibility that
+     * another thread require's the master's {@link #lock} while we are waiting
+     * on a sink's input queue. Whenever this timeout expires we will yield the
+     * {@link #lock} and then retry in a bit.
+     */
     private final static long offerTimeoutNanos = TimeUnit.MILLISECONDS
-            .toNanos(1000);
+            .toNanos(1);
+
+    /**
+     * This is a much slower timeout - we log a warning when it expires.
+     */
+    private final static long offerWarningTimeoutNanos = TimeUnit.MILLISECONDS
+            .toNanos(5000);
 
 }
