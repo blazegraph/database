@@ -483,6 +483,8 @@
 	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
 </replace>
 <!-- fix newlines (otherwise substitutions cause things to break). -->
+<fixcrlf srcDir="${install.config.dir}" />
+<!-- fix newlines (otherwise substitutions cause things to break). -->
 <fixcrlf srcDir="${install.bin.dir}" />
 <!-- set execute bit for scripts in this directory (must be the last step). -->
 <chmod perm="u+x,g+rx,o-rwx">
