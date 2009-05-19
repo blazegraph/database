@@ -58,6 +58,14 @@ if [ 0 != $? ]; then
 fi
 echo $"`date` : `hostname` : created lock file."
 
+if [ "@LOG4J_SOCKET_LOGGER_HOST@" == "`hostname`" ]; then
+	echo $"`date` : `hostname` : starting log4j server."
+	java -cp ${CLASSPATH} \
+    org.apache.log4j.net.SimpleSocketServer \
+    @LOG4J_SOCKET_LOGGER_PORT@ \
+    @LOG4J_SOCKET_LOGGER_CONFIG@&
+fi
+
 # Start the services manager on this host.
 java ${JAVA_OPTS} \
 	 -cp ${CLASSPATH} \
