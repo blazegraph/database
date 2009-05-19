@@ -18,4 +18,4 @@ java ${JAVA_OPTS} \
 	-cp ${CLASSPATH} \
     org.apache.log4j.net.SimpleSocketServer \
     @LOG4J_SOCKET_LOGGER_PORT@ \
-    @BIGDATA_LOG4J_SERVER_CONFIG@
+    @LOG4J_SOCKET_LOGGER_CONFIG@
