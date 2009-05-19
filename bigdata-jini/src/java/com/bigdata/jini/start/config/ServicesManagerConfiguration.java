@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
+import org.apache.log4j.net.SimpleSocketServer;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import cern.colt.Arrays;
@@ -44,6 +45,7 @@ import com.bigdata.service.jini.DataServer;
 import com.bigdata.service.jini.LoadBalancerServer;
 import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.jini.TransactionServer;
+import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
 import com.sun.jini.tool.ClassServer;
 
@@ -67,21 +69,51 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
      * @version $Id$
      */
     public interface Options extends BigdataServiceConfiguration.Options {
-        
+
         /**
-         * An array of the (class) names of the services that will be started by
-         * the {@link ServicesManagerServer}. For each service declared in this
-         * array, there must be a corresponding component defined within the
-         * {@link Configuration}. For each {@link ManagedServiceConfiguration},
-         * an entry will be made in zookeeper and logical and physical service
-         * instances will be managed automatically. For unmanaged services, such
-         * as {@link JiniCoreServicesConfiguration} and zookeeper itself,
-         * instances will be started iff necessary by the services manager when
-         * it starts up.
+         * An array of the names of the service configurations that will be
+         * started by the {@link ServicesManagerServer}. For each value declared
+         * in this array, there must be a corresponding component defined within
+         * the {@link Configuration}.
+         * <p>
+         * There are four basic kinds of entries for this array:
+         * <dl>
          * 
-         * @todo the resolution of the {@link ServiceConfiguration} class to
-         *       instantiate from the (class) name is completely hacked. See
-         *       {@link ServicesManagerConfiguration#getServiceConfigurations(Configuration)}.
+         * <dt>jini</dt>
+         * <dd>This value is recognized as the jini core services and an
+         * instance of {@link JiniCoreServicesConfiguration} is created from the
+         * corresponding configuration component.</dd>
+         * 
+         * <dt>{@link QuorumPeerMain}</dt>
+         * <dd>This value is recognized as the zookeeper server and an instance
+         * of a {@link ZookeeperServerConfiguration} is created from the
+         * corresponding configuration component.</dd>
+         * 
+         * <dt>
+         * Any of {@link DataServer}, {@link ClientServer},
+         * {@link TransactionServer}, {@link LoadBalancer},
+         * {@link MetadataServer}.</dt>
+         * <dd>These are the known bigdata server classes. An instance of the
+         * corresponding {@link BigdataServiceConfiguration} is created from the
+         * corresponding component. For example, {@link DataServerConfiguration}
+         * is created if the component name is {@link DataServer}.</dd>
+         * 
+         * <dt><i>other</i></dt>
+         * <dd>
+         * Any other value is interpreted as a java service configuration. The
+         * name of the component is understood as the name of the main class to
+         * execute unless the
+         * {@link JavaServiceConfiguration.Options#CLASS_NAME} property is
+         * explicitly specified. This makes it possible to create more than one
+         * configuration of the same component. However, this only works for
+         * generic java services. The {@link SimpleSocketServer} can be started
+         * in this manner. You can also use this to run the
+         * {@link ServiceStarter} and specify the
+         * {@link NonActivatableServiceDescriptor} in the component
+         * configuration.</dd>
+         * </dl>
+         * 
+         * @see ServicesManagerConfiguration#getServiceConfigurations(Configuration)
          */
         String SERVICES = "services";
 
@@ -170,18 +202,21 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
                 throw new ConfigurationException(Options.SERVICES
                         + ": Contains null elements.");
 
+            /*
+             * The following are hacked.
+             */
             if (a.equals("jini")) {
 
                 v.add(new JiniCoreServicesConfiguration(config));
 
-            } else if (a.equals(ServiceStarter.class.getName())) {
-
-                /*
-                 * Service starter for arbitrary non-activatable service
-                 * descriptions.
-                 */
-                v.add(new JavaServiceConfiguration(ServiceStarter.class
-                        .getName(), config));
+//            } else if (a.equals(ServiceStarter.class.getName())) {
+//
+//                /*
+//                 * Service starter for arbitrary non-activatable service
+//                 * descriptions.
+//                 */
+//                v.add(new JavaServiceConfiguration(ServiceStarter.class
+//                        .getName(), config));
 
             } else if (a.equals(QuorumPeerMain.class.getName())) {
 
@@ -209,18 +244,25 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
 
             } else {
 
-                throw new ConfigurationException(Options.SERVICES
-                        + " : Unknown class/name: " + a);
+                /*
+                 * This interprets any unknown value as a java service
+                 * configuration. The class name to be executed will default to
+                 * the name of the component but may be overridden using the
+                 * CLASS_NAME property in the component configuration. This
+                 * makes it possible to create more than one configuration of
+                 * the same component. However, this only works for generic java
+                 * services. A managed service configuration, such as a bigdata
+                 * service, requires additional handshaking so recognition is
+                 * hacked above for known kinds of managed configurations.
+                 */
+                v.add(new JavaServiceConfiguration(a,config));
+                
+//                throw new ConfigurationException(Options.SERVICES
+//                        + " : Unknown class/name: " + a);
 
             }
             
         }
-
-        // // class server(s).
-        // zoo.create(zconfig + ZSLASH
-        // + ClassServer.class.getSimpleName(), SerializerUtil
-        // .serialize(classServerConfig), acl,
-        // CreateMode.PERSISTENT);
 
         return v.toArray(new ServiceConfiguration[0]);
             

@@ -125,8 +125,8 @@ abstract public class ServiceConfiguration implements Serializable {
     private static final long serialVersionUID = 648244470740671354L;
 
     /**
-     * The name of server class (or a token used for servers that are not
-     * started directly by invoking a JVM, such as "jini").
+     * The name of the server class to be executed (or a token used for servers
+     * that are not started directly by invoking a JVM, such as "jini").
      */
     public final String className;
 
@@ -249,8 +249,8 @@ abstract public class ServiceConfiguration implements Serializable {
         
         this.className = className;
         
-        if(log.isInfoEnabled())
-            log.info("className="+className);
+        if (log.isInfoEnabled())
+            log.info("className=" + className);
 
         args = getArgs(className, config);
 

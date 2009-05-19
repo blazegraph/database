@@ -438,7 +438,11 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
                                     if(halt.get())
                                         throw new HaltedException();
                                     
-                                    // verify the sink WAS NOT closed by an idle timeout.
+                                    /* Verify the sink WAS NOT closed by an idle timeout.
+                                     * 
+                                     * Note: I have seen this assertion triggered occasionally.
+                                     * However, on re-trial it generally succeeds.
+                                     */
                                     assertEquals("subtaskIdleTimeout", 0,
                                             masterStats.subtaskIdleTimeout);
                                     

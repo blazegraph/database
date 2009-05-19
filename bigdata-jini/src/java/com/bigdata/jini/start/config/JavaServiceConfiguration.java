@@ -96,10 +96,19 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
 
         /**
          * The default log4j configuration for {@link JavaServiceConfiguration}
-         * service instances. This may be overriden on a per-service type basis.
+         * service instances. This may be overridden on a per-service type basis.
          * It is required for {@link BigdataServiceConfiguration}s.
          */
         String LOG4J = "log4j";
+        
+        /**
+         * The name of the class whose <code>main(String[] args)</code> method 
+         * will be executed.  This is optional and defaults to the name of the
+         * service configuration component.
+         * 
+         * @see JavaServiceConfiguration#getClassName(String, Configuration)
+         */
+        String CLASS_NAME = "className";
 
     }
 
@@ -131,7 +140,7 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
      */
     public final String[] classpath;
 
-    protected void toString(StringBuilder sb) {
+    protected void toString(final StringBuilder sb) {
 
         super.toString(sb);
 
@@ -148,24 +157,24 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
 
     /**
      *
-     * @param className
-     *            The name of the class to be executed.
+     * @param component
+     *            The component (service configuration). 
      * @param config
      *            The {@link Configuration}.
      * @throws ConfigurationException
      */
-    public JavaServiceConfiguration(final String className,
+    public JavaServiceConfiguration(final String component,
             final Configuration config) throws ConfigurationException {
 
-        super(className, config);
+        super(getClassName(component, config), config);
 
-        this.java = getJava(className, config);
+        this.java = getJava(component, config);
 
-        this.defaultJavaArgs = getDefaultJavaArgs(className, config);
+        this.defaultJavaArgs = getDefaultJavaArgs(component, config);
 
-        this.log4j = getLog4j(className, config);
+        this.log4j = getLog4j(component, config);
 
-        this.classpath = getClasspath(className, config);
+        this.classpath = getClasspath(component, config);
 
     }
 
@@ -217,10 +226,10 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
          * @param env
          */
         @Override
-        protected void setUpEnvironment(Map<String, String> env) {
+        protected void setUpEnvironment(final Map<String, String> env) {
 
             super.setUpEnvironment(env);
-            
+
             if (classpath == null) {
 
                 // pass on our classpath to the child.
@@ -319,10 +328,33 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
 
     }
 
-    public static String getJava(final String className,
+    /**
+     * Extract the value of the {@link Options#CLASS_NAME} from the
+     * configuration.
+     * 
+     * @param component
+     *            The name of the component (service configuration).
+     * @param config
+     *            The configuration.
+     *            
+     * @return The name of the main class.
+     * 
+     * @throws ConfigurationException
+     * 
+     * @see {@link Options#CLASS_NAME}
+     */
+    public static String getClassName(final String component,
             final Configuration config) throws ConfigurationException {
 
-        String java = (String) config.getEntry(className, Options.JAVA,
+        return (String) config.getEntry(component, Options.CLASS_NAME,
+                String.class, component/* defaultValue */);
+
+    }
+
+    public static String getJava(final String component,
+            final Configuration config) throws ConfigurationException {
+
+        String java = (String) config.getEntry(component, Options.JAVA,
                 String.class, null/* defaultValue */);
 
         if (java == null) {
@@ -339,8 +371,8 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
     /**
      * Return the log4j configuration URI for this service type.
      * 
-     * @param className
-     *            Identifies the service type.
+     * @param component
+     *            Identifies the service configuration.
      * @param config
      * 
      * @return The service specific log4j configuration URI or the global log4j
@@ -351,10 +383,10 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
      * 
      * @see Options#LOG4J
      */
-    public static String getLog4j(final String className,
+    public static String getLog4j(final String component,
             final Configuration config) throws ConfigurationException {
 
-        String log4j = (String) config.getEntry(className, Options.LOG4J,
+        String log4j = (String) config.getEntry(component, Options.LOG4J,
                 String.class, null/* defaultValue */);
 
         if (log4j == null) {

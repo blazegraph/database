@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
 
 import org.apache.log4j.Logger;
 
@@ -117,7 +118,23 @@ L>//
      * sink has become idle. (A sink with an available chunk is never idle.)
      */
     protected volatile long lastChunkAvailableNanos = lastChunkNanos;
-    
+
+    /**
+     * Condition is signaled by a subtask when it has drained a chunk.
+     * <p>
+     * Note:
+     * {@link AbstractMasterTask#offerChunk(AbstractSubtask, Object[], boolean)}
+     * will await this condition if the subtask's input queue is full. This
+     * allows the master to yield its {@link AbstractMasterTask#lock} for
+     * exactly as much time is required for the subtask to drain a chunk so that
+     * the master can fill it back up. The master will only await this condition
+     * if the subtask's input queue is full.
+     * <p>
+     * Note: In order to coordinate via this condition, the subtask must gain
+     * the {@link AbstractMasterTask#lock} when it drains a chunk.
+     */
+    protected final Condition drainedChunk;
+
     public AbstractSubtask(final M master, final L locator,
             final BlockingBuffer<E[]> buffer) {
 
@@ -138,6 +155,8 @@ L>//
 
         this.src = buffer.iterator();
 
+        this.drainedChunk = master.lock.newCondition();
+        
         this.stats = (HS) master.stats.getSubtaskStats(locator);
 
     }
@@ -391,18 +410,41 @@ L>//
                     // Done.
                     return true;
                 }
-                
-                // poll the source iterator for another chunk.
-                if (src.hasNext(master.sinkPollTimeoutNanos,
-                        TimeUnit.NANOSECONDS)) {
 
-                    /*
-                     * Take whatever is already buffered but do not allow the
-                     * source iterator to combine chunks since that would
-                     * increase our blocking time by whatever the chunkTimeout
-                     * is.
-                     */
-                    final E[] a = src.next(1L, TimeUnit.NANOSECONDS);
+                /*
+                 * Poll the source iterator for another chunk.
+                 * 
+                 * Note: We need to gain the master's lock to drain the chunk
+                 * since we need to signal [drainedChunk] so this tries to barge
+                 * in on the master. If it can not barge in, then it waits for a
+                 * bit. If the lock is still not acquired then it is as if
+                 * hasNext(timeout) returned [false] and we will just poll the
+                 * iterator again.
+                 */
+                if (src.hasNext(master.sinkPollTimeoutNanos,
+                        TimeUnit.NANOSECONDS)
+                        && (master.lock.tryLock() || master.lock.tryLock(1,
+                                TimeUnit.MILLISECONDS))) {
+
+                    final E[] a;
+                    try {
+                        
+                        /*
+                         * Take whatever is already buffered but do not allow
+                         * the source iterator to combine chunks since that
+                         * would increase our blocking time by whatever the
+                         * chunkTimeout is.
+                         */
+                        a = src.next(1L, TimeUnit.NANOSECONDS);
+
+                        // Note: signal the master (which is single threaded).
+                        drainedChunk.signal();
+                        
+                    } finally {
+                        
+                        master.lock.unlock();
+                        
+                    }
 
                     assert a != null;
                     assert a.length != 0;
