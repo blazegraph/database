@@ -9,13 +9,13 @@
 # so that you don't spam the network with log events that will not be
 # logged by the server.
 #
-# @deprecated I am modifying the configuration to start this automatically
-# on the configured host.
+# Note: This can also be started automatically on the configured host
+# from the main bigdata configuration file.
 
 source `dirname $0`/bigdataenv
 
 java ${JAVA_OPTS} \
 	-cp ${CLASSPATH} \
     org.apache.log4j.net.SimpleSocketServer \
-    ${LOG4J_SOCKET_LOGGER_PORT} \
-    ${BIGDATA_LOG4J_SERVER_CONFIG}
+    @LOG4J_SOCKET_LOGGER_PORT@ \
+    @BIGDATA_LOG4J_SERVER_CONFIG@

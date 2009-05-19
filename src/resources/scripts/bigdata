@@ -110,21 +110,21 @@ if [ ! -f "$eventLog" -o ! -f "$errorLog" -o ! -f "$detailLog" ]; then
 	    echo $"`date` : `hostname` : creating event log."
 	    touch $eventLog
 	    chgrp $INSTALL_GROUP $eventLog
-	    chmod g+rw $eventLog
+	    chmod g+rw,o-rw $eventLog
 	fi
 # Error log (where ERROR and above is logged by each service or client).
 	if [ ! -f "$errorLog" ]; then
 	    echo $"`date` : `hostname` : creating error log."
 	    touch $errorLog
 	    chgrp $INSTALL_GROUP $errorLog
-	    chmod g+rw $errorLog
+	    chmod g+rw,o-rw $errorLog
 	fi
 # Detail log (where INFO and above is logged by each service or client).
 	if [ ! -f "$detailLog" ]; then
 	    echo $"`date` : `hostname` : creating detail log."
 	    touch $detailLog
 	    chgrp $INSTALL_GROUP $detailLog
-	    chmod g+rw $detailLog
+	    chmod g+rw,o-rw $detailLog
 	fi
 	rm -f "$logLockFile"
     fi
