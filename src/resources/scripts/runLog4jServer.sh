@@ -11,11 +11,13 @@
 #
 # Note: This can also be started automatically on the configured host
 # from the main bigdata configuration file.
+#
+# Note: JAVA_OPTS is ignored since it specifies the log4j configuration
+# and we do not want to use that here.
 
 source `dirname $0`/bigdataenv
 
-java ${JAVA_OPTS} \
-	-cp ${CLASSPATH} \
+java -cp ${CLASSPATH} \
     org.apache.log4j.net.SimpleSocketServer \
     @LOG4J_SOCKET_LOGGER_PORT@ \
     @LOG4J_SOCKET_LOGGER_CONFIG@
