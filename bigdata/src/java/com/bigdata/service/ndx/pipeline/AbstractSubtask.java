@@ -33,14 +33,12 @@ import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.ChunkMergeSortHelper;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.resources.StaleLocatorException;
 
 /**
  * Abstract implementation of a subtask for the {@link AbstractMasterTask}
@@ -119,22 +117,6 @@ L>//
      */
     protected volatile long lastChunkAvailableNanos = lastChunkNanos;
 
-    /**
-     * Condition is signaled by a subtask when it has drained a chunk.
-     * <p>
-     * Note:
-     * {@link AbstractMasterTask#offerChunk(AbstractSubtask, Object[], boolean)}
-     * will await this condition if the subtask's input queue is full. This
-     * allows the master to yield its {@link AbstractMasterTask#lock} for
-     * exactly as much time is required for the subtask to drain a chunk so that
-     * the master can fill it back up. The master will only await this condition
-     * if the subtask's input queue is full.
-     * <p>
-     * Note: In order to coordinate via this condition, the subtask must gain
-     * the {@link AbstractMasterTask#lock} when it drains a chunk.
-     */
-    protected final Condition drainedChunk;
-
     public AbstractSubtask(final M master, final L locator,
             final BlockingBuffer<E[]> buffer) {
 
@@ -155,8 +137,6 @@ L>//
 
         this.src = buffer.iterator();
 
-        this.drainedChunk = master.lock.newCondition();
-        
         this.stats = (HS) master.stats.getSubtaskStats(locator);
 
     }
@@ -175,19 +155,20 @@ L>//
              * sinks.
              */
             long lastHandledChunkNanos = System.nanoTime();
-            
-            while(itr.hasNext()) {
+
+            while (itr.hasNext()) {
 
                 final E[] chunk = itr.next();
 
                 // how long we waited for this chunk.
-                final long elapsedChunkWaitNanos = System.nanoTime() - lastHandledChunkNanos;
+                final long elapsedChunkWaitNanos = System.nanoTime()
+                        - lastHandledChunkNanos;
 
                 synchronized (master.stats) {
                     master.stats.elapsedSinkChunkWaitingNanos += elapsedChunkWaitNanos;
                 }
                 stats.elapsedChunkWaitingNanos += elapsedChunkWaitNanos;
-                
+
                 if (handleChunk(chunk)) {
 
                     if (log.isInfoEnabled())
@@ -203,9 +184,9 @@ L>//
 
             }
             
-            // normal completion.
-            master.removeOutputBuffer(locator, this);
-
+            if(buffer.isOpen())
+                throw new AssertionError(toString());
+            
             if (log.isInfoEnabled())
                 log.info("Done: " + locator);
 
@@ -221,6 +202,9 @@ L>//
                 // else only abbreviated warning.
                 log.warn(this + " : " + t);
             }
+
+            // make sure the buffer is closed.
+            buffer.abort(t);
             
             /*
              * Halt processing.
@@ -236,9 +220,23 @@ L>//
 
         } finally {
 
+            /*
+             * Increment this counter immediately when the subtask is done
+             * regardless of the outcome. This is used by some unit tests to
+             * verify idle timeouts and the like.
+             */
+            synchronized (master.stats) {
+                master.stats.subtaskEndCount++;
+            }
+            if (log.isDebugEnabled())
+                log.debug("subtaskEndCount incremented: " + locator);
+
+            /*
+             * Signal the master than the subtask is done.
+             */
             master.lock.lock();
             try {
-                master.subtask.signalAll();
+                master.subtaskDone.signalAll();
             } finally {
                 master.lock.unlock();
             }
@@ -341,46 +339,40 @@ L>//
 //                final boolean idle = elapsedSinceLastChunk > master.sinkIdleTimeoutNanos;
                 final boolean idle = elapsedSinceLastChunk > master.sinkIdleTimeoutNanos
                         && elapsedSinceLastChunkAvailable > master.sinkIdleTimeoutNanos;
-                
+
                 if ((idle || master.src.isExhausted()) && buffer.isOpen()) {
-                    master.lock.lockInterruptibly();
-                    try {
-                        if (buffer.isEmpty()) {
+                    if (buffer.isEmpty()) {
+                        /*
+                         * Close out buffer. Since the buffer is empty the
+                         * iterator will be quickly be exhausted (it is possible
+                         * there is one chunk waiting in the iterator) and the
+                         * subtask will quit the next time through the loop.
+                         * 
+                         * Note: This can happen either if the master is closed
+                         * or if idle too long.
+                         */
+                        if (log.isInfoEnabled())
+                            log.info("Closing buffer: idle=" + idle + " : "
+                                    + this);
+                        if (idle) {
+                            // stack trace here if closed by idle timeout.
+                            buffer.abort(new IdleTimeoutException());
+                            synchronized (master.stats) {
+                                master.stats.subtaskIdleTimeout++;
+                            }
+                        } else {
+                            // stack trace here if master exhausted.
+                            buffer.close();
+                        }
+                        if (chunkSize == 0 && !src.hasNext()) {
                             /*
-                             * Close out buffer. Since the buffer is empty the
-                             * iterator will be quickly be exhausted (it is
-                             * possible there is one chunk waiting in the
-                             * iterator) and the subtask will quit the next time
-                             * through the loop.
-                             * 
-                             * Note: This can happen either if the master is
-                             * closed or if idle too long.
+                             * The iterator is already exhausted so we break out
+                             * of the loop now.
                              */
                             if (log.isInfoEnabled())
-                                log.info("Closing buffer: idle=" + idle + " : "
-                                        + this);
-                            if (idle) {
-                                // stack trace here if closed by idle timeout.
-                                buffer.close();
-                                synchronized (master.stats) {
-                                    master.stats.subtaskIdleTimeout++;
-                                }
-                            } else {
-                                // stack trace here if master exhausted.
-                                buffer.close();
-                            }
-                            if (chunkSize == 0 && !src.hasNext()) {
-                                /*
-                                 * The iterator is already exhausted so we break
-                                 * out of the loop now.
-                                 */
-                                if (log.isInfoEnabled())
-                                    log.info("No more data: " + this);
-                                return false;
-                            }
+                                log.info("No more data: " + this);
+                            return false;
                         }
-                    } finally {
-                        master.lock.unlock();
                     }
                 }
 
@@ -422,29 +414,15 @@ L>//
                  * iterator again.
                  */
                 if (src.hasNext(master.sinkPollTimeoutNanos,
-                        TimeUnit.NANOSECONDS)
-                        && (master.lock.tryLock() || master.lock.tryLock(1,
-                                TimeUnit.MILLISECONDS))) {
+                        TimeUnit.NANOSECONDS)) {
 
-                    final E[] a;
-                    try {
-                        
-                        /*
-                         * Take whatever is already buffered but do not allow
-                         * the source iterator to combine chunks since that
-                         * would increase our blocking time by whatever the
-                         * chunkTimeout is.
-                         */
-                        a = src.next(1L, TimeUnit.NANOSECONDS);
-
-                        // Note: signal the master (which is single threaded).
-                        drainedChunk.signal();
-                        
-                    } finally {
-                        
-                        master.lock.unlock();
-                        
-                    }
+                    /*
+                     * Take whatever is already buffered but do not allow the
+                     * source iterator to combine chunks since that would
+                     * increase our blocking time by whatever the chunkTimeout
+                     * is.
+                     */
+                    final E[] a = src.next(1L, TimeUnit.NANOSECONDS);
 
                     assert a != null;
                     assert a.length != 0;
@@ -573,42 +551,27 @@ L>//
             throw new IllegalArgumentException();
         
         final long begin = System.nanoTime();
-        
+
         /*
-         * Close the output buffer for this sink - nothing more may
-         * written onto it now that we have seen the
-         * StaleLocatorException.
-         * 
-         * Note: We DO NOT seek the master's lock first since that can
-         * cause a deadlock if the master is currently blocking trying
-         * to write on this sink. Instead, we set the stale locator
-         * exception as the cause when we close the sink's buffer and
-         * then handled that exception in addToOutputBuffer() in the
-         * master.
+         * Notify the client so it can refresh the information for this locator.
+         */
+        notifyClientOfRedirect(locator, cause);
+
+        /*
+         * Close the output buffer for this sink - nothing more may be written
+         * onto it now that we have seen the StaleLocatorException.
          */
         buffer.abort(cause);
         
         /*
          * Handle the chunk for which we got the stale locator exception by
-         * feeding it back into the master.
-         * 
-         * Note: In this case we may re-open an output buffer for the index
-         * partition. The circumstances under which this can occur are subtle.
-         * However, if data had already been assigned to the output buffer for
-         * the index partition and written through to the index partition and
-         * the output buffer closed because awaitAll() was invoked before we
-         * received the stale locator exception for an outstanding RMI, then it
-         * is possible for the desired output buffer to already be closed. In
-         * order for this condition to arise either the stale locator exception
-         * must have been received in response to a different index operation or
-         * the client is not caching the index partition locators.
+         * placing it onto the master's redirect queue.
          */
         master.redirectQueue.put(chunk);
 
         /*
          * Drain the rest of the buffered chunks from the closed sink, feeding
-         * them back into the master which will assign them to the new sink(s).
-         * Again, we will 'reopen' the output buffer if it has been closed.
+         * them onto the master's redirect queue.
          */
         final IAsynchronousIterator<E[]> itr = src;
 
@@ -618,24 +581,16 @@ L>//
 
         }
         
-        /*
-         * Notify the client so it can refresh the information for this locator.
-         */
-        notifyClientOfRedirect(locator, cause);
-
-        /*
-         * Remove the buffer from the map.
-         * 
-         * Note: This could cause a concurrent modification error if we are
-         * awaiting the various output buffers to be closed. In order to
-         * handle that code that modifies or traverses the [buffers] map
-         * MUST be MUTEX or synchronized.
-         */
-        master.removeOutputBuffer(locator, this);
+        // note: we only do this when the master checks the subtask's Future.
+//        /*
+//         * Remove the buffer from the map.
+//         */
+//        master.removeOutputBuffer(locator, this);
         
         synchronized (master.stats) {
 
             master.stats.elapsedRedirectNanos += System.nanoTime() - begin;
+
             master.stats.redirectCount++;
 
         }

@@ -112,13 +112,13 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                             // the write will be redirected into partition#14.
                             redirects.put(13, 14);
                             
-                            lock.lockInterruptibly();
-                            try {
+//                            lock.lockInterruptibly();
+//                            try {
                                 handleRedirect(chunk,
                                         new MockStaleLocatorException(locator));
-                            } finally {
-                                lock.unlock();
-                            }
+//                            } finally {
+//                                lock.unlock();
+//                            }
                             
                             // stop processing.
                             return false;
@@ -229,7 +229,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
             @Override
             protected void removeOutputBuffer(final L locator,
-                    final AbstractSubtask sink) throws InterruptedException {
+                    final AbstractSubtask sink) {
 
                 super.removeOutputBuffer(locator, sink);
 
@@ -285,13 +285,13 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                             // the write will be redirected into partition#14.
                             redirects.put(13, 14);
 
-                            lock.lockInterruptibly();
-                            try {
+//                            lock.lockInterruptibly();
+//                            try {
                                 handleRedirect(chunk,
                                         new MockStaleLocatorException(locator));
-                            } finally {
-                                lock.unlock();
-                            }
+//                            } finally {
+//                                lock.unlock();
+//                            }
                             
                             // stop processing.
                             return false;
@@ -441,13 +441,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         // maximum delay for writing a chunk (uniform distribution up to this max).
         final long maxWriteDelay = 1000;
         
-        /*
-         * FIXME I am seeing non-termination when the test time is longer (5-10
-         * seconds). I need to revisit this test and figure out what is happening.
-         * Is the problem in the test or the async write API?
-         */
         // duration of the stress test.
-        final long timeout = TimeUnit.SECONDS.toNanos(3/* seconds to run */);
+        final long timeout = TimeUnit.SECONDS.toNanos(10/* seconds to run */);
 
         /*
          * Stress test impl.

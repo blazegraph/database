@@ -86,12 +86,6 @@ import com.bigdata.service.ndx.IScaleOutClientIndex;
  *            single {@link Split} of data.
  * @param <A>
  *            The type of the aggregated result.
- * 
- * @todo throughput could probably be increased by submitting a sink to the data
- *       service which received chunks from client(s) [use a factory for this
- *       similar to the pipeline joins?], accumulating chunks, and merge sorted
- *       those chunks before performing a sustained index write. However, this
- *       might go too far and cause complications with periodic overflow.
  */
 abstract public class IndexWriteTask <//
 H extends IndexAsyncWriteStats<L, HS>, //
@@ -251,7 +245,7 @@ A//
 
         final long begin = System.nanoTime();
         
-        lock.lockInterruptibly();
+//        lock.lockInterruptibly();
         try {
 
             final long beforeSplit = System.nanoTime();
@@ -280,7 +274,7 @@ A//
 
         } finally {
 
-            lock.unlock();
+//            lock.unlock();
             
             synchronized (stats) {
              

@@ -203,7 +203,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
      * Unit test verifies that an idle timeout may be LT the chunk timeout and
      * that the sink will be closed by the idle timeout if chunks do not appear
      * in a timely manner.
-
+     * 
      * @throws InterruptedException
      * @throws ExecutionException
      */
@@ -211,10 +211,10 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 
         final long sinkIdleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(50);
 
-        final long sinkChunkTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(100);
+        final long sinkChunkTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(140);
         
         // make sure there is enough room for the test to succeed.
-        assertTrue(sinkIdleTimeoutNanos * 2 >= sinkChunkTimeoutNanos);
+        assertTrue(sinkIdleTimeoutNanos * 2 <= sinkChunkTimeoutNanos);
         
         final M master = new M(masterStats, masterBuffer, executorService,
                 sinkIdleTimeoutNanos,
@@ -238,8 +238,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         masterBuffer.setFuture(future);
 
         /*
-         * write a chunk on the buffer. this will cause an output buffer to be
-         * created.
+         * write a chunk on the buffer. this will cause a sink to be created.
          */
         final long beginWrite = System.nanoTime();
         {
@@ -251,10 +250,14 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         }
 
         // wait just a bit for that chunk to be output by the sink.
-        awaitChunksOut(master, 1, sinkIdleTimeoutNanos + sinkIdleTimeoutNanos
-                / 2, TimeUnit.NANOSECONDS);
+        awaitChunksOut(master, 1, sinkIdleTimeoutNanos
+                + (sinkIdleTimeoutNanos / 2), TimeUnit.NANOSECONDS);
 
         final long elapsed = System.nanoTime() - beginWrite;
+        if (log.isInfoEnabled())
+            log.info("elapsed=" + elapsed + " "
+                    + (elapsed < sinkChunkTimeoutNanos ? "LT" : "GTE")
+                    + " chunkTimeout=" + sinkChunkTimeoutNanos);
         
         // verify chunk was output by the sink.
         assertEquals("elementsIn", 1, masterStats.elementsIn);
@@ -264,8 +267,6 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
         
         // verify the sink was closed by an idle timeout.
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
         assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
 
         /*
@@ -277,7 +278,8 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
          * if the host was swapping since the timings would be far off their
          * nominal values.
          */
-        assertTrue("test did not complete before chunk timeout.",
+        assertTrue("test did not complete before chunk timeout: elapsed="
+                + elapsed + ", chunkTimeout=" + sinkChunkTimeoutNanos,
                 elapsed <= sinkChunkTimeoutNanos);
         
         // close the master
@@ -286,6 +288,9 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         // and await its future.
         masterBuffer.getFuture().get();
 
+        // verify only one sink started/ended
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
+        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
     }
 
     /**
