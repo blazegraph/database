@@ -32,11 +32,28 @@ import java.util.LinkedList;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.mdi.IMetadataIndex;
+import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.Split;
 
 /**
  * Interface for finding the {@link Split}s for an ordered set of unsigned
  * byte[] keys.
+ * <p>
+ * The splitter processes the keys in order. In queries the MDI for the
+ * partition spanning the first key. It then places all keys spanned by that
+ * partition into that split. When it reaches the first key which is GTE the
+ * rightSeparator, it queries the MDI for that key. Index partition Split, Move
+ * and Joins should not be able to cause a problem for this algorithm. At the
+ * worst, some tuples will be directed to a stale locator and the stale locator
+ * exception is handled.
+ * <p>
+ * The split operation is not atomic, however it is consistent in the following
+ * sense. Any identified {@link Split}s will either be for a valid index
+ * partition, for a partition of an index which has been deleted, or for an
+ * index partition which has since been split, joined or moved. In the latter
+ * case a {@link StaleLocatorException} will be thrown if the client attempts an
+ * operation on the unisolated view of that index partition. All clients know
+ * how to handle that exception and redirect the request as appropriate.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

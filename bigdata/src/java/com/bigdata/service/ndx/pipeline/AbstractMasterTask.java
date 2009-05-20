@@ -28,15 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.Iterator;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -49,12 +50,112 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.Split;
+import com.bigdata.service.ndx.ISplitter;
 import com.bigdata.util.concurrent.AbstractHaltableProcess;
 
 /**
  * Abstract base class for a master task which consumes chunks of elements
  * written onto a {@link BlockingBuffer} and distributes those chunks to
  * subtasks according to some abstraction which is not defined by this class.
+ * 
+ * <h3>Design discussion</h3>
+ * 
+ * The asynchronous write API exposes a blocking buffer to the application which
+ * accepts concurrent writes of {@link KVO}[] chunks, in which each {@link KVO}
+ * represents a tuple to be written on a scale-out index. The buffer is drained
+ * by a master task, which transfers chunks to sinks tasks, each of which writes
+ * on a specific index partition.
+ * <p>
+ * The master is provisioned with a CTOR which is used to convert the
+ * {@link KVO}s into <code>unsigned byte[]</code> <i>keys</i> and
+ * <code>byte[]</code> <i>values</i> for writes on the scale-out index. The
+ * master may be provisioned with a mechanism to filter out duplicate tuples.
+ * <p>
+ * Writes on the index partitions are asynchronous with respect to the
+ * application. However, a {@link KVOC} / {@link KVOLatch} combination can be
+ * used to coordinate notification when some set of tuples of interest have been
+ * successfully written onto the scale-out index. This combination can also be
+ * used to pass back values from the write operation if they are assigned by
+ * side-effect onto the {@link KVO#obj} reference.
+ * <p>
+ * The asynchronous write implementation is divided into a master, with an input
+ * queue and a redirect queue, and sinks, each of which has an input queue and
+ * writes chunks onto a specific index partition for the scale-out index. The
+ * input queues for the master and the sinks are bounded. The redirect input
+ * queue is unbounded. The master and each sink is assigned its own worker
+ * thread.
+ * <p>
+ * The master transfers chunks from its input queue to the sinks. It polls the
+ * redirect queue for a chunk. If that queue was empty, then it polls a chunk
+ * from the input queue. If no chunks are available, it needs to check again.
+ * The master stops polling the input queue when the input queue is closed, but
+ * it continues to drain the redirect queue until all sinks are done or the
+ * master is canceled.
+ * <p>
+ * Note: The requirement for polling arises because: (a) we are not coordinating
+ * signals for the arrival of a chunk on the input or redirect queues; and (b) a
+ * chunk can be redirected at any time if there is an outstanding write by a
+ * sink on an index partition.
+ * <p>
+ * The atomic decision to terminate the master is made using a {@link #lock}.
+ * The lock is specific to the life cycle of the sinks. The lock is held when a
+ * sink is created. When a sink terminates, its last action is to grab the lock
+ * and signal the {@link #subtaskDone} {@link Condition}. The master terminates
+ * when, while holding the lock, it observes that no sinks are running AND the
+ * redirect queue is empty. Since chunks are placed onto the redirect queue by
+ * sinks (and there are no sinks running) and by the master (which is not
+ * issuing a redirect since it is running its termination logic) these criteria
+ * are sufficient for termination. However, the sink must ensure that its buffer
+ * is closed before it terminates, even if it terminates by exception, so that
+ * an attempt to transfer a chunk to the sink will not block forever.
+ * <p>
+ * Once the master is holding a chunk, it splits the chunk into a set of dense
+ * chunks correlated with the locators of the index partitions on which those
+ * chunks will be written. The split operation is NOT atomic, but it is
+ * consistent in the following sense. If a {@link Split} is identified based on
+ * old information, then the chunk will be directed to an index partition which
+ * no longer exists. An attempt to write on that index partition will result in
+ * a stale locator exception, which is handled.
+ * <p>
+ * Once the chunk has been split, the split chunks are transferred to the
+ * appropriate sink(s). Since the master is not holding any locks, a blocking
+ * put() may be used to transfer the chunk to sink.
+ * <p>
+ * The sink drain chunks from its input queue. If the input queue is empty and
+ * the idle timeout expires before a chunk is transferred to the input queue,
+ * then the sink will be asynchronously closed and an
+ * {@link IdleTimeoutException} will be set on the input queue. If the master
+ * attempts to transfer a chunk to the sink's input queue after the idle
+ * timeout, then an exception wrapping the idle timeout exception will be
+ * thrown. The master handles the wrapped idle timeout exception by re-opening
+ * the sink and will retry the transfer of the chunk to the (new) sink's input
+ * queue. After the sink closes it's input queue by an idle timeout, it will
+ * continue to drain the input queue until it is empty, at which point the sink
+ * will terminate (this handles the case where the master concurrently
+ * transferred a chunk to the sink's input queue before it was closed by the
+ * idle time out).
+ * <p>
+ * The sink combines chunks drained from its input queue until the target chunk
+ * size for a write is achieved or until the chunk timeout for the sink is
+ * exceeded. The sink then writes on the index partition corresponding to its
+ * locator. This write occurs in the thread assigned to the sink and the sink
+ * will block during the write request.
+ * <p>
+ * If a stale locator exception is received by the sink in response to a write,
+ * it will: (a) notify the client of the stale locator exception; (b) close the
+ * input queue, setting the stale locator exception as the cause; (c) place the
+ * chunk for that write onto the master's (unbounded) redirect queue; and (d)
+ * drain its input queue and transfer the chunks to the master's redirect queue.
+ * <p>
+ * If the master attempts to transfer a chunk to the input queue for a sink
+ * which has closed its input queue in response to a stale locator exception,
+ * then an exception will be thrown with the stale locator exception as the
+ * inner cause. The master will trap that exception and place the chunk on the
+ * redirect queue instead.
+ * <p>
+ * If the sink RMI is successful, the sink will invoke the optional result
+ * handler and touch each tuple in the chunk using KVO#done(). These protocols
+ * can be used to pass results from asynchronous writes back to the application.
  * 
  * @param <H>
  *            The generic type of the value returned by {@link Callable#call()}
@@ -71,6 +172,8 @@ import com.bigdata.util.concurrent.AbstractHaltableProcess;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @see ISplitter
+ * 
  */
 public abstract class AbstractMasterTask<//
 H extends AbstractMasterStats<L, ? extends AbstractSubtaskStats>, //
@@ -121,7 +224,7 @@ L>//
      * Note: This map must be protected against several kinds of concurrent
      * access using the {@link #lock}.
      */
-    private final Map<L, S> subtasks;
+    private final ConcurrentHashMap<L, S> sinks;
 
     /**
      * Maps an operation across the subtasks.
@@ -134,64 +237,38 @@ L>//
     public void mapOperationOverSubtasks(final SubtaskOp<S> op)
             throws InterruptedException, Exception {
 
-        /*
-         * Note: by grabbing the values as an array we avoid the possibility
-         * that the operation might request any locks and therefore avoid the
-         * possibility that map() could cause a deadlock based on the choice of
-         * the op to be mapped.
-         */
-        final AbstractSubtask[] sinks;
-        lock.lockInterruptibly();
-        try {
-
-            sinks = subtasks.values().toArray(new AbstractSubtask[0]);
-
-        } finally {
-
-            lock.unlock();
-
-        }
-
-        for (S subtask : subtasks.values()) {
-
-            op.call(subtask);
-
+//        /*
+//         * Note: by grabbing the values as an array we avoid the possibility
+//         * that the operation might request any locks and therefore avoid the
+//         * possibility that map() could cause a deadlock based on the choice of
+//         * the op to be mapped.
+//         */
+//        final AbstractSubtask[] sinks;
+//        lock.lockInterruptibly();
+//        try {
+//
+//            sinks = subtasks.values().toArray(new AbstractSubtask[0]);
+//
+//        } finally {
+//
+//            lock.unlock();
+//
+//        }
+//
+//        for (S subtask : subtasks.values()) {
+//
+//            op.call(subtask);
+//
+//        }
+        final Iterator<S> itr = sinks.values().iterator();
+        while(itr.hasNext()) {
+            op.call(itr.next());
         }
 
     }
-    
+
     /**
-     * Lock used to ensure consistency of the overall operation. There are
-     * several ways in which an inconsistency could arise. Some examples
-     * include:
-     * <ul>
-     * 
-     * <li>The client writes on the top-level {@link BlockingBuffer} while an
-     * index partition write is asynchronously handling a
-     * {@link StaleLocatorException}. This could cause a problem because we may
-     * be required to (re-)open an {@link IndexPartitionWriteTask}.</li>
-     * 
-     * <li>The client has closed the top-level {@link BlockingBuffer} but there
-     * are still writes buffered for the individual index partitions. This could
-     * cause a problem since we must wait until those buffered writes have been
-     * flushed. We can not simply monitor the remaining values in
-     * {@link #subtasks} since {@link StaleLocatorException}s could cause new
-     * {@link IndexPartitionWriteTask} to start.</li>
-     * 
-     * <li>...</li>
-     * 
-     * </ul>
-     * 
-     * The {@link #lock} is therefore used to make the following operations
-     * mutually exclusive while allowing them to complete:
-     * <dl>
-     * <dt>{@link #addToOutputBuffer(Split, KVO[], boolean)}</dt>
-     * <dd>Adding data to an output blocking buffer.</dd>
-     * <dt>{@link #cancelAll()}</dt>
-     * <dd>Canceling the task and its subtask(s).</dd>
-     * <dt>{@link #awaitAll()}</dt>
-     * <dd>Awaiting the successful completion of the task and its subtask(s).</dd>
-     * </ol>
+     * Lock used for sink life cycle events <em>only</em>.
      */
     protected final ReentrantLock lock = new ReentrantLock();
 
@@ -201,7 +278,7 @@ L>//
      * subtasks in {@link #subtasks} are complete when this signal is received
      * then the master may terminate.
      */
-    protected final Condition subtask = lock.newCondition();
+    protected final Condition subtaskDone = lock.newCondition();
 
     /**
      * Statistics for this (and perhaps other) masters.
@@ -274,7 +351,15 @@ L>//
         
         this.src = buffer.iterator();
 
-        this.subtasks = new LinkedHashMap<L, S>();
+        /*
+         * The current access to this map is relatively limited. It is accessed
+         * when assembling the performance counters and by the worker thread for
+         * the master task. The size of the map is the #of index partitions. The
+         * #of index partitions does not change rapidly, so this map will not be
+         * resized frequently. The only time there is a rapid change in the #of
+         * index partitions is when we scatter-split an index.
+         */
+        this.sinks = new ConcurrentHashMap<L, S>();
         
         stats.addMaster(this);
 
@@ -394,113 +479,10 @@ L>//
     abstract protected void handleChunk(E[] chunk, boolean reopen)
             throws InterruptedException;
 
-//    /**
-//     * Redirects a chunk to the appropriate sink(s) and then drains the sink,
-//     * redirecting all chunks which can be read from that sink to the
-//     * appropriate sink(s).
-//     * <p>
-//     * The <i>sink</i> is closed so that no further data may be written on it.
-//     * 
-//     * @param sink
-//     *            The sink whose output needs to be redirected.
-//     * @param chunk
-//     *            The chunk which the sink was processing when it discovered
-//     *            that it need to redirect its outputs to a different sink (that
-//     *            is, a chunk which it had already read from its buffer and
-//     *            hence which needs to be redirected now).
-//     * 
-//     * @throws InterruptedException
-//     * 
-//     * @deprecated by {@link #redirectQueue}
-//     */
-//    final protected void handleRedirect(final S sink, final E[] chunk)
-//            throws InterruptedException {
-//
-//        throw new UnsupportedOperationException();
-//        
-////        if (sink == null)
-////            throw new IllegalArgumentException();
-////        
-////        if (chunk == null)
-////            throw new IllegalArgumentException();
-////        
-////        if(!lock.isHeldByCurrentThread())
-////            throw new IllegalMonitorStateException();
-////        
-////        final long begin = System.nanoTime();
-////        
-////        synchronized (stats) {
-////        
-////            stats.redirectCount++;
-////            
-////        }
-////
-////        /*
-////         * Note: This is now down when we receive the stale locator exception.
-////         * Together with the redirectQueue, it prevents some deadlock scenarios
-////         * if we close the buffer before seeking the master's lock.
-////         */
-//////        /*
-//////         * Close the output buffer for this sink - nothing more may written onto
-//////         * it now that we have seen the StaleLocatorException.
-//////         * 
-//////         * Note: We ensure that we are holding the lock before the buffer is
-//////         * closed so that addToOutputBuffer() can not attempt to add a chunk to
-//////         * a buffer which is concurrently closed by this method.
-//////         */
-//////        sink.buffer.close();
-////
-////        /*
-////         * Handle the chunk for which we got the stale locator exception by
-////         * feeding it back into the master.
-////         * 
-////         * Note: In this case we may re-open an output buffer for the index
-////         * partition. The circumstances under which this can occur are subtle.
-////         * However, if data had already been assigned to the output buffer for
-////         * the index partition and written through to the index partition and
-////         * the output buffer closed because awaitAll() was invoked before we
-////         * received the stale locator exception for an outstanding RMI, then it
-////         * is possible for the desired output buffer to already be closed. In
-////         * order for this condition to arise either the stale locator exception
-////         * must have been received in response to a different index operation or
-////         * the client is not caching the index partition locators.
-////         */
-////        handleChunk(chunk, true/* reopen */);
-////
-////        /*
-////         * Drain the rest of the buffered chunks from the closed sink, feeding
-////         * them back into the master which will assign them to the new sink(s).
-////         * Again, we will 'reopen' the output buffer if it has been closed.
-////         */
-////        {
-////
-////            final IAsynchronousIterator<E[]> itr = sink.src;
-////
-////            while (itr.hasNext()) {
-////
-////                handleChunk(itr.next(), true/* reopen */);
-////
-////            }
-////
-////        }
-////
-////        synchronized(stats) {
-////            
-////            stats.elapsedRedirectNanos += System.nanoTime() - begin;
-////            
-////        }
-//        
-//    }
-    
     /**
-     * Await the completion of the writes on each index partition.
-     * <p>
-     * Note: This is tricky because a new buffer may be created at any time in
-     * response to a {@link StaleLocatorException}. Also, when we handle a
-     * {@link StaleLocatorException}, it is possible that new writes will be
-     * identified for an index partition whose buffer we already closed (this is
-     * handled by re-opening of the output buffer for an index partition if it
-     * is closed when we handle a {@link StaleLocatorException}).
+     * Await the completion of the writes on each index partition. The master
+     * will terminate when there are no active subtasks and the redirect queue
+     * is empty.  That condition is tested atomically.
      * 
      * @throws ExecutionException
      *             This will report the first cause.
@@ -521,23 +503,20 @@ L>//
                 halted();
 
                 final E[] a = redirectQueue.poll();
-                
-                if(a != null) {
-                    
+
+                if (a != null) {
+
                     /*
                      * Handle a redirected chunk.
                      */
 
                     handleChunk(a, true/* reopen */);
-                    
+
                     continue;
                     
                 }
                 
-                final AbstractSubtask[] sinks = subtasks.values().toArray(
-                        new AbstractSubtask[0]);
-
-                if (sinks.length == 0 && redirectQueue.isEmpty()) {
+                if (sinks.isEmpty() && redirectQueue.isEmpty()) {
 
                     // Done.
                     break;
@@ -545,20 +524,23 @@ L>//
                 }
 
                 if (log.isDebugEnabled())
-                    log.debug("Waiting for " + sinks.length + " subtasks : "
+                    log.debug("Waiting for " + sinks.size() + " subtasks : "
                             + this);
 
                 /*
-                 * Wait for the sinks to complete.
+                 * Check for sinks which have finished.
                  */
-                for (AbstractSubtask sink : sinks) {
+                for (S sink : sinks.values()) {
 
-                    final Future f = sink.buffer.getFuture();
+                    final Future<?> f = sink.buffer.getFuture();
 
                     if (f.isDone()) {
 
                         // check the future (can throw exception).
                         f.get();
+
+                        // clear from the map (but ONLY once we have checked the Future!)
+                        removeOutputBuffer((L)sink.locator, (AbstractSubtask)sink);
 
                     }
 
@@ -566,12 +548,12 @@ L>//
 
                 /*
                  * Yield the lock and wait up to a timeout for a sink to
-                 * complete.
+                 * complete. We can not wait that long because we are still
+                 * polling the redirect queue!
                  * 
-                 * @todo config
+                 * @todo config timeout
                  */
-                subtask.await(BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT);
+                subtaskDone.await(5, TimeUnit.MILLISECONDS);
 
             } // continue
 
@@ -589,40 +571,37 @@ L>//
     /**
      * Cancel all running tasks, discarding any buffered data.
      * <p>
-     * Note: This method does not wait on the cancelled tasks.
+     * Note: This method does not wait on the canceled tasks.
      * <p>
      * Note: The caller should have already invoked {@link #halt(Throwable)}.
      */
     private void cancelAll(final boolean mayInterruptIfRunning) {
 
-        lock.lock();
-        try {
+        log.warn("Cancelling job: " + this);
 
-            log.warn("Cancelling job: " + this);
+        /*
+         * Close the buffer (nothing more may be written).
+         * 
+         * Note: We DO NOT close the iterator draining the buffer since that
+         * would cause this task to interrupt itself!
+         * 
+         * @todo should also clear the backing queue.
+         */
+        buffer.close();
+        
+        // clear the redirect queue.
+        redirectQueue.clear();
+        
+        // cancel the futures.
+        for (S sink : sinks.values()) {
 
-            /*
-             * Close the buffer (nothing more may be written).
-             * 
-             * Note: We DO NOT close the [src] iterator since that would cause
-             * this task to interrupt itself!
-             */
-            buffer.close();
+            final Future<?> f = sink.buffer.getFuture();
 
-            for (S sink : subtasks.values()) {
+            if (!f.isDone()) {
 
-                final Future f = sink.buffer.getFuture();
-
-                if (!f.isDone()) {
-
-                    f.cancel(mayInterruptIfRunning);
-
-                }
+                f.cancel(mayInterruptIfRunning);
 
             }
-
-        } finally {
-
-            lock.unlock();
 
         }
 
@@ -636,8 +615,8 @@ L>//
      * @param locator
      *            The locator (unique subtask key).
      * @param reopen
-     *            <code>true</code> IFF a closed buffer should be re-opened
-     *            (in fact, this causes a new buffer to be created and the new
+     *            <code>true</code> IFF a closed buffer should be re-opened (in
+     *            fact, this causes a new buffer to be created and the new
      *            buffer will be drained by a new
      *            {@link IndexPartitionWriteTask}).
      * 
@@ -645,32 +624,21 @@ L>//
      * 
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
-     * @throws IllegalMonitorStateException
-     *             unless the caller owns the {@link #lock}.
+     * @throws InterruptedException
+     *             if interrupted.
      * @throws RuntimeException
      *             if {@link #halted()}
      */
-//    Note: This is no longer true - the method is now always invoked from 
-//    the thread draining the master's input buffer and its redirect queue.
-//    
-//    * Note: The caller must own the {@link #lock}. This requirement arises
-//    * because this method is invoked not only from within the thread consuming
-//    * consuming the top-level buffer but also invoked concurrently from the
-//    * thread(s) consuming the output buffer(s)
-//    * {@link #handleRedirect(AbstractSubtask, Object[])} is invoked for that
-//    * sink.
-    private S getSink(final L locator, final boolean reopen) {
+    private S getSink(final L locator, final boolean reopen)
+            throws InterruptedException {
 
         if (locator == null)
             throw new IllegalArgumentException();
 
-        if (!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
-
         // operation not allowed if halted.
         halted();
 
-        S sink = subtasks.get(locator);
+        S sink = sinks.get(locator);
 
         if (reopen && sink != null && !sink.buffer.isOpen()) {
 
@@ -691,19 +659,41 @@ L>//
                 log.info("Creating output buffer: " + this + ", locator="
                         + locator);
 
-            final BlockingBuffer<E[]> out = newSubtaskBuffer();
+            /*
+             * Obtain the lock used to guard sink life cycle events.
+             */
+            lock.lockInterruptibly();
+            try {
 
-            sink = newSubtask(locator, out);
+                final BlockingBuffer<E[]> out = newSubtaskBuffer();
 
-            final Future<? extends AbstractSubtaskStats> future = submitSubtask(sink);
+                sink = newSubtask(locator, out);
 
-            out.setFuture(future);
+                final S oldval = sinks.put(locator, sink);
 
-            subtasks.put(locator, sink);
+                if (oldval == null) {
 
-            synchronized(stats) {
+                    // assign a worker thread to the sink.
+                    final Future<? extends AbstractSubtaskStats> future = submitSubtask(sink);
 
-                stats.subtaskStartCount++;
+                    out.setFuture(future);
+
+                    synchronized (stats) {
+
+                        stats.subtaskStartCount++;
+
+                    }
+
+                } else {
+
+                    // concurrent create of the sink.
+                    sink = oldval;
+
+                }
+                
+            } finally {
+
+                lock.unlock();
                 
             }
 
@@ -740,56 +730,49 @@ L>//
      * @return The {@link Future}.
      */
     abstract protected Future<? extends AbstractSubtaskStats> submitSubtask(S subtask);
-    
+
     /**
      * This is invoked when there is already a sink for that index partition but
-     * it has been closed. Poll the future until the existing sink is finished
-     * before putting the new sink into play. This ensures that we can verify
-     * the Future completes normally. Other sinks (except the one(s) that is
-     * waiting on this Future) will continue to drain normally.
+     * it has been closed. This checks the {@link Future} to verify that the
+     * sink completed normally.
      * 
-     * @throws IllegalMonitorStateException
-     *             unless the caller holds the {@link #lock}
      * @throws IllegalStateException
      *             unless the {@link #buffer} is closed.
      */
-    protected void awaitSink(final S sink) {
+    private void awaitSink(final S sink) {
 
         if (sink == null)
             throw new IllegalArgumentException();
         
-        if(!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
-
         if(sink.buffer.isOpen())
             throw new IllegalStateException();
 
-        final Future f = sink.buffer.getFuture();
+        final Future<?> f = sink.buffer.getFuture();
         final long begin = System.nanoTime();
-        long lastNotice = begin;
         try {
 
-            while (!f.isDone()) {
+            while (true) {
 
-                // yield the lock until a subtask completes 
-                subtask.await(
-                        // @todo config - should be ~10 - 50 ms.
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT);
+                try {
 
-                final long now = System.nanoTime();
-                final long elapsed = now - lastNotice;
+                    // test the future.
+                    f.get(1, TimeUnit.SECONDS);
 
-                if (elapsed >= 1000) {
+                    // clear from the map (but ONLY once we have checked the Future!)
+                    removeOutputBuffer((L) sink.locator, (AbstractSubtask) sink);
+
+                    // Done.
+                    return;
+                    
+                } catch (TimeoutException ex) {
+
                     log.warn("Waiting on sink: elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(elapsed)
-                            + ", sink=" + sink);
+                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
+                                    - begin) + ", sink=" + sink);
+
                 }
 
             }
-
-            // test the future.
-            f.get();
 
         } catch (Throwable t) {
 
@@ -803,48 +786,38 @@ L>//
 
     /**
      * Removes the output buffer (unless it has been replaced by another output
-     * buffer associated with a different sink).
+     * buffer associated with a different sink). DO NOT invoke this method until
+     * you have checked the {@link Future} of the sink for errors.
      * 
+     * @param locator
+     *            The locator.
      * @param sink
      *            The sink.
      */
     protected void removeOutputBuffer(final L locator,
-            final AbstractSubtask sink) throws InterruptedException {
+            final AbstractSubtask sink) {
+
+        if (locator == null)
+            throw new IllegalArgumentException();
 
         if (sink == null)
             throw new IllegalArgumentException();
+        
+        /*
+         * Remove map entry IFF it is for the same reference.
+         */
+        if (sinks.remove(locator, sink)) {
 
-        lock.lockInterruptibly();
-        try {
-
-            final S t = subtasks.get(locator);
-
-            if (t == sink) {
-
-                /*
-                 * Remove map entry IFF it is for the same reference.
-                 */
-
-                subtasks.remove(locator);
-
-                if (log.isDebugEnabled())
-                    log.debug("Removed output buffer: " + locator);
-
-            }
+            if (log.isDebugEnabled())
+                log.debug("Removed output buffer: " + locator);
 
             /*
-             * Note: increment counter regardless of whether or not the
-             * reference was the same since the specified sink is now done.
+             * Note: This should not be invoked on a sink whose Future has not
+             * been checked. That means that nobody is checking the Future for
+             * that sink and that errors could go unreported.
              */
-            synchronized (stats) {
-
-                stats.subtaskEndCount++;
-
-            }
-
-        } finally {
-
-            lock.unlock();
+            
+            assert sink.buffer.getFuture().isDone();
 
         }
 
@@ -871,56 +844,86 @@ L>//
      */
     @SuppressWarnings("unchecked")
     protected void addToOutputBuffer(final L locator, final E[] a,
-            final int fromIndex, final int toIndex, final boolean reopen)
+            final int fromIndex, final int toIndex, boolean reopen)
             throws InterruptedException {
 
         final int n = (toIndex - fromIndex);
 
         if (n == 0)
             return;
-        
-        lock.lockInterruptibly();
-        try {
 
-            /*
-             * Make a dense chunk for this split.
-             */
+        /*
+         * Make a dense chunk for this split.
+         */
 
-            final E[] b = (E[]) java.lang.reflect.Array.newInstance(a
-                    .getClass().getComponentType(), n);
+        final E[] b = (E[]) java.lang.reflect.Array.newInstance(a.getClass()
+                .getComponentType(), n);
 
-            System.arraycopy(a, fromIndex, b, 0, n);
+        System.arraycopy(a, fromIndex, b, 0, n);
+
+        final long begin = System.nanoTime();
+
+        boolean added = false;
+
+        while (!added) {
 
             halted();
-            
-            // add the dense split to the appropriate output buffer.
+
+            // resolve the sink / create iff necessary.
             final S sink = getSink(locator, reopen);
 
-            final long begin = System.nanoTime();
-
-            boolean added = false;
-
-            while (!added) {
+            try {
 
                 added = offerChunk(sink, b, reopen);
 
+            } catch (BufferClosedException ex) {
+
+                if (ex.getCause() instanceof IdleTimeoutException) {
+
+                    /*
+                     * Note: The sinks sets the exception if it closes the input
+                     * queue by idle timeout.
+                     * 
+                     * When we trap idle timeout exception here and cause the
+                     * sink to be re-opened (simply by restarting the loop).
+                     */
+
+                    if (log.isInfoEnabled())
+                        log.info("Sink closed asynchronously by idle timeout: "
+                                + sink);
+
+                    // definitely re-open!
+                    reopen = true;
+                    
+                    // retry
+                    continue;
+
+                } else {
+
+                    // anything else is a problem.
+                    throw ex;
+
+                }
+
             }
 
-            // update timestamp of the last chunk written on that sink.
-            sink.lastChunkNanos = System.nanoTime();
+            if (added) {
 
-            synchronized (stats) {
+                /*
+                 * Update timestamp of the last chunk written on that sink.
+                 */
+                sink.lastChunkNanos = System.nanoTime();
 
-                stats.chunksTransferred += 1;
-                stats.elementsTransferred += b.length;
-                stats.elementsOnSinkQueues += b.length;
-                stats.elapsedSinkOfferNanos += (System.nanoTime() - begin);
-                
             }
 
-        } finally {
+        }
 
-            lock.unlock();
+        synchronized (stats) {
+
+            stats.chunksTransferred += 1;
+            stats.elementsTransferred += b.length;
+            stats.elementsOnSinkQueues += b.length;
+            stats.elapsedSinkOfferNanos += (System.nanoTime() - begin);
 
         }
 
@@ -960,65 +963,9 @@ L>//
 
             try {
 
-                /*
-                 * Offer the chunk with a fast timeout. If the sink's input
-                 * queue is full the offer will not be accepted and [added] will
-                 * remain [false].
-                 */
-                
-                if (reopen) {
-
-                    // stack trace through here if [reopen == true]
-                    added = sink.buffer.add(dense, offerTimeoutNanos,
-                            TimeUnit.NANOSECONDS);
-
-                } else {
-
-                    // stack trace through here if [reopen == false]
-                    added = sink.buffer.add(dense, offerTimeoutNanos,
-                            TimeUnit.NANOSECONDS);
-
-                }
-
-                if(!added) {
-
-                    /*
-                     * The subtask's input queue is full so we await this
-                     * condition. When the subtask drains a chunk the master
-                     * will be signaled and can resume.
-                     * 
-                     * Note: The sink require's the master's lock in order to
-                     * notify the master so the sinks are all contending for the
-                     * master's lock when they drain a chunk.
-                     */
-                    
-                    if (!sink.drainedChunk.await(offerWarningTimeoutNanos,
-                            TimeUnit.NANOSECONDS)) {
-
-                        /*
-                         * Normally, each index partition of a given scale-out
-                         * index will proceed at nearly the same write rate. If
-                         * you are seeing this message for many partitions of
-                         * the same index then the client has filled its queues
-                         * and is blocking. This is OK. However, if you are
-                         * seeing it for only one or two index partitions out of
-                         * 10s or 100s then those index partitions are
-                         * bottlenecks. Such bottlenecks SHOULD be addressed
-                         * automatically by splitting or moving an index
-                         * partition.
-                         */
-
-                        log
-                                .warn("Master blocking on sink: sink="
-                                + sink
-                                + ", elapsed="
-                                + TimeUnit.NANOSECONDS.toMillis(System
-                                        .nanoTime()
-                                        - begin) + "ms, reopen=" + reopen);
-
-                    }
-
-                }
+                // stack trace through here if [reopen == true]
+                added = sink.buffer.add(dense, offerTimeoutNanos,
+                        TimeUnit.NANOSECONDS);
                 
             } catch (BufferClosedException ex) {
 
