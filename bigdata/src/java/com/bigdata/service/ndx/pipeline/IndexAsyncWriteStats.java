@@ -100,11 +100,15 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                 });
 
         /**
-         * The moving average of the #of elements on the sink queues.  This does
+         * The moving average of the #of elements on the sink queues. This does
          * not count the #of elements on the master queues nor does it count the
          * #of elements which have been drained from a sink queue and are either
          * being prepared for or awaiting completion of a write on an index
          * partition.
+         * 
+         * @todo Change this to be the average #of elements on each sink queue
+         *       rather than the average of the total #of elements across all
+         *       sink queues?
          */
         final MovingAverageTask averageElementsOnSinkQueues = new MovingAverageTask(
                 "averageElementsOnSinkQueues", new Callable<Long>() {
