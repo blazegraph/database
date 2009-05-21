@@ -208,10 +208,15 @@ case "$1" in
 	if [ -s "$eventLog" -o -s "$errorLog" -o -s "$detailLog" ]; then
 	    lockfile -r 1 -1 "$logLockFile"
 	    if [ 0 == $? ]; then
+#
 #           Granted lock in the log directory so we can rename the log
 #           files.
-#	if [ "$MASTER" == "`hostname`" ]; then
+#
 #           Move the event log out of the way (exists and is not empty).
+#
+#           @todo should really trigger a normal rollover for these log
+#                 files when the SimpleSocketServer is taken down.
+#
 		random=`date +%N | sed -e 's/000$//' -e 's/^0//'`
 		if [ -s "$eventLog" ]; then
 		    echo $"`date` : `hostname` : renaming old event log."
@@ -227,20 +232,6 @@ case "$1" in
 		    echo $"`date` : `hostname` : renaming old services log."
 		    mv "$detailLog" "$detailLog-`date +%F`$random.old"
 		fi
-## @todo add a bigdatadestroy hook and then this stuff can go into that file.
-##
-## Delete performance counter snapshots from the load balancer.
-##	    if [ -d "/opt2/var/log/bigdata" ]; then
-##		echo $"`date` : `hostname` : removing LBS logs."
-##		rm -f /opt2/var/log/bigdata/events.jnl
-##		rm -f /opt2/var/log/bigdata/counters*
-##		rmdir /opt2/var/log/bigdata/
-##	    fi
-## Delete index partition metadata dumps from the data loader.
-##	    if [ -d /opt2/trials/indexDumps ]; then
-##		echo $"`date` : `hostname` : removing index dumps."
-##		rm -rf /opt2/trials/indexDumps
-##	    fi
 		rm -f "$logLockFile"
 	    fi
 	fi
