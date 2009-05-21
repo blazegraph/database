@@ -806,7 +806,6 @@ ${postInstallMessage}</echo>
 	 install directory. -->
 <fileset dir="${install.bin.dir}" id="lubm-scripts" description="The lubm scripts.">
 	<include name="lubmMaster.sh" />
-	<include name="lubmMaster.sh" />
 	<include name="classServer.sh" />
 </fileset>
 
@@ -817,13 +816,13 @@ ${postInstallMessage}</echo>
      script, which exposes them using a ClassServer.  You can use this as
      a model for how to install and run your own software against a bigdata 
      federation that is already up and running. -->
-<target name="lubm-install" depends="lubm-compile" description="Install the optional lubm integration which may be used for benchmarking the RDF database.">
+<target name="lubm-install" depends="lubm-jar" description="Install the optional lubm integration which may be used for benchmarking the RDF database.">
  	<!-- install JAR. -->
 	<mkdir dir="${install.lib.dir}/lubm"/>
  	<copy toDir="${install.lib.dir}/lubm" file="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
 	<!-- install scripts. -->
 	<copy toDir="${install.bin.dir}">
-		<fileset dir="src/resources/scripts"/>
+		<fileset dir="bigdata-lubm/src/resources/scripts"/>
 	</copy>
 	<!-- replace will only find those @XXX@ parameters which have not yet been
 		 transcribed out by the bigdata ant install. -->
