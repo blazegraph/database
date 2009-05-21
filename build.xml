@@ -822,7 +822,7 @@ ${postInstallMessage}</echo>
  	<copy toDir="${install.lib.dir}/lubm" file="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
 	<!-- install scripts. -->
 	<copy toDir="${install.bin.dir}">
-		<fileset dir="bigdata-lubm/src/resources/scripts"/>
+		<fileset dir="bigdata-lubm/resources/scripts"/>
 	</copy>
 	<!-- replace will only find those @XXX@ parameters which have not yet been
 		 transcribed out by the bigdata ant install. -->
