@@ -24,7 +24,7 @@
 
 	<!-- runtime classpath w/o install. -->
 	<path id="runtime.classpath">
-		<pathelement location="${build.dir}" />
+		<pathelement location="${build.dir}/classes" />
 		<path refid="build.classpath" />
 	</path>
 
@@ -514,7 +514,7 @@ ${postInstallMessage}</echo>
 <!-- Note: we must fork the JVM to get the jvmarg overrides. -->
 <!-- Note: We suppress the bigdata banner so it does not get written into output file. -->
 <!-- Note: We disable registration of log4j MBeans since that requires policy file. -->
-<target name="analysis" depends="jar" description="Extracts performance counters from logged XML files.">
+<target name="analysis" depends="bundleJar" description="Extracts performance counters from logged XML files.">
 <mkdir dir="${analysis.out.dir}" />
 <mkdir dir="${analysis.out.dir}/cpu" />
 <mkdir dir="${analysis.out.dir}/disk" />
@@ -747,6 +747,6 @@ ${postInstallMessage}</echo>
 	<arg value="12" />
 	<arg file="${analysis.counters.dir}" />
 </java>
-</target>
 
+</target>
 </project>
