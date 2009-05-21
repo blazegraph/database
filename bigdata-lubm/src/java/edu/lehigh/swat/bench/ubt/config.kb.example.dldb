@@ -1,0 +1,19 @@
+# [repository ID]
+# class=<repository factory class>
+# data=<directory where the test data reside>
+# database=<database where the data are stored>
+# ontology=<url of univ-bench ontology> 
+
+# 1-university
+[DLDB_1]
+class=dldbowlwrapper.DldbFactory
+data=c:\ubt\testdata\lubm_owl_0_0
+database=c:\ubt\results\dldb_owl_0_0.mdb
+ontology=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl
+
+# 5-university
+[DLDB_5]
+class=dldbowlwrapper.DldbFactory
+data=c:\ubt\testdata\lubm_owl_0_4
+database=c:\ubt\results\dldb_owl_0_4.mdb
+ontology=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl

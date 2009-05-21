@@ -9,6 +9,7 @@
 	<classpathentry kind="src" path="bigdata-sails/src/test"/>
 	<classpathentry kind="src" path="bigdata-jini/src/java"/>
 	<classpathentry kind="src" path="bigdata/src/resources/logging"/>
+	<classpathentry kind="src" path="bigdata-lubm/src/java"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/commons-io-1.4.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-3_6.jar"/>
