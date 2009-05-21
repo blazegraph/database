@@ -63,7 +63,12 @@
 	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
 	<target name="compile" depends="prepare">
 		<mkdir dir="${build.dir}" />
-		<javac destdir="${build.dir}/classes" classpathref="build.classpath" verbose="off" target="1.5" debug="${debug}" debuglevel="${debuglevel}">
+		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
+		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+	     encoding="${javac.encoding}"
+	     	>
+			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
+			<!-- target="${javac.target}" source="${javac.source}" -->
 			<src path="${bigdata.dir}/bigdata/src/java" />
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
@@ -753,7 +758,7 @@ ${postInstallMessage}</echo>
 <!--                                            -->
 <!-- Targets for the optional LUBM integration. -->
 <!--                                            -->
-
+	
 <target name="lubm-clean" description="Clean the lubm-integration from the build directory.">
 	<delete dir="${build.dir}/lubm" />
 </target>
@@ -764,9 +769,22 @@ ${postInstallMessage}</echo>
 	<mkdir dir="${build.dir}/lubm/lib" />
 </target>
 
-<target name="lubm-compile" depends="compile, lubm-prepare" description="Compile the optional lubm integration.">
+<path id="lubm.build.classpath" description="The lubm build-time classpath (this expects to find the bigdata JAR already installed).">
+	<fileset dir="${install.lib.dir}">
+		<include name="**/*.jar" />
+	</fileset>
+</path>
+
+<!-- And now for something totally weird.  If you compile against the bigdata.jar
+     rather than build.dir/classes then you will see some errors reported in
+     LubmGeneratorMaster.java which otherwise are not reported... -->
+<target name="lubm-compile" depends="lubm-prepare" description="Compile the optional lubm integration.">
 	<javac destdir="${build.dir}/lubm/classes" classpathref="runtime.classpath" 
-		 debug="${debug}" debuglevel="${debuglevel}" verbose="off" target="1.5">
+	       debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+		   encoding="${javac.encoding}"
+    	>
+		<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
+		<!-- target="${javac.target}" source="${javac.source}" -->
 		<src path="${bigdata.dir}/bigdata-lubm/src/java" />
 	</javac>
 	<!-- copy resources. -->
@@ -799,7 +817,7 @@ ${postInstallMessage}</echo>
      script, which exposes them using a ClassServer.  You can use this as
      a model for how to install and run your own software against a bigdata 
      federation that is already up and running. -->
-<target name="lubm-install" depends="install, lubm-compile" description="Install the optional lubm integration which may be used for benchmarking the RDF database.">
+<target name="lubm-install" depends="lubm-compile" description="Install the optional lubm integration which may be used for benchmarking the RDF database.">
  	<!-- install JAR. -->
 	<mkdir dir="${install.lib.dir}/lubm"/>
  	<copy toDir="${install.lib.dir}/lubm" file="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
