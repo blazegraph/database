@@ -1,0 +1,110 @@
+# queries expressed in a KIF-like language
+# [query ID]
+# query
+
+[query1]
+# All the graduate students who take course
+# http://www.Department0.University0.edu/GraduateCourse0
+
+(@everyInstance GraduateStudent ?X)
+(takesCourse ?X http://www.Department0.University0.edu/GraduateCourse0)
+
+#[query2]
+# All the graduate students who are now studying at the university from
+#    which they obtained their bachelor's degrees.
+
+(@everyInstance GraduateStudent ?X)
+(@everyInstance University ?Y)
+(@everyInstance Department ?Z)
+(memberOf ?X ?Z)
+(subOrganizationOf ?Z ?Y)
+(undergraduateDegreeFrom ?X ?Y)
+
+[query3]
+# All the publications of professor
+# http://www.Department0.University0.edu/AssistantProfessor0
+
+(@everyInstance Publication ?X)
+(publicationAuthor ?X http://www.Department0.University0.edu/AssistantProfessor0)
+
+[query4]
+# All the professors at Department0 of University0 and their email addresses
+# and telephone numbers
+
+(@everyInstance Professor ?X)
+(worksFor ?X http://www.Department0.University0.edu)
+(name ?X ?Y1)
+(emailAddress ?X ?Y2)
+(telephone ?X ?Y3)
+
+[Query5]
+# All the members of department http://www.Department0.University0.edu
+
+(@everyInstance Person ?X)
+(memberOf ?X http://www.Department0.University0.edu)
+
+[query6]
+# all the students
+
+(@everyInstance Student ?X)
+
+[Query7]
+# All the students who take courses of professor
+# http://www.Department0.University0.edu/AssociateProfessor0
+
+(@everyInstance Student ?X)
+(@everyInstance Course ?Y)
+(teacherOf http://www.Department0.University0.edu/AssociateProfessor0 ?Y)
+(takesCourse ?X ?Y)
+
+[Query8]
+# All the students of university 
+# http://www.University0.edu and their email addresses
+
+(@everyInstance Student ?X)
+(@everyInstance Department ?Y)
+(memberOf ?X ?Y)
+(subOrganizationOf ?Y http://www.University0.edu)
+(emailAddress ?X ?Z)
+
+[query9]
+# All the students who take the courses of their advisors.
+
+(@everyInstance Student ?X)
+(@everyInstance Faculty ?Y)
+(@everyInstance Course ?Z)
+(advisor ?X ?Y)
+(takesCourse ?X ?Z)
+(teacherOf ?Y ?Z)
+
+[query10]
+# All the students who take course
+# http://www.Department0.University0.edu/GraduateCourse0
+
+(@everyInstance Student ?X)
+(takesCourse ?X http://www.Department0.University0.edu/GraduateCourse0)
+
+[Query11]
+# All the research groups at university http://www.University0.edu
+
+(@everyInstance ResearchGroup ?X)
+(subOrganizationOf ?X http://www.University0.edu)
+
+[Query12]
+# All the department chairs of university http://www.University0.edu
+
+(@everyInstance Chair ?X)
+(@everyInstance Department ?Y)
+(worksFor ?X ?Y)
+(subOrganizationOf ?Y  http://www.University0.edu)
+
+[Query13]
+# All the alumni of university http://www.University0.edu
+
+(@everyInstance Person ?X)
+(hasAlumnus http://www.University0.edu ?X)
+
+[Query14]
+# All the undergraduate students
+
+(@everyInstance UndergraduateStudent ?X)

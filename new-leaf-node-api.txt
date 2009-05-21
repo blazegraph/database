@@ -1,0 +1,94 @@
+new leaf API:
+
+Re-design of the node/leaf API to support processing of serialized
+nodes and leaves without materializing their contents as java objects.
+
+Goals:
+
+  - Compression: two-level compression.
+
+    1. Record compression (e.g., deflate)
+
+       Store as record header + compressed (deflate) record body.
+
+       Using deflate (record level compression) is new.  The thing
+       which makes it difficult is the double-linked leaves in the
+       index segment.  The record size must be known when we obtain
+       the address of the record from the store.  This means that the
+       priorAddr/nextAddr are outside of the compressed region.
+
+    2. Leaf:
+
+	  key:byte[][]
+	  value:byte[][]
+	  timestamp:long[]
+	  deleteMarker:bit[]
+
+       Node:
+
+	  key:byte[][]
+	  childAddr[]:long[]
+	  childEntryCounts:int[]
+
+    x. prefix or hu-tucker coding for keys.
+
+       For hu-tucker, store the dictionary in the node/leaf and
+       project the probe key into the hu-tucker coding each time we
+       enter a node/leaf.
+
+       For prefix coding, we do a similar projection by chopping off
+       the part of the probe key which is held in common.
+
+       Those "projections" should be invisible to the caller.
+
+    x. huffman (or extensible?) coding for the values.
+
+    x. The spanned entry counts, the child addresses, and the
+       timestamps are all fixed length int32 or int64 fields.  These
+       can be compressed by a huffman coding on their byte values if
+       we want to keep the in-memory representation down more or they
+       could be stored "as is" in serialized record and deflate could
+       then compress them for the disk.
+
+    x. Bit flags for the delete markers.  Set aside (nentries/8)+1
+       bytes for this.
+
+  - Fixed or variable sized "page?"
+
+     - Unless record size is variable we need to control the #of
+       tuples in a "page" which would require new logic in Node, Leaf
+       and IndexSegmentBuilder/Plan.
+
+     - However, if record size is variable, then we need to manage the
+       "heap" on a native direct buffer or use byte[]s (or a
+       ByteBuffer backed by a byte[]).
+
+Access:
+
+  - Efficient search on compressed keys (prefix or hu-tucker).
+
+  - Random access to tuples in a leaf (for keyAt(), etc).  This does
+    not have to be as efficient as the key search which is much more
+    heavily used.
+
+  - Fast extraction of the value, timestamp, and delete marker for a
+    tuple.
+
+  - Fast scan of tuples in either direction, materializing keys,
+    values, timestamps, and/or delete flags.
+
+  - Efficient merged iterator on two or more leaves with optional
+    filter (used for storing asynchronous writes in a compressed
+    form).
+
+API: 
+
+    Use the same API for mutable nodes and leaves and immutable nodes
+    and leaves, but the latter use a de-compressed record.
+
+Questions:
+
+    Will the data rest in a direct ByteBuffer or a byte[]?
+
+    Do we need to code "null" as well as variable length byte[] and
+    allow values[] itself to be null?

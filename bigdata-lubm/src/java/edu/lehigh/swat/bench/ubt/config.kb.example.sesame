@@ -1,0 +1,19 @@
+# [repository ID]
+# class=<repository factory class>
+# data=<directory where the test data reside>
+# database=<database where the data are stored>
+# ontology=<url of univ-bench ontology> 
+
+# 1-university
+[SESAME_1]
+class=sesamewrapper.SesameFactory
+data=e:/SW/ubt/testdata/lubm_owl_0_0
+database=jdbc:mysql://localhost:3306/sesame_owl_0_0
+ontology=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl
+
+# 5-university
+[SESAME_5]
+class=sesamewrapper.SesameFactory
+data=e:/SW/ubt/testdata/lubm_owl_0_4
+database=jdbc:mysql://localhost:3306/sesame_owl_0_4
+ontology=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl

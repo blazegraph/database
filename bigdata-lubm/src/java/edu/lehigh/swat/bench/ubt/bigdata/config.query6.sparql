@@ -1,0 +1,11 @@
+# This is a 2-bound single access path query.  It gives you a sense of the
+# throughput for one access path.  Query 14 is another such query.  These
+# queries will under report unless the closure has been computed.
+
+[query6]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:Student
+}

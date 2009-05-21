@@ -1,0 +1,7 @@
+The Lehigh University Benchmark is under the GPL but does not specify
+which version and does not bundle the license in their source code.
+
+The LUBM test harness was modified to support incremental generation
+of extremely synthetic data sets.  That integration is a derived work
+and falls under the LUBM license (GPL).  The integration is contained
+in the "LubmGeneratorMaster.java" file.

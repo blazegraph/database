@@ -1,0 +1,117 @@
+# queries expressed in RQL
+# [query ID]
+# query
+
+[query1]
+SELECT X
+from
+ ub:GraduateStudent {X}. ub:takesCourse {Y}
+where Y=http://www.Department0.University0.edu/GraduateCourse0
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query2]
+SELECT X, Y
+from
+ ub:University {Y}, ub:Department {Z},
+ ub:GraduateStudent {X}. ub:memberOf {Z}. ub:subOrganizationOf {Y},
+ {X} ub:undergraduateDegreeFrom {Y}
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query3]
+SELECT X
+from
+ ub:Publication {X}. ub:publicationAuthor {Y}
+where Y=http://www.Department0.University0.edu/AssistantProfessor0
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query4]
+SELECT X, Y1, Y2, Y3
+from
+ ub:Professor {X}. ub:worksFor {Y},
+ {X} ub:name {Y1},
+ {X} ub:emailAddress {Y2},
+ {X} ub:telephone {Y3}
+where
+ Y=http://www.Department0.University0.edu
+using namespace
+      ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query5]
+SELECT X
+from
+ ub:Person {X}. ub:memberOf {Y}
+where
+ Y=http://www.Department0.University0.edu
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query6]
+SELECT X
+from
+ ub:Student {X}
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query7]
+SELECT X, Y
+from
+ ub:Course {Y},
+ ub:Student {X}. ub:takesCourse {Y},
+ {Z} ub:teacherOf {Y}
+where
+ Z=http://www.Department0.University0.edu/AssociateProfessor0
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query8]
+SELECT X, Z
+from
+ ub:Department {Y},
+ ub:Student {X}. ub:memberOf {Y}. ub:subOrganizationOf {U},
+ {X} ub:emailAddress {Z}
+where
+ U=http://www.University0.edu
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query9]
+SELECT X, Y, Z
+from
+ ub:Faculty {Y}, ub:Course {Z},
+ ub:Student {X}. ub:advisor {Y}. ub:teacherOf {Z},
+ {X} ub:takesCourse {Z}
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query10]
+SELECT X
+from
+ ub:Student {X}. ub:takesCourse {Y}
+where
+ Y=http://www.Department0.University0.edu/GraduateCourse0
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query11]
+SELECT X
+from
+ ub:ResearchGroup {X}. ub:subOrganizationOf {Y}
+where Y=http://www.University0.edu
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query12]
+SELECT X, Y
+from
+ ub:Department {Y},
+ ub:Chair {X}. ub:worksFor {Y}. ub:subOrganizationOf {U}
+where U=http://www.University0.edu
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query13]
+SELECT X
+from
+ ub:Person {X},
+ {Y} ub:hasAlumnus {X}
+where
+ Y=http://www.University0.edu
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#
+
+[query14]
+SELECT X
+from
+ ub:UndergraduateStudent {X}
+using namespace ub=http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#

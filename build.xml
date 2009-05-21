@@ -749,4 +749,81 @@ ${postInstallMessage}</echo>
 </java>
 
 </target>
+
+<!--                                            -->
+<!-- Targets for the optional LUBM integration. -->
+<!--                                            -->
+
+<target name="lubm-clean" description="Clean the lubm-integration from the build directory.">
+	<delete dir="${build.dir}/lubm" />
+</target>
+
+<target name="lubm-prepare" description="Clean the lubm-integration from the build directory.">
+	<mkdir dir="${build.dir}/lubm" />
+	<mkdir dir="${build.dir}/lubm/classes" />
+	<mkdir dir="${build.dir}/lubm/lib" />
+</target>
+
+<target name="lubm-compile" depends="compile, lubm-prepare" description="Compile the optional lubm integration.">
+	<javac destdir="${build.dir}/lubm/classes" classpathref="runtime.classpath" 
+		 debug="${debug}" debuglevel="${debuglevel}" verbose="off" target="1.5">
+		<src path="${bigdata.dir}/bigdata-lubm/src/java" />
+	</javac>
+	<!-- copy resources. -->
+	<copy toDir="${build.dir}/lubm/classes">
+		<fileset dir="${bigdata.dir}/bigdata-lubm/src/java">
+			<exclude name="**/*.java" />
+		</fileset>
+	</copy>
+</target>
+
+<target name="lubm-jar" depends="lubm-compile" description="Generates the JAR containing the optional LUBM integration.">
+	<jar destfile="${build.dir}/lubm/lib/bigdata-lubm.jar">
+		<fileset dir="${build.dir}/lubm/classes" />
+	</jar>
+</target>
+
+<!-- This explicitly enumerates the lubm scripts so we don't run
+	 fixcrlf or set the execute bit on arbitrary files in the 
+	 install directory. -->
+<fileset dir="${install.bin.dir}" id="lubm-scripts" description="The lubm scripts.">
+	<include name="lubmMaster.sh" />
+	<include name="lubmMaster.sh" />
+	<include name="classServer.sh" />
+</fileset>
+
+<!-- While this installs the LUBM integration into the same place as the
+     bigdata federation, you do not need to have the LUBM classes or the
+     integration classes installed when you start the bigdata federation.
+     Those classes will be automatically found when you run the lubmMaster
+     script, which exposes them using a ClassServer.  You can use this as
+     a model for how to install and run your own software against a bigdata 
+     federation that is already up and running. -->
+<target name="lubm-install" depends="install, lubm-compile" description="Install the optional lubm integration which may be used for benchmarking the RDF database.">
+ 	<!-- install JAR. -->
+	<mkdir dir="${install.lib.dir}/lubm"/>
+ 	<copy toDir="${install.lib.dir}/lubm" file="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
+	<!-- install scripts. -->
+	<copy toDir="${install.bin.dir}">
+		<fileset dir="src/resources/scripts"/>
+	</copy>
+	<!-- replace will only find those @XXX@ parameters which have not yet been
+		 transcribed out by the bigdata ant install. -->
+	<replace dir="${install.bin.dir}" summary="true">
+		<replacefilter token="@NAS@" value="${NAS}" />
+		<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+		<replacefilter token="@LUBM_CLASS_SERVER_PORT@" value="${LUBM_CLASS_SERVER_PORT}" />
+		<replacefilter token="@LUBM_CLASS_SERVER_HOSTNAME@" value="${LUBM_CLASS_SERVER_HOSTNAME}" />
+		<replacefilter token="@LUBM_RMI_CODEBASE_URL@" value="${LUBM_RMI_CODEBASE_URL}" />
+	</replace>
+	<!-- fix newlines (otherwise substitutions cause things to break). -->
+	<fixcrlf srcDir="${install.bin.dir}" >
+		<!-- file set not supported. <fileset refid="scripts" /> -->
+	</fixcrlf>
+	<!-- set execute bit for scripts in this directory (must be the last step). -->
+	<chmod perm="u+x,g+rx,o-rwx">
+		<fileset refid="lubm-scripts" />
+	</chmod>
+</target>
+
 </project>
