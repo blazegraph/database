@@ -580,6 +580,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
                 future.cancel(true/* mayInterruptIfRunning */);
 
+                System.err.println("Shutdown: " + new Date());
+                
             }
 
         });
