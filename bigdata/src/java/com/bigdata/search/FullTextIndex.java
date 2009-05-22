@@ -98,9 +98,9 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * the logical model is:
  * 
  * <pre>
- *                                                                 
+ * 
  *             token : {docId, freq?, weight?}+
- *                                                                 
+ * 
  * </pre>
  * 
  * (For RDF, docId is the term identifier as assigned by the term:id index.)
@@ -114,9 +114,9 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * In fact, we actually represent the data as follows:
  * 
  * <pre>
- *                            
+ * 
  *             {sortKey(token), docId, fldId} : {freq?, weight?, sorted(pos)+}
- *                                     
+ * 
  * </pre>
  * 
  * That is, there is a distinct entry in the full text B+Tree for each field in
@@ -134,18 +134,19 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * <p>
  * A field is any pre-identified text container within a document. Field
  * identifiers are integers, so there are <code>32^2</code> distinct possible
- * field identifiers. It is possible to manage the field identifers through a
+ * field identifiers. It is possible to manage the field identifiers through a
  * secondary index, but that has no direct bearing on the structure of the full
  * text index itself. Field identifies appear after the token in the key so that
  * queries may be expressed that will be matched against any field in the
  * document. Likewise, field identifiers occur before the document identifier in
- * the key since we always search across documents (the document identifier is
- * always 0L in the search keys). There are many applications for fields: for
- * example, distinct fields may be used for the title, abstract, and full text
- * of a document or for the CDATA section of each distinct element in documents
- * corresponding to some DTD. The application is responsible for recognizing the
- * fields in the document and producing the appropriate token stream, each of
- * which must be tagged by the field.
+ * the key since we always search across documents (in a search key, the
+ * document identifier is always {@link Long#MIN_VALUE} and the field identifier
+ * is always {@link Integer#MIN_VALUE}). There are many applications for fields:
+ * for example, distinct fields may be used for the title, abstract, and full
+ * text of a document or for the CDATA section of each distinct element in
+ * documents corresponding to some DTD. The application is responsible for
+ * recognizing the fields in the document and producing the appropriate token
+ * stream, each of which must be tagged by the field.
  * <p>
  * A query is tokenized, producing a (possibly normalized) token-frequency
  * vector. The relevance of documents to the query is generally taken as the
@@ -156,8 +157,8 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * against the full text index.
  * 
  * <pre>
- *             fromKey := token, 0L
- *             toKey   := successor(token), 0L
+ *             fromKey := token, Long.MIN_VALUE
+ *             toKey   := successor(token), Long.MIN_VALUE
  * </pre>
  * 
  * and extracting the appropriate token frequency, normalized token weight, or
@@ -167,7 +168,7 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * <p>
  * Tokenization is informed by the language code for a {@link Literal} (when
  * declared) and by the configured {@link Locale} for the database otherwise. An
- * appropriate {@link Analyzer} is choosen based on the language code or
+ * appropriate {@link Analyzer} is chosen based on the language code or
  * {@link Locale} and the "document" is broken into a token-frequency
  * distribution (alternatively a set of tokens). The same process is used to
  * tokenize queries, and the API allows the caller to specify the language code
@@ -181,7 +182,7 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * configuration regardless of the language family in which the token was
  * originally expressed. Unlike the collator used by the terms index (which
  * often is set at IDENTICAL strength), the collector used by the full text
- * index should be choosen such that it makes relatively few distinctions in
+ * index should be chosen such that it makes relatively few distinctions in
  * order to increase recall (e.g., set at PRIMARY strength). Since a total order
  * over the full text index is not critical from the perspective of its IR
  * application, the {@link Locale} for the collator is likewise not critical and
@@ -252,15 +253,15 @@ public class FullTextIndex extends AbstractRelation {
 
     final protected static Logger log = Logger.getLogger(FullTextIndex.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static boolean INFO = log.isInfoEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The backing index.
@@ -404,7 +405,7 @@ public class FullTextIndex extends AbstractRelation {
             overwrite = Boolean.parseBoolean(properties.getProperty(
                     Options.OVERWRITE, Options.DEFAULT_OVERWRITE));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(Options.OVERWRITE + "=" + overwrite);
 
         }
@@ -415,7 +416,7 @@ public class FullTextIndex extends AbstractRelation {
             timeout = Long.parseLong(properties.getProperty(
                     Options.INDEXER_TIMEOUT, Options.DEFAULT_INDEXER_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
             log.info(Options.INDEXER_TIMEOUT+ "=" + timeout);
 
         }
@@ -463,7 +464,7 @@ public class FullTextIndex extends AbstractRelation {
 
             indexManager.registerIndex(indexMetadata);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Registered new text index: name=" + name);
 
             ndx = getIndex(name);
@@ -478,7 +479,7 @@ public class FullTextIndex extends AbstractRelation {
 
     public void destroy() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         assertWritable();
@@ -868,8 +869,8 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @see TokenBuffer#flush()
      */
-    public void index(TokenBuffer buffer, long docId, int fieldId,
-            String languageCode, Reader r) {
+    public void index(final TokenBuffer buffer, final long docId, final int fieldId,
+            final String languageCode, final Reader r) {
 
         /*
          * Note: You can invoke this on a read-only index. It is only overflow
@@ -909,7 +910,7 @@ public class FullTextIndex extends AbstractRelation {
 
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Indexed " + n + " tokens: docId=" + docId + ", fieldId="
                     + fieldId);
 
@@ -928,7 +929,7 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return The extracted token stream.
      */
-    protected TokenStream getTokenStream(String languageCode, Reader r) {
+    protected TokenStream getTokenStream(final String languageCode, final Reader r) {
 
         /*
          * Note: This stripping out stopwords by default.
@@ -958,16 +959,17 @@ public class FullTextIndex extends AbstractRelation {
      *            will be encoded into the key. This is useful when forming the
      *            <i>toKey</i> in a search.
      * @param docId
-     *            The document identifier - use <code>0L</code> when forming a
+     *            The document identifier - use {@link Long#MIN_VALUE} when forming a
      *            search key.
      * @param fieldId
-     *            The field identifier - use <code>0</code> when forming a
+     *            The field identifier - use {@link Integer#MIN_VALUE} when forming a
      *            search key.
      * 
      * @return The key.
      */
-    static protected byte[] getTokenKey(IKeyBuilder keyBuilder, String termText,
-            boolean successor, long docId, int fieldId) {
+    static protected byte[] getTokenKey(final IKeyBuilder keyBuilder,
+            final String termText, final boolean successor, final long docId,
+            final int fieldId) {
         
         keyBuilder.reset();
 
@@ -980,7 +982,7 @@ public class FullTextIndex extends AbstractRelation {
         
         final byte[] key = keyBuilder.getKey();
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("{" + termText + "," + docId + "," + fieldId
                     + "}, successor=" + (successor?"true ":"false") + ", key="
@@ -1015,13 +1017,13 @@ public class FullTextIndex extends AbstractRelation {
      *       quite small (it depends on the #of stopwords) so use a nibble
      *       format for this.
      */
-    protected byte[] getTokenValue(ByteArrayBuffer buf, TermMetadata metadata) {
+    protected byte[] getTokenValue(final ByteArrayBuffer buf, final TermMetadata metadata) {
 
         final int termFreq = metadata.termFreq();
         
         final double localTermWeight = metadata.localTermWeight;
         
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("termText=" + metadata.termText() + ", termFreq="
                             + termFreq);
@@ -1109,8 +1111,8 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @see Options#INDEXER_TIMEOUT
      */
-    public Hiterator search(String query, String languageCode,
-            double minCosine, int maxRank) {
+    public Hiterator search(final String query, final String languageCode,
+            final double minCosine, final int maxRank) {
         
         return search(query, languageCode, false/* prefixMatch */, minCosine,
                 maxRank, this.timeout, TimeUnit.MILLISECONDS);
@@ -1206,7 +1208,7 @@ public class FullTextIndex extends AbstractRelation {
         if (unit == null)
             throw new IllegalArgumentException();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("languageCode=[" + languageCode + "], text=[" + query
                     + "], minCosine=" + minCosine + ", maxRank=" + maxRank
                     + ", timeout=" + timeout + ", unit=" + unit);
@@ -1224,7 +1226,8 @@ public class FullTextIndex extends AbstractRelation {
             
             final TokenBuffer buffer = new TokenBuffer(1, this);
             
-            index(buffer, 0L/*docId*/, 0/*fieldId*/, languageCode,
+            index(buffer, Long.MIN_VALUE/* docId */,
+                    Integer.MIN_VALUE/* fieldId */, languageCode,
                     new StringReader(query));
 
             if (buffer.size() == 0) {
@@ -1311,7 +1314,7 @@ public class FullTextIndex extends AbstractRelation {
          * hits.
          */
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Rank ordering "+nhits+" hits by relevance");
         
         final Hit[] a = hits.values().toArray(new Hit[0]);
@@ -1320,7 +1323,7 @@ public class FullTextIndex extends AbstractRelation {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Done: " + nhits + " hits in " + elapsed + "ms");
 
         /*

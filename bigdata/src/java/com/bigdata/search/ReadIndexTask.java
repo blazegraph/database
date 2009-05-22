@@ -37,15 +37,15 @@ public class ReadIndexTask implements Callable<Object> {
 
     final protected static Logger log = Logger.getLogger(ReadIndexTask.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static boolean INFO = log.isInfoEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
 
     private final String queryTerm;
     private final boolean prefixMatch;
@@ -117,7 +117,7 @@ public class ReadIndexTask implements Callable<Object> {
              * "bro", it will match "broom" and "brown" but not "break".
              */
             toKey = FullTextIndex.getTokenKey(keyBuilder, termText,
-                    true/* successor */, 0L/* docId */, 0/* fieldId */);
+                    true/* successor */, Long.MIN_VALUE/* docId */, Integer.MIN_VALUE/* fieldId */);
 //        } else {
 //            /*
 //             * Accepts only those entries that exactly match the search term.
@@ -126,7 +126,7 @@ public class ReadIndexTask implements Callable<Object> {
 //                    false/* successor */, 0L/* docId */, 0/* fieldId */);
 //        }
 
-        if (DEBUG) log.debug
+        if (log.isDebugEnabled()) log.debug
 //            System.err.println
             ("termText=[" + termText + "], prefixMatch=" + prefixMatch
                     + ", queryTermWeight=" + queryTermWeight + "\nfromKey="
@@ -153,7 +153,7 @@ public class ReadIndexTask implements Callable<Object> {
 
         long nhits = 0;
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("queryTerm=" + queryTerm + ", termWeight="
                     + queryTermWeight);
 
@@ -163,7 +163,7 @@ public class ReadIndexTask implements Callable<Object> {
 
             if (t.isInterrupted()) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Interrupted: queryTerm=" + queryTerm + ", nhits="
                             + nhits);
                 
@@ -195,7 +195,7 @@ public class ReadIndexTask implements Callable<Object> {
             final int termFreq = dis.readShort();
             final double termWeight = dis.readDouble();
             
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("hit: term=" + queryTerm + ", docId=" + docId
                         + ", termFreq=" + termFreq + ", termWeight="
                         + termWeight + ", product="

@@ -228,9 +228,9 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
          *            The access path that corresponds to the position of the
          *            unbound variable reference from the head.
          */
-        public DistinctTermScan(IRule rule, IJoinNexus joinNexus,
-                IBuffer<ISolution[]> buffer, IVariable<Long> h,
-                SPOKeyOrder keyOrder) {
+        public DistinctTermScan(final IRule rule, final IJoinNexus joinNexus,
+                final IBuffer<ISolution[]> buffer, final IVariable<Long> h,
+                final SPOKeyOrder keyOrder) {
         
             if (rule == null)
                 throw new IllegalArgumentException();

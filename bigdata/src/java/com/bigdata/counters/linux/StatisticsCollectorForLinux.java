@@ -62,7 +62,7 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
     public void start() {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("starting collectors");
         
         super.start();
@@ -80,7 +80,7 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
 
     public void stop() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("stopping collectors");
         
         super.stop();

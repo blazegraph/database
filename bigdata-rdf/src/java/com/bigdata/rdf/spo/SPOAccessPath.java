@@ -156,7 +156,12 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
         
         final byte[] fromKey;
         final byte[] toKey;
-        
+
+        /*
+         * The minimum value that a term identifier may take on.
+         */
+        long MIN = Long.MIN_VALUE;
+
         if (s != NULL && p != NULL && o != NULL) {
             
             assert keyOrder == SPOKeyOrder.SPO;
@@ -169,49 +174,49 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
 
             assert keyOrder == SPOKeyOrder.SPO;
             
-            fromKey = tupleSer.statement2Key(s, p, NULL);
+            fromKey = tupleSer.statement2Key(s, p, MIN);
 
-            toKey = tupleSer.statement2Key(s, p + 1, NULL);
+            toKey = tupleSer.statement2Key(s, p + 1, MIN);
 
         } else if (s != NULL && o != NULL) {
 
             assert keyOrder == SPOKeyOrder.OSP;
             
-            fromKey = tupleSer.statement2Key(o, s, NULL);
+            fromKey = tupleSer.statement2Key(o, s, MIN);
 
-            toKey = tupleSer.statement2Key(o, s + 1, NULL);
+            toKey = tupleSer.statement2Key(o, s + 1, MIN);
 
         } else if (p != NULL && o != NULL) {
 
             assert keyOrder == SPOKeyOrder.POS;
             
-            fromKey = tupleSer.statement2Key(p, o, NULL);
+            fromKey = tupleSer.statement2Key(p, o, MIN);
 
-            toKey = tupleSer.statement2Key(p, o + 1, NULL);
+            toKey = tupleSer.statement2Key(p, o + 1, MIN);
 
         } else if (s != NULL) {
 
             assert keyOrder == SPOKeyOrder.SPO;
             
-            fromKey = tupleSer.statement2Key(s, NULL, NULL);
+            fromKey = tupleSer.statement2Key(s, MIN, MIN);
 
-            toKey = tupleSer.statement2Key(s + 1, NULL, NULL);
+            toKey = tupleSer.statement2Key(s + 1, MIN, MIN);
 
         } else if (p != NULL) {
 
             assert keyOrder == SPOKeyOrder.POS;
             
-            fromKey = tupleSer.statement2Key(p, NULL, NULL);
+            fromKey = tupleSer.statement2Key(p, MIN, MIN);
 
-            toKey = tupleSer.statement2Key(p + 1, NULL, NULL);
+            toKey = tupleSer.statement2Key(p + 1, MIN, MIN);
 
         } else if (o != NULL) {
 
             assert keyOrder == SPOKeyOrder.OSP;
             
-            fromKey = tupleSer.statement2Key(o, NULL, NULL);
+            fromKey = tupleSer.statement2Key(o, MIN, MIN);
 
-            toKey = tupleSer.statement2Key(o + 1, NULL, NULL);
+            toKey = tupleSer.statement2Key(o + 1, MIN, MIN);
 
         } else {
 
@@ -252,7 +257,7 @@ public class SPOAccessPath extends AbstractAccessPath<ISPO> {
     }
 
     /**
-     * Overriden to delegate to
+     * Overridden to delegate to
      * {@link AbstractTripleStore#removeStatements(IChunkedOrderedIterator)} in
      * order to (a) write on all access paths; (b) handle statement identifiers,
      * including truth maintenance for statement identifiers; and (c) if

@@ -137,7 +137,8 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
 //     */
 //    private transient DataService dataService;
 
-    public void setDataService(DataService dataService) {
+    @Override
+    public void setDataService(final DataService dataService) {
 
         super.setDataService(dataService);
         
@@ -163,8 +164,8 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
      * @param step
      * @param joinNexus
      */
-    public ProgramTask(ActionEnum action, IStep step,
-            IJoinNexusFactory joinNexusFactory) {
+    public ProgramTask(final ActionEnum action, final IStep step,
+            final IJoinNexusFactory joinNexusFactory) {
 
         if (action == null)
             throw new IllegalArgumentException();
@@ -196,8 +197,8 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
      * @throws IllegalArgumentException
      *             if any parameter is <code>null</code>.
      */
-    public ProgramTask(ActionEnum action, IStep step,
-            IJoinNexusFactory joinNexusFactory, IIndexManager indexManager) {
+    public ProgramTask(final ActionEnum action, final IStep step,
+            final IJoinNexusFactory joinNexusFactory, final IIndexManager indexManager) {
 
         if (action == null)
             throw new IllegalArgumentException();
@@ -638,7 +639,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    protected RuleStats executeClosure(IProgram program)
+    protected RuleStats executeClosure(final IProgram program)
             throws InterruptedException, ExecutionException {
 
         if (program == null)
@@ -761,7 +762,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
      * @throws IllegalStateException
      *             unless the {@link ActionEnum} is a mutation operation.
      */
-    protected RuleStats executeProgramWithEmbeddedClosure(IProgram program)
+    protected RuleStats executeProgramWithEmbeddedClosure(final IProgram program)
             throws InterruptedException, ExecutionException {
 
         if (program == null)

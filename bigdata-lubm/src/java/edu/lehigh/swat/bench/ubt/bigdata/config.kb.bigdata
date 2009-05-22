@@ -24,11 +24,11 @@
 #data=../rdf-data/lehigh/U5
 #database=d:/LTS.U5
 
-#[BIGDATA_LTS_10]
-#class=edu.lehigh.swat.bench.ubt.bigdata.LTS
-#ontology=../rdf-data/lehigh/univ-bench.owl
-#data=../rdf-data/lehigh/U10
-#database=e:/LTS.U10
+[BIGDATA_LTS_10]
+class=edu.lehigh.swat.bench.ubt.bigdata.LTS
+ontology=../rdf-data/lehigh/univ-bench.owl
+data=../rdf-data/lehigh/U10
+database=e:/LTS.U10
 
 #[BIGDATA_LTS_20]
 #class=edu.lehigh.swat.bench.ubt.bigdata.LTS

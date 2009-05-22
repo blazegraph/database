@@ -402,9 +402,9 @@ public abstract class AbstractRuleFastClosure_3_5_6_7_9 extends Rule {
          */
         protected long[] getSortedArray(Set<Long> ids) {
 
-            int n = ids.size();
+            final int n = ids.size();
 
-            long[] a = new long[n];
+            final long[] a = new long[n];
 
             int i = 0;
 

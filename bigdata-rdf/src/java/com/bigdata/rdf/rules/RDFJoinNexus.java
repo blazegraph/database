@@ -330,7 +330,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         @SuppressWarnings("unchecked")
         @Override
-        protected String toString(IPredicate pred) {
+        protected String toString(final IPredicate pred) {
 
             if (indexManager == null) {
 
@@ -407,8 +407,8 @@ public class RDFJoinNexus implements IJoinNexus {
 	 * @param indexManager
 	 *            The object used to resolve indices, relations, etc.
 	 */
-	public RDFJoinNexus(RDFJoinNexusFactory joinNexusFactory,
-			IIndexManager indexManager) {
+	public RDFJoinNexus(final RDFJoinNexusFactory joinNexusFactory,
+			final IIndexManager indexManager) {
 
         if (joinNexusFactory == null)
             throw new IllegalArgumentException();
@@ -997,7 +997,7 @@ public class RDFJoinNexus implements IJoinNexus {
      * particular, Unicode should be handled however it is handled for the
      * {@link LexiconRelation}.
      */
-    public ISortKeyBuilder<IBindingSet> newBindingSetSortKeyBuilder(IRule rule) {
+    public ISortKeyBuilder<IBindingSet> newBindingSetSortKeyBuilder(final IRule rule) {
 
         final IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance();
         
@@ -1059,7 +1059,7 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
 
-    public IBindingSet newBindingSet(IRule rule) {
+    public IBindingSet newBindingSet(final IRule rule) {
 
         final IBindingSet constants = rule.getConstants();
 
@@ -1640,9 +1640,9 @@ public class RDFJoinNexus implements IJoinNexus {
      * {@link IBigdataFederation} implementations are scale-out (use key-range
      * partitioned indices).
      */
-    protected Object runDataServiceProgram(DataService dataService,
-            ActionEnum action, IStep step) throws InterruptedException,
-            ExecutionException {
+    protected Object runDataServiceProgram(final DataService dataService,
+            final ActionEnum action, final IStep step)
+            throws InterruptedException, ExecutionException {
 
         if (INFO) {
 

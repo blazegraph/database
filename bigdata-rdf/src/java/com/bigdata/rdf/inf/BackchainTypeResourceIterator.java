@@ -305,12 +305,6 @@ public class BackchainTypeResourceIterator implements IChunkedOrderedIterator<IS
      *            The source iterator. {@link #nextChunk()} will sort statements
      *            into the {@link IKeyOrder} reported by this iterator (as long
      *            as the {@link IKeyOrder} is non-<code>null</code>).
-     * @param s
-     *            The subject of the triple pattern.
-     * @param p
-     *            The predicate of the triple pattern.
-     * @param o
-     *            The object of the triple pattern.
      * @param db
      *            The database from which we will read the distinct subject
      *            identifiers (iff this is an all unbound triple pattern).

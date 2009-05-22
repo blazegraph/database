@@ -72,19 +72,6 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     final protected static Logger log = Logger
             .getLogger(AbstractStatisticsCollector.class);
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-//    /** {@link InetAddress#getHostName()} for this host. */
-//    static final public String hostname;
-
     /** {@link InetAddress#getCanonicalHostName()} for this host. */
     static final public String fullyQualifiedHostName;
 
@@ -108,7 +95,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         hostPathPrefix = ICounterSet.pathSeparator + fullyQualifiedHostName
                 + ICounterSet.pathSeparator;
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 //            log.info("hostname  : " + hostname);
             log.info("FQDN      : " + fullyQualifiedHostName);
             log.info("hostPrefix: " + hostPathPrefix);
@@ -134,7 +121,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         if (interval <= 0)
             throw new IllegalArgumentException();
 
-        if(INFO) log.info("interval=" + interval);
+        if(log.isInfoEnabled()) log.info("interval=" + interval);
         
         this.interval = interval;
         
@@ -447,7 +434,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      */
     public void start() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Starting collection.");
 
         installShutdownHook();
@@ -460,7 +447,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      */
     public void stop() {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Stopping collection.");
 
     }

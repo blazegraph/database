@@ -520,10 +520,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
     }
 
     /**
-     * Overriden to return the hard reference for the index.
+     * Overridden to return the hard reference for the index.
      */
     @Override
-    public IIndex getIndex(IKeyOrder<? extends ISPO> keyOrder) {
+    public IIndex getIndex(final IKeyOrder<? extends ISPO> keyOrder) {
 
         if (keyOrder == SPOKeyOrder.SPO) {
      
@@ -1654,7 +1654,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
     /**
      * Dumps the specified index.
      */
-    public StringBuilder dump(IKeyOrder<ISPO> keyOrder) {
+    public StringBuilder dump(final IKeyOrder<ISPO> keyOrder) {
         
         final StringBuilder sb = new StringBuilder();
         

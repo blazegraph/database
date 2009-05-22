@@ -25,17 +25,17 @@ public class TokenBuffer {
 
     final protected static Logger log = Logger.getLogger(TokenBuffer.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static  boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static  boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static  boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+//            .toInt();
+//
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static  boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
+//            .toInt();
 
     /** The object on which the buffer will write when it overflows. */
     private FullTextIndex textIndexer;
@@ -168,7 +168,7 @@ public class TokenBuffer {
      */
     public void add(final long docId, final int fieldId, final Token token) {
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("docId=" + docId + ", fieldId=" + fieldId + ", token="
                     + token);
@@ -278,7 +278,7 @@ public class TokenBuffer {
             
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("count=" + count + ", ndocs=" + ndocs + ", nfields="
                     + nfields + ", nterms=" + nterms);
 
@@ -320,7 +320,7 @@ public class TokenBuffer {
                 final byte[] key = FullTextIndex.getTokenKey(keyBuilder, termText,
                         false/* successor */, docId, fieldId);
                 
-                if(DEBUG) {
+                if(log.isDebugEnabled()) {
                     log.debug("{" + termText + "," + docId + "," + fieldId
                             + "}: #occurences="
                             + termMetadata.occurrences.size());
