@@ -951,21 +951,21 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             // runs @t0, 1m, 2m, ... 9m.
             fed.addScheduledTask(new ScheduledDumpTask(fed,
-                    jobState.indexDumpNamespace, 10, jobState.indexDumpDir,
-                    "indexDump", TimeUnit.MINUTES), 0/* initialDelay */,
-                    1/* delay */, TimeUnit.MINUTES);
+                    jobState.indexDumpNamespace, 10/* nruns */,
+                    jobState.indexDumpDir, "indexDump", TimeUnit.MINUTES),
+                    0/* initialDelay */, 1/* delay */, TimeUnit.MINUTES);
 
             // runs @t10m, 20m, 30m, ... 50m.
             fed.addScheduledTask(new ScheduledDumpTask(fed,
-                    jobState.indexDumpNamespace, 5, jobState.indexDumpDir,
-                    "indexDump", TimeUnit.MINUTES), 10/* initialDelay */,
-                    10/* delay */, TimeUnit.MINUTES);
+                    jobState.indexDumpNamespace, 5/* nruns */,
+                    jobState.indexDumpDir, "indexDump", TimeUnit.MINUTES),
+                    10/* initialDelay */, 10/* delay */, TimeUnit.MINUTES);
 
             // runs @t1h, 2h, ... until cancelled.
             fed.addScheduledTask(new ScheduledDumpTask(fed,
-                    jobState.indexDumpNamespace, 0, jobState.indexDumpDir,
-                    "indexDump", TimeUnit.MINUTES), 1/* initialDelay */,
-                    1/* delay */, TimeUnit.HOURS);
+                    jobState.indexDumpNamespace, Integer.MAX_VALUE/* nruns */,
+                    jobState.indexDumpDir, "indexDump", TimeUnit.MINUTES),
+                    1/* initialDelay */, 1/* delay */, TimeUnit.HOURS);
 
         }
 
