@@ -832,7 +832,7 @@ ${postInstallMessage}</echo>
 	</copy>
 	<!-- replace will only find those @XXX@ parameters which have not yet been
 		 transcribed out by the bigdata ant install. -->
-	<replace dir="${install.lubm.bin.dir}" summary="true">
+	<replace dir="${install.bin.dir}" summary="true">
 		<replacefilter token="@NAS@" value="${NAS}" />
 		<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
 		<replacefilter token="@LUBM_CLASS_SERVER_PORT@" value="${LUBM_CLASS_SERVER_PORT}" />
