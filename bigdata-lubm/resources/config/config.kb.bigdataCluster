@@ -1,0 +1,14 @@
+# Configuration for running the lubm "Test" class against a bigdata federation
+# instance.
+#
+# Note: The scale-out data load is performed using the lubmMaster.sh script
+# and DOES NOT use this configuration file.  This configuration files is ONLY
+# used by the lubm Test.java class (for query) which is run by the lubmQuery.sh
+# script so [data] will be ignored.  [database] is the main bigdata configuration
+# file.
+
+[BIGDATA_FEDERATION]
+class=edu.lehigh.swat.bench.ubt.bigdata.JDS
+ontology=@install.lubm.config.dir@/univ-bench.owl
+data=ignored
+database=@BIGDATA_CONFIG@
