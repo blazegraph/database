@@ -806,7 +806,7 @@ ${postInstallMessage}</echo>
 	 install directory. -->
 <fileset dir="${install.bin.dir}" id="lubm-scripts" description="The lubm scripts.">
 	<include name="lubmMaster.sh" />
-	<include name="classServer.sh" />
+	<include name="lubmQuery.sh" />
 </fileset>
 
 <!-- While this installs the LUBM integration into the same place as the
@@ -817,21 +817,28 @@ ${postInstallMessage}</echo>
      a model for how to install and run your own software against a bigdata 
      federation that is already up and running. -->
 <target name="lubm-install" depends="lubm-jar" description="Install the optional lubm integration which may be used for benchmarking the RDF database.">
+	<mkdir dir="${install.lubm.dir}"/>
+	<mkdir dir="${install.lubm.lib.dir}"/>
+	<mkdir dir="${install.lubm.config.dir}"/>
  	<!-- install JAR. -->
-	<mkdir dir="${install.lib.dir}/lubm"/>
- 	<copy toDir="${install.lib.dir}/lubm" file="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
+ 	<copy toDir="${install.lubm.lib.dir}" file="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
+	<!-- install ontology, configuration files, and query files. -->
+	<copy toDir="${install.lubm.config.dir}">
+		<fileset dir="bigdata-lubm/resources/config"/>
+	</copy>
 	<!-- install scripts. -->
 	<copy toDir="${install.bin.dir}">
 		<fileset dir="bigdata-lubm/resources/scripts"/>
 	</copy>
 	<!-- replace will only find those @XXX@ parameters which have not yet been
 		 transcribed out by the bigdata ant install. -->
-	<replace dir="${install.bin.dir}" summary="true">
+	<replace dir="${install.lubm.bin.dir}" summary="true">
 		<replacefilter token="@NAS@" value="${NAS}" />
 		<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
 		<replacefilter token="@LUBM_CLASS_SERVER_PORT@" value="${LUBM_CLASS_SERVER_PORT}" />
 		<replacefilter token="@LUBM_CLASS_SERVER_HOSTNAME@" value="${LUBM_CLASS_SERVER_HOSTNAME}" />
 		<replacefilter token="@LUBM_RMI_CODEBASE_URL@" value="${LUBM_RMI_CODEBASE_URL}" />
+		<replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
 	</replace>
 	<!-- fix newlines (otherwise substitutions cause things to break). -->
 	<fixcrlf srcDir="${install.bin.dir}" >

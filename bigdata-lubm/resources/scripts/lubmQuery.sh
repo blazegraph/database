@@ -4,26 +4,38 @@
 #
 # Pre-conditions: jini is running; services are running.
 #
-# usage: namespace (of the KB)
+# usage: namespace [queryFile]
 
 source `dirname $0`/bigdataenv
 
+if [ -z "$1" ]; then
+	echo "usage: $0 namespace [queryFile]"
+	echo "   where 'namespace' is the namespace of the KB."
+	echo "   where 'queryFile' is the name of a file containing queries to be executed (defaults to all LUBM queries)."
+	exit 1;
+fi
+
+namespace=$1
+
+# use the given query file or use a default (all LUBM queries).
+queryFile=$2
+if [ -z "$queryFile" ]; then
+	queryFile="@install.lubm.config.dir@/config.query.sparql"
+fi
+
+# @todo This code is relatively old.  It does not know how many DS there
+# really are since it is not consulting the bigdata configuration file.
+# It will just wait 10 seconds and then run with however many it finds.
+# You can edit [minDataServices] here or the timeout in the code.
+  
 java ${JAVA_OPTS} \
-	-cp ${CLASSPATH}:${libDir}/bigdata-lubm.jar \
+	-cp ${CLASSPATH}:${libDir}/lubm/bigdata-lubm.jar \
     -Dlubm.warmUp=false \
-    -Dlubm.queryTime=5 \
+    -Dlubm.queryTime=10 \
     -Dlubm.queryParallel=1 \
-    -DminDataServices=13 \
+    -DminDataServices=1 \
     -Dnamespace=$1 \
     edu.lehigh.swat.bench.ubt.Test \
     query \
-    /opt2/src/config.kb.bigdataCluster \
-    /opt2/src/bigdata-lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query9.sparql
-
-#config.query-1-14-9.sparql
-
-exit
-
-#   config.query.sparql
-#   config.query-1-14-9.sparql
-#   config.query9.sparql
+    @install.lubm.config.dir@/config.kb.bigdataCluster \
+    $queryFile
