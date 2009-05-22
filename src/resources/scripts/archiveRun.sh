@@ -45,6 +45,7 @@ fi
 cp -v $BIGDATA_CONFIG \
    $eventLog \
    $errorLog \
+   $detailLog \
    $targetDir
 
 # the journal containing the events (and eventually the counters).
@@ -59,10 +60,5 @@ if [ -d "$NAS/lubm" ]; then
 fi
 
 tar -cvz -C "$targetDir/.." -f $targetDir.tgz $targetDir
-rm -rf $targetDir/*
-echo "ready: $targetDir.tgz"
 
-# The detail log is so large that it gets copied and compressed separately.
-cp -v $detailLog $targetDir
-gzip $targetDir/detail.log 
-echo "ready: $targetDir/detail.log.gz"
+echo "ready: $targetDir.tgz"
