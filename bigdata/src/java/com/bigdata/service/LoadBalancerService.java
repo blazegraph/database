@@ -386,7 +386,7 @@ abstract public class LoadBalancerService extends AbstractService
 
         /**
          * The maximum #of distinct log files to retain (default is one week
-         * based on a {@link #LOG_DELAY} equivilant to one hour).
+         * based on a {@link #LOG_DELAY} equivalent to one hour).
          */
         String LOG_MAX_FILES = LoadBalancerService.class.getName()+".log.maxFiles";
 
