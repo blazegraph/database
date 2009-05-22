@@ -486,6 +486,8 @@
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
 	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
+	<!-- updates the configuration file to locate the lubm ontology. -->
+	<replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
 </replace>
 <!-- fix newlines (otherwise substitutions cause things to break). -->
 <fixcrlf srcDir="${install.config.dir}" />
@@ -835,9 +837,21 @@ ${postInstallMessage}</echo>
 	<replace dir="${install.bin.dir}" summary="true">
 		<replacefilter token="@NAS@" value="${NAS}" />
 		<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+		<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
 		<replacefilter token="@LUBM_CLASS_SERVER_PORT@" value="${LUBM_CLASS_SERVER_PORT}" />
 		<replacefilter token="@LUBM_CLASS_SERVER_HOSTNAME@" value="${LUBM_CLASS_SERVER_HOSTNAME}" />
 		<replacefilter token="@LUBM_RMI_CODEBASE_URL@" value="${LUBM_RMI_CODEBASE_URL}" />
+		<replacefilter token="@install.lubm.lib.dir@" value="${install.lubm.lib.dir}" />
+		<replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
+	</replace>
+	<replace dir="${install.lubm.config.dir}" summary="true">
+		<replacefilter token="@NAS@" value="${NAS}" />
+		<replacefilter token="@BIN_DIR@" value="${install.bin.dir}" />
+		<replacefilter token="@BIGDATA_CONFIG@" value="${bigdata.config}" />
+		<replacefilter token="@LUBM_CLASS_SERVER_PORT@" value="${LUBM_CLASS_SERVER_PORT}" />
+		<replacefilter token="@LUBM_CLASS_SERVER_HOSTNAME@" value="${LUBM_CLASS_SERVER_HOSTNAME}" />
+		<replacefilter token="@LUBM_RMI_CODEBASE_URL@" value="${LUBM_RMI_CODEBASE_URL}" />
+		<replacefilter token="@install.lubm.lib.dir@" value="${install.lubm.lib.dir}" />
 		<replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
 	</replace>
 	<!-- fix newlines (otherwise substitutions cause things to break). -->

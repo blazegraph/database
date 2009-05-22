@@ -28,14 +28,14 @@ source `dirname $0`/bigdataenv
 #
 TFILE="/tmp/$(basename $0).$$.tmp"
 echo "Unpacking jar to $TFILE"
-mkdir $TFILE; pushd $TFILE; jar xf ${libDir}/lubm/bigdata-lubm.jar; popd
+mkdir $TFILE; pushd $TFILE; jar xf @install.lubm.lib.dir@/bigdata-lubm.jar; popd
 java -jar ${libDir}/jini/lib/tools.jar -dir $TFILE $verbose -port @LUBM_CLASS_SERVER_PORT@ &
 pid1=$!
 echo $"ClassServer running: pid=$pid1"
 
 # Start the lubm master.
 java ${JAVA_OPTS} \
-    -cp ${CLASSPATH}:${libDir}/lubm/bigdata-lubm.jar \
+    -cp ${CLASSPATH}:@install.lubm.lib.dir@/bigdata-lubm.jar \
     -Djava.rmi.server.codebase=@LUBM_RMI_CODEBASE_URL@ \
     edu.lehigh.swat.bench.ubt.bigdata.LubmGeneratorMaster \
     ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES} \

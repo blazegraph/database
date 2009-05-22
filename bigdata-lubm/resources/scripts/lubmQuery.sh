@@ -29,7 +29,7 @@ fi
 # You can edit [minDataServices] here or the timeout in the code.
   
 java ${JAVA_OPTS} \
-	-cp ${CLASSPATH}:${libDir}/lubm/bigdata-lubm.jar \
+	-cp ${CLASSPATH}:@install.lubm.lib.dir@/bigdata-lubm.jar \
     -Dlubm.warmUp=false \
     -Dlubm.queryTime=10 \
     -Dlubm.queryParallel=1 \
