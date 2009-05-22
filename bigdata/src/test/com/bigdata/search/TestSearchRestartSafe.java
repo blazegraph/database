@@ -109,12 +109,12 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
             final String languageCode = "EN";
             {
 
-                FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
+                final FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
                         ITx.UNISOLATED, properties);
 
                 ndx.create();
 
-                TokenBuffer buffer = new TokenBuffer(2, ndx);
+                final TokenBuffer buffer = new TokenBuffer(2, ndx);
 
                 ndx.index(buffer, docId, fieldId, languageCode,
                         new StringReader(text));
@@ -138,7 +138,7 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
 
                 assertTrue(itr.hasNext());
 
-                IHit hit1 = itr.next();
+                final IHit hit1 = itr.next();
 
                 System.err.println("hit1:" + hit1);
 

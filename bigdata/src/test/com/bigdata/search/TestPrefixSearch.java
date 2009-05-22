@@ -82,7 +82,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
                 ndx.create();
 
-                TokenBuffer buffer = new TokenBuffer(2, ndx);
+                final TokenBuffer buffer = new TokenBuffer(2, ndx);
 
                 // index a document.
                 ndx.index(buffer, docId, fieldId, languageCode,

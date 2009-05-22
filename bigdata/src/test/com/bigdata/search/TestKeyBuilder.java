@@ -43,6 +43,8 @@ import com.bigdata.search.FullTextIndex.Options;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo write tests in which the docId is a negative long integer.
  */
 public class TestKeyBuilder extends TestCase2 {
 

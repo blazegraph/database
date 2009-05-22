@@ -47,7 +47,7 @@ abstract public class DelegateSortKeyBuilder<E, F> implements
 
     private final ISortKeyBuilder<F> delegate;
 
-    public DelegateSortKeyBuilder(ISortKeyBuilder<F> delegate) {
+    public DelegateSortKeyBuilder(final ISortKeyBuilder<F> delegate) {
 
         if (delegate == null)
             throw new IllegalArgumentException();

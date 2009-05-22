@@ -199,13 +199,13 @@ public class SPOPredicate implements IPredicate<ISPO> {
      */
     public SPOPredicate(String[] relationName, //
             final int partitionId, //
-            IVariableOrConstant<Long> s,//
-            IVariableOrConstant<Long> p,//
-            IVariableOrConstant<Long> o,//
-            IVariableOrConstant<Long> c,//
+            final IVariableOrConstant<Long> s,//
+            final IVariableOrConstant<Long> p,//
+            final IVariableOrConstant<Long> o,//
+            final IVariableOrConstant<Long> c,//
             final boolean optional, //
-            IElementFilter<ISPO> constraint,//
-            ISolutionExpander<ISPO> expander//
+            final IElementFilter<ISPO> constraint,//
+            final ISolutionExpander<ISPO> expander//
             ) {
         
         if (relationName == null)
@@ -256,7 +256,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param relationName
      *            The new relation name(s).
      */
-    protected SPOPredicate(SPOPredicate src, String[] relationName) {
+    protected SPOPredicate(final SPOPredicate src, final String[] relationName) {
         
         if (relationName == null)
             throw new IllegalArgumentException();
@@ -331,7 +331,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-    public final IVariableOrConstant<Long> get(int index) {
+    public final IVariableOrConstant<Long> get(final int index) {
         switch (index) {
         case 0:
             return s;
@@ -496,9 +496,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-    public String toString(IBindingSet bindingSet) {
+    public String toString(final IBindingSet bindingSet) {
 
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
 
         sb.append("(");
 
@@ -595,7 +595,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
-    public boolean equals(Object other) {
+    public boolean equals(final Object other) {
         
         if (this == other)
             return true;

@@ -52,7 +52,7 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
      *            An array of {@link IVariable}s, all of which MUST be bound.
      */
     public BindingSetSortKeyBuilder(final IKeyBuilder keyBuilder,
-            IVariable[] vars) {
+            final IVariable[] vars) {
 
         if (keyBuilder == null)
             throw new IllegalArgumentException();
@@ -66,7 +66,7 @@ public class BindingSetSortKeyBuilder implements ISortKeyBuilder<IBindingSet> {
         
     }
     
-    public byte[] getSortKey(IBindingSet bindingSet) {
+    public byte[] getSortKey(final IBindingSet bindingSet) {
         
         keyBuilder.reset();
         

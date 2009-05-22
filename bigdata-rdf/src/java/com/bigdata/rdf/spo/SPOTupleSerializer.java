@@ -54,7 +54,7 @@ import com.bigdata.striterator.IKeyOrder;
  * positions of the statement. Each statement index uses a permutation of those
  * term identifiers, e.g., {s,p,o}, {o,s,p}, or {p,o,s}. The {@link SPOKeyOrder}
  * identifies the specific permutation for a given index. The keys are fully
- * decodable and are NOT stored redundently in the tuple's value.
+ * decodable and are NOT stored redundantly in the tuple's value.
  * <p>
  * The tuple value encodes the {@link StatementEnum}, indicating whether the
  * statement is {explicit, inferred, or an axiom}, and optionally the unique
@@ -137,7 +137,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
     
-    public SPO deserialize(ITuple tuple) {
+    public SPO deserialize(final ITuple tuple) {
 
         if (tuple == null)
             throw new IllegalArgumentException();
@@ -249,14 +249,14 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
 
-    public SPO deserializeKey(ITuple tuple) {
+    public SPO deserializeKey(final ITuple tuple) {
         
         // just de-serialize the whole tuple.
         return deserialize(tuple);
         
     }
 
-    public byte[] serializeKey(Object obj) {
+    public byte[] serializeKey(final Object obj) {
 
         if (obj == null)
             throw new IllegalArgumentException();
@@ -269,7 +269,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         
     }
 
-    public byte[] serializeKey(SPO spo) {
+    public byte[] serializeKey(final SPO spo) {
         
         return statement2Key(keyOrder, spo);
         
@@ -285,7 +285,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * 
      * @return The key.
      */
-    public byte[] statement2Key(IKeyOrder<ISPO> keyOrder, ISPO spo) {
+    public byte[] statement2Key(final IKeyOrder<ISPO> keyOrder, final ISPO spo) {
         
         switch (((SPOKeyOrder)keyOrder).index()) {
 
@@ -318,13 +318,6 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * directly. For example, if you provide (s,p,o) then you could form the
      * (p,o,s) key by copying 8 byte sections of the returned sort key around to
      * generate the desired permutation.
-     * <p>
-     * Note: When an identifier is {@link IRawTripleStore#NULL} we can generate
-     * a shorter key by not including the NULL value.  This should be fine since
-     * identifiers SHOULD NOT be NULL unless they are in the tail position(s) of
-     * a triple pattern.  Such keys are always used for rangeCount or rangeQuery
-     * purposes where the additional length does not matter (unless it interacts
-     * with how we choose to compact the keys for RPC calls).
      * 
      * @param id1
      *            An RDF value identifier from the term index.
@@ -335,7 +328,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * 
      * @return The sort key for the statement with those values.
      */
-    public byte[] statement2Key(long id1, long id2, long id3) {
+    public byte[] statement2Key(final long id1, final long id2, final long id3) {
 
         return getKeyBuilder().reset().append(id1).append(id2).append(id3)
                 .getKey();

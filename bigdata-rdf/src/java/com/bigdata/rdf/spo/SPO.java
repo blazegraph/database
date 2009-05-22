@@ -82,7 +82,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      * <p>
      * Note: this is not final since we have to set it lazily when adding an
      * {@link SPO} to the database. However, when reading {@link SPO}s from the
-     * database the statement identifier is aleady on hand and is set
+     * database the statement identifier is already on hand and is set
      * immediately.
      */
     private long sid = NULL;
@@ -647,7 +647,7 @@ public class SPO implements ISPO, Comparable<SPO> {
      * @throws IllegalStateException
      *             if the statement type is already set to a different value.
      */
-    final public void setStatementType(StatementEnum type) {
+    final public void setStatementType(final StatementEnum type) {
         
         if(this.type != null && this.type != type) {
             
