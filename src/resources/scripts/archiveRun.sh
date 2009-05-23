@@ -43,9 +43,9 @@ fi
 
 # Copy the configuration file and the various log files.
 cp -v $BIGDATA_CONFIG \
-   $eventLog \
-   $errorLog \
-   $detailLog \
+   $eventLog* \
+   $errorLog* \
+   $detailLog* \
    $targetDir
 
 # the journal containing the events (and eventually the counters).
