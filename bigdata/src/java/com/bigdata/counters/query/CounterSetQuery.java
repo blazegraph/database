@@ -328,7 +328,7 @@ public class CounterSetQuery {
                      * this file and then read counters accepted by the optional
                      * filter into the counter set to be served.
                      */
-                    final int nslots = 1000; // @todo arg
+                    final int nslots = 10000; // @todo arg w/ def 1000
                     
                     final File file = new File(arg);
                     
