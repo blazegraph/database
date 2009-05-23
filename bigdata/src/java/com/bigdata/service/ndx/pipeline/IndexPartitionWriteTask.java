@@ -31,6 +31,7 @@ package com.bigdata.service.ndx.pipeline;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.IAsyncResultHandler;
@@ -186,8 +187,8 @@ A//
         }
 
         /*
-         * Instantiate the procedure using the data from the chunk and
-         * submit it to be executed on the DataService using an RMI call.
+         * Instantiate the procedure using the data from the chunk and submit it
+         * to be executed on the DataService using an RMI call.
          */
         final long beginNanos = System.nanoTime();
         try {
@@ -195,10 +196,62 @@ A//
             final T proc = master.ctor.newInstance(master.ndx,
                     0/* fromIndex */, chunkSize/* toIndex */, keys, vals);
 
-            // submit and await Future
-            final R result = ((Future<R>) dataService.submit(timestamp,
-                    indexPartitionName, proc)).get();
+            /*
+             * @todo isolate this as a retry policy, but note that we need to be
+             * able to indicate when the error is fatal, when the error was
+             * handled by a redirect and hence the sink should close, and when
+             * the error was handled by a successfull retry.
+             */
+            R result = null;
+            boolean done = false;
+            final int maxtries = 3;
+            final long retryDelayNanos = TimeUnit.MILLISECONDS.toNanos(1000);
+            for (int ntries = 0; ntries < maxtries; ntries++) {
 
+                // submit and await Future
+                try {
+
+                    result = ((Future<R>) dataService.submit(timestamp,
+                            indexPartitionName, proc)).get();
+                    done = true;
+                    break;
+                } catch (ExecutionException ex) {
+
+                    final StaleLocatorException cause = (StaleLocatorException) InnerCause
+                            .getInnerCause(ex, StaleLocatorException.class);
+
+                    if (cause != null) {
+
+                        // Handle a stale locator.
+                        handleRedirect((E[]) chunk, cause);
+
+                        // done.
+                        return true;
+
+                    } else {
+
+                        if (ntries + 1 < maxtries) {
+
+                            log.error("Will retry (" + ntries + " of "
+                                    + maxtries + "): " + this, ex);
+
+                            continue;
+
+                        }
+
+                        log.fatal(this, ex);
+
+                        throw ex;
+
+                    }
+
+                }
+            }
+            if (!done) {
+                // should not reach this point.
+                throw new AssertionError();
+            }
+             
             if (master.resultHandler != null) {
 
                 // aggregate results.
@@ -231,40 +284,6 @@ A//
 
             // keep reading.
             return false;
-
-        } catch (ExecutionException ex) {
-
-            final StaleLocatorException cause = (StaleLocatorException) InnerCause
-                    .getInnerCause(ex, StaleLocatorException.class);
-
-            if (cause != null) {
-
-//                /*
-//                 * Handle a stale locator.
-//                 * 
-//                 * Note: The master has (a) update its locator cache such that
-//                 * no more work is assigned to this output buffer; (b) re-split
-//                 * the chunk which failed with the StaleLocatorException; and
-//                 * (c) re-split all the data remaining in the output buffer
-//                 * since it all needs to go into different output buffer(s).
-//                 */
-//
-//                if (log.isInfoEnabled())
-//                    log.info("Stale locator: name=" + cause.getName()
-//                            + ", reason=" + cause.getReason());
-//
-//                master.handleStaleLocator((S) this, (E[]) chunk, cause);
-
-                handleRedirect((E[]) chunk, cause);
-                
-                // done.
-                return true;
-
-            } else {
-
-                throw ex;
-
-            }
 
         } finally {
 

@@ -403,8 +403,18 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         lock.lock();
         try {
 
-            if (open)
-                throw new IllegalStateException("Already open.");
+            if (open) {
+                /*
+                 * The store was already open by the time we got the lock.
+                 * 
+                 * Note: IndexSegment#readNodeOrLeaf() does not have a lock
+                 * before it invokes this method so the backing store can easily
+                 * have been concurrently re-opened once that thread gains the
+                 * lock.
+                 */
+//                throw new IllegalStateException("Already open.");
+                return;
+            }
 
             try {
 
