@@ -452,6 +452,8 @@
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
 	<replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+	<replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+	<replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
 	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
 </replace>
 <replace dir="${install.config.dir}" summary="true">
@@ -487,6 +489,8 @@
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
 	<replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
+	<replacefilter token="@NTP_NETWORK@" value="${NTP_NETWORK}" />
+	<replacefilter token="@NTP_NETMASK@" value="${NTP_NETMASK}" />
 	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
 	<!-- updates the configuration file to locate the lubm ontology. -->
 	<replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
@@ -514,6 +518,10 @@
 </echo>
 <chmod perm="g+rw,o-rw" file="${stateFile}" />
 <chmod perm="g+rw,o-rw" file="${stateLog}" />
+<!-- Make sure that the entire shared directory structure is read/write for the group. -->
+<chmod perm="g+rwx" file="${NAS}" />
+<!-- Make sure that it is all accessible to the install group. -->
+<chown file="${NAS}" type="both" owner="${install.user}.${install.group}"/>
 <loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
 <echo>
 
