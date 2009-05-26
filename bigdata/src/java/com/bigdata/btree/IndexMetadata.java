@@ -828,10 +828,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         /**
          * The maximum amount of time in nanoseconds that a sink will combine
-         * smaller chunks so that it can satisify the desired <i>sinkChunkSize</i>
+         * smaller chunks so that it can satisfy the desired <i>sinkChunkSize</i>
          * (default {@value #DEFAULT_SINK_CHUNK_TIMEOUT_NANOS}). The default is
          * an infinite timeout. This means that the sink will simply wait until
-         * {@link #SINK_CHUNK_SIZE} elements have accumualated before writing on
+         * {@link #SINK_CHUNK_SIZE} elements have accumulated before writing on
          * the index partition. This makes it much easier to adjust the
          * performance since you simply adjust the {@link #SINK_CHUNK_SIZE}.
          */

@@ -217,30 +217,30 @@ case "$1" in
 	if [ -s "$eventLog" -o -s "$errorLog" -o -s "$detailLog" ]; then
 	    lockfile -r 1 -1 "$logLockFile"
 	    if [ 0 == $? ]; then
-#
 #           Granted lock in the log directory so we can rename the log
 #           files.
+        rm -f $detailLog ${detailLog}.* $errorLog ${errorLog}.* $eventLog $eventLog.*
 #
 #           Move the event log out of the way (exists and is not empty).
 #
 #           @todo should really trigger a normal rollover for these log
 #                 files when the SimpleSocketServer is taken down.
 #
-		random=`date +%N | sed -e 's/000$//' -e 's/^0//'`
-		if [ -s "$eventLog" ]; then
-		    echo $"`date` : `hostname` : renaming old event log."
-		    mv "$eventLog" "$eventLog-`date +%F`$random.old"
-		fi
-#           Move the error log out of the way (exists and is not empty).
-		if [ -s "$errorLog" ]; then
-		    echo $"`date` : `hostname` : renaming old error log."
-		    mv "$errorLog" "$errorLog-`date +%F`$random.old"
-		fi
-#           Move the services log out of the way (exists and is not empty).
-		if [ -s "$detailLog" ]; then
-		    echo $"`date` : `hostname` : renaming old services log."
-		    mv "$detailLog" "$detailLog-`date +%F`$random.old"
-		fi
+#		random=`date +%N | sed -e 's/000$//' -e 's/^0//'`
+#		if [ -s "$eventLog" ]; then
+#		    echo $"`date` : `hostname` : renaming old event log."
+#		    mv "$eventLog" "$eventLog-`date +%F`$random.old"
+#		fi
+##           Move the error log out of the way (exists and is not empty).
+#		if [ -s "$errorLog" ]; then
+#		    echo $"`date` : `hostname` : renaming old error log."
+#		    mv "$errorLog" "$errorLog-`date +%F`$random.old"
+#		fi
+##           Move the detail log out of the way (exists and is not empty).
+#		if [ -s "$detailLog" ]; then
+#		    echo $"`date` : `hostname` : renaming old detail log."
+#		    mv "$detailLog" "$detailLog-`date +%F`$random.old"
+#		fi
 		rm -f "$logLockFile"
 	    fi
 	fi
