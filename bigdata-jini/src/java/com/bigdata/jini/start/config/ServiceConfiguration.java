@@ -652,8 +652,8 @@ abstract public class ServiceConfiguration implements Serializable {
             // allow override of the environment for the child.
             setUpEnvironment(processBuilder.environment());
 
-            // specify the startup directory?
-            // processBuilder.directory(dataDir);
+            // start in the service directory.
+            processBuilder.directory(getServiceDir());
 
             return processBuilder;
 
