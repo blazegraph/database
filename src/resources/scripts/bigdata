@@ -199,6 +199,7 @@ case "$1" in
 #
 	if [ -f "$lockFile" ]; then
 	    action $"`date` : `hostname` : bringing down services: " ./bigdatadown
+		rm -f "$lockFile"
 	fi
 	if [ "$FORCE_KILL_ALL" == "true" ]; then
 # Note: This is a "sure kill" but it does not play nice with other
