@@ -451,6 +451,7 @@
 	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+	<replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
 	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
 </replace>
 <replace dir="${install.config.dir}" summary="true">
@@ -485,6 +486,7 @@
 	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
+	<replacefilter token="@NTP_MASTER@" value="${NTP_MASTER}" />
 	<replacefilter token="@CLASSPATH@" value="${myclasspath}" />
 	<!-- updates the configuration file to locate the lubm ontology. -->
 	<replacefilter token="@install.lubm.config.dir@" value="${install.lubm.config.dir}" />
@@ -530,7 +532,8 @@ ${postInstallMessage}</echo>
 <mkdir dir="${analysis.out.dir}/service/cs" />
 <mkdir dir="${analysis.out.dir}/service/ds" />
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/chunksIn.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/cs/chunksIn.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -545,7 +548,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/chunksOut.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/cs/chunksOut.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -560,7 +564,56 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/toldTriplesPerSec.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/cs/averageMillisPerWait.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IClientService/.*/Indices/([^/]*)/asynchronous/averageMillisPerWait" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="14" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/cs/averageMillisPerWrite.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IClientService/.*/Indices/([^/]*)/asynchronous/averageMillisPerWrite" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="14" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/cs/averageElementsPerWrite.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*IClientService/.*/Indices/([^/]*)/asynchronous/averageElementsPerWrite" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="14" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/cs/toldTriplesPerSec.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -575,7 +628,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/cs/toldTriplesLoaded.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/cs/toldTriplesLoaded.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -590,7 +644,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/memory/bytesFree.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/memory/bytesFree.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -605,7 +660,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/memory/majorPageFaultsPerSecond.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery" 
+	output="${analysis.out.dir}/memory/majorPageFaultsPerSecond.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -620,7 +676,69 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/cpu/processorTime.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/virtualSize.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Virtual Size" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/residentSetSize.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Resident Set Size" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/runtimeTotalMemory.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Runtime Total Memory" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/runtimeFreeMemory.txt" failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
+	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+	<arg value="-regex" />
+	<arg value="/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Runtime Free Memory" />
+	<arg value="-report" />
+	<arg value="correlated" />
+	<arg value="-period" />
+	<arg value="Minutes" />
+	<arg value="-depth" />
+	<arg value="12" />
+	<arg file="${analysis.counters.dir}" />
+</java>
+
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/cpu/processorTime.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -635,7 +753,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/cpu/IOWait.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/cpu/IOWait.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -650,7 +769,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/disk/bytesWrittenPerSec.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/disk/bytesWrittenPerSec.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -665,7 +785,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/disk/bytesReadPerSecond.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/disk/bytesReadPerSecond.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -680,7 +801,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/indexSegmentCacheSize.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/indexSegmentCacheSize.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -695,7 +817,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafCount.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafCount.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -710,7 +833,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafByteCount.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/indexSegmentOpenLeafByteCount.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -725,7 +849,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/bytesUnderManagement.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/bytesUnderManagement.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -740,7 +865,8 @@ ${postInstallMessage}</echo>
 	<arg file="${analysis.counters.dir}" />
 </java>
 
-<java classname="com.bigdata.counters.query.CounterSetQuery" output="${analysis.out.dir}/service/ds/managedSegmentStoreCount.txt" failonerror="true" fork="true" logerror="true">
+<java classname="com.bigdata.counters.query.CounterSetQuery"
+	output="${analysis.out.dir}/service/ds/managedSegmentStoreCount.txt" failonerror="true" fork="true" logerror="true">
 	<classpath refid="runtime.classpath" />
 	<jvmarg value="-Dcom.bigdata.Banner.quiet=true" />
 	<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
@@ -754,7 +880,7 @@ ${postInstallMessage}</echo>
 	<arg value="12" />
 	<arg file="${analysis.counters.dir}" />
 </java>
-
+	
 </target>
 
 <!--                                            -->
