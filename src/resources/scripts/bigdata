@@ -288,6 +288,41 @@ case "$1" in
 	    echo $"`date` : `hostname` : not running."
 	fi
 	;;
+  ntpSet)
+#
+# Stops ntpd on all hosts except the one which is specified as the
+# ntpd master and cause the date/time on each such host to be set from
+# the ntpd master using ntpdate. Once the clocks are synchronized,
+# change the run state to 'ntpStart' until ntp is running on all
+# hosts.  You can see if the clocks are mostly synchronized just by
+# watching the 'date' output or adding an [ntpdate -q] command to get
+# some exact information.  There are some sample configuration files
+# for ntp which can help you out, but also see the following resources.
+#
+# See http://www.cis.udel.edu/~mills/ntp/html/ntpdate.html
+#
+# See http://www.brennan.id.au/09-Network_Time_Protocol.html
+#
+	if [ -z "@NTP_MASTER@" ]; then
+	    echo $"`date` : `hostname` : ntp commands not enabled."
+	    exit 1;
+	fi
+	if [ "@NTP_MASTER@" != "`hostname`" ]; then
+	    action $"`date` : `hostname` : stopping ntpd: " /etc/init.d/ntpd stop
+	    action $"`date` : `hostname` : setting clock: " /usr/sbin/ntpdate "@NTP_MASTER@"
+#	    action $"`date` : `hostname` : clock status " /usr/sbin/ntpdate -q "@NTP_MASTER@"
+	fi
+	;;
+  ntpStart)
+# Starts ntpd on all hosts other except: @NTP_MASTER@
+	if [ -z "@NTP_MASTER@" ]; then
+	    echo $"`date` : `hostname` : ntp commands not enabled."
+	    exit 1;
+	fi
+	if [ "@NTP_MASTER@" != "`hostname`" ]; then
+	    action $"`date` : `hostname` : starting ntpd: " /etc/init.d/ntpd start
+	fi
+	;;
 #    restart)
 # Note: DO NOT enable [restart].  It will kill and restart the
 # services each time the script is read so you can not reach a stable
@@ -315,7 +350,7 @@ case "$1" in
 #
 # Usage
 #
-        echo $"Usage: $0 {start|stop|hup|destroy|status|file}"
+        echo $"Usage: $0 {start|stop|hup|destroy|status|ntpd|file}"
         exit 1
 esac
 
