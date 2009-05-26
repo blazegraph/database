@@ -521,7 +521,12 @@
 <!-- Make sure that the entire shared directory structure is read/write for the group. -->
 <chmod perm="g+rwx" file="${NAS}" />
 <!-- Make sure that it is all accessible to the install group. -->
-<chown file="${NAS}" type="both" owner="${install.user}.${install.group}"/>
+<!-- Unfortunately, chown is an optional ant component so we have to do this by hand 
+     in the post-install.
+
+ <chown file="${NAS}" type="both" owner="${install.user}.${install.group}"/>
+ 
+ -->
 <loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
 <echo>
 
