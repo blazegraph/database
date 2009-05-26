@@ -97,7 +97,10 @@ fi
 # doing.  This affects all files created by root, including the
 # directory structure. umask could be used to correct this.  It
 # can also be corrected by "chown -R root.wheel $NAS"
-umask -S u=rwx,g=rwx,o=rx
+# 
+# @todo this does not seem to be sufficient.
+#
+# umask -S u=rwx,g=rwx,o=rx
 
 # Verify site-specific preconditions.
 ./bigdataprecond
