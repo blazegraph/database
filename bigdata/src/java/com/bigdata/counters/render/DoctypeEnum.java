@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Apr 18, 2008
  */
 
-package com.bigdata.counters.httpd;
+package com.bigdata.counters.render;
 
 import java.io.IOException;
 import java.io.Writer;

@@ -1,33 +1,24 @@
-package com.bigdata.counters.httpd;
+package com.bigdata.counters.render;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.lang.reflect.Field;
-import java.net.URLEncoder;
 import java.text.DateFormat;
-import java.text.DecimalFormat;
 import java.text.Format;
-import java.text.NumberFormat;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
-import java.util.Vector;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.History;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterNode;
@@ -35,19 +26,18 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IHistoryEntry;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.PeriodEnum;
-import com.bigdata.counters.httpd.XHTMLRenderer.Model.ReportEnum;
-import com.bigdata.counters.httpd.XHTMLRenderer.Model.TimestampFormatEnum;
+import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.query.CSet;
 import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.HistoryTable;
+import com.bigdata.counters.query.ICounterSelector;
 import com.bigdata.counters.query.PivotTable;
-import com.bigdata.counters.query.QueryUtil;
-import com.bigdata.counters.render.HTMLHistoryTableRenderer;
-import com.bigdata.counters.render.PivotTableRenderer;
-import com.bigdata.counters.render.ValueFormatter;
+import com.bigdata.counters.query.ReportEnum;
+import com.bigdata.counters.query.TimestampFormatEnum;
+import com.bigdata.counters.query.URLQueryModel;
+import com.bigdata.counters.query.URLQueryParam;
 import com.bigdata.service.Event;
 import com.bigdata.service.IEventReportingService;
-import com.bigdata.service.IService;
 import com.bigdata.util.HTMLUtility;
 
 /**
@@ -61,731 +51,12 @@ import com.bigdata.util.HTMLUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class XHTMLRenderer {
+public class XHTMLRenderer implements IRenderer {
     
     final static protected Logger log = Logger.getLogger(XHTMLRenderer.class);
     
     final public static String ps = ICounterSet.pathSeparator;
 
-    public static class Model {
-        
-        /**
-         * Name of the URL query parameter specifying the starting path for the page
-         * view.
-         */
-        static final String PATH = "path";
-
-        /**
-         * Depth to be displayed from the given path -or- zero (0) to display
-         * all levels.
-         */
-        static final String DEPTH = "depth";
-        
-        /**
-         * URL query parameter whose value is the type of report to generate.
-         * The default is {@link ReportEnum#hierarchy}.
-         * 
-         * @see ReportEnum
-         */
-        static final String REPORT = "report";
-        
-        /**
-         * The different kinds of reports that we can generate.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
-         */
-        public static enum ReportEnum {
-           
-            /**
-             * This is the navigational view of the performance counter
-             * hierarchy.
-             */
-            hierarchy,
-            
-            /**
-             * A correlated view will be generated for the spanned counters
-             * showing all samples for each counter in a column where the rows
-             * are all for the same sample period. Counters without history are
-             * elided in this view. This is useful for plotting timeseries.
-             */
-            correlated,
-            
-            /**
-             * This is a pivot table ready view, which is useful for aggregating
-             * the performance counter data in a variety of ways.
-             */
-            pivot,
-            
-            /**
-             * Plot a timeline of events.
-             */
-            events;
-            
-        }
-        
-        /**
-         * The ordered labels to be assigned to the category columns in a
-         * {@link ReportEnum#pivot} report. The order of the names in the URL
-         * query parameters MUST correspond with the order of the capturing
-         * groups in the {@link #REGEX}.
-         */
-        static final String CATEGORY = "category";
-        
-        /**
-         * Name of the URL query parameter specifying whether the optional
-         * correlated view for counter histories will be displayed.
-         * <p>
-         * Note: This is a shorthand for specifying {@link #REPORT} as
-         * {@value ReportEnum#correlated}.
-         */
-        static final String CORRELATED = "correlated";
-        
-        /**
-         * Name of the URL query parameter specifying one or more strings for
-         * the filter to be applied to the counter paths.
-         */
-        static final String FILTER = "filter";
-
-        /**
-         * Name of the URL query parameter specifying one or more regular
-         * expression for the filter to be applied to the counter paths. Any
-         * capturing groups in this regular expression will be used to generate
-         * the column title when examining correlated counters in a table view.
-         * If there are no capturing groups then the counter name is used as the
-         * default title.
-         */
-        static final String REGEX = "regex";
-
-        /**
-         * Name of the URL query parameter specifying that the format for the
-         * first column of the history counter table view. This column is the
-         * timestamp associated with the counter but it can be reported in a
-         * variety of ways. The possible values for this option are specified by
-         * {@link TimestampFormatEnum}.
-         * 
-         * @see TimestampFormatEnum
-         */
-        static final String TIMESTAMP_FORMAT = "timestampFormat";
-
-        /**
-         * The reporting period to be displayed. When not specified, all periods
-         * will be reported. The value may be any {@link PeriodEnum}.
-         */
-        static final String PERIOD = "period";
-        
-        /**
-         * A collection of event filters. Each filter is a regular expression.
-         * The key is the {@link Event} {@link Field} to which the filter will
-         * be applied. The events filters are specified using URL query
-         * parameters having the general form: <code>events.column=regex</code>.
-         * For example,
-         * 
-         * <pre>
-         * events.majorEventType = AsynchronousOverflow
-         * </pre>
-         * 
-         * would select just the asynchronous overflow events and
-         * 
-         * <pre>
-         * events.hostname=blade12.*
-         * </pre>
-         * 
-         * would select events reported for blade12.
-         */
-        public final HashMap<Field,Pattern> eventFilters = new HashMap<Field, Pattern>();
-
-        /**
-         * The <code>eventOrderBy=fld</code> URL query parameters specifies
-         * the sequence in which events should be grouped. The value of the
-         * query parameter is an ordered list of the names of {@link Event}
-         * {@link Field}s. For example:
-         * 
-         * <pre>
-         * eventOrderBy=majorEventType &amp; eventOrderOrderBy=hostname
-         * </pre>
-         * 
-         * would group the events first by the major event type and then by the
-         * hostname. All events for the same {@link Event#majorEventType} and
-         * the same {@link Event#hostname} would appear on the same Y value.
-         * <p>
-         * If no value is specified for this URL query parameter then the
-         * default is as if {@link Event#hostname} was specified.
-         */
-        static final String EVENT_ORDER_BY = "eventOrderBy";
-        
-        /**
-         * The order in which the events will be grouped.
-         * 
-         * @see #EVENT_ORDER_BY
-         */
-        public final Field[] eventOrderBy;
-        
-        /**
-         * Type-safe enum for the options used to render the timestamp of the
-         * row in a history or correlated history.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         * @version $Id$
-         */
-        enum TimestampFormatEnum {
-
-            /**
-             * 
-             */
-            dateTime,
-            
-            /**
-             * Report the timestamp of the counter value in milliseconds since
-             * the epoch (localtime).
-             */
-            epoch;
-
-        };
-
-//        /**
-//         * The service reference IFF one was specified when
-//         * {@link CounterSetHTTPD} was started.
-//         */
-//        final public IService service;
-        
-        /**
-         * Object used to select the performance counters of interest.
-         */
-        final public ICounterSelector counterSelector;
-        
-        /**
-         * The URI from the request.
-         */
-        final public String uri;
-        
-        /**
-         * The parameters from the request (eg, as parsed from URL query
-         * parameters).
-         */
-        final public LinkedHashMap<String,Vector<String>> params;
-        
-        /**
-         * The request headers.
-         */
-        final public Properties headers;
-        
-        /**
-         * The value of the {@link #PATH} query parameter. 
-         */
-        final public String path;
-        
-        /**
-         * The value of the {@link #DEPTH} query parameter.
-         */
-        final public int depth;
-        
-        /**
-         * The kind of report to generate.
-         * 
-         * @see #REPORT
-         * @see ReportEnum
-         */
-        final public ReportEnum reportType;
-        
-        /**
-         * @see #timestampFormat
-         * @see TimestampFormatEnum
-         */
-        final public TimestampFormatEnum timestampFormat;
-
-        /**
-         * The ordered labels to be assigned to the category columns in a
-         * {@link ReportEnum#pivot} report (optional). The order of the names in
-         * the URL query parameters MUST correspond with the order of the
-         * capturing groups in the {@link #REGEX}.
-         * 
-         * @see #CATEGORY
-         */
-        final public String[] category;
-        
-        /**
-         * The inclusive lower bound in milliseconds of the timestamp for the
-         * counters or events to be selected.
-         */
-        final long fromTime;
-
-        /**
-         * The exclusive upper bound in milliseconds of the timestamp for the
-         * counters or events to be selected.
-         */
-        final long toTime;
-        
-        /**
-         * The reporting period to be used. When <code>null</code> all periods
-         * will be reported. When specified, only that period is reported.
-         */
-        final public PeriodEnum period;
-        
-        /**
-         * The {@link Pattern} compiled from the {@link #FILTER} query
-         * parameters and <code>null</code> iff there are no {@link #FILTER}
-         * query parameters.
-         */
-        final public Pattern pattern;
-
-        /**
-         * The events iff they are available from the service.
-         * 
-         * @see IEventReportingService
-         */
-//        final LinkedHashMap<UUID, Event> events;
-        final IEventReportingService eventReportingService;
-        
-        /**
-         * <code>true</code> iff we need to output the scripts to support
-         * flot.
-         */
-        final boolean flot;
-        
-        /**
-         * Used to format double and float counter values.
-         */
-        final DecimalFormat decimalFormat;
-        
-        /**
-         * Used to format counter values that can be inferred to be a percentage.
-         */
-        final NumberFormat percentFormat;
-        
-        /**
-         * Used to format integer and long counter values.
-         */
-        final NumberFormat integerFormat;
-        
-        /**
-         * Used to format the units of time when expressed as elapsed units since
-         * the first sample of a {@link History}.
-         */
-        final DecimalFormat unitsFormat;
-//        final DateFormat dateFormat;
-        
-        /**
-         * @param fed
-         *            The service object IFF one was specified when
-         *            {@link CounterSetHTTPD} was started.
-         * @param counterSelector
-         *            Object used to select the performance counters of
-         *            interest.
-         * @param uri
-         *            Percent-decoded URI without parameters, for example
-         *            "/index.cgi"
-         * @param parms
-         *            Parsed, percent decoded parameters from URI and, in case
-         *            of POST, data. The keys are the parameter names. Each
-         *            value is a {@link Collection} of {@link String}s
-         *            containing the bindings for the named parameter. The order
-         *            of the URL parameters is preserved.
-         * @param header
-         *            Header entries, percent decoded
-         */
-        public Model(final IService service, final ICounterSelector counterSelector,
-                final String uri,
-                final LinkedHashMap<String, Vector<String>> params,
-                final Properties headers) {
-
-//            this.service = service;
-            
-            this.counterSelector = counterSelector;
-
-            this.uri = uri;
-
-            this.params = params;
-            
-            this.headers = headers;
-
-            this.path = getProperty(params, PATH, ps);
-
-            if (log.isInfoEnabled())
-                log.info(PATH + "=" + path);
-
-            this.depth = Integer.parseInt(getProperty(params, DEPTH, "2"));
-            
-            if (log.isInfoEnabled())
-                log.info(DEPTH + "=" + depth);
-            
-            if (depth <= 0)
-                throw new IllegalArgumentException("depth must be GT ZERO(0)");
-
-            /*
-             * FIXME fromTime and toTime are not yet being parsed. They should
-             * be interpreted so as to allow somewhat flexible specification and
-             * should be applied to both performance counter views and event
-             * views.
-             */
-            fromTime = 0L;
-            toTime = Long.MAX_VALUE;
-
-            // assemble the optional filter.
-            this.pattern = QueryUtil.getPattern(//
-                    params.get(FILTER),//
-                    params.get(REGEX)//
-                    );
-
-            if (service != null && service instanceof IEventReportingService) {
-
-                // events are available.
-                eventReportingService = ((IEventReportingService) service);
-
-            } else {
-
-                // events are not available.
-                eventReportingService = null;
-                
-            }
-            
-            if (params.containsKey(REPORT) && params.containsKey(CORRELATED)) {
-
-                throw new IllegalArgumentException("Please use either '"
-                        + CORRELATED + "' or '" + REPORT + "'");
-                
-            }
-
-            if(params.containsKey(REPORT)) {
-            
-                this.reportType = ReportEnum.valueOf(getProperty(
-                    params, REPORT, ReportEnum.hierarchy.toString()));
-
-                if (log.isInfoEnabled())
-                    log.info(REPORT + "=" + reportType);
-                
-            } else {
-            
-                final boolean correlated = Boolean.parseBoolean(getProperty(
-                        params, CORRELATED, "false"));
-            
-                if (log.isInfoEnabled())
-                    log.info(CORRELATED + "=" + correlated);
-
-                this.reportType = correlated ? ReportEnum.correlated
-                        : ReportEnum.hierarchy;
-
-            }
-
-            if (eventReportingService != null) {
-                
-                final Iterator<Map.Entry<String, Vector<String>>> itr = params
-                        .entrySet().iterator();
-                
-                while(itr.hasNext()) {
-                    
-                    final Map.Entry<String, Vector<String>> entry = itr.next();
-                    
-                    final String name = entry.getKey();
-                    
-                    if (!name.startsWith("events."))
-                        continue;
-                    
-                    final int pos = name.indexOf('.');
-
-                    if (pos == -1) {
-
-                        throw new IllegalArgumentException(
-                                "Missing event column name: " + name);
-                        
-                    }
-                    
-                    // the name of the event column.
-                    final String col = name.substring(pos + 1, name.length());
-                    
-                    final Field fld;
-                    try {
-                        
-                        fld = Event.class.getField(col);
-                        
-                    } catch(NoSuchFieldException ex) {
-
-                        throw new IllegalArgumentException("Unknown event field: "+col);
-                        
-                    }
-
-                    final Vector<String> patterns = entry.getValue();
-                    
-                    if (patterns.size() == 0)
-                        continue;
-
-                    if (patterns.size() > 1)
-                        throw new IllegalArgumentException(
-                                "Only one pattern per field: " + name);
-                    
-                    /*
-                     * compile the pattern
-                     * 
-                     * Note: Throws PatternSyntaxException if the pattern can
-                     * not be compiled.
-                     */
-                    final Pattern pattern = Pattern.compile(patterns.firstElement());
-                    
-                    eventFilters.put(fld, pattern);
-                    
-                }
-
-                if (log.isInfoEnabled()) {
-                    final StringBuilder sb = new StringBuilder();
-                    for (Field f : eventFilters.keySet()) {
-                        sb.append(f.getName() + "=" + eventFilters.get(f));
-                    }
-                    log.info("eventFilters={" + sb + "}");
-                }
-                
-            }
-            
-            // eventOrderBy
-            {
-                
-                final Vector<String> v = params.get(EVENT_ORDER_BY);
-
-                if (v == null) {
-
-                    /*
-                     * Use a default for eventOrderBy.
-                     */
-
-                    try {
-
-                        eventOrderBy = new Field[] { Event.class
-                                .getField("hostname") };
-
-                    } catch (Throwable t) {
-
-                        throw new RuntimeException(t);
-
-                    }
-
-                } else {
-
-                    final Vector<Field> fields = new Vector<Field>();
-
-                    for (String s : v) {
-
-                        try {
-
-                            fields.add(Event.class.getField(s));
-
-                        } catch (Throwable t) {
-
-                            throw new RuntimeException(t);
-
-                        }
-
-                    }
-
-                    eventOrderBy = fields.toArray(new Field[0]);
-
-                }
-               
-                if (log.isInfoEnabled())
-                    log.info(EVENT_ORDER_BY + "="
-                            + Arrays.toString(eventOrderBy));
-
-            }
-            
-            switch (reportType) {
-            case events:
-                if (eventReportingService == null) {
-
-                    /*
-                     * Throw exception since the report type requires events but
-                     * they are not available.
-                     */
-
-                    throw new IllegalStateException("Events are not available.");
-
-                }
-                flot = true;
-                break;
-            default:
-                flot = false;
-                break;
-            }
-            
-            this.category = params.containsKey(CATEGORY) ? params.get(CATEGORY)
-                    .toArray(new String[0]) : null;
-
-            if (log.isInfoEnabled() && category != null)
-                log.info(CATEGORY + "=" + Arrays.toString(category));
-
-            this.timestampFormat = TimestampFormatEnum.valueOf(getProperty(
-                    params, TIMESTAMP_FORMAT, TimestampFormatEnum.dateTime.toString()));
-            
-            if (log.isInfoEnabled())
-                log.info(TIMESTAMP_FORMAT + "=" + timestampFormat);
-
-            this.period = PeriodEnum.valueOf(getProperty(params, PERIOD,
-                    PeriodEnum.Minutes.toString()/* defaultValue */));
-
-            if (log.isInfoEnabled())
-                log.info(PERIOD + "=" + period);
-
-            /*
-             * @todo this should be parameter whose default is set on the server and
-             * which can be overriden by a URL query parameter (.
-             */
-//            this.decimalFormat = new DecimalFormat("0.###E0");
-            this.decimalFormat = new DecimalFormat("##0.#####E0");
-            
-//            decimalFormat.setGroupingUsed(true);
-    //
-//            decimalFormat.setMinimumFractionDigits(3);
-//            
-//            decimalFormat.setMaximumFractionDigits(6);
-//            
-//            decimalFormat.setDecimalSeparatorAlwaysShown(true);
-            
-            this.percentFormat = NumberFormat.getPercentInstance();
-            
-            this.integerFormat = NumberFormat.getIntegerInstance();
-            
-            integerFormat.setGroupingUsed(true);
-            
-            this.unitsFormat = new DecimalFormat("0.#");
-            
-        }
-
-        /**
-         * Return the first value for the named property.
-         * 
-         * @param params
-         *            The request parameters.
-         * @param property
-         *            The name of the property
-         * @param defaultValue
-         *            The default value (optional).
-         * 
-         * @return The first value for the named property and the defaultValue
-         *         if there named property was not present in the request.
-         * 
-         * @todo move to a request object?
-         */
-        public String getProperty(final Map<String, Vector<String>> params,
-                final String property, final String defaultValue) {
-            
-            if (params == null)
-                throw new IllegalArgumentException();
-
-            if (property == null)
-                throw new IllegalArgumentException();
-
-            final Vector<String> vals = params.get(property);
-
-            if (vals == null)
-                return defaultValue;
-
-            return vals.get(0);
-            
-        }
-
-        /**
-         * Re-create the request URL, including the protocol, host, port, and
-         * path but not any query parameters.
-         */
-        public StringBuilder getRequestURL() {
-            
-            final StringBuilder sb = new StringBuilder();
-
-            // protocol
-            sb.append("http://");
-            
-            // host and port
-            sb.append(headers.get("host"));
-            
-            // path (including the leading '/')
-            sb.append(uri);
-
-            return sb;
-
-        }
-
-        /**
-         * Re-create the request URL.
-         * 
-         * @param override
-         *            Overriden query parameters (optional).
-         *            
-         * @todo move to request object?
-         */
-        public String getRequestURL(final NV[] override) {
-        
-            // Note: Used throughput to preserve the parameter order.
-            final LinkedHashMap<String,Vector<String>> p;
-            
-            if(override == null) {
-                
-                p = params;
-                
-            } else {
-                
-                p = new LinkedHashMap<String,Vector<String>>(params);
-                
-                for(NV x : override) {
-                                            
-                    p.put(x.name, x.values);
-                    
-                }
-                
-            }
-
-            final StringBuilder sb = getRequestURL();
-            
-            sb.append("?path=" + encodeURL(getProperty(p, PATH, ps)));
-            
-            final Iterator<Map.Entry<String, Vector<String>>> itr = p
-                    .entrySet().iterator();
-            
-            while(itr.hasNext()) {
-                
-                final Map.Entry<String, Vector<String>> entry = itr.next();
-
-                final String name = entry.getKey();
-
-                if (name.equals(PATH)) {
-
-                    // already handled.
-                    continue;
-
-                }
-
-                final Collection<String> vals = entry.getValue();
-
-                for (String s : vals) {
-
-                    sb.append("&" + encodeURL(name) + "=" + encodeURL(s));
-
-                }
-                
-            }
-            
-            return sb.toString();
-
-        }
-
-        static public String encodeURL(final String url) {
-
-            final String charset = "UTF-8";
-
-            try {
-
-                return URLEncoder.encode(url, charset);
-
-            } catch (UnsupportedEncodingException e) {
-
-                log.error("Could not encode: charset=" + charset + ", url="
-                        + url);
-
-                return url;
-
-            }
-            
-        }
-        
-    } // class Model
-    
     static final private String encoding = "UTF-8";
     
     /*
@@ -796,81 +67,42 @@ public class XHTMLRenderer {
     static final private DoctypeEnum doctype = DoctypeEnum.xhtml_1_0_strict;
     
     /**
-     * Allows override of the binding(s) for a named property.
-     *  
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static private class NV {
-        
-        public final String name;
-        public final Vector<String> values;
-        
-        public NV(String name, String value) {
-
-            if (name == null)
-                throw new IllegalArgumentException();
-
-            this.name = name;
-
-            if (value == null) {
-
-                this.values = null;
-
-            } else {
-
-                Vector<String> values = new Vector<String>();
-
-                values.add(value);
-
-                this.values = values;
-
-            }
-            
-        }
-        
-        public NV(String name, String[] values) {
-            
-            if (name == null)
-                throw new IllegalArgumentException();
-            
-            if (values == null)
-                throw new IllegalArgumentException();
-            
-            this.name = name;
-            
-            Vector<String> tmp = new Vector<String>();
-            
-            for(String s : values) {
-
-                tmp.add(s);
-                
-            }
-            
-            this.values = tmp;
-            
-        }
-        
-    }
-    
-    /**
      * Describes the state of the controller.
      */
-    protected final Model model;
-    
+    public final URLQueryModel model;
+
     /**
-     * 
+     * Selects the counters to be rendered.
      */
-    public XHTMLRenderer(final Model model) {
+    public final ICounterSelector counterSelector;
+
+    /**
+     * @param model
+     *            Describes the state of the controller (e.g., as parsed from
+     *            the URL query parameters).
+     * @param counterSelector
+     *            Selects the counters to be rendered.
+     */
+    public XHTMLRenderer(final URLQueryModel model,
+            final ICounterSelector counterSelector) {
 
         if (model == null)
             throw new IllegalArgumentException();
 
+        if (counterSelector == null)
+            throw new IllegalArgumentException();
+
         this.model = model;
+
+        this.counterSelector = counterSelector;
 
     }
 
-    public void write(final Writer w) throws IOException {
+    /**
+     * @param w
+     * @throws IOException
+     */
+    public void render(final Writer w) throws IOException {
 
         writeXmlDecl(w);
         
@@ -961,14 +193,12 @@ public class XHTMLRenderer {
         
     }
     
-    protected void writeBody(Writer w) throws IOException  {
+    protected void writeBody(final Writer w) throws IOException  {
         
         w.write("<body\n>");
 
-        /*
-         * @todo alternative ICounterSelect given just a Path.
-         */
-        final ICounterNode node = ((CounterSetSelector)model.counterSelector).getRoot().getPath(model.path);
+        final ICounterNode node = ((CounterSetSelector) counterSelector)
+                .getRoot().getPath(model.path);
         
         if(node == null) {
 
@@ -1010,7 +240,7 @@ public class XHTMLRenderer {
                 
             case correlated:
                 
-                writeHistoryTable(w, model.counterSelector.selectCounters(
+                writeHistoryTable(w, counterSelector.selectCounters(
                         model.depth, model.pattern, model.fromTime,
                         model.toTime, model.period), model.period,
                         model.timestampFormat);
@@ -1019,7 +249,7 @@ public class XHTMLRenderer {
                 
             case pivot:
                 
-                writePivotTable(w, model.counterSelector.selectCounters(
+                writePivotTable(w, counterSelector.selectCounters(
                         model.depth, model.pattern, model.fromTime,
                         model.toTime, model.period));
                 
@@ -1076,7 +306,7 @@ public class XHTMLRenderer {
             
             // click through to the root of the counter hierarchy
             w.write("<a href=\""
-                    + model.getRequestURL(new NV[] { new NV(Model.PATH, ps) })
+                    + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, ps) })
                     + "\">");
             w.write(ps);
             w.write("</a>");
@@ -1113,7 +343,7 @@ public class XHTMLRenderer {
                 if(rootDepth!=0 && n==rootDepth) {
                     
                     w.write("<a href=\""
-                            + model.getRequestURL(new NV[] { new NV(Model.PATH, prefix) }) + "\">");
+                            + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, prefix) }) + "\">");
 
                     w.write("...");
 
@@ -1126,7 +356,7 @@ public class XHTMLRenderer {
                 w.write("&nbsp;");
 
                 w.write("<a href=\""
-                        + model.getRequestURL(new NV[] { new NV(Model.PATH, sb
+                        + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, sb
                                 .toString()) }) + "\">");
 
                 // current path component.
@@ -1521,24 +751,15 @@ public class XHTMLRenderer {
      */
     public class HTMLValueFormatter extends ValueFormatter {
 
-        protected final Model model;
+        protected final URLQueryModel model;
         
         /**
          * 
-         * @param dateFormat
          * @param model
-         * 
-         * FIXME Do not require {@link Model} -- it makes it to difficult to run
-         * outside of the {@link CounterSetHTTPD}? (Not really, we could just
-         * parse a URL into the required form.) The other problem is that this
-         * is a non-static inner class of {@link XHTMLRenderer} (for
-         * {@link #value(ICounter, Object)}, which could be handled easily
-         * enough by copying the code, making it reference the
-         * {@link HTMLValueFormatter}, etc.).
          */
-        public HTMLValueFormatter(DateFormat dateFormat, Model model) {
+        public HTMLValueFormatter(URLQueryModel model) {
             
-            super(dateFormat);
+            super(model);
             
             this.model = model;
             
@@ -1581,7 +802,7 @@ public class XHTMLRenderer {
                 
                 // click through to the root of the counter hierarchy
                 w.write("<a href=\""
-                        + model.getRequestURL(new NV[] { new NV(Model.PATH, ps) })
+                        + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, ps) })
                         + "\">");
                 w.write(ps);
                 w.write("</a>");
@@ -1618,7 +839,7 @@ public class XHTMLRenderer {
                     if(rootDepth!=0 && n==rootDepth) {
                         
                         w.write("<a href=\""
-                                + model.getRequestURL(new NV[] { new NV(Model.PATH, prefix) }) + "\">");
+                                + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, prefix) }) + "\">");
 
                         w.write("...");
 
@@ -1631,7 +852,7 @@ public class XHTMLRenderer {
                     w.write("&nbsp;");
 
                     w.write("<a href=\""
-                            + model.getRequestURL(new NV[] { new NV(Model.PATH, sb
+                            + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, sb
                                     .toString()) }) + "\">");
 
                     // current path component.
@@ -1669,7 +890,7 @@ public class XHTMLRenderer {
      *             if any element of <i>a</i> does not use a
      *             {@link HistoryInstrument}.
      * 
-     * @todo review use of basePeriod - this is {@link Model#period}, right?
+     * @todo review use of basePeriod - this is {@link URLQueryModel#period}, right?
      */
     protected void writeHistoryTable(final Writer w, final ICounter[] a,
             final PeriodEnum basePeriod,
@@ -1726,7 +947,7 @@ public class XHTMLRenderer {
         }
 
         new HTMLHistoryTableRenderer(t, model.pattern, new HTMLValueFormatter(
-                dateFormat, model)).render(w);
+                model)).render(w);
         
     }
 
@@ -1967,7 +1188,7 @@ public class XHTMLRenderer {
      * 
      * @throws IOException
      * 
-     * @todo review use of basePeriod. is this {@link Model#period}?
+     * @todo review use of basePeriod. is this {@link URLQueryModel#period}?
      */
     protected void writePivotTable(final Writer w, final ICounter[] a,
             final PeriodEnum basePeriod,
@@ -2025,8 +1246,7 @@ public class XHTMLRenderer {
             throw new AssertionError(timestampFormat.toString());
         }
 
-        new HTMLPivotTableRenderer(pt,
-                new HTMLValueFormatter(dateFormat, model)).render(w);
+        new HTMLPivotTableRenderer(pt, new HTMLValueFormatter(model)).render(w);
         
     }
     
@@ -2036,13 +1256,13 @@ public class XHTMLRenderer {
      * The pivot table data are selected in the same manner as the correlated
      * view and are used to generate a {@link HistoryTable}. There will be one
      * data row per row in the history table. There will be one category column
-     * for each capturing group in the {@link Model#pattern}, one column for
+     * for each capturing group in the {@link URLQueryModel#pattern}, one column for
      * the timestamp associated with the row, and one for the value of each
-     * performance counter selected by the {@link Model#pattern}.
+     * performance counter selected by the {@link URLQueryModel#pattern}.
      * <p>
      * Since the pivot table and the correlated view are both based on the
      * {@link HistoryTable} you can switch between these views simply by
-     * changing the {@link Model#reportType} using the {@value Model#REPORT} URL
+     * changing the {@link URLQueryModel#reportType} using the {@value URLQueryModel#REPORT} URL
      * query parameter.
      * 
      * @see ReportEnum#pivot
@@ -2103,7 +1323,7 @@ public class XHTMLRenderer {
     }
     
     /**
-     * Applies the {@link Model#eventFilters} to the event.
+     * Applies the {@link URLQueryModel#eventFilters} to the event.
      * 
      * @param e
      *            The event.
@@ -2198,8 +1418,8 @@ public class XHTMLRenderer {
      * Plots events using <code>flot</code>.
      * 
      * @see ReportEnum#events
-     * @see Model#eventFilters
-     * @see Model#eventOrderBy
+     * @see URLQueryModel#eventFilters
+     * @see URLQueryModel#eventOrderBy
      * 
      * FIXME Modify to allow visualization of a performance counter timeseries
      * data.

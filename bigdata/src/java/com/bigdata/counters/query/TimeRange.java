@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 
 import cern.clhep.Units;
 
-import com.bigdata.counters.httpd.XHTMLRenderer;
+import com.bigdata.counters.render.XHTMLRenderer;
 
 /**
  * Utility class to interpret URL query parameters as a time range. Some
@@ -82,7 +82,7 @@ import com.bigdata.counters.httpd.XHTMLRenderer;
  * 
  * @todo if no suffix then directly gives the milliseconds since the epoch?
  * 
- * @todo the {@link XHTMLRenderer.Model} should also support fromDate and
+ * @todo the {@link XHTMLRenderer.URLQueryModel} should also support fromDate and
  *       toDate, where the values are dates/date-times and where there is an
  *       optional URL query parameter to specify the format string used to
  *       interpret the data/time.

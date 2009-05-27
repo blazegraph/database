@@ -28,17 +28,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.query;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.StringWriter;
-import java.text.DateFormat;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
+import java.net.URL;
 import java.util.Collection;
-import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
+import java.util.Vector;
 import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -48,150 +54,188 @@ import org.xml.sax.SAXException;
 
 import com.bigdata.Banner;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.ICounter;
 import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.httpd.DummyEventReportingService;
-import com.bigdata.counters.httpd.XHTMLRenderer.Model.ReportEnum;
+import com.bigdata.counters.query.CounterSetSelector;
+import com.bigdata.counters.query.QueryUtil;
+import com.bigdata.counters.query.URLQueryModel;
 import com.bigdata.counters.render.IRenderer;
-import com.bigdata.counters.render.TabDelimitedHistoryTableRenderer;
-import com.bigdata.counters.render.TabDelimitedPivotTableRenderer;
-import com.bigdata.counters.render.TextValueFormatter;
-import com.bigdata.counters.store.CounterSetBTree;
-import com.bigdata.journal.Journal;
+import com.bigdata.counters.render.RendererFactory;
+import com.bigdata.service.Event;
+import com.bigdata.util.httpd.NanoHTTPD;
 
 /**
- * Utility to query counter sets.
+ * Utility to extract a batch of performance counters from a collection of
+ * logged XML counter set files. This utility accepts file(s) giving the URLs
+ * which would be used to demand the corresponding performance counters against
+ * the live bigdata federation. The URLs listed in that file are parsed. The
+ * host and port information are ignored, but the URL query parameters are
+ * extracted and used to configured a set of {@link URLQueryModel}s.
+ * <p>
+ * A single pass is made through the specified XML counter set files. Each file
+ * is read into memory by itself, and each query implied by a listed URL is run
+ * against the in-memory {@link CounterSet} hierarchy. The results are collected
+ * in independent {@link CounterSet} provisioned for the specified reporting
+ * units, etc. Once the last XML counter set file has been processed, the
+ * various reports requested by the listed URLs are generated.
+ * <p>
+ * For each generated report, the name of the file on which the report will be
+ * written is taken from the name of the counter whose value was extracted for
+ * that report. This filename may be overridden by including the URL query
+ * parameter {@value URLQueryModel#FILE}, which specifies the file on which to
+ * write the report for that query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo How will navigational views be supported against a counter set on a
- *       store?
+ * @see IHostCounters
+ * @see IRequiredHostCounters
  * 
- * @todo Another useful query is to scan for time periods when a counter exceeds
- *       a threshold and report those counter values.
- * 
- * @todo Could report weighted averages, not just the raw values.
- * 
- * @todo flot output for graphs, including flot of averages, multi-line flot,
- *       etc.
- * 
- * @todo there really ought to be unit tests of the {@link HistoryTable} and the
- *       {@link PivotTable} against known data, e.g., as loaded from XML files
- *       or from a test journal resource.
- *       
- *       @see IHostCounters
- *       @see IRequiredHostCounters
+ * @todo When rendering HTML output using flot, the flot resources need to be
+ *       available in order to view the graphs. They should be written once into
+ *       the output directory and the links in the (X)HTML output should resolve
+ *       them there.
  */
 public class CounterSetQuery {
 
     static protected final Logger log = Logger.getLogger(CounterSetQuery.class);
 
-//    public final long fromTime;
-//    public final long toTime;
-//    public final TimeUnit unit;
-//    public final Pattern pattern;
-//    public final TimeUnit granularity;
-//
-//    /**
-//     * 
-//     * @param fromTime
-//     *            The first time whose counters will be visited.
-//     * @param toTime
-//     *            The first time whose counters WILL NOT be visited.
-//     * @param unit
-//     *            The unit in which <i>fromTime</i> and <i>toTime</i> are
-//     *            expressed.
-//     * @param pattern
-//     *            Only paths matched by the {@link Pattern} will be accepted
-//     *            (optional).
-//     * @param granularity
-//     *            The unit of aggregation.
-//     */
-//    protected CounterSetQuery(long fromTime, long toTime, TimeUnit unit,
-//            Pattern pattern, TimeUnit granularity) {
-//
-//        this.fromTime = fromTime;
-//        this.toTime = toTime;
-//        this.unit = unit;
-//        this.pattern = pattern;
-//        this.granularity = granularity;
-//        
-//    }
-//
-//    /**
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    static class HistoryTableQuery extends CounterSetQuery {
-//
-//        public HistoryTableQuery(long fromTime, long toTime, TimeUnit unit,
-//                Pattern pattern, TimeUnit granularity) {
-//
-//            super(fromTime, toTime, unit, pattern, granularity);
-//            
-//        }
-//        
-//    }
-//
-//    /**
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    static class PivotTableQuery extends CounterSetQuery {
-//    
-//        public final String[] category;
-//
-//        /**
-//         * 
-//         * 
-//         * @param pattern
-//         *            The pattern used to specify the counters of interest and
-//         *            the capturing groups which determined how the counters
-//         *            will be aggregated.
-//         * @param category
-//         *            The ordered labels to be assigned to the category columns
-//         *            (optional). When given, the order of the category names
-//         *            parameters MUST correspond with the order of the capturing
-//         *            groups in the <i>pattern</i>.
-//         */
-//        public PivotTableQuery(long fromTime, long toTime, TimeUnit unit,
-//                Pattern pattern, TimeUnit granularity, String[] category) {
-//
-//            super(fromTime, toTime, unit, pattern, granularity);
-//
-//            this.category = category;
-//
-//        }
-//        
-//    }
-
     /**
-     * The supported output formats.
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * Create a {@link URLQueryModel} from a URL.
+     * 
+     * @param url
+     *            The URL.
+     * 
+     * @return The {@link URLQueryModel}
+     * 
+     * @throws UnsupportedEncodingException
      */
-    static public enum FormatEnum {
-     
-        /**
-         * XHTML.
-         */
-        html,
-     
-        /**
-         * tab-delimited text.
-         */
-        text;
-        
+    static private URLQueryModel newQueryModel(final URL url)
+            throws UnsupportedEncodingException {
+
+        // Extract the URL query parameters.
+        final LinkedHashMap<String, Vector<String>> params = NanoHTTPD
+                .decodeParms(url.getQuery());
+
+        // add any relevant headers
+        final Properties headers = new Properties();
+
+        headers.setProperty("host", url.getHost() + ":" + url.getPort());
+
+        return new URLQueryModel(null/* service */, url.toString(), params,
+                headers);
+
     }
 
     /**
+     * Reads a list of {@link URL}s from a file. Blank lines and comment lines
+     * are ignored.
+     * 
+     * @param file
+     *            A file containing URLs, blank lines, and comment lines (which
+     *            start with '#').
+     * 
+     * @return A list of the URLs read from the file.
+     * 
+     * @throws IOException
+     */
+    private static Collection<URL> readURLsFromFile(final File file) throws IOException {
+
+        if(log.isInfoEnabled())
+            log.info("Reading queries: "+file);
+        
+        final List<URL> tmp = new LinkedList<URL>();
+
+        final BufferedReader r = new BufferedReader(new FileReader(file));
+
+        String s;
+        while ((s = r.readLine()) != null) {
+
+            s = s.trim();
+
+            if (s.isEmpty())
+                continue;
+
+            if (s.startsWith("#"))
+                continue;
+
+            tmp.add(new URL(s));
+
+        }
+
+        return tmp;
+
+    }
+
+    /**
+     * Reads URLs from a file or all files (recursively) in a directory.
+     * 
+     * @param file
+     *            The file or directory.
+     *            
+     * @return The URLs read from the file(s).
+     * 
+     * @throws IOException 
+     */
+    static private Collection<URL> readURLs(final File file) throws IOException {
+
+        /*
+         * note: duplicates are not filtered out but this preserves the
+         * evaluation order.
+         */
+        final Collection<URL> urls = new LinkedList<URL>();
+        
+        if (file.isDirectory()) {
+
+            final File[] files = file.listFiles();
+            
+            for(File f : files) {
+               
+                urls.addAll(readURLsFromFile(f));
+                               
+            }
+            
+        } else {
+
+            urls.addAll(readURLsFromFile(file));
+
+        }
+
+        return urls;
+        
+    }
+    
+    /**
      * Utility class for running extracting data from performance counter dumps
      * and running various kinds of reports on those data.
+     * <p>
+     * Usage:
+     * <dl>
+     * <dt>-outputDir</dt>
+     * <dd>The output directory (default is the current working directory).</dd>
+     * <dt>-mimeType</dt>
+     * <dd>The default MIME type for the rendered reports. The default is
+     * <code>text/plain</code>, but can be overridden on a query by query basis
+     * using {@link URLQueryModel#MIMETYPE}.</dd>
+     * <dt>-nsamples</dt>
+     * <dd>Override for the default #of history samples to be retained. It is an
+     * error if there are more distinct samples in the processed XML counter set
+     * files (that is, if the #of time periods sampled exceeds this many
+     * samples). If there are fewer, then some internal arrays will be
+     * dimensioned larger than is otherwise necessary.</dd>
+     * <dt>-events &lt;file&gt;</dt>
+     * <dd>A file containing tab-delimited {@link Event}s. The {@link Event}s
+     * are not required for simple performance counter views.</dd>
+     * <dt>-queries &lt;file&gt;</dt>
+     * <dd>A file, or directory of files, containing a list of URLs, each of
+     * which is interpreted as a {@link URLQueryModel}.</dd>
+     * <dt>&lt;file&gt;(s)</dt>
+     * <dd>One or more XML counter set files or directories containing such
+     * files. All such files will be processed before the reports are generated.
+     * </dd>
+     * </dl>
      * 
      * @param args
      *            Command line arguments.
@@ -199,368 +243,278 @@ public class CounterSetQuery {
      * @throws IOException
      * @throws ParserConfigurationException
      * @throws SAXException
-     * 
-     * @todo arg for the journal file.
      */
     public static void main(final String[] args) throws IOException,
             SAXException, ParserConfigurationException {
 
         Banner.banner();
+
+        if (args.length == 0) {
+
+            System.err.println("See javadoc for usage.");
+
+            System.exit(1);
+            
+        }
         
-        if (true) {
+        /*
+         * The events read from the file(s).
+         */
+        final DummyEventReportingService service = new DummyEventReportingService();
 
-            /*
-             * The performance counters read from the file(s).
-             */
-            final CounterSet counterSet = new CounterSet();
+        // The default output format (text, html, etc.)
+        String defaultMimeType = NanoHTTPD.MIME_TEXT_PLAIN;
 
-            /*
-             * The events read from the file(s).
-             */
-            final DummyEventReportingService service = new DummyEventReportingService();
+        /*
+         * The #of slots to allocate (one slot per period of data to be read).
+         * 
+         * Note: The default is 7 days of data if period is minutes.
+         */
+        int nsamples = 60 * 24 * 7;
 
-            /*
-             * Optional filter by depth.  This is normally zero for reports. Non-zero
-             * values are generally used for the navigational view to restrict the
-             * #of descendant nodes that are visible at one time.
-             */
-            int depth = 0;
+        // The output directory defaults to the current working directory.
+        File outputDir = new File(".");
+        
+        // the set of queries to be processed.
+        final List<URLQueryModel> queries = new LinkedList<URLQueryModel>();
+        
+        // the set of counter set XML files to be processed.
+        final List<File> counterSetFiles = new LinkedList<File>();
+        
+        for (int i = 0; i < args.length; i++) {
 
-            // any -filter arguments.
-            final Collection<String> filter = new LinkedList<String>();
+            final String arg = args[i];
 
-            // any -regex arguments.
-            final Collection<String> regex = new LinkedList<String>();
+            if (arg.startsWith("-")) {
 
-            /*
-             * The ordered labels to be assigned to the category columns in a
-             * pivot table report. The order of the names MUST correspond with
-             * the order of the capturing groups in the regex.
-             * 
-             * @todo I will have to separate the use of the regex to filter the
-             * counters which are read from the file from its use in a query if
-             * you can run multiple queries in a single program run against a
-             * filtered subset of the counter set XML data.
-             */
-            final List<String> category = new LinkedList<String>();
+                if (arg.equals("-outputDir")) {
 
-            /*
-             * Note: fromTime=0, toTime=0, period=Minutes means all data
-             * aggregated by minutes.
-             * 
-             * @todo args and apply as filter when reading the data from files,
-             * when returning ICounter[]s from a CounterSet, and when querying
-             * the data from a store.
-             */
-            final long fromTime = 0L;
-            final long toTime = 0L;
+                    outputDir = new File(args[++i]);
 
-            // The units in which the data will be reported.
-            PeriodEnum period = PeriodEnum.Minutes;
+                    if (log.isInfoEnabled()) {
 
-            // The default report type.
-            ReportEnum report = ReportEnum.correlated;
+                        log.info("outputDir: " + outputDir);
 
-            // The output format (text, html, etc.)
-            FormatEnum format = FormatEnum.text;
+                    }
+                    
+                    if(!outputDir.exists()) {
+                        
+                        outputDir.mkdirs();
+                        
+                    }
+                    
+                } else if (arg.equals("-mimeType")) {
 
-            /*
-             * Figure out how we will format the timestamp (From:, To:, and the
-             * last column).
-             * 
-             * @todo handle epoch here (for flot) and minutes, hours, days.
-             * 
-             * @todo use an arg for this
-             */
-            final DateFormat dateFormat = DateFormat
-                    .getTimeInstance(DateFormat.SHORT);
+                    defaultMimeType = args[++i];
 
-            for (int i = 0; i < args.length; i++) {
+                } else if (arg.equals("-nsamples")) {
 
-                final String arg = args[i];
+                    nsamples = Integer.valueOf(args[++i]);
 
-                if (arg.startsWith("-")) {
+                    if (nsamples <= 0)
+                        throw new IllegalArgumentException(
+                                "nslots must be positive.");
 
-                    if (arg.equals("-depth")) {
+                } else if (arg.equals("-events")) {
 
-                        depth = Integer.parseInt(args[++i]);
+                    // @todo read list of event files once all args are parsed.
+                    QueryUtil.readEvents(service, new File(args[++i]));
 
-                    } else if (arg.equals("-report")) {
+                } else if (arg.equals("-queries")) {
 
-                        report = ReportEnum.valueOf(args[++i]);
+                    final File file = new File(args[++i]);
 
-                    } else if (arg.equals("-format")) {
-
-                        format = FormatEnum.valueOf(args[++i]);
-
-                    } else if (arg.equals("-filter")) {
-
-                        filter.add(args[++i]);
-
-                    } else if (arg.equals("-regex")) {
-
-                        regex.add(args[++i]);
-
-                    } else if (arg.equals("-category")) {
-
-                        category.add(args[++i]);
-
-                    } else if (arg.equals("-period")) {
-
-                        period = PeriodEnum.valueOf(args[++i]);
-
-                    } else if (arg.equals("-events")) {
-
-                        QueryUtil.readEvents(service, new File(args[++i]));
-
-                    } else {
-
-                        System.err.println("Unknown option: " + arg);
-
-                        System.exit(1);
+                    final Collection<URL> urls = readURLs(file);
+                    
+                    for (URL url : urls) {
+                        
+                        queries.add(newQueryModel(url));
 
                     }
 
                 } else {
 
-                    /*
-                     * Compute the optional filter to be applied when reading
-                     * this file and then read counters accepted by the optional
-                     * filter into the counter set to be served.
-                     */
-                    final int nslots = 10000; // @todo arg w/ def 1000
-                    
-                    final File file = new File(arg);
-                    
-                    if(file.isDirectory()) {
-                    
-                        System.err.println("Reading directory: "+file);
-                        
-                        final File[] files = file
-                                .listFiles(new FilenameFilter() {
+                    System.err.println("Unknown option: " + arg);
 
-                                    public boolean accept(File dir, String name) {
-                                        return name.endsWith(".xml");
-                                    }
-                                });
+                    System.exit(1);
 
-                        for (File f : files) {
+                }
 
-                            System.err.println("Reading file: "+f);
+            } else {
 
-                            QueryUtil.readCountersFromFile(f, counterSet,
-                                    QueryUtil.getPattern(filter, regex),
-                                    nslots, period);
-                            
-                        }
-                        
-                    } else {
+                final File file = new File(arg);
 
-                        System.err.println("Reading file: "+file);
+                if (!file.exists())
+                    throw new FileNotFoundException(file.toString());
 
-                        QueryUtil
-                            .readCountersFromFile( file, counterSet,
-                                    QueryUtil.getPattern(filter, regex),
-                                    nslots, period);
+                counterSetFiles.add(file);
+
+            }
+
+        }
+
+        if (queries.isEmpty()) {
+
+            throw new RuntimeException("No queries were specified.");
+
+        }
+
+        if (counterSetFiles.isEmpty()) {
+
+            throw new RuntimeException("No counter set files were specified.");
+
+        }
+
+        /*
+         * Compute a regular expression which will match anything which would
+         * have been matched by the individual URLs. E.g., the OR of the
+         * individual regular expressions entailed by each URL when interpreted
+         * as a query.
+         */
+        final Pattern regex;
+        {
+            final List<Pattern> tmp = new LinkedList<Pattern>();
+
+            for (URLQueryModel model : queries) {
+
+                if (model.pattern != null) {
+
+                    tmp.add(model.pattern);
+
+                }
+
+            }
+
+            regex = QueryUtil.getPattern(tmp);
+
+        }
+
+        /*
+         * Read counters accepted by the optional filter into the counter set to
+         * be served.
+         */
+
+        // The performance counters read from the file(s).
+        final CounterSet counterSet = new CounterSet();
+
+        if(log.isInfoEnabled())
+            log.info("Reading performance counters from "
+                    + counterSetFiles.size() + " sources.");
+        
+        for (File file : counterSetFiles) {
+
+            /*
+             * @todo this does not support reading at different periods for each
+             * query.
+             */
+            final PeriodEnum period = PeriodEnum.Minutes;
+
+            if (file.isDirectory()) {
+
+                // @todo does not process subdirectories recursively.
+                if(log.isInfoEnabled())
+                    log.info("Reading directory: " + file);
+
+                final File[] files = file.listFiles(new FilenameFilter() {
+
+                    public boolean accept(File dir, String name) {
+                        return name.endsWith(".xml");
                     }
+                });
+
+                for (File f : files) {
+
+                    if(log.isInfoEnabled())
+                        log.info("Reading file: " + f);
+
+                    QueryUtil.readCountersFromFile(f, counterSet, regex,
+                            nsamples, period);
+
+                }
+
+            } else {
+
+                if(log.isInfoEnabled())
+                    log.info("Reading file: " + file);
+
+                QueryUtil.readCountersFromFile(file, counterSet, regex, nsamples,
+                        period);
+
+            }
+
+        }
+
+        /*
+         * Run each query in turn against the filtered pre-loaded counter set.
+         */
+        if (log.isInfoEnabled())
+            log.info("Evaluating " + queries.size() + " queries.");
+        
+        for (URLQueryModel model : queries) {
+
+            final IRenderer renderer = RendererFactory.get(model,
+                    new CounterSetSelector(counterSet), defaultMimeType);
+
+            /*
+             * Render on a file. The file can be specified by a URL query
+             * parameter.
+             * 
+             * FIXME Use the munged counter name (when one can be identified) as
+             * the default filename.
+             */
+            File file;
+
+            if (model.file == null) {
+
+                file = File.createTempFile("query", ".out", outputDir);
+
+            } else {
+
+                if (!model.file.isAbsolute()) {
+
+                    file = new File(outputDir, model.file.toString());
+
+                } else {
+
+                    file = model.file;
 
                 }
 
             }
 
-            /*
-             * The regular expression formed from the mixture of filters and/or
-             * regular expressions specified on the command line.
-             */
-            final Pattern pattern = QueryUtil.getPattern(filter, regex);
+            if (file.getParentFile() != null && !file.getParentFile().exists()) {
+
+                if (log.isInfoEnabled()) {
+                 
+                    log.info("Creating directory: " + file.getParentFile());
+                    
+                }
+                
+                // make sure the parent directory exists.
+                file.getParentFile().mkdirs();
+                
+            }
+
+            if (log.isInfoEnabled()) {
+
+                log.info("Writing file: " + file + " for query: " + model.uri);
+
+            }
             
-            // Select the relevant performance counters.
-            final ICounter[] counters = new CounterSetSelector(counterSet)
-                    .selectCounters(depth, pattern, fromTime, toTime, period);
+            final Writer w = new BufferedWriter(
+                    new FileWriter(file, false/* append */));
 
-            /*
-             * FIXME Figure out aggregation for the history table or use the
-             * pivot table for that purpose but then transform back to table for
-             * plotting.
-             */
-            final HistoryTable historyTable = new HistoryTable(counters, period);
+            try {
 
-            final IRenderer renderer;
+                renderer.render(w);
 
-            switch (report) {
-            case correlated: {
-                /*
-                 * normal (aka history) table.
-                 */
-                switch (format) {
-                case text: {
-                    renderer = new TabDelimitedHistoryTableRenderer(
-                            historyTable, pattern, new TextValueFormatter(
-                                    dateFormat));
-                    break;
-                }
-                case html: {
-                    /*
-                     * @todo support HTML as well as tab-delimited here. This
-                     * will require either a refactor of the HTMLValueFormatter
-                     * to decouple it from XHTMLRenderer.Model or just parse a
-                     * URL into the appropriate format.
-                     */
-                    // renderer = new HTMLHistoryTableRenderer(
-                    // historyTable, pattern,
-                    // new HTMLValueFormatter(dateFormat,model));
-                }
-                default:
-                    throw new UnsupportedOperationException(format.toString());
-                }
-                break;
-            }
-            case pivot: {
-                /*
-                 * pivot table.
-                 */
-                final PivotTable pivotTable = new PivotTable(pattern, category
-                        .toArray(new String[] {}), historyTable);
-                switch (format) {
-                case text: {
-                    renderer = new TabDelimitedPivotTableRenderer(pivotTable,
-                            new TextValueFormatter(dateFormat));
-                    break;
-                }
-                case html: {
-                    /*
-                     * @todo support HTML as well as tab-delimited here. This
-                     * will require either a refactor of the HTMLValueFormatter
-                     * to decouple it from XHTMLRenderer.Model or just parse a
-                     * URL into the appropriate format.
-                     */
-                }
-                default:
-                    throw new UnsupportedOperationException(format.toString());
-                }
-            }
-            case events: {
-                /*
-                 * @todo support flot rendering of events
-                 * 
-                 * @todo support aggregation of events?
-                 */
-                throw new UnsupportedOperationException(report.toString());
-            }
-            case hierarchy: {
-                /*
-                 * @todo Is there any reason why would we want to render this
-                 * view for reporting purposes?
-                 */
-                throw new UnsupportedOperationException(report.toString());
-            }
-            default:
-                /*
-                 * An unrecognized value.
-                 */
-                throw new UnsupportedOperationException(report.toString());
-            }
+                w.flush();
 
-            final StringWriter w = new StringWriter();
+            } finally {
 
-            // new PrintWriter(
-            // System.out, true/* autoFlush */);
-
-            renderer.render(w);
-
-            System.out.print(w);
-
-        } else {
-
-            /*
-             * @todo This is an alternative approach based on a journal on which
-             * the desired performance counter data has been stored. However,
-             * the current representation of performance counters on a journal
-             * is not efficient for query or space. There are various notes on
-             * this issue in this package and the com.bigdata.counters.store
-             * package and on a possible refactor to make this space and time
-             * efficient. Until then, this code is out of line.
-             */
-
-            final Properties properties = new Properties();
-
-            final File file = new File("counters.jnl");
-
-            if (!file.exists()) {
-
-                System.err.println("No journal: " + file);
-
-                System.exit(1);
+                w.close();
 
             }
-
-            // @todo config
-            properties.setProperty(Journal.Options.FILE, file.toString());
-
-            // (re-)open the store.
-            final Journal store = new Journal(properties);
-
-            // (re-)open the counter set B+Tree on the store.
-            final CounterSetBTree btree = (CounterSetBTree) store
-                    .getIndex("counters");// , store.getLastCommitTime());
-
-            if (btree == null) {
-
-                System.err.println("No counters: " + file);
-
-                System.exit(1);
-
-            }
-
-            System.out.println("There are " + btree.rangeCount()
-                    + " counter values covering "
-                    + new Date(btree.getFirstTimestamp()) + " to "
-                    + new Date(btree.getLastTimestamp()));
-
-            final long firstTimestamp = btree.getFirstTimestamp();
-
-            final long lastTimestamp = btree.getLastTimestamp();
-
-            // optional depth constraint.
-            final int depth = 0;
-
-            // sample pattern.
-            final Pattern pattern = Pattern
-                    .compile("/([^/]*)/.*IDataService.*/([^/]*)/([^/]*)/IO/(readSecs|writeSecs|serializeSecs|deserializeSecs)");
-
-            // all data, aggregated by the minute.
-            // final long fromTime = 0L;
-            // final long toTime = 0L;
-            // final TimeUnit unit = TimeUnit.MINUTES;
-
-            // N minutes of data, starting from the fromTime. @todo drop +1 here
-            // and below.
-            final long fromTime = firstTimestamp + TimeUnit.MINUTES.toMillis(0);
-            final long toTime = fromTime + TimeUnit.MINUTES.toMillis(60
-            /* N */+ 1);
-            final TimeUnit unit = TimeUnit.MINUTES;
-
-            // N minutes of data, starting from the last reported value.
-            // final long fromTime = lastTimestamp -
-            // TimeUnit.MINUTES.toMillis(10);
-            // final long toTime = lastTimestamp + TimeUnit.MINUTES.toMillis(1);
-            // final TimeUnit unit = TimeUnit.MINUTES;
-
-            // all data, aggregated for each hour.
-            // final long fromTime = 0L;
-            // final long toTime = 0L;
-            // first N hours.
-            // final long fromTime = firstTimestamp;
-            // final long toTime = fromTime + TimeUnit.HOURS.toMillis(5/*N*/ +
-            // 1);
-            // final TimeUnit unit = TimeUnit.HOURS;
-
-            /*
-             * Read the relevant performance counter data from the store.
-             */
-            final ICounter[] counters = new CounterSetBTreeSelector(btree)
-                    .selectCounters(depth, pattern, fromTime, toTime,
-                            PeriodEnum.getValue(unit));
 
         }
 

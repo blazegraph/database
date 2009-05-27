@@ -2,11 +2,10 @@ package com.bigdata.counters.render;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.text.DateFormat;
 import java.text.Format;
 
 import com.bigdata.counters.ICounter;
-import com.bigdata.counters.httpd.XHTMLRenderer;
+import com.bigdata.counters.query.URLQueryModel;
 
 /**
  * 
@@ -15,9 +14,9 @@ import com.bigdata.counters.httpd.XHTMLRenderer;
  */
 public class TextValueFormatter extends ValueFormatter {
 
-    public TextValueFormatter(DateFormat dateFormat) {
+    public TextValueFormatter(final URLQueryModel model) {
         
-        super(dateFormat);
+        super(model);
 
     }
 

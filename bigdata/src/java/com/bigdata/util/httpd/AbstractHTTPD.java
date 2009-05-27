@@ -57,7 +57,7 @@ public abstract class AbstractHTTPD extends NanoHTTPD {
             final Properties header,
             final LinkedHashMap<String, Vector<String>> parms) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(method + " '" + uri + "' ");
 
         try {

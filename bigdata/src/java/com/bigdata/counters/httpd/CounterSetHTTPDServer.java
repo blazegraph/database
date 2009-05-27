@@ -40,6 +40,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.query.QueryUtil;
+import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.service.Event;
 import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
@@ -137,7 +138,7 @@ public class CounterSetHTTPDServer implements Runnable {
                     CounterSetHTTPDServer.log.setLevel(level);
                     
                     // set logging level for the view.
-                    XHTMLRenderer.log.setLevel(level);
+                    Logger.getLogger(XHTMLRenderer.class).setLevel(level);
 
                     // set logging level on the service.
                     NanoHTTPD.log.setLevel(level);

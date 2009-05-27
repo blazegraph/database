@@ -35,9 +35,12 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,6 +57,7 @@ import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterNode;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.History.SampleIterator;
+import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.counters.httpd.DummyEventReportingService;
 import com.bigdata.service.Event;
 
@@ -233,6 +237,46 @@ public class QueryUtil {
     }
 
     /**
+     * Generate a {@link Pattern} from the OR of zero or more regular
+     * expressions which must be matched.
+     * 
+     * @param regex
+     *            A list of regular expressions to be matched (may be null).
+     * 
+     * @return The {@link Pattern} -or- <code>null</code> if both collects are
+     *         empty.
+     */
+    static public Pattern getPattern(final Collection<Pattern> regex) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        for (Pattern val : regex) {
+
+            if (log.isInfoEnabled())
+                log.info("regex" + "=" + val);
+
+            if (sb.length() > 0) {
+
+                // OR of previous pattern and this pattern.
+                sb.append("|");
+
+            }
+
+            // Non-capturing group.
+            sb.append("(?:" + val + ")");
+
+        }
+    
+        final String s = sb.toString();
+
+        if (log.isInfoEnabled())
+            log.info("effective regex filter=" + s);
+
+        return Pattern.compile(s);
+        
+    }
+
+    /**
      * Read counters matching the optional filter from the file into the given
      * {@link CounterSet}.
      * 
@@ -258,6 +302,46 @@ public class QueryUtil {
             final CounterSet counterSet, final Pattern filter,
             final int nslots, final PeriodEnum unit) throws IOException,
             SAXException, ParserConfigurationException {
+
+        /*
+         * @todo does not roll minutes into hours or hours into days until
+         * overflow of the minutes, which is only after N days.
+         * 
+         * @todo this can easily run out of memory if you try to read several
+         * hours worth of performance counters without filtering them by a
+         * regex.
+         */
+        final IInstrumentFactory instrumentFactory = new DefaultInstrumentFactory(
+                nslots, unit, false/* overwrite */);
+        
+        readCountersFromFile(
+                file,
+                counterSet,
+                filter,
+                instrumentFactory);
+        
+    }
+
+    /**
+     * Read counters matching the optional filter from the file into the given
+     * {@link CounterSet}.
+     * 
+     * @param file
+     *            The file.
+     * @param counterSet
+     *            The {@link CounterSet}.
+     * @param filter
+     *            An optional filter.
+     * @param instrumentFactory
+     * 
+     * @throws IOException
+     * @throws SAXException
+     * @throws ParserConfigurationException
+     */
+    static public void readCountersFromFile(final File file,
+            final CounterSet counterSet, final Pattern filter,
+            final IInstrumentFactory instrumentFactory) throws IOException,
+            SAXException, ParserConfigurationException {
         
         if (log.isInfoEnabled())
             log.info("reading file: " + file);
@@ -271,17 +355,8 @@ public class QueryUtil {
             /*
              * Retain up to N days worth of samples, with one sample per
              * minute.
-             * 
-             * @todo does not roll minutes into hours or hours into days
-             * until overflow of the minutes, which is only after N
-             * days.
-             * 
-             * @todo this can easily run out of memory if you try to
-             * read several hours worth of performance counters without
-             * filtering them by a regex.
              */
-            counterSet.readXML(is, new DefaultInstrumentFactory(nslots, unit,
-                    false/* overwrite */), filter);
+            counterSet.readXML(is, instrumentFactory, filter);
 
 //            counterSet
 //                    .readXML(is,

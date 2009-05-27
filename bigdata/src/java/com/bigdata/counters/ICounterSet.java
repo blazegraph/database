@@ -112,7 +112,7 @@ public interface ICounterSet extends ICounterNode {
     public void asXML(OutputStream os, String encoding, Pattern filter) throws IOException;
 
     /**
-     * Write an XML reprentation of the counters in the hierarchy together with
+     * Write an XML representation of the counters in the hierarchy together with
      * their current value - does not write the XML declaration element since
      * the encoding is unknown.
      * 
