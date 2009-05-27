@@ -72,7 +72,7 @@ public interface BigdataValue extends Value {//, Comparable<BigdataValue> {
      * Return the term identifier for this value. The term identifier uniquely
      * identifies a {@link Value} for a database. Sometimes a
      * {@link TempTripleStore} will be used that shares the lexicon with a given
-     * database, in which case the same term identiifers will be value for that
+     * database, in which case the same term identifiers will be value for that
      * {@link TempTripleStore}.
      */
     public long getTermId();
