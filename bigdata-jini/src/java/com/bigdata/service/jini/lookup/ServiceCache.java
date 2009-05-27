@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini.lookup;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Vector;
@@ -41,6 +42,8 @@ import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.service.IService;
 
 /**
  * A mapping from {@link ServiceID} to {@link ServiceItem} that is maintained by
@@ -114,7 +117,7 @@ public class ServiceCache implements ServiceDiscoveryListener {
     }
 
     /**
-     * NOP.
+     * updates the map and delegates to the {@link #listener}.
      */
     public void serviceChanged(final ServiceDiscoveryEvent e) {
 
@@ -134,10 +137,35 @@ public class ServiceCache implements ServiceDiscoveryListener {
     }
 
     /**
-     * NOP.
+     * This removes the service from the cache. However, if the service is an
+     * {@link IService} and it will still respond to its interface then we DO
+     * NOT remove the service from the cache. This makes the cache more robust
+     * in the face of transient de-registrations of a service. The most common
+     * explanation for those transients is that the host with the service is
+     * swapping and has failed to keep up its pings to the jini registrar(s).
      */
     public void serviceRemoved(final ServiceDiscoveryEvent e) {
 
+        final Object service = e.getPreEventServiceItem().service;
+
+        if(service instanceof IService) {
+            
+            try {
+            
+                final String serviceName = ((IService)service).getServiceName();
+
+                log.warn("Service still active: "+serviceName);
+                
+                return;
+                
+            } catch(IOException ex) {
+                
+                // ignore, fall through and remove the service from the cache.
+                
+            }
+            
+        }
+                
         if (log.isInfoEnabled())
             log.info("" + e + ", class="
                     + e.getPreEventServiceItem().toString());

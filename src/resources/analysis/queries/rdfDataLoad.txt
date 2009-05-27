@@ -1,0 +1,18 @@
+#
+# This file contains a list of URLs of interest when doing a post-mortem
+# investigation.  The file is basically a list of URLs which could be used
+# to demand the corresponding counters from the httpd service.  It can be
+# submitted to a Java class that will extract the necessary performance
+# counters from a directory containing counter set XML files.  This is done
+# relatively efficiently - in a single pass over the XML files.
+#
+# In addition to the normal URL, you will typically want to specify the
+# "file=" URL query parameter to name the output file.  You can also specify
+# the desired MIME type using the "-mimeType=" URL query parameter.
+
+##
+# Throughput (triples per second and toldTriples) for the RDF bulk distributed data load)
+##
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesPerSec&depth=7&correlated=true&period=Minutes&file=service/cs/tps
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesLoaded&depth=7&period=Minutes&report=correlated&file=service/cs/toldTriples
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load+Service%2FAverage+Queuing+Time&depth=12&correlated=true&file=service/cs/loadServiceQueuingTime

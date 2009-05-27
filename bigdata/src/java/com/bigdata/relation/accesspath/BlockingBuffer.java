@@ -1367,7 +1367,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * since many queries can be evaluated in LT 10ms !
                  * 
                  * Note: Even with poll(timeout,unit), a modest timeout will
-                 * result in the thread yielding and a drammatic performance
+                 * result in the thread yielding and a dramatic performance
                  * hit. We are better off using a short timeout so that we can
                  * continue to test the other conditions, specifically whether
                  * the buffer was closed asynchronously. Otherwise a client that

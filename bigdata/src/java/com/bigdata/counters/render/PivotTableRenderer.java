@@ -8,9 +8,9 @@ import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterNode;
 import com.bigdata.counters.PeriodEnum;
-import com.bigdata.counters.httpd.XHTMLRenderer.Model;
 import com.bigdata.counters.query.HistoryTable;
 import com.bigdata.counters.query.PivotTable;
+import com.bigdata.counters.query.URLQueryModel;
 
 /**
  * Writes out a pivot table containing the histories for the selected
@@ -27,20 +27,20 @@ import com.bigdata.counters.query.PivotTable;
  * the first row and is incremented by one each time we move into another
  * sampling period for the given {@link PeriodEnum}. The other time column
  * is the timestamp associated with the row. The format of that timestamp is
- * specified by {@link Model#timestampFormat}.
+ * specified by {@link URLQueryModel#timestampFormat}.
  * <p>
  * In this example, there are three category columns (hostname, indexName,
  * and indexPartitionName). The category columns were selected by the
- * capturing groups in {@link Model#pattern} and take on different values
+ * capturing groups in {@link URLQueryModel#pattern} and take on different values
  * for each row in the table. In order to get nice column names you MUST
- * specify the column names using the {@link Model#CATEGORY} URL query
+ * specify the column names using the {@link URLQueryModel#CATEGORY} URL query
  * parameter. The given category column names are used in order and
  * synthetic column names are generated if none (or not enough) were
- * specified in the {@link Model}.
+ * specified in the {@link URLQueryModel}.
  * <p>
  * In this example, there are four value columns. Each vlaue column
  * corresponds to an {@link ICounter} whose path was matched by the
- * {@link Model#pattern}.
+ * {@link URLQueryModel#pattern}.
  * <p>
  * Note: The orientation of the data in the pivot table view is different
  * from the data in the correlated view. The pivot table puts each set of

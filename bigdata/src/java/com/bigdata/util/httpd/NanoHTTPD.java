@@ -14,6 +14,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Hashtable;
@@ -51,7 +52,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * <li> Only one Java file </li>
  * <li> Java 1.1 compatible </li>
- * <li> Released as open source, Modified BSD licence </li>
+ * <li> Released as open source, Modified BSD license </li>
  * <li> No fixed config files, logging, authorization etc. (Implement yourself
  * if you need them.) </li>
  * <li> Supports parameter parsing of GET and POST methods </li>
@@ -89,16 +90,6 @@ public class NanoHTTPD implements IServiceShutdown
     
     final static public Logger log = Logger.getLogger(NanoHTTPD.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
-
     /** The server socket. */
     private final ServerSocket ss;
     
@@ -135,10 +126,10 @@ public class NanoHTTPD implements IServiceShutdown
             final Properties header,
             final LinkedHashMap<String, Vector<String>> parms) {
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(method + " '" + uri + "' ");
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
             {
                 Enumeration e = header.propertyNames();
                 while (e.hasMoreElements()) {
@@ -285,7 +276,7 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running on port=" + port);
 
         // @todo parameter and configuration of same.
@@ -330,7 +321,7 @@ public class NanoHTTPD implements IServiceShutdown
                     
                     if (!open) {
 
-                        if(INFO)
+                        if(log.isInfoEnabled())
                             log.info("closed.");
 
                         return;
@@ -375,7 +366,7 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
         
         // time when shutdown begins.
@@ -399,7 +390,7 @@ public class NanoHTTPD implements IServiceShutdown
 
         try {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Awaiting accept service termination");
             
             long elapsed = System.currentTimeMillis() - begin;
@@ -418,7 +409,7 @@ public class NanoHTTPD implements IServiceShutdown
 
         try {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Awaiting request service termination");
             
             long elapsed = System.currentTimeMillis() - begin;
@@ -458,7 +449,7 @@ public class NanoHTTPD implements IServiceShutdown
             
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("");
 
         acceptService.shutdownNow();
@@ -543,7 +534,7 @@ public class NanoHTTPD implements IServiceShutdown
 		public void run()
 		{
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Handling request: localPort="
                         + mySocket.getLocalPort());
             
@@ -750,7 +741,7 @@ public class NanoHTTPD implements IServiceShutdown
 				PrintWriter pw = new PrintWriter( out );
 				pw.print("HTTP/1.0 " + status + " \r\n");
 
-                if (INFO) { // optionally log the status and content type.
+                if (log.isInfoEnabled()) { // optionally log the status and content type.
                     log.info("status: [HTTP/1.0 " + status
                             + "]"//
                             + (mime == null ? "" : "[Content-Type: " + mime
@@ -990,6 +981,57 @@ public class NanoHTTPD implements IServiceShutdown
 		}
 	}
 
+    /**
+     * Decodes parameters in percent-encoded URI-format ( e.g.
+     * "name=Jack%20Daniels&pass=Single%20Malt" ) and adds them to a {@link Map}
+     * .
+     * 
+     * @return A map of the parsed, percent decoded parameters from URI and. The
+     *         keys are the parameter names. Each value is a {@link Vector} of
+     *         {@link String}s containing the bindings for the named parameter.
+     *         The order of the URL parameters is preserved by the insertion
+     *         order of the {@link LinkedHashMap} and the elements of the
+     *         {@link Vector} values.
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    static public LinkedHashMap<String,Vector<String>> decodeParms( final String parms )
+        throws UnsupportedEncodingException
+    {
+        
+        final LinkedHashMap<String, Vector<String>> p = new LinkedHashMap<String, Vector<String>>();
+
+        final StringTokenizer st = new StringTokenizer(parms, "&");
+        while (st.hasMoreTokens()) {
+            final String e = st.nextToken();
+            final int sep = e.indexOf('=');
+            if (sep != -1) {
+                final String name = _decodePercent(e.substring(0, sep)).trim();
+                final String val = _decodePercent(e.substring(sep + 1));
+                Vector<String> vals = p.get(name);
+                if (vals == null) {
+                    vals = new Vector<String>();
+                    p.put(name, vals);
+                }
+                vals.add(val);
+            }
+        }
+
+        return p;
+        
+    }
+
+    /**
+     * Decodes the percent encoding scheme. <br/>
+     * For example: "an+example%20string" -> "an example string"
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    static private String _decodePercent( final String str ) throws UnsupportedEncodingException 
+    {
+        return URLDecoder.decode(str, "utf-8");
+    }
+
 	/**
 	 * Hashtable mapping (String)FILENAME_EXTENSION -> (String)MIME_TYPE
 	 */
@@ -1028,7 +1070,7 @@ public class NanoHTTPD implements IServiceShutdown
 	}
 
 	/**
-	 * The distribution licence
+	 * The distribution license
 	 */
 	private static final String LICENCE =
 		"Copyright (C) 2001,2005 by Jarno Elonen <elonen@iki.fi>\n"+

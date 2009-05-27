@@ -38,7 +38,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.HistoryInstrument;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.PeriodEnum;
-import com.bigdata.counters.httpd.ICounterSelector;
 
 /**
  * Reads counters from a {@link CounterSet}.

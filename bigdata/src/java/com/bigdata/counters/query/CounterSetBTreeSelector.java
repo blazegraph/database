@@ -37,7 +37,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.PeriodEnum;
-import com.bigdata.counters.httpd.ICounterSelector;
 import com.bigdata.counters.store.CounterSetBTree;
 
 /**

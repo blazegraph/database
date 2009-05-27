@@ -50,7 +50,7 @@ import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.httpd.CounterSetHTTPDServer;
-import com.bigdata.counters.httpd.XHTMLRenderer;
+import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.BlockingBuffer;

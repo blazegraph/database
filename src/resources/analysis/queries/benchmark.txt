@@ -1,0 +1,90 @@
+# Standard query set for benchmark run analysis.
+#
+# This file contains a list of URLs of interest when doing a post-mortem
+# investigation.  The file is basically a list of URLs which could be used
+# to demand the corresponding counters from the httpd service.  It can be
+# submitted to a Java class that will extract the necessary performance
+# counters from a directory containing counter set XML files.  This is done
+# relatively efficiently - in a single pass over the XML files.
+#
+# In addition to the normal URL, you will typically want to specify the
+# "file=" URL query parameter to name the output file.  You can also specify
+# the desired MIME type using the "-mimeType=" URL query parameter.
+#
+# The output files are grouped according to the following file system
+# hierarchy.
+#
+# cpu		  (per host CPU)
+# disk		  (per host DISK)
+# memory	  (per host RAM mixed with some per-service memory stuff)
+# service
+# service/cs  (counters specific to client servers)
+# service/ds  (counters specific to data servers)
+# service/lbs (counters specific to the load balancer)
+# service/mds (counters specific to the metadata server)
+# service/txs (counters specific to the transaction server)
+
+##
+# The asynchronous index write API (clients)
+##
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/chunksIn&depth=14&period=Minutes&report=correlated&file=service/cs/chunksIn
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/chunksOut&depth=14&period=Minutes&report=correlated&file=service/cs/chunksOut
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMillisPerWait&correlated=true&depth=14&period=Minutes&file=service/cs/averageMillisPerWait
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMillisPerWrite&correlated=true&depth=14&period=Minutes&file=service/cs/averageMillisPerWrite
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageElementsPerWrite&correlated=true&depth=14&period=Minutes&file=service/cs/averageElementsPerWrite
+
+##
+# CPU
+##
+http://localhost:8080/?regex=/([^/]*)/.*Processor%20Time&depth=4&correlated=true&period=Minutes&file=cpu/ProcessorTime
+http://localhost:8080/?regex=/([^/]*)/.*IO%20Wait&depth=4&correlated=true&period=Minutes&file=cpu/IOWait
+
+##
+# Memory (per host and per CS/DS process)
+##
+http://localhost:8080/?regex=/([^/]*)/.*Memory/Bytes%20Free&correlated=true&depth=3&file=memory/BytesFree
+http://localhost:8080/?regex=/([^/]*)/.*Memory/Swap%20Bytes%20Used&correlated=true&depth=3&period=Minutes&file=memory/SwapBytesUsed
+http://localhost:8080/?regex=/([^/]*)/.*Memory/Major%20Page%20Faults%20Per%20Second&correlated=true&depth=3&period=Minutes&file=memory/MajorPageFaultsPerSecond
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*/Memory/DirectBufferPool/poolSize&correlated=true&depth=12&file=memory/directBufferPool/poolSize
+http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Virtual%20Size&correlated=true&depth=12&file=memory/VirtualSize
+http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Resident%20Set%20Size&correlated=true&depth=12&file=memory/ResidentSetSize
+http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Runtime%20Total%20Memory&correlated=true&depth=12&file=memory/RuntimeTotalMemory
+http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Runtime%20Free%20Memory&correlated=true&depth=12&file=memory/RuntimeFreeMemory
+http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Garbage%20Collectors/([^/]*)/Cumulative%20Collection%20Time&correlated=true&depth=12&file=memory/GC/CumulativeCollectionTime
+
+##
+# DISK (per host and some per-DS stuff)
+##
+http://localhost:8080/?depth=3&correlated=true&regex=/([^/]*)/.*PhysicalDisk/Bytes%20Written%20Per%20Second&period=Minutes&file=disk/BytesWrittenPerSecond
+http://localhost:8080/?depth=3&correlated=true&regex=/([^/]*)/.*PhysicalDisk/Bytes%20Read%20Per%20Second&period=Minutes&file=disk/BytesReadPerSecond
+
+##
+# LBS
+##
+http://localhost:8080/?filter=hosts/scores&correlated=true&depth=7&file=service/lbs/hostScores
+
+##
+# DS
+##
+
+http://localhost:8080/?depth=10&regex=/([^/]*)/.*Overflow%20Manager/Asynchronous%20Overflow%20Count&correlated=true&period=Minutes&file=service/ds/AsynchronousOverflowCount
+
+# @todo live journal counters are not being carried through past the first overflow.
+# http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/readSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/readSecs
+# http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/writeSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/writeSecs
+
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Store%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/liveJournal/readSecs
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Managed%20Segment%20Store%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/ManagedSegmentStoreCount
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Bytes%20Under%20Management&period=Minutes&depth=10&correlated=true&file=service/ds/BytesUnderManagement
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexCacheSize
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexSegmentCacheSize
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/OpenLeafCount
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Byte%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/OpenLeafByteCount
+
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Queue%20Length&depth=9&correlated=true&period=Minutes&file=service/ds/AverageQueueLength
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Queuing%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageQueuingTime
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Service%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageServiceTime
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Active%20Count%20With%20Locks%20Held&depth=9&correlated=true&period=Minutes&file=service/ds/AverageActiveCountWithLocksHeld
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Commit%20Group%20Size&depth=9&correlated=true&period=Minutes&file=service/ds/AverageCommitGroupSize
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Byte%20Count%20Per%20Commit&depth=9&correlated=true&period=Minutes&file=service/ds/AverageByteCountPerCommit
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Commit%20Service%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageCommitServiceTime

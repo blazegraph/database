@@ -13,8 +13,11 @@ import java.util.Properties;
 import java.util.Vector;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.counters.httpd.XHTMLRenderer.Model;
 import com.bigdata.counters.query.CounterSetSelector;
+import com.bigdata.counters.query.ICounterSelector;
+import com.bigdata.counters.query.URLQueryModel;
+import com.bigdata.counters.render.IRenderer;
+import com.bigdata.counters.render.RendererFactory;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IService;
 import com.bigdata.util.httpd.AbstractHTTPD;
@@ -22,15 +25,15 @@ import com.bigdata.util.httpd.AbstractHTTPD;
 /**
  * Exposes a {@link CounterSet} via HTTPD.
  * 
- * @todo Write XSL and stylesheet for interactive browsing of the CounterSet XML
- *       and support conneg for XML result.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class CounterSetHTTPD extends AbstractHTTPD {
     
-    protected final CounterSet root;
+    /**
+     * The {@link CounterSet} exposed by this service.
+     */
+    protected final CounterSet counterSet;
     
     /**
      * The service reference iff one one specified to the ctor (may be null).
@@ -120,7 +123,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
 
         super(port);
 
-        this.root = root;
+        this.counterSet = root;
         
         // Note: MAY be null.
         this.service = service;
@@ -154,8 +157,6 @@ public class CounterSetHTTPD extends AbstractHTTPD {
 
         final String charset = "UTF-8";
         
-        final String mimeType;
-        
         final InputStream is;
 
         /*
@@ -169,42 +170,51 @@ public class CounterSetHTTPD extends AbstractHTTPD {
             // send that resource.
             return sendClasspathResource(decl);
 
-        } else if (true) {
+        }
 
-            // conneg HMTL
+        /*
+         * Obtain a renderer.
+         * 
+         * @todo This really should pass in the Accept header and our own list
+         * of preferences and do CONNEG for (X)HMTL vs XML vs text/plain.
+         * 
+         * @todo if controller state error then send HTTP_BAD_REQUEST
+         * 
+         * @todo Write XSL and stylesheet for interactive browsing of the
+         * CounterSet XML?
+         */
+        final String mimeType = MIME_TEXT_HTML;
+        final IRenderer renderer;
+        {
+
+            // build model of the controller state.
+            final URLQueryModel model = new URLQueryModel(service, uri, parms,
+                    header);
+
+            final ICounterSelector counterSelector = new CounterSetSelector(
+                    counterSet);
+
+            renderer = RendererFactory.get(model, counterSelector, mimeType);
             
-            mimeType = MIME_TEXT_HTML;
-            
+        }
+
+        /*
+         * Render the counters as specified by the query for the negotiated MIME
+         * type.
+         */
+        {
+
             final OutputStreamWriter w = new OutputStreamWriter(baos);
 
-            // @todo parameterize for CounterSet vs CounterSetBTree.
-            final ICounterSelector counterSelector = new CounterSetSelector(root);
-            
-            // build model of the controller state.
-            final Model model = new Model(service, counterSelector, uri, parms, header);
-            
-            // @todo if controller state error then send HTTP_BAD_REQUEST
-            
             // render the view.
-            new XHTMLRenderer(model).write(w);
+            renderer.render(w);
 
             w.flush();
 
             is = new ByteArrayInputStream(baos.toByteArray());
             
-        } else {
-
-            // conneg XML
-
-            mimeType = MIME_APPLICATION_XML;
-
-            // send everything - client can apply XSLT as desired.            
-            root.asXML(baos, charset, null/*filter*/);
-
-            is = new ByteArrayInputStream(baos.toByteArray());
-            
         }
-
+        
         final Response r = new Response(HTTP_OK, mimeType + "; charset='"
                 + charset + "'", is);
 
@@ -240,7 +250,7 @@ public class CounterSetHTTPD extends AbstractHTTPD {
         if (decl == null)
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Serving: " + decl.localResource + " as " + decl.mimeType);
 
         /*

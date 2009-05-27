@@ -6,7 +6,6 @@ import java.util.Arrays;
 
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.IHistoryEntry;
-import com.bigdata.counters.httpd.XHTMLRenderer;
 import com.bigdata.counters.query.CSet;
 import com.bigdata.counters.query.HistoryTable;
 import com.bigdata.counters.query.PivotTable;

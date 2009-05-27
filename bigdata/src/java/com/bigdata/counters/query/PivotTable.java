@@ -12,7 +12,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterNode;
 import com.bigdata.counters.IHistoryEntry;
-import com.bigdata.counters.httpd.XHTMLRenderer.Model;
 
 /**
  * Aggregates data from a table by grouping the cells in the table into sets ({@link CSet}s)
@@ -52,7 +51,7 @@ public class PivotTable {
      * URL query parameters. When they are not specified or when there are
      * not enough specified parameters then we use some generated names.
      * 
-     * @see Model#CATEGORY
+     * @see URLQueryModel#CATEGORY
      */
     public final String[] cnames;
 

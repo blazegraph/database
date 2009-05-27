@@ -333,9 +333,30 @@ public abstract class AbstractCounterSet implements ICounterSet {
      *           &lt;/counters&gt;
      * </pre>
      */
-    public void asXML(OutputStream os, String encoding, Pattern filter) throws IOException {
+    public void asXML(final OutputStream os, final String encoding,
+            final Pattern filter) throws IOException {
         
         final Writer w = new OutputStreamWriter(os, encoding);
+
+        asXML(w, encoding, filter);
+        
+    }
+
+    /**
+     * Alternative, but you are still required to specify the character set
+     * encoding in use by the writer.
+     * 
+     * @param w
+     *            The writer.
+     * @param encoding
+     *            The character set encoding used by that writer.
+     * @param filter
+     *            An optional filter.
+     *            
+     * @throws IOException
+     */
+    public void asXML(final Writer w, final String encoding,
+            final Pattern filter) throws IOException {
         
         w.write("<?xml version=\"1.0\" encoding=\""+encoding+"\" ?>");
 
@@ -343,21 +364,22 @@ public abstract class AbstractCounterSet implements ICounterSet {
         
     }
     
-    public String asXML(Pattern filter) {
+    public String asXML(final Pattern filter) {
 
-        StringWriter w = new StringWriter();
+        final StringWriter w = new StringWriter();
 
         try {
-            asXML(w, null/* filter */);
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException("Unexpected exception: "+ex, ex);
-            
+
+            asXML(w, filter);
+
+        } catch (IOException ex) {
+
+            throw new RuntimeException("Unexpected exception: " + ex, ex);
+
         }
 
         return w.toString();
-        
+
     }
-    
+
 }
