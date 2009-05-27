@@ -78,7 +78,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * 
      * @return The index name.
      */
-    public String getFQN(IKeyOrder<? extends E> keyOrder) {
+    public String getFQN(final IKeyOrder<? extends E> keyOrder) {
         
         return getNamespace() + "." + keyOrder.getIndexName();
         
