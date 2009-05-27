@@ -45,7 +45,7 @@ public class RelationSchema extends Schema {
     /**
      * The name of the property whose value is namespace of the container (if
      * any) for this the {@link ILocatableResource} resource having {@link #NAMESPACE}
-     * as its resource identifer. When defined, this value MUST be a prefix of
+     * as its resource identifier. When defined, this value MUST be a prefix of
      * the value stored under the {@link #NAMESPACE} property.
      */
     public static final String CONTAINER = RelationSchema.class.getPackage()

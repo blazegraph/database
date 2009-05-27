@@ -193,6 +193,9 @@ public class CounterSetQuery {
             
             for(File f : files) {
                
+                if (f.isHidden())
+                    continue;
+                
                 urls.addAll(readURLsFromFile(f));
                                
             }
