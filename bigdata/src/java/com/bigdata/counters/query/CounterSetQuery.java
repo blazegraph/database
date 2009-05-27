@@ -57,10 +57,8 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.PeriodEnum;
+import com.bigdata.counters.XMLUtility;
 import com.bigdata.counters.httpd.DummyEventReportingService;
-import com.bigdata.counters.query.CounterSetSelector;
-import com.bigdata.counters.query.QueryUtil;
-import com.bigdata.counters.query.URLQueryModel;
 import com.bigdata.counters.render.IRenderer;
 import com.bigdata.counters.render.RendererFactory;
 import com.bigdata.service.Event;
@@ -97,6 +95,14 @@ import com.bigdata.util.httpd.NanoHTTPD;
  *       available in order to view the graphs. They should be written once into
  *       the output directory and the links in the (X)HTML output should resolve
  *       them there.
+ * 
+ * @todo Performance could be improved by reading the various XML counter set
+ *       files in parallel since most of the time will be IO Wait.
+ * 
+ * @todo Performance for long runs could be improved if we use more efficient
+ *       classes for mutable strings in {@link XMLUtility} and perhaps
+ *       {@link CounterSet}. E.g., mg4j mutable string or
+ *       http://javolution.org/.
  */
 public class CounterSetQuery {
 
