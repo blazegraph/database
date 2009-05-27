@@ -58,8 +58,11 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("relations");
+        final TestSuite suite = new TestSuite("relations");
 
+        // data declaration layer.
+        suite.addTest(com.bigdata.relation.ddl.TestAll.suite());
+        
         // test suite for rules, but not rule execution.
         suite.addTest(com.bigdata.relation.rule.TestAll.suite());
         
