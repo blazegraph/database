@@ -37,6 +37,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -128,6 +129,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     private volatile boolean open = true;
 
+    /**
+     * Lock used to make {@link BlockingIterator#_hasNext(long)} atomic with
+     * respect to {@link #add(Object, long, TimeUnit)} when the buffer has been
+     * closed.
+     */
+    private final ReentrantLock lock = new ReentrantLock();
+    
+    /**
+     * The exception (if any) which caused the buffer to be closed.
+     */
     private volatile Throwable cause = null;
 
     /**
@@ -696,7 +707,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     public void add(final E e) {
 
-        add(e, Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        try {
+            
+            add(e, Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            
+        } catch(InterruptedException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
     }
 
@@ -714,7 +733,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *         <code>false</code> indicates that the timout expired before the
      *         element could be added to the buffer).
      */
-    public boolean add(final E e, final long timeout, final TimeUnit unit) {
+    public boolean add(final E e, final long timeout, final TimeUnit unit)
+        throws InterruptedException {
         
         if (e == null)
             throw new IllegalArgumentException();
@@ -745,92 +765,110 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         while ((nanos = (System.nanoTime() - begin)) > 0) {
 
-            /*
-             * Note: This is done inside of the loop so that we will notice if
-             * the buffer is closed asynchronously. Otherwise we would just spin
-             * forever once we made it past the guard the first time.
-             */
-            assertOpen();
-            
-            /*
-             * Note: While not the only explanation, a timeout here can occur if
-             * you have nested JOINs. The outer JOIN can timeout waiting on the
-             * inner JOINs to consume the current tuple. If there are a lot of
-             * tuples being evaluated in the inner JOINs, then a timeout is
-             * becomes more likely.
-             * 
-             * Note: This is basically a spin lock, though offer(e) does acquire
-             * a lock internally. If we have spun enough times, then we will use
-             * staged timeouts for subsequent offer()s. This allows the consumer
-             * to catch up with less contention for the queue.
-             */
-
-            final boolean added;
-
-            if (ntries < NSPIN) {
-
-                // offer (non-blocking).
-                added = queue.offer(e);
-
-            } else {
-
-                final long offerTimeoutNanos = Math
-                        .min(nanos, TimeUnit.MILLISECONDS
-                                .toNanos(getTimeoutMillis(ntries)));
+            if (/* lock.tryLock()|| */lock.tryLock(nanos, TimeUnit.NANOSECONDS)) {
 
                 try {
 
-                    // offer (staged timeout, not to exceed the time remaining).
-                    added = queue.offer(e, offerTimeoutNanos,
-                            TimeUnit.NANOSECONDS);
+                    /*
+                     * Note: This is done inside of the loop so that we will
+                     * notice if the buffer is closed asynchronously. Otherwise
+                     * we would just spin forever once we made it past the guard
+                     * the first time.
+                     */
+                    assertOpen();
 
-                } catch (InterruptedException ex) {
+                    /*
+                     * Note: While not the only explanation, a timeout here can
+                     * occur if you have nested JOINs. The outer JOIN can
+                     * timeout waiting on the inner JOINs to consume the current
+                     * tuple. If there are a lot of tuples being evaluated in
+                     * the inner JOINs, then a timeout is becomes more likely.
+                     * 
+                     * Note: This is basically a spin lock, though offer(e) does
+                     * acquire a lock internally. If we have spun enough times,
+                     * then we will use staged timeouts for subsequent offer()s.
+                     * This allows the consumer to catch up with less contention
+                     * for the queue.
+                     */
 
-                    abort(ex);
+                    final boolean added;
 
-                    throw new RuntimeException("Buffer closed by interrupt", ex);
+                    if (ntries < NSPIN) {
 
-                }
+                        // offer (non-blocking).
+                        added = queue.offer(e);
 
-            }
-
-            if (!added) {
-
-                ntries++;
-
-                final long elapsed = System.nanoTime() - begin;
-
-                if (elapsed >= logTimeout) {
-
-                    logTimeout += Math.min(maxLogTimeout, logTimeout);
-
-                    final String msg = "blocked: ntries="
-                            + ntries
-                            + ", elapsed="
-                            + TimeUnit.MILLISECONDS.convert(elapsed,
-                                    TimeUnit.NANOSECONDS)
-                            + ", timeout="
-                            + TimeUnit.MILLISECONDS.convert(logTimeout,
-                                    TimeUnit.NANOSECONDS) + "ms : " + this;
-
-                    if (log.isInfoEnabled() && logTimeout > maxLogTimeout) {
-                        /*
-                         * Issue warning with stack trace showing who is
-                         * blocked.
-                         */
-                        log.warn(msg, new RuntimeException(
-                                MSG_PRODUCER_STACK_FRAME));
                     } else {
-                        // issue warning.
-                        log.warn(msg);
+
+                        final long offerTimeoutNanos = Math.min(nanos,
+                                TimeUnit.MILLISECONDS
+                                        .toNanos(getTimeoutMillis(ntries)));
+
+                        try {
+
+                            // offer (staged timeout, not to exceed the time
+                            // remaining).
+                            added = queue.offer(e, offerTimeoutNanos,
+                                    TimeUnit.NANOSECONDS);
+
+                        } catch (InterruptedException ex) {
+
+                            abort(ex);
+
+                            throw new RuntimeException(
+                                    "Buffer closed by interrupt", ex);
+
+                        }
+
                     }
 
+                    if (!added) {
+
+                        ntries++;
+
+                        final long elapsed = System.nanoTime() - begin;
+
+                        if (elapsed >= logTimeout) {
+
+                            logTimeout += Math.min(maxLogTimeout, logTimeout);
+
+                            final String msg = "blocked: ntries="
+                                    + ntries
+                                    + ", elapsed="
+                                    + TimeUnit.MILLISECONDS.convert(elapsed,
+                                            TimeUnit.NANOSECONDS)
+                                    + ", timeout="
+                                    + TimeUnit.MILLISECONDS.convert(logTimeout,
+                                            TimeUnit.NANOSECONDS) + "ms : "
+                                    + this;
+
+                            if (log.isInfoEnabled()
+                                    && logTimeout > maxLogTimeout) {
+                                /*
+                                 * Issue warning with stack trace showing who is
+                                 * blocked.
+                                 */
+                                log.warn(msg, new RuntimeException(
+                                        MSG_PRODUCER_STACK_FRAME));
+                            } else {
+                                // issue warning.
+                                log.warn(msg);
+                            }
+
+                        }
+
+                        // try to add the element again.
+                        continue;
+
+                    } // if (!added)
+
+                } finally {
+
+                    lock.unlock();
+
                 }
 
-                // try to add the element again.
-                continue;
-
-            }
+            } // while
 
             // item now on the queue.
 
@@ -1277,8 +1315,37 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
              * both acquire a lock, so they are the slowest. BlockingBuffer.open
              * is volatile. nextE is just a local field.
              */
-            while (nextE != null || BlockingBuffer.this.open
-                    || ((nextE = queue.poll()) != null)) {
+//            while (nextE != null || BlockingBuffer.this.open
+//                    || ((nextE = queue.poll()) != null)) {
+            while (true) {
+
+                if (nextE == null && !BlockingBuffer.this.open) {
+                    /*
+                     * Note: The lock is used to make the decision that the
+                     * buffer is exhausted atomic with respect to the close of
+                     * the buffer and add(E,timeout). Without the lock it is
+                     * possible that add(E,timeout) passed the assertOpen()
+                     * guard but has not yet offered the element to the queue.
+                     * With the lock, this becomes atomic.
+                     */
+                    lock.lock();
+                    try {
+                        if (((nextE = queue.poll()) == null)) {
+
+                            if (log.isInfoEnabled())
+                                log.info("Exhausted");
+
+                            assert isExhausted();
+
+                            // strong false - the iterator is exhausted.
+                            checkFuture();
+
+                            return false;
+                        }
+                    } finally {
+                        lock.unlock();
+                    }
+                }
 
                 if (nextE == null) {
 
@@ -1403,9 +1470,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                     try {
 
-                        final long timeout = getTimeoutMillis(ntries);
+//                        final long timeout = getTimeoutMillis(ntries);
+                        final long timeout = Math.min(nanos, TimeUnit.MILLISECONDS
+                                .toNanos(getTimeoutMillis(ntries)));
                         
-                        if ((nextE = queue.poll(timeout, TimeUnit.MILLISECONDS)) != null) {
+                        if ((nextE = queue.poll(timeout, TimeUnit.NANOSECONDS)) != null) {
 
                             if (log.isDebugEnabled())
                                 log.debug("next: " + nextE);
@@ -1523,15 +1592,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 
             }
 
-            if (log.isInfoEnabled())
-                log.info("Exhausted");
-
-            assert isExhausted();
-            
-            // strong false - the iterator is exhausted.
-            checkFuture();
-            
-            return false;
+//            if (log.isInfoEnabled())
+//                log.info("Exhausted");
+//
+//            assert isExhausted();
+//            
+//            // strong false - the iterator is exhausted.
+//            checkFuture();
+//            
+//            return false;
 
         }
 
