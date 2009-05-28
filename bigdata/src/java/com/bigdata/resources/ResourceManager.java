@@ -345,7 +345,7 @@ abstract public class ResourceManager extends OverflowManager implements
                             }
                         });
                 
-                if(true)
+                if(false)
                     tmp.addCounter(IIndexManagerCounters.StaleLocators,
                         new Instrument<String>() {
                         public void sample() {
@@ -366,6 +366,13 @@ abstract public class ResourceManager extends OverflowManager implements
                         }
                     });
                 
+                tmp.addCounter(IIndexManagerCounters.IndexCount,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(getLiveJournal().getName2Addr().rangeCount());
+                            }
+                        });
+
                 tmp.addCounter(IIndexManagerCounters.IndexCacheCapacity,
                         new Instrument<Integer>() {
                             public void sample() {

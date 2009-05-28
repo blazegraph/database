@@ -250,6 +250,13 @@ abstract public class IndexManager extends StoreManager {
         String StaleLocators = "Stale Locators";
 
         /**
+         * The #of named indices on the live journal. Each index partition is
+         * registered as an named index on the live journal, so this may also be
+         * interpreted as the #of index partitions on the data service.
+         */
+        String IndexCount = "Index Count";
+        
+        /**
          * The capacity of the index cache.
          */
         String IndexCacheCapacity = "Index Cache Capacity";
@@ -265,7 +272,7 @@ abstract public class IndexManager extends StoreManager {
         String IndexSegmentCacheCapacity = "Index Segment Cache Capacity";
 
         /**
-         * The approximate #of open {@link IndexSegment}.
+         * The approximate #of open {@link IndexSegment}s.
          */
         String IndexSegmentCacheSize = "Index Segment Cache Size";
 
