@@ -103,6 +103,13 @@ public class TestBlockingBufferWithChunks extends TestCase2 {
 		final int chunkSize = 4;
 		final long chunkTimeout = 1000;
 		final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
+		/*
+         * The test timeout is just a smidge longer than the chunk timeout.
+         * 
+         * Note: use Long.MAX_VALUE iff debugging.
+         */
+//      final long testTimeout = Long.MAX_VALUE;
+        final long testTimeout = chunkTimeout + 20;
 		final boolean ordered = false;
 
 		final BlockingBuffer<Integer[]> buffer = new BlockingBuffer<Integer[]>(
@@ -254,13 +261,11 @@ public class TestBlockingBufferWithChunks extends TestCase2 {
 			}
 		});
 
-		final long testTimeout = 1000;
-
 		// wait a little bit for the producer future.
-		producerFuture.get(testTimeout, TimeUnit.MILLISECONDS);
+		producerFuture.get(testTimeout, chunkTimeoutUnit);
 
 		// wait a little bit for the consumer future.
-		consumerFuture.get(testTimeout, TimeUnit.MILLISECONDS);
+		consumerFuture.get(testTimeout, chunkTimeoutUnit);
 
 	}
 
