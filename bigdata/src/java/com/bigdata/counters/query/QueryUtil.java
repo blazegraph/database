@@ -31,16 +31,17 @@ package com.bigdata.counters.query;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -429,6 +430,60 @@ public class QueryUtil {
     }
 
     /**
+     * Task reads counters matching a regular expression into the caller's
+     * {@link CounterSet}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    public static class ReadCounterSetXMLFileTask implements Callable<Void> {
+        
+        final File file;
+
+        final CounterSet counterSet;
+
+        final int nsamples;
+
+        final PeriodEnum period;
+        
+        final Pattern regex;
+
+        /**
+         * 
+         * @param file
+         * @param counterSet
+         * @param nsamples
+         * @param period
+         * @param regex
+         */
+        public ReadCounterSetXMLFileTask(final File file, final CounterSet counterSet,
+                final int nsamples, final PeriodEnum period, final Pattern regex) {
+
+            this.file = file;
+
+            this.counterSet = counterSet;
+
+            this.nsamples = nsamples;
+
+            this.period = period;
+
+            this.regex = regex;
+
+        }
+
+        public Void call() throws Exception {
+
+            QueryUtil.readCountersFromFile(file, counterSet, regex, nsamples,
+                    period);
+
+            return null;
+            
+        }
+
+    }
+    
+    /**
      * Read in {@link Event}s logged on a file in a tab-delimited format.
      * 
      * @param service
@@ -470,4 +525,57 @@ public class QueryUtil {
 
     }
 
+    /**
+     * Return the specified files, substituting recursively spanned files when a
+     * given file is a directory.
+     * 
+     * @param in
+     *            A collection of zero or more files.
+     * @param filter
+     *            A filter which will select the files to be accepted.
+     *            
+     * @return A collection of the accepted files.
+     */
+    public static Collection<File> collectFiles(final Collection<File> in,
+            final FileFilter filter) {
+        
+        if (in == null)
+            throw new IllegalArgumentException();
+
+        if (filter == null)
+            throw new IllegalArgumentException();
+
+        final Collection<File> out = new LinkedList<File>();
+
+        for (File file : in) {
+
+            if (file.isDirectory()) {
+
+                // recursively process the files in the directory.
+
+                if (log.isInfoEnabled())
+                    log.info("Reading directory: " + file);
+
+                final File[] files = file.listFiles(filter);
+
+                out
+                        .addAll(collectFiles(Arrays.asList(files), filter));
+
+            } else {
+
+                // the file is not a directory.
+                if(filter.accept(file)) {
+
+                    out.add(file);
+                    
+                }
+
+            }
+
+        }
+        
+        return out;
+        
+    }
+    
 }
