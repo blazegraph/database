@@ -31,20 +31,26 @@ package com.bigdata.counters.query;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Vector;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -96,8 +102,8 @@ import com.bigdata.util.httpd.NanoHTTPD;
  *       the output directory and the links in the (X)HTML output should resolve
  *       them there.
  * 
- * @todo Performance could be improved by reading the various XML counter set
- *       files in parallel since most of the time will be IO Wait.
+ * @todo Permit nsamples to be specified in units of minutes, hours, days. E.g.,
+ *       3d would be 3 days.
  * 
  * @todo Performance for long runs could be improved if we use more efficient
  *       classes for mutable strings in {@link XMLUtility} and perhaps
@@ -215,7 +221,105 @@ public class CounterSetQuery {
         return urls;
         
     }
-    
+
+    private static void readFiles(final Collection<File> counterSetFiles,
+            final CounterSet counterSet, final int nsamples,
+            final PeriodEnum period, final Pattern regex) throws IOException,
+            SAXException, ParserConfigurationException, InterruptedException,
+            ExecutionException {
+
+        // flatten directories in the list of files.
+        final Collection<File> flatFileList = QueryUtil.collectFiles(counterSetFiles,
+                new FileFilter() {
+
+                    public boolean accept(File pathname) {
+
+                        return !pathname.isHidden()
+                                && pathname.getName().endsWith(".xml");
+
+                    }
+
+                });
+
+        if (log.isInfoEnabled())
+            log.info("Reading performance counters from "
+                    + flatFileList.size() + " sources.");
+        
+        // read the files
+        if (false/* sequential */) {
+
+            // process the files one at a time.
+            readFilesSequential(flatFileList, counterSet, nsamples, period,
+                    regex);
+
+        } else {
+
+            // process the files in parallel.
+            readFilesParallel(flatFileList, counterSet, nsamples, period,
+                    regex);
+            
+        }
+
+    }
+
+    private static void readFilesSequential(
+            final Collection<File> counterSetFiles,
+            final CounterSet counterSet, final int nsamples,
+            final PeriodEnum period, final Pattern regex) throws IOException,
+            SAXException, ParserConfigurationException {
+
+        for (File file : counterSetFiles) {
+
+                if(log.isInfoEnabled())
+                    log.info("Reading file: " + file);
+
+                QueryUtil.readCountersFromFile(file, counterSet, regex, nsamples,
+                        period);
+
+        }
+
+    }
+
+    private static void readFilesParallel(
+            final Collection<File> counterSetFiles,
+            final CounterSet counterSet, final int nsamples,
+            final PeriodEnum period, final Pattern regex) throws IOException,
+            SAXException, ParserConfigurationException, InterruptedException, ExecutionException {
+
+        final int nfiles = counterSetFiles.size();
+
+        final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(nfiles);
+
+        for (File file : counterSetFiles) {
+
+            tasks.add(new QueryUtil.ReadCounterSetXMLFileTask(file, counterSet,
+                    nsamples, period, regex));
+            
+        }
+        
+        final ExecutorService service = Executors.newFixedThreadPool(nfiles);
+        
+        final List<Future<Void>> futures;
+        try {
+        
+            // run all tasks.
+            futures = service.invokeAll(tasks);
+
+        } finally {
+            
+            service.shutdownNow();
+            
+        }
+        
+        for(Future<Void> future : futures) {
+            
+            // look for errors in the tasks.
+            future.get();
+            
+        }
+
+    }
+
     /**
      * Utility class for running extracting data from performance counter dumps
      * and running various kinds of reports on those data.
@@ -252,9 +356,12 @@ public class CounterSetQuery {
      * @throws IOException
      * @throws ParserConfigurationException
      * @throws SAXException
+     * @throws ExecutionException
+     * @throws InterruptedException
      */
     public static void main(final String[] args) throws IOException,
-            SAXException, ParserConfigurationException {
+            SAXException, ParserConfigurationException, InterruptedException,
+            ExecutionException {
 
         Banner.banner();
 
@@ -401,58 +508,17 @@ public class CounterSetQuery {
         /*
          * Read counters accepted by the optional filter into the counter set to
          * be served.
+         * 
+         * @todo this does not support reading at different periods for each
+         * query.
          */
 
         // The performance counters read from the file(s).
         final CounterSet counterSet = new CounterSet();
 
-        if(log.isInfoEnabled())
-            log.info("Reading performance counters from "
-                    + counterSetFiles.size() + " sources.");
+        readFiles(counterSetFiles, counterSet, nsamples, PeriodEnum.Minutes,
+                regex);
         
-        for (File file : counterSetFiles) {
-
-            /*
-             * @todo this does not support reading at different periods for each
-             * query.
-             */
-            final PeriodEnum period = PeriodEnum.Minutes;
-
-            if (file.isDirectory()) {
-
-                // @todo does not process subdirectories recursively.
-                if(log.isInfoEnabled())
-                    log.info("Reading directory: " + file);
-
-                final File[] files = file.listFiles(new FilenameFilter() {
-
-                    public boolean accept(File dir, String name) {
-                        return name.endsWith(".xml");
-                    }
-                });
-
-                for (File f : files) {
-
-                    if(log.isInfoEnabled())
-                        log.info("Reading file: " + f);
-
-                    QueryUtil.readCountersFromFile(f, counterSet, regex,
-                            nsamples, period);
-
-                }
-
-            } else {
-
-                if(log.isInfoEnabled())
-                    log.info("Reading file: " + file);
-
-                QueryUtil.readCountersFromFile(file, counterSet, regex, nsamples,
-                        period);
-
-            }
-
-        }
-
         /*
          * Run each query in turn against the filtered pre-loaded counter set.
          */
@@ -468,8 +534,8 @@ public class CounterSetQuery {
              * Render on a file. The file can be specified by a URL query
              * parameter.
              * 
-             * FIXME Use the munged counter name (when one can be identified) as
-             * the default filename.
+             * @todo Use the munged counter path / counter name (when one can be
+             * identified) as the default filename.
              */
             File file;
 
