@@ -818,6 +818,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     } else {
 
+                        // update in case we waited a while for the lock.
+                        nanos = (System.nanoTime() - begin);
+                        
                         final long offerTimeoutNanos = Math.min(nanos,
                                 TimeUnit.MILLISECONDS
                                         .toNanos(getTimeoutMillis(ntries)));
@@ -880,39 +883,38 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                     } // if (!added)
 
+                    // item now on the queue.
+                    if (e.getClass().getComponentType() != null) {
+
+                        chunksAddedCount++;
+                        elementsAddedCount += ((Object[]) e).length;
+                        elementsOnQueueCount.addAndGet(((Object[]) e).length);
+
+                        if (log.isDebugEnabled())
+                            log.debug("added chunk: len=" + ((Object[])e).length);
+
+                    } else {
+
+                        elementsAddedCount++;
+                        elementsOnQueueCount.incrementAndGet();
+                        
+                        if (log.isDebugEnabled())
+                            log.debug("added: " + e.toString());
+
+                    }
+
+                    // success.
+                    return true;
+
                 } finally {
 
                     lock.unlock();
 
                 }
 
-            } // while
+            } // if(tryLock())
 
-            // item now on the queue.
-
-            if (e.getClass().getComponentType() != null) {
-
-                chunksAddedCount++;
-                elementsAddedCount += ((Object[]) e).length;
-                elementsOnQueueCount.addAndGet(((Object[]) e).length);
-
-                if (log.isDebugEnabled())
-                    log.debug("added chunk: len=" + ((Object[])e).length);
-
-            } else {
-
-                elementsAddedCount++;
-                elementsOnQueueCount.incrementAndGet();
-                
-                if (log.isDebugEnabled())
-                    log.debug("added: " + e.toString());
-
-            }
-
-            // success.
-            return true;
-
-        }
+        } // while
 
         // timeout
         return false;
