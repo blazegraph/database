@@ -206,6 +206,9 @@ L>//
             // make sure the buffer is closed.
             buffer.abort(t);
             
+            // clear the backing queue.
+            buffer.clear();
+            
             /*
              * Halt processing.
              * 
