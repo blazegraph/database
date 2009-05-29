@@ -96,7 +96,6 @@ public class CounterSetHTTPDServer implements Runnable {
      * 
      * @throws IOException
      */
-
     public static void main(final String[] args) throws Exception {
 
         // default port.
