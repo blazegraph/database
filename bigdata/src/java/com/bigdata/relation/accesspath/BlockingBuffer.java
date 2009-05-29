@@ -603,6 +603,24 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
     }
 
+    /**
+     * Clear the backing queue.
+     * 
+     * @throws IllegalStateException
+     *             If the buffer is open.
+     */
+    public void clear() throws IllegalStateException {
+        
+        if(open)
+            throw new IllegalStateException();
+
+        if (log.isInfoEnabled())
+            log.info("");
+
+        queue.clear();
+        
+    }
+    
     public void abort(final Throwable cause) {
 
         if (cause == null)

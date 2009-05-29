@@ -584,10 +584,11 @@ L>//
          * 
          * Note: We DO NOT close the iterator draining the buffer since that
          * would cause this task to interrupt itself!
-         * 
-         * @todo should also clear the backing queue.
          */
         buffer.close();
+        
+        // Clear the backing queue.
+        buffer.clear();
         
         // clear the redirect queue.
         redirectQueue.clear();
