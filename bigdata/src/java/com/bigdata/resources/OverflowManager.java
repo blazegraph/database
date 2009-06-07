@@ -2391,7 +2391,7 @@ abstract public class OverflowManager extends IndexManager {
 
                         ((CounterSet) tmp
                                 .getPath(IResourceManagerCounters.LiveJournal))
-                                .attach(getLiveJournal().getBufferStrategy()
+                                .attach(getLiveJournal()//.getBufferStrategy()
                                         .getCounters(), true/* replace */);
 
                         log.warn("Re-attached live journal counters: path="
