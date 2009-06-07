@@ -1126,10 +1126,6 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * 
      * @todo nextOffset does update and reset when there is a new journal, which
      *       is interesting.
-     * 
-     * @todo The file counter does not appear to update in either the LBS or the
-     *       DiskOnlYStrategy view. It is on the AbstractJournal's counters.
-     *       After a while it names a journal which has since been deleted!
      */
     synchronized 
     public CounterSet getCounters() {
