@@ -366,6 +366,45 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                     }
                 });
 
+        /**
+         * The moving average of the maximum #of chunks on the input queue for
+         * each sink for all masters for this index. If there are no index
+         * partitions for some index (that is, if the asynchronous write API is
+         * not in use for that index) then this will report ZERO (0).
+         */
+        final MovingAverageTask averageMaximumSinkQueueSize = new MovingAverageTask(
+                "averageMaximumSinkQueueSize", new Callable<Integer>() {
+                    public Integer call() {
+                        final AtomicInteger max = new AtomicInteger(0);
+                        final SubtaskOp op = new SubtaskOp() {
+                            public void call(AbstractSubtask subtask) {
+                                // the subtask queue size.
+                                final int queueSize = subtask.buffer.size();
+                                // find the max (sync not necessary since op is serialized).
+                                if (queueSize > max.get()) {
+                                    max.set(queueSize);
+                                }
+                            }
+                        };
+                        final Iterator<WeakReference<AbstractMasterTask>> itr = masters
+                                .iterator();
+                        while (itr.hasNext()) {
+                            final AbstractMasterTask master = itr.next().get();
+                            if (master == null)
+                                continue;
+                            try {
+                                master.mapOperationOverSubtasks(op);
+                            } catch(InterruptedException ex) {
+                                break;
+                            } catch(Exception ex) {
+                                log.error(this,ex);
+                                break;
+                            }
+                        }
+                        return max.get();
+                    }
+                });
+
         public void run() {
  
             averageElementsOnMasterQueues.run();
@@ -381,6 +420,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             averageMasterRedirectQueueSize.run();
             averageSinkQueueSize.run();
             averageSinkQueueSizeStdev.run();
+            averageMaximumSinkQueueSize.run();
             
         }
         
@@ -637,6 +677,17 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             @Override
             protected void sample() {
                 setValue(statisticsTask.averageSinkQueueSizeStdev.getMovingAverage());
+            }
+        });
+
+        /*
+         * The moving average of the maximum #of chunks on the input queue for
+         * each sink for all masters for this index.
+         */
+        t.addCounter("averageMaximumSinkQueueSize", new Instrument<Double>() {
+            @Override
+            protected void sample() {
+                setValue(statisticsTask.averageMaximumSinkQueueSize.getMovingAverage());
             }
         });
 
