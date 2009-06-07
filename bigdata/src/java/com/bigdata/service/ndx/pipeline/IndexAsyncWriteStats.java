@@ -2,9 +2,11 @@ package com.bigdata.service.ndx.pipeline;
 
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -255,22 +257,28 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageSinkQueueSize = new MovingAverageTask(
                 "averageSinkQueueSize", new Callable<Double>() {
                     public Double call() {
-                        final AtomicInteger n = new AtomicInteger(0);
+                        // #of elements on all subtasks queues.
+                        final AtomicLong n = new AtomicLong(0);
+                        // #of subtasks.
+                        final AtomicInteger m = new AtomicInteger(0);
                         final SubtaskOp op = new SubtaskOp() {
                             public void call(AbstractSubtask subtask) {
-                                n.addAndGet(subtask.buffer.size());
+                                // the subtask queue size.
+                                final int queueSize = subtask.buffer.size();
+                                // sum of subtask queue lengths.
+                                n.addAndGet(queueSize);
+                                // #of subtasks reflected by that sum.
+                                m.incrementAndGet();
                             }
                         };
                         final Iterator<WeakReference<AbstractMasterTask>> itr = masters
                                 .iterator();
-                        int partitionCount = 0;
                         while (itr.hasNext()) {
                             final AbstractMasterTask master = itr.next().get();
                             if (master == null)
                                 continue;
                             try {
                                 master.mapOperationOverSubtasks(op);
-                                partitionCount++;
                             } catch(InterruptedException ex) {
                                 break;
                             } catch(Exception ex) {
@@ -278,11 +286,83 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                                 break;
                             }
                         }
-                        if (partitionCount == 0) {
+                        if (m.get() == 0) {
                             // avoid divide by zero.
                             return 0d;
                         }
-                        return n.get() / (double) partitionCount;
+                        return n.get() / (double) m.get();
+                    }
+                });
+
+        /**
+         * The standard deviation of the moving average of the #of chunks on the
+         * input queue for each sink for all masters for this index. If there
+         * are no index partitions for some index (that is, if the asynchronous
+         * write API is not in use for that index) then this will report ZERO
+         * (0.0).
+         */
+        final MovingAverageTask averageSinkQueueSizeStdev = new MovingAverageTask(
+                "averageSinkQueueSizeStdev", new Callable<Double>() {
+                    public Double call() {
+                        // the per subtask queue sizes.
+                        final LinkedList<Integer> queueSizes = new LinkedList<Integer>();
+                        // #of elements on all subtasks queues.
+                        final AtomicLong n = new AtomicLong(0);
+                        // #of subtasks.
+                        final AtomicInteger m = new AtomicInteger(0);
+                        final SubtaskOp op = new SubtaskOp() {
+                            public void call(AbstractSubtask subtask) {
+                                // the subtask queue size.
+                                final int queueSize = subtask.buffer.size();
+                                // track them all.
+                                queueSizes.add(queueSize);
+                                // sum of subtask queue lengths.
+                                n.addAndGet(queueSize);
+                                // #of subtasks reflected by that sum.
+                                m.incrementAndGet();
+                            }
+                        };
+                        final Iterator<WeakReference<AbstractMasterTask>> itr = masters
+                                .iterator();
+//                        int partitionCount = 0;
+                        while (itr.hasNext()) {
+                            final AbstractMasterTask master = itr.next().get();
+                            if (master == null)
+                                continue;
+                            try {
+                                master.mapOperationOverSubtasks(op);
+//                                partitionCount++;
+                            } catch(InterruptedException ex) {
+                                break;
+                            } catch(Exception ex) {
+                                log.error(this,ex);
+                                break;
+                            }
+                        }
+//                        if (partitionCount == 0) {
+                        if (m.get() == 0) {
+                            // avoid divide by zero.
+                            return 0d;
+                        }
+                        final double mean = n.get() / (double) m.get();// partitionCount;
+                        /*
+                         * To calculate the standard deviation, we compute the
+                         * difference of each data point from the mean, and
+                         * square the result.  We keep the running sum of those
+                         * squares to compute the average, below.
+                         */
+                        double sse = 0.0;
+                        for (Integer queueSize : queueSizes) {
+                            final double delta = (mean - queueSize
+                                    .doubleValue());
+                            sse += delta * delta;
+                        }
+                        /*
+                         * Next we average these values and take the square
+                         * root, which gives the standard deviation.
+                         */
+                        final double stdev = Math.sqrt(sse / m.get());
+                        return mean;
                     }
                 });
 
@@ -300,6 +380,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             averageMasterQueueSize.run();
             averageMasterRedirectQueueSize.run();
             averageSinkQueueSize.run();
+            averageSinkQueueSizeStdev.run();
             
         }
         
@@ -383,10 +464,14 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         });
 
         /*
-         * The moving average of the nanoseconds the master spends handling a
+         * The moving average of the milliseconds the master spends handling a
          * chunk which it has drained from its input queue.
+         * 
+         * Note: The name of this counter was changed on 6/6/2009 to reflect the
+         * fact that this counter is reporting the average #of milliseconds, not
+         * nanoseconds.
          */
-        t.addCounter("averageHandleChunkNanos", new Instrument<Double>() {
+        t.addCounter("averageHandleChunkMillis", new Instrument<Double>() {
             @Override
             protected void sample() {
                 setValue(statisticsTask.averageHandleChunkNanos
@@ -396,10 +481,14 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         });
 
         /*
-         * The moving average of the nanoseconds the master spends splitting a
+         * The moving average of the milliseconds the master spends splitting a
          * chunk which it has drained from its input queue.
+         * 
+         * Note: The name of this counter was changed on 6/6/2009 to reflect the
+         * fact that this counter is reporting the average #of milliseconds, not
+         * nanoseconds.
          */
-        t.addCounter("averageSplitChunkNanos", new Instrument<Double>() {
+        t.addCounter("averageSplitChunkMillis", new Instrument<Double>() {
             @Override
             protected void sample() {
                 setValue(statisticsTask.averageSplitChunkNanos
@@ -537,6 +626,17 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             @Override
             protected void sample() {
                 setValue(statisticsTask.averageSinkQueueSize.getMovingAverage());
+            }
+        });
+
+        /*
+         * The moving average of the standard deviation #of chunks on the input
+         * queue for each sink for all masters for this index.
+         */
+        t.addCounter("averageSinkQueueSizeStdev", new Instrument<Double>() {
+            @Override
+            protected void sample() {
+                setValue(statisticsTask.averageSinkQueueSizeStdev.getMovingAverage());
             }
         });
 
