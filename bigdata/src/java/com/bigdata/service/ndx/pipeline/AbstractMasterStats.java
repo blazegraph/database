@@ -137,7 +137,9 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * The #of chunks transferred from the master to the sinks. Where there is
      * more than one index partition, there will be more than one sink and each
      * chunk written on the master will be divided among the sinks based on the
-     * key-ranges of the tuples in the chunks.
+     * key-ranges of the tuples in the chunks. Therefore each chunk drained from
+     * the master will be registered as some larger #of chunks transferred to
+     * the sink(s) for that master.
      */
     public long chunksTransferred = 0L;
 
