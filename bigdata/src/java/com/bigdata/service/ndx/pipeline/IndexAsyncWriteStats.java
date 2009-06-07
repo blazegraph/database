@@ -362,7 +362,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                          * root, which gives the standard deviation.
                          */
                         final double stdev = Math.sqrt(sse / m.get());
-                        return mean;
+                        return stdev;
                     }
                 });
 
