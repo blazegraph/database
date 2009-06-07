@@ -369,7 +369,20 @@ abstract public class ResourceManager extends OverflowManager implements
                 tmp.addCounter(IIndexManagerCounters.IndexCount,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue(getLiveJournal().getName2Addr().rangeCount());
+                                /*
+                                 * Note: the Name2Addr instance as of the last
+                                 * commit time of the live journal is used
+                                 * deliberately. This avoids the possibility
+                                 * that the live journal is concurrently closed
+                                 * for writes by synchronous overflow, which
+                                 * appears to lead to the inability to access
+                                 * the live Name2Addr object (or its read-only
+                                 * view).
+                                 */
+                                final ManagedJournal liveJournal = getLiveJournal();
+                                setValue(liveJournal.getName2Addr(
+                                        liveJournal.getLastCommitTime())
+                                        .rangeCount());
                             }
                         });
 
