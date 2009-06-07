@@ -1180,6 +1180,11 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             counters.addCounter("file", new OneShotInstrument<String>(""
                     + jnl.getFile()));
 
+            /*
+             * Note: A one-shot counter is not used so that the LBS can aggregate
+             * the different values which this counter takes on across different
+             * live journal instances for the same data service.
+             */
             counters.addCounter("createTime", new Instrument<Long>() {
                 public void sample() {
                     final AbstractJournal jnl = ref.get();
