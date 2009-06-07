@@ -307,7 +307,7 @@ final public class BTreeCounters {
     public long deserializeNanos = 0;
     public long writeNanos = 0;
     public long readNanos = 0;
-    
+
     /**
      * Return a score whose increasing value is correlated with the amount of
      * read/write activity on an index as reflected in these
@@ -329,6 +329,13 @@ final public class BTreeCounters {
      * suspended at any time). For deep B+Trees, DISK READ time dominates DISK
      * WRITE time since increasing numbers of random reads are required to
      * materialize any given leaf.
+     * <p>
+     * The total read-write cost (in seconds) for a BTree is one of the factors
+     * that is considered when choosing which index partition to move. Comparing
+     * the total read/write cost for BTrees across a database can help to reveal
+     * which index partitions have the heaviest load. If only a few index
+     * partitions for a given scale-out index have a heavy load, then those
+     * index partitions are hotspots for that index.
      * 
      * @return The computed score.
      */
@@ -752,6 +759,40 @@ final public class BTreeCounters {
                                 setValue(deserializePerSec);
                             }
                         });
+                
+                /*
+                 * Aggregated read / write times for IO and (de-)serialization.
+                 */
+                
+                /*
+                 * Sum of readSecs + writeSecs + deserializeSecs + serializeSecs.
+                 */
+                tmp.addCounter("totalReadWriteSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double secs = (computeRawReadWriteScore()/ 1000000000.);
+                        setValue(secs);
+                    }
+                });
+                
+                /*
+                 * Sum of readSecs + deserializeSecs.
+                 */
+                tmp.addCounter("totalReadSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double secs = (computeRawReadScore()/ 1000000000.);
+                        setValue(secs);
+                    }
+                });
+                
+                /*
+                 * Sum of writeSecs + serializeSecs.
+                 */
+                tmp.addCounter("totalWriteSecs", new Instrument<Double>() {
+                    public void sample() {
+                        final double secs = (computeRawWriteScore()/ 1000000000.);
+                        setValue(secs);
+                    }
+                });
                 
             }
 
