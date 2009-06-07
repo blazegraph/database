@@ -1161,13 +1161,19 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
     private CounterSet counters;
-    
+
     /**
-     * Note: A combination of a static inner class and a weak reference to
-     * the outer class are used to avoid the returned {@link CounterSet}
-     * having a hard reference to the outer class while retaining the
-     * ability to update the {@link CounterSet} dynamically as long as the
-     * referenced object exists.
+     * Note: A combination of a static inner class and a weak reference to the
+     * outer class are used to avoid the returned {@link CounterSet} having a
+     * hard reference to the outer class while retaining the ability to update
+     * the {@link CounterSet} dynamically as long as the referenced object
+     * exists.
+     * <p>
+     * Note: one-shot counter are NOT used so that the LBS can aggregate the
+     * different values which this counter takes on across different live
+     * journal instances for the same data service. For example, the createTime
+     * for each live journal or the name of the file backing the current live
+     * journal.
      */
     private static class CountersFactory {
 
@@ -1177,14 +1183,17 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
             final WeakReference<AbstractJournal> ref = new WeakReference<AbstractJournal>(jnl);
             
-            counters.addCounter("file", new OneShotInstrument<String>(""
-                    + jnl.getFile()));
+            counters.addCounter("file", new Instrument<String>() {
+                public void sample() {
+                    final AbstractJournal jnl = ref.get();
+                    if (jnl != null) {
+                        setValue(jnl.getFile().toString());
+                    }
+                }
+            });
+//            counters.addCounter("file", new OneShotInstrument<String>(""
+//                    + jnl.getFile()));
 
-            /*
-             * Note: A one-shot counter is not used so that the LBS can aggregate
-             * the different values which this counter takes on across different
-             * live journal instances for the same data service.
-             */
             counters.addCounter("createTime", new Instrument<Long>() {
                 public void sample() {
                     final AbstractJournal jnl = ref.get();
