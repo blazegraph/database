@@ -1099,11 +1099,11 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
             this.storeCounters = storeCounters;
 
-            if (root != null) {
-                
-                root.attach(storeCounters.getCounters(), true/* replace */);
-                
-            }
+//            if (root != null) {
+//                
+//                root.attach(storeCounters.getCounters(), true/* replace */);
+//                
+//            }
             
         }
         
@@ -1127,12 +1127,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * @todo nextOffset does update and reset when there is a new journal, which
      *       is interesting.
      */
-    synchronized 
+//    synchronized 
     public CounterSet getCounters() {
         
-        if (root == null) {
+//        if (root == null) {
             
-            root = new CounterSet();
+        CounterSet root = new CounterSet();
             
             root.addCounter("nextOffset", new Instrument<Long>() {
                 public void sample() {
@@ -1238,16 +1238,12 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
             }
             
-//            sb.append("file="+file);
-//            sb.append(", mode="+fileMode);
-//            sb.append(", readOnly=" + isReadOnly());
-            
-        }
+//        }
         
         return root;
         
     }
-    private CounterSet root;
+//    private CounterSet root;
     
     /**
      * 

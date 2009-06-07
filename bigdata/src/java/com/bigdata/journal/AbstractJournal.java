@@ -1149,18 +1149,21 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * Return counters reporting on various aspects of the journal.
      */
-    synchronized public CounterSet getCounters() {
+//    synchronized 
+    public CounterSet getCounters() {
         
-        if (counters == null) {
+        return CountersFactory.getCounters(this);
+        
+//        if (counters == null) {
+//
+//            counters = CountersFactory.getCounters(this);
+//            
+//        }
 
-            counters = CountersFactory.getCounters(this);
-            
-        }
-
-        return counters;
+//        return counters;
         
     }
-    private CounterSet counters;
+//    private CounterSet counters;
 
     /**
      * Note: A combination of a static inner class and a weak reference to the
