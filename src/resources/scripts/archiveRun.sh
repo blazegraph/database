@@ -49,14 +49,14 @@ cp -v $BIGDATA_CONFIG \
    $targetDir
 
 # the journal containing the events (and eventually the counters).
-cp -v /var/bigdata/benchmark/LoadBalancer*/logicalService*/*/events.jnl $targetDir
+cp -v $LAS/LoadBalancerServer/logicalService*/*/events.jnl $targetDir
 
 # text files containing the logged performance counters.
 cp -v $LAS/LoadBalancerServer/logicalService*/*/counters* $targetDir/counters
 
 # Copy the index dumps if you are running the lubm test harness.
 if [ -d "$NAS/lubm" ]; then
-	cp -vr /opt2/trials/indexDumps/* $targetDir/indexDumps
+	cp -vr "$NAS/lubm/*indexDumps* $targetDir
 fi
 
 tar -cvz -C "$targetDir/.." -f $targetDir.tgz $targetDir
