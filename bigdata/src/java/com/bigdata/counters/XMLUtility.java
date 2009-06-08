@@ -111,7 +111,22 @@ public class XMLUtility {
                 
                 final String name = counter.getName();
                 
-                final Object value = counter.getValue();
+                final Object value;
+                try {
+                    value = counter.getValue();
+                } catch (Throwable t) {
+                    /*
+                     * Log an error if we can't obtain the value of a counter
+                     * and continue processing the remaining counters.
+                     * 
+                     * Note: Counter#getValue() typically invokes
+                     * Instrument#sample() so an error here typically means that
+                     * the instrument implementation class ran into a problem.
+                     */
+                    log.error("Could not read counter value (skipped): "
+                            + counter.getPath(), t);
+                    continue;
+                }
                 
                 final long time = counter.lastModified();
 
