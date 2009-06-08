@@ -52,7 +52,6 @@ import com.bigdata.counters.History;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
-import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.service.Event;
 import com.bigdata.service.IEventReportingService;
 import com.bigdata.service.IService;
@@ -609,19 +608,26 @@ public class URLQueryModel {
          */
         switch(timestampFormat) {
         case dateTime:
-            switch (period) {
-            case Minutes:
-                dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
-                break;
-            case Hours:
-                dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
-                break;
-            case Days:
-                dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
-                break;
-            default:
-                throw new UnsupportedOperationException(period.toString());
-            }
+            /*
+             * Note: I have decided to go with the long format (date + time)
+             * since runs often span days and the time along is not enough
+             * information.
+             */
+          dateFormat = DateFormat.getDateTimeInstance(
+                    DateFormat.MEDIUM/* date */, DateFormat.MEDIUM/* time */);
+//            switch (period) {
+//            case Minutes:
+//                dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
+//                break;
+//            case Hours:
+//                dateFormat = DateFormat.getTimeInstance(DateFormat.MEDIUM);
+//                break;
+//            case Days:
+//                dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
+//                break;
+//            default:
+//                throw new UnsupportedOperationException(period.toString());
+//            }
             break;
         case epoch: {
             // milliseconds since the epoch
