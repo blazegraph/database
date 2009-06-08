@@ -38,7 +38,7 @@ import com.bigdata.rawstore.Bytes;
  * releases it back to those pool when it is finalized) or the buffer is
  * immediately released back to this pool.
  * <p>
- * Note: Precisey because of the bug which motivates this class, we DO NOT
+ * Note: Precisely because of the bug which motivates this class, we DO NOT
  * release buffers back to the JVM. This means that the size of a
  * {@link DirectBufferPool} can only increase, but at least you get to (re-)use
  * the memory that you have allocated rather than leaking it to the native heap.
@@ -180,7 +180,7 @@ public class DirectBufferPool {
          * allocated and managed by the {@link DirectBufferPool} ({@link #DEFAULT_BUFFER_CAPACITY}).
          */
         String BUFFER_CAPACITY = DirectBufferPool.class.getName()
-                + ".bufferSize";
+                + ".bufferCapacity";
 
         /**
          * The default capacity of the allocated buffers.
