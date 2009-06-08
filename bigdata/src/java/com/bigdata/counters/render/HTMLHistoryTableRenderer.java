@@ -89,7 +89,8 @@ public class HTMLHistoryTableRenderer extends HistoryTableRenderer {
 
             // header row.
             w.write(" <tr\n>");
-            w.write("  <th>" + cdata(t.units) + "</th\n>");
+//            w.write("  <th>" + cdata(t.units) + "</th\n>");
+            w.write("  <th>Timestamp</th>\n");
             for (ICounter counter : t.a) {
                 /*
                  * If the pattern included capturing groups then use the matched
@@ -113,7 +114,7 @@ public class HTMLHistoryTableRenderer extends HistoryTableRenderer {
                 }
                 w.write("  <th>" + cdata(label) + "</th\n>");
             }
-            w.write("  <th>Timestamp</th>\n");
+//            w.write("  <th>Timestamp</th>\n");
             w.write(" </tr\n>");
 
         }
@@ -139,25 +140,28 @@ public class HTMLHistoryTableRenderer extends HistoryTableRenderer {
 
             }
 
-            /*
-             * The time will be zero for the first row and a delta (expressed in
-             * the units of the history) for the remaining rows.
-             * 
-             * Note: The time units are computed using floating point math and
-             * then converted to a display form using formatting in order to be
-             * able to accurately convey where a sample falls within the
-             * granularity of the unit (e.g., early or late in the day).
-             */
-
             final long timestamp = t.getTimestamp(row);
 
-            final String timeStr = formatter.unitsFormat
-                    .format(((double) timestamp - t.getTimestamp(0/* row */))
-                            / t.period);
+//            /*
+//             * The time will be zero for the first row and a delta (expressed in
+//             * the units of the history) for the remaining rows.
+//             * 
+//             * Note: The time units are computed using floating point math and
+//             * then converted to a display form using formatting in order to be
+//             * able to accurately convey where a sample falls within the
+//             * granularity of the unit (e.g., early or late in the day).
+//             */
+//
+//            final String timeStr = formatter.unitsFormat
+//                    .format(((double) timestamp - t.getTimestamp(0/* row */))
+//                            / t.period);
 
             w.write(" <tr\n>");
 
-            w.write("  <td>" + cdata(timeStr) + "</td\n>");
+//           w.write("  <td>" + cdata(timeStr) + "</td\n>");
+
+            w.write("  <td>" + cdata(formatter.date(timestamp))
+                    + "</td\n>");
 
             for (String s : valStr) {
 
@@ -165,8 +169,8 @@ public class HTMLHistoryTableRenderer extends HistoryTableRenderer {
 
             }
 
-            w.write("  <td>" + cdata(formatter.date(timestamp))
-                    + "</td\n>");
+//            w.write("  <td>" + cdata(formatter.date(timestamp))
+//                    + "</td\n>");
 
             w.write(" </tr\n>");
 

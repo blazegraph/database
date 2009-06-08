@@ -509,13 +509,13 @@ public class XHTMLRenderer implements IRenderer {
                     w.write("  <td>" + value(counter,inst.minutes.getAverage())
                             + " (" + value(counter,inst.minutes.size()) + ")"
                             + "</td\n>");
-
-                    w.write("  <td>" + value(counter,inst.hours.getAverage())
-                            + " (" + value(counter,inst.hours.size()) + ")"
+                    
+                    w.write("  <td>" + (inst.hours==null?"N/A":(value(counter,inst.hours.getAverage())
+                            + " (" + value(counter,inst.hours.size()) + ")"))
                             + "</td\n>");
 
-                    w.write("  <td>" + value(counter,inst.days.getAverage())
-                            + " (" + value(counter,inst.days.size()) + ")"
+                    w.write("  <td>" + (inst.days==null?"N/A":(value(counter,inst.days.getAverage())
+                            + " (" + value(counter,inst.days.size()) + ")"))
                             + "</td\n>");
 
                     // the most recent value.
