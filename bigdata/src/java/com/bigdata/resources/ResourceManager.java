@@ -390,7 +390,8 @@ abstract public class ResourceManager extends OverflowManager implements
                                 long lastCommitTime;
                                 int ntries = 1;
                                 while ((lastCommitTime = liveJournal
-                                        .getLastCommitTime()) == 0L && ntries<10) {
+                                        .getLastCommitTime()) == 0L
+                                        && ntries < 10) {
                                     try {
                                         Thread.sleep(10/* ms */);
                                         ntries++;
@@ -400,9 +401,23 @@ abstract public class ResourceManager extends OverflowManager implements
                                                     .info("Awaiting 1st commit on the new journal.");
                                     }
                                 }
-                                if (lastCommitTime == 0L)
-                                    throw new AssertionError(
+                                if (lastCommitTime == 0L) {
+                                    /*
+                                     * @todo This warning will be issued for the
+                                     * first live journal for a data service
+                                     * since there are no commit points until
+                                     * the application registers an index on
+                                     * that data service. When the issue
+                                     * described above is resolved, we will have
+                                     * to return silently for this case or go
+                                     * ahead and force an initial commit when
+                                     * the 1st live journal is created for the
+                                     * data service by the store manager.
+                                     */
+                                    log.warn(
                                             "No commit points on the live journal?");
+                                    return;
+                                }
                                 final long indexCount = liveJournal
                                         .getName2Addr(lastCommitTime)
                                         .rangeCount();
