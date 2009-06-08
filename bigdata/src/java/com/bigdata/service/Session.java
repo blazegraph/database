@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.log4j.Logger;
 
 /**
- * A property set associated with a {@link DataService}.
+ * A (transient) property set associated with some kinds of services.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -41,8 +41,6 @@ import org.apache.log4j.Logger;
 public class Session {
 
     protected static final Logger log = Logger.getLogger(Session.class);
-
-    protected static final boolean INFO = log.isInfoEnabled();
 
     private ConcurrentHashMap<String, Object> session = new ConcurrentHashMap<String, Object>();
 
@@ -56,7 +54,7 @@ public class Session {
 
         final Object ret = session.putIfAbsent(name, value);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + ", size=" + session.size());
 
         return ret;
@@ -67,7 +65,7 @@ public class Session {
 
         final Object ret = session.put(name, value);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + ", size=" + session.size());
 
         return ret;
@@ -78,7 +76,7 @@ public class Session {
 
         final Object ret = session.remove(name);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + ", size=" + session.size() + ", removed="
                     + (ret != null));
 
@@ -90,7 +88,7 @@ public class Session {
 
         final Object ret = session.remove(name, expectedValue);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("name=" + name + ", size=" + session.size() + ", removed="
                     + (ret != null));
 

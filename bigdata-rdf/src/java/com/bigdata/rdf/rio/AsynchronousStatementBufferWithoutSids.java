@@ -56,7 +56,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.KVOTermIdComparator;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
@@ -85,6 +84,7 @@ import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IRunnableBuffer;
 import com.bigdata.relation.accesspath.UnsynchronizedUnboundedChunkBuffer;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
@@ -936,7 +936,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         private final IChunkedIterator<BigdataValue> src;
 
-        private final BlockingBuffer<KVO<BigdataValue>[]> buffer;
+        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer;
 
         /**
          * 
@@ -950,7 +950,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                 final KVOLatch latch,
                 final LexiconRelation r,
                 final IChunkedIterator<BigdataValue> src,
-                final BlockingBuffer<KVO<BigdataValue>[]> buffer) {
+                final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
 
             if (latch == null)
                 throw new IllegalArgumentException();
@@ -1048,7 +1048,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
         private final IChunkedIterator<BigdataValue> src;
 
-        private final BlockingBuffer<KVO<BigdataValue>[]> buffer;
+        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer;
 
         /**
          * 
@@ -1060,7 +1060,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         public AsyncId2TermIndexWriteTask(
                 final BigdataValueFactory valueFactory,
                 final IChunkedIterator<BigdataValue> src,
-                final BlockingBuffer<KVO<BigdataValue>[]> buffer) {
+                final IRunnableBuffer<KVO<BigdataValue>[]> buffer) {
 
             this.valueFactory = valueFactory;
 
@@ -1163,7 +1163,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         /* Note: problem with java 1.6.0_07 and _12 on linux when typed. */
         private final IChunkedOrderedIterator/*<ISPO>*/ src;
 
-        private final BlockingBuffer<KVO<ISPO>[]> writeBuffer;
+        private final IRunnableBuffer<KVO<ISPO>[]> writeBuffer;
 
         private final SPOTupleSerializer tupleSer;
         
@@ -1172,7 +1172,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
                 final SPORelation spoRelation,
                 /* Note: problem with java 1.6.0_07 and _12 on linux when typed. */
                 final IChunkedOrderedIterator/*<ISPO>*/ src,
-                final BlockingBuffer<KVO<ISPO>[]> writeBuffer) {
+                final IRunnableBuffer<KVO<ISPO>[]> writeBuffer) {
 
             if (keyOrder == null)
                 throw new IllegalArgumentException();
@@ -1278,7 +1278,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
      * @version $Id$
      */
     public static class AsynchronousWriteBufferFactoryWithoutSids<S extends BigdataStatement> implements
-            IAsynchronousWriteBufferFactory<S> {
+            IAsynchronousWriteStatementBufferFactory<S> {
        
         private final ScaleOutTripleStore tripleStore;
         
@@ -1316,12 +1316,12 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          */
         final boolean syncRPCForTERM2ID;
         
-        private final BlockingBuffer<KVO<BigdataValue>[]> buffer_t2id;
-        private final BlockingBuffer<KVO<BigdataValue>[]> buffer_id2t;
-        private final BlockingBuffer<KVO<BigdataValue>[]> buffer_text;
-        private final BlockingBuffer<KVO<ISPO>[]> buffer_spo;
-        private final BlockingBuffer<KVO<ISPO>[]> buffer_pos;
-        private final BlockingBuffer<KVO<ISPO>[]> buffer_osp;
+        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer_t2id;
+        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer_id2t;
+        private final IRunnableBuffer<KVO<BigdataValue>[]> buffer_text;
+        private final IRunnableBuffer<KVO<ISPO>[]> buffer_spo;
+        private final IRunnableBuffer<KVO<ISPO>[]> buffer_pos;
+        private final IRunnableBuffer<KVO<ISPO>[]> buffer_osp;
         
         private final LongAggregator statementResultHandler = new LongAggregator();
 

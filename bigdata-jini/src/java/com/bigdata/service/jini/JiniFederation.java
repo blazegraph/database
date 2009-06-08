@@ -71,6 +71,7 @@ import com.bigdata.journal.ITransactionService;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.accesspath.IRunnableBuffer;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IClientService;
@@ -88,12 +89,15 @@ import com.bigdata.service.jini.lookup.TransactionServiceClient;
 import com.bigdata.service.proxy.ClientAsynchronousIterator;
 import com.bigdata.service.proxy.ClientBuffer;
 import com.bigdata.service.proxy.ClientFuture;
+import com.bigdata.service.proxy.ClientRunnableBuffer;
 import com.bigdata.service.proxy.RemoteAsynchronousIterator;
 import com.bigdata.service.proxy.RemoteAsynchronousIteratorImpl;
 import com.bigdata.service.proxy.RemoteBuffer;
 import com.bigdata.service.proxy.RemoteBufferImpl;
 import com.bigdata.service.proxy.RemoteFuture;
 import com.bigdata.service.proxy.RemoteFutureImpl;
+import com.bigdata.service.proxy.RemoteRunnableBuffer;
+import com.bigdata.service.proxy.RemoteRunnableBufferImpl;
 import com.bigdata.zookeeper.ZooHelper;
 import com.bigdata.zookeeper.ZooKeeperAccessor;
 import com.bigdata.zookeeper.ZooResourceLockService;
@@ -1067,12 +1071,15 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
      * RMI).
      * 
      * @param buffer
-     *            The future.
+     *            The buffer.
      * 
      * @return A proxy for that {@link IBuffer} that masquerades any RMI
      *         exceptions.
      */
     public <E> IBuffer<E> getProxy(final IBuffer<E> buffer) {
+        
+        if (buffer == null)
+            throw new IllegalArgumentException();
         
         /*
          * Setup the Exporter.
@@ -1106,6 +1113,58 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
 
         // return proxy to caller.
         return new ClientBuffer<E>(proxy);
+
+    }
+
+    /**
+     * A proxy for an {@link IRunnableBuffer} that does not extend
+     * {@link Remote} and which DOES NOT declare that its methods throw
+     * {@link IOException} (for RMI).
+     * 
+     * @param buffer
+     *            The buffer.
+     * 
+     * @return A proxy for that {@link IBuffer} that masquerades any RMI
+     *         exceptions.
+     */
+    public <E,V> IRunnableBuffer<E> getProxy(final IRunnableBuffer<E> buffer) {
+        
+        if (buffer == null)
+            throw new IllegalArgumentException();
+        
+        /*
+         * Setup the Exporter.
+         */
+        final Exporter exporter = getExporter(true/* enableDGC */);
+        
+        // wrap in a proxyable object.
+        final RemoteRunnableBuffer<E, V> impl = new RemoteRunnableBufferImpl<E, V>(
+                buffer, getProxy(buffer.getFuture()));
+
+        /*
+         * Export the proxy.
+         */
+        final RemoteRunnableBuffer<E,V> proxy;
+        try {
+
+            // export proxy.
+            proxy = (RemoteRunnableBuffer<E,V>) exporter.export(impl);
+
+            if (log.isInfoEnabled()) {
+
+                log.info("Exported proxy: proxy=" + proxy + "("
+                        + proxy.getClass() + ")");
+
+            }
+
+        } catch (ExportException ex) {
+
+            throw new RuntimeException("Export error: " + ex, ex);
+
+        }
+
+        // return proxy to caller.
+        return new ClientRunnableBuffer<E,V>(proxy);
 
     }
 

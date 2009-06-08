@@ -59,13 +59,13 @@ import com.bigdata.striterator.ICloseableIterator;
  * <strong>You MUST make sure that the thread that sets up the
  * {@link BlockingBuffer} and which submits a task that writes on the buffer
  * also sets the {@link Future} on the {@link BlockingBuffer} so that the
- * iterator can monitor the {@link Future}, detect if it has been cancelled,
+ * iterator can monitor the {@link Future}, detect if it has been canceled,
  * and throw out the exception from the {@link Future} back to the client.
  * Failure to do this can lead to the iterator not terminating!</strong>
  * </p>
  * <p>
  * Note: {@link BlockingBuffer} is used (a) for {@link IAccessPath} iterators
- * that exceed the fully-buffered read threashold; (b) for high-level query with
+ * that exceed the fully-buffered read threshold; (b) for high-level query with
  * at least one join; (c) by the {@link BigdataStatementIteratorImpl}, which is
  * used by the RDF DB for high-level query with no joins; and by the
  * {@link BigdataSolutionResolverator}, which is used by the RDF DB high-level

@@ -53,7 +53,7 @@ import com.bigdata.counters.httpd.CounterSetHTTPDServer;
 import com.bigdata.counters.render.XHTMLRenderer;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IRunnableBuffer;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
@@ -588,27 +588,29 @@ public class ThroughputMaster
                     ITx.UNISOLATED);
 
             final IDuplicateRemover<Void> duplicateRemover;
-            final BlockingBuffer<KVO<Void>[]> insert;
-            final BlockingBuffer<KVO<Void>[]> remove;
+            final IRunnableBuffer<KVO<Void>[]> insertBuffer;
+            final IRunnableBuffer<KVO<Void>[]> removeBuffer;
             if (jobState.asynchronous) {
                 /*
                  * @todo enable optional duplicate removal and see what impact
                  * it has.
+                 * 
+                 * @todo support the AggregatorTask.
                  */
                 duplicateRemover = null;
                 // for inserts.
-                insert = ndx.newWriteBuffer(//
+                insertBuffer = ndx.newWriteBuffer(//
                         (IResultHandler<Void, Void>) null,// resultHandler
                         duplicateRemover,
                         BatchInsertConstructor.RETURN_NO_VALUES);
                 // for deletes.
-                remove = ndx.newWriteBuffer(//
+                removeBuffer = ndx.newWriteBuffer(//
                         (IResultHandler<Void, Void>) null,// resultHandler
                         duplicateRemover,//
                         BatchRemoveConstructor.RETURN_NO_VALUES);
             } else {
                 duplicateRemover = null;
-                insert = remove = null;
+                insertBuffer = removeBuffer = null;
             }
             
             while (nops < jobState.operationCount) {
@@ -660,7 +662,7 @@ public class ThroughputMaster
                  */
                 final double insertRate = 1d;
 
-                new Task(ndx, insert, remove, r, nkeys, firstKey,
+                new Task(ndx, insertBuffer, removeBuffer, r, nkeys, firstKey,
                         jobState.incRange, insertRate).call();
 
                 nops += nkeys;
@@ -689,13 +691,13 @@ public class ThroughputMaster
             if(jobState.asynchronous) {
                 
                 // close the asynchronous write buffers.
-                insert.close();
-                remove.close();
+                insertBuffer.close();
+                removeBuffer.close();
                 
                 // await their futures.
-                insert.getFuture().get();
+                insertBuffer.getFuture().get();
                 
-                remove.getFuture().get();
+                removeBuffer.getFuture().get();
                 
             }
             
@@ -721,8 +723,8 @@ public class ThroughputMaster
     public static class Task implements Callable<Void> {
 
         private final IIndex ndx;
-        private final BlockingBuffer<KVO<Void>[]> insert;
-        private final BlockingBuffer<KVO<Void>[]> remove;
+        private final IRunnableBuffer<KVO<Void>[]> insert;
+        private final IRunnableBuffer<KVO<Void>[]> remove;
         private final int nops;
         private final double insertRate;
         private final int incRange;
@@ -759,8 +761,8 @@ public class ThroughputMaster
          *       to be executed against the service.
          */
         public Task(final IScaleOutClientIndex ndx,
-                final BlockingBuffer<KVO<Void>[]> insert,
-                final BlockingBuffer<KVO<Void>[]> remove, final Random r,
+                final IRunnableBuffer<KVO<Void>[]> insert,
+                final IRunnableBuffer<KVO<Void>[]> remove, final Random r,
                 final int nops, final long firstKey, final int incRange,
                 final double insertRate) {
 
