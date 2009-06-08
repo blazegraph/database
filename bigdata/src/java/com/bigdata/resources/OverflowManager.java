@@ -528,66 +528,6 @@ abstract public class OverflowManager extends IndexManager {
                 + ".scatterSplitEnabled";
 
         String DEFAULT_SCATTER_SPLIT_ENABLED = "true";
-
-//        /**
-//         * The percentage of the nominal index partition size at which a scatter
-//         * split is triggered when there is only a single index partition for a
-//         * given scale-out index (default
-//         * {@link #DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD}). The
-//         * scatter split will break the index into multiple partitions and
-//         * distribute those index partitions across the federation in order to
-//         * allow more resources to be brought to bear on the scale-out index.
-//         * The value must LT the nominal index partition split point or normal
-//         * index splits will take precedence and a scatter split will never be
-//         * performed. The allowable range is therefore constrained to
-//         * <code>(0.1 : 1.0)</code>.
-//         */
-//        String SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = OverflowManager.class
-//                .getName()
-//                + ".scatterSplitPercentOfSplitThreshold";
-//        
-//        String DEFAULT_SCATTER_SPLIT_PERCENT_OF_SPLIT_THRESHOLD = ".25";
-//        
-//        /**
-//         * The #of data services on which the index will be scattered or ZERO(0)
-//         * to use all discovered data services (default
-//         * {@value #DEFAULT_SCATTER_SPLIT_DATA_SERVICES_COUNT}).
-//         */
-//        String SCATTER_SPLIT_DATA_SERVICES_COUNT = OverflowManager.class
-//                .getName()
-//                + ".scatterSplitDataServicesCount";
-//
-//        String DEFAULT_SCATTER_SPLIT_DATA_SERVICES_COUNT = "0";
-//
-//        /**
-//         * The #of index partitions to generate when an index is scatter split.
-//         * The index partitions will be evenly distributed across up to
-//         * {@link #SCATTER_SPLIT_DATA_SERVICES_COUNT} discovered data services.
-//         * When ZERO(0), the scatter split will generate
-//         * <code>(NDATA_SERVICES x 2)</code> index partitions, where
-//         * NDATA_SERVICES is either {@link #SCATTER_SPLIT_DATA_SERVICES_COUNT}
-//         * or the #of discovered data services when that option is ZERO (0).
-//         * <p>
-//         * The "ideal" number of index partitions is generally between (NCORES x
-//         * NDATA_SERVICES / NINDICES) and (NCORES x NDATA_SERVICES). When there
-//         * are NCORES x NDATA_SERVICES index partitions, each core is capable of
-//         * servicing a distinct index partition assuming that the application
-//         * and the "schema" are capable of driving the data service writes with
-//         * that concurrency. However, if you have NINDICES, and the application
-//         * drives writes on all index partitions of all indices at the same
-//         * rate, then a 1:1 allocation of index partitions to cores would be
-//         * "ideal".
-//         * <p>
-//         * The "right" answer also depends on the data scale. If you have far
-//         * less data than can fill that many index partitions to 200M each, then
-//         * you should adjust the scatter split to use fewer index partitions or
-//         * fewer data services.
-//         */
-//        String SCATTER_SPLIT_INDEX_PARTITIONS_COUNT = OverflowManager.class
-//                .getName()
-//                + ".scatterSplitIndexPartitionsCount";
-//
-//        String DEFAULT_SCATTER_SPLIT_INDEX_PARTITIONS_COUNT = "0";
         
         /**
          * Option may be used to disable index partition joins.
@@ -870,7 +810,7 @@ abstract public class OverflowManager extends IndexManager {
         String DEFAULT_OVERFLOW_TASKS_CONCURRENT = "0";
 
         /**
-         * Cancel an existing asychronous overflow process (interrupting any
+         * Cancel an existing asynchronous overflow process (interrupting any
          * running tasks) if the live journal is again approaching its maximum
          * extent (default
          * {@value #DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL}).
@@ -1738,7 +1678,7 @@ abstract public class OverflowManager extends IndexManager {
 
             /*
              * We have an exclusive lock and the overflow conditions are
-             * satisifed.
+             * satisfied.
              */
             // Do overflow processing.
             final OverflowMetadata overflowMetadata = doSynchronousOverflow();
@@ -1824,7 +1764,7 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * Synchronous overflow processing.
      * <p>
-     * This is invoked once all pre-conditions have been satisified.
+     * This is invoked once all pre-conditions have been satisfied.
      * <p>
      * Index partitions that have fewer than some threshold #of index entries
      * will be copied onto the new journal. Otherwise the view of the index will
@@ -1854,8 +1794,6 @@ abstract public class OverflowManager extends IndexManager {
         final AbstractJournal oldJournal = getLiveJournal();
         final ManagedJournal newJournal;
 
-        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
-
         /*
          * Note: We assign the same timestamp to the createTime of the new
          * journal and the closeTime of the old journal.
@@ -1881,6 +1819,16 @@ abstract public class OverflowManager extends IndexManager {
          * allocation strategy to support a direct buffers for the Direct and
          * BufferedDisk modes. Update the comments inline above when making this
          * change.
+         * 
+         * FIXME The current approach opens a hole during synchronous overflow
+         * when there are NO indices defined on the (new) live journal. This has
+         * not shown up as a problem primarily because I have not been testing
+         * with writes with concurrent read during synchronous overflow, but
+         * closure might provoke this error.
+         * 
+         * @todo The logic to report the #of index partitions on the data
+         * services in ResourceManager has been hacked to work around this hole.
+         * Simplify that logic once this hole is fixed.
          */
         {
 
@@ -1906,7 +1854,7 @@ abstract public class OverflowManager extends IndexManager {
          * Create the new journal.
          * 
          * @todo this is not using the temp filename mechanism in a manner that
-         * truely guarentees an atomic file create. The CREATE_TEMP_FILE option
+         * truly guarantees an atomic file create. The CREATE_TEMP_FILE option
          * should probably be extended with a CREATE_DIR option that allows you
          * to override the directory in which the journal is created. That will
          * allow the atomic creation of the journal in the desired directory
@@ -1954,6 +1902,11 @@ abstract public class OverflowManager extends IndexManager {
 
         /*
          * Cut over to the new journal.
+         * 
+         * @todo Once the direct buffer allocation issue is resolved, refactor
+         * this into a private method, perhaps combined with the close out of
+         * the old journal and the propagation of the performance counters. That
+         * will simply this code and make easier to understand.
          */
         {
 
@@ -1979,7 +1932,7 @@ abstract public class OverflowManager extends IndexManager {
             journalBytesUnderManagement.addAndGet(-newJournal.getBufferStrategy().getExtent());
 
             // note the lastCommitTime on the old journal.
-            lastOverflowTime = lastCommitTime;
+            lastOverflowTime = oldJournal.getRootBlockView().getLastCommitTime();
             
             /*
              * Set the performance counters from the old store on the new store
@@ -2004,345 +1957,33 @@ abstract public class OverflowManager extends IndexManager {
                 log.info("New live journal: " + newJournal.getFile());
 
         }
+
+        /*
+         * Propagate the index declarations to the new journal. If an error
+         * arises during overflow then the new journal is deleted and the old
+         * journal remains in place so that we continue to run against a known
+         * good state.
+         * 
+         * FIXME In order to handle an error in this manner we need to make the
+         * change in how the direct buffers are allocated for the new journal so
+         * we can keep the old journal open for writes until the atomic cutover.
+         * At it stands, we have already closed out the old journal for writes
+         * so error handling here WILL NOT permit the application to continue
+         * writing on the old journal. 
+         */
+//        try {
+            propagateIndexDecls(oldJournal, newJournal, overflowMetadata);
+//        } catch (Throwable t) {
+//            log.error("Overflow error (continuing with the old journal): " + t,
+//                    t);
+//            newJournal.destroy();
+//            // @todo rethrow the exception or just return?
+//            throw t;
+//        }
         
-        /*
-         * Overflow each index by re-defining its view on the new journal.
-         * 
-         * FIXME This whole operation should be validated as a pre-condition to
-         * attempting overflow and if an error arises during overflow then a
-         * compensating action should restore the old journal and delete the new
-         * one so that we continue to run against a known good state. For
-         * example, if an unpartitioned index is encountered then a thrown
-         * exception results in the application running against the new live
-         * journal but its indices have not been propagated correctly onto that
-         * journal!
-         */
-        // #of declared indices.
-        final int numIndices = overflowMetadata.getIndexCount();
-        // #of indices processed (copied over or view redefined).
-        int numIndicesProcessed = 0;
-        // #of indices whose view was redefined on the new journal.
-        int numIndicesViewRedefined = 0;
-        // #of indices with at least one index entry that were copied.
-        int numIndicesNonZeroCopy = 0;
-        // #of indices that were copied over.
-        int ncopy = 0;
-        /*
-         * Maximum #of non-zero indices that we will copy over.
-         * 
-         * @todo config. maxNonZeroCopy might not be a good idea in some cases.
-         * if there is a large #of small indices on the journal then some should
-         * really be moved somewhere else and this limit can promote that.
-         * however, if the entire federation is filled with such small indices
-         * then we hardly needs to be doing index builds for all of them.
-         */
-        final int maxNonZeroCopy = 100;
-        final long firstCommitTime;
-        {
-
-            if (log.isInfoEnabled())
-                log.info("doOverflow(): lastCommitTime="
-                        + lastCommitTime
-                        + "\nfile="
-                        + oldJournal.getFile()
-                        + "\npre-condition views: synchronousOverflowCounter="
-                        + getSynchronousOverflowCount()
-                        + "\n"
-                        + listIndexPartitions(TimestampUtility
-                                .asHistoricalRead(lastCommitTime)));
-
-            final Iterator<ViewMetadata> itr = overflowMetadata.views();
-            
-            while(itr.hasNext()) {
-            
-                final ViewMetadata bm = itr.next();
-                
-                final BTree oldBTree = bm.getBTree();
-                
-                // clone index metadata.
-                final IndexMetadata indexMetadata = oldBTree.getIndexMetadata()
-                        .clone();
-
-                // old partition metadata (from cloned IndexMetadata record).
-                final LocalPartitionMetadata oldpmd = indexMetadata
-                        .getPartitionMetadata();
-                
-                if (oldpmd == null) {
-
-                    /*
-                     * A named index that is not an index partition.
-                     * 
-                     * Note: In the scale-out system all named indices are
-                     * registered as partitioned indices so this condition
-                     * SHOULD NOT arise.
-                     * 
-                     * @todo probably overflow the entire index, but it is a
-                     * problem to have an unpartitioned index if you are
-                     * expecting to do overflows since the index can never be
-                     * broken down and can't be moved around.
-                     * 
-                     * @todo move runtime check to before we close the old journal.
-                     */
-
-                    throw new RuntimeException("Not a partitioned index: "
-                            + bm.name);
-                     
-                }
-                
-                // true iff an overflow handler is defined.
-                final boolean hasOverflowHandler = indexMetadata.getOverflowHandler() != null;
-
-                /*
-                 * When an index partition is empty we always just copy it onto
-                 * the new journal (since there is no data, all that we are
-                 * doing is registering the index on the new journal).
-                 * 
-                 * When the copyIndexThreshold is ZERO (0) index partitions will
-                 * not be copied unless they are empty.
-                 * 
-                 * When an index partition is non-empty, the copyIndexThreshold
-                 * is non-zero, and the entry count of the buffered write set is
-                 * LTE the threshold then the buffered writes will be copied to
-                 * the new journal UNLESS an overflow handler is defined
-                 * (overflow handlers are used to copy raw records from the
-                 * journal onto the index segment - such records can be quite
-                 * large, for example the distributed file system allows records
-                 * up to 64M each, so we do not want to copy over even a small
-                 * index with an overflow handler since there may be large
-                 * records on the journal that would have to be copied as well).
-                 * 
-                 * Note: The other reason for NOT copying the tuples over is
-                 * that the view already includes more than one journal. We DO
-                 * NOT copy the tuples over in this case since we want to purge
-                 * that journal from the view using a compacting merge.
-                 * 
-                 * Otherwise we will let the asynchronous post-processing figure
-                 * out what it wants to do with this index partition.
-                 */
-                final int entryCount = bm.entryCount;
-                final boolean copyIndex = (entryCount == 0)
-                        || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
-                                && numIndicesNonZeroCopy < maxNonZeroCopy //
-                                && !hasOverflowHandler // must be applied
-                                && !bm.manditoryMerge // 
-                                );
-
-                if(copyIndex) {
-                    
-                    /*
-                     * We will copy the index data from the B+Tree old journal
-                     * (but not from the full index view) onto the new journal.
-                     * In this case the index will use a view that DOES NOT
-                     * include the old index on the old journal.
-                     */
-
-                    final IResourceMetadata[] oldResources = oldpmd.getResources();
-
-                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length];
-
-                    System.arraycopy(oldResources, 0, newResources, 0, oldResources.length);
-
-                    // new resource is listed first (reverse chronological order)
-                    newResources[0] = newJournal.getResourceMetadata();
-
-                    // describe the index partition.
-                    indexMetadata
-                            .setPartitionMetadata(new LocalPartitionMetadata(
-                                    oldpmd.getPartitionId(),//
-                                    oldpmd.getSourcePartitionId(),//
-                                    oldpmd.getLeftSeparatorKey(),//
-                                    oldpmd.getRightSeparatorKey(),//
-                                    newResources, //
-                                    oldpmd.getIndexPartitionCause(),
-                                    oldpmd.getHistory()+
-                                    OverflowActionEnum.Copy+
-                                    "(lastCommitTime="
-                                            + lastCommitTime + ",entryCount="
-                                            + entryCount + ",counter="
-                                            + oldBTree.getCounter().get()
-                                            + ") "));
-                    
-                } else {
-
-                    /*
-                     * We will only create a empty index on the new journal.
-                     * 
-                     * We will update the partition metadata so that the new
-                     * index reflects its location on the new journal. The index
-                     * view will continue to read from the old journal as well
-                     * until asynchronous post-processing decides what to do
-                     * with the index partition.
-                     * 
-                     * Note that the old journal will continue to be required
-                     * for historical reads on the new journal between its
-                     * firstCommitTime and the commit point at which the index
-                     * partition view is updated to no longer include the old
-                     * journal.
-                     */
-                    
-                    final IResourceMetadata[] oldResources = oldpmd
-                            .getResources();
-
-                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length + 1];
-
-                    System.arraycopy(oldResources, 0, newResources, 1,
-                            oldResources.length);
-
-                    // new resource is listed first (reverse chronological order).
-                    newResources[0] = newJournal.getResourceMetadata();
-
-                    // describe the index partition.
-                    indexMetadata
-                            .setPartitionMetadata(new LocalPartitionMetadata(
-                                    oldpmd.getPartitionId(),//
-                                    oldpmd.getSourcePartitionId(),//
-                                    oldpmd.getLeftSeparatorKey(),//
-                                    oldpmd.getRightSeparatorKey(),//
-                                    newResources, //
-                                    oldpmd.getIndexPartitionCause(),
-                                    oldpmd.getHistory()+
-                                    "overflow(lastCommitTime="
-                                            + lastCommitTime + ",entryCount="
-                                            + entryCount + ",counter="
-                                            + oldBTree.getCounter().get()
-                                            + ") "));
-
-                }
-
-                /*
-                 * Create and register the index with the new view on the new
-                 * journal.
-                 * 
-                 * Note: This is essentially a variant of BTree#create() where
-                 * we need to propagate the counter from the old BTree to the
-                 * new BTree.
-                 */
-                {
-
-                    /*
-                     * Write metadata record on store. The address of that
-                     * record is set as a side-effect on the metadata object.
-                     */
-                    indexMetadata.write(newJournal);
-
-                    // note the current counter value.
-                    final long oldCounter = oldBTree.getCounter().get();
-
-                    if(log.isInfoEnabled())
-                    log.info("Re-defining view on new journal"//
-                            + ": name=" + bm.name //
-                            + ", copyIndex=" + copyIndex//
-//                            + ", copyIndexThreashold=" + copyIndexThreshold //
-                            + ", entryCount=" + entryCount//
-                            + ", counter=" + oldCounter//
-                            + ", partitionId="+oldpmd.getPartitionId()//
-                            + ", checkpoint=" + oldBTree.getCheckpoint()//
-                    );
-
-                    // Create checkpoint for the new B+Tree.
-                    final Checkpoint overflowCheckpoint = indexMetadata
-                            .overflowCheckpoint(oldBTree.getCheckpoint());
-
-                    /*
-                     * Write the checkpoint record on the store. The address of
-                     * the checkpoint record is set on the object as a side
-                     * effect.
-                     */
-                    overflowCheckpoint.write(newJournal);
-
-                    /*
-                     * Load the B+Tree from the store using that checkpoint
-                     * record.
-                     */
-                    final BTree newBTree = BTree.load(newJournal,
-                            overflowCheckpoint.getCheckpointAddr());
-
-                    // Note the counter value on the new BTree.
-                    final long newCounter = newBTree.getCounter().get();
-                    
-                    // Verify the counter was propagated to the new BTree.
-                    assert newCounter == oldCounter : "expected oldCounter="
-                            + oldCounter + ", but found newCounter="
-                            + newCounter;
-                    
-                    if(copyIndex) {
-                        
-                        /*
-                         * Copy the data from the B+Tree on the old journal into
-                         * the B+Tree on the new journal.
-                         * 
-                         * Note: [overflow := true] since we are copying from
-                         * the old journal onto the new journal, but the
-                         * overflow handler will never be applied since we do
-                         * NOT copy an index with a non-null overflow handler
-                         * (see above).
-                         */
-                        
-                        if(log.isDebugEnabled())
-                        log.debug("Copying data to new journal: name=" + bm.name
-                                + ", entryCount=" + entryCount + ", threshold="
-                                + copyIndexThreshold);
-                        
-                        newBTree.rangeCopy(oldBTree, null, null, true/*overflow*/);
-
-                        // Note that index partition was copied for the caller.
-//                        overflowMetadata.copied.add(bm.name);
-                        overflowMetadata.setAction(bm.name,
-                                OverflowActionEnum.Copy);
-                        ncopy++;
-                        
-                        if (entryCount > 0) {
-                            
-                            // count copied indices with at least one index entry.
-                            numIndicesNonZeroCopy++;
-                            
-                        }
-
-                    } else {
-
-                        /*
-                         * The index was not copied so its view was re-defined
-                         * on the new journal.
-                         */
-                        
-                        numIndicesViewRedefined++;
-                        
-                    }
-                    
-                    /*
-                     * Register the new B+Tree on the new journal.
-                     */
-                    newJournal.registerIndex(bm.name, newBTree);
-
-                }
-
-                numIndicesProcessed++;
-
-//                log.info("Did overflow: " + noverflow + " of " + nindices
-//                        + " : " + entry.name);
-
-            }
-
-            if (log.isInfoEnabled())
-                log.info("Processed indices: #indices=" + numIndices
-                        + ", ncopy=" + ncopy + ", ncopyNonZero="
-                        + numIndicesNonZeroCopy + ", #viewRedefined="
-                        + numIndicesViewRedefined);
-
-            assert numIndices == numIndicesProcessed;
-            assert numIndices == (ncopy + numIndicesViewRedefined);
-            assert ncopy == overflowMetadata.getActionCount(OverflowActionEnum.Copy);
-
-            /*
-             * post processing should be performed if any indices were redefined
-             * onto the new journal rather than being copied over.
-             */
-            overflowMetadata.postProcess = numIndicesViewRedefined > 0;
-            
-            // make the index declarations restart safe on the new journal.
-            firstCommitTime = newJournal.commit();
-
-        }
+        // make the index declarations restart safe on the new journal.
+        final long firstCommitTime = newJournal.commit();
+        // @todo atomic cutover really belongs here.
 
         /*
          * Change over the counter set to the new live journal.
@@ -2428,6 +2069,356 @@ abstract public class OverflowManager extends IndexManager {
                             .asHistoricalRead(firstCommitTime)));
 
         return overflowMetadata;
+
+    }
+
+    /**
+     * Propagate the index declarations from the old journal to the new journal.
+     */
+    private void propagateIndexDecls(final AbstractJournal oldJournal,
+            final AbstractJournal newJournal,
+            final OverflowMetadata overflowMetadata) {
+
+        /*
+         * Overflow each index by re-defining its view on the new journal.
+         */
+        // #of declared indices.
+        final int numIndices = overflowMetadata.getIndexCount();
+        // #of indices processed (copied over or view redefined).
+        int numIndicesProcessed = 0;
+        // #of indices whose view was redefined on the new journal.
+        int numIndicesViewRedefined = 0;
+        // #of indices with at least one index entry that were copied.
+        int numIndicesNonZeroCopy = 0;
+        // #of indices that were copied over.
+        int ncopy = 0;
+        /*
+         * Maximum #of non-zero indices that we will copy over.
+         * 
+         * @todo config. maxNonZeroCopy might not be a good idea in some cases.
+         * if there is a large #of small indices on the journal then some should
+         * really be moved somewhere else and this limit can promote that.
+         * however, if the entire federation is filled with such small indices
+         * then we hardly needs to be doing index builds for all of them.
+         */
+        final int maxNonZeroCopy = 100;
+        final long lastCommitTime = oldJournal.getRootBlockView().getLastCommitTime();
+        {
+
+            if (log.isInfoEnabled())
+                log.info("doOverflow(): lastCommitTime="
+                        + lastCommitTime
+                        + "\nfile="
+                        + oldJournal.getFile()
+                        + "\npre-condition views: synchronousOverflowCounter="
+                        + getSynchronousOverflowCount()
+                        + "\n"
+                        + listIndexPartitions(TimestampUtility
+                                .asHistoricalRead(lastCommitTime)));
+
+            final Iterator<ViewMetadata> itr = overflowMetadata.views();
+
+            while (itr.hasNext()) {
+
+                final ViewMetadata bm = itr.next();
+
+                final BTree oldBTree = bm.getBTree();
+
+                // clone index metadata.
+                final IndexMetadata indexMetadata = oldBTree.getIndexMetadata()
+                        .clone();
+
+                // old partition metadata (from cloned IndexMetadata record).
+                final LocalPartitionMetadata oldpmd = indexMetadata
+                        .getPartitionMetadata();
+
+                if (oldpmd == null) {
+
+                    /*
+                     * A named index that is not an index partition.
+                     * 
+                     * Note: In the scale-out system all named indices are
+                     * registered as partitioned indices so this condition
+                     * SHOULD NOT arise.
+                     * 
+                     * @todo probably overflow the entire index, but it is a
+                     * problem to have an unpartitioned index if you are
+                     * expecting to do overflows since the index can never be
+                     * broken down and can't be moved around.
+                     * 
+                     * @todo move runtime check to before we close the old
+                     * journal.
+                     */
+
+                    throw new RuntimeException("Not a partitioned index: "
+                            + bm.name);
+
+                }
+
+                // true iff an overflow handler is defined.
+                final boolean hasOverflowHandler = indexMetadata
+                        .getOverflowHandler() != null;
+
+                /*
+                 * When an index partition is empty we always just copy it onto
+                 * the new journal (since there is no data, all that we are
+                 * doing is registering the index on the new journal).
+                 * 
+                 * When the copyIndexThreshold is ZERO (0) index partitions will
+                 * not be copied unless they are empty.
+                 * 
+                 * When an index partition is non-empty, the copyIndexThreshold
+                 * is non-zero, and the entry count of the buffered write set is
+                 * LTE the threshold then the buffered writes will be copied to
+                 * the new journal UNLESS an overflow handler is defined
+                 * (overflow handlers are used to copy raw records from the
+                 * journal onto the index segment - such records can be quite
+                 * large, for example the distributed file system allows records
+                 * up to 64M each, so we do not want to copy over even a small
+                 * index with an overflow handler since there may be large
+                 * records on the journal that would have to be copied as well).
+                 * 
+                 * Note: The other reason for NOT copying the tuples over is
+                 * that the view already includes more than one journal. We DO
+                 * NOT copy the tuples over in this case since we want to purge
+                 * that journal from the view using a compacting merge.
+                 * 
+                 * Otherwise we will let the asynchronous post-processing figure
+                 * out what it wants to do with this index partition.
+                 */
+                final int entryCount = bm.entryCount;
+                final boolean copyIndex = (entryCount == 0)
+                        || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
+                                && numIndicesNonZeroCopy < maxNonZeroCopy //
+                                && !hasOverflowHandler // must be applied
+                        && !bm.manditoryMerge // 
+                        );
+
+                if (copyIndex) {
+
+                    /*
+                     * We will copy the index data from the B+Tree old journal
+                     * (but not from the full index view) onto the new journal.
+                     * In this case the index will use a view that DOES NOT
+                     * include the old index on the old journal.
+                     */
+
+                    final IResourceMetadata[] oldResources = oldpmd
+                            .getResources();
+
+                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length];
+
+                    System.arraycopy(oldResources, 0, newResources, 0,
+                            oldResources.length);
+
+                    // new resource is listed first (reverse chronological
+                    // order)
+                    newResources[0] = newJournal.getResourceMetadata();
+
+                    // describe the index partition.
+                    indexMetadata
+                            .setPartitionMetadata(new LocalPartitionMetadata(
+                                    oldpmd.getPartitionId(),//
+                                    oldpmd.getSourcePartitionId(),//
+                                    oldpmd.getLeftSeparatorKey(),//
+                                    oldpmd.getRightSeparatorKey(),//
+                                    newResources, //
+                                    oldpmd.getIndexPartitionCause(), oldpmd
+                                            .getHistory()
+                                            + OverflowActionEnum.Copy
+                                            + "(lastCommitTime="
+                                            + lastCommitTime
+                                            + ",entryCount="
+                                            + entryCount
+                                            + ",counter="
+                                            + oldBTree.getCounter().get()
+                                            + ") "));
+
+                } else {
+
+                    /*
+                     * We will only create a empty index on the new journal.
+                     * 
+                     * We will update the partition metadata so that the new
+                     * index reflects its location on the new journal. The index
+                     * view will continue to read from the old journal as well
+                     * until asynchronous post-processing decides what to do
+                     * with the index partition.
+                     * 
+                     * Note that the old journal will continue to be required
+                     * for historical reads on the new journal between its
+                     * firstCommitTime and the commit point at which the index
+                     * partition view is updated to no longer include the old
+                     * journal.
+                     */
+
+                    final IResourceMetadata[] oldResources = oldpmd
+                            .getResources();
+
+                    final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length + 1];
+
+                    System.arraycopy(oldResources, 0, newResources, 1,
+                            oldResources.length);
+
+                    // new resource is listed first (reverse chronological
+                    // order).
+                    newResources[0] = newJournal.getResourceMetadata();
+
+                    // describe the index partition.
+                    indexMetadata
+                            .setPartitionMetadata(new LocalPartitionMetadata(
+                                    oldpmd.getPartitionId(),//
+                                    oldpmd.getSourcePartitionId(),//
+                                    oldpmd.getLeftSeparatorKey(),//
+                                    oldpmd.getRightSeparatorKey(),//
+                                    newResources, //
+                                    oldpmd.getIndexPartitionCause(), oldpmd
+                                            .getHistory()
+                                            + "overflow(lastCommitTime="
+                                            + lastCommitTime
+                                            + ",entryCount="
+                                            + entryCount
+                                            + ",counter="
+                                            + oldBTree.getCounter().get()
+                                            + ") "));
+
+                }
+
+                /*
+                 * Create and register the index with the new view on the new
+                 * journal.
+                 * 
+                 * Note: This is essentially a variant of BTree#create() where
+                 * we need to propagate the counter from the old BTree to the
+                 * new BTree.
+                 */
+                {
+
+                    /*
+                     * Write metadata record on store. The address of that
+                     * record is set as a side-effect on the metadata object.
+                     */
+                    indexMetadata.write(newJournal);
+
+                    // note the current counter value.
+                    final long oldCounter = oldBTree.getCounter().get();
+
+                    if (log.isInfoEnabled())
+                        log.info("Re-defining view on new journal"//
+                                + ": name=" + bm.name //
+                                + ", copyIndex=" + copyIndex//
+                                // + ", copyIndexThreashold=" +
+                                // copyIndexThreshold //
+                                + ", entryCount=" + entryCount//
+                                + ", counter=" + oldCounter//
+                                + ", partitionId=" + oldpmd.getPartitionId()//
+                                + ", checkpoint=" + oldBTree.getCheckpoint()//
+                        );
+
+                    // Create checkpoint for the new B+Tree.
+                    final Checkpoint overflowCheckpoint = indexMetadata
+                            .overflowCheckpoint(oldBTree.getCheckpoint());
+
+                    /*
+                     * Write the checkpoint record on the store. The address of
+                     * the checkpoint record is set on the object as a side
+                     * effect.
+                     */
+                    overflowCheckpoint.write(newJournal);
+
+                    /*
+                     * Load the B+Tree from the store using that checkpoint
+                     * record.
+                     */
+                    final BTree newBTree = BTree.load(newJournal,
+                            overflowCheckpoint.getCheckpointAddr());
+
+                    // Note the counter value on the new BTree.
+                    final long newCounter = newBTree.getCounter().get();
+
+                    // Verify the counter was propagated to the new BTree.
+                    assert newCounter == oldCounter : "expected oldCounter="
+                            + oldCounter + ", but found newCounter="
+                            + newCounter;
+
+                    if (copyIndex) {
+
+                        /*
+                         * Copy the data from the B+Tree on the old journal into
+                         * the B+Tree on the new journal.
+                         * 
+                         * Note: [overflow := true] since we are copying from
+                         * the old journal onto the new journal, but the
+                         * overflow handler will never be applied since we do
+                         * NOT copy an index with a non-null overflow handler
+                         * (see above).
+                         */
+
+                        if (log.isDebugEnabled())
+                            log.debug("Copying data to new journal: name="
+                                    + bm.name + ", entryCount=" + entryCount
+                                    + ", threshold=" + copyIndexThreshold);
+
+                        newBTree
+                                .rangeCopy(oldBTree, null, null, true/* overflow */);
+
+                        // Note that index partition was copied for the caller.
+                        // overflowMetadata.copied.add(bm.name);
+                        overflowMetadata.setAction(bm.name,
+                                OverflowActionEnum.Copy);
+                        ncopy++;
+
+                        if (entryCount > 0) {
+
+                            // count copied indices with at least one index
+                            // entry.
+                            numIndicesNonZeroCopy++;
+
+                        }
+
+                    } else {
+
+                        /*
+                         * The index was not copied so its view was re-defined
+                         * on the new journal.
+                         */
+
+                        numIndicesViewRedefined++;
+
+                    }
+
+                    /*
+                     * Register the new B+Tree on the new journal.
+                     */
+                    newJournal.registerIndex(bm.name, newBTree);
+
+                }
+
+                numIndicesProcessed++;
+
+                // log.info("Did overflow: " + noverflow + " of " + nindices
+                // + " : " + entry.name);
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info("Processed indices: #indices=" + numIndices
+                        + ", ncopy=" + ncopy + ", ncopyNonZero="
+                        + numIndicesNonZeroCopy + ", #viewRedefined="
+                        + numIndicesViewRedefined);
+
+            assert numIndices == numIndicesProcessed;
+            assert numIndices == (ncopy + numIndicesViewRedefined);
+            assert ncopy == overflowMetadata
+                    .getActionCount(OverflowActionEnum.Copy);
+
+            /*
+             * post processing should be performed if any indices were redefined
+             * onto the new journal rather than being copied over.
+             */
+            overflowMetadata.postProcess = numIndicesViewRedefined > 0;
+
+        }
 
     }
 

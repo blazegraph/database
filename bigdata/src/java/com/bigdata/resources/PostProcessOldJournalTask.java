@@ -136,6 +136,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo rename as AsynchronousOverflowTask
  */
 public class PostProcessOldJournalTask implements Callable<Object> {
 
