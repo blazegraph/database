@@ -424,16 +424,21 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         protected void assignClientsToServices(final ServiceItem[] serviceItems)
                 throws Exception {
             
+            if (serviceItems == null)
+                throw new IllegalArgumentException();
+            
             for (int clientNum = 0; clientNum < ntasks; clientNum++) {
 
                 final int i = clientNum % serviceItems.length;
 
-                final UUID serviceUUID = JiniUtil
-                        .serviceID2UUID(serviceItems[i].serviceID);
+                final ServiceItem serviceItem = serviceItems[i];
+                
+                assert serviceItem != null : "No service item @ index=" + i;
 
-                serviceItems[clientNum] = serviceItems[i];
+                this.serviceItems[clientNum] = serviceItem;
 
-                serviceUUIDs[clientNum] = serviceUUID;
+                this.serviceUUIDs[clientNum] = JiniUtil
+                        .serviceID2UUID(serviceItem.serviceID);
 
             }
             
@@ -966,7 +971,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         final long begin = System.currentTimeMillis();
 
-        // unless successfull.
+        // unless successful.
         boolean failure = true;
 
         try {
@@ -1016,8 +1021,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         final Map<Integer/* client# */, Future<U>> futures = new LinkedHashMap<Integer, Future<U>>(
                 jobState.nclients/* initialCapacity */);
 
-        // unless all clients are submitted successfully.
-        boolean failure = true;
+        // #of clients that were started successfully.
+        int nstarted = 0;
         try {
 
             for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
@@ -1057,17 +1062,18 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                         (Future<U>) service
                                 .submit(clientTask));
 
+                nstarted++;
+                
             } // start the next client.
-            
-            failure = false;
 
             return futures;
 
         } finally {
 
-            if(failure) {
+            if (nstarted < jobState.nclients) {
 
-                log.error("Aborting : could not start client(s)");
+                log.error("Aborting : could not start client(s): nstarted="
+                        + nstarted + ", nclients=" + jobState.nclients);
 
                 cancelAll(futures, true/* mayInterruptIfRunning */);
                 
@@ -1217,21 +1223,20 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      */
     abstract protected T newClientTask(final int clientNum)
             throws ConfigurationException;
-    
+
     /**
-     * Callable invoked when the job is ready to execute and is holding the
+     * Callback invoked when the job is ready to execute and is holding the
      * {@link ZLock} for the {@link JobState}. This may be extended to register
-     * indices, etc.
+     * indices, etc.  The default implementation handles the setup of the
+     * optional index partition metadata dumps.
      * 
      * @throws Exception
+     * 
+     * @see ConfigurationOptions#INDEX_DUMP_DIR
+     * @see ConfigurationOptions#INDEX_DUMP_NAMESPACE
      */
     protected void beginJob(final S jobState) throws Exception {
 
-        /*
-         * Setup scheduled metadata dumps of the index partitions in the KB.
-         * 
-         * @todo @t0 can fail if the indices do not yet exist.
-         */
         if (jobState.indexDumpDir != null) {
 
             // runs @t0, 1m, 2m, ... 9m.
