@@ -30,6 +30,7 @@ package com.bigdata.btree.proc;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.service.Split;
+import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.IndexPartitionWriteTask;
 
@@ -50,9 +51,7 @@ import com.bigdata.service.ndx.pipeline.IndexPartitionWriteTask;
  *       writes.
  * 
  * @see KVO
- * @see IScaleOutClientIndex#newWriteBuffer(IResultHandler,
- *      com.bigdata.service.ndx.pipeline.IDuplicateRemover,
- *      AbstractKeyArrayIndexProcedureConstructor)
+ * @see IAsynchronousWriteBufferFactory
  */
 public interface IAsyncResultHandler<R extends Object, A extends Object, O extends Object, X extends KVO<O>>
         extends IResultHandler<R, A> {

@@ -48,7 +48,7 @@ import com.bigdata.rdf.load.ConcurrentDataLoader;
 import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.rdf.load.RDFFileLoadTask;
-import com.bigdata.rdf.rio.IAsynchronousWriteBufferFactory;
+import com.bigdata.rdf.rio.IAsynchronousWriteStatementBufferFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.service.DataService;
@@ -935,9 +935,9 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
                 final IStatementBufferFactory bufferFactory = taskFactory.getBufferFactory();
                 
-                if (bufferFactory instanceof IAsynchronousWriteBufferFactory) {
+                if (bufferFactory instanceof IAsynchronousWriteStatementBufferFactory) {
 
-                    if (((IAsynchronousWriteBufferFactory) bufferFactory)
+                    if (((IAsynchronousWriteStatementBufferFactory) bufferFactory)
                             .isAnyDone()) {
                     
                         /*

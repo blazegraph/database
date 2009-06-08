@@ -73,7 +73,7 @@ import com.bigdata.striterator.IChunkedIterator;
  * @param <E>
  *            The generic type of the elements in the chunks.
  */
-public interface IBlockingBuffer<E> extends IBuffer<E> {
+public interface IBlockingBuffer<E> extends IRunnableBuffer<E> {
 
     /**
      * Return an iterator reading from the buffer. It is NOT safe for concurrent
@@ -86,44 +86,7 @@ public interface IBlockingBuffer<E> extends IBuffer<E> {
      * @return The iterator.
      */
     public IAsynchronousIterator<E> iterator();
-
-    /**
-     * Add an element to the buffer.
-     * <p>
-     * Note: This method is constrained to throw the specified exception if the
-     * buffer has been {@link #close()}d.
-     * 
-     * @param e
-     *            The element
-     * 
-     * @throws BufferClosedException
-     *             if the buffer has been {@link #close()}d.
-     */
-    public void add(E e);
     
-    /**
-     * Return <code>true</code> if the buffer is open.
-     */
-    public boolean isOpen();
-    
-    /**
-     * Signal that no more data will be written on this buffer (this is required
-     * in order for the {@link #iterator()} to know when no more data will be
-     * made available).
-     */
-    public void close();
-
-    /**
-     * Signal abnormal termination of the process writing on the buffer. The
-     * buffer will be closed. The {@link #iterator()} will report the <i>cause</i>
-     * via a wrapped exception the next time any method on its interface is
-     * invoked. The internal queue may be cleared once this method is invoked.
-     * 
-     * @param cause
-     *            The exception thrown by the processing writing on the buffer.
-     */
-    public void abort(Throwable cause);
-
     /**
      * This is a NOP since the {@link #iterator()} is the only way to consume
      * data written on the buffer.
@@ -143,6 +106,8 @@ public interface IBlockingBuffer<E> extends IBuffer<E> {
      *             if the argument is <code>null</code>.
      * @throws IllegalStateException
      *             if the future has already been set.
+     *             
+     * @todo There should be a generic type for this.
      */
     public void setFuture(Future future);
     

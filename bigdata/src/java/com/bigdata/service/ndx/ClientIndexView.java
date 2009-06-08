@@ -29,7 +29,6 @@ package com.bigdata.service.ndx;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -45,7 +44,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleCursor;
@@ -81,6 +79,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.relation.accesspath.IRunnableBuffer;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataServiceTupleIterator;
@@ -1739,7 +1738,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
 
-    public <T extends IKeyArrayIndexProcedure, O, R, A> BlockingBuffer<KVO<O>[]> newWriteBuffer(
+    public <T extends IKeyArrayIndexProcedure, O, R, A> IRunnableBuffer<KVO<O>[]> newWriteBuffer(
             final IResultHandler<R, A> resultHandler,
             final IDuplicateRemover<O> duplicateRemover,
             final AbstractKeyArrayIndexProcedureConstructor<T> ctor) {

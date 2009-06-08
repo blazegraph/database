@@ -33,6 +33,16 @@ http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchron
 http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMillisPerWrite&correlated=true&depth=14&period=Minutes&file=service/cs/averageMillisPerWrite
 http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageElementsPerWrite&correlated=true&depth=14&period=Minutes&file=service/cs/averageElementsPerWrite
 
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMasterQueueSize&depth=14&period=Minutes&report=correlated&file=service/cs/averageMasterQueueSize
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSinkQueueSize&depth=14&period=Minutes&report=correlated&file=service/cs/averageSinkQueueSize
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSinkQueueSizeStdev&depth=14&period=Minutes&report=correlated&file=service/cs/averageSinkQueueSizeStdev
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMaximumSinkQueueSize&depth=14&period=Minutes&report=correlated&file=service/cs/averageMaximumSinkQueueSize
+# Note: changed averageHandleChunkNanos to averageHandleChunkMillis on 6/7/09.  This is just a name change.  The historical values were reported in milliseconds. 
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageHandleChunkMillis&depth=14&period=Minutes&report=correlated&file=service/cs/averageHandleChunkMillis
+# Note: changed averageSplitChunkNanos to averageSplitChunkMillis on 6/7/09.  This is just a name change.  The historical values were reported in milliseconds. 
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSplitChunkMillis&depth=14&period=Minutes&report=correlated&file=service/cs/averageSplitChunkMillis
+http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSinkOfferMillis&depth=14&period=Minutes&report=correlated&file=service/cs/averageSinkOfferMillis
+
 ##
 # CPU
 ##
@@ -69,10 +79,36 @@ http://localhost:8080/?filter=hosts/scores&correlated=true&depth=7&file=service/
 
 http://localhost:8080/?depth=10&regex=/([^/]*)/.*Overflow%20Manager/Asynchronous%20Overflow%20Count&correlated=true&period=Minutes&file=service/ds/AsynchronousOverflowCount
 
+# Note: You can identify "hot" data services and "hot" indices and index partitions
+# by examining the read and write time for the live journal, the index, or the index
+# partition.  The per-index partition and the per-index data are extracted in a form 
+# suited for a pivot table due to the large #of empty cells.  In general I recommend
+# extracting at the per-index partition detail level since you can always use a pivot
+# table to aggregate the data to the per-index level.  However, if there is too much
+# data you may be forced to extract it at the per-index level instead.  You can also
+# identify potential hotspots by considering dumps of the index partition metadata
+# and looking for indices whose size on a given host is growing rapidly.  Eventually
+# a hotspot is normally handled by splits and a move of a split.  However, that does
+# not always occur in a timely manner and some index write patterns require special
+# handling, e.g., an index which is tail append and hot for write can not be handled
+# by a split and a move.  Instead, you generally need to change the application or
+# the schema such that the tail append pattern is distributed across multiple index
+# partitions.
+#
+# per index partition:
+#
+#http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/indices/(?=U[^/]*)([^/]*)/([^/]*)/.*(?:writeSecs|readSecs|serializeSecs|deserializeSecs|leafSplit|tailSplit)&depth=12&period=Minutes&report=pivot&category=host&category=indexName&category=indexPartitionName&file=service/ds/indices/IndexPartitionReadWriteTime
+#
+# per index:
+#
+#http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/indices/(?=U[^/]*)([^/]*)/(?:[^/]*)/.*(?:writeSecs|readSecs|serializeSecs|deserializeSecs|leafSplit|tailSplit)&depth=12&period=Minutes&report=pivot&category=host&category=indexName&category=indexPartitionName&file=ds/service/indices/IndexReadWriteTime
+
 # @todo live journal counters are not being carried through past the first overflow.
 # http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/readSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/readSecs
 # http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/writeSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/writeSecs
 
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Data%20Volume%20Bytes%20Available&depth=12&period=Minutes&correlated=true&file=service/ds/DataVolumeBytesAvailable
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Temp%20Volume%20Bytes%20Available&depth=12&period=Minutes&correlated=true&file=service/ds/TempVolumeBytesAvailable
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Store%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/StoreCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Managed%20Segment%20Store%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/ManagedSegmentStoreCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Bytes%20Under%20Management&period=Minutes&depth=10&correlated=true&file=service/ds/BytesUnderManagement
@@ -88,3 +124,6 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Serv
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Commit%20Group%20Size&depth=9&correlated=true&period=Minutes&file=service/ds/AverageCommitGroupSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Byte%20Count%20Per%20Commit&depth=9&correlated=true&period=Minutes&file=service/ds/AverageByteCountPerCommit
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Commit%20Service%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageCommitServiceTime
+
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Overflow%20Tasks/Move%20Count&depth=8&correlated=true&period=Minutes&file=service/ds/MoveCount
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Overflow%20Tasks/Split%20Count&depth=8&correlated=true&period=Minutes&file=service/ds/SplitCount

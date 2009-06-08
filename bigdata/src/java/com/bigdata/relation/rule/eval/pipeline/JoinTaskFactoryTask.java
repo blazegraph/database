@@ -53,7 +53,7 @@ import com.bigdata.striterator.IKeyOrder;
  * 
  * @todo Whenever a {@link DistributedJoinTask} is interrupted or errors it must
  *       make sure that the entry is removed from the session (it could also
- *       interupt/cancel the remaining {@link DistributedJoinTask}s for the
+ *       interrupt/cancel the remaining {@link DistributedJoinTask}s for the
  *       same {masterInstance}, but we are already doing that in a different
  *       way.)
  * 
@@ -92,16 +92,6 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
     private static final long serialVersionUID = -2637166803787195001L;
     
     protected static final transient Logger log = Logger.getLogger(JoinTaskFactoryTask.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected static final transient boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected static final transient boolean DEBUG = log.isDebugEnabled();
 
     final String scaleOutIndexName;
     
@@ -226,7 +216,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
 
         /*
          * Start the iterator using our local thread pool in order to avoid
-         * having it start() with a new Thead().
+         * having it start() with a new Thread().
          * 
          * Note: This MUST be done before we create the join task or the
          * iterator will create its own Thread.
@@ -336,7 +326,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
    
     protected Future<Void> submit(DistributedJoinTask task) {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("Submitting new JoinTask: orderIndex=" + orderIndex
                     + ", partitionId=" + partitionId + ", indexName="
                     + scaleOutIndexName);

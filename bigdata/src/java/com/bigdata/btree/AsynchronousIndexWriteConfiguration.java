@@ -9,6 +9,7 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.AbstractMasterTask;
 import com.bigdata.service.ndx.pipeline.AbstractSubtask;
@@ -16,9 +17,7 @@ import com.bigdata.service.ndx.pipeline.AbstractSubtask;
 /**
  * Configuration for the asynchronous index write API.
  * 
- * @see IScaleOutClientIndex#newWriteBuffer(com.bigdata.btree.proc.IResultHandler,
- *      com.bigdata.service.ndx.pipeline.IDuplicateRemover,
- *      com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor)
+ * @see IAsynchronousWriteBufferFactory
  * @see AbstractMasterTask
  * @see AbstractSubtask
  */

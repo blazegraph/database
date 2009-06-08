@@ -12,7 +12,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 /**
  * Factory interface for asynchronous writers on an {@link ITripleStore}.
  */
-public interface IAsynchronousWriteBufferFactory<S extends Statement>
+public interface IAsynchronousWriteStatementBufferFactory<S extends Statement>
         extends IStatementBufferFactory<S> {
 
     /**
