@@ -1694,6 +1694,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         // Note: used to avoid concurrent modification of [futures].
         final List<Integer> finished = new LinkedList<Integer>();
 
+        int nremaining = futures.size();
+        
         for (Map.Entry<Integer, Future<U>> entry : futures.entrySet()) {
 
             final int clientNum = entry.getKey();
@@ -1707,6 +1709,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                  */
                 final U value = future.get();
                 
+                nremaining--;
+                
+                System.out.println("Done: client=" + clientNum + " of "
+                        + jobState.nclients + " with " + nremaining
+                        + " remaining : result=" + value);
+
                 try {
                     notifyOutcome(clientNum, value);
                 } catch (Throwable t) {
@@ -1791,7 +1799,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @param value
      *            The value returned by the {@link Future}.
      */
-    protected void notifyOutcome(final int clientNum,final U value) {
+    protected void notifyOutcome(final int clientNum, final U value) {
         
     }
 
