@@ -102,24 +102,6 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                 });
 
         /**
-         * The moving average of the #of elements on the sink queues. This does
-         * not count the #of elements on the master queues nor does it count the
-         * #of elements which have been drained from a sink queue and are either
-         * being prepared for or awaiting completion of a write on an index
-         * partition.
-         * 
-         * @todo Change this to be the average #of elements on each sink queue
-         *       rather than the average of the total #of elements across all
-         *       sink queues?
-         */
-        final MovingAverageTask averageElementsOnSinkQueues = new MovingAverageTask(
-                "averageElementsOnSinkQueues", new Callable<Long>() {
-                    public Long call() {
-                        return elementsOnSinkQueues;
-                    }
-                });
-
-        /**
          * The moving average of the nanoseconds the master spends handling a
          * chunk which it has drained from its input queue.
          */
@@ -405,10 +387,27 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                     }
                 });
 
+        /**
+         * The moving average of the #of elements on the sink queues. This does
+         * not count the #of elements on the master queues nor does it count the
+         * #of elements which have been drained from a sink queue and are either
+         * being prepared for or awaiting completion of a write on an index
+         * partition.
+         * 
+         * @todo Change this to be the average #of elements on each sink queue
+         *       rather than the average of the total #of elements across all
+         *       sink queues?
+         */
+        final MovingAverageTask averageElementsOnSinkQueues = new MovingAverageTask(
+                "averageElementsOnSinkQueues", new Callable<Long>() {
+                    public Long call() {
+                        return elementsOnSinkQueues;
+                    }
+                });
+
         public void run() {
  
             averageElementsOnMasterQueues.run();
-            averageElementsOnSinkQueues.run();
             averageHandleChunkNanos.run();
             averageSplitChunkNanos.run();
             averageSinkOfferNanos.run();
@@ -421,6 +420,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             averageSinkQueueSize.run();
             averageSinkQueueSizeStdev.run();
             averageMaximumSinkQueueSize.run();
+            averageElementsOnSinkQueues.run();
             
         }
         
@@ -483,22 +483,6 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             @Override
             public void sample() {
                 setValue(statisticsTask.averageElementsOnMasterQueues
-                        .getMovingAverage());
-            }
-        });
-
-
-        /*
-         * The moving average of the #of elements on the sink queues.  This does
-         * not count the #of elements on the master queues nor does it count the
-         * #of elements which have been drained from a sink queue and are either
-         * being prepared for or awaiting completion of a write on an index
-         * partition.
-         */
-        t.addCounter("averageElementsOnSinkQueues", new Instrument<Double>() {
-            @Override
-            public void sample() {
-                setValue(statisticsTask.averageElementsOnSinkQueues
                         .getMovingAverage());
             }
         });
@@ -688,6 +672,21 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             @Override
             protected void sample() {
                 setValue(statisticsTask.averageMaximumSinkQueueSize.getMovingAverage());
+            }
+        });
+
+        /*
+         * The moving average of the #of elements on the sink queues.  This does
+         * not count the #of elements on the master queues nor does it count the
+         * #of elements which have been drained from a sink queue and are either
+         * being prepared for or awaiting completion of a write on an index
+         * partition.
+         */
+        t.addCounter("averageElementsOnSinkQueues", new Instrument<Double>() {
+            @Override
+            public void sample() {
+                setValue(statisticsTask.averageElementsOnSinkQueues
+                        .getMovingAverage());
             }
         });
 
