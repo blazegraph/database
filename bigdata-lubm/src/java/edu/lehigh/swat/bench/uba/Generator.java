@@ -683,7 +683,11 @@ public class Generator {
   private void _generate(final File outDir) {
     System.out.println("Started... : nclients="+nclients+", clientNum="+clientNum);
     try {
-      log_ = new PrintStream(new FileOutputStream(logFile));
+        log_ = new PrintStream(new FileOutputStream(logFile));
+      }
+      catch (IOException e) {
+        throw new RuntimeException("Failed to create log file!: "+logFile);
+      }
       writer_.start();
       for (int i = 0; i < instances_[CS_C_UNIV].num; i++) {
           final int k = i + startIndex_;
@@ -712,10 +716,6 @@ public class Generator {
       }
       writer_.end();
       log_.close();
-    }
-    catch (IOException e) {
-      System.err.println("Failed to create log file!");
-    }
     System.out.println("Completed!");
   }
   
