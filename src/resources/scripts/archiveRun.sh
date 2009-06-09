@@ -56,7 +56,7 @@ cp -v $LAS/LoadBalancerServer/logicalService*/*/counters* $targetDir/counters
 
 # Copy the index dumps if you are running the lubm test harness.
 if [ -d "$NAS/lubm" ]; then
-	cp -vr "$NAS/lubm/*indexDumps* $targetDir
+	cp -vr $NAS/lubm/*indexDumps* $targetDir/indexDumps
 fi
 
 tar -cvz -C "$targetDir/.." -f $targetDir.tgz $targetDir
