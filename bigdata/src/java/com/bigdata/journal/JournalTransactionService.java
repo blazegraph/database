@@ -358,7 +358,7 @@ public class JournalTransactionService extends AbstractTransactionService {
      * This task is an UNISOLATED operation that validates and commits a
      * transaction known to have non-empty write sets.
      * <p>
-     * Note: DO NOT {@link AbstractTx#lock} while you submit this task as it
+     * Note: DO NOT {@link Tx#lock} while you submit this task as it
      * could cause a deadlock if there is a task ahead of you in the queue for
      * the same tx!
      * <p>
