@@ -14,34 +14,43 @@
 # The output files are grouped according to the following file system
 # hierarchy.
 #
-# cpu		  (per host CPU)
-# disk		  (per host DISK)
-# memory	  (per host RAM mixed with some per-service memory stuff)
+# cpu		    (per host CPU)
+# disk		    (per host DISK)
+# memory	    (per host RAM mixed with some per-service memory stuff)
+# indices
+# indices/sync  (synchronous index RPC)
+# indices/async (asynchronous index writes)
 # service
-# service/cs  (counters specific to client servers)
-# service/ds  (counters specific to data servers)
-# service/lbs (counters specific to the load balancer)
-# service/mds (counters specific to the metadata server)
-# service/txs (counters specific to the transaction server)
+# service/cs    (counters specific to client servers)
+# service/ds    (counters specific to data servers)
+# service/lbs   (counters specific to the load balancer)
+# service/mds   (counters specific to the metadata server)
+# service/txs   (counters specific to the transaction server)
 
 ##
-# The asynchronous index write API (clients)
+# Asynchronous index write API
 ##
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/chunksIn&depth=14&period=Minutes&report=correlated&file=service/cs/chunksIn
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/chunksOut&depth=14&period=Minutes&report=correlated&file=service/cs/chunksOut
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMillisPerWait&correlated=true&depth=14&period=Minutes&file=service/cs/averageMillisPerWait
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMillisPerWrite&correlated=true&depth=14&period=Minutes&file=service/cs/averageMillisPerWrite
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageElementsPerWrite&correlated=true&depth=14&period=Minutes&file=service/cs/averageElementsPerWrite
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/chunksIn&depth=14&period=Minutes&report=correlated&file=indices/async/chunksIn
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/chunksOut&depth=14&period=Minutes&report=correlated&file=indices/async/chunksOut
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMillisPerWait&correlated=true&depth=14&period=Minutes&file=indices/async/averageMillisPerWait
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMillisPerWrite&correlated=true&depth=14&period=Minutes&file=indices/async/averageMillisPerWrite
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageElementsPerWrite&correlated=true&depth=14&period=Minutes&file=indices/async/averageElementsPerWrite
 
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMasterQueueSize&depth=14&period=Minutes&report=correlated&file=service/cs/averageMasterQueueSize
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSinkQueueSize&depth=14&period=Minutes&report=correlated&file=service/cs/averageSinkQueueSize
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSinkQueueSizeStdev&depth=14&period=Minutes&report=correlated&file=service/cs/averageSinkQueueSizeStdev
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageMaximumSinkQueueSize&depth=14&period=Minutes&report=correlated&file=service/cs/averageMaximumSinkQueueSize
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMasterQueueSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageMasterQueueSize
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSinkQueueSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageSinkQueueSize
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSinkQueueSizeStdev&depth=14&period=Minutes&report=correlated&file=indices/async/averageSinkQueueSizeStdev
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMaximumSinkQueueSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageMaximumSinkQueueSize
 # Note: changed averageHandleChunkNanos to averageHandleChunkMillis on 6/7/09.  This is just a name change.  The historical values were reported in milliseconds. 
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageHandleChunkMillis&depth=14&period=Minutes&report=correlated&file=service/cs/averageHandleChunkMillis
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageHandleChunkMillis&depth=14&period=Minutes&report=correlated&file=indices/async/averageHandleChunkMillis
 # Note: changed averageSplitChunkNanos to averageSplitChunkMillis on 6/7/09.  This is just a name change.  The historical values were reported in milliseconds. 
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSplitChunkMillis&depth=14&period=Minutes&report=correlated&file=service/cs/averageSplitChunkMillis
-http://localhost:8080/?regex=/([^/]*)/.*IClientService/.*/Indices/(.*)/asynchronous/averageSinkOfferMillis&depth=14&period=Minutes&report=correlated&file=service/cs/averageSinkOfferMillis
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSplitChunkMillis&depth=14&period=Minutes&report=correlated&file=indices/async/averageSplitChunkMillis
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSinkOfferMillis&depth=14&period=Minutes&report=correlated&file=indices/async/averageSinkOfferMillis
+
+##
+# Synchronous index RPC API.
+##
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/synchronous/averageMillisPerRequest&correlated=true&depth=14&period=Minutes&file=indices/sync/averageMillisPerRequest
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/synchronous/averageElementsPerRequest&correlated=true&depth=14&period=Minutes&file=indices/sync/averageElementsPerRequest
 
 ##
 # CPU
