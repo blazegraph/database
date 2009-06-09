@@ -138,6 +138,10 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
          * The actual log file has the form <code><i>logDir</i>/log#.txt</code>,
          * where "#" is the client number. This makes it possible to place the
          * log files onto a shared volume.
+         * <p>
+         * The LUBM generator log file can grow to be very large for scale-out
+         * runs. Therefore, you may specify <code>/dev/null</code> as the output
+         * file on platforms which support that device.
          */
         String LOG_DIR = "logDir";
 
@@ -604,10 +608,24 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
             outDir.mkdirs();
 
-            jobState.logDir.mkdirs();
+//            jobState.logDir.mkdirs();
+//
+//            final File logFile = new File(jobState.logDir, "lubmGenerator"
+//                    + clientNum + ".log");
 
-            final File logFile = new File(jobState.logDir, "lubmGenerator"
-                    + clientNum + ".log");
+            final File logFile;
+            if (jobState.logDir.getPath().equals("/dev/null")) {
+
+                logFile = new File("/dev/null");
+                
+            } else {
+
+                jobState.logDir.mkdirs();
+
+                logFile = new File(jobState.logDir, "lubmGenerator" + clientNum
+                        + ".log");
+                
+            }
 
             /*
              * Start the consumer.
