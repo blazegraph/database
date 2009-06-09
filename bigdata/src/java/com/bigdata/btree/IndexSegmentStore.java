@@ -1246,8 +1246,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * The buffer would be too small to contain the nodes.
              */
             
-            log.warn("Node extent exceeds buffer capacity: extent="
-                    + checkpoint.extentNodes + ", bufferCapacity="
+            log.warn("Node extent exceeds buffer capacity: index="
+                    + getIndexMetadata().getName() + ", file=" + file + ", "
+                    + "extent=" + checkpoint.extentNodes + ", bufferCapacity="
                     + DirectBufferPool.INSTANCE.getBufferCapacity());
             
             return;
