@@ -32,7 +32,7 @@ mkdir -p $targetDir/indexDumps
 # Look for the load balancer service directory on the local host. If
 # we find it, then we read the pid for the LBS and send it a HUP signal
 # so it will write a snapshot of its performance counters.
-waitDur=10
+waitDur=60
 if [ -f "$lockFile" ]; then
     read pid < `find $LAS -name pid | grep LoadBalancerServer`
     if [ -z "$pid" ]; then
