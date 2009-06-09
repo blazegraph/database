@@ -482,89 +482,131 @@ L>//
     /**
      * Await the completion of the writes on each index partition. The master
      * will terminate when there are no active subtasks and the redirect queue
-     * is empty.  That condition is tested atomically.
+     * is empty. That condition is tested atomically.
      * 
      * @throws ExecutionException
      *             This will report the first cause.
      * @throws InterruptedException
      *             If interrupted while awaiting the {@link #lock} or the child
      *             tasks.
+     * 
+     * @todo The test suite should include a case where a set of redirects
+     *       appear just as the sinks are processing their last chunk. This
+     *       corresponds to the conditions for a deadlock, which has been
+     *       resolved in the code. The deadlock would arise because the
+     *       {@link #awaitAll()} was holding the {@link #lock} across
+     *       {@link #handleChunk(Object[], boolean)} such that a
+     *       {@link AbstractSubtask#call()} was unable to gain the {@link #lock}
+     *       so that it could signal {@link #subtaskDone}.
      */
     private void awaitAll() throws InterruptedException, ExecutionException {
 
-        lock.lockInterruptibly();
-        try {
-
             // close buffer - nothing more may be written on the master.
-            buffer.close();
+        buffer.close();
 
-            while (true) {
+        while (true) {
 
-                halted();
+            halted();
 
-                final E[] a = redirectQueue.poll();
+            /*
+             * Note: We need to hold this lock in order to make an decision
+             * atomic concerning whether or not the master's termination
+             * conditions have been satisfied.
+             * 
+             * Note: If we poll the redirectQueue and find that there is another
+             * chunk to be processed, then we MUST NOT hold the lock when
+             * processing that chunk. Doing so will lead to a deadlock in
+             * AbstractSubtask#call() when it tries to grab the lock so that it
+             * can signal subtaskDone.
+             */
+            final E[] a;
+            lock.lockInterruptibly();
+            try {
 
-                if (a != null) {
+                a = redirectQueue.poll();
+
+                if (a == null) {
 
                     /*
-                     * Handle a redirected chunk.
+                     * There is nothing available from the redirect queue. 
                      */
-
-                    handleChunk(a, true/* reopen */);
-
-                    continue;
                     
-                }
-                
-                if (sinks.isEmpty() && redirectQueue.isEmpty()) {
+                    if (sinks.isEmpty() && redirectQueue.isEmpty()) {
 
-                    // Done.
-                    break;
-
-                }
-
-                if (log.isDebugEnabled())
-                    log.debug("Waiting for " + sinks.size() + " subtasks : "
-                            + this);
-
-                /*
-                 * Check for sinks which have finished.
-                 */
-                for (S sink : sinks.values()) {
-
-                    final Future<?> f = sink.buffer.getFuture();
-
-                    if (f.isDone()) {
-
-                        // check the future (can throw exception).
-                        f.get();
-
-                        // clear from the map (but ONLY once we have checked the Future!)
-                        removeOutputBuffer((L)sink.locator, (AbstractSubtask)sink);
+                        /*
+                         * We are done since there are no running sinks and the
+                         * redirectQueue is empty.
+                         * 
+                         * Note: We MUST be holding the lock for this
+                         * termination condition to be atomic.
+                         */
+                        break;
 
                     }
 
+                    /*
+                     * Check for sinks which have finished.
+                     */
+                    
+                    if (log.isDebugEnabled())
+                        log.debug("Waiting for " + sinks.size()
+                                + " subtasks : " + this);
+
+                    for (S sink : sinks.values()) {
+
+                        final Future<?> f = sink.buffer.getFuture();
+
+                        if (f.isDone()) {
+
+                            // check the future (can throw exception).
+                            f.get();
+
+                            // clear from the map (but ONLY once we have checked
+                            // the Future!)
+                            removeOutputBuffer((L) sink.locator,
+                                    (AbstractSubtask) sink);
+
+                        }
+
+                    }
+
+                    /*
+                     * Yield the lock and wait up to a timeout for a sink to
+                     * complete. We can not wait that long because we are still
+                     * polling the redirect queue!
+                     * 
+                     * @todo config timeout
+                     */
+                    subtaskDone.await(5, TimeUnit.MILLISECONDS);
+
+                    continue;
+
                 }
 
+            } finally {
+
+                lock.unlock();
+
+            }
+
+            if (a != null) {
+
                 /*
-                 * Yield the lock and wait up to a timeout for a sink to
-                 * complete. We can not wait that long because we are still
-                 * polling the redirect queue!
+                 * Handle a redirected chunk.
                  * 
-                 * @todo config timeout
+                 * Note: We DO NOT hold the [lock] here!
                  */
-                subtaskDone.await(5, TimeUnit.MILLISECONDS);
 
-            } // continue
+                handleChunk(a, true/* reopen */);
 
-            if (log.isInfoEnabled())
-                log.info("All subtasks are done: " + this);
-            
-        } finally {
+                continue;
 
-            lock.unlock();
+            }
 
-        }
+        } // continue
+
+        if (log.isInfoEnabled())
+            log.info("All subtasks are done: " + this);
 
     }
 
@@ -662,6 +704,11 @@ L>//
 
             /*
              * Obtain the lock used to guard sink life cycle events.
+             * 
+             * @todo double-check locking or is caller single threaded, in which
+             * case do we need this lock? Document this better either way. [The
+             * caller is single threaded since this is invoked from the master's
+             * thread, at least for now.]
              */
             lock.lockInterruptibly();
             try {

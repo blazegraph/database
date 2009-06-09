@@ -213,18 +213,18 @@ A//
         
     }
 
+//    * This implementation grabs the {@link AbstractMasterTask#lock}.
+//    * <p>
+//    * Note: Locking is required here so that the splits are computed coherently
+//    * with respect to the buffers to which they will be assigned. Otherwise,
+//    * for example, a set of splits computed before a MOVE is noticed will
+//    * continue to target the pre-MOVE index partition after sink for that index
+//    * partition has noticed the MOVE, closed its buffer, and redirected its
+//    * buffered output to another sink. If we did not hold the lock across the
+//    * split/addToOutputBuffer operation then the master would discover that the
+//    * output buffer assigned by the split had since been closed (due to a
+//    * redirect).
     /**
-     * This implementation grabs the {@link AbstractMasterTask#lock}.
-     * <p>
-     * Note: Locking is required here so that the splits are computed coherently
-     * with respect to the buffers to which they will be assigned. Otherwise,
-     * for example, a set of splits computed before a MOVE is noticed will
-     * continue to target the pre-MOVE index partition after sink for that index
-     * partition has noticed the MOVE, closed its buffer, and redirected its
-     * buffered output to another sink. If we did not hold the lock across the
-     * split/addToOutputBuffer operation then the master would discover that the
-     * output buffer assigned by the split had since been closed (due to a
-     * redirect).
      * 
      * @todo The test suite does not demonstrate this problem which makes
      *       detection difficult. See

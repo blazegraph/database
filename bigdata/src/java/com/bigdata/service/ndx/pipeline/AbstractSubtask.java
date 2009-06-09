@@ -408,13 +408,6 @@ L>//
 
                 /*
                  * Poll the source iterator for another chunk.
-                 * 
-                 * Note: We need to gain the master's lock to drain the chunk
-                 * since we need to signal [drainedChunk] so this tries to barge
-                 * in on the master. If it can not barge in, then it waits for a
-                 * bit. If the lock is still not acquired then it is as if
-                 * hasNext(timeout) returned [false] and we will just poll the
-                 * iterator again.
                  */
                 if (src.hasNext(master.sinkPollTimeoutNanos,
                         TimeUnit.NANOSECONDS)) {
