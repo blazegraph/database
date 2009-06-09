@@ -1599,9 +1599,9 @@ public class XHTMLRenderer implements IRenderer {
             
         }
 
-        log.warn("accepted: " + naccepted + " out of "
-                + nvisited
-                + " events");
+        if (log.isInfoEnabled())
+            log.info("accepted: " + naccepted + " out of " + nvisited
+                    + " events");
         
         // all series.
         final String[] keys = eventsByHost.keySet().toArray(new String[0]);
