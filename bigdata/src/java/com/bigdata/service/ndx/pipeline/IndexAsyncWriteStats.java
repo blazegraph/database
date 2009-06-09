@@ -21,6 +21,12 @@ import com.bigdata.util.concurrent.MovingAverageTask;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo The sink counters based on a {@link MovingAverageTask} will stop
+ *       updating once a given sink is discarded. Since the
+ *       {@link MovingAverageTask} is no longer run, the counter does not get a
+ *       new sample from that task and the counter value thereafter remains the
+ *       same.
  */
 public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extends
         AbstractMasterStats<L, HS> {
