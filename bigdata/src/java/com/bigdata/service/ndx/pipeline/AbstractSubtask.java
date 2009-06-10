@@ -358,14 +358,22 @@ L>//
                             log.info("Closing buffer: idle=" + idle + " : "
                                     + this);
                         if (idle) {
-                            // stack trace here if closed by idle timeout.
+                            /*
+                             * An idle timeout is a conditional close and the
+                             * sink MAY be reopened.
+                             */
                             buffer.abort(new IdleTimeoutException());
                             synchronized (master.stats) {
                                 master.stats.subtaskIdleTimeout++;
                             }
                         } else {
-                            // stack trace here if master exhausted.
-                            buffer.close();
+                            /*
+                             * Since redirects of outstanding writes can cause
+                             * the master to (re-)process redirected chunks,
+                             * this is treated as a conditional close and the
+                             * sink MAY be reopened.
+                             */
+                            buffer.abort(new MasterExhaustedException());
                         }
                         if (chunkSize == 0 && !src.hasNext()) {
                             /*

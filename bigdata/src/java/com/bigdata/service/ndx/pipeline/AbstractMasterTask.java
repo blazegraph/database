@@ -926,19 +926,21 @@ L>//
 
             } catch (BufferClosedException ex) {
 
-                if (ex.getCause() instanceof IdleTimeoutException) {
+                if (ex.getCause() instanceof IdleTimeoutException
+                        || ex.getCause() instanceof IdleTimeoutException) {
 
                     /*
                      * Note: The sinks sets the exception if it closes the input
-                     * queue by idle timeout.
+                     * queue by idle timeout or because the master was
+                     * exhausted.
                      * 
-                     * When we trap idle timeout exception here and cause the
-                     * sink to be re-opened (simply by restarting the loop).
+                     * These exceptions are trapped here and cause the sink to
+                     * be re-opened (simply by restarting the loop).
                      */
 
                     if (log.isInfoEnabled())
-                        log.info("Sink closed asynchronously by idle timeout: "
-                                + sink);
+                        log.info("Sink closed asynchronously: cause="
+                                + ex.getCause() + ", sink=" + sink);
 
                     // definitely re-open!
                     reopen = true;
