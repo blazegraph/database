@@ -1711,7 +1711,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 
                 nremaining--;
                 
-                System.out.println("Done: client=" + clientNum + " of "
+                System.out.println("Done: clientNum=" + clientNum + " of "
                         + jobState.nclients + " with " + nremaining
                         + " remaining : result=" + value);
 
