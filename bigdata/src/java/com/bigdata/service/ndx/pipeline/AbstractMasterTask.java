@@ -927,7 +927,7 @@ L>//
             } catch (BufferClosedException ex) {
 
                 if (ex.getCause() instanceof IdleTimeoutException
-                        || ex.getCause() instanceof IdleTimeoutException) {
+                        || ex.getCause() instanceof MasterExhaustedException) {
 
                     /*
                      * Note: The sinks sets the exception if it closes the input
