@@ -31,12 +31,15 @@
 # Asynchronous index write API
 ##
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/chunksIn&depth=14&period=Minutes&report=correlated&file=indices/async/chunksIn
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/chunksTransferred&depth=14&period=Minutes&report=correlated&file=indices/async/chunksTransferred
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageTransferChunkSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageTransferChunkSize
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/chunksOut&depth=14&period=Minutes&report=correlated&file=indices/async/chunksOut
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMillisPerWait&correlated=true&depth=14&period=Minutes&file=indices/async/averageMillisPerWait
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMillisPerWrite&correlated=true&depth=14&period=Minutes&file=indices/async/averageMillisPerWrite
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageElementsPerWrite&correlated=true&depth=14&period=Minutes&file=indices/async/averageElementsPerWrite
 
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMasterQueueSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageMasterQueueSize
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMasterRedirectQueueSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageMasterRedirectQueueSize
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSinkQueueSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageSinkQueueSize
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSinkQueueSizeStdev&depth=14&period=Minutes&report=correlated&file=indices/async/averageSinkQueueSizeStdev
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageMaximumSinkQueueSize&depth=14&period=Minutes&report=correlated&file=indices/async/averageMaximumSinkQueueSize
@@ -121,6 +124,7 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Temp%20Vo
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Store%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/StoreCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Managed%20Segment%20Store%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/ManagedSegmentStoreCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Bytes%20Under%20Management&period=Minutes&depth=10&correlated=true&file=service/ds/BytesUnderManagement
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexSegmentCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/OpenLeafCount
