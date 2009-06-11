@@ -36,6 +36,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -1748,7 +1749,9 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         final BlockingBuffer<KVO<O>[]> writeBuffer = new BlockingBuffer<KVO<O>[]>(
                 // @todo array vs linked w/ capacity and fair vs unfair.
-                new ArrayBlockingQueue<KVO<O>[]>(conf.getMasterQueueCapacity()),
+                // @todo config deque vs queue (deque combines on add() as well)
+                new LinkedBlockingDeque<KVO<O>[]>(conf.getMasterQueueCapacity()),
+//                new ArrayBlockingQueue<KVO<O>[]>(conf.getMasterQueueCapacity()),
                 conf.getMasterChunkSize(),//
                 conf.getMasterChunkTimeoutNanos(),// 
                 TimeUnit.NANOSECONDS,//

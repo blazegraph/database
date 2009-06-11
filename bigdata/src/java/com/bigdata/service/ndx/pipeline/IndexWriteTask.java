@@ -32,6 +32,7 @@ import java.util.LinkedList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.keys.KVO;
@@ -385,7 +386,9 @@ A//
     protected BlockingBuffer<E[]> newSubtaskBuffer() {
         
         return new BlockingBuffer<E[]>(//
-                new ArrayBlockingQueue<E[]>(sinkQueueCapacity), //
+                // @todo config deque vs queue (deque combines on add() as well)
+                new LinkedBlockingDeque<E[]>(sinkQueueCapacity),//
+//                new ArrayBlockingQueue<E[]>(sinkQueueCapacity), //
                 sinkChunkSize,// 
                 sinkChunkTimeoutNanos,//
                 TimeUnit.NANOSECONDS,//

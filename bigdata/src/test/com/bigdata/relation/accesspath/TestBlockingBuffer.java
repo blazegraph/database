@@ -152,8 +152,12 @@ public class TestBlockingBuffer extends TestCase2 {
                 assertEquals(e2, itr.next());
 
                 // nothing available from the iterator (non-blocking test).
-                assertFalse(itr.hasNext(1, TimeUnit.NANOSECONDS));
-                assertNull(itr.next(1, TimeUnit.NANOSECONDS));
+                try {
+                    assertFalse(itr.hasNext(1, TimeUnit.NANOSECONDS));
+                    assertNull(itr.next(1, TimeUnit.NANOSECONDS));
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
 
                 // will block until we close the buffer.
                 assertFalse(itr.hasNext());

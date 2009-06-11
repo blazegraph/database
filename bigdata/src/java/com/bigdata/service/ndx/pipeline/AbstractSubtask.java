@@ -387,7 +387,7 @@ L>//
                     }
                 }
 
-                if (chunkSize >= buffer.getChunkSize()) {
+                if (chunkSize >= buffer.getMinimumChunkSize()) {
                     /*
                      * We have a full chunk worth of data so do not wait longer.
                      */

@@ -604,7 +604,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 
                 return new BlockingBuffer<KVO<O>[]>(
                         new ArrayBlockingQueue<KVO<O>[]>(subtaskQueueCapacity), //
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// 
+                        BlockingBuffer.DEFAULT_MINIMUM_CHUNK_SIZE,// 
                         Long.MAX_VALUE, TimeUnit.SECONDS,// chunkTimeout
                         true // ordered
                 );
@@ -704,7 +704,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 
                 return new BlockingBuffer<KVO<O>[]>(
                         new ArrayBlockingQueue<KVO<O>[]>(subtaskQueueCapacity), //
-                        BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// 
+                        BlockingBuffer.DEFAULT_MINIMUM_CHUNK_SIZE,// 
                         Long.MAX_VALUE, TimeUnit.SECONDS,// chunkTimeout (infinite)
                         true // ordered
                 );

@@ -58,7 +58,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("access path");
+        final TestSuite suite = new TestSuite("access path and blocking buffers");
 
         /*
          * @todo test basic access path mechanisms and the access path fused
@@ -75,6 +75,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestBlockingBuffer.class);
 
         suite.addTestSuite(TestBlockingBufferWithChunks.class);
+        
+        suite.addTestSuite(TestBlockingBufferWithChunksDeque.class);
         
         suite.addTestSuite(TestUnsynchronizedArrayBuffer.class);
         

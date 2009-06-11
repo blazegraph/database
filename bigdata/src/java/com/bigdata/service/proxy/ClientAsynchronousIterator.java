@@ -507,7 +507,8 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
 
     }
 
-    public boolean hasNext(long timeout, TimeUnit unit) {
+    public boolean hasNext(long timeout, TimeUnit unit)
+            throws InterruptedException {
 
         start();
         
@@ -523,7 +524,7 @@ public class ClientAsynchronousIterator<E> implements IAsynchronousIterator<E>,
         
     }
 
-    public E next(long timeout, TimeUnit unit) {
+    public E next(long timeout, TimeUnit unit) throws InterruptedException {
 
         start();
         

@@ -31,6 +31,7 @@ import java.nio.channels.FileChannel;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -40,6 +41,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
+
+import cern.colt.Arrays;
 
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
@@ -158,14 +161,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public static transient final int DEFAULT_PRODUCER_QUEUE_CAPACITY = 5000;
 
     /**
-     * The default target chunk size for
-     * {@link BlockingBuffer.BlockingIterator#next()}.
+     * The default minimum chunk size for the chunk combiner.
      */
-    public static transient final int DEFAULT_CONSUMER_CHUNK_SIZE = 10000;
+    public static transient final int DEFAULT_MINIMUM_CHUNK_SIZE = 10000;
 
     /**
      * The default timeout in milliseconds during which chunks of elements may
-     * be combined by {@link BlockingBuffer.BlockingIterator#next()}.
+     * be combined in order to satisfy the desired minimum chunk size.
      */
     public static transient final long DEFAULT_CONSUMER_CHUNK_TIMEOUT = 20;
 
@@ -176,20 +178,20 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public static transient final TimeUnit DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT = TimeUnit.MILLISECONDS;
 
     /**
-     * The target chunk size for the chunk combiner.
+     * The desired minimum chunk size for the chunk combiner.
      * 
-     * @see #DEFAULT_CONSUMER_CHUNK_SIZE
+     * @see #DEFAULT_MINIMUM_CHUNK_SIZE
      */
-    private final int chunkCapacity;
+    private final int minimumChunkSize;
 
     /**
-     * The target chunk size for the chunk combiner.
+     * The desired minimum chunk size for the chunk combiner.
      * 
-     * @see #DEFAULT_CONSUMER_CHUNK_SIZE
+     * @see #DEFAULT_MINIMUM_CHUNK_SIZE
      */
-    public final int getChunkSize() {
+    public final int getMinimumChunkSize() {
 
-        return chunkCapacity;
+        return minimumChunkSize;
         
     }
     
@@ -284,28 +286,28 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public BlockingBuffer(final int capacity) {
 
        this(capacity,
-            DEFAULT_CONSUMER_CHUNK_SIZE,
+            DEFAULT_MINIMUM_CHUNK_SIZE,
             DEFAULT_CONSUMER_CHUNK_TIMEOUT,
             DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT
             ); 
 
     }
-    
+
     /**
      * 
      * @param capacity
-     *            The capacity of the buffer. When the generic type <i>&lt;E&gt;</i>
-     *            is an array type, then this is the <i>chunkOfChunksCapacity</i>
-     *            and small chunks will be automatically combined based on
-     *            availability and latency. When zero (0) a
-     *            {@link SynchronousQueue} will be used. Otherwise an
+     *            The capacity of the buffer. When the generic type
+     *            <i>&lt;E&gt;</i> is an array type, then this is the
+     *            <i>chunkOfChunksCapacity</i> and small chunks will be
+     *            automatically combined based on availability and latency. When
+     *            zero (0) a {@link SynchronousQueue} will be used. Otherwise an
      *            {@link ArrayBlockingQueue} of the given capacity is used.
-     * @param chunkCapacity
-     *            The target chunk size. When the elements stored in the buffer
-     *            are chunks (ie., arrays of some component type), elements will
-     *            be combined together to form larger chunks until this
-     *            chunkSize is satisifed, the {@link #iterator()} is exhausted,
-     *            or the <i>chunkTime</i> is reached.
+     * @param minimumChunkSize
+     *            The desired minimum chunk size. When the elements stored in
+     *            the buffer are chunks (i.e., arrays of some component type),
+     *            elements will be combined together to form larger chunks until
+     *            this chunkSize is satisfied, the {@link #iterator()} is
+     *            exhausted, or the <i>chunkTime</i> is reached.
      * @param chunkTimeout
      *            The maximum time to wait in nanoseconds for another chunk to
      *            come along so that we can combine it with the current chunk
@@ -314,12 +316,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * @param chunkTimeoutUnit
      *            The units in which the <i>chunkTimeout</i> is expressed.
      */
-    public BlockingBuffer(final int capacity, final int chunkSize,
+    public BlockingBuffer(final int capacity, final int minimumChunkSize,
             final long chunkTimeout, final TimeUnit chunkTimeoutUnit) {
 
         this(capacity == 0 ? new SynchronousQueue<E>()
                 : new ArrayBlockingQueue<E>(capacity), //
-                chunkSize,//
+                minimumChunkSize,//
                 chunkTimeout,//
                 chunkTimeoutUnit,//
                 false// ordered
@@ -333,13 +335,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * @param queue
      *            The queue on which elements will be buffered. Elements will be
      *            {@link #add(Object) added} to the queue and drained by the
-     *            {@link #iterator()}.
-     * @param chunkCapacity
-     *            The target chunk size. When the elements stored in the buffer
-     *            are chunks (ie., arrays of some component type), elements will
-     *            be combined together to form larger chunks until this
-     *            chunkSize is satisifed, the {@link #iterator()} is exhausted,
-     *            or the <i>chunkTime</i> is reached.
+     *            {@link #iterator()}. When this is a {@link BlockingDeque}
+     *            array element types will be combined by
+     *            {@link #add(Object, long, TimeUnit)} until the
+     *            <i>minimumChunkSize</i> is satisfied.
+     * @param minimumChunkSize
+     *            The desired minimum chunk size. When the elements stored in
+     *            the buffer are chunks (i.e., arrays of some component type),
+     *            elements will be combined together to form larger chunks until
+     *            this chunkSize is satisfied, the {@link #iterator()} is
+     *            exhausted, or the <i>chunkTimeout</i> is reached.
      * @param chunkTimeout
      *            The maximum time to wait in nanoseconds for another chunk to
      *            come along so that we can combine it with the current chunk
@@ -348,20 +353,19 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * @param chunkTimeoutUnit
      *            The units in which the <i>chunkTimeout</i> is expressed.
      * @param ordered
-     *            When <code>true</code> the data are asserted to be ordered
-     *            and a merge sort will be applied if chunks are combined such
-     *            that the combined chunks will also be ordered (this has no
-     *            effect unless the generic type of the buffer is an array
-     *            type).
+     *            When <code>true</code> the data are asserted to be ordered and
+     *            a merge sort will be applied if chunks are combined such that
+     *            the combined chunks will also be ordered (this has no effect
+     *            unless the generic type of the buffer is an array type).
      */
     public BlockingBuffer(final BlockingQueue<E> queue,
-            final int chunkCapacity, final long chunkTimeout,
+            final int minimumChunkSize, final long chunkTimeout,
             final TimeUnit chunkTimeoutUnit, final boolean ordered) {
     
         if (queue == null)
             throw new IllegalArgumentException();
 
-        if (chunkCapacity < 0) {
+        if (minimumChunkSize < 0) {
             /*
              * Note: zero is allowed since the buffer may store individual
              * elements depending on the generic type <E>, not just chunks of
@@ -382,7 +386,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
         this.queue = queue;
         
-        this.chunkCapacity = chunkCapacity;
+        this.minimumChunkSize = minimumChunkSize;
         
         // convert to nanoseconds.
         this.chunkTimeout = TimeUnit.NANOSECONDS.convert(chunkTimeout,
@@ -714,7 +718,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         return elementsOnQueueCount.get();
         
     }
-    
+
     /**
      * @throws BufferClosedException
      *             if the buffer has been {@link #close()}d.
@@ -738,6 +742,141 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     }
 
     /**
+     * This method provides a non-blocking feature to combine chunks when they
+     * are added to an internal {@link BlockingDeque}. The feature is enabled
+     * iff the elements are an array type (chunks) and a {@link BlockingDeque}
+     * was specified via the constructor. The purpose of this is to keep the
+     * size of the queue down when it is common that (a) the chunks being added
+     * to the queue are small; and (b) the consumer is slower than the producer
+     * (so combining chunks when the queue is drained by the iterator will not
+     * keep the queue size down).
+     * <p>
+     * Approach: While holding the lock in add(e,timeout) and when offering a
+     * chunk which is LTE the desired chunkSize, do Dequeue()#peekLast() and
+     * verify that the last chunk could be combined with the current chunk. If
+     * so, then do Dequeue#pollLast() to remove the last chunk from the queue
+     * [if pollLast() returns non-null it will return the same chunk as
+     * peekLast() since no other thread is draining from this end of the
+     * dequeue].
+     * 
+     * If pollLast() returns an chunk which be combined with the chunk to be
+     * offered, then combine the chunks, apply a mergeSort if they are ordered,
+     * and add(E) the combined chunk [this should succeed immediately since we
+     * are holding the lock, so no other thread can be adding to the queue
+     * concurrently and we have just drained something from the queue so it can
+     * not be full.]
+     * 
+     * Otherwise, add(E) the chunk returned by pollLast() [again, this should
+     * succeed immediately since we are holding the lock and no other thread can
+     * cause the size of the queue to increase] and then then offer(E) the
+     * original chunk [but do not retry the chunk combination logic.]
+     * 
+     * Note: if no other thread is dequeuing elements from the last position
+     * then we do not need to iteratively dequeue successive elements since any
+     * successive element already has either a sufficient chunk size or can not
+     * be combined with the current element.]
+     * 
+     * @todo review performance impact. do we need head combining and tail
+     *       combining? tail combining is more efficient in that it does one
+     *       merge sort no matter how many chunks were combined. head combining
+     *       handles the special case where the queue is being run up to its
+     *       capacity because a lot of small chunks are being added to the
+     *       queue. This sometimes can cause a problem. For example, in the
+     *       asynchronous write API, if ANY sink queue fills up then the master
+     *       will block and progress will halt until the sink queue is no longer
+     *       full.
+     */
+    private boolean combineChunkOnAdd(final E e) {
+
+        /*
+         * Note: the caller must verify that the element is an array type and
+         * that the internal queue is a BlockingDeque.
+         */
+        
+        /*
+         * Note: the caller MUST be holding the lock.  That is how we achieve
+         * our non-blocking guarantee.
+         */
+        assert lock.isHeldByCurrentThread();
+
+        final BlockingDeque<E> deque = (BlockingDeque<E>) queue; // 
+
+        // examine the last chunk in the dequeue.
+        E t = deque.peekLast();
+
+        if (t != null
+                && ((Object[]) t).length + ((Object[]) e).length <= minimumChunkSize) {
+
+            /*
+             * Take the last chunk from the dequeue.
+             * 
+             * Note: Since we are holding the lock, and since the lock is
+             * required to add a chunk to the internal queue, we are guaranteed
+             * that we can return a chunk to the queue without blocking. That
+             * will either be the chunk that we get from pollLast() or a new
+             * chunk we obtain by combining the caller's chunk with the chunk
+             * from pollLast().
+             */
+            t = deque.pollLast();
+
+            if (t != null) {
+
+                if (((Object[]) t).length + ((Object[]) e).length <= minimumChunkSize) {
+
+                    /*
+                     * Combine chunks.
+                     * 
+                     * Note: The order of the elements in the resulting array
+                     * maintains their queuing order. Since [t] was on the
+                     * queue, it comes first in the combined chunk.
+                     */
+                    t = combineChunks(t, e);
+                    
+                    if(ordered) {
+                        /*
+                         * Maintain the natural order within the
+                         * combined chunk using an in place merge
+                         * sort.
+                         */
+                        ChunkMergeSortHelper.mergeSort((Object[]) t);
+                    }
+
+                    // add combined chunk (will not block).
+                    deque.add(t);
+
+                    chunksAddedCount++;
+                    elementsAddedCount += ((Object[]) e).length;
+                    elementsOnQueueCount.addAndGet(((Object[]) e).length);
+
+                    if (log.isDebugEnabled())
+                        log.debug("add/combined chunk: len="
+                                + ((Object[]) e).length + ", combined length="
+                                + ((Object[]) t).length);
+
+                    // done : must exit : @todo count #of head combined chunks.
+                    return true;
+
+                }
+
+                // return chunk to dequeue (will not block)
+                deque.add(t);
+
+                // fall through (caller's chunk was not queued).
+
+            }
+
+        }
+
+        /*
+         * Fall through - either the dequeue is empty or last chunk
+         * plus this chunk exceeds the target chunkCapacity.
+         */
+
+        return false;
+        
+    }
+
+    /**
      * Add element to the buffer.
      * 
      * @param e
@@ -748,8 +887,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            The unit in which the timeout is expressed.
      * 
      * @return <code>true</code> iff the element was added to the buffer (
-     *         <code>false</code> indicates that the timout expired before the
+     *         <code>false</code> indicates that the timeout expired before the
      *         element could be added to the buffer).
+     * 
+     * @throws InterruptedException
+     *             if interrupted
      */
     public boolean add(final E e, final long timeout, final TimeUnit unit)
         throws InterruptedException {
@@ -777,6 +919,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         int ntries = 0;
         // initial delay before the 1st log message.
         long logTimeout = initialLogTimeout;
+        // false unless we attempt to combine the chunk with the last chunk on the deque.
+        boolean didCombine = false;
         
         // nanoseconds remaining until the timeout.
         long nanos;
@@ -796,12 +940,27 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     assertOpen();
 
                     /*
-                     * Note: While not the only explanation, a timeout here can
-                     * occur if you have nested JOINs. The outer JOIN can
-                     * timeout waiting on the inner JOINs to consume the current
-                     * tuple. If there are a lot of tuples being evaluated in
-                     * the inner JOINs, then a timeout is becomes more likely.
-                     * 
+                     * Consider combining with the last element on the queue
+                     * only the first time through. If it does not work, then
+                     * trying again will only waste CPU.
+                     */
+
+                    if (!didCombine && minimumChunkSize > 0
+                            && queue instanceof BlockingDeque
+                            && e.getClass().getComponentType() != null) {
+
+                        if (combineChunkOnAdd(e)) {
+
+                            // done (was able to combine the chunks on add).
+                            return true;
+
+                        }
+
+                        didCombine = true;
+                        
+                    } // not a dequeue or not an array type (fall through).
+
+                    /*
                      * Note: This is basically a spin lock, though offer(e) does
                      * acquire a lock internally. If we have spun enough times,
                      * then we will use staged timeouts for subsequent offer()s.
@@ -820,7 +979,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                         // update in case we waited a while for the lock.
                         nanos = (System.nanoTime() - begin);
-                        
+
                         final long offerTimeoutNanos = Math.min(nanos,
                                 TimeUnit.MILLISECONDS
                                         .toNanos(getTimeoutMillis(ntries)));
@@ -891,13 +1050,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                         elementsOnQueueCount.addAndGet(((Object[]) e).length);
 
                         if (log.isDebugEnabled())
-                            log.debug("added chunk: len=" + ((Object[])e).length);
+                            log.debug("added chunk: len="
+                                    + ((Object[]) e).length);
 
                     } else {
 
                         elementsAddedCount++;
                         elementsOnQueueCount.incrementAndGet();
-                        
+
                         if (log.isDebugEnabled())
                             log.debug("added: " + e.toString());
 
@@ -918,7 +1078,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         // timeout
         return false;
-        
+
     }
 
     public long flush() {
@@ -991,7 +1151,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * <p>
          * Note: This is NOT <code>volatile</code> since it is set by the
          * consumer using {@link #close()} and the consumer is supposed to be
-         * single-threaded.
+         * single-threaded.  However, this means that invoking {@link #toString()}
+         * from another thread can show the old state of the field.
          */
         private boolean open = true;
 
@@ -1085,7 +1246,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * Task creates a BlockingBuffer for each sink there is an
                  * inversion of control. The JoinTask is populating the
                  * BlockingBuffer in its own thread(s) while the sink is
-                 * draining the BlockingBuffer independely. However, the more
+                 * draining the BlockingBuffer independently. However, the more
                  * common case has a task that is created to write on the
                  * BlockingBuffer and the iterator is then consumed by the
                  * caller (Query works this way).
@@ -1242,11 +1403,31 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
              * timeout.
              */
             
-            return hasNext(Long.MAX_VALUE, TimeUnit.SECONDS);
+            try {
+
+                return hasNext(Long.MAX_VALUE, TimeUnit.SECONDS);
+
+            } catch (InterruptedException ex) {
+
+                // itr will not deliver any more elements.
+                _close();
+
+                // strong false (interrupted, so itr is closed).
+                checkFuture();
+
+                if (log.isDebugEnabled())
+                    log.info("Interrupted: " + this, ex);
+                else if (log.isInfoEnabled())
+                    log.info("Interrupted: " + this);
+
+                return false;
+
+            }
             
         }
         
-        public boolean hasNext(final long timeout, final TimeUnit unit) {
+        public boolean hasNext(final long timeout, final TimeUnit unit)
+                throws InterruptedException {
             
             if (nextE != null) {
 
@@ -1274,7 +1455,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 //                checkFuture();
 //                
 //            }
-            
+
             return _hasNext(nanos);
 
         }
@@ -1282,22 +1463,15 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         /**
          * 
          * @param nanos
-         *            The number of nanos seconds remaining until timeout. This
+         *            The number of nanoseconds remaining until timeout. This
          *            value is decremented until LTE ZERO (0L), at which point
          *            {@link #_hasNext(long)} will timeout.
          * 
          * @return iff an element is available before the timeout has expired.
          * 
-         * @todo The if the iterator is interrupted the
-         *       {@link IAsynchronousIterator} API hides the interrupt and
-         *       closes the iterator. Consider an API change that does not clear
-         *       the interrupted status so that callers can notice that they
-         *       were interrupted or that simply throws out the
-         *       {@link InterruptedException}? This API change would put us
-         *       more in line with how Java APIs deal with interrupts might have
-         *       consequences for the existing code.
+         * @throws InterruptedException
          */
-        private boolean _hasNext(long nanos) {
+        private boolean _hasNext(long nanos) throws InterruptedException {
 
         	// set to true to log stack traces at most once per request.
         	final boolean logOnce = !log.isDebugEnabled();
@@ -1348,23 +1522,51 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      * guard but has not yet offered the element to the queue.
                      * With the lock, this becomes atomic.
                      */
-                    lock.lock();
-                    try {
-                        if (((nextE = queue.poll()) == null)) {
+                    // Wait a bit for the lock, but not more time than remains.
+                    final long lockTimeout = Math.min(nanos,
+                            TimeUnit.MILLISECONDS.toNanos(5));
+                    if (lock.tryLock(lockTimeout, TimeUnit.NANOSECONDS)) {
+                        try {
+                            if (((nextE = queue.poll()) == null)) {
 
-                            if (log.isInfoEnabled())
-                                log.info("Exhausted");
+                                if (log.isInfoEnabled())
+                                    log.info("Exhausted");
 
-                            assert isExhausted();
+                                assert isExhausted();
 
-                            // strong false - the iterator is exhausted.
-                            checkFuture();
+                                // strong false - the iterator is exhausted.
+                                checkFuture();
 
-                            return false;
+                                return false;
+                            }
+                        } finally {
+                            lock.unlock();
                         }
-                    } finally {
-                        lock.unlock();
-                    }
+                    } else { // else tryLock()
+                        
+                        final long now = System.nanoTime();
+
+                        // decrement time remaining.
+                        nanos -= now - lastTime;
+
+                        lastTime = now;
+                        
+                        if (nanos <= 0) {
+
+                            if (log.isDebugEnabled())
+                                log.debug("Timeout");
+
+                            // weak false (timeout).
+                            return false;
+                            
+                        }
+
+                        if(log.isDebugEnabled())
+                            log.debug("Lock timeout - will retry.");
+                        
+                        // try again for the lock.
+                        continue;
+                    }// end if(tryLock)
                 }
 
                 if (nextE == null) {
@@ -1488,7 +1690,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      * read.
                      */
                     
-                    try {
+//                    try {
 
 //                        final long timeout = getTimeoutMillis(ntries);
                         final long timeout = Math.min(nanos, TimeUnit.MILLISECONDS
@@ -1497,28 +1699,33 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                         if ((nextE = queue.poll(timeout, TimeUnit.NANOSECONDS)) != null) {
 
                             if (log.isDebugEnabled())
-                                log.debug("next: " + nextE);
+                                log
+                                    .debug("next: "
+                                            + (nextE.getClass()
+                                                    .getComponentType() != null ? Arrays
+                                                    .toString((Object[]) nextE)
+                                                    : nextE));
 
                             return true;
 
                         }
                     
-                    } catch (InterruptedException ex) {
-
-                        if (log.isDebugEnabled())
-							log.info("Interrupted: " + this, ex);
-						else if (log.isInfoEnabled())
-							log.info("Interrupted: " + this);
-
-                        // itr will not deliver any more elements.
-                        _close();
-
-                        // strong false (interrupted, so itr is closed).
-                        checkFuture();
-                        
-                        return false;
-
-                    }
+//                    } catch (InterruptedException ex) {
+//
+//                        // itr will not deliver any more elements.
+//                        _close();
+//
+//                        // strong false (interrupted, so itr is closed).
+//                        checkFuture();
+//                        
+//                        if (log.isDebugEnabled())
+//							log.info("Interrupted: " + this, ex);
+//						else if (log.isInfoEnabled())
+//							log.info("Interrupted: " + this);
+//
+//                        return false;
+//
+//                    }
 
                 }
                 
@@ -1624,7 +1831,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         }
 
-        public E next(long timeout, final TimeUnit unit) {
+        public E next(long timeout, final TimeUnit unit) throws InterruptedException {
 
         	// elapsed is measured against this timestamp.
             final long startTime = System.nanoTime();
@@ -1822,33 +2029,40 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             final long elapsed = System.nanoTime() - startTime;
             
             final boolean isTimeout = elapsed >= timeout;
+            boolean isInterrupt = false;
             
             // remaining nanos until timeout.
             final long nanos = chunkTimeout - elapsed;
             
-            if (chunk.length < chunkCapacity && !isTimeout
-                    && hasNext(nanos, TimeUnit.NANOSECONDS)) {
-                
-                /*
-                 * Note: hasNext() will block until either we have another chunk
-                 * or until the iterator is known to be exhausted.
-                 */
-
-                return combineChunks(combineNextChunk(e), nchunks + 1,
-                        startTime, timeout);
-
+            if (chunk.length < minimumChunkSize && !isTimeout) {
+                try {
+                    if (hasNext(nanos, TimeUnit.NANOSECONDS)) {
+                        /*
+                         * Note: hasNext() will block until either (a) we have
+                         * another chunk; (b) the timeout has expired; (c) until
+                         * the iterator is known to be exhausted; or (d) the
+                         * current thread is interrupted.
+                         */
+                        return combineChunks(combineNextChunk(e), nchunks + 1,
+                                startTime, timeout);
+                    }
+                } catch (InterruptedException ex) {
+                    // Note: we treat an interrupt as if it forced a timeout.
+                    isInterrupt = true;
+                }
             }
             
-            if (chunk.length < chunkCapacity && !isTimeout && !queue.isEmpty()) {
-                
+            if (chunk.length < minimumChunkSize && !isTimeout && !isInterrupt
+                    && !queue.isEmpty()) {
+
                 /*
-                 * Non-blocking case. Once we have satisified the minimum chunk
+                 * Non-blocking case. Once we have satisfied the minimum chunk
                  * size we will only combine chunks that are already waiting in
                  * the queue.
                  * 
-                 * Note: required to make sure that _nextE is bound. This is
-                 * non-blocking since we already know that the queue is not
-                 * empty.
+                 * Note: hasNext() is invoked here to make sure that _nextE is
+                 * bound. This is non-blocking since we already know that the
+                 * queue is not empty.
                  */
                 hasNext();
 
@@ -1859,8 +2073,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             // Done.
             if (log.isInfoEnabled())
-                log.info("done:\n" + ">>> #chunks=" + nchunks + ", #elements="
-                        + chunk.length + ", chunkCapacity=" + chunkCapacity
+                log.info("done:\n" + ">>> #combined=" + nchunks + ", #elements="
+                        + chunk.length + ", minimumChunkCapacity=" + minimumChunkSize
                         + ", elapsed=" + elapsed + "ns, isTimeout=" + isTimeout
                         + ", queueEmpty=" + queue.isEmpty() + ", open="
                         + BlockingBuffer.this.open);
@@ -1877,34 +2091,36 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * 
          * @return The given chunk combined with the {@link #_next()} chunk.
          */
-        @SuppressWarnings("unchecked")
+//        @SuppressWarnings("unchecked")
         private E combineNextChunk(final E e) {
             
-            final Object[] e1 = (Object[]) e;
+            return BlockingBuffer.this.combineChunks(e, _next());
             
-            final Object[] e2 = (Object[]) _next();
-            
-            if (e2.length == 0) {
-            
-                // empty chunk.
-                return e;
-                
-            }
-            
-            final int chunkSize = e1.length + e2.length;
-            
-            // Dynamic instantiation of array of the same component type.
-            final Object[] a = (E[]) java.lang.reflect.Array.newInstance(e1[0]
-                    .getClass(), chunkSize);
-            
-            // copy first chunk onto the new array.
-            System.arraycopy(e, 0, a, 0, e1.length);
-            
-            // copy second chunk onto the new array.
-            System.arraycopy(e2, 0, a, e1.length, e2.length);
-            
-            // return the combined chunk.
-            return (E) a;
+//            final Object[] e1 = (Object[]) e;
+//            
+//            final Object[] e2 = (Object[]) _next();
+//            
+//            if (e2.length == 0) {
+//            
+//                // empty chunk.
+//                return e;
+//                
+//            }
+//            
+//            final int chunkSize = e1.length + e2.length;
+//            
+//            // Dynamic instantiation of array of the same component type.
+//            final Object[] a = (E[]) java.lang.reflect.Array.newInstance(e1[0]
+//                    .getClass(), chunkSize);
+//            
+//            // copy first chunk onto the new array.
+//            System.arraycopy(e, 0, a, 0, e1.length);
+//            
+//            // copy second chunk onto the new array.
+//            System.arraycopy(e2, 0, a, e1.length, e2.length);
+//            
+//            // return the combined chunk.
+//            return (E) a;
             
         }
         
@@ -1917,6 +2133,59 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
         }
 
+    }
+
+    /**
+     * Combines two chunks in the order given (DOES NOT apply a merge sort).
+     * 
+     * @param chunk1
+     *            The first chunk.
+     * @param chunk2
+     *            The second chunk.
+     * 
+     * @return The combined chunks.
+     */
+    private E combineChunks(final E chunk1, final E chunk2) {
+        
+        final Object[] e1 = (Object[]) chunk1;
+        
+        final Object[] e2 = (Object[]) chunk2;
+
+        if (e1.length == 0) {
+
+            // empty chunk - return the other argument.
+            return chunk2;
+        }
+
+        if (e2.length == 0) {
+
+            // empty chunk - return the other argument.
+            return chunk1;
+
+        }
+        
+        if (log.isDebugEnabled()) {
+
+            log.debug("Combining chunks: e.length=" + e1.length + ", t.length="
+                    + e2.length);
+            
+        }
+        
+        final int chunkSize = e1.length + e2.length;
+        
+        // Dynamic instantiation of array of the same component type.
+        final Object[] a = (E[]) java.lang.reflect.Array.newInstance(e1[0]
+                .getClass(), chunkSize);
+        
+        // copy first chunk onto the new array.
+        System.arraycopy(chunk1, 0, a, 0, e1.length);
+        
+        // copy second chunk onto the new array.
+        System.arraycopy(e2, 0, a, e1.length, e2.length);
+        
+        // return the combined chunk.
+        return (E) a;
+        
     }
 
 }

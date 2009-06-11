@@ -58,6 +58,7 @@ if [ 0 != $? ]; then
 fi
 echo $"`date` : `hostname` : created lock file."
 
+# @todo note the pid and look for it before attempting to start the service.
 if [ "@LOG4J_SOCKET_LOGGER_HOST@" == "`hostname`" ]; then
 	echo $"`date` : `hostname` : starting log4j server."
 	java -cp ${CLASSPATH} \
@@ -67,7 +68,13 @@ if [ "@LOG4J_SOCKET_LOGGER_HOST@" == "`hostname`" ]; then
 fi
 
 # Start the services manager on this host.
-java ${JAVA_OPTS} \
+#
+# Note: This explicitly specifies a small heap for the services manager since
+# it uses very little heap space and we can avoid problems with contention for
+# virtual memory by not permitting JVM defaults to grant this a large maximum
+# heap on machines with lots of RAM.
+#
+java ${JAVA_OPTS} -Xmx400m \
 	 -cp ${CLASSPATH} \
 	 com.bigdata.jini.start.ServicesManagerServer \
 	 ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES} &
