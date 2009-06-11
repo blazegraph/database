@@ -103,7 +103,8 @@ public class RemoteAsynchronousIteratorImpl<E> implements
         
     }
 
-    public boolean hasNext(long timeout, TimeUnit unit) throws IOException {
+    public boolean hasNext(long timeout, TimeUnit unit) throws IOException,
+            InterruptedException {
         
         return itr.hasNext(timeout, unit);
         
@@ -121,8 +122,9 @@ public class RemoteAsynchronousIteratorImpl<E> implements
         
     }
 
-    public E next(long timeout, TimeUnit unit) throws IOException {
-    
+    public E next(long timeout, TimeUnit unit) throws IOException,
+            InterruptedException {
+
         return itr.next(timeout, unit);
         
     }

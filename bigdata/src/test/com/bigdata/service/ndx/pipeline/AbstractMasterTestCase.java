@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
@@ -317,11 +318,21 @@ public class AbstractMasterTestCase extends TestCase2 {
 
         }
 
+        protected boolean isDeque() {
+            
+            return true;
+            
+        }
+        
         protected BlockingBuffer<KVO<O>[]> newSubtaskBuffer() {
 
             return new BlockingBuffer<KVO<O>[]>(
-                    new ArrayBlockingQueue<KVO<O>[]>(subtaskQueueCapacity), //
-                    BlockingBuffer.DEFAULT_CONSUMER_CHUNK_SIZE,// 
+                    (isDeque() ? new LinkedBlockingDeque<KVO<O>[]>(
+                            subtaskQueueCapacity) //
+                            : new ArrayBlockingQueue<KVO<O>[]>(
+                                    subtaskQueueCapacity)//
+                    ), //
+                    BlockingBuffer.DEFAULT_MINIMUM_CHUNK_SIZE,// 
                     BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT,//
                     BlockingBuffer.DEFAULT_CONSUMER_CHUNK_TIMEOUT_UNIT,//
                     true // ordered

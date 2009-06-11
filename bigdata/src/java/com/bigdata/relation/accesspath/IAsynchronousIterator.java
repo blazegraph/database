@@ -70,32 +70,33 @@ public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
      *         visit more elements.
      */
     public boolean isExhausted();
-    
+
     /**
-     * Return <code>true</code> iff there is at least one element that can
-     * be visited. If the buffer is empty then this will block until: (a) an
+     * Return <code>true</code> iff there is at least one element that can be
+     * visited. If the buffer is empty then this will block until: (a) an
      * element appears in the buffer; (b) the buffer is
      * {@link BlockingBuffer#close()}ed; or (c) the timeout expires.
      * <p>
-     * Note that a <code>false</code> return DOES NOT signify that the
-     * iterator is exhausted. However, if you specify an infinite timeout
-     * using {@link Long#MAX_VALUE} {@link TimeUnit#SECONDS} then you MAY
-     * safely interpret a <code>false</code> return as an indication that
-     * the iterator is exhausted.
+     * Note that a <code>false</code> return DOES NOT signify that the iterator
+     * is exhausted. However, if you specify an infinite timeout using
+     * {@link Long#MAX_VALUE} {@link TimeUnit#SECONDS} then you MAY safely
+     * interpret a <code>false</code> return as an indication that the iterator
+     * is exhausted.
      * 
      * @param timeout
      *            The length of time that the method may block awaiting an
      *            element to appear.
      * @param unit
      *            The units in which the <i>timeout</i> is expressed.
-     *            
+     * 
      * @return <code>true</code> iff there is an element available.
      * 
-     * @throws RuntimeException
-     *             if the current thread is interrupted while waiting for
-     *             the buffer to be {@link BlockingBuffer#flush()}ed.
+     * @throws InterruptedException
+     *             if the current thread is interrupted while waiting another
+     *             element.
      */
-    public boolean hasNext(final long timeout, final TimeUnit unit);
+    public boolean hasNext(final long timeout, final TimeUnit unit)
+            throws InterruptedException;
     
     /**
      * Waits up to the <i>timeout</i> to return the next element. When the
@@ -118,16 +119,16 @@ public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
      *         exhausted you need to invoke {@link #hasNext()} without a timeout
      *         (blocking) or {@link #isExhausted()} (non-blocking).
      *         
-     * @throws RuntimeException
+     * @throws InterruptedException
      *             if the current thread is interrupted while waiting for
-     *             the buffer to be {@link BlockingBuffer#flush()}ed.
+     *             another element.
      */
-    public E next(long timeout, TimeUnit unit);
+    public E next(long timeout, TimeUnit unit) throws InterruptedException;
     
     /**
      * Notes that the iterator is closed and hence may no longer be read. It is
      * safe to invoke this method even if the iterator is closed. However, if
-     * the producer is still running then it will be <em>cancelled</em>
+     * the producer is still running then it will be <em>canceled</em>
      * (interrupted) in order to prevent the {@link IBlockingBuffer} from
      * filling up and deadlocking. For this reason, {@link #close()} has
      * consequences NOT entailed by {@link ICloseableIterator}.
@@ -136,7 +137,7 @@ public interface IAsynchronousIterator<E> extends ICloseableIterator<E> {
      * an interrupt() as normal (but eager) termination. For example, rule
      * execution treats an interrupt() as normal (but eager) termination with
      * the consequence that queries may be safely interrupted once some limit
-     * has been satisified. However, the preferred way to treat LIMIT is using
+     * has been satisfied. However, the preferred way to treat LIMIT is using
      * {@link IRule} with an {@link IQueryOptions} that specifies a LIMIT.
      */
     public void close();

@@ -821,10 +821,10 @@ abstract public class JoinTask implements Callable<Void> {
      * @return The next available chunk of {@link IBindingSet}s -or-
      *         <code>null</code> IFF all known source(s) are exhausted.
      */
-    abstract protected IBindingSet[] nextChunk();
+    abstract protected IBindingSet[] nextChunk() throws InterruptedException;
 
     /**
-     * Class consumes chunks from the source(s) until cancelled,
+     * Class consumes chunks from the source(s) until canceled,
      * interrupted, or all source(s) are exhausted. For each
      * {@link IBindingSet} in each chunk, an {@link AccessPathTask} is
      * created which will consume that {@link IBindingSet}. The
@@ -889,7 +889,12 @@ abstract public class JoinTask implements Callable<Void> {
                 IBindingSet[] chunk;
 
                 while (!halt && (chunk = nextChunk()) != null) {
-                    // @todo ChunkTrace for bindingSet chunks in as well as access path chunks consumed 
+                    
+                    /*
+                     * @todo ChunkTrace for bindingSet chunks in as well as
+                     * access path chunks consumed.
+                     */
+                    
                     if (DEBUG)
                         log.debug("Read chunk of bindings: chunkSize="
                                 + chunk.length + ", orderIndex=" + orderIndex

@@ -96,12 +96,13 @@ public interface RemoteAsynchronousIterator<E> extends Remote {
      * @see IAsynchronousIterator#hasNext(long, TimeUnit)
      */
     boolean hasNext(final long timeout, final TimeUnit unit)
-            throws IOException;
+            throws IOException, InterruptedException;
 
     /**
      * @see IAsynchronousIterator#next(long, TimeUnit)
      */
-    E next(long timeout, TimeUnit unit) throws IOException;
+    E next(long timeout, TimeUnit unit) throws IOException,
+            InterruptedException;
     
     /**
      * Used to send an serialized element together with the object that knows

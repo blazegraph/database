@@ -30,9 +30,10 @@ package com.bigdata.relation.accesspath;
 
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.io.SerializerUtil;
+import junit.framework.AssertionFailedError;
+import junit.framework.TestCase2;
 
-import junit.framework.TestCase;
+import com.bigdata.io.SerializerUtil;
 
 /**
  * Unit tests for {@link ThickAsynchronousIterator}.
@@ -40,7 +41,7 @@ import junit.framework.TestCase;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestThickAsynchronousIterator extends TestCase {
+public class TestThickAsynchronousIterator extends TestCase2 {
 
     /**
      * 
@@ -103,7 +104,11 @@ public class TestThickAsynchronousIterator extends TestCase {
 
             assertTrue(actual.hasNext());
 
-            assertTrue(actual.hasNext(1L, TimeUnit.MILLISECONDS));
+            try {
+                assertTrue(actual.hasNext(1L, TimeUnit.MILLISECONDS));
+            } catch (InterruptedException e) {
+                fail("Interrupted", e);
+            }
 
             final String val = actual.next();
             
@@ -113,7 +118,11 @@ public class TestThickAsynchronousIterator extends TestCase {
         
         assertFalse(actual.hasNext());
 
-        assertFalse(actual.hasNext(1L,TimeUnit.MILLISECONDS));
+        try {
+            assertFalse(actual.hasNext(1L,TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+            fail("Interrupted", e);
+        }
     
     }
     

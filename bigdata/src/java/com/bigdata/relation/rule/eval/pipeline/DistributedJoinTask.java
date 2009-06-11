@@ -384,7 +384,7 @@ public class DistributedJoinTask extends JoinTask {
     
     /**
      * This lock is used to make {@link #nextChunk()} and
-     * {@link #addSource(IAsynchronousIterator)} into mutally exclusive
+     * {@link #addSource(IAsynchronousIterator)} into mutually exclusive
      * operations. {@link #nextChunk()} is the reader.
      * {@link #addSource(IAsynchronousIterator)} is the writer. These operations
      * need to be exclusive and atomic so that the termination condition of
@@ -413,7 +413,7 @@ public class DistributedJoinTask extends JoinTask {
      * @return A chunk assembled from one or more chunks from one or more of
      *         the source {@link JoinTask}s.
      */
-    protected IBindingSet[] nextChunk() {
+    protected IBindingSet[] nextChunk() throws InterruptedException {
 
         if (sourcesExhausted) {
 

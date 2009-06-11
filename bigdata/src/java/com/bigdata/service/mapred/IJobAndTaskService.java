@@ -53,10 +53,10 @@ import java.util.concurrent.Future;
  * interface are declared to throw {@link IOException} since they may be invoked
  * by RMI.
  * 
- * @param M
+ * @param <M>
  *            The type for the job metadata parameter in
  *            {@link #startJob(UUID, Object)}.
- * @param T
+ * @param <T>
  *            The type for the task in {@link #submit(UUID, Object)}.
  * 
  * @todo add a status message returning a String containing a service specific

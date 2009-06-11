@@ -308,7 +308,7 @@ public class LocalJoinTask extends JoinTask {
      * @return The next chunk -or- <code>null</code> iff the source is
      *         exhausted.
      */
-    protected IBindingSet[] nextChunk() {
+    protected IBindingSet[] nextChunk() throws InterruptedException {
 
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex);
