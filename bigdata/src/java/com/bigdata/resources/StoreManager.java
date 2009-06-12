@@ -365,6 +365,14 @@ abstract public class StoreManager extends ResourceEvents implements
         String MaximumJournalSizeAtOverflow = "Maximum Journal Size At Overflow";
 
         /**
+         * The elapsed milliseconds to date required to purge old resources from
+         * the file system.
+         * 
+         * @see StoreManager#purgeOldResources()
+         */
+        String PurgeResourcesMillis = "Purge Resources Millis";
+
+        /**
          * The current release time for the {@link StoreManager}.
          * 
          * @see StoreManager#getReleaseTime()
@@ -750,6 +758,11 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private long releaseTime = 0L;
 
+    /**
+     * The elapsed #of milliseconds in {@link #purgeOldResources()}
+     */
+    protected long purgeResourcesMillis = 0L;
+    
     /**
      * The last value computed by {@link #getEffectiveReleaseTime()} and ZERO(0)
      * until a value has been calculated.
@@ -3057,7 +3070,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * {@link WriteExecutorService}.
      * 
      * @return A summary of the work done -or- <code>null</code> if the
-     *         pre-conditions for the purge operation were not satisified.
+     *         preconditions for the purge operation were not satisfied.
      * 
      * @see src/architecture/purgeResourceDecisionsMatrix.xls
      */
@@ -3377,6 +3390,8 @@ abstract public class StoreManager extends ResourceEvents implements
             final long bytesAfterCount = getBytesUnderManagement();
             
             final long elapsedPurgeResourcesTime = System.currentTimeMillis() - beginPurgeTime;
+            
+            purgeResourcesMillis += elapsedPurgeResourcesTime;
             
             return new PurgeResult(firstCommitTime, lastCommitTime,
                     this.releaseTime, indexRetentionTime, choosenReleaseTime,
@@ -4561,7 +4576,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * When the {@link StoreManager} is relatively new (as measured by the #of
      * bytes under management) we discount the journal extent in order to
      * trigger overflow earlier. Together with the discount applied to the split
-     * handler by the {@link PostProcessOldJournalTask}, this helps to break
+     * handler by the {@link AsynchronousOverflowTask}, this helps to break
      * down new index partitions allocated on the new data service and
      * re-distribute those index partitions (if there are other data services
      * which have even less utilization).

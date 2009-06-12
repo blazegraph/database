@@ -35,6 +35,7 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -301,7 +302,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            <i>chunkOfChunksCapacity</i> and small chunks will be
      *            automatically combined based on availability and latency. When
      *            zero (0) a {@link SynchronousQueue} will be used. Otherwise an
-     *            {@link ArrayBlockingQueue} of the given capacity is used.
+     *            {@link LinkedBlockingDeque} of the given capacity is used.
      * @param minimumChunkSize
      *            The desired minimum chunk size. When the elements stored in
      *            the buffer are chunks (i.e., arrays of some component type),
@@ -315,12 +316,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            combiner.
      * @param chunkTimeoutUnit
      *            The units in which the <i>chunkTimeout</i> is expressed.
+     * 
+     * @todo There has been little to no testing of {@link BlockingBuffer} in
+     *       combination with a {@link SynchronousQueue}.
      */
     public BlockingBuffer(final int capacity, final int minimumChunkSize,
             final long chunkTimeout, final TimeUnit chunkTimeoutUnit) {
 
         this(capacity == 0 ? new SynchronousQueue<E>()
-                : new ArrayBlockingQueue<E>(capacity), //
+                : new LinkedBlockingDeque<E>(capacity),//
+//                    new ArrayBlockingQueue<E>(capacity), //
                 minimumChunkSize,//
                 chunkTimeout,//
                 chunkTimeoutUnit,//

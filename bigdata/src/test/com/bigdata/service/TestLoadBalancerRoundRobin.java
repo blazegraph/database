@@ -35,7 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.resources.PostProcessOldJournalTask;
+import com.bigdata.resources.AsynchronousOverflowTask;
 
 /**
  * Unit tests for the round robin behaviors of the load balancer in isolation
@@ -221,8 +221,8 @@ public class TestLoadBalancerRoundRobin extends TestCase2 {
     
     /**
      * Test when minCount=maxCount=0 where there is an excluded service. This is
-     * how {@link PostProcessOldJournalTask} looks for target services for index
-     * partition MOVEs. {@link PostProcessOldJournalTask} will specify the local
+     * how {@link AsynchronousOverflowTask} looks for target services for index
+     * partition MOVEs. {@link AsynchronousOverflowTask} will specify the local
      * data service as the excluded service. The proper behavior is to return
      * all services except the excluded service on each request.
      * 
