@@ -3095,8 +3095,10 @@ abstract public class StoreManager extends ResourceEvents implements
      *         preconditions for the purge operation were not satisfied.
      * 
      * @see src/architecture/purgeResourceDecisionsMatrix.xls
+     * 
+     * @see #purgeOldResources(long, boolean)
      */
-    final private PurgeResult purgeOldResources() {
+    final protected PurgeResult purgeOldResources() {
 
         final long beginPurgeTime = System.currentTimeMillis();
         
@@ -4501,21 +4503,22 @@ abstract public class StoreManager extends ResourceEvents implements
 
     /**
      * This attempts to obtain the exclusive lock for the
-     * {@link WriteExecutorService}. If successful, it purges any resources
-     * that are no longer required based on
+     * {@link WriteExecutorService}. If successful, it purges any resources that
+     * are no longer required based on
      * {@link StoreManager.Options#MIN_RELEASE_AGE} and optionally truncates the
-     * live journal such that no free space remains in the journal.
-     * <p>
-     * Note: Asynchronous overflow handling can cause resources to no longer be
-     * needed as new index partition views are defined. Therefore this method is
-     * normally invoked as an after action for asynchronous overflow.
+     * live journal such that no free space remains in the journal. If there is
+     * heavy write activity on the service then the timeout may well expire
+     * before the exclusive write lock becomes available. Further, the
+     * acquisition of the exclusive write lock will throttle concurrent write
+     * activity and negatively impact write performance if the system is heavily
+     * loaded by write tasks.
      * 
      * @param timeout
      *            The timeout (in milliseconds) that the method will await the
      *            pause of the write service.
      * @param truncateJournal
-     *            When <code>true</code>, the live journal will be truncated
-     *            to its minimum extent (all writes will be preserved but there
+     *            When <code>true</code>, the live journal will be truncated to
+     *            its minimum extent (all writes will be preserved but there
      *            will be no free space left in the journal). This may be used
      *            to force the {@link DataService} to its minimum possible
      *            footprint for the configured history retention policy.
@@ -4524,8 +4527,8 @@ abstract public class StoreManager extends ResourceEvents implements
      *         write service could not be paused after the specified timeout.
      * 
      * @param truncateJournal
-     *            When <code>true</code> the live journal will be truncated
-     *            such that no free space remains in the journal. If writes are
+     *            When <code>true</code> the live journal will be truncated such
+     *            that no free space remains in the journal. If writes are
      *            directed to the live journal after it has been truncated then
      *            it will transparently re-extended.
      * 
