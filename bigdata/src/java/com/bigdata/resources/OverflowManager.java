@@ -330,6 +330,23 @@ abstract public class OverflowManager extends IndexManager {
     protected final boolean overflowCancelledWhenJournalFull;
 
     /**
+     * @see Options#PURGE_RESOURCES_TIMEOUT
+     */
+    private final long purgeResourcesTimeout;
+
+    /**
+     * The timeout in milliseconds that we will await an exclusive write lock on
+     * the {@link WriteExecutorService} in order to purge unused resources.
+     * 
+     * @see Options#PURGE_RESOURCES_TIMEOUT
+     */
+    public long getPurgeResourcesTimeout() {
+        
+        return purgeResourcesTimeout;
+        
+    }
+    
+    /**
      * #of synchronous overflows that have taken place. This counter is
      * incremented each time the synchronous overflow operation.
      */
@@ -784,7 +801,7 @@ abstract public class OverflowManager extends IndexManager {
         /**
          * The timeout in milliseconds for asynchronous overflow processing to
          * complete (default {@link #DEFAULT_OVERFLOW_TIMEOUT}). Any overflow
-         * task that does not complete within this timeout will be cancelled.
+         * task that does not complete within this timeout will be canceled.
          * <p>
          * Asynchronous overflow processing is responsible for splitting,
          * moving, and joining index partitions. The asynchronous overflow tasks
@@ -834,6 +851,15 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL = "true";
 
+        /**
+         * The timeout in milliseconds that we will await an exclusive lock on
+         * the {@link WriteExecutorService} in order to release unused resources
+         * (journals and segment files).
+         */
+        String PURGE_RESOURCES_TIMEOUT = "purgeResourcesTimeout";
+
+        String DEFAULT_PURGE_RESOURCES_TIMEOUT = "" + (1000 * 60L);
+        
     }
 
     /**
@@ -899,7 +925,7 @@ abstract public class OverflowManager extends IndexManager {
 
         /**
          * The #of asynchronous overflow tasks (split, join, merge, etc) that
-         * were cancelled due to timeout.
+         * were canceled due to timeout.
          */
         String AsynchronousOverflowTaskCancelledCount = "Asynchronous Overflow Task Cancelled Count";
 
@@ -1049,6 +1075,19 @@ abstract public class OverflowManager extends IndexManager {
                 log.info(Options.OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL + "="
                         + overflowCancelledWhenJournalFull);
 
+        }
+
+        // purgeResourcesTimeout
+        {
+            
+            purgeResourcesTimeout = Long
+                    .parseLong(properties.getProperty(
+                            Options.PURGE_RESOURCES_TIMEOUT,
+                            Options.DEFAULT_PURGE_RESOURCES_TIMEOUT));
+
+            if(log.isInfoEnabled())
+                log.info(Options.PURGE_RESOURCES_TIMEOUT + "=" + purgeResourcesTimeout);
+            
         }
 
         // copyIndexThreshold

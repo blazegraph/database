@@ -4586,7 +4586,7 @@ abstract public class StoreManager extends ResourceEvents implements
 
         } else {
 
-            log.warn("Write service did not pause: timeout=" + timeout);
+            log.warn("Purge resources did not run: timeout=" + timeout);
 
             return false;
 

@@ -1,5 +1,6 @@
 package com.bigdata.resources;
 
+import java.lang.ref.SoftReference;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,10 +31,6 @@ import com.bigdata.service.IDataService;
 public class OverflowMetadata {
 
     protected static final Logger log = Logger.getLogger(OverflowMetadata.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The resource manager.
@@ -93,6 +90,24 @@ public class OverflowMetadata {
      */
     private final LinkedHashMap<String, ViewMetadata> views;
 
+    /**
+     * Clears the {@link ViewMetadata} map, clearing the {@link SoftReference}s
+     * from each {@link BTreeMetadata} and {@link ViewMetadata} instance. This
+     * is used by the {@link AsynchronousOverflowTask} to encourage the eager GC
+     * of resources once that task is finished.
+     */
+    void clearViews() {
+        
+        for(ViewMetadata view : views.values()) {
+        
+            view.clearRef();
+            
+        }
+        
+        views.clear();
+        
+    }
+    
     /**
      * Random lookup of the {@link ViewMetadata}.
      * 
@@ -233,12 +248,12 @@ public class OverflowMetadata {
     
     /**
      * Return the #of index partitions for which the specified action was
-     * choosen.
+     * chosen.
      * 
      * @param action
      *            The action.
      *            
-     * @return The #of index partitions where that action was choosen.
+     * @return The #of index partitions where that action was chosen.
      */
     public int getActionCount(final OverflowActionEnum action) {
 
@@ -377,7 +392,7 @@ public class OverflowMetadata {
 
                 }
 
-                // sort into ascending order (inceasing activity).
+                // sort into ascending order (increasing activity).
                 Arrays.sort(scores);
 
                 for (i = 0; i < scores.length; i++) {
@@ -390,7 +405,7 @@ public class OverflowMetadata {
 
                 }
 
-                if (DEBUG) {
+                if (log.isDebugEnabled()) {
 
                     log.debug("The most active index was: "
                             + scores[scores.length - 1]);
@@ -463,14 +478,14 @@ public class OverflowMetadata {
              * operations.
              */
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Index is cold: " + name);
 
             return null;
 
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("Index score: " + score);
 
         return score;

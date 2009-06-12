@@ -19,7 +19,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
  * handle an index partition during asynchronous overflow.
  * <p>
  * Note: This class uses {@link SoftReference}s to hold onto the mutable
- * {@link BTree}. The {@link SoftReference} was choosen because it is important
+ * {@link BTree}. The {@link SoftReference} was chosen because it is important
  * to keep these {@link BTree}s open so that we do not loose their buffers
  * until we have finish asynchronous overflow for a given {@link BTree}. Once
  * asynchronous overflow processing is complete for the {@link BTree} you SHOULD
@@ -31,10 +31,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 class BTreeMetadata {
 
     static protected final Logger log = Logger.getLogger(BTreeMetadata.class);
-    
-    static protected final boolean INFO = log.isInfoEnabled();
-    
-    static protected final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * The object which may be used to (re-)open the {@link BTree} and the index
@@ -131,7 +127,7 @@ class BTreeMetadata {
 
     /**
      * <code>true</code> iff this index partition meets the criteria for a
-     * manditory compacting merge (too many journals in the view, too many
+     * mandatory compacting merge (too many journals in the view, too many
      * index segments in the view, or too many sources in the view).
      */
     public final boolean manditoryMerge;
