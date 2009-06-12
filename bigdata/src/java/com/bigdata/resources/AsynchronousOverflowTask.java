@@ -2578,9 +2578,20 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                     + resourceManager.asynchronousOverflowCounter.get() + "\n"
                     + resourceManager.listIndexPartitions(ITx.UNISOLATED));
 
-            // purge resources that are no longer required.
-            resourceManager.getFederation().getExecutorService().submit(
-                    new PurgeResourcesAfterActionTask(resourceManager));
+            /*
+             * Note: I have moved the purge of old resources back into the
+             * synchronous overflow logic. When the data service is heavily
+             * loaded by write activity, it takes a while to obtain the
+             * exclusive lock on the write service which we need to be able to
+             * purge old resources and this can actually impact throughput.
+             * However, we already have that lock when we are doing a
+             * synchronous overflow so it makes to purge resources while we are
+             * holding the lock.
+             */
+            
+//            // purge resources that are no longer required.
+//            resourceManager.getFederation().getExecutorService().submit(
+//                    new PurgeResourcesAfterActionTask(resourceManager));
             
             return null;
             
@@ -2633,75 +2644,75 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
     }
 
-    /**
-     * Helper task used to purge resources <strong>after</strong> asynchronous
-     * overflow is complete.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    static protected class PurgeResourcesAfterActionTask implements Callable<Void> {
-
-        private final OverflowManager overflowManager;
-        
-        public PurgeResourcesAfterActionTask(final OverflowManager overflowManager) {
-            
-            this.overflowManager = overflowManager;
-            
-        }
-        
-        /**
-         * Sleeps for a few seconds to give asynchronous overflow processing a
-         * chance to quit and release its hard reference on the old journal and
-         * then invokes {@link OverflowManager#purgeOldResources(long, boolean)}.
-         */
-        public Void call() throws Exception {
-            
-            // wait for the asynchronous overflow task to finish.
-            Thread.sleep(2000);
-
-            try {
-
-                final long timeout = overflowManager.getPurgeResourcesTimeout();
-
-                /*
-                 * Try to get the exclusive write service lock and then purge
-                 * resources.
-                 */
-                if (!overflowManager
-                        .purgeOldResources(timeout, false/* truncateJournal */)) {
-
-                    /*
-                     * This can become a serious problem if it persists since
-                     * the disk will fill up with old journals and index
-                     * segments.
-                     * 
-                     * @todo (progressively?) double the timeout if we are
-                     * nearing disk exhaustion
-                     */
-
-                    log.error("Purge resources did not run: service="
-                            + overflowManager.getFederation().getServiceName()
-                            + ", timeout=" + timeout);
-
-                }
-                
-            } catch (InterruptedException ex) {
-
-                // Ignore.
-
-            } catch (Throwable t) {
-
-                // log and ignore.
-                log.error("Problem purging old resources?", t);
-
-            }
-
-            return null;
-
-        }
-
-    }
+//    /**
+//     * Helper task used to purge resources <strong>after</strong> asynchronous
+//     * overflow is complete.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    static protected class PurgeResourcesAfterActionTask implements Callable<Void> {
+//
+//        private final OverflowManager overflowManager;
+//        
+//        public PurgeResourcesAfterActionTask(final OverflowManager overflowManager) {
+//            
+//            this.overflowManager = overflowManager;
+//            
+//        }
+//        
+//        /**
+//         * Sleeps for a few seconds to give asynchronous overflow processing a
+//         * chance to quit and release its hard reference on the old journal and
+//         * then invokes {@link OverflowManager#purgeOldResources(long, boolean)}.
+//         */
+//        public Void call() throws Exception {
+//            
+//            // wait for the asynchronous overflow task to finish.
+//            Thread.sleep(2000);
+//
+//            try {
+//
+//                final long timeout = overflowManager.getPurgeResourcesTimeout();
+//
+//                /*
+//                 * Try to get the exclusive write service lock and then purge
+//                 * resources.
+//                 */
+//                if (!overflowManager
+//                        .purgeOldResources(timeout, false/* truncateJournal */)) {
+//
+//                    /*
+//                     * This can become a serious problem if it persists since
+//                     * the disk will fill up with old journals and index
+//                     * segments.
+//                     * 
+//                     * @todo (progressively?) double the timeout if we are
+//                     * nearing disk exhaustion
+//                     */
+//
+//                    log.error("Purge resources did not run: service="
+//                            + overflowManager.getFederation().getServiceName()
+//                            + ", timeout=" + timeout);
+//
+//                }
+//                
+//            } catch (InterruptedException ex) {
+//
+//                // Ignore.
+//
+//            } catch (Throwable t) {
+//
+//                // log and ignore.
+//                log.error("Problem purging old resources?", t);
+//
+//            }
+//
+//            return null;
+//
+//        }
+//
+//    }
 
     /**
      * Submit all tasks, awaiting their completion and check their futures for

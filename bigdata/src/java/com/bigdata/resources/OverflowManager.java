@@ -329,22 +329,22 @@ abstract public class OverflowManager extends IndexManager {
      */
     protected final boolean overflowCancelledWhenJournalFull;
 
-    /**
-     * @see Options#PURGE_RESOURCES_TIMEOUT
-     */
-    private final long purgeResourcesTimeout;
+//    /**
+//     * @see Options#PURGE_RESOURCES_TIMEOUT
+//     */
+//    private final long purgeResourcesTimeout;
 
-    /**
-     * The timeout in milliseconds that we will await an exclusive write lock on
-     * the {@link WriteExecutorService} in order to purge unused resources.
-     * 
-     * @see Options#PURGE_RESOURCES_TIMEOUT
-     */
-    public long getPurgeResourcesTimeout() {
-        
-        return purgeResourcesTimeout;
-        
-    }
+//    /**
+//     * The timeout in milliseconds that we will await an exclusive write lock on
+//     * the {@link WriteExecutorService} in order to purge unused resources.
+//     * 
+//     * @see Options#PURGE_RESOURCES_TIMEOUT
+//     */
+//    public long getPurgeResourcesTimeout() {
+//        
+//        return purgeResourcesTimeout;
+//        
+//    }
     
     /**
      * #of synchronous overflows that have taken place. This counter is
@@ -1077,18 +1077,18 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-        // purgeResourcesTimeout
-        {
-            
-            purgeResourcesTimeout = Long
-                    .parseLong(properties.getProperty(
-                            Options.PURGE_RESOURCES_TIMEOUT,
-                            Options.DEFAULT_PURGE_RESOURCES_TIMEOUT));
-
-            if(log.isInfoEnabled())
-                log.info(Options.PURGE_RESOURCES_TIMEOUT + "=" + purgeResourcesTimeout);
-            
-        }
+//        // purgeResourcesTimeout
+//        {
+//            
+//            purgeResourcesTimeout = Long
+//                    .parseLong(properties.getProperty(
+//                            Options.PURGE_RESOURCES_TIMEOUT,
+//                            Options.DEFAULT_PURGE_RESOURCES_TIMEOUT));
+//
+//            if(log.isInfoEnabled())
+//                log.info(Options.PURGE_RESOURCES_TIMEOUT + "=" + purgeResourcesTimeout);
+//            
+//        }
 
         // copyIndexThreshold
         {
@@ -1825,7 +1825,7 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * Synchronous overflow processing.
      * <p>
-     * This is invoked once all pre-conditions have been satisfied.
+     * This is invoked once all preconditions have been satisfied.
      * <p>
      * Index partitions that have fewer than some threshold #of index entries
      * will be copied onto the new journal. Otherwise the view of the index will
@@ -2109,6 +2109,37 @@ abstract public class OverflowManager extends IndexManager {
                     + "\n"
                     + listIndexPartitions(TimestampUtility
                             .asHistoricalRead(firstCommitTime)));
+
+      try {
+
+            /*
+             * When there is sustained heavy write activity on the data service
+             * it can take a while to obtain the exclusive write lock, which can
+             * negatively impact throughput as write tasks are blocked until
+             * that lock is obtained.
+             * 
+             * While asynchronous overflow handling updates the index partition
+             * views and is the means by which older views become release free,
+             * we release the old resource here rather than as an after action
+             * for asynchronous overflow in order to avoid the throughput hit.
+             * As a consequence, the data service tends to retain slightly more
+             * persistent state than it would otherwise need.
+             */
+
+          purgeOldResources();
+
+        } catch (Throwable t) {
+
+            /*
+             * Note: An error releasing old resources can become a serious
+             * problem if it persists since the disk will fill up with old
+             * journals and index segments.
+             */
+            
+            log.error("Problem purging old resources? service="
+                    + getFederation().getServiceName(), t);
+
+        }
 
         return overflowMetadata;
 
