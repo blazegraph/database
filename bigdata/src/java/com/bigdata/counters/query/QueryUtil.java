@@ -353,16 +353,7 @@ public class QueryUtil {
 
             is = new BufferedInputStream(new FileInputStream(file));
 
-            /*
-             * Retain up to N days worth of samples, with one sample per
-             * minute.
-             */
             counterSet.readXML(is, instrumentFactory, filter);
-
-//            counterSet
-//                    .readXML(is,
-//                            DefaultInstrumentFactory.OVERWRITE_60M,
-//                            null/* filter */);
 
             if(log.isInfoEnabled()) {
              
@@ -481,6 +472,13 @@ public class QueryUtil {
             
         }
 
+        public String toString() {
+
+            return getClass() + "{ file=" + file + ", nsamples=" + nsamples
+                    + ", period=" + period + ", regex=" + regex + "}";
+            
+        }
+        
     }
     
     /**

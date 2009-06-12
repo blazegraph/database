@@ -1108,142 +1108,127 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
         
     }
-    
+
     /**
      * Return interesting information about the write cache and file operations.
-     * 
-     * @todo clean up the counter set reporting. it is a bit messed up since I
-     *       added
-     *       {@link #setStoreCounters(com.bigdata.journal.DiskOnlyStrategy.StoreCounters)}
-     *       in order to use a single {@link StoreCounters} instance for all
-     *       journals managed by a given data service.
-     * 
-     * @todo The outer counters for the read and write cache on the store
-     *       manager might not update after the 1st overflow as they are
-     *       generated once and not replaced when StoreCounters are replaced. On
-     *       the other hand, those counters are linked to the specific
-     *       DiskOnlyStrategy instance.
-     * 
-     * @todo nextOffset does update and reset when there is a new journal, which
-     *       is interesting.
      */
-//    synchronized 
     public CounterSet getCounters() {
-        
-//        if (root == null) {
-            
-        CounterSet root = new CounterSet();
-            
-            root.addCounter("nextOffset", new Instrument<Long>() {
-                public void sample() {
-                    setValue(nextOffset);
-                }
-            });
 
-            root.addCounter("extent", new Instrument<Long>() {
-                public void sample() {
-                    setValue(extent);
-                }
-            });
+        final CounterSet root = new CounterSet();
 
-            root.attach(storeCounters.getCounters());
-            
-            /*
-             * other.
-             */
-            {
-                final CounterSet writeCache = root.makePath("writeCache");
-
-                {
-                 
-                    final WriteCache tmp = DiskOnlyStrategy.this.writeCache;
-
-                    // add counter for the write cache capacity.
-                    writeCache.addCounter("capacity",
-                            new OneShotInstrument<Long>(tmp == null ? 0L : tmp
-                                    .capacity()));
-                    
-                }
-                
+        root.addCounter("nextOffset", new Instrument<Long>() {
+            public void sample() {
+                setValue(nextOffset);
             }
-            
-            /*
-             * read cache.
-             */
+        });
+
+        root.addCounter("extent", new Instrument<Long>() {
+            public void sample() {
+                setValue(extent);
+            }
+        });
+
+        root.attach(storeCounters.getCounters());
+
+        /*
+         * other.
+         */
+        {
+            final CounterSet writeCache = root.makePath("writeCache");
+
             {
 
-                final CounterSet readCache = root.makePath("readCache");
+                final WriteCache tmp = DiskOnlyStrategy.this.writeCache;
 
-                {
-                    
+                // add counter for the write cache capacity.
+                writeCache.addCounter("capacity", new OneShotInstrument<Long>(
+                        tmp == null ? 0L : tmp.capacity()));
+
+            }
+
+        }
+
+        /*
+         * read cache.
+         */
+        {
+
+            final CounterSet readCache = root.makePath("readCache");
+
+            {
+
+                final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+
+                readCache.addCounter("capacity", new OneShotInstrument<Long>(
+                        (long) (tmp == null ? 0 : tmp.capacity())));
+
+            }
+
+            readCache.addCounter("testCount", new Instrument<Long>() {
+
+                @Override
+                protected void sample() {
+
                     final LRUCache tmp = DiskOnlyStrategy.this.readCache;
 
-                    readCache.addCounter("capacity",
-                            new OneShotInstrument<Long>((long) (tmp == null ? 0
-                                    : tmp.capacity())));
-                    
+                    if (tmp == null)
+                        return;
+
+                    setValue(tmp.getTestCount());
+
                 }
-                
-                readCache.addCounter("testCount",new Instrument<Long>(){
+            });
 
-                    @Override
-                    protected void sample() {
+            readCache.addCounter("successCount", new Instrument<Long>() {
 
-                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-                        
-                        if(tmp==null) return;
-                        
-                        setValue(tmp.getTestCount());
+                @Override
+                protected void sample() {
 
-                    }});
-                
-                readCache.addCounter("successCount",new Instrument<Long>(){
+                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
 
-                    @Override
-                    protected void sample() {
+                    if (tmp == null)
+                        return;
 
-                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-                        
-                        if(tmp==null) return;
-                        
-                        setValue(tmp.getSuccessCount());
+                    setValue(tmp.getSuccessCount());
 
-                    }});
-                
-                readCache.addCounter("insertCount",new Instrument<Long>(){
+                }
+            });
 
-                    @Override
-                    protected void sample() {
+            readCache.addCounter("insertCount", new Instrument<Long>() {
 
-                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-                        
-                        if(tmp==null) return;
-                        
-                        setValue(tmp.getInsertCount());
+                @Override
+                protected void sample() {
 
-                    }});
-                
-                readCache.addCounter("hitRatio",new Instrument<Double>(){
+                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
 
-                    @Override
-                    protected void sample() {
+                    if (tmp == null)
+                        return;
 
-                        final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-                        
-                        if(tmp==null) return;
-                        
-                        setValue(tmp.getHitRatio());
+                    setValue(tmp.getInsertCount());
 
-                    }});
-                
-            }
-            
-//        }
-        
+                }
+            });
+
+            readCache.addCounter("hitRatio", new Instrument<Double>() {
+
+                @Override
+                protected void sample() {
+
+                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+
+                    if (tmp == null)
+                        return;
+
+                    setValue(tmp.getHitRatio());
+
+                }
+            });
+
+        }
+
         return root;
-        
+
     }
-//    private CounterSet root;
     
     /**
      * 

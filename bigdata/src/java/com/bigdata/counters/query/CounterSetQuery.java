@@ -310,13 +310,34 @@ public class CounterSetQuery {
             service.shutdownNow();
             
         }
-        
+
+        int i = 0;
+        int nerrors = 0;
         for(Future<Void> future : futures) {
             
             // look for errors in the tasks.
-            future.get();
+            try {
+                future.get();
+            } catch(ExecutionException ex) {
+                if(ex.getCause() instanceof SAXException) {
+                    /*
+                     * Sometimes you can get a partial XML file if the LBS was
+                     * in the process of generating the file when it was copied.
+                     * This shows up as a SAXException.  Rather than dying, this
+                     * just logs a warning and continues.
+                     */
+                    log.warn("Could not parse file (ignored): " + tasks.get(i), ex);
+                    nerrors++;
+                    continue;
+                }
+            }
+            
+            i++;
             
         }
+        
+        if (nerrors != 0)
+            log.error("There were " + nerrors + " errors.");
 
     }
 

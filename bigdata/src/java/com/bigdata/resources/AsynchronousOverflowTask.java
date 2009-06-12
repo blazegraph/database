@@ -65,6 +65,7 @@ import com.bigdata.service.MetadataService;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.sun.org.apache.bcel.internal.generic.GETSTATIC;
 
 /**
  * Examine the named indices defined on the journal identified by the
@@ -168,7 +169,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * Note: The {@link TreeMap} imposes an alpha order which is useful when
      * debugging.
      * 
-     * @todo This is mostly redundent with
+     * @todo This is mostly redundant with
      *       {@link OverflowMetadata#getAction(String)}.
      *       <p>
      *       There are some additional semantics here in terms of how we treat
@@ -182,7 +183,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
     /**
      * Return <code>true</code> if the named index partition has already been
-     * "used" by assigning it to partitipate in some build, split, join, or move
+     * "used" by assigning it to participate in some build, split, join, or move
      * operation.
      * 
      * @param name
@@ -199,7 +200,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
     
     /**
      * This method is invoked each time an index partition is "used" by
-     * assigning it to partitipate in some build, split, join, or move
+     * assigning it to participate in some build, split, join, or move
      * operation.
      * 
      * @param name
@@ -2556,7 +2557,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             
             /*
              * Note: At this point we have the history as of the lastCommitTime
-             * entirely contained in index segments. Also, since we constained
+             * entirely contained in index segments. Also, since we constrained
              * the resource manager to refuse another overflow until we have
              * handle the old journal, all new writes are on the live index.
              */
@@ -2622,7 +2623,11 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
             }
 
-            resourceManager.asynchronousOverflowMillis.addAndGet(e.getElapsed());
+            resourceManager.asynchronousOverflowMillis
+                    .addAndGet(e.getElapsed());
+
+            // clear references to the views so that they may GC'd more readily.
+            overflowMetadata.clearViews();
             
         }
 
@@ -2639,7 +2644,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
         private final OverflowManager overflowManager;
         
-        public PurgeResourcesAfterActionTask(OverflowManager overflowManager) {
+        public PurgeResourcesAfterActionTask(final OverflowManager overflowManager) {
             
             this.overflowManager = overflowManager;
             
@@ -2648,22 +2653,39 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         /**
          * Sleeps for a few seconds to give asynchronous overflow processing a
          * chance to quit and release its hard reference on the old journal and
-         * then invokes {@link OverflowManager#purgeOldResources()}.
+         * then invokes {@link OverflowManager#purgeOldResources(long, boolean)}.
          */
         public Void call() throws Exception {
-
-            // wait for the async overflow task to finish.
+            
+            // wait for the asynchronous overflow task to finish.
             Thread.sleep(2000);
 
             try {
+
+                final long timeout = overflowManager.getPurgeResourcesTimeout();
 
                 /*
                  * Try to get the exclusive write service lock and then purge
                  * resources.
                  */
-                overflowManager
-                        .purgeOldResources(3000/* timeout */, false/* truncateJournal */);
+                if (!overflowManager
+                        .purgeOldResources(timeout, false/* truncateJournal */)) {
 
+                    /*
+                     * This can become a serious problem if it persists since
+                     * the disk will fill up with old journals and index
+                     * segments.
+                     * 
+                     * @todo (progressively?) double the timeout if we are
+                     * nearing disk exhaustion
+                     */
+
+                    log.error("Purge resources did not run: service="
+                            + overflowManager.getFederation().getServiceName()
+                            + ", timeout=" + timeout);
+
+                }
+                
             } catch (InterruptedException ex) {
 
                 // Ignore.
