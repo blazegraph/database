@@ -208,7 +208,7 @@ public class SplitIndexPartitionTask extends
 
                 } catch (Throwable t) {
 
-                    if (PostProcessOldJournalTask.isNormalShutdown(
+                    if (AsynchronousOverflowTask.isNormalShutdown(
                             resourceManager, t)) {
 
                         /*

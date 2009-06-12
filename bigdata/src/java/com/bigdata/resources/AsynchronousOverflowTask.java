@@ -78,7 +78,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * <li>Join N index partitions into a single index partition (underflow).</li>
  * <li>Move an index partition to another data service (redistribution). The
  * decision here is made on the basis of (a) underutilized nodes elsewhere; and
- * (b) overutilization of this node.</li>
+ * (b) over utilization of this node.</li>
  * <li>Nothing. This option is selected when (a) synchronous overflow
  * processing choose to copy the index entries from the old journal onto the new
  * journal (this is cheaper when the index has not absorbed many writes); and
@@ -136,12 +136,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo rename as AsynchronousOverflowTask
  */
-public class PostProcessOldJournalTask implements Callable<Object> {
+public class AsynchronousOverflowTask implements Callable<Object> {
 
-    protected static final Logger log = Logger.getLogger(PostProcessOldJournalTask.class);
+    protected static final Logger log = Logger.getLogger(AsynchronousOverflowTask.class);
 
     /**
      * 
@@ -335,7 +333,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
      * @param resourceManager
      * @param overflowMetadata
      */
-    public PostProcessOldJournalTask(final ResourceManager resourceManager,
+    public AsynchronousOverflowTask(final ResourceManager resourceManager,
             final OverflowMetadata overflowMetadata) {
 
         if (resourceManager == null)
@@ -2594,7 +2592,7 @@ public class PostProcessOldJournalTask implements Callable<Object> {
              * otherwise they will not be noticed.
              * 
              * At the same time, the resource manager can be shutdown at any
-             * time. Asynchrous shutdown will provoke an exception here, but
+             * time. Asynchronous shutdown will provoke an exception here, but
              * those exceptions do not indicate a problem.
              */
             
@@ -2623,6 +2621,8 @@ public class PostProcessOldJournalTask implements Callable<Object> {
                 throw new AssertionError();
 
             }
+
+            resourceManager.asynchronousOverflowMillis.addAndGet(e.getElapsed());
             
         }
 

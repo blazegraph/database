@@ -71,7 +71,7 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 /**
  * Class encapsulates logic for handling journal overflow events. Overflow is
  * triggered automatically when the user data extent on the journal nears a
- * configured threshold. Once the pre-conditions for overflow are satisified,
+ * configured threshold. Once the preconditions for overflow are satisfied,
  * the {@link WriteExecutorService}s for the journal are paused and all running
  * tasks on those services are allowed to complete and commit. Once no writers
  * are running, the {@link WriteExecutorService} triggers synchronous overflow.
@@ -81,9 +81,9 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * initiates a background thread performing asynchronous overflow
  * post-processing.
  * <p>
- * Asynchronous overflow post-processing is reponsible for identifying index
+ * Asynchronous overflow post-processing is responsible for identifying index
  * partitions overflow (resulting in a split into two or more index partitions),
- * index partition underflow (resulting in the join of the undercapacity index
+ * index partition underflow (resulting in the join of the under-capacity index
  * partition with its rightSibling), index partition moves (the index partition
  * is moved to a different {@link DataService}), and index partition builds (an
  * {@link IndexSegment} is created from the current view in what is effectively
@@ -188,7 +188,7 @@ abstract public class OverflowManager extends IndexManager {
 
     /**
      * The service that runs the asynchronous overflow
-     * {@link PostProcessOldJournalTask}.
+     * {@link AsynchronousOverflowTask}.
      */
     private final ExecutorService overflowService;
 
@@ -211,7 +211,7 @@ abstract public class OverflowManager extends IndexManager {
      * A flag used to disable overflow of the live journal until asynchronous
      * post-processing of the old journal has been completed.
      * 
-     * @see PostProcessOldJournalTask
+     * @see AsynchronousOverflowTask
      */
     protected final AtomicBoolean overflowAllowed = new AtomicBoolean(true);
     
@@ -228,12 +228,22 @@ abstract public class OverflowManager extends IndexManager {
     protected final AtomicLong synchronousOverflowCounter = new AtomicLong(0L);
 
     /**
+     * The elapsed milliseconds for synchronous overflow processing to date.  
+     */
+    protected final AtomicLong synchronousOverflowMillis = new AtomicLong(0L);
+    
+    /**
      * #of asynchronous overflows that have taken place. This counter is
      * incremented each time the entire overflow operation is complete,
      * including any asynchronous post-processing of the old journal.
      */
     protected final AtomicLong asynchronousOverflowCounter = new AtomicLong(0L);
 
+    /**
+     * The elapsed milliseconds for asynchronous overflow processing to date.  
+     */
+    protected final AtomicLong asynchronousOverflowMillis = new AtomicLong(0L);
+    
     /**
      * A flag that may be set to force the next overflow to perform a compacting
      * merge for all indices that are not simply copied over to the new journal.
@@ -248,7 +258,7 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * The #of asynchronous overflow operations which fail.
      * 
-     * @see PostProcessOldJournalTask
+     * @see AsynchronousOverflowTask
      */
     protected final AtomicLong asyncOverflowFailedCounter = new AtomicLong(0L);
 
@@ -260,7 +270,7 @@ abstract public class OverflowManager extends IndexManager {
 
     /**
      * The #of asynchronous overflow tasks (index partition splits, joins, or
-     * moves) that were cancelled due to timeout.
+     * moves) that were canceled due to timeout.
      * 
      * @see Options#OVERFLOW_TIMEOUT
      */
@@ -344,7 +354,7 @@ abstract public class OverflowManager extends IndexManager {
      * <code>true</code> if overflow processing is enabled and
      * <code>false</code> if overflow processing was disabled as a
      * configuration option or if a maximum overflow count was configured and
-     * has been satisified, in which case the live journal will NOT overflow.
+     * has been satisfied, in which case the live journal will NOT overflow.
      * 
      * @see Options#OVERFLOW_ENABLED
      * @see Options#OVERFLOW_MAX_COUNT
@@ -858,6 +868,16 @@ abstract public class OverflowManager extends IndexManager {
          * is complete.
          */
         String SynchronousOverflowCount = "Synchronous Overflow Count";
+
+        /**
+         * The elapsed time for synchronous overflow processing to date.
+         */
+        String SynchronousOverflowMillis = "Synchronous Overflow Millis";
+
+        /**
+         * The elapsed time for asynchronous overflow processing to date.
+         */
+        String AsynchronousOverflowMillis = "Asynchronous Overflow Millis";
 
         /**
          * The #of asynchronous overflow events that have taken place. This
@@ -1638,13 +1658,13 @@ abstract public class OverflowManager extends IndexManager {
     /**
      * Core method for overflow with post-processing.
      * <p>
-     * Note: This method does not test pre-conditions based on the extent of the
+     * Note: This method does not test preconditions based on the extent of the
      * journal.
      * <p>
      * Note: The caller is responsible for ensuring that this method is invoked
      * with an exclusive lock on the write service.
      * <p>
-     * Pre-conditions:
+     * Preconditions:
      * <ol>
      * <li>Exclusive lock on the {@link WriteExecutorService}</li>
      * <li>{@link #isOverflowAllowed()}</li>
@@ -1721,7 +1741,7 @@ abstract public class OverflowManager extends IndexManager {
                      */
 
                     return overflowService
-                            .submit(new PostProcessOldJournalTask(
+                            .submit(new AsynchronousOverflowTask(
                                     (ResourceManager) this, overflowMetadata));
 
                 }
@@ -1756,6 +1776,8 @@ abstract public class OverflowManager extends IndexManager {
         } finally {
 
             e.end();
+            
+            synchronousOverflowMillis.addAndGet(e.getElapsed());
 
         }
 
@@ -1775,7 +1797,7 @@ abstract public class OverflowManager extends IndexManager {
      * local file system that are no longer required as determined by
      * {@link #setReleaseTime(long)} and {@link #getEffectiveReleaseTime()}.
      * <p>
-     * Note: This method does NOT start a {@link PostProcessOldJournalTask}.
+     * Note: This method does NOT start a {@link AsynchronousOverflowTask}.
      * <P>
      * Note: You MUST have an exclusive lock on the {@link WriteExecutorService}
      * before you invoke this method!

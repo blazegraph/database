@@ -122,6 +122,8 @@ http://localhost:8080/?depth=10&regex=/([^/]*)/.*Overflow%20Manager/Asynchronous
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Data%20Volume%20Bytes%20Available&depth=12&period=Minutes&correlated=true&file=service/ds/DataVolumeBytesAvailable
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Temp%20Volume%20Bytes%20Available&depth=12&period=Minutes&correlated=true&file=service/ds/TempVolumeBytesAvailable
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Store%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/StoreCacheSize
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Maximum%20Journal%20Size%20At%20Overflow&depth=12&period=Minutes&correlated=true&file=service/ds/MaximumJournalSizeAtOverflow
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Managed%20Journal%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/ManagedJournalCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Managed%20Segment%20Store%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/ManagedSegmentStoreCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Bytes%20Under%20Management&period=Minutes&depth=10&correlated=true&file=service/ds/BytesUnderManagement
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexCount

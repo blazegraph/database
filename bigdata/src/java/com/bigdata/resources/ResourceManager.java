@@ -227,6 +227,20 @@ abstract public class ResourceManager extends OverflowManager implements
                             }
                         });
 
+                tmp.addCounter(IOverflowManagerCounters.SynchronousOverflowMillis,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(synchronousOverflowMillis.get());
+                            }
+                        });
+                
+                tmp.addCounter(IOverflowManagerCounters.AsynchronousOverflowMillis,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(asynchronousOverflowMillis.get());
+                            }
+                        });
+                
                 tmp.addCounter(IOverflowManagerCounters.AsynchronousOverflowCount,
                         new Instrument<Long>() {
                             public void sample() {
@@ -618,6 +632,13 @@ abstract public class ResourceManager extends OverflowManager implements
                         new Instrument<Long>() {
                             public void sample() {
                                 setValue(maximumJournalSizeAtOverflow);
+                            }
+                        });
+
+                tmp.addCounter(IStoreManagerCounters.PurgeResourcesMillis,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(purgeResourcesMillis);
                             }
                         });
 

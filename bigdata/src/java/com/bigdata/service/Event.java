@@ -199,7 +199,7 @@ public class Event implements Serializable {
     }
 
     /**
-     * The event start time. Assigned locally. The ecipient may use [endTime -
+     * The event start time. Assigned locally. The recipient may use [endTime -
      * startTime] to adjust the event to its local clock.
      */
     protected long startTime;
@@ -242,6 +242,18 @@ public class Event implements Serializable {
 
     }
 
+    /**
+     * The elapsed time for the event.
+     */
+    public long getElapsed() {
+        
+        if (endTime == 0)
+            return System.currentTimeMillis() - startTime;
+        else
+            return endTime - startTime;
+        
+    }
+    
     public Event(final IBigdataFederation fed, final EventResource resource,
             final Object majorEventType) {
         
@@ -287,7 +299,7 @@ public class Event implements Serializable {
      *            Optional details for the event.
      * 
      * @todo consider passing along the {@link UUID} of the parent event but
-     *       then must correlate that {@link UUID} when the event is recieved.
+     *       then must correlate that {@link UUID} when the event is received.
      */
     protected Event(final IBigdataFederation fed, final EventResource resource,
             final Object majorEventType, final Object minorEventType,
@@ -402,7 +414,7 @@ public class Event implements Serializable {
      * <p>
      * Note: If you want to report an event with a duration then you MUST use
      * {@link #start()} when the event starts and {@link #end()} when the event
-     * ends. If you want to report an "instantenous" event then you can just use
+     * ends. If you want to report an "instantaneous" event then you can just use
      * {@link #end()}.
      */
     synchronized public Event start() {
@@ -430,7 +442,7 @@ public class Event implements Serializable {
     /**
      * Sends the end event.
      * <p>
-     * Note: You can use this method for "instantenous" events.
+     * Note: You can use this method for "instantaneous" events.
      * 
      * @return The event.
      */
