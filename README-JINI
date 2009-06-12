@@ -107,4 +107,54 @@ JINI
   owing to the semantics of RPC (call and wait for response) and the definition
   of JERI.
 
-  
+- Clients downloadable code that will be run on the bigdata services MUST set:
+	
+	-Djava.rmi.server.codebase=http://.../
+	
+	where "..." is your host and path
+	
+	in order for the correct codebase property to be communicated to clients that
+	will then download code from that HTTP server.  Note: the trailing '/' is
+	REQUIRED in your codebase or the generated URLs will NOT resolve correctly.
+
+	There is an example of how to do this with the "ant lubm-install" target and
+	the "lubmMaster.sh" script.
+
+- Debugging with jini.
+	
+	See http://java.sun.com/j2se/1.4.2/docs/guide/rmi/javarmiproperties.html for
+	some guidance.  Among other things, it suggests:
+	
+		-Djava.rmi.server.logCalls=true
+		
+	as an aid to debugging.  Also try setting
+		
+		-Dcom.sun.jini.reggie.proxy.debug=1
+		
+	for the client, e.g., the service browser. Also see:
+	
+		http://www.adtmag.com/java/articleold.aspx?id=1159
+		
+	for some (very good) guidance in debugging jini services.
+
+	Note: You may have to restart jini locally in order to force download of 
+	updated classes from the codebase!
+
+	See http://archives.java.sun.com/cgi-bin/wa?A2=ind0512&L=jini-users&P=R391&I=-3
+	for instructions on setting up an "download jar" (dljar) ANT task that can make
+	life much simpler (one supposes).
+
+    See http://archives.java.sun.com/cgi-bin/wa?A2=ind0311&L=jini-users&F=&S=&P=7182
+        for a description of policy files and
+        http://www.dancres.org/cottage/jini-start-examples-2_1.zip for the
+        policy files described.
+	
+	See http://jan.newmarch.name/java/jini/tutorial/Ant.xml for a description of
+	one (simple) approach to using ant for jini projects (it does not use the
+	dljar ant task but explicitly enumerates what goes where).
+	
+	See http://jan.newmarch.name/java/jini/tutorial/TroubleShooting.xml#RMI%20Stubs
+	for common errors when using RMI stubs.
+	
+	See https://java.sun.com/products/jini/2.1/doc/api/com/sun/jini/example/browser/package-summary.html
+	for the dirty on the jini Service Browser.
