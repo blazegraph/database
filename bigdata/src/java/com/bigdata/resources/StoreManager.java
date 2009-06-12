@@ -433,10 +433,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * instances used by the data service over time. The performance counters
      * are not themselves persistent and do not survive a restart of the
      * {@link StoreManager}.
-     * 
-     * FIXME This is hard-wired for the {@link DiskOnlyStrategy} and needs to be
-     * generalized so that it works with any {@link IBufferStrategy}
-     * implementation.
      */
     private final StoreCounters storeCounters = new StoreCounters();
 
@@ -449,10 +445,6 @@ abstract public class StoreManager extends ResourceEvents implements
      * instances used by the data service over time. The performance counters
      * are not themselves persistent and do not survive a restart of the
      * {@link StoreManager}.
-     * 
-     * FIXME This is hard-wired for the {@link DiskOnlyStrategy} and needs to be
-     * generalized so that it works with any {@link IBufferStrategy}
-     * implementation.
      */
     public final StoreCounters getStoreCounters() {
         
