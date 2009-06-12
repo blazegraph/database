@@ -45,7 +45,7 @@ public class PurgeResult implements Serializable, Params {
     final public long indexRetentionTime;
 
     /**
-     * The choosen release time.
+     * The chosen release time.
      */
     final public long choosenReleaseTime;
     
@@ -156,22 +156,22 @@ public class PurgeResult implements Serializable, Params {
         
         sb.append(getClass().getSimpleName());
         
-        sb.append("{firstCommitTime" + firstCommitTime);
-        sb.append(",lastCommitTime" + lastCommitTime);
-        sb.append(",givenReleaseTime" + givenReleaseTime);
-        sb.append(",indexRetentionTime" + indexRetentionTime);
-        sb.append(",choosenReleaseTime" + choosenReleaseTime);
-        sb.append(",commitTimeToPreserve" + commitTimeToPreserve);
-        sb.append(",resourcesInUseCount" + resourcesInUseCount);
-        sb.append(",journalBeforeCount" + journalBeforeCount);
-        sb.append(",journalAfterCount" + journalAfterCount);
-        sb.append(",segmentBeforeCount" + segmentBeforeCount);
-        sb.append(",segmentAfterCount" + segmentAfterCount);
-        sb.append(",bytesBeforeCount" + bytesBeforeCount);
-        sb.append(",bytesAfterCount" + bytesAfterCount);
-        sb.append(",elapsedScanCommitIndicesTime" + elapsedScanCommitIndicesTime);
-        sb.append(",elapsedDeleteResourcesTime" + elapsedDeleteResourcesTime);
-        sb.append(",elapsedPurgeResourcesTime" + elapsedPurgeResourcesTime);
+        sb.append("{firstCommitTime=" + firstCommitTime);
+        sb.append(",lastCommitTime=" + lastCommitTime);
+        sb.append(",givenReleaseTime=" + givenReleaseTime);
+        sb.append(",indexRetentionTime=" + indexRetentionTime);
+        sb.append(",choosenReleaseTime=" + choosenReleaseTime);
+        sb.append(",commitTimeToPreserve=" + commitTimeToPreserve);
+        sb.append(",resourcesInUseCount=" + resourcesInUseCount);
+        sb.append(",journalBeforeCount=" + journalBeforeCount);
+        sb.append(",journalAfterCount=" + journalAfterCount);
+        sb.append(",segmentBeforeCount=" + segmentBeforeCount);
+        sb.append(",segmentAfterCount=" + segmentAfterCount);
+        sb.append(",bytesBeforeCount=" + bytesBeforeCount);
+        sb.append(",bytesAfterCount=" + bytesAfterCount);
+        sb.append(",elapsedScanCommitIndicesTime=" + elapsedScanCommitIndicesTime);
+        sb.append(",elapsedDeleteResourcesTime=" + elapsedDeleteResourcesTime);
+        sb.append(",elapsedPurgeResourcesTime=" + elapsedPurgeResourcesTime);
         sb.append("}");
 
         return sb.toString();
