@@ -1955,26 +1955,7 @@ abstract public class OverflowManager extends IndexManager {
 
             // note the lastCommitTime on the old journal.
             lastOverflowTime = oldJournal.getRootBlockView().getLastCommitTime();
-            
-            /*
-             * Set the performance counters from the old store on the new store
-             * so that we have a cumulative track of all activity on the "live"
-             * journals.
-             * 
-             * Note: This is also done when we re-open a read-only journal.
-             * 
-             * FIXME Must also roll the counters forward for the other journal
-             * buffer strategies!
-             */
-            if (newJournal.getBufferStrategy() instanceof DiskOnlyStrategy
-                    && oldJournal.getBufferStrategy() instanceof DiskOnlyStrategy) {
-
-                ((DiskOnlyStrategy) newJournal.getBufferStrategy())
-                        .setStoreCounters((((DiskOnlyStrategy) oldJournal
-                                .getBufferStrategy()).getStoreCounters()));
-                
-            }
-            
+           
             if (log.isInfoEnabled())
                 log.info("New live journal: " + newJournal.getFile());
 

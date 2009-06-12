@@ -543,7 +543,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         public long nreads;
 
         /**
-         * #of read requests that are satisified by our write cache (vs the
+         * #of read requests that are satisfied by our write cache (vs the
          * OS or disk level write cache).
          */
         public long ncacheRead;

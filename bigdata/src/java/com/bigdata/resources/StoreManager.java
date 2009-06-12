@@ -66,7 +66,6 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
-import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.concurrent.NamedLock;
@@ -78,6 +77,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
@@ -89,6 +89,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.WriteExecutorService;
+import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IPartitionMetadata;
@@ -169,7 +170,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * Note: While files are stored per the scheme described above, the
          * entire {@link #DATA_DIR} will be scanned recursively to identify all
          * journal files and index segments during startup. Files will be used
-         * whereever they are found but the {@link IResourceMetadata#getFile()}
+         * where ever they are found but the {@link IResourceMetadata#getFile()}
          * read from a given resource MUST correspond to its relative location
          * within the {@link #DATA_DIR}.
          * <p>
@@ -423,6 +424,42 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     protected final File tmpDir;
 
+    /**
+     * The performance counters for the {@link IBufferStrategy} backing the live
+     * journal and any historical journals which are concurrently open with the
+     * live journal. A single instance of this object is used, and a hard
+     * reference to that instance is held here, so that we can track the
+     * cumulative performance counters across the live cycles of all journal
+     * instances used by the data service over time. The performance counters
+     * are not themselves persistent and do not survive a restart of the
+     * {@link StoreManager}.
+     * 
+     * FIXME This is hard-wired for the {@link DiskOnlyStrategy} and needs to be
+     * generalized so that it works with any {@link IBufferStrategy}
+     * implementation.
+     */
+    private final StoreCounters storeCounters = new StoreCounters();
+
+    /**
+     * The performance counters for the {@link IBufferStrategy} backing the live
+     * journal and any historical journals which are concurrently open with the
+     * live journal. A single instance of this object is used, and a hard
+     * reference to that instance is held here, so that we can track the
+     * cumulative performance counters across the live cycles of all journal
+     * instances used by the data service over time. The performance counters
+     * are not themselves persistent and do not survive a restart of the
+     * {@link StoreManager}.
+     * 
+     * FIXME This is hard-wired for the {@link DiskOnlyStrategy} and needs to be
+     * generalized so that it works with any {@link IBufferStrategy}
+     * implementation.
+     */
+    public final StoreCounters getStoreCounters() {
+        
+        return storeCounters;
+        
+    }
+    
     /**
      * A map over the journal histories. The map is transient and is
      * re-populated from a scan of the file system during startup.
@@ -1496,7 +1533,7 @@ abstract public class StoreManager extends ResourceEvents implements
                  * directory.
                  * 
                  * @todo this is not using the temp filename mechanism in a
-                 * manner that truely guarentees an atomic file create. The
+                 * manner that truly guarantees an atomic file create. The
                  * CREATE_TEMP_FILE option should probably be extended with a
                  * CREATE_DIR option that allows you to override the directory
                  * in which the journal is created. That will allow the atomic
@@ -2354,7 +2391,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class ManagedJournal extends AbstractJournal { // implements IValueAge {
+    public class ManagedJournal extends AbstractJournal {
 
         /**
          * Note: Each instance of the {@link ManagedJournal} reuses the SAME
@@ -2369,6 +2406,21 @@ abstract public class StoreManager extends ResourceEvents implements
 
             super(properties, writeCache);
 
+            /*
+             * Set the performance counters on the new store so that we have a
+             * cumulative track of all activity on both the "live" journals and
+             * the "historical" journals managed by this data service.
+             * 
+             * FIXME Must also roll the counters forward for the other journal
+             * buffer strategies!
+             */
+            if (getBufferStrategy() instanceof DiskOnlyStrategy) {
+
+                ((DiskOnlyStrategy) getBufferStrategy())
+                        .setStoreCounters(getStoreCounters());
+
+            }
+ 
         }
 
         public String toString() {
@@ -2842,28 +2894,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
                     // opened another journal.
                     journalReopenCount.incrementAndGet();
-
-                    /*
-                     * Make sure that the re-opened journal is using the same
-                     * performance counters instance as the live journal so that
-                     * we have a record of all activity on journals used by the
-                     * data service in a single location.
-                     * 
-                     * Note: This is also done at synchronous overflow.
-                     * 
-                     * FIXME We need to do this for other implementation classes
-                     * as well.
-                     */
-                    if (journal.getBufferStrategy() instanceof DiskOnlyStrategy
-                            && getLiveJournal().getBufferStrategy() instanceof DiskOnlyStrategy) {
-
-                        ((DiskOnlyStrategy) getLiveJournal()
-                                .getBufferStrategy())
-                                .setStoreCounters((((DiskOnlyStrategy) journal
-                                        .getBufferStrategy())
-                                        .getStoreCounters()));
-                        
-                    }
                     
                 } else {
 
