@@ -293,84 +293,34 @@
 </exec>
 </target>
 
-<!-- Note: To remove a bigdata installation, first change the run state to
-		 'destroy' and wait for all services to halt.  Then remove the shared
-		 NAS directory and the LAS directory on each host running the bigdata
-		 instance.
- 	     
- 	     @todo classServer setup : The following are somewhat dated notes on using jini with downloadable
-	     code.
-	
-	You need to copy downloadable code to an HTTP server so that the classes can
-	be resolved for activatable services, e.g.,
-	
-	assuming:
-	
-	codebase=http://proto.cognitiveweb.org/maven-repository/bigdata/jars/
+<!--
 
-	do:
+This is the cluster-based install.  You need to edit build.properties, decide
+which configuration is going to be the basis for your cluster, and then edit
+that configuration file.  When you are ready, you can use this target to install
+bigdata onto a cluster.
 
-	scp ant-deploy/* bryan@proto.cognitiveweb.org:/home/groups/c/cw/cweb/maven-repository/bigdata/jars
-	
-	then verfify that you can see the resources in a web browser at that codebase
-	URL (e.g., the files all have the right permissions on the server).  You MUST
-	then unarchive bigdata.jar into this directory so that the actual class files
-	themselves are available for download (only .class files are downloaded, NOT
-	JARs).
+In order to get things moving you need to setup a cron job that will run the
+'bigdata' script which is installed by this target.  Documentation on how to
+do this is written onto the console after a successfull install.  Those notes
+are in the "POST-INSTALL" file in the source distribution and are also copied
+into the $binDir when bigdata is installed.
 
-		cd /home/groups/c/cw/cweb/maven-repository/bigdata/jars
-			
-		/usr/java/j2sdk1.4.2_05/bin/jar xf bigdata.jar
-	
-	Finally, the code that will expose services with downloadable code MUST set
-	
-	-Djava.rmi.server.codebase=http://.../
-	
-	where "..." is your host and path
-	
-	in order for the correct codebase property to be communicated to clients that
-	will then download code from that HTTP server.  Note: the trailing '/' is
-	REQUIRED in your codebase or the generated URLs will NOT resolve correctly.
-	
-	See http://java.sun.com/j2se/1.4.2/docs/guide/rmi/javarmiproperties.html for
-	some guidence.  Among other things, it suggests:
-	
-		-Djava.rmi.server.logCalls=true
-		
-	as an aid to debuging.  Also try setting
-		
-		-Dcom.sun.jini.reggie.proxy.debug=1
-		
-	for the client, e.g., the service browser. Also see:
-	
-		http://www.adtmag.com/java/articleold.aspx?id=1159
-		
-	for some (very good) guidence in debugging jini services.
+Once you have cron setup, and once you have adjusted the owner and group
+properties if you are running bigdata as root, you must edit the $stateFile
+and change the run state from 'status' to 'start'.
 
-	Note: You may have to restart jini locally in order to force download of 
-	updated classes from the codebase!
+If you want to shutdown the bigdata services, change the run state to 'stop'.
+This will halt all services, but they can be restarted by changing the run
+state back to 'start'.
 
-	See http://archives.java.sun.com/cgi-bin/wa?A2=ind0512&L=jini-users&P=R391&I=-3
-	for instructions on setting up an "download jar" (dljar) ANT task that can make
-	life much simpler (one supposes).
-
-    See http://archives.java.sun.com/cgi-bin/wa?A2=ind0311&L=jini-users&F=&S=&P=7182
-        for a description of policy files and
-        http://www.dancres.org/cottage/jini-start-examples-2_1.zip for the
-        policy files described.
-	
-	See http://jan.newmarch.name/java/jini/tutorial/Ant.xml for a description of
-	one (simple) approach to using ant for jini projects (it does not use the
-	dljar ant task but explicitly enumerates what goes where).
-	
-	See http://jan.newmarch.name/java/jini/tutorial/TroubleShooting.xml#RMI%20Stubs
-	for common errors when using RMI stubs.
-	
-	See https://java.sun.com/products/jini/2.1/doc/api/com/sun/jini/example/browser/package-summary.html
-	for the dirty on the jini Service Browser.
-	
-	-->
-<target name="install" depends="jar, javadoc, bundle" description="Install bigdata.">
+To remove a bigdata installation, first change the run state to 'destroy' and
+wait for all services to halt.  THIS WILL DESTROY ALL PERSISTENT STATE!!!!
+When that is done, you can remove the shared $NAS directory.  The cron job
+will still be trying to run the 'bigdata' script, so either replace it with
+an "NOP" bash script or edit your crontab. 
+-->
+<target name="install" depends="jar, javadoc, bundle" description="Install bigdata on a cluster.">
 <!-- create NAS/LAS directories. -->
 <mkdir dir="${NAS}" />
 <mkdir dir="${LAS}" />

@@ -539,79 +539,89 @@ public class CounterSetQuery {
 
         readFiles(counterSetFiles, counterSet, nsamples, PeriodEnum.Minutes,
                 regex);
-        
+
         /*
          * Run each query in turn against the filtered pre-loaded counter set.
          */
         if (log.isInfoEnabled())
             log.info("Evaluating " + queries.size() + " queries.");
-        
+
         for (URLQueryModel model : queries) {
-
-            final IRenderer renderer = RendererFactory.get(model,
-                    new CounterSetSelector(counterSet), defaultMimeType);
-
-            /*
-             * Render on a file. The file can be specified by a URL query
-             * parameter.
-             * 
-             * @todo Use the munged counter path / counter name (when one can be
-             * identified) as the default filename.
-             */
-            File file;
-
-            if (model.file == null) {
-
-                file = File.createTempFile("query", ".out", outputDir);
-
-            } else {
-
-                if (!model.file.isAbsolute()) {
-
-                    file = new File(outputDir, model.file.toString());
-
-                } else {
-
-                    file = model.file;
-
-                }
-
-            }
-
-            if (file.getParentFile() != null && !file.getParentFile().exists()) {
-
-                if (log.isInfoEnabled()) {
-                 
-                    log.info("Creating directory: " + file.getParentFile());
-                    
-                }
-                
-                // make sure the parent directory exists.
-                file.getParentFile().mkdirs();
-                
-            }
-
-            if (log.isInfoEnabled()) {
-
-                log.info("Writing file: " + file + " for query: " + model.uri);
-
-            }
-            
-            final Writer w = new BufferedWriter(
-                    new FileWriter(file, false/* append */));
 
             try {
 
-                renderer.render(w);
+                final IRenderer renderer = RendererFactory.get(model,
+                        new CounterSetSelector(counterSet), defaultMimeType);
 
-                w.flush();
+                /*
+                 * Render on a file. The file can be specified by a URL query
+                 * parameter.
+                 * 
+                 * @todo Use the munged counter path / counter name (when one
+                 * can be identified) as the default filename.
+                 */
+                File file;
 
-            } finally {
+                if (model.file == null) {
 
-                w.close();
+                    file = File.createTempFile("query", ".out", outputDir);
+
+                } else {
+
+                    if (!model.file.isAbsolute()) {
+
+                        file = new File(outputDir, model.file.toString());
+
+                    } else {
+
+                        file = model.file;
+
+                    }
+
+                }
+
+                if (file.getParentFile() != null
+                        && !file.getParentFile().exists()) {
+
+                    if (log.isInfoEnabled()) {
+
+                        log.info("Creating directory: " + file.getParentFile());
+
+                    }
+
+                    // make sure the parent directory exists.
+                    file.getParentFile().mkdirs();
+
+                }
+
+                if (log.isInfoEnabled()) {
+
+                    log.info("Writing file: " + file + " for query: "
+                            + model.uri);
+
+                }
+
+                final Writer w = new BufferedWriter(
+                        new FileWriter(file, false/* append */));
+
+                try {
+
+                    renderer.render(w);
+
+                    w.flush();
+
+                } finally {
+
+                    w.close();
+
+                }
+
+            } catch (Throwable t) {
+
+                log.error("Could not run query: " + model.uri, t);
 
             }
-
+            
         }
 
     }

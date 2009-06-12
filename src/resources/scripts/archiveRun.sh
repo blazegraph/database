@@ -40,7 +40,7 @@ if [ -f "$lockFile" ]; then
     else
         echo "Sending HUP to the LoadBalancer: $pid"
         kill -hup $pid
-        echo "Waiting $waitDur seconds for the peformance counter dump."
+        echo "Waiting $waitDur seconds for the performance counter dump."
         sleep $waitDur
     fi
 fi
