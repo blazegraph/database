@@ -102,11 +102,15 @@
 		</copy>
 	</target>
 
-	<target name="bundleJar" depends="bundle, jar" description="Generates the jar and bundles all the dependencies and adds 'bigdata.jar' into the output lib directory (without any version info).">
+	<!-- Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory. -->
+	<target name="bundleJar" depends="bundle, jar"
+		description="Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory.">
 		<copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib"/>
 	</target>
 
-	<target name="jar" depends="compile" description="Generates the jar.">
+	<!-- This generates the jar, but does not bundled the dependencies.
+		 See 'bundleJar'. -->
+	<target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
 		<jar destfile="${build.dir}/${version}.jar">
 			<fileset dir="${build.dir}/classes" />
 			<manifest>
