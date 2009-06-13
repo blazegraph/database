@@ -1,8 +1,12 @@
 package com.bigdata.service.ndx.pipeline;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -10,6 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.keys.KVO;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.service.AbstractFederation;
@@ -799,10 +804,81 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             }
         });
 
+        /*
+         * Lists the locators for the top N slow sinks (those with the largest
+         * queue size). The sink queue needs to have at least M chunks before we
+         * will include it in this list.
+         */
+        t.addCounter("slowSinks", new Instrument<String>() {
+            @Override
+            public void sample() {
+                // the maximum #of sinks that will be reported.
+                final int N = 10;
+                // the minimum queue length before we will report the sink.
+                final int M = 3;
+                final TreeSet<SinkQueueSize> sinks = new TreeSet<SinkQueueSize>();
+                final SubtaskOp op = new SubtaskOp() {
+                    public void call(AbstractSubtask subtask) {
+                        final int queueSize = subtask.buffer.size();
+                        if (queueSize >= M)
+                            sinks.add(new SinkQueueSize(subtask, queueSize));
+                    }
+                };
+                final Iterator<WeakReference<AbstractMasterTask>> itr = masters
+                        .iterator();
+                while (itr.hasNext()) {
+                    final AbstractMasterTask master = itr.next().get();
+                    if (master == null)
+                        continue;
+                    try {
+                        master.mapOperationOverSubtasks(op);
+                    } catch(InterruptedException ex) {
+                        break;
+                    } catch(Exception ex) {
+                        log.error(this,ex);
+                        break;
+                    }
+                }
+                /*
+                 * Now format the performance counter message.
+                 */
+                int n = 0;
+                final StringBuilder sb = new StringBuilder();
+                for (SinkQueueSize t : sinks) {
+                    if (n >= N)
+                        break;
+                    sb.append("{queueSize=" + t.queueSize + ", sink=" + t.sink
+                            + "} ");
+                    n++;
+                }
+                setValue(sb.toString());
+            }
+        });
+
         return t;
 
     }
 
+    /**
+     * Places the sinks into descending order by queue length.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class SinkQueueSize implements Comparable<SinkQueueSize> {
+        final AbstractSubtask sink;
+        final int queueSize;
+        public SinkQueueSize(AbstractSubtask sink, int queueSize) {
+            this.sink = sink;
+            this.queueSize = queueSize;
+        }
+        public int compareTo(SinkQueueSize o) {
+            if(queueSize<o.queueSize) return 1;
+            if(queueSize>o.queueSize) return -1;
+            return 0;
+        }
+    }
+    
     @Override
     public String toString() {
 

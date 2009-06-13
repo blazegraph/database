@@ -65,7 +65,6 @@ import com.bigdata.service.MetadataService;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
-import com.sun.org.apache.bcel.internal.generic.GETSTATIC;
 
 /**
  * Examine the named indices defined on the journal identified by the
