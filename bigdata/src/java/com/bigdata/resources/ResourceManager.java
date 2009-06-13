@@ -343,8 +343,8 @@ abstract public class ResourceManager extends OverflowManager implements
                             new Instrument<String>() {
                                 public void sample() {
                                     /*
-                                     * Put the running tasks into order by their elapsed
-                                     * execution time.
+                                     * Put the running tasks into order by their
+                                     * elapsed execution time.
                                      */
                                     final TreeMap<Long/* elapsed */, IndexSegmentBuilder> map = new TreeMap<Long, IndexSegmentBuilder>(
                                             new ReverseLongComparator());
@@ -353,6 +353,10 @@ abstract public class ResourceManager extends OverflowManager implements
                                             .values()) {
                                         final long startTime = task
                                                 .getStartTime();
+                                        if (startTime == 0) {
+                                            // task has not started.
+                                            continue;
+                                        }
                                         final long elapsed = (startTime == 0 ? 0L
                                                 : now - startTime);
                                         map.put(elapsed, task);

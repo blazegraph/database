@@ -94,6 +94,15 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     }
     
     /**
+     * The #of active sinks.
+     */
+    public int getActiveSinkCount() {
+       
+        return sinkStats.size();
+        
+    }
+    
+    /**
      * The #of redirects ({@link StaleLocatorException}s) that were handled.
      */
     public long redirectCount = 0L;
@@ -184,7 +193,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * closed so we don't really need a backing hard reference queue at all in
      * this case.
      */
-    private final ConcurrentWeakValueCache<L, HS> currentPartitionStats = new ConcurrentWeakValueCache<L, HS>(
+    private final ConcurrentWeakValueCache<L, HS> sinkStats = new ConcurrentWeakValueCache<L, HS>(
             0/* queueCapacity */);
 
     /**
@@ -245,18 +254,18 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      */
     public HS getSubtaskStats(final L locator) {
 
-        synchronized (currentPartitionStats) {
+        synchronized (sinkStats) {
          
-            HS t = currentPartitionStats.get(locator);
+            HS t = sinkStats.get(locator);
 
             if (t == null) {
 
                 t = newSubtaskStats(locator);
 
-                currentPartitionStats.put(locator, t);
+                sinkStats.put(locator, t);
 
                 maximumPartitionCount = Math.max(maximumPartitionCount,
-                        currentPartitionStats.size());
+                        sinkStats.size());
                 
             }
 
@@ -281,10 +290,10 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      */
     public Map<L, HS> getSubtaskStats() {
 
-        final Map<L, HS> m = new LinkedHashMap<L, HS>(currentPartitionStats
+        final Map<L, HS> m = new LinkedHashMap<L, HS>(sinkStats
                 .size());
 
-        final Iterator<Map.Entry<L, WeakReference<HS>>> itr = currentPartitionStats
+        final Iterator<Map.Entry<L, WeakReference<HS>>> itr = sinkStats
                 .entryIterator();
 
         while (itr.hasNext()) {
@@ -366,7 +375,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("activePartitionCount", new Instrument<Integer>() {
             @Override
             protected void sample() {
-                setValue(currentPartitionStats.size());
+                setValue(sinkStats.size());
             }
         });
 
