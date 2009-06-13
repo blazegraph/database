@@ -128,7 +128,7 @@ abstract public class IndexManager extends StoreManager {
          * eventually GC the index object, thereby effectively closing it (or at
          * least releasing all resources associated with that index). Since
          * indices which are strongly reachable are never "closed" this provides
-         * our guarentee that indices are never closed if they are in use.
+         * our guarantee that indices are never closed if they are in use.
          * <p>
          * Note: The {@link IIndex}s managed by this class are a
          * {@link FusedView} of {@link AbstractBTree}s. Each
@@ -180,7 +180,7 @@ abstract public class IndexManager extends StoreManager {
          * eventually GC the index object, thereby effectively closing it (or at
          * least releasing all resources associated with that index). Since
          * indices which are strongly reachable are never "closed" this provides
-         * our guarentee that indices are never closed if they are in use.
+         * our guarantee that indices are never closed if they are in use.
          * <p>
          * Note: {@link IndexSegment}s have a hard reference to the backing
          * {@link IndexSegmentStore} and will keep the {@link IndexSegmentStore}
@@ -525,7 +525,7 @@ abstract public class IndexManager extends StoreManager {
         }
         
         /**
-         * Overriden to clear the {@link #retentionTime} if the map entry
+         * Overridden to clear the {@link #retentionTime} if the map entry
          * corresponding to that timestamp is being removed from the map.
          */
         protected WeakReference<ILocalBTreeView> removeMapEntry(final NT k) {
@@ -1747,8 +1747,19 @@ abstract public class IndexManager extends StoreManager {
                 builder = IndexSegmentBuilder.newInstance(indexPartitionName, src, outFile,
                         tmpDir, compactingMerge, commitTime, fromKey, toKey);
 
-                // build the index segment.
-                builder.call();
+                try {
+                    // place on the active tasks lists.
+                    buildTasks.put(outFile, builder);
+                    
+                    // build the index segment.
+                    builder.call();
+                    
+                } finally {
+                    
+                    // remove from the active tasks list.
+                    buildTasks.remove(outFile);
+                    
+                }
 
                 /*
                  * Report on a bulk merge/build of an {@link IndexSegment}.
@@ -1869,6 +1880,14 @@ abstract public class IndexManager extends StoreManager {
         }
 
     }
+
+    /**
+     * A map containing the concurrently executing index segment build tasks.
+     * This is used to report those tasks out via the performance counters
+     * interface.
+     */
+    protected final ConcurrentHashMap<File,IndexSegmentBuilder> buildTasks = 
+        new ConcurrentHashMap<File, IndexSegmentBuilder>();
 
     /*
      * Per index counters.

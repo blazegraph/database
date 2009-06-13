@@ -922,100 +922,26 @@ L>//
 
             try {
 
-                added = offerChunk(sink, b, reopen);
-
-            } catch (BufferClosedException ex) {
-
-                if (ex.getCause() instanceof IdleTimeoutException
-                        || ex.getCause() instanceof MasterExhaustedException) {
+//                added = offerChunk(sink, b, reopen);
+                added = sink.buffer.add(b, offerWarningTimeoutNanos,
+                        TimeUnit.NANOSECONDS);
+                
+                final long now = System.nanoTime();
+                
+                if (added) {
 
                     /*
-                     * Note: The sinks sets the exception if it closes the input
-                     * queue by idle timeout or because the master was
-                     * exhausted.
-                     * 
-                     * These exceptions are trapped here and cause the sink to
-                     * be re-opened (simply by restarting the loop).
+                     * Update timestamp of the last chunk written on that sink.
                      */
-
-                    if (log.isInfoEnabled())
-                        log.info("Sink closed asynchronously: cause="
-                                + ex.getCause() + ", sink=" + sink);
-
-                    // definitely re-open!
-                    reopen = true;
-                    
-                    // retry
-                    continue;
+                    sink.lastChunkNanos = now;
 
                 } else {
-
-                    // anything else is a problem.
-                    throw ex;
-
+                    
+                    log.warn("Sink is slow: elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(now - begin)
+                            + "ms, sink=" + sink);
+                    
                 }
-
-            }
-
-            if (added) {
-
-                /*
-                 * Update timestamp of the last chunk written on that sink.
-                 */
-                sink.lastChunkNanos = System.nanoTime();
-
-            }
-
-        }
-
-        synchronized (stats) {
-
-            stats.chunksTransferred += 1;
-            stats.elementsTransferred += b.length;
-            stats.elementsOnSinkQueues += b.length;
-            stats.elapsedSinkOfferNanos += (System.nanoTime() - begin);
-
-        }
-
-    }
-
-    /**
-     * Add a dense chunk to the sink's input queue. This is method deliberately
-     * yields the {@link #lock} if it blocks while attempting to added the chunk
-     * to the sink's input queue. This is done to prevent deadlocks from arising
-     * where the caller owns the {@link #lock} but the sink's input queue is
-     * full and the sink can not gain the {@link #lock} in order to drain a
-     * chunk.
-     * 
-     * @param sink
-     *            The sink.
-     * @param dense
-     *            A dense chunk to be transferred to the sink's input queue.
-     * @param reopen
-     * 
-     * @return <code>true</code> iff the chunk was added to the sink's input
-     *         queue.
-     * 
-     * @throws InterruptedException
-     */
-    @SuppressWarnings("unchecked")
-    private final boolean offerChunk(final S sink, E[] dense,
-            final boolean reopen) throws InterruptedException {
-
-        // track offer time.
-//        final long begin = System.nanoTime();
-
-        boolean added = false;
-
-        while (!added) {
-
-            halted();
-
-            try {
-
-                // stack trace through here if [reopen == true]
-                added = sink.buffer.add(dense, offerTimeoutNanos,
-                        TimeUnit.NANOSECONDS);
                 
             } catch (BufferClosedException ex) {
 
@@ -1037,10 +963,29 @@ L>//
                                 .info("Sink closed asynchronously by stale locator exception: "
                                         + sink);
 
-                    redirectQueue.put(dense);
+                    redirectQueue.put( b );
 
                     added = true;
+                    
+                } else if (ex.getCause() instanceof IdleTimeoutException
+                        || ex.getCause() instanceof MasterExhaustedException) {
 
+                    /*
+                     * Note: The sinks sets the exception if it closes the input
+                     * queue by idle timeout or because the master was
+                     * exhausted.
+                     * 
+                     * These exceptions are trapped here and cause the sink to
+                     * be re-opened (simply by restarting the loop).
+                     */
+
+                    if (log.isInfoEnabled())
+                        log.info("Sink closed asynchronously: cause="
+                                + ex.getCause() + ", sink=" + sink);
+
+                    // definitely re-open!
+                    reopen = true;
+                    
                 } else {
 
                     // anything else is a problem.
@@ -1052,21 +997,96 @@ L>//
 
         }
 
-        return added;
+        synchronized (stats) {
+
+            stats.chunksTransferred += 1;
+            stats.elementsTransferred += b.length;
+            stats.elementsOnSinkQueues += b.length;
+            stats.elapsedSinkOfferNanos += (System.nanoTime() - begin);
+
+        }
 
     }
-    
-    /**
-     * This is a fast timeout since we want to avoid the possibility that
-     * another thread require's the master's {@link #lock} while we are waiting
-     * on a sink's input queue. Whenever this timeout expires we will yield the
-     * {@link #lock} and then retry in a bit.
-     */
-    private final static long offerTimeoutNanos = TimeUnit.MILLISECONDS
-            .toNanos(1);
+
+//    /**
+//     * Add a dense chunk to the sink's input queue. 
+//     * 
+//     * @param sink
+//     *            The sink.
+//     * @param dense
+//     *            A dense chunk to be transferred to the sink's input queue.
+//     * @param reopen
+//     * 
+//     * @return <code>true</code> iff the chunk was added to the sink's input
+//     *         queue.
+//     * 
+//     * @throws InterruptedException
+//     */
+//    @SuppressWarnings("unchecked")
+//    private final boolean offerChunk(final S sink, E[] dense,
+//            final boolean reopen) throws InterruptedException {
+//
+//        boolean added = false;
+//
+//        while (!added) {
+//
+//            halted();
+//
+//            try {
+//
+//                added = sink.buffer.add(dense, offerTimeoutNanos,
+//                        TimeUnit.NANOSECONDS);
+//                
+//            } catch (BufferClosedException ex) {
+//
+//                if (ex.getCause() instanceof StaleLocatorException) {
+//
+//                    /*
+//                     * Note: The sinks sets the exception when closing the
+//                     * buffer when handling the stale locator exception and
+//                     * transfers the outstanding and all queued chunks to the
+//                     * redirectQueue.
+//                     * 
+//                     * When we trap the stale locator exception here we need to
+//                     * transfer the chunk to the redirectQueue since the buffer
+//                     * was closed (and drained) asynchronously.
+//                     */
+//
+//                    if (log.isInfoEnabled())
+//                        log
+//                                .info("Sink closed asynchronously by stale locator exception: "
+//                                        + sink);
+//
+//                    redirectQueue.put(dense);
+//
+//                    added = true;
+//
+//                } else {
+//
+//                    // anything else is a problem.
+//                    throw ex;
+//
+//                }
+//
+//            }
+//
+//        }
+//
+//        return added;
+//
+//    }
+//    
+//    /**
+//     * This is a fast timeout since we want to avoid the possibility that
+//     * another thread require's the master's {@link #lock} while we are waiting
+//     * on a sink's input queue. Whenever this timeout expires we will yield the
+//     * {@link #lock} and then retry in a bit.
+//     */
+//    private final static long offerTimeoutNanos = TimeUnit.MILLISECONDS
+//            .toNanos(1);
 
     /**
-     * This is a much slower timeout - we log a warning when it expires.
+     * This timeout is used to log warning messages when a sink is slow.
      */
     private final static long offerWarningTimeoutNanos = TimeUnit.MILLISECONDS
             .toNanos(5000);

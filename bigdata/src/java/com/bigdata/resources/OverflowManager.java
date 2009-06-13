@@ -981,6 +981,15 @@ abstract public class OverflowManager extends IndexManager {
          */
         String ReceiveCount = "Receive Count";
 
+        /**
+         * The running index partition builds for this service. The vast
+         * majority of any of the index partition tasks (split, move, join,
+         * etc.) lies in the index segment build operations. Therefore you can
+         * use the tasks reported here to see the majority of the effort for
+         * asynchronous overflow operations.
+         */
+        String RunningBuilds = "Active Builds";
+        
     }
     
     /**
