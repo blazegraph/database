@@ -162,13 +162,52 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
 
         /**
          * The moving average of nanoseconds waiting for a chunk to become ready
-         * so that it can be written on an output sink.
+         * so that it can be written on an index partition.
          */
         final MovingAverageTask averageSinkChunkWaitingNanos = new MovingAverageTask(
                 "averageSinkChunkWaitingNanos", new Callable<Double>() {
                     public Double call() {
                         return (chunksOut == 0L ? 0 : elapsedSinkChunkWaitingNanos
                                 / (double) chunksOut);
+                    }
+                });
+
+        /**
+         * The moving average of the maximum #of nanoseconds a sink waits for a
+         * chunk to become ready so that it can be written onto an index
+         * partition. If there are no index partitions for some index (that is,
+         * if the asynchronous write API is not in use for that index) then this
+         * will report ZERO (0).
+         */
+        final MovingAverageTask averageMaximumSinkChunkWaitingNanos = new MovingAverageTask(
+                "averageMaximumSinkChunkWaitingNanos", new Callable<Long>() {
+                    public Long call() {
+                        final AtomicLong max = new AtomicLong(0);
+                        final SubtaskOp op = new SubtaskOp() {
+                            public void call(AbstractSubtask subtask) {
+                                final long nanos = subtask.stats.elapsedChunkWaitingNanos;
+                                // find the max (sync not necessary since op is serialized).
+                                if (nanos > max.get()) {
+                                    max.set(nanos);
+                                }
+                            }
+                        };
+                        final Iterator<WeakReference<AbstractMasterTask>> itr = masters
+                                .iterator();
+                        while (itr.hasNext()) {
+                            final AbstractMasterTask master = itr.next().get();
+                            if (master == null)
+                                continue;
+                            try {
+                                master.mapOperationOverSubtasks(op);
+                            } catch(InterruptedException ex) {
+                                break;
+                            } catch(Exception ex) {
+                                log.error(this,ex);
+                                break;
+                            }
+                        }
+                        return max.get();
                     }
                 });
 
@@ -181,6 +220,45 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                     public Double call() {
                         return (chunksOut == 0L ? 0 : elapsedSinkChunkWritingNanos
                                 / (double) chunksOut);
+                    }
+                });
+
+        /**
+         * The moving average of the maximum #of nanoseconds per write for
+         * chunks written on an index partition by an output sink. If there are
+         * no index partitions for some index (that is, if the asynchronous
+         * write API is not in use for that index) then this will report ZERO
+         * (0).
+         */
+        final MovingAverageTask averageMaximumSinkChunkWritingNanos = new MovingAverageTask(
+                "averageMaximumChunkWritingNanos", new Callable<Long>() {
+                    public Long call() {
+                        final AtomicLong max = new AtomicLong(0);
+                        final SubtaskOp op = new SubtaskOp() {
+                            public void call(AbstractSubtask subtask) {
+                                final long nanos = subtask.stats.elapsedChunkWritingNanos;
+                                // find the max (sync not necessary since op is serialized).
+                                if (nanos > max.get()) {
+                                    max.set(nanos);
+                                }
+                            }
+                        };
+                        final Iterator<WeakReference<AbstractMasterTask>> itr = masters
+                                .iterator();
+                        while (itr.hasNext()) {
+                            final AbstractMasterTask master = itr.next().get();
+                            if (master == null)
+                                continue;
+                            try {
+                                master.mapOperationOverSubtasks(op);
+                            } catch(InterruptedException ex) {
+                                break;
+                            } catch(Exception ex) {
+                                log.error(this,ex);
+                                break;
+                            }
+                        }
+                        return max.get();
                     }
                 });
 
@@ -312,14 +390,12 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                         };
                         final Iterator<WeakReference<AbstractMasterTask>> itr = masters
                                 .iterator();
-//                        int partitionCount = 0;
                         while (itr.hasNext()) {
                             final AbstractMasterTask master = itr.next().get();
                             if (master == null)
                                 continue;
                             try {
                                 master.mapOperationOverSubtasks(op);
-//                                partitionCount++;
                             } catch(InterruptedException ex) {
                                 break;
                             } catch(Exception ex) {
@@ -327,7 +403,6 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                                 break;
                             }
                         }
-//                        if (partitionCount == 0) {
                         if (m.get() == 0) {
                             // avoid divide by zero.
                             return 0d;
@@ -402,7 +477,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
          * 
          * @todo Change this to be the average #of elements on each sink queue
          *       rather than the average of the total #of elements across all
-         *       sink queues?
+         *       sink queues? Or just rename as "OnAllSinkQueues"?
          */
         final MovingAverageTask averageElementsOnSinkQueues = new MovingAverageTask(
                 "averageElementsOnSinkQueues", new Callable<Long>() {
@@ -419,7 +494,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             averageSinkOfferNanos.run();
             averageTransferChunkSize.run();
             averageSinkChunkWaitingNanos.run();
+            averageMaximumSinkChunkWaitingNanos.run();
             averageSinkChunkWritingNanos.run();
+            averageMaximumSinkChunkWritingNanos.run();
             averageSinkWriteChunkSize.run();
             averageMasterQueueSize.run();
             averageMasterRedirectQueueSize.run();
@@ -566,6 +643,19 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         });
 
         /*
+         * The moving average of the maximum milliseconds waiting for a chunk to
+         * become ready so that it can be written on an output sink.
+         */
+        t.addCounter("averageMaximumMillisPerWait", new Instrument<Double>() {
+            @Override
+            protected void sample() {
+                setValue(statisticsTask.averageMaximumSinkChunkWaitingNanos
+                        .getMovingAverage()
+                        * scalingFactor);
+            }
+        });
+        
+        /*
          * The moving average of milliseconds per write for chunks written on an
          * index partition by an output sink.
          */
@@ -577,6 +667,19 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
             }
         });
 
+        /*
+         * The moving average of the maximum milliseconds per write for chunks
+         * written on an index partition by an output sink.
+         */
+        t.addCounter("averageMaximumMillisPerWrite", new Instrument<Double>() {
+            @Override
+            protected void sample() {
+                setValue(statisticsTask.averageMaximumSinkChunkWritingNanos
+                        .getMovingAverage()
+                        * scalingFactor);
+            }
+        });
+        
         /*
          * The ratio of the average consumption time (time to write on an index
          * partition) to the average production time (time to generate a full

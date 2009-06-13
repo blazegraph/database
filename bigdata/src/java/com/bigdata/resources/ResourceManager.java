@@ -27,23 +27,30 @@
 
 package com.bigdata.resources;
 
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
+import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.cache.ICacheEntry;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.mdi.IndexPartitionCause;
+import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.MetadataService;
+import com.bigdata.util.ReverseLongComparator;
 
 /**
  * The {@link ResourceManager} has broad responsibility for journal files, index
@@ -329,6 +336,61 @@ abstract public class ResourceManager extends OverflowManager implements
                             new Instrument<Long>() {
                                 public void sample() {
                                     setValue(indexPartitionReceiveCounter.get());
+                                }
+                            });
+
+                    tmp2.addCounter(IIndexPartitionTaskCounters.RunningBuilds,
+                            new Instrument<String>() {
+                                public void sample() {
+                                    /*
+                                     * Put the running tasks into order by their elapsed
+                                     * execution time.
+                                     */
+                                    final TreeMap<Long/* elapsed */, IndexSegmentBuilder> map = new TreeMap<Long, IndexSegmentBuilder>(
+                                            new ReverseLongComparator());
+                                    final long now = System.currentTimeMillis();
+                                    for (IndexSegmentBuilder task : buildTasks
+                                            .values()) {
+                                        final long startTime = task
+                                                .getStartTime();
+                                        final long elapsed = (startTime == 0 ? 0L
+                                                : now - startTime);
+                                        map.put(elapsed, task);
+                                    }
+                                    /*
+                                     * Format the list of running tasks.
+                                     */
+//                                    int n = 0;
+                                    final StringBuilder sb = new StringBuilder();
+//                                    sb.append("There are " + map.size()
+//                                            + " running index segment builds.");
+                                    for(Map.Entry<Long, IndexSegmentBuilder> e : map.entrySet()) {
+                                        final long elapsed = e.getKey();
+                                        final IndexSegmentBuilder task = e
+                                                .getValue();
+//                                        if (n > 0)
+//                                            sb.append(" ");
+                                        final String name = task.metadata
+                                                .getName();
+                                        final LocalPartitionMetadata pmd = task.metadata
+                                                .getPartitionMetadata();
+                                        final int partitionId = (pmd == null ? -1
+                                                : pmd.getPartitionId());
+                                        final String cause = (pmd == null ? "N/A"
+                                                : pmd.getIndexPartitionCause()
+                                                        .toString());
+                                        final String indexPartitionName = DataService
+                                                .getIndexPartitionName(name,
+                                                        partitionId);
+                                        sb.append(indexPartitionName
+                                                + "{elapsed=" + elapsed
+                                                + "ms, cause=" + cause
+                                                + ", compactingMerge="
+                                                + task.compactingMerge
+                                                + ", commitTime=" + task.commitTime
+                                                + ", plan=" + task.plan + "} ");
+                                    }
+                                    setValue(sb.toString());
                                 }
                             });
 

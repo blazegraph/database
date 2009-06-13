@@ -4424,9 +4424,14 @@ abstract public class StoreManager extends ResourceEvents implements
                 .getIndexUUID(), pmd == null ? -1 : pmd.getPartitionId());
         
     }
-    
+
     /**
-     * 
+     * Return the file on which a new {@link IndexSegment} should be written.
+     * The file will exist but will have zero length. The file is created using
+     * the {@link File#createTempFile(String, String, File)} mechanism within
+     * the configured {@link #dataDir} in the subdirectory for the specified
+     * scale-out index.
+     * <p>
      * Note: The index name appears in the file path above the {@link UUID} of
      * the scale-out index. Therefore it is not possible to have collisions
      * arise in the file system when given indices whose scale-out names differ

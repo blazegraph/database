@@ -39,7 +39,19 @@ public class IndexSegmentPlan {
     protected static final transient Logger log = Logger
             .getLogger(IndexSegmentPlan.class);
 
-    protected static final transient boolean INFO = log.isInfoEnabled();
+    /**
+     * A summary representation of the index build plan. The branching factor
+     * and the #of entries are the inputs.  The outputs include the height of
+     * the B+Tree that should be generated and the #of nodes and leaves that
+     * will exist in that B+Tree. 
+     */
+    public String toString() {
+
+        return getClass() + "{branchingFactor=" + m + ", nentries=" + nentries
+                + ", height=" + height + ", nnodes=" + nnodes + ", nleaves="
+                + nleaves + "}";
+        
+    }
     
     /**
      * The branching factor of the output tree (input).
@@ -140,7 +152,7 @@ public class IndexSegmentPlan {
              * Special case for an empty tree.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Empty tree.");
             
             nleaves = 0;
@@ -160,7 +172,7 @@ public class IndexSegmentPlan {
         // The height of the output tree.
         height = getMinimumHeight(m,nleaves);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("branchingFactor=" + m + ", nentries=" + nentries
                     + ", nleaves=" + nleaves + ", height=" + height);
         
@@ -239,7 +251,7 @@ public class IndexSegmentPlan {
              * The maximum #of leaves addressable by a tree of height h and the
              * given branching factor.
              * 
-             * Note: Java guarentees that Math.pow(int,int) produces the exact
+             * Note: Java guarantees that Math.pow(int,int) produces the exact
              * result iff that result can be represented as an integer. This
              * useful feature lets us avoid having to deal with precision issues
              * or write our own integer version of pow (computing m*m h times).
@@ -274,7 +286,7 @@ public class IndexSegmentPlan {
      * leaf, then we have to adjust the allocation of entries such that the last
      * leaf is at its minimum capacity. This is done by computing the shortage
      * and then distributing that shortage among the leaves. Once we have
-     * deferred enough entries we are guarenteed that the final leaf will not be
+     * deferred enough entries we are guaranteed that the final leaf will not be
      * under capacity.
      * 
      * @param m
@@ -334,7 +346,7 @@ public class IndexSegmentPlan {
         int remaining = nentries - ((nleaves - 1) * m);
 
         /*
-         * If the #of entries remainin would put the leaf under capacity then we
+         * If the #of entries remaining would put the leaf under capacity then we
          * compute the shortage. We need to defer this many entries from the
          * previous leaves in order to have the last leaf reach its minimum
          * capacity.

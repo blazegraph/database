@@ -120,16 +120,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             .getLogger(IndexSegmentBuilder.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-    
-    /**
      * Error message when the #of tuples in the {@link IndexSegment} would
      * exceed {@link Integer#MAX_VALUE}.
      * <p>
@@ -372,6 +362,21 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     final public IndexSegmentPlan plan;
     
     /**
+     * The timestamp in milliseconds when {@link #call()} was invoked. 
+     */
+    private long begin_build;
+    
+    /**
+     * The timestamp in milliseconds when {@link #call()} was invoked -or-
+     * ZERO (0L) if {@link #call()} has not been invoked. 
+     */
+    public long getStartTime() {
+        
+        return begin_build;
+        
+    }
+    
+    /**
      * The time to setup the index build, including the generation of the index
      * plan and the initialization of some helper objects.
      */
@@ -499,7 +504,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             nentries = (int) n;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Compacting merge: name=" + name
                         + ", non-deleted index entries=" + nentries);
 
@@ -524,7 +529,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             nentries = (int) n;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Incremental build: name=" + name + ", nentries="
                         + nentries + ", rangeCountExactWithDeleted=" + n);
 
@@ -601,13 +606,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            onto the {@link IndexSegment}.
      * @param m
      *            The branching factor for the generated tree. This can be
-     *            choosen with an eye to minimizing the height of the generated
+     *            chosen with an eye to minimizing the height of the generated
      *            tree. (Small branching factors are permitted for testing, but
      *            generally you want something relatively large.)
      * @param metadata
      *            The metadata record for the source index. A copy will be made
      *            of this object. The branching factor in the generated tree
-     *            will be overriden to <i>m</i>.
+     *            will be overridden to <i>m</i>.
      * @param commitTime
      *            The commit time associated with the view from which the
      *            {@link IndexSegment} is being generated. This value is written
@@ -857,7 +862,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          * Setup for IO.
          */
 
-        final long begin_build = System.currentTimeMillis();
+        begin_build = System.currentTimeMillis();
         
         if (outFile.exists() && outFile.length() != 0L) {
             
@@ -1164,7 +1169,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             mbPerSec = (elapsed == 0 ? 0 : checkpoint.length / Bytes.megabyte32
                     / (elapsed / 1000f));
             
-            if(INFO) {
+            if(log.isInfoEnabled()) {
             
                 final NumberFormat cf = NumberFormat.getNumberInstance();
                 
@@ -1285,7 +1290,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         assert col < plan.numInLevel[h];
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("closing " + (node.isLeaf() ? "leaf" : "node") + "; h="
                     + h + ", col=" + col + ", max=" + node.max + ", nkeys="
                     + node.keys.getKeyCount());
@@ -1371,7 +1376,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         // assert parent.nchildren < parent.max;
 
-        if(DEBUG)
+        if(log.isDebugEnabled())
             log.debug("setting child at index=" + parent.nchildren
                 + " on node at level=" + parent.level + ", col="
                 + writtenInLevel[parent.level] + ", addr="
@@ -1447,7 +1452,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * the #of keys in the parent.
              */
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("setting separatorKey on node at level "
                         + parent.level + ", col="
                         + writtenInLevel[parent.level]);
@@ -1552,9 +1557,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             if (nleavesWritten > 0) {
 
-                if(DEBUG)
+                if(log.isDebugEnabled())
                     log.info("Writing leaf: priorLeaf="+addrPriorLeaf+", nextLeaf="+addr);
-                else if (INFO)
+                else if (log.isInfoEnabled())
                     System.err.print("."); // wrote a leaf.
 
                 // patch representation of the previous leaf
@@ -1605,9 +1610,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * Force out the last leaf.
              */
     
-            if(DEBUG)
+            if(log.isDebugEnabled())
                 log.debug("Writing leaf: priorLeaf="+addrPriorLeaf+", nextLeaf="+0L);
-            else if (INFO)
+            else if (log.isInfoEnabled())
                 System.err.print("."); // wrote a leaf.
             
             // patch representation of the last leaf.
@@ -1741,7 +1746,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         // the #of nodes written so far.
         nnodesWritten++;
 
-        if(INFO)
+        if(log.isInfoEnabled())
         System.err.print("x"); // wrote a node.
 
         /*
@@ -1910,7 +1915,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("addrRoot(Leaf): " + addrRoot + ", "
                     + addressManager.toString(addrRoot));
 
@@ -2014,7 +2019,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             md.write(out);
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(md.toString());
 
             // save the index segment resource description for the caller.
