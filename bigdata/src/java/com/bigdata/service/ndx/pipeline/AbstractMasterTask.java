@@ -220,9 +220,6 @@ L>//
     /**
      * Map from the index partition identifier to the open subtask handling
      * writes bound for that index partition.
-     * <p>
-     * Note: This map must be protected against several kinds of concurrent
-     * access using the {@link #lock}.
      */
     private final ConcurrentHashMap<L, S> sinks;
 
@@ -237,32 +234,12 @@ L>//
     public void mapOperationOverSubtasks(final SubtaskOp<S> op)
             throws InterruptedException, Exception {
 
-//        /*
-//         * Note: by grabbing the values as an array we avoid the possibility
-//         * that the operation might request any locks and therefore avoid the
-//         * possibility that map() could cause a deadlock based on the choice of
-//         * the op to be mapped.
-//         */
-//        final AbstractSubtask[] sinks;
-//        lock.lockInterruptibly();
-//        try {
-//
-//            sinks = subtasks.values().toArray(new AbstractSubtask[0]);
-//
-//        } finally {
-//
-//            lock.unlock();
-//
-//        }
-//
-//        for (S subtask : subtasks.values()) {
-//
-//            op.call(subtask);
-//
-//        }
         final Iterator<S> itr = sinks.values().iterator();
+
         while(itr.hasNext()) {
+            
             op.call(itr.next());
+            
         }
 
     }
@@ -270,7 +247,7 @@ L>//
     /**
      * Lock used for sink life cycle events <em>only</em>.
      */
-    protected final ReentrantLock lock = new ReentrantLock();
+    private final ReentrantLock lock = new ReentrantLock();
 
     /**
      * Condition is signaled by a subtask when it is finished. This is used by
@@ -278,7 +255,48 @@ L>//
      * subtasks in {@link #subtasks} are complete when this signal is received
      * then the master may terminate.
      */
-    protected final Condition subtaskDone = lock.newCondition();
+    private final Condition subtaskDone = lock.newCondition();
+
+    /**
+     * A queue of subtasks which have finished running. The master polls this
+     * queue in {@link #call()} in order to clear finished sinks from
+     * {@link #sinks} in a timely manner during normal operations.
+     * {@link #awaitAll()} and {@link #cancelAll(boolean)} both handle this in
+     * their own way.
+     */
+    private final BlockingQueue<S> finishedSubtasks = new LinkedBlockingQueue<S>();
+
+    /**
+     * Notify the master that a subtask is done.
+     * 
+     * @param subtask
+     *            The subtask.
+     *            
+     * @throws InterruptedException
+     */
+    protected void notifySubtaskDone(final AbstractSubtask subtask)
+            throws InterruptedException {
+        
+        if (subtask == null)
+            throw new IllegalArgumentException();
+        
+        lock.lock();
+        
+        try {
+    
+            // signal condition (used by awaitAll).
+            subtaskDone.signalAll();
+            
+            // place on queue (used by call()).
+            finishedSubtasks.put((S) subtask);
+        
+        } finally {
+        
+            lock.unlock();
+            
+        }
+    
+    }
 
     /**
      * Statistics for this (and perhaps other) masters.
@@ -380,9 +398,25 @@ L>//
              * Note: This polls the master's input buffer so it can check the
              * redirectQueue in a timely manner.
              */
-            while (true) {//src.hasNext() || !redirectQueue.isEmpty()) {
+            while (true) {
 
                 halted();
+
+                /*
+                 * Poll the queue of sinks that have finished running
+                 * (non-blocking).
+                 * 
+                 * Note: We don't actually remove the subtask from the queue
+                 * until its Future is available.
+                 */
+                final S finishedSink = finishedSubtasks.peek();
+                if (finishedSink != null
+                        && finishedSink.buffer.getFuture().isDone()) {
+                    // remove the subtask from the queue.
+                    finishedSubtasks.remove();
+                    // check the Future for errors.
+                    awaitSink(finishedSink);
+                }
                 
                 // drain the redirectQueue if not empty.
                 E[] a = redirectQueue.poll();
@@ -804,7 +838,7 @@ L>//
                 try {
 
                     // test the future.
-                    f.get(1, TimeUnit.SECONDS);
+                    f.get(1000, TimeUnit.MILLISECONDS);
 
                     // clear from the map (but ONLY once we have checked the Future!)
                     removeOutputBuffer((L) sink.locator, (AbstractSubtask) sink);

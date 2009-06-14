@@ -237,12 +237,7 @@ L>//
             /*
              * Signal the master than the subtask is done.
              */
-            master.lock.lock();
-            try {
-                master.subtaskDone.signalAll();
-            } finally {
-                master.lock.unlock();
-            }
+            master.notifySubtaskDone(this);
 
         }
 

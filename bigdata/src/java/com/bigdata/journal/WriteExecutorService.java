@@ -1260,6 +1260,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                              * extent will grow without bound and the service
                              * will be unable to release older resources on the
                              * disk.
+                             * 
+                             * @todo Should probably wait in a loop until we have
+                             * the lock or interrupt the running tasks so as to
+                             * obtain the lock preemptively.
                              */
                             log
                                     .error("Could not obtain exclusive lock on the write service: timeout="
