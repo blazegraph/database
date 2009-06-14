@@ -54,6 +54,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
+import com.bigdata.service.DataService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.WriteTaskCounters;
 
@@ -79,7 +80,7 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  * <p>
  * The ground state from which an unisolated operation begins needs to evolve
  * after each unisolated operation that reaches its commit point successfully.
- * This can be acomplished by holding onto the btree reference, or even just the
+ * This can be accomplished by holding onto the btree reference, or even just the
  * address at which the metadata record for the btree was last written. We use
  * {@link AbstractJournal#getName2Addr()} for this purpose.
  * <p>
@@ -92,7 +93,7 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  * modifications. This means that we must reload the btree from a metadata
  * record if we have to roll back due to an abort of some unisolated operation
  * since the state of the {@link BTree} has been changed as a side effect in a
- * non-reversable manner.
+ * non-reversible manner.
  * <p>
  * Note: Running {@link Thread}s may be interrupted at arbitrary moments for a
  * number of reasons by this class. The foremost example is a {@link Thread}
@@ -112,13 +113,13 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  * <p>
  * The {@link WriteExecutorService} invokes {@link #overflow()} each time it
  * does a group commit. Normally the {@link WriteExecutorService} does not
- * quiese before doing a group commit, and when it is not quiesent the
+ * quiesce before doing a group commit, and when it is not quiescent the
  * {@link ResourceManager} can NOT {@link #overflow()} the journal since
  * concurrent tasks are still writing on the current journal. Therefore the
  * {@link ResourceManager} monitors the {@link IBufferStrategy#getExtent()} of
  * the live journal. When it decides that the live journal is large enough it
  * {@link WriteExecutorService#pause()}s {@link WriteExecutorService} and waits
- * until {@link #overflow()} is called with a quiesent
+ * until {@link #overflow()} is called with a quiescent
  * {@link WriteExecutorService}. This effectively grants the
  * {@link ResourceManager} exclusive access to the journal. It can then run
  * {@link #overflow()} to setup a new journal and tell the
@@ -180,6 +181,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     final boolean trackActiveSetInMDC = false; // MUST be false for deploy
 
     private final IResourceManager resourceManager;
+    
+    /**
+     * The name of the service if the write service is running inside of a
+     * service (used for error messages).
+     */
+    private final String serviceName;
     
     /**
      * The object that coordinates exclusive access to the resources.
@@ -300,6 +307,18 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             }
             
         });
+
+        /*
+         * Extract the name of the service if we are running inside of one.
+         */
+        String serviceName;
+        try {
+            final DataService dataService = resourceManager.getDataService();
+            serviceName = dataService.getServiceName();
+        } catch(UnsupportedOperationException ex) {
+            serviceName = "";
+        }
+        this.serviceName = serviceName;
         
     }
 
@@ -763,10 +782,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * commitCounter at after the task had executed to see how many
              * group commits were made while this task was running.
              */
-            MDC.put("commitCounter","commitCounter="+ngroupCommits);
+            MDC.put("commitCounter", "commitCounter=" + ngroupCommits);
 
-            if(INFO)
-                log.info("nrunning="+nrunning);
+            if (INFO)
+                log.info("nrunning=" + nrunning);
             
         } finally {
             
@@ -1261,13 +1280,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                              * will be unable to release older resources on the
                              * disk.
                              * 
-                             * @todo Should probably wait in a loop until we have
-                             * the lock or interrupt the running tasks so as to
-                             * obtain the lock preemptively.
+                             * @todo Should probably interrupt the running tasks
+                             * in order obtain the lock preemptively if the
+                             * request would timeout.
                              */
                             log
                                     .error("Could not obtain exclusive lock on the write service: timeout="
-                                            + overflowLockRequestTimeout);
+                                            + overflowLockRequestTimeout
+                                            + ", service=" + serviceName);
                         }
                     } catch (InterruptedException ex) {
                         log.warn("Interrupted awaiting exclusive write lock.");
@@ -1398,7 +1418,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         } catch (Throwable t) {
 
-            log.error("Problem with commit? : " + t, t);
+            log.error("Problem with commit? : "+serviceName+" : "+ t, t);
 
             /*
              * A thrown exception here indicates a failure, but not during the
@@ -1410,7 +1430,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * that is running the group commit) there are index checkpoints
              * that will get written by the next commit. If we do nothing then
              * those checkpoints will be made restart safe if a subsequent
-             * commit succeeds, which would be pretty suprising since the task
+             * commit succeeds, which would be pretty surprising since the task
              * will have reported a failure! So, yes, we do need to do an
              * abort() here.
              */
@@ -1695,7 +1715,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         } catch (Throwable t) {
 
-            log.error("Overflow error", t);
+            log.error("Overflow error: "+serviceName+" : "+t, t);
 
         } finally {
 
@@ -2129,7 +2149,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Something went wrong in the commit itself.
              */
 
-            log.error("Commit failed - will abort: " + t, t);
+            log.error("Commit failed - will abort: "+serviceName+" : "+ t, t);
 
             abort();
 
@@ -2296,7 +2316,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             if(journal.isOpen()) {
 
-                log.error("Problem with abort?", t);
+                log.error("Problem with abort? : "+serviceName+" : "+t, t);
                 
             }
 
@@ -2356,7 +2376,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         } catch (Throwable t) {
 
-            log.error("Problem with resetState?", t);
+            log.error("Problem with resetState? : "+serviceName+" : "+t, t);
 
         }
 
