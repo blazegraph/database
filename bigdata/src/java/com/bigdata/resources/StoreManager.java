@@ -4511,12 +4511,13 @@ abstract public class StoreManager extends ResourceEvents implements
      * {@link WriteExecutorService}. If successful, it purges any resources that
      * are no longer required based on
      * {@link StoreManager.Options#MIN_RELEASE_AGE} and optionally truncates the
-     * live journal such that no free space remains in the journal. If there is
-     * heavy write activity on the service then the timeout may well expire
-     * before the exclusive write lock becomes available. Further, the
-     * acquisition of the exclusive write lock will throttle concurrent write
-     * activity and negatively impact write performance if the system is heavily
-     * loaded by write tasks.
+     * live journal such that no free space remains in the journal.
+     * <p>
+     * Note: If there is heavy write activity on the service then the timeout
+     * may well expire before the exclusive write lock becomes available.
+     * Further, the acquisition of the exclusive write lock will throttle
+     * concurrent write activity and negatively impact write performance if the
+     * system is heavily loaded by write tasks.
      * 
      * @param timeout
      *            The timeout (in milliseconds) that the method will await the

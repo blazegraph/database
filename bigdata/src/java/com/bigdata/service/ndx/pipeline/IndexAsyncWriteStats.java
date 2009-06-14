@@ -820,8 +820,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                 final SubtaskOp op = new SubtaskOp() {
                     public void call(AbstractSubtask subtask) {
                         final int queueSize = subtask.buffer.size();
-                        if (queueSize >= M)
+                        if (queueSize >= M) {
                             sinks.add(new SinkQueueSize(subtask, queueSize));
+                        }
                     }
                 };
                 final Iterator<WeakReference<AbstractMasterTask>> itr = masters

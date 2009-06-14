@@ -50,7 +50,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.BufferedDiskStrategy;
-import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -1621,7 +1620,9 @@ abstract public class OverflowManager extends IndexManager {
 
     /**
      * An overflow condition is recognized when the journal is within some
-     * declared percentage of {@link Options#MAXIMUM_EXTENT}.
+     * declared percentage of {@link Options#MAXIMUM_EXTENT}. However, this
+     * method will return <code>false</code> if overflow has been disabled
+     * or if there is an asynchronous overflow operation in progress.
      */
     public boolean shouldOverflow() {
      

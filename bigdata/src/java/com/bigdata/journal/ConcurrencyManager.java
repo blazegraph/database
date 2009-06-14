@@ -273,6 +273,30 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         String DEFAULT_WRITE_SERVICE_GROUP_COMMIT_TIMEOUT = "100";
 
+        /**
+         * The time in milliseconds that a group commit will await an exclusive
+         * lock on the write service in order to perform synchronous overflow
+         * processing (default
+         * {@value #DEFAULT_WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT}). This
+         * lock is requested IFF overflow process SHOULD be performed
+         * (asynchronous overflow processing is enabled, asynchronous overflow
+         * processing is not ongoing, and the live journal extent exceeds the
+         * threshold extent).
+         * <p>
+         * The lock timeout needs to be of significant duration or a lock
+         * request for a write service under heavy write load will timeout, in
+         * which case an error will be logged. If overflow processing is not
+         * performed the live journal extent will grow without bound and the
+         * service will be unable to release older resources on the disk.
+         */
+        String WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT = ConcurrencyManager.class
+                .getName()
+                + ".writeService.overflowLockRequestTimeout";
+
+        String DEFAULT_WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT = ""
+                + (60 * 1000);
+        
+
     }
 
     /**
@@ -774,6 +798,17 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         .info(ConcurrencyManager.Options.WRITE_SERVICE_GROUP_COMMIT_TIMEOUT
                                 + "=" + groupCommitTimeout);
 
+            final long overflowLockRequestTimeout = Long
+                    .parseLong(properties
+                            .getProperty(
+                                    ConcurrencyManager.Options.WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT,
+                                    ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT));
+
+            if (INFO)
+                log
+                        .info(ConcurrencyManager.Options.WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT
+                                + "=" + overflowLockRequestTimeout);
+
             final long keepAliveTime = Long
                     .parseLong(properties
                             .getProperty(
@@ -803,7 +838,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
                     keepAliveTime, TimeUnit.MILLISECONDS, // keepAliveTime
                     queue, //
                     new DaemonThreadFactory(getClass().getName()+".writeService"), //
-                    groupCommitTimeout//
+                    groupCommitTimeout,//
+                    overflowLockRequestTimeout
             );
 
             if (writeServicePrestart) {
