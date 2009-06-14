@@ -196,6 +196,17 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * tasks to join the commit group.
      */
     protected final long groupCommitTimeout;
+
+    /**
+     * The time in milliseconds that a group commit will await an exclusive lock
+     * on the write service in order to perform synchronous overflow processing.
+     * This lock is requested IFF overflow process SHOULD be performed. The lock
+     * timeout needs to be of significant duration or a lock request for a write
+     * service under heavy write load will timeout, in which case an error will
+     * be logged. If overflow processing is not performed the live journal
+     * extent will grow without bound.
+     */
+    protected final long overflowLockRequestTimeout;
     
     /**
      * 
@@ -209,6 +220,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @param groupCommitTimeout
      *            The time in milliseconds that a group commit will await
      *            currently running tasks to join the commit group.
+     *            @param overflowLockRequestTimeout
      */
     public WriteExecutorService(//
             final IResourceManager resourceManager,
@@ -218,7 +230,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             final TimeUnit keepAliveUnit,//
             final BlockingQueue<Runnable> queue, 
             final ThreadFactory threadFactory,
-            final long groupCommitTimeout) {
+            final long groupCommitTimeout,
+            final long overflowLockRequestTimeout) {
 
         super(  corePoolSize, //
                 maximumPoolSize,//
@@ -233,8 +246,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         if (groupCommitTimeout < 0L) 
             throw new IllegalArgumentException();
+
+        if (overflowLockRequestTimeout < 0L) 
+            throw new IllegalArgumentException();
         
         this.groupCommitTimeout = groupCommitTimeout;
+        
+        this.overflowLockRequestTimeout = overflowLockRequestTimeout;
         
         // Setup the lock manager used by the write service.
         {
@@ -1224,11 +1242,29 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                     /*
                      * Try to acquire the exclusive write lock so that we can do
                      * synchronous overflow processing.
-                     * 
-                     * @todo config overflow exclusive lock timeout.
                      */
                     try {
-                        locked = tryLock(2000, TimeUnit.MILLISECONDS);
+                        if (!(locked = tryLock(overflowLockRequestTimeout,
+                                TimeUnit.MILLISECONDS))) {
+                            /*
+                             * Note: This can cause serious problem if it
+                             * persists since the service will be unable to
+                             * release old resources on the disk and the live
+                             * journal extent will continue to grow without
+                             * bound.
+                             * 
+                             * The lock timeout needs to be of significant
+                             * duration or a lock request for a write service
+                             * under heavy write load will timeout. If overflow
+                             * processing is not performed the live journal
+                             * extent will grow without bound and the service
+                             * will be unable to release older resources on the
+                             * disk.
+                             */
+                            log
+                                    .error("Could not obtain exclusive lock on the write service: timeout="
+                                            + overflowLockRequestTimeout);
+                        }
                     } catch (InterruptedException ex) {
                         log.warn("Interrupted awaiting exclusive write lock.");
                         // will not do group commit.
@@ -1665,7 +1701,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
 
     }
-    
+
     /**
      * Acquires an exclusive lock on the write service.
      * <p>
@@ -1682,11 +1718,20 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * and the write service will be paused. This ensures that no task can run
      * on the write service and that groupCommit will not attempt to grab the
      * lock itself.
+     * <p>
+     * Note: If there is heavy write activity on the service then the timeout
+     * may well expire before the exclusive write lock becomes available.
+     * Further, the acquisition of the exclusive write lock will throttle
+     * concurrent write activity and negatively impact write performance if the
+     * system is heavily loaded by write tasks. Therefore, the write lock should
+     * be requested only when it is necessary and a significant value should be
+     * specified for the timeout (60s or more) to ensure that it is acquired.
      * 
      * @param timeout
      *            The timeout.
      * @param unit
      *            The unit in which the <i>timeout</i> is expressed.
+     *            
      * @return <code>true</code> iff the exclusive lock was acquired.
      * 
      * @throws InterruptedException
