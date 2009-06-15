@@ -1285,7 +1285,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                              * request would timeout.
                              */
                             log
-                                    .error("Could not obtain exclusive lock on the write service: timeout="
+                                    .error("Could not obtain exclusive lock: timeout="
                                             + overflowLockRequestTimeout
                                             + ", service=" + serviceName);
                         }
