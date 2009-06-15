@@ -1023,7 +1023,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * them for a move (if this host is at peak CPU, low disk, or swapping
      * heavily) or a split (if the CPU is underutilized).
      * <p>
-     * The LBS ranks services based on their average queueing time. When a
+     * The LBS ranks services based on their average queuing time. When a
      * service is "highly utilized" according to the LBS, we consider its
      * resource utilization. If the service is utilizing most of its CPU, if it
      * is swapping heavily, or if it is low on disk, then we need to shed an
@@ -1112,7 +1112,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
          * @todo config options for these triggers.
          * 
          * FIXME Review the move policy with an eye towards how it selects which
-         * index partition(s) to move. Notge that chooseMoves() is now invoked
+         * index partition(s) to move. Note that chooseMoves() is now invoked
          * ONLY when the host is heavily utilized (on both the global and the
          * local scale). CPU is the only fungable resource since things will
          * just slow down if a host has 100% CPU while it can die if it runs out

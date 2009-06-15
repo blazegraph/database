@@ -294,7 +294,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 + ".writeService.overflowLockRequestTimeout";
 
         String DEFAULT_WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT = ""
-                + (60 * 1000);
+                + (2 * 60 * 1000);
         
 
     }
