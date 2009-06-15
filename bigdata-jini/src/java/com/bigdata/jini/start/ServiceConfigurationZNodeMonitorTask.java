@@ -433,8 +433,8 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
             final WatchedEvent e) throws Exception {
 
         switch (e.getState()) {
-        case SyncConnected:
-            return;
+//        case SyncConnected:
+//            return;
         case Disconnected:
             return;
         }
