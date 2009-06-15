@@ -433,6 +433,13 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
             final WatchedEvent e) throws Exception {
 
         switch (e.getState()) {
+        /*
+         * @todo Sometimes a SyncConnected event will come through here without
+         * a zpath and trip the AssertionError below.  However, we definitely
+         * need to process SyncConnected events when the zpath is defined (if
+         * you always ignore the SyncConnected event here then the services
+         * manager will fail to start services!). 
+         */
 //        case SyncConnected:
 //            return;
         case Disconnected:
