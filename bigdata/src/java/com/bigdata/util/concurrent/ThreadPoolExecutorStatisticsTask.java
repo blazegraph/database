@@ -10,6 +10,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.WriteExecutorService;
+import com.bigdata.util.concurrent.IQueueCounters.ITaskCounters;
 import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorCounters;
 import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 import com.bigdata.util.concurrent.IQueueCounters.IWriteServiceExecutorCounters;
@@ -686,6 +687,59 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                         });
 
                 /*
+                 * Running totals for various things.
+                 */
+
+                {
+
+                    counterSet.addCounter(ITaskCounters.InterArrivalTime,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(TimeUnit.NANOSECONDS
+                                            .toMillis(taskCounters.interArrivalNanoTime
+                                                    .get()));
+                                }
+                            });
+
+                    counterSet.addCounter(ITaskCounters.QueueWaitingTime,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(TimeUnit.NANOSECONDS
+                                            .toMillis(taskCounters.queueWaitingNanoTime
+                                                    .get()));
+                                }
+                            });
+
+                    counterSet.addCounter(ITaskCounters.ServiceTime,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(TimeUnit.NANOSECONDS
+                                            .toMillis(taskCounters.serviceNanoTime
+                                                    .get()));
+                                }
+                            });
+
+                    counterSet.addCounter(ITaskCounters.CheckpointTime,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(TimeUnit.NANOSECONDS
+                                            .toMillis(taskCounters.checkpointNanoTime
+                                                    .get()));
+                                }
+                            });
+
+                    counterSet.addCounter(ITaskCounters.QueuingTime,
+                            new Instrument<Long>() {
+                                public void sample() {
+                                    setValue(TimeUnit.NANOSECONDS
+                                            .toMillis(taskCounters.queuingNanoTime
+                                                    .get()));
+                                }
+                            });
+
+                }
+
+                /*
                  * Moving averages.
                  */
 
@@ -695,21 +749,23 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                             @Override
                             protected void sample() {
                                 final double t = interArrivalNanoTimeTask
-                                        .getMovingAverage();
+                                        .getMovingAverage()
+                                        * scalingFactor;
                                 if (t != 0d)
-                                    setValue(1d/(t*scalingFactor));
+                                    setValue(1d / t);
                             }
                         });
-                
+
                 counterSet.addCounter(
                         IWriteServiceExecutorCounters.AverageServiceRate,
                         new Instrument<Double>() {
                             @Override
                             protected void sample() {
                                 final double t = serviceNanoTimeTask
-                                        .getMovingAverage();
+                                        .getMovingAverage()
+                                        * scalingFactor;
                                 if (t != 0d)
-                                    setValue(1d/(t*scalingFactor));
+                                    setValue(1d / t);
                             }
                         });
                 
