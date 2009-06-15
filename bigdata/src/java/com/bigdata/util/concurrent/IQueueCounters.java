@@ -3,6 +3,7 @@ package com.bigdata.util.concurrent;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.counters.ICounterHierarchy;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
@@ -54,6 +55,11 @@ public interface IQueueCounters extends ICounterHierarchy {
          * Count of all tasks which were successfully executed.
          */
         String TaskSuccessCount = "Task Success Count";
+
+        /**
+         * Cumulative milliseconds of the inter-arrival time between tasks.
+         */
+        String InterArrivalTime = "Inter Arrival Time";
 
         /**
          * Cumulative milliseconds across tasks of the time that a task was
@@ -174,6 +180,16 @@ public interface IQueueCounters extends ICounterHierarchy {
         String TaskSuccessCount = ITaskCounters.TaskSuccessCount;
 
         /**
+         * The average arrival rate (1/average-inter-arrival-time).
+         */
+        String AverageArrivalRate = "Average Arrival Rate";
+        
+        /**
+         * The average service rate (1/average-service-time).
+         */
+        String AverageServiceRate = "Average Service Rate";
+        
+        /**
          * Moving average in milliseconds of the time a task waits on a queue
          * pending execution.
          * 
@@ -188,6 +204,9 @@ public interface IQueueCounters extends ICounterHierarchy {
          * <p>
          * Note: For tasks which acquire resource lock(s), this does NOT include
          * the time waiting to acquire the resource lock(s).
+         * <p>
+         * Note: The average service rate is the inverse of the
+         * {@link #AverageServiceTime}.
          * 
          * @see ITaskCounters#ServiceTime
          */
@@ -197,7 +216,10 @@ public interface IQueueCounters extends ICounterHierarchy {
          * Moving average in milliseconds of the time that a task is
          * checkpointing the indices on which it has written (this is already
          * reported as part of the {@link #AverageServiceTime} but is broken out
-         * here as a detail).
+         * here as a detail). An index checkpoint operation consists of flushing
+         * all dirty pages to the backing store and then writing a new
+         * {@link Checkpoint} record on the backing store. This operation is an
+         * after action of a successful write task.
          * 
          * @see ITaskCounters#CheckpointTime
          */

@@ -1,7 +1,6 @@
 package com.bigdata.util.concurrent;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -19,27 +18,27 @@ public class MovingAverageTask implements Runnable {
     /**
      * The label used in log messages.
      */
-    private final String name;
+    protected final String name;
 
     /**
      * Used to sample whatever is being measured.
      */
-    private final Callable<?extends Number> sampleTask;
+    protected final Callable<?extends Number> sampleTask;
     
     /**
      * The weight used to compute the moving average.
      */
-    private final double w;
+    protected final double w;
 
     /**
      * #of samples taken so far.
      */
-    private long nsamples = 0;
+    protected long nsamples = 0;
 
     /**
      * The moving average.
      */
-    private double average = 0d;
+    protected double average = 0d;
 
     /**
      * The current value of the moving average.
@@ -86,7 +85,8 @@ public class MovingAverageTask implements Runnable {
      * @param sampleTask
      *            Task that returns a sampled value.
      */
-    public MovingAverageTask(String name, Callable<? extends Number> sampleTask) {
+    public MovingAverageTask(final String name,
+            final Callable<? extends Number> sampleTask) {
 
         this(name, sampleTask, DEFAULT_WEIGHT);
 
@@ -103,8 +103,8 @@ public class MovingAverageTask implements Runnable {
      *            The weight to be used by
      *            {@link #getMovingAverage(double, double, double)}
      */
-    public MovingAverageTask(String name,
-            Callable<? extends Number> sampleTask, double w) {
+    public MovingAverageTask(final String name,
+            final Callable<? extends Number> sampleTask, final double w) {
 
         if (name == null)
             throw new IllegalArgumentException();

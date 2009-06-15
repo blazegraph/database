@@ -19,7 +19,7 @@ import com.bigdata.util.concurrent.IQueueCounters.ITaskCounters;
  * <p>
  * Note: The various counters are {@link AtomicLong}s since we need them to be
  * thread-safe. (<code>counter++</code> and <code>counter+=foo</code> are
- * NOT guarenteed to be thread-safe for simple fields or even
+ * NOT guaranteed to be thread-safe for simple fields or even
  * <code>volatile</code> fields).
  * 
  * @see ThreadPoolExecutorStatisticsTask
@@ -53,6 +53,16 @@ public class TaskCounters {
     /** #of tasks that succeeded. */
     final public AtomicLong taskSuccessCount = new AtomicLong();
 
+    /**
+     * The timestamp in nanoseconds when the last task arrived.
+     */
+    final public AtomicLong lastArrivalNanoTime = new AtomicLong();
+
+    /**
+     * Cumulative elapsed time in nanoseconds between the arrival of tasks.
+     */
+    final public AtomicLong interArrivalNanoTime = new AtomicLong();
+    
     /**
      * Cumulative elapsed time in nanoseconds waiting on the queue pending
      * service.
@@ -91,7 +101,7 @@ public class TaskCounters {
      * Cumulative elapsed time in nanoseconds consumed by tasks from when they
      * are submitted until they are complete.
      * <p>
-     * Note: Queueing time on the client includes queueing time on the service.
+     * Note: Queuing time on the client includes queuing time on the service.
      */
     final public AtomicLong queuingNanoTime = new AtomicLong();
 
@@ -139,6 +149,14 @@ public class TaskCounters {
                 new Instrument<Long>() {
                     public void sample() {
                         setValue(taskSuccessCount.get());
+                    }
+                });
+
+        counterSet.addCounter(ITaskCounters.InterArrivalTime,
+                new Instrument<Long>() {
+                    public void sample() {
+                        setValue(TimeUnit.NANOSECONDS
+                                .toMillis(interArrivalNanoTime.get()));
                     }
                 });
 

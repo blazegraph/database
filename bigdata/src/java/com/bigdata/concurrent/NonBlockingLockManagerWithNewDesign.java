@@ -27,10 +27,8 @@
 
 package com.bigdata.concurrent;
 
-import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.Halted;
 import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.Running;
 import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.Shutdown;
-import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.ShutdownNow;
 import static com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.ServiceRunState.Starting;
 
 import java.lang.ref.WeakReference;
@@ -65,7 +63,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.MovingAverageTask;
-import com.bigdata.util.concurrent.QueueStatisticsTask;
+import com.bigdata.util.concurrent.QueueSizeMovingAverageTask;
 import com.bigdata.util.concurrent.WriteTaskCounters;
 
 /**
@@ -2720,7 +2718,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         /**
          * Used to track statistics for this queue while it exists.
          */
-        final QueueStatisticsTask statisticsTask;
+        final QueueSizeMovingAverageTask statisticsTask;
         
         /**
          * The resource whose locks are administeded by this object.
@@ -2802,7 +2800,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
             this.queue = new LinkedBlockingQueue<T>(/* unbounded */);
             
-            this.statisticsTask = new QueueStatisticsTask(resource.toString(), queue);
+            this.statisticsTask = new QueueSizeMovingAverageTask(resource.toString(), queue);
             
         }
 
@@ -2875,12 +2873,12 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         }
 
         /**
-         * This method updates the {@link QueueStatisticsTask} for each
+         * This method updates the {@link QueueSizeMovingAverageTask} for each
          * {@link ResourceQueue} each time it is run.
          * <p>
          * Note: This is written so as to not cause hard references to be
          * retained to the {@link ResourceQueue}s. The
-         * {@link QueueStatisticsTask} is a member field for the
+         * {@link QueueSizeMovingAverageTask} is a member field for the
          * {@link ResourceQueue} for the same reason. This way the statistics
          * for active {@link ResourceQueue}s are tracked and may be reported
          * but {@link ResourceQueue}s will remain strongly reachable only if
