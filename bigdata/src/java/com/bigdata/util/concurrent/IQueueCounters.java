@@ -180,12 +180,12 @@ public interface IQueueCounters extends ICounterHierarchy {
         String TaskSuccessCount = ITaskCounters.TaskSuccessCount;
 
         /**
-         * The average arrival rate (1/average-inter-arrival-time).
+         * The average arrival rate in tasks per millisecond (1/average-inter-arrival-time).
          */
         String AverageArrivalRate = "Average Arrival Rate";
         
         /**
-         * The average service rate (1/average-service-time).
+         * The average service rate in tasks per millisecond (1/average-service-time).
          */
         String AverageServiceRate = "Average Service Rate";
         

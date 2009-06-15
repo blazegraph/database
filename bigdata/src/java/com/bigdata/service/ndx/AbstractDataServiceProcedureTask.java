@@ -57,19 +57,14 @@ abstract class AbstractDataServiceProcedureTask implements Callable<Void> {
     final protected boolean WARN = log.getEffectiveLevel().toInt() <= Level.WARN
             .toInt();
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.isInfoEnabled();
-
     protected final IScaleOutClientIndex ndx;
 
     /**
-     * The timestamp for the operation. This will be the timestamp for the
-     * view (the outer class) unless the operation is read-only, in which
-     * case a different timestamp may be choosen either to improve
-     * concurrency or to provide globally read-consistent operations (in the
-     * latter cases this will be a read-only transaction identifier).
+     * The timestamp for the operation. This will be the timestamp for the view
+     * (the outer class) unless the operation is read-only, in which case a
+     * different timestamp may be chosen either to improve concurrency or to
+     * provide globally read-consistent operations (in the latter cases this
+     * will be a read-only transaction identifier).
      */
     protected final long ts;
 
@@ -187,6 +182,20 @@ abstract class AbstractDataServiceProcedureTask implements Callable<Void> {
         // the index partition locator.
         final PartitionLocator locator = (PartitionLocator) split.pmd;
 
+        /*
+         * Track the total inter-arrival time.
+         */
+        synchronized (taskCounters.lastArrivalNanoTime) {
+            final long lastArrivalNanoTime = taskCounters.lastArrivalNanoTime
+                    .get();
+            final long now = System.nanoTime();
+            final long delta = now - lastArrivalNanoTime;
+            // cumulative inter-arrival time.
+            taskCounters.interArrivalNanoTime.addAndGet(delta);
+            // update timestamp of the last task arrival.
+            taskCounters.lastArrivalNanoTime.set(now);
+        }
+        
         taskCounters.taskSubmitCount.incrementAndGet();
         //            taskCountersByProc.taskSubmitCount.incrementAndGet();
         taskCountersByIndex.taskSubmitCount.incrementAndGet();

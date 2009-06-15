@@ -697,7 +697,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                                 final double t = interArrivalNanoTimeTask
                                         .getMovingAverage();
                                 if (t != 0d)
-                                    setValue(1d/t);
+                                    setValue(1d/(t*scalingFactor));
                             }
                         });
                 
@@ -709,7 +709,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                                 final double t = serviceNanoTimeTask
                                         .getMovingAverage();
                                 if (t != 0d)
-                                    setValue(1d/t);
+                                    setValue(1d/(t*scalingFactor));
                             }
                         });
                 
