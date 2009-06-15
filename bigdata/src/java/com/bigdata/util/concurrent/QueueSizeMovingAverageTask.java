@@ -9,7 +9,7 @@ import java.util.concurrent.Callable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class QueueStatisticsTask extends MovingAverageTask implements Runnable {
+public class QueueSizeMovingAverageTask extends MovingAverageTask implements Runnable {
 
     /**
      * The size of the queue (moving average).
@@ -29,7 +29,7 @@ public class QueueStatisticsTask extends MovingAverageTask implements Runnable {
      * @param queue
      *            The queue to be monitored.
      */
-    public QueueStatisticsTask(String name, BlockingQueue queue) {
+    public QueueSizeMovingAverageTask(String name, BlockingQueue queue) {
 
         this(name, queue, DEFAULT_WEIGHT);
 
@@ -46,7 +46,7 @@ public class QueueStatisticsTask extends MovingAverageTask implements Runnable {
      *            The weight to be used by
      *            {@link #getMovingAverage(double, double, double)}
      */
-    public QueueStatisticsTask(final String name, final BlockingQueue queue,
+    public QueueSizeMovingAverageTask(final String name, final BlockingQueue queue,
             final double w) {
 
         super(name, new Callable<Integer>() {

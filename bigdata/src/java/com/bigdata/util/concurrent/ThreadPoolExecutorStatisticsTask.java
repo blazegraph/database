@@ -1,5 +1,6 @@
 package com.bigdata.util.concurrent;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -26,7 +27,7 @@ import com.bigdata.util.concurrent.IQueueCounters.IWriteServiceExecutorCounters;
  *       Consider subclassing {@link ThreadPoolExecutor} to maintain these
  *       counters more cheaply.
  * 
- * @todo refactor to layer {@link QueueStatisticsTask} then
+ * @todo refactor to layer {@link QueueSizeMovingAverageTask} then
  *       {@link ThreadPoolExecutorStatisticsTask} then for the
  *       {@link WriteServiceExecutor}.
  * 
@@ -38,14 +39,19 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     protected static final Logger log = Logger.getLogger(ThreadPoolExecutorStatisticsTask.class);
     
     /**
-     * The service that is being monitored.
+     * The label for the executor service (used in log messages).
      */
-    private final ThreadPoolExecutor service;
+    private final String serviceName;
     
     /**
-     * The label for the service (used in log messages).
+     * The executor service that is being monitored.
      */
-    private final String name;
+    private final ThreadPoolExecutor service;
+
+    /**
+     * The time when we started to collect data about the {@link #service} (set by the ctor).
+     */
+    private final long startNanos;
     
     /**
      * The weight used to compute the moving average.
@@ -67,92 +73,6 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     private double averageActiveCountWithLocksHeld = 0d;
     
     /**
-     * The #of tasks not yet assigned to any thread which are waiting to run
-     * (moving average).
-     * 
-     * @see IQueueCounters#AverageQueueSize
-     */
-    public final Instrument<Double> averageQueueSizeInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue( averageQueueSize );
-            
-        }
-        
-    };
-
-    /**
-     * The #of tasks that are currently running (moving average).
-     * 
-     * @see IThreadPoolExecutorCounters#AverageActiveCount
-     */
-    public final Instrument<Double> averageActiveCountInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue( averageActiveCount );
-            
-        }
-        
-    };
-    
-    /**
-     * The #of tasks that are currently running <strong>with locks held</strong>
-     * (moving average) (this is only reported for the
-     * {@link WriteExecutorService}).
-     * 
-     * @see IWriteServiceExecutorCounters#AverageActiveCountWithLocksHeld
-     */
-    public final Instrument<Double> averageActiveCountWithLocksHeldInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue( averageActiveCountWithLocksHeld );
-            
-        }
-        
-    };
-    
-    /**
-     * The queue length (moving average).
-     * <p>
-     * Note: this is the primary average of interest - it includes both the
-     * tasks waiting to be run and those that are currently running in the
-     * definition of the "queue length".
-     * 
-     * @see IThreadPoolExecutorCounters#AverageQueueLength
-     */
-    public final Instrument<Double> averageQueueLengthInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue(averageQueueLength);
-
-        }
-
-    };
-
-    /**
-     * The #of tasks waiting to execute on the internal lock on the
-     * {@link WriteExecutorService}.
-     */
-    public final Instrument<Double> averageReadyCountInst = new Instrument<Double>() {
-
-        @Override
-        protected void sample() {
-
-            setValue(averageReadyCount);
-            
-        }
-        
-    };
-
-    /**
      * Data collected about {@link AbstractTask}s run on a service (optional).
      */
     private final TaskCounters taskCounters;
@@ -171,7 +91,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     private double averageQueueWaitingTime = 0d;
     /** time waiting for resource locks. */
     private double averageLockWaitingTime = 0d;
-    /** time doing work (with any resources locks, excludes commit). */
+    /** time doing work (does not include time to acquire resources locks or commit time). */
     private double averageServiceTime = 0d;
     /** time checkpointing indices (included in the {@link #averageServiceTime}). */
     private double averageCheckpointTime = 0d;
@@ -183,6 +103,10 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     private double averageCommitGroupSize = 0d;
     private double averageByteCountPerCommit = 0d;
     
+    /*
+     * private variables used to compute the delta in various counters since
+     * they were last sampled.
+     */
     private long queueWaitingTime = 0L;
     private long lockWaitingTime = 0L;
     private long serviceTime = 0L;
@@ -193,173 +117,12 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     private long commitServiceTime = 0L;
     
     private double averageReadyCount;
-
-    /**
-     * Moving average in milliseconds of the time a task waits on a queue
-     * pending execution.
-     * 
-     * @see IThreadPoolExecutorTaskCounters#AverageQueueWaitingTime
-     */
-    public final Instrument<Double> averageQueueWaitingTimeInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue( averageQueueWaitingTime );
-            
-        }
-
-    };
-
-    /**
-     * Moving average in milliseconds of the time that a task is waiting for
-     * resource locks (zero unless the task is unisolated).
-     * 
-     * @see IWriteServiceExecutorCounters#AverageLockWaitingTime
-     */
-    public final Instrument<Double> averageLockWaitingTimeInst = new Instrument<Double>() {
-
-        @Override
-        protected void sample() {
-
-            setValue(averageLockWaitingTime);
-
-        }
-
-    };
-    
-    /**
-     * Moving average in milliseconds of the time that a task is checkpointing
-     * indices on which it has written (this is already reported as part of the
-     * tasks {@link #averageServiceTimeInst}).
-     * 
-     * @see IThreadPoolExecutorTaskCounters#AverageCheckpointTime
-     */
-    public final Instrument<Double> averageCheckpointTimeInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue( averageCheckpointTime );
-            
-        }
-        
-    };
-
-    /**
-     * Moving average in milliseconds of the time that a task is being serviced
-     * by a worker thread (elapsed clock time from when the task was assigned to
-     * the thread until the task completes its work).
-     * <p>
-     * Note: For tasks which acquire resource lock(s), this does NOT include the
-     * time waiting to acquire the resource lock(s).
-     * 
-     * @see IThreadPoolExecutorTaskCounters#AverageServiceTime
-     */
-    public final Instrument<Double> averageServiceTimeInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue( averageServiceTime );
-            
-        }
-        
-    };
-
-    /**
-     * Moving average in milliseconds of the time between the submission of a
-     * task and its completion including any time spent waiting for resource
-     * locks, commit processing and any time spent servicing that task.
-     * 
-     * @see IThreadPoolExecutorTaskCounters#AverageQueuingTime
-     */
-    public final Instrument<Double> averageQueuingTimeInst = new Instrument<Double>() {
-        
-        @Override
-        protected void sample() {
-
-            setValue( averageQueuingTime );
-            
-        }
-        
-    };
-
-    /**
-     * Moving average in milliseconds of the time that the task that initiates
-     * the group commit waits for other tasks to join the commit group (zero
-     * unless the service is unisolated).
-     * 
-     * @see IWriteServiceExecutorCounters#AverageCommitWaitingTime
-     */
-    public final Instrument<Double> averageCommitWaitingTimeInst = new Instrument<Double>() {
-
-        @Override
-        protected void sample() {
-
-            setValue(averageCommitWaitingTime);
-
-        }
-
-    };
-    
-    /**
-     * Moving average in milliseconds of the time servicing the group commit
-     * (zero unless the service is unisolated).
-     * 
-     * @see IWriteServiceExecutorCounters#AverageCommitServiceTime
-     */
-    public final Instrument<Double> averageCommitServiceTimeInst = new Instrument<Double>() {
-
-        @Override
-        protected void sample() {
-
-            setValue(averageCommitServiceTime);
-
-        }
-
-    };
-
-    /**
-     * Moving average of the size of commits (zero unless the service is
-     * unisolated).
-     * 
-     * @see IWriteServiceExecutorCounters#AverageCommitGroupSize
-     */
-    public final Instrument<Double> averageCommitGroupSizeInst = new Instrument<Double>() {
-
-        @Override
-        protected void sample() {
-
-            setValue(averageCommitGroupSize);
-
-        }
-
-    };
-
-    /**
-     * Moving average of the #of bytes written since the previous commit (zero
-     * unless the service is unisolated).
-     * 
-     * @see IWriteServiceExecutorCounters#AverageByteCountPerCommit
-     */
-    public final Instrument<Double> averageByteCountPerCommitInst = new Instrument<Double>() {
-
-        @Override
-        protected void sample() {
-
-            setValue(averageByteCountPerCommit);
-
-        }
-
-    };
     
     /**
      * Scaling factor converts nanoseconds to milliseconds.
      */
     static final double scalingFactor = 1d / TimeUnit.NANOSECONDS.convert(1,
             TimeUnit.MILLISECONDS);
-    
     
     /**
      * The weight used to compute the moving average.
@@ -389,15 +152,15 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * an {@link AbstractTask} and therefore does not update
      * {@link TaskCounters}s.
      * 
-     * @param name
+     * @param serviceName
      *            The label for the service.
      * 
      * @param service
      *            The service to be monitored.
      */
-    public ThreadPoolExecutorStatisticsTask(String name, ThreadPoolExecutor service) {
+    public ThreadPoolExecutorStatisticsTask(String serviceName, ThreadPoolExecutor service) {
 
-        this(name, service, null/* taskCounters */, DEFAULT_WEIGHT);
+        this(serviceName, service, null/* taskCounters */, DEFAULT_WEIGHT);
 
     }
 
@@ -405,7 +168,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * Ctor variant when the {@link ThreadPoolExecutor} has hooks for an
      * {@link AbstractTask} and updates the given {@link TaskCounters}s.
      * 
-     * @param name
+     * @param serviceName
      *            The label for the service.
      * @param service
      *            The service to be monitored.
@@ -413,17 +176,17 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      *            The per-task counters used to compute the latency data for
      *            tasks run on that service.
      */
-    public ThreadPoolExecutorStatisticsTask(String name, ThreadPoolExecutor service,
+    public ThreadPoolExecutorStatisticsTask(String serviceName, ThreadPoolExecutor service,
             TaskCounters taskCounters) {
 
-        this(name, service, taskCounters, DEFAULT_WEIGHT);
+        this(serviceName, service, taskCounters, DEFAULT_WEIGHT);
 
     }
     
     /**
      * Core impl.
      * 
-     * @param name
+     * @param serviceName
      *            The label for the service.
      * @param service
      *            The service to be monitored.
@@ -434,10 +197,10 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      *            The weight to be used by
      *            {@link #getMovingAverage(double, double, double)}
      */
-    public ThreadPoolExecutorStatisticsTask(String name, ThreadPoolExecutor service,
+    public ThreadPoolExecutorStatisticsTask(String serviceName, ThreadPoolExecutor service,
             TaskCounters taskCounters, double w) {
     
-        if (name == null)
+        if (serviceName == null)
             throw new IllegalArgumentException();
 
         if (service == null)
@@ -450,9 +213,11 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
         if (w <= 0d || w >= 1d)
             throw new IllegalArgumentException();
         
-        this.name = name;
+        this.serviceName = serviceName;
         
         this.service = service;
+        
+        this.startNanos = System.nanoTime();
         
         this.taskCounters = taskCounters;
         
@@ -481,18 +246,45 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     }
 
     /**
-     * Note: don't throw anything from here or it will cause the task to no
-     * longer be run!
+     * The moving average of the change in the total inter-arrival time.
+     * 
+     * @see TaskCounters#interArrivalNanoTime
+     */
+    private DeltaMovingAverageTask interArrivalNanoTimeTask = new DeltaMovingAverageTask(
+            "interArrivalTime", new Callable<Long>() {
+                public Long call() {
+                    return taskCounters.interArrivalNanoTime.get();
+                }
+            });
+
+    /**
+     * The moving average of the change in the total task service time.
+     * 
+     * @see TaskCounters#serviceNanoTime
+     */
+    private DeltaMovingAverageTask serviceNanoTimeTask = new DeltaMovingAverageTask(
+            "interArrivalTime", new Callable<Long>() {
+                public Long call() {
+                    return taskCounters.serviceNanoTime.get();
+                }
+            });
+    
+    /**
+     * This should be invoked once per second to sample various counters in
+     * order to turn their values into moving averages.
+     * <p>
+     * Note: don't throw anything from here or it will cause the scheduled task
+     * executing this to no longer be run!
      */
     public void run() {
 
         try {
 
-            // queueSize := #of tasks in the queue.
-            final int queueSize = service.getQueue().size();
-
             {
                 
+                // queueSize := #of tasks in the queue.
+                final int queueSize = service.getQueue().size();
+
                 // activeCount := #of tasks assigned a worker thread
                 final int activeCount = service.getActiveCount();
 
@@ -519,12 +311,12 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
             if (service instanceof WriteExecutorService) {
 
                 /*
-                 * Note: For the WriteExecutorService we also compute the
-                 * averageActiveCount using a definition of [activeCount] that
-                 * only counts tasks that are currently holding their exclusive
-                 * resource lock(s). This is the real concurrency of the write
-                 * service since tasks without locks are waiting on other tasks
-                 * so that they can obtain their lock(s) and "run".
+                 * Note: For the WriteExecutorService we compute a variant of
+                 * [activeCount] the which only counts tasks that are currently
+                 * holding their exclusive resource lock(s). This is the real
+                 * concurrency of the write service since tasks without locks
+                 * are waiting on other tasks so that they can obtain their
+                 * lock(s) and "run".
                  */
                 
                 final int activeCountWithLocksHeld = ((WriteExecutorService) service)
@@ -543,7 +335,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
                 // #of tasks that have been submitted so far.
                 final long taskCount = taskCounters.taskCompleteCount.get();
-                
+
                 if (taskCount > 0) {
 
                     /*
@@ -608,6 +400,13 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
                     }
 
+                    /*
+                     * The moving average of the change in the cumulative
+                     * inter-arrival time.
+                     */
+                    interArrivalNanoTimeTask.run();
+                    serviceNanoTimeTask.run();
+                    
                     /*
                      * Time that the task is busy checkpoint its indices (this
                      * is already reported as part of the service time but which
@@ -722,28 +521,9 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
             
             nsamples++;
 
-            // @todo config reporting period.
-            final int period = 10;
-            if (nsamples % period == 0) {
-
-                // todo log all counter values using counterSet.asXML()?
-                if(log.isInfoEnabled())
-                log.info(name + ":\naverageQueueLength=" + averageQueueLength
-                        + " (activeCountAverage=" + averageActiveCount
-                        + ",queueSizeAverage=" + averageQueueSize
-                        + "), nsamples=" + nsamples+"\n"+service+"\n"
-                        + "#active="+service.getActiveCount()
-                        +", poolSize="+service.getPoolSize()
-                        +", maxPoolSize="+service.getMaximumPoolSize()
-                        +", largestPoolSize="+service.getLargestPoolSize()
-                        +", queueSize="+service.getQueue().size()
-                        );
-
-            }
-            
         } catch (Exception ex) {
 
-            log.warn(ex.getMessage(),ex);
+            log.warn(serviceName, ex);
 
         }
         
@@ -795,7 +575,12 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
             {
 
                 counterSet.addCounter(IQueueCounters.AverageQueueSize,
-                        averageQueueSizeInst);
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageQueueSize);
+                            }
+                        });
 
             }
 
@@ -836,11 +621,21 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 
                 counterSet.addCounter(
                         IThreadPoolExecutorCounters.AverageActiveCount,
-                        averageActiveCountInst);
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageActiveCount);
+                            }
+                        });
 
                 counterSet.addCounter(
                         IThreadPoolExecutorCounters.AverageQueueLength,
-                        averageQueueLengthInst);
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageQueueLength);
+                            }
+                        });
 
             }
 
@@ -895,16 +690,56 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                  */
 
                 counterSet.addCounter(
-                        IThreadPoolExecutorTaskCounters.AverageQueueWaitingTime,
-                        averageQueueWaitingTimeInst);
+                        IWriteServiceExecutorCounters.AverageArrivalRate,
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                final double t = interArrivalNanoTimeTask
+                                        .getMovingAverage();
+                                if (t != 0d)
+                                    setValue(1d/t);
+                            }
+                        });
+                
+                counterSet.addCounter(
+                        IWriteServiceExecutorCounters.AverageServiceRate,
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                final double t = serviceNanoTimeTask
+                                        .getMovingAverage();
+                                if (t != 0d)
+                                    setValue(1d/t);
+                            }
+                        });
+                
+                counterSet
+                        .addCounter(
+                                IThreadPoolExecutorTaskCounters.AverageQueueWaitingTime,
+                                new Instrument<Double>() {
+                                    @Override
+                                    protected void sample() {
+                                        setValue(averageQueueWaitingTime);
+                                    }
+                                });
 
                 counterSet.addCounter(
                         IThreadPoolExecutorTaskCounters.AverageServiceTime,
-                        averageServiceTimeInst);
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageServiceTime);
+                            }
+                        });
 
                 counterSet.addCounter(
                         IThreadPoolExecutorTaskCounters.AverageQueuingTime,
-                        averageQueuingTimeInst);
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageQueuingTime);
+                            }
+                        });
 
             }
 
@@ -982,31 +817,83 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                         });
 
                 /*
-                 * Moving averages available only for the write executor service.
+                 * Moving averages available only for the write executor
+                 * service.
                  */
 
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageActiveCountWithLocksHeld,
-                        averageActiveCountWithLocksHeldInst);
+                counterSet
+                        .addCounter(
+                                IWriteServiceExecutorCounters.AverageActiveCountWithLocksHeld,
+                                new Instrument<Double>() {
+                                    @Override
+                                    protected void sample() {
+                                        setValue(averageActiveCountWithLocksHeld);
+                                    }
+                                });
 
                 counterSet.addCounter(
                         IWriteServiceExecutorCounters.AverageReadyCount,
-                        averageReadyCountInst);
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageReadyCount);
+                            }
+                        });
 
-                counterSet.addCounter(IWriteServiceExecutorCounters.AverageCommitGroupSize,
-                        averageCommitGroupSizeInst);
+                counterSet.addCounter(
+                        IWriteServiceExecutorCounters.AverageCommitGroupSize,
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageCommitGroupSize);
+                            }
+                        });
 
-                counterSet.addCounter(IWriteServiceExecutorCounters.AverageLockWaitingTime,
-                        averageLockWaitingTimeInst);
+                counterSet.addCounter(
+                        IWriteServiceExecutorCounters.AverageLockWaitingTime,
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageLockWaitingTime);
+                            }
+                        });
 
-                counterSet.addCounter(IWriteServiceExecutorCounters.AverageCommitWaitingTime,
-                        averageCommitWaitingTimeInst);
+                counterSet.addCounter(
+                        IWriteServiceExecutorCounters.AverageCheckpointTime,
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageCheckpointTime);
+                            }
+                        });
 
-                counterSet.addCounter(IWriteServiceExecutorCounters.AverageCommitServiceTime,
-                        averageCommitServiceTimeInst);
+                counterSet.addCounter(
+                        IWriteServiceExecutorCounters.AverageCommitWaitingTime,
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageCommitWaitingTime);
+                            }
+                        });
 
-                counterSet.addCounter(IWriteServiceExecutorCounters.AverageByteCountPerCommit,
-                        averageByteCountPerCommitInst);
+                counterSet.addCounter(
+                        IWriteServiceExecutorCounters.AverageCommitServiceTime,
+                        new Instrument<Double>() {
+                            @Override
+                            protected void sample() {
+                                setValue(averageCommitServiceTime);
+                            }
+                        });
+
+                counterSet
+                        .addCounter(
+                                IWriteServiceExecutorCounters.AverageByteCountPerCommit,
+                                new Instrument<Double>() {
+                                    @Override
+                                    protected void sample() {
+                                        setValue(averageByteCountPerCommit);
+                                    }
+                                });
 
             }
 

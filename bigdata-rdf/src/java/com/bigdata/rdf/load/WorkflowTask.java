@@ -224,6 +224,17 @@ public class WorkflowTask<T extends Runnable, F> implements Runnable {
             counters.taskSubmitCount.incrementAndGet();
             // submit task.
             future = (Future<F>) service.submit(this);
+            // Track the total inter-arrival time.
+            synchronized (counters.lastArrivalNanoTime) {
+                final long lastArrivalNanoTime = counters.lastArrivalNanoTime
+                        .get();
+                final long now = System.nanoTime();
+                final long delta = now - lastArrivalNanoTime;
+                // cumulative inter-arrival time.
+                counters.interArrivalNanoTime.addAndGet(delta);
+                // update timestamp of the last task arrival.
+                counters.lastArrivalNanoTime.set(now);
+            }
         } catch (RejectedExecutionException ex) {
             // task was rejected.
             // clear submit time.

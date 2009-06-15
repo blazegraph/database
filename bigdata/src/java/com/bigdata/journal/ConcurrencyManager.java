@@ -1193,14 +1193,28 @@ public class ConcurrencyManager implements IConcurrencyManager {
             final AbstractTask<T> task, final ExecutorService service,
             final TaskCounters taskCounters) {
 
+        /*
+         * Track the total inter-arrival time.
+         */
+        synchronized (taskCounters.lastArrivalNanoTime) {
+            final long lastArrivalNanoTime = taskCounters.lastArrivalNanoTime
+                    .get();
+            final long now = System.nanoTime();
+            final long delta = now - lastArrivalNanoTime;
+            // cumulative inter-arrival time.
+            taskCounters.interArrivalNanoTime.addAndGet(delta);
+            // update timestamp of the last task arrival.
+            taskCounters.lastArrivalNanoTime.set(now);
+        }
+
         taskCounters.taskSubmitCount.incrementAndGet();
-        
+
         /*
          * Note: The StoreManager (part of the ResourceManager) has some
          * asynchronous startup processing where it scans the existing store
          * files or creates the initial store file. This code will await the
-         * completion of startup processing before permitting a task to be
-         * submittinged. This causes clients to block until we are ready to
+         * completion of service startup processing before permitting a task to
+         * be submitted. This causes clients to block until we are ready to
          * process their tasks.
          */
         if (resourceManager instanceof StoreManager) {
