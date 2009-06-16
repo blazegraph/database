@@ -132,6 +132,8 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20S
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/OpenLeafCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Byte%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/OpenLeafByteCount
 
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Arrival%20Rate&depth=9&correlated=true&period=Minutes&file=service/ds/AverageArrivalRate
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Arrival%20Service&depth=9&correlated=true&period=Minutes&file=service/ds/AverageServiceRate
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Queue%20Length&depth=9&correlated=true&period=Minutes&file=service/ds/AverageQueueLength
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Queuing%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageQueuingTime
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Service%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageServiceTime
