@@ -60,6 +60,7 @@ import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.counters.httpd.DummyEventReportingService;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.Event;
 
 /**
@@ -351,7 +352,9 @@ public class QueryUtil {
 
         try {
 
-            is = new BufferedInputStream(new FileInputStream(file));
+            // use large buffers.  these files are 200-300M each!
+            is = new BufferedInputStream(new FileInputStream(file),
+                    Bytes.megabyte32 * 1);
 
             counterSet.readXML(is, instrumentFactory, filter);
 
