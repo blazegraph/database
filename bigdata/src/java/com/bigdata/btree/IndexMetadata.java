@@ -158,7 +158,7 @@ import com.bigdata.sparse.SparseRowStore;
  * earliest fully isolated transaction (either a read-only tx as of the start
  * time of the tx or a read-write tx as of its start time). The role of a
  * "history policy" with transactions is therefore how much history to buffer
- * between the earliest running tx and the choosen "purge time". When the
+ * between the earliest running tx and the chosen "purge time". When the
  * transaction manager updates the "purge time" it notifies the journal/data
  * services. Resources having no data later than the purge time may be deleted
  * and SHOULD NOT be carried forward when building new index segments.

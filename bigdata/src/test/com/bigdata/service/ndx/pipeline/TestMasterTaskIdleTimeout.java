@@ -125,8 +125,8 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
          * Note: If the idle timeout is too short then Thread#sleep() will not
          * return before the timeout has expired.
          */
-        Thread.sleep(TimeUnit.NANOSECONDS.toMillis(master.sinkIdleTimeoutNanos
-                / 2 - elapsed1));
+        Thread.sleep(Math.max(1,TimeUnit.NANOSECONDS.toMillis(master.sinkIdleTimeoutNanos
+                / 2 - elapsed1)));
 
         final long elapsed2 = System.nanoTime() - beforeWrite;
 

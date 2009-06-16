@@ -411,6 +411,19 @@ L>//
 
                 /*
                  * Poll the source iterator for another chunk.
+                 * 
+                 * @todo I need to review the logic for choosing a shorting poll
+                 * duration here. I believe that this choice is leading to high
+                 * CPU utilization when there are a lot of index partitions and
+                 * hence a large #of threads running on the clients. In fact, I
+                 * am not certain that the rational for the specialized
+                 * non-blocking iterator class in AbstractSubtask is still valid
+                 * now that we are not holding onto the master's lock.  Perhaps
+                 * we can just get by now with the BlockingBuffer's asynchronous
+                 * iterator and a timeout equal to Min(chunkTimeout,idleTimeout).
+                 * The problem may be noticing when the master is exhausted, in
+                 * which case we can flush this sink without waiting up to the
+                 * chunk/idle timeout.
                  */
                 if (src.hasNext(master.sinkPollTimeoutNanos,
                         TimeUnit.NANOSECONDS)) {

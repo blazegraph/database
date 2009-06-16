@@ -264,7 +264,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * @see TaskCounters#serviceNanoTime
      */
     private DeltaMovingAverageTask serviceNanoTimeTask = new DeltaMovingAverageTask(
-            "interArrivalTime", new Callable<Long>() {
+            "serviceNanoTime", new Callable<Long>() {
                 public Long call() {
                     return taskCounters.serviceNanoTime.get();
                 }
@@ -406,6 +406,11 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                      * inter-arrival time.
                      */
                     interArrivalNanoTimeTask.run();
+
+                    /*
+                     * The moving average of the change in the total task
+                     * service time.
+                     */
                     serviceNanoTimeTask.run();
                     
                     /*
