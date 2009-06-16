@@ -30,6 +30,9 @@ echo $"`date` : `hostname` : `sysctl -w vm.swappiness=0`"
 # CAUTION: Once large pages are enabled you MUST tell the JVM to request
 # them (-XX:+UseLargePages) or it will be unable to access the portion
 # of your RAM which you give over to large pages!!!!
+#
+# Use 'cat /proc/meminfo' to examine the huge page use.
+# Use 'ipcs -m' to examine the shared memory segment use.
 
 # Increase RAM available used as shared memory
 # 
