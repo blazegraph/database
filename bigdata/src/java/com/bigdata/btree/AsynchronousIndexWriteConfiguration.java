@@ -10,7 +10,6 @@ import org.CognitiveWeb.extser.LongPacker;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
-import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.AbstractMasterTask;
 import com.bigdata.service.ndx.pipeline.AbstractSubtask;
 

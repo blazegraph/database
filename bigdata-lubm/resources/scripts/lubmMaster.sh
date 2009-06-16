@@ -18,39 +18,33 @@ source `dirname $0`/bigdataenv
 # convention.  Therefore I am unpacking the JAR before starting
 # the class server.
 #
-# FIXME Could run on `hostname` and the configured port as an (optional)
-# option.
-#
-# @todo should use an unique temporary directory.
-#
 # Note: You can nohup this script to prevent accidental disconnects.
 # Or be fancy and use 'disown' or 'screen'.
 #
 TFILE="/tmp/$(basename $0).$$.tmp"
 echo "Unpacking jar to $TFILE"
 mkdir $TFILE; pushd $TFILE; jar xf @install.lubm.lib.dir@/bigdata-lubm.jar; popd
-java -jar ${libDir}/jini/lib/tools.jar -dir $TFILE $verbose -port @LUBM_CLASS_SERVER_PORT@ &
+# Run the ClassServer in the background (uses very little RAM).
+java -Xmx80m\
+	-jar ${libDir}/jini/lib/tools.jar\
+	-dir $TFILE\
+	$verbose\
+	-port @LUBM_CLASS_SERVER_PORT@ &
 pid1=$!
 echo $"ClassServer running: pid=$pid1"
 
-# Start the lubm master.
+# Start the lubm master.  This does not need much RAM.  It will distribute
+# the work to be performed across a set of clients running on other machines.
+#
 java ${JAVA_OPTS} \
+	-Xmx400m \
     -cp ${CLASSPATH}:@install.lubm.lib.dir@/bigdata-lubm.jar \
     -Djava.rmi.server.codebase=@LUBM_RMI_CODEBASE_URL@ \
     edu.lehigh.swat.bench.ubt.bigdata.LubmGeneratorMaster \
-    ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES} \
-#    > lubmMaster.out 2>&1 < /dev/null & 
-## save the pid
-#pid2=$!
-#echo $"LUBM Master running: pid=$pid2"
-
-## disown jobs so that they will not be stopped if the terminal is closed.
-#disown -h $pid1
-#disown -h $pid2
-
-# tail the output file(s)
-#tail -f lubmMaster.out classServer.out
+    ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES}
 
 # kill the class server when done.
 kill $pid1
-rm -rf /tmp/lubm
+
+# remove the temp directory containing the unpacked class files.
+rm -rf $TFILE

@@ -63,6 +63,24 @@ if [ -d "$NAS/lubm" ]; then
 	cp -vr $NAS/lubm/*indexDumps* $targetDir/indexDumps
 fi
 
+# Extract performance counters for analysis.
+#
+# Note: This is easier to do on a server class machine, but it will nail the
+# CPU for a few minutes while it processes the counter set XML files so you
+# need to be sure that nothing will be adversely effected by that.
+# 
+# Note: This will only execute if it is run from the directory containing the
+# bigdata source (it looks for the queries to run in a known location but also
+# has a dependency on the build.properties and build.xml files for ant).
+#
+if [ -d "src/resources/analsysis/queries" ]; then
+	ant \
+		"-Danalysis.counters.dir=$targetDir/counters"\
+		"-Danalysis.queries=src/resources/analysis/queries"\
+		"-Danalysis.out.dir=$targetDir/output"\
+		analysis
+fi
+
 tar -cvz -C "$targetDir/.." -f $targetDir.tgz $targetDir
 
 echo "ready: $targetDir.tgz"
