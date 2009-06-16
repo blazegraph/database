@@ -17,9 +17,13 @@ echo $"`date` : `hostname` : `sysctl -w vm.swappiness=0`"
 ##############################
 # Configure huge pages.
 #
+# See http://java.sun.com/javase/technologies/hotspot/largememory.jsp
 # See http://andrigoss.blogspot.com/2008/02/jvm-performance-tuning.html
+# See http://www.puschitz.com/TuningLinuxForOracle.shtml#LargeMemoryOptimization
+# See http://www.puschitz.com/TuningLinuxForOracle.shtml#RemovingSharedMemory
+# See http://www.mjmwired.net/kernel/Documentation/vm/hugetlbpage.txt (older)
 #
-# CAUTION: Read the link above, figure out the existing values for your
+# CAUTION: Read the links above, figure out the existing values for your
 # kernel (and make a note of them), and compute the new values based on
 # the advice in that article.
 #
@@ -31,7 +35,7 @@ echo $"`date` : `hostname` : `sysctl -w vm.swappiness=0`"
 # 
 # was: kernel.shmmax = 33554432 (32M)
 #
-echo $"`date` : `hostname` : `sysctl -w kernel.shmmax=34359738368`"
+#echo $"`date` : `hostname` : `sysctl -w kernel.shmmax=34359738368`"
 
 # Allow some #of huge pages (required).
 #
@@ -39,7 +43,7 @@ echo $"`date` : `hostname` : `sysctl -w kernel.shmmax=34359738368`"
 # 
 # was: vm.nr_hugepages=0
 #
-echo $"`date` : `hostname` : `sysctl -w vm.nr_hugepages=8192`"
+#echo $"`date` : `hostname` : `sysctl -w vm.nr_hugepages=8192`"
 
 # The group (id) permitted to use huge pages (not required for root
 # and must be done by root, so you can't do it from this script if
