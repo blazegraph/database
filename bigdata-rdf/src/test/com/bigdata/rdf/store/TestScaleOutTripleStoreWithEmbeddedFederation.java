@@ -139,11 +139,11 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
      * Data files are placed into a directory named by the test. If the
      * directory exists, then it is removed before the federation is set up.
      */
-    public void setUp(ProxyTestCase testCase) throws Exception {
+    public void setUp(final ProxyTestCase testCase) throws Exception {
     
         super.setUp(testCase);
         
-        File dataDir = new File( testCase.getName() );
+        final File dataDir = new File( testCase.getName() );
         
         if(dataDir.exists() && dataDir.isDirectory()) {
 
@@ -166,7 +166,7 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
         
     }
     
-    public void tearDown(ProxyTestCase testCase) throws Exception {
+    public void tearDown(final ProxyTestCase testCase) throws Exception {
 
         // Note: also closes the embedded federation.
         client.disconnect(true/*immediateShutdown*/);
@@ -180,7 +180,7 @@ public class TestScaleOutTripleStoreWithEmbeddedFederation extends AbstractTestC
     
     private AtomicInteger inc = new AtomicInteger();
     
-    protected AbstractTripleStore getStore(Properties properties) {
+    protected AbstractTripleStore getStore(final Properties properties) {
     
         // Note: distinct namespace for each triple store created on the federation.
         final String namespace = "test"+inc.incrementAndGet();

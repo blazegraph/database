@@ -154,27 +154,57 @@ public class KVOLatch {
 
         try {
 
-            lock.lockInterruptibly();
-            try {
-
-                if (log.isInfoEnabled())
-                    log.info("signalAll()");
-
-                // release anyone awaiting our signal.
-                cond.signalAll();
-
-            } finally {
-
-                lock.unlock();
-                
-            }
-
+            // signal blocked threads.
+            _signal();
+            
         } catch (InterruptedException ex) {
 
             throw new RuntimeException(ex);
 
         }
+
+    }
+
+    /**
+     * Signal any threads blocked in {@link #await(long, TimeUnit)}.
+     * 
+     * @throws InterruptedException
+     */
+    private final void _signal() throws InterruptedException {
+
+        lock.lockInterruptibly();
+        try {
+
+            if (log.isInfoEnabled())
+                log.info("signalAll()");
+
+            // release anyone awaiting our signal.
+            cond.signalAll();
+
+        } finally {
+
+            lock.unlock();
+
+        }
+
+        // allow extensions, but not while holding the lock.
+        signal();
         
+    }
+
+    /**
+     * Invoked when the latch reaches zero after any threads blocked at
+     * {@link #await(long, TimeUnit)} have been released. This may be overridden
+     * to perform additional processing, such as moving an associated object
+     * onto another queue.
+     * <p>
+     * CAUTION: DO NOT invoke any operation from within this method which could
+     * block as that would cause the thread running the asynchronous write task
+     * in which this method is invoked to block. If you are transferring objects
+     * to a queue, the queue MUST be unbounded.
+     */
+    protected void signal() throws InterruptedException {
+
     }
 
     /**

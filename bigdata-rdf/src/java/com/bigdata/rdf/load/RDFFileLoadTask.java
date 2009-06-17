@@ -45,10 +45,6 @@ import com.bigdata.service.jini.JiniFederation;
  *            The generic for the {@link JobState}.
  * @param <V>
  *            The generic type of the client state (stored in zookeeper).
- * 
- * @todo report counters to federation. they will be attached to the
- *       {@link JiniFederation} of the {@link DataService}. they should be
- *       reported under the namespace of the job.
  */
 public class RDFFileLoadTask<S extends JobState, V extends Serializable>
         extends FederationCallable<Void> implements Serializable {
@@ -208,7 +204,7 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
      *            Where to put the data.
      * 
      * @throws InterruptedException
-     *             if interrupted (job cancelled).
+     *             if interrupted (job canceled).
      * @throws Exception
      *             if something else goes wrong.
      */
@@ -251,7 +247,7 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
         final long delay = 5000;
 
         /*
-         * Start a scheduled task. It will run until explicitly cancelled.
+         * Start a scheduled task. It will run until explicitly canceled.
          */
         final ScheduledFuture f = getFederation().addScheduledTask(
                 new RunnableFileSystemLoader(loader, taskFactory, tripleStore,
@@ -260,7 +256,7 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
 
         /*
          * The scheduled task should run forever so this blocks until this
-         * thread is interruted.
+         * thread is interrupted.
          */
         try {
 

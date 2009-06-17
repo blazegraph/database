@@ -39,16 +39,25 @@ import com.bigdata.btree.keys.KVO;
 public interface IDuplicateRemover<O> {
 
     /**
-     * Accepts a dense array of key-value tuples and returns a dense array
-     * of key-value tuples in which duplicates have been eliminated. The
-     * elements of the given array MUST NOT be modified as a side-effect.
-     * Implementations of this method MUST be thread-safe.
+     * Accepts a dense array of key-value tuples and returns a dense array of
+     * key-value tuples in which duplicates have been eliminated. The elements
+     * of the given array MUST NOT be modified as a side-effect.
+     * <p>
+     * Implementations MUST be thread-safe.
+     * <p>
+     * Implementations MUST test for {@link KVOList} and obey its contract (this
+     * ensures that we can map {@link KVO#done()} over the eliminated duplicates
+     * once the original has been written successfully onto the database).
      * 
      * @param a
      *            A sorted array of key-value tuples.
      * 
      * @return The a dense array of key-value tuples in which any duplicates
      *         have been eliminated.
+     * 
+     * @todo The thread safe requirement is probably not necessary. At least as
+     *       implemented, duplicates are eliminated by the
+     *       {@link IndexPartitionWriteTask} within a single-threaded context.
      */
     public KVO<O>[] filter(KVO<O>[] a);
 

@@ -13,6 +13,9 @@ import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.service.Split;
+import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
+import com.bigdata.service.ndx.pipeline.KVOC;
+import com.bigdata.service.ndx.pipeline.KVOList;
 
 /**
  * Synchronous RPC write on the TERM2ID index.
@@ -251,7 +254,7 @@ public class Term2IdWriteTask implements
          * @param readOnly
          *            if readOnly was specified for the {@link Term2IdWriteProc}.
          * @param nunknown
-         *            Incremeted as a side effect for each terms that could not
+         *            Incremented as a side effect for each terms that could not
          *            be resolved (iff readOnly == true).
          */
         public Term2IdWriteProcResultHandler(final KVO<BigdataValue>[] a,
@@ -291,8 +294,22 @@ public class Term2IdWriteTask implements
 
                 } else {
 
+                    // assign the term identifier.
                     a[i].obj.setTermId(termId);
 
+                    if(a[i] instanceof KVOList) {
+                        
+                        final KVOList<BigdataValue> tmp = (KVOList<BigdataValue>) a[i];
+
+                        if (!tmp.isDuplicateListEmpty()) {
+
+                            // assign the term identifier to the duplicates.
+                            tmp.map(new AssignTermId(termId));
+
+                        }
+                        
+                    }
+                    
                     if (log.isDebugEnabled()) {
                         log.debug("termId=" + termId + ", term=" + a[i].obj);
                     }
@@ -307,6 +324,44 @@ public class Term2IdWriteTask implements
 
             return null;
 
+        }
+
+    }
+
+    /**
+     * Assigns the term identifier to duplicate {@link BigdataValue} for a
+     * single write operation when an {@link IDuplicateRemover} was applied.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * 
+     * @todo this should be more transparent. One way to do that is to get rid
+     *       of {@link KVOList#map(com.bigdata.service.ndx.pipeline.KVOList.Op)}
+     *       and {@link KVOList.Op} and provide a TERM2ID index write specific
+     *       interface extending KVO. When the term identifier is assigned, we
+     *       then invoke the method on that interface to set the term identifier
+     *       on the original and any duplicates. The method would have to know
+     *       about {@link KVOList} however, and that means that we would really
+     *       need to different implementations depending on whether {@link KVOC}
+     *       was being extended or not. This is possibly even more messy.
+     */
+    static public class AssignTermId implements KVOList.Op<BigdataValue> {
+        
+        private final long tid;
+
+        public AssignTermId(final long tid) {
+
+            this.tid = tid;
+            
+        }
+
+        public void apply(final KVO<BigdataValue> t) {
+
+            t.obj.setTermId(tid);
+            
+//            System.err.println("Assigned term identifier to duplicate: "+tid+" : "+t.obj);
+            
         }
 
     }

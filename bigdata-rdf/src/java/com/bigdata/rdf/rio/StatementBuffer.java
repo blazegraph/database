@@ -266,7 +266,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * friends.
      * 
      * @param database
-     *            The database into which the terma and statements will be
+     *            The database into which the termS and statements will be
      *            inserted.
      * @param capacity
      *            The #of statements that the buffer can hold.
@@ -286,7 +286,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * 
      * @param statementStore
      *            The store into which the statements will be inserted
-     *            (optional). When <code>null</code>, both statments and
+     *            (optional). When <code>null</code>, both statements and
      *            terms will be inserted into the <i>database</i>. This
      *            optional argument provides the ability to load statements into
      *            a temporary store while the terms are resolved against the
@@ -330,7 +330,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      *            This option is NOT permitted when statementStore is also
      *            specified. The statementStore is always a local triple store
      *            and there is no reason to pipeline writes onto a local triple
-     *            store. Also, since, {@link SPORelation#newWriteBuffer()} is
+     *            store. Also, since, {@link SPORelation#newWriteBuffer(int)} is
      *            not parameterized to accept a lexicon other than the one
      *            associated with its container, it can not be used for truth
      *            maintenance where the statementStore must use the database's

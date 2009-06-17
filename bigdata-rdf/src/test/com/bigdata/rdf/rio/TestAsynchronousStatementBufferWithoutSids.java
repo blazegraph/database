@@ -44,6 +44,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.service.AbstractFederation;
 
 /**
  * Test suite for {@link AsynchronousStatementBufferWithoutSids}.
@@ -259,23 +260,23 @@ public class TestAsynchronousStatementBufferWithoutSids extends
             final String resource, final boolean parallel)
             throws Exception {
 
-        final AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement> factory = new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
+        final AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement> statementBufferFactory = new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
                 (ScaleOutTripleStore) store, chunkSize, valuesInitialCapacity,
                 bnodesInitialCapacity, syncRPCForTERM2ID);
 
         try {
 
-            doLoad(store, resource, parallel, factory);
+            doLoad(store, resource, parallel, statementBufferFactory);
             
             // wait for the async writes to complete.
-            factory.awaitAll();
+            statementBufferFactory.awaitAll();
 
             // dump write statistics for indices used by kb.
-            System.err.println(factory.getCounters());
+            System.err.println(statementBufferFactory.getCounters());
 
         } catch (Throwable t) {
 
-            factory.cancelAll(true/* mayInterruptIfRunning */);
+            statementBufferFactory.cancelAll(true/* mayInterruptIfRunning */);
 
             // rethrow
             throw new RuntimeException(t);

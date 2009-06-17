@@ -5,6 +5,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -77,77 +78,110 @@ public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
      * 
      * @todo in the base class also?
      */
-//    synchronized 
     public CounterSet getCounters() {
 
-//        if (counterSet == null) {
+        final CounterSet counterSet = new CounterSet();
 
-            final CounterSet counterSet = new CounterSet();
+        /*
+         * Elapsed ms since the start of the load up to and until the end of the
+         * load.
+         */
+        counterSet.addCounter("elapsed", new Instrument<Long>() {
 
-            /*
-             * Elapsed ms since the start of the load up to and until the end of
-             * the load.
+            @Override
+            protected void sample() {
+
+                final long elapsed = elapsed();
+
+                setValue(elapsed);
+
+            }
+        });
+
+        /*
+         * Note: This is the #of told triples read by _this_ client.
+         * 
+         * When you are loading using multiple instances of the concurrent data
+         * loader, then the total #of told triples is the aggregation across all
+         * of those instances.
+         */
+        counterSet.addCounter("toldTriplesLoaded", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                setValue(toldTriples.get());
+
+            }
+        });
+
+        /*
+         * Note: This is the told triples per second rate for _this_ client only
+         * since it is based on the triples read by the threads for this client.
+         * 
+         * When you are loading using multiple instances of the concurrent data
+         * loader, then the total told triples per second rate is the
+         * aggregation across all of those instances.
+         */
+        counterSet.addCounter("toldTriplesPerSec", new Instrument<Long>() {
+
+            @Override
+            protected void sample() {
+
+                final long elapsed = elapsed();
+
+                final double tps = (long) (((double) toldTriples.get())
+                        / ((double) elapsed) * 1000d);
+
+                setValue((long) tps);
+
+            }
+        });
+
+        if (bufferFactory instanceof AsynchronousWriteBufferFactoryWithoutSids) {
+
+            /**
+             * The #of documents whose TERM2ID writes are restart-safe on the
+             * database. Each parser thread will block until the TERM2ID writes
+             * are done and then proceed to write on the remaining indices.
              */
-            counterSet.addCounter("elapsed", new Instrument<Long>() {
-
+            counterSet.addCounter("documentsTermsDoneCount", new Instrument<Long>() {
                 @Override
                 protected void sample() {
-
-                    final long elapsed = elapsed();
-
-                    setValue(elapsed);
-
+                    setValue(((AsynchronousWriteBufferFactoryWithoutSids) bufferFactory)
+                            .getDocumentsTermsDoneCount());
                 }
             });
 
-            /*
-             * Note: This is the #of told triples read by _this_ client.
-             * 
-             * When you are loading using multiple instances of the concurrent
-             * data loader, then the total #of told triples is the aggregation
-             * across all of those instances.
+            /**
+             * The #of parser tasks that are currently blocked awaiting the results
+             * of a write on the TERM2ID index.
              */
-            counterSet.addCounter("toldTriplesLoaded", new Instrument<Long>() {
-
+            counterSet.addCounter("blockedParserTaskCount", new Instrument<Integer>() {
                 @Override
                 protected void sample() {
-
-                    setValue(toldTriples.get());
-
+                    setValue(((AsynchronousWriteBufferFactoryWithoutSids) bufferFactory)
+                            .getBlockedParserCount());
                 }
             });
 
-            /*
-             * Note: This is the told triples per second rate for _this_ client
-             * only since it is based on the triples read by the threads for
-             * this client.
-             * 
-             * When you are loading using multiple instances of the concurrent
-             * data loader, then the total told triples per second rate is the
-             * aggregation across all of those instances.
+            /**
+             * The #of documents which have been processed by this client and
+             * are restart safe on the database by this client.
              */
-            counterSet.addCounter("toldTriplesPerSec", new Instrument<Long>() {
-
+            counterSet.addCounter("documentsDoneCount", new Instrument<Long>() {
                 @Override
                 protected void sample() {
-
-                    final long elapsed = elapsed();
-
-                    final double tps = (long) (((double) toldTriples.get())
-                            / ((double) elapsed) * 1000d);
-
-                    setValue((long) tps);
-
+                    setValue(((AsynchronousWriteBufferFactoryWithoutSids) bufferFactory)
+                            .getDocumentsDoneCount());
                 }
             });
 
-//        }
+        }
 
         return counterSet;
 
     }
-
-//    private CounterSet counterSet = null;
     
     /**
      * Report totals.

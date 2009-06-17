@@ -15,13 +15,11 @@ import org.openrdf.rio.RDFFormat;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.rio.PresortRioLoader;
-import com.bigdata.rdf.rio.StatementBuffer;
 
 /**
  * Tasks either loads a RDF resource or verifies that the told triples found
  * in that resource are present in the database. The difference between data
- * load and data verify is just the behavior of the {@link StatementBuffer}
- * returned by {@link ConcurrentDataLoader#newStatementBuffer()}.
+ * load and data verify is just the behavior of the {@link IStatementBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
