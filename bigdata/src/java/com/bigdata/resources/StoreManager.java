@@ -1445,11 +1445,11 @@ abstract public class StoreManager extends ResourceEvents implements
              */
             openLiveJournal();
 
-            /*
-             * Purge any index partition moves which did not complete before
-             * shutdown.
-             */
-            purgeIncompleteMoves();
+//            /*
+//             * Purge any index partition moves which did not complete before
+//             * shutdown.
+//             */
+//            purgeIncompleteMoves();
             
             /*
              * Notify the transaction service of the last commit time for the
@@ -1666,122 +1666,122 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
         
-        /**
-         * Purge any index partition moves which did not complete successfully
-         * on restart. These index partitions are identified by scanning the
-         * indices registered on the live journal. If an index has
-         * <code>sourcePartitionId != -1</code> in its
-         * {@link LocalPartitionMetadata} then the index was being moved onto
-         * this {@link IDataService} when the service was shutdown. The index
-         * (together with any {@link IndexSegment} resources that are identified
-         * in its {@link LocalPartitionMetadata}) is deleted.
-         * 
-         * @todo write a unit test for this feature.
-         * 
-         * @todo test MDS to verify that the index partition flagged as an
-         *       incomplete move is not registered as part of scale-out index?
-         * 
-         * @deprecated This is no longer necessary. The new MOVE does not use
-         *             {@link LocalPartitionMetadata#getSourcePartitionId()}
-         *             field. Index segments are cleaned up during a failed
-         *             receive. If the index segment for some reason is NOT
-         *             cleaned up, then it will be released eventually (unless
-         *             an immortal database is being used) since it will not be
-         *             incorporated into any index partition view.
-         */
-        private void purgeIncompleteMoves() {
-
-            final boolean reallyDelete = true;
-
-            final ManagedJournal liveJournal = liveJournalRef.get();
-            
-            // using read-committed view of Name2Addr
-            final ITupleIterator itr = liveJournal.getName2Addr()
-                    .rangeIterator();
-
-            // the list of indices that will be dropped.
-            final List<String> toDrop = new LinkedList<String>();
-            
-            while (itr.hasNext()) {
-
-                final ITuple tuple = itr.next();
-
-                final Entry entry = EntrySerializer.INSTANCE
-                        .deserialize(new DataInputBuffer(tuple.getValue()));
-
-                /*
-                 * Open the mutable btree on the journal (not the full view of
-                 * that index).
-                 */
-                final BTree btree = (BTree) liveJournal.getIndex(entry.checkpointAddr);
-                
-                final String name = btree.getIndexMetadata().getName();
-
-                final LocalPartitionMetadata pmd = btree.getIndexMetadata().getPartitionMetadata();
-
-                if (pmd != null) {
-
-//                    System.err.println("\nname=" + name + "\npmd=" + pmd);
-
-                    if (pmd.getSourcePartitionId() != -1) {
-
-                        log.warn("Incomplete index partition move: name="
-                                + name + ", pmd=" + pmd);
-
-                        for (IResourceMetadata resource : pmd.getResources()) {
-
-                            if (resource.isIndexSegment()) {
-
-                                final File file = resourceFiles.get(resource.getUUID());
-                                
-//                                final File file = new File(segmentsDir,
-//                                        resource.getFile());
-
-                                log.warn("Deleting index segment: " + file);
-
-                                if (file.exists()) {
-
-                                    if (reallyDelete) {
-
-                                        deleteResource(resource.getUUID(),
-                                                false/* isJournal */);
-
-                                    }
-
-                                } else {
-
-                                    log.warn("Could not locate file: " + file);
-                                    
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-                if (!toDrop.isEmpty() && reallyDelete) {
-
-                    for (String s : toDrop) {
-
-                        liveJournal.dropIndex(s);
-
-                    }
-
-                    liveJournal.commit();
-
-                }
-
-            }
-
-        }
+//        /**
+//         * Purge any index partition moves which did not complete successfully
+//         * on restart. These index partitions are identified by scanning the
+//         * indices registered on the live journal. If an index has
+//         * <code>sourcePartitionId != -1</code> in its
+//         * {@link LocalPartitionMetadata} then the index was being moved onto
+//         * this {@link IDataService} when the service was shutdown. The index
+//         * (together with any {@link IndexSegment} resources that are identified
+//         * in its {@link LocalPartitionMetadata}) is deleted.
+//         * 
+//         * @todo write a unit test for this feature.
+//         * 
+//         * @todo test MDS to verify that the index partition flagged as an
+//         *       incomplete move is not registered as part of scale-out index?
+//         * 
+//         * @deprecated This is no longer necessary. The new MOVE does not use
+//         *             {@link LocalPartitionMetadata#getSourcePartitionId()}
+//         *             field. Index segments are cleaned up during a failed
+//         *             receive. If the index segment for some reason is NOT
+//         *             cleaned up, then it will be released eventually (unless
+//         *             an immortal database is being used) since it will not be
+//         *             incorporated into any index partition view.
+//         */
+//        private void purgeIncompleteMoves() {
+//
+//            final boolean reallyDelete = true;
+//
+//            final ManagedJournal liveJournal = liveJournalRef.get();
+//            
+//            // using read-committed view of Name2Addr
+//            final ITupleIterator itr = liveJournal.getName2Addr()
+//                    .rangeIterator();
+//
+//            // the list of indices that will be dropped.
+//            final List<String> toDrop = new LinkedList<String>();
+//            
+//            while (itr.hasNext()) {
+//
+//                final ITuple tuple = itr.next();
+//
+//                final Entry entry = EntrySerializer.INSTANCE
+//                        .deserialize(new DataInputBuffer(tuple.getValue()));
+//
+//                /*
+//                 * Open the mutable btree on the journal (not the full view of
+//                 * that index).
+//                 */
+//                final BTree btree = (BTree) liveJournal.getIndex(entry.checkpointAddr);
+//                
+//                final String name = btree.getIndexMetadata().getName();
+//
+//                final LocalPartitionMetadata pmd = btree.getIndexMetadata().getPartitionMetadata();
+//
+//                if (pmd != null) {
+//
+////                    System.err.println("\nname=" + name + "\npmd=" + pmd);
+//
+//                    if (pmd.getSourcePartitionId() != -1) {
+//
+//                        log.warn("Incomplete index partition move: name="
+//                                + name + ", pmd=" + pmd);
+//
+//                        for (IResourceMetadata resource : pmd.getResources()) {
+//
+//                            if (resource.isIndexSegment()) {
+//
+//                                final File file = resourceFiles.get(resource.getUUID());
+//                                
+////                                final File file = new File(segmentsDir,
+////                                        resource.getFile());
+//
+//                                log.warn("Deleting index segment: " + file);
+//
+//                                if (file.exists()) {
+//
+//                                    if (reallyDelete) {
+//
+//                                        deleteResource(resource.getUUID(),
+//                                                false/* isJournal */);
+//
+//                                    }
+//
+//                                } else {
+//
+//                                    log.warn("Could not locate file: " + file);
+//                                    
+//                                }
+//
+//                            }
+//
+//                        }
+//
+//                    }
+//
+//                }
+//
+//                if (!toDrop.isEmpty() && reallyDelete) {
+//
+//                    for (String s : toDrop) {
+//
+//                        liveJournal.dropIndex(s);
+//
+//                    }
+//
+//                    liveJournal.commit();
+//
+//                }
+//
+//            }
+//
+//        } // purgeIncompleteMoves()
         
-    }
+    } // class Startup
 
     /**
-     * <code>true</code> initally and until {@link #start()} completes
+     * <code>true</code> initially and until {@link #start()} completes
      * successfully.
      */
     public boolean isStarting() {
@@ -3220,6 +3220,9 @@ abstract public class StoreManager extends ResourceEvents implements
 //            }
 //            log.warn("nstores=" + nstores + ", nindices=" + nindices);
 //        }
+
+        final Event e = new Event(getFederation(), new EventResource(),
+                EventType.PurgeResources).start();
         
         /*
          * Prevent concurrent access to the index cache.
@@ -3417,7 +3420,7 @@ abstract public class StoreManager extends ResourceEvents implements
             
             purgeResourcesMillis += elapsedPurgeResourcesTime;
             
-            return new PurgeResult(firstCommitTime, lastCommitTime,
+            final PurgeResult result = new PurgeResult(firstCommitTime, lastCommitTime,
                     this.releaseTime, indexRetentionTime, choosenReleaseTime,
                     commitTimeToPreserve, resourcesInUse.size(),
                     journalBeforeCount, journalAfterCount, segmentBeforeCount,
@@ -3425,10 +3428,16 @@ abstract public class StoreManager extends ResourceEvents implements
                     elapsedScanCommitIndicesTime, elapsedDeleteResourcesTime,
                     elapsedPurgeResourcesTime);
 
+            e.addDetails(result.getParams());
+            
+            return result;
+            
         } finally {
 
             indexCacheLock.writeLock().unlock();
 
+            e.end();
+            
         }
 
     }
