@@ -115,10 +115,12 @@ http://localhost:8080/?depth=10&regex=/([^/]*)/.*Overflow%20Manager/Asynchronous
 #
 #http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/indices/(?=U[^/]*)([^/]*)/(?:[^/]*)/.*(?:writeSecs|readSecs|serializeSecs|deserializeSecs|leafSplit|tailSplit)&depth=12&period=Minutes&report=pivot&category=host&category=indexName&category=indexPartitionName&file=ds/service/indices/IndexReadWriteTime
 
-# @todo live journal counters are not being carried through past the first overflow.
-# http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/readSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/readSecs
-# http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/writeSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/writeSecs
+# live journal
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/readSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/readSecs
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/writeSecs&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/writeSecs
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/extent&depth=18&correlated=true&period=Minutes&file=service/ds/liveJournal/extent
 
+# StoreManager
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Data%20Volume%20Bytes%20Available&depth=12&period=Minutes&correlated=true&file=service/ds/DataVolumeBytesAvailable
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Temp%20Volume%20Bytes%20Available&depth=12&period=Minutes&correlated=true&file=service/ds/TempVolumeBytesAvailable
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Store%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/StoreCacheSize
@@ -126,14 +128,17 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Maximum%2
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Managed%20Journal%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/ManagedJournalCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Managed%20Segment%20Store%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/ManagedSegmentStoreCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Bytes%20Under%20Management&period=Minutes&depth=10&correlated=true&file=service/ds/BytesUnderManagement
+
+# IndexManager
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexSegmentCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/OpenLeafCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Byte%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/OpenLeafByteCount
 
+# UnisolatedWriteService
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Arrival%20Rate&depth=9&correlated=true&period=Minutes&file=service/ds/AverageArrivalRate
-http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Arrival%20Service&depth=9&correlated=true&period=Minutes&file=service/ds/AverageServiceRate
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Service%20Rate&depth=9&correlated=true&period=Minutes&file=service/ds/AverageServiceRate
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Queue%20Length&depth=9&correlated=true&period=Minutes&file=service/ds/AverageQueueLength
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Queuing%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageQueuingTime
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Service%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageServiceTime
@@ -142,5 +147,6 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Serv
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Byte%20Count%20Per%20Commit&depth=9&correlated=true&period=Minutes&file=service/ds/AverageByteCountPerCommit
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Commit%20Service%20Time&depth=9&correlated=true&period=Minutes&file=service/ds/AverageCommitServiceTime
 
+# Overflow Tasks
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Overflow%20Tasks/Move%20Count&depth=8&correlated=true&period=Minutes&file=service/ds/MoveCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Overflow%20Tasks/Split%20Count&depth=8&correlated=true&period=Minutes&file=service/ds/SplitCount
