@@ -43,6 +43,11 @@ java ${JAVA_OPTS} \
     edu.lehigh.swat.bench.ubt.bigdata.LubmGeneratorMaster \
     ${BIGDATA_CONFIG} ${BIGDATA_CONFIG_OVERRIDES}
 
+# Uncomment and specify the KB namespace if you want to run query 
+# after the data load.
+#
+#source lubmQuery.sh NAMESPACE
+
 # kill the class server when done.
 kill $pid1
 
