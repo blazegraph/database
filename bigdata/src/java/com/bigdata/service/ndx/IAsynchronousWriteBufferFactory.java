@@ -111,14 +111,7 @@ public interface IAsynchronousWriteBufferFactory {
      *            Used to aggregate results.
      * @param duplicateRemover
      *            Used to filter out duplicates in an application specified
-     *            manner (optional). A duplicate remover MUST NOT be used to
-     *            eliminate duplicates in combination with {@link KVOC} and
-     *            {@link KVOLatch}. If a {@link KVOC} having the same key,
-     *            value, and reference but a distinct {@link KVOLatch} reference
-     *            is eliminated as a duplicate that would cause a
-     *            {@link KVOLatch#dec()} invocation to be "lost" and would
-     *            result in non-termination since the count for the "lost" latch
-     *            would never reach zero.
+     *            manner (optional).
      * @param ctor
      *            Used to create instances of the procedure that will execute a
      *            write on an individual index partition (this implies that

@@ -1,15 +1,14 @@
 package com.bigdata.service.ndx.pipeline;
 
-import com.bigdata.btree.keys.KVO;
-
 /**
- * Extends {@link KVO} to provide handshaking with a {@link KVOLatch}.
+ * Extends {@link KVOList} to provide handshaking with a {@link KVOLatch}.
  * <p>
- * Note: A duplicate remover MUST NOT eliminate "duplicate" {@link KVOC}s when
- * one or the other has {@link KVOLatch} not shared by the other. Eliminating a
- * "duplicate" in this case would cause a {@link KVOLatch#dec()} to be "lost"
- * and generally results in non-termination of {@link KVOLatch#await()} since
- * the count for the "lost" latch would never reach zero.
+ * Note: {@link IDuplicateRemover}s MUST create a list from the identified
+ * duplicates so that the {@link KVOLatch} of each duplicate as well as the
+ * original are decremented after a successful write. Failure to do this will
+ * cause a {@link KVOLatch#dec()} to be "lost" and generally results in
+ * non-termination of {@link KVOLatch#await()} since the count for the "lost"
+ * latch would never reach zero.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -17,8 +16,9 @@ import com.bigdata.btree.keys.KVO;
  * @param <O>
  *            The generic type of the unserialized value object.
  */
-public class KVOC<O> extends KVO<O> {
+public class KVOC<O> extends KVOList<O> {
 
+    /** The latch. */
     private final KVOLatch latch;
 
     /**
@@ -47,10 +47,17 @@ public class KVOC<O> extends KVO<O> {
     }
 
     /**
-     * Decrements the {@link KVOLatch}.
+     * Extended to decrement the {@link KVOLatch}. This inherits the
+     * {@link KVOList} super class behavior, which maps {@link KVOList#done()}
+     * over the list of duplicates. This ensures that all latches are
+     * decremented once the original value has been successfully written onto an
+     * index partition.
      */
+    @Override
     public void done() {
 
+        super.done();
+        
         latch.dec();
 
     }

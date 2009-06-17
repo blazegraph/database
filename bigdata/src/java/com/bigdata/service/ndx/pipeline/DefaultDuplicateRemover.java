@@ -8,9 +8,12 @@ import com.bigdata.btree.keys.KVO;
 /**
  * Implementation which retains one instance of each tuple having the same
  * unsigned byte[] key and the same byte[] value. For efficiency, you may
- * specify that the presence of the same non-<code>null</code> object
- * reference may be used to detect duplicates without requiring the comparison
- * of the byte[] values.
+ * specify that the presence of the same non-<code>null</code> object reference
+ * may be used to detect duplicates without requiring the comparison of the
+ * byte[] values.
+ * <p>
+ * When duplicates are eliminated, {@link KVOC}s identified as duplicates are
+ * arranged into a linked list.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -23,21 +26,24 @@ public class DefaultDuplicateRemover<O> implements IDuplicateRemover<O> {
             .getLogger(DefaultDuplicateRemover.class);
 
     static protected transient final boolean DEBUG = log.isDebugEnabled();
-    
+
     final private boolean testRefs;
 
     /**
-     * Instance verifies the same unsigned byte[] key and the same byte[] value.,
+     * Instance verifies the same unsigned byte[] key and the same byte[]
+     * value.,
      */
-    public transient static final IDuplicateRemover KEY_VAL = new DefaultDuplicateRemover(false);
-    
+    public transient static final IDuplicateRemover KEY_VAL = new DefaultDuplicateRemover(
+            false/* testRefs */);
+
     /**
      * Instance verifies the same unsigned byte[] key and will accept the same
-     * non-<code>null</code> object reference as indicating the same value.
-     * If the object reference is <code>null</code> then it will compare the
-     * byte[] values.
+     * non-<code>null</code> object reference as indicating the same value. If
+     * the object reference is <code>null</code> then it will compare the byte[]
+     * values.
      */
-    public transient static final IDuplicateRemover KEY_REF_VAL = new DefaultDuplicateRemover(false);
+    public transient static final IDuplicateRemover KEY_REF_VAL = new DefaultDuplicateRemover(
+            false/* testRefs */);
     
     /**
      * @param testRefs
@@ -61,40 +67,64 @@ public class DefaultDuplicateRemover<O> implements IDuplicateRemover<O> {
         
         {
 
+            KVO<O> lastDistinct = null;
+
             for (int i = 0; i < nsrc; i++) {
 
-                if (i > 0 && BytesUtil.bytesEqual(src[i].key, src[i - 1].key)) {
+                final KVO<O> thisKVO = src[i];
+                
+                if (lastDistinct != null) {
 
-                    // same key
-                    if (log.isTraceEnabled())
-                        log.trace("duplicate key: "
-                                + BytesUtil.toString(src[i].key));
-                    
-                    if (testRefs && src[i].obj != null
-                            && src[i].obj == src[i - 1].obj) {
+                    if (BytesUtil.bytesEqual(thisKVO.key, lastDistinct.key)) {
 
-                        if (DEBUG)
-                            log.debug("duplicate reference: " + src[i].obj);
+                        // same key
+                        if (log.isTraceEnabled())
+                            log.trace("duplicate key: "
+                                    + BytesUtil.toString(thisKVO.key));
 
-                        // duplicate reference.
-                        continue;
+                        if (testRefs && thisKVO.obj != null
+                                && thisKVO.obj == lastDistinct.obj) {
 
-                    }
+                            // duplicate reference.
 
-                    if (BytesUtil.bytesEqual(src[i - 1].val, src[i].val)) {
+                            if (DEBUG)
+                                log.debug("duplicate reference: " + thisKVO.obj);
 
-                        if (DEBUG)
-                            log.debug("duplicate value: " + src[i].val);
+                            if(lastDistinct instanceof KVOList) {
+                                
+                                // link the duplicates together.
+                                ((KVOList)lastDistinct).add(thisKVO);
+                                
+                            }
+                            
+                            continue;
 
-                        // same value.
-                        continue;
+                        }
+
+                        if (BytesUtil.bytesEqual(lastDistinct.val, thisKVO.val)) {
+
+                            // same value.
+
+                            if (DEBUG)
+                                log.debug("duplicate value: " + thisKVO.val);
+
+                            if(lastDistinct instanceof KVOList) {
+                                
+                                // link the duplicates together.
+                                ((KVOList)lastDistinct).add(thisKVO);
+                                
+                            }
+
+                            continue;
+
+                        }
 
                     }
 
                 }
 
                 // add to the temporary array.
-                tmp[ndistinct++] = src[i];
+                tmp[ndistinct++] = lastDistinct = thisKVO;
 
             }
 

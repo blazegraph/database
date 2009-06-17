@@ -418,12 +418,25 @@ L>//
                  * hence a large #of threads running on the clients. In fact, I
                  * am not certain that the rational for the specialized
                  * non-blocking iterator class in AbstractSubtask is still valid
-                 * now that we are not holding onto the master's lock.  Perhaps
+                 * now that we are not holding onto the master's lock. Perhaps
                  * we can just get by now with the BlockingBuffer's asynchronous
-                 * iterator and a timeout equal to Min(chunkTimeout,idleTimeout).
-                 * The problem may be noticing when the master is exhausted, in
-                 * which case we can flush this sink without waiting up to the
-                 * chunk/idle timeout.
+                 * iterator and a timeout equal to
+                 * Min(chunkTimeout,idleTimeout). The problem may be noticing
+                 * when the master is exhausted, in which case we can flush this
+                 * sink without waiting up to the chunk/idle timeout. Since the
+                 * lock in the BlockingQueue is not visible, we can not signal
+                 * it if it is waiting. An blocking take combined with an
+                 * interrupt of the sink by the master when it is exhausted
+                 * where halted() still returns false might be the way to go.
+                 * 
+                 * However, on reflection, I think that the correct route is to
+                 * have the BlockingBuffer recognize a distinguished value, such
+                 * as an empty array, as closing the queue. That way the master
+                 * can invoke close(), which drops an empty array, and a
+                 * blocking take will notice it. That works for normal
+                 * termination. For abort, I can do what I already do - set the
+                 * Throwable an interrupt the thread draining the queue. The only
+                 * catch is that this will not work with scalar elements.
                  */
                 if (src.hasNext(master.sinkPollTimeoutNanos,
                         TimeUnit.NANOSECONDS)) {

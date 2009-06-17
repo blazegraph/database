@@ -103,16 +103,6 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
 
     protected static final transient Logger log = Logger.getLogger(ProgramTask.class);
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected final boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected final boolean DEBUG = log.isDebugEnabled();
-
     private final ActionEnum action;
     
     private final IStep step;
@@ -235,7 +225,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
      */
     public Object call() throws Exception {
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("begin: program=" + step.getName() + ", action="
                             + action);
@@ -277,7 +267,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
                     
                 }
 
-                if(INFO) {
+                if(log.isInfoEnabled()) {
                     
                     log.info("totals: \n" + totals);
                     
@@ -343,7 +333,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
 
         } finally {
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("bye");
 
         }
@@ -370,7 +360,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
         if (step == null)
             throw new IllegalArgumentException();
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("program=" + step.getName());
         
         // buffer shared by all rules run in this query.
@@ -409,7 +399,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
             // set the future on the BlockingBuffer.
             buffer.setFuture(future);
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Returning iterator reading on async query task");
 
             // return the async iterator.
@@ -571,7 +561,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
         final MutationTask mutationTask = new MutationTask(action, joinNexusFactory,
                 step, indexManager, isDataService()?getDataService():null);
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("begin: action=" + action + ", program=" + step.getName()
                     + ", task=" + mutationTask);
         
@@ -661,7 +651,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
             // mutationCount before this round.
             final long mutationCount0 = totals.mutationCount.get();
             
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("round=" + round + ", mutationCount(before)="
                         + mutationCount0);
 
@@ -699,7 +689,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
             // Aggregate the rule statistics, but not mutationCount.
             totals.add(tmp);
 
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
 
                 log.debug("round# " + round + ", mutationCount(before="
                         + mutationCount0 + ", after=" + mutationCount1
@@ -722,7 +712,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
             
         }
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("\nComputed fixed point: program=" + program.getName()
                     + ", rounds=" + round + ", elapsed=" + elapsed + "ms");
@@ -775,7 +765,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
             throw new IllegalStateException();
         }
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("program embeds closure operations");
         
         final RuleStats totals = joinNexusFactory.newInstance(indexManager)

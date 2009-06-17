@@ -71,6 +71,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.AssignedSplits;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
 import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -89,6 +90,7 @@ import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 import com.bigdata.service.DataService;
+import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -1111,128 +1113,110 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
-    /**
-     * Return a buffer onto which a multi-threaded process may write chunks of
-     * elements to be written on the relation asynchronously. Chunks will be
-     * combined by a {@link BlockingBuffer} for greater efficiency. The buffer
-     * should be {@link BlockingBuffer#close() closed} once no more data will be
-     * written. This buffer may be used whether or not statement identifiers are
-     * enabled and will eventually delegate its work to
-     * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)}
-     * <p>
-     * The returned {@link BlockingBuffer} is thread-safe and is intended for
-     * high concurrency use cases such as bulk loading data in which multiple
-     * threads need to write on the relation concurrently. The use of this
-     * buffer can substantially increase throughput for such use cases owing to
-     * its ability to combine chunks together before they are scattered to the
-     * indices. The effect is most pronounced for scale-out deployments when
-     * each write would normally be scattered to a large number of index
-     * partitions. By combining the chunks before they are scattered, the writes
-     * against the index partitions can be larger. Increased throughput results
-     * both from issuing fewer RMI requests, each of which must sit in a queue,
-     * and from having more data in each request which results in more efficient
-     * ordered writes on each index partition.
-     * 
-     * @param chunkSize
-     *            The desired chunk size for a write operation (this is an
-     *            explicit parameter since the desirable chunk size for a write
-     *            can be much larger than the desired chunk size for a read).
-     * 
-     * @return A write buffer. The {@link Future} on the blocking buffer is the
-     *         task draining the buffer and writing on the statement indices. It
-     *         may be used to wait until the writes are stable on the federation
-     *         or to cancel any outstanding writes.
-     * 
-     * @todo Explore the extent to which a similar approach may be taken to the
-     *       {@link LexiconRelation}.
-     *       <p>
-     *       The problem is that the {@link StatementBuffer} must wait for the
-     *       lexicon writes before it can proceed since the lexicon writes will
-     *       assign term identifiers which it needs to set on the {@link ISPO}s
-     *       before it can submit the {@link ISPO}[] chunks to the write
-     *       buffer.
-     *       <p>
-     *       That suggests that the reverse index writes (ID2TERM and full text
-     *       index) might be queued on a {@link BlockingBuffer} but that the
-     *       TERM2ID index writes must be synchronous.
-     * 
-     * FIXME This should be asynchronous all the way down but it will have to
-     * wait on synchronous RPC for the TERM2ID index for SIDs _regardless_ of
-     * whether there are dependencies among the statements since statements MUST
-     * be assigned consistent SIDS.
-     */
-    synchronized public BlockingBuffer<ISPO[]> newWriteBuffer(final int chunkSize) {
-
-        final BlockingBuffer<ISPO[]> writeBuffer = new BlockingBuffer<ISPO[]>(
-                getChunkOfChunksCapacity(), chunkSize/*getChunkCapacity()*/,
-                getChunkTimeout(), TimeUnit.MILLISECONDS);
-
-        final Future<Void> future = getExecutorService().submit(
-                new ChunkConsumerTask(writeBuffer.iterator()));
-
-        writeBuffer.setFuture(future);
-
-        return writeBuffer;
-
-    }
-
-    /**
-     * Consumes elements from the source iterator, converting them into chunks
-     * on a {@link BlockingBuffer}. The consumer will drain the chunks from the
-     * buffer.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private class ChunkConsumerTask implements Callable<Void> {
-        
-        /**
-         * The source which this task is draining.
-         * <p>
-         * Note: DO NOT close this iterator from within {@link #call()} - that
-         * would cause the task to interrupt itself!
-         */
-        private final IAsynchronousIterator<ISPO[]> src;
-        
-        public ChunkConsumerTask(final IAsynchronousIterator<ISPO[]> src) {
-
-            if (src == null)
-                throw new IllegalArgumentException();
-            
-            this.src = src;
-
-        }
-            
-        public Void call() throws Exception {
-
-            long nchunks = 0;
-            long nelements = 0;
-
-            while (src.hasNext()) {
-
-                final ISPO[] chunk = src.next();
-
-                nchunks++;
-                nelements += chunk.length;
-
-                if (log.isDebugEnabled())
-                    log.debug("#chunks=" + nchunks + ", chunkSize="
-                            + chunk.length + ", nelements=" + nelements);
-
-                getContainer()
-                        .addStatements(chunk, chunk.length, null/* filter */);
-
-            }
-
-            if (log.isInfoEnabled())
-                log.info("Done: #chunks=" + nchunks + ", #elements="
-                        + nelements);
-
-            return null;
-
-        }
-
-    }
+//    /**
+//     * Return a buffer onto which a multi-threaded process may write chunks of
+//     * elements to be written on the relation asynchronously. Chunks will be
+//     * combined by a {@link BlockingBuffer} for greater efficiency. The buffer
+//     * should be {@link BlockingBuffer#close() closed} once no more data will be
+//     * written. This buffer may be used whether or not statement identifiers are
+//     * enabled and will eventually delegate its work to
+//     * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)}
+//     * <p>
+//     * The returned {@link BlockingBuffer} is thread-safe and is intended for
+//     * high concurrency use cases such as bulk loading data in which multiple
+//     * threads need to write on the relation concurrently. The use of this
+//     * buffer can substantially increase throughput for such use cases owing to
+//     * its ability to combine chunks together before they are scattered to the
+//     * indices. The effect is most pronounced for scale-out deployments when
+//     * each write would normally be scattered to a large number of index
+//     * partitions. By combining the chunks before they are scattered, the writes
+//     * against the index partitions can be larger. Increased throughput results
+//     * both from issuing fewer RMI requests, each of which must sit in a queue,
+//     * and from having more data in each request which results in more efficient
+//     * ordered writes on each index partition.
+//     * 
+//     * @param chunkSize
+//     *            The desired chunk size for a write operation (this is an
+//     *            explicit parameter since the desirable chunk size for a write
+//     *            can be much larger than the desired chunk size for a read).
+//     * 
+//     * @return A write buffer. The {@link Future} on the blocking buffer is the
+//     *         task draining the buffer and writing on the statement indices. It
+//     *         may be used to wait until the writes are stable on the federation
+//     *         or to cancel any outstanding writes.
+//     */
+//    synchronized public BlockingBuffer<ISPO[]> newWriteBuffer(final int chunkSize) {
+//
+//        final BlockingBuffer<ISPO[]> writeBuffer = new BlockingBuffer<ISPO[]>(
+//                getChunkOfChunksCapacity(), chunkSize/*getChunkCapacity()*/,
+//                getChunkTimeout(), TimeUnit.MILLISECONDS);
+//
+//        final Future<Void> future = getExecutorService().submit(
+//                new ChunkConsumerTask(writeBuffer.iterator()));
+//
+//        writeBuffer.setFuture(future);
+//
+//        return writeBuffer;
+//
+//    }
+//
+//    /**
+//     * Consumes elements from the source iterator, converting them into chunks
+//     * on a {@link BlockingBuffer}. The consumer will drain the chunks from the
+//     * buffer.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+//     * @version $Id$
+//     */
+//    private class ChunkConsumerTask implements Callable<Void> {
+//        
+//        /**
+//         * The source which this task is draining.
+//         * <p>
+//         * Note: DO NOT close this iterator from within {@link #call()} - that
+//         * would cause the task to interrupt itself!
+//         */
+//        private final IAsynchronousIterator<ISPO[]> src;
+//        
+//        public ChunkConsumerTask(final IAsynchronousIterator<ISPO[]> src) {
+//
+//            if (src == null)
+//                throw new IllegalArgumentException();
+//            
+//            this.src = src;
+//
+//        }
+//            
+//        public Void call() throws Exception {
+//
+//            long nchunks = 0;
+//            long nelements = 0;
+//
+//            while (src.hasNext()) {
+//
+//                final ISPO[] chunk = src.next();
+//
+//                nchunks++;
+//                nelements += chunk.length;
+//
+//                if (log.isDebugEnabled())
+//                    log.debug("#chunks=" + nchunks + ", chunkSize="
+//                            + chunk.length + ", nelements=" + nelements);
+//
+//                getContainer()
+//                        .addStatements(chunk, chunk.length, null/* filter */);
+//
+//            }
+//
+//            if (log.isInfoEnabled())
+//                log.info("Done: #chunks=" + nchunks + ", #elements="
+//                        + nelements);
+//
+//            return null;
+//
+//        }
+//
+//    }
 
     /**
      * Inserts {@link SPO}s, writing on the statement indices in parallel.
@@ -1330,8 +1314,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            An optional filter on the elements to be written.
      * 
      * @return The mutation count.
-     * 
-     * @todo raise the filter into the caller?
      */
     public long insert(final ISPO[] a, final int numStmts,
             final IElementFilter<ISPO> filter) {

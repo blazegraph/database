@@ -99,7 +99,7 @@ import com.bigdata.service.ResourceService;
  * that view MAY be in used by historical views. Second, there MAY be historical
  * commit points for the index partition on the live journal before the atomic
  * cutover to the new {@link IDataService} - those historical commit points MUST
- * be preserved until the release policy for those views has been satisified.
+ * be preserved until the release policy for those views has been satisfied.
  * <p>
  * Note: The MOVE task MUST be explicitly coordinated with the target
  * {@link IDataService}. Failure to coordinate the move results in an error
@@ -116,7 +116,7 @@ import com.bigdata.service.ResourceService;
  * join, or move) WHILE the index partition is still being moved onto the target
  * {@link IDataService} THEN the MOVE is not atomic and the definition of the
  * index partition in the {@link MetadataService} will not coherently reflect
- * either the MOVE or the action choosen by the target {@link IDataService},
+ * either the MOVE or the action chosen by the target {@link IDataService},
  * depending on which one makes its atomic update first.
  * <p>
  * The target {@link IDataService} MAY undergo both synchronous and asynchronous
@@ -143,12 +143,12 @@ import com.bigdata.service.ResourceService;
  * <li>The atomic update task causes the <code>sourcePartitionId</code> to be
  * set to <code>-1</code> as one of its last actions, thereby allowing the
  * target {@link IDataService} to use operations that could re-define the index
- * parition (split, join, move) and also preventing the target index partition
+ * partition (split, join, move) and also preventing the target index partition
  * from being deleted on restart. </li>
  * 
  * </ol>
  * 
- * FIXME javadoc update & test.
+ * FIXME javadoc update & unit tests.
  * <p>
  * Note: There are only two entry points: a simple move and a move where the
  * compacting merge has already been performed, e.g., by a split, and we just

@@ -158,7 +158,7 @@ import com.bigdata.striterator.IKeyOrder;
  *       over arbitrary relations with foreign key joins.
  * 
  * @todo add an {@link IBindingSet} serializer and drive through with the
- *       {@link IAsynchronousIterator}.
+ *       {@link IAsynchronousIterator} when wrapped for RMI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

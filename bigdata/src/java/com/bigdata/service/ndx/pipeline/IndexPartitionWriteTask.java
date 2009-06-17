@@ -134,6 +134,10 @@ A//
 
         /*
          * Remove duplicates in a caller specified manner (may be a NOP).
+         * 
+         * Note: Duplicate removal is applied in a single-threaded context by
+         * the sink against an unchanging KVO[] chunk. Concurrency problems can
+         * not arise from duplicate elimination.
          */
         final KVO<O>[] chunk;
         final int duplicateCount;
@@ -200,7 +204,7 @@ A//
              * @todo isolate this as a retry policy, but note that we need to be
              * able to indicate when the error is fatal, when the error was
              * handled by a redirect and hence the sink should close, and when
-             * the error was handled by a successfull retry.
+             * the error was handled by a successful retry.
              */
             R result = null;
             boolean done = false;
@@ -273,8 +277,10 @@ A//
                 log.debug(stats);
 
             /*
-             * Since the chunk was successfully written, we now rip through
-             * the KVOs and  
+             * Since the chunk was successfully written, we now rip through the
+             * KVOs and invoke done() on each. If there are duplicates and
+             * KVOList was used, then done() will be mapped over each duplicate
+             * as well.
              */
             for (int i = 0; i < chunkSize; i++) {
 
