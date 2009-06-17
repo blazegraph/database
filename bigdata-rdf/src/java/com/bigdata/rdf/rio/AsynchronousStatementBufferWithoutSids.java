@@ -851,6 +851,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
             @Override
             protected void signal() throws InterruptedException {
 
+                super.signal();
+                
                 statementBufferFactory.documentsDoneCount.incrementAndGet();
                 
                 if(log.isInfoEnabled())
@@ -1498,7 +1500,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          */
         public long getDocumentsDoneCount() {
 
-            return documentsDoneCount.incrementAndGet();
+            return documentsDoneCount.get();
             
         }
         
