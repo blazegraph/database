@@ -145,7 +145,7 @@ public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
              * database. Each parser thread will block until the TERM2ID writes
              * are done and then proceed to write on the remaining indices.
              */
-            counterSet.addCounter("documentsTermsDoneCount", new Instrument<Long>() {
+            counterSet.addCounter("documentTermsDoneCount", new Instrument<Long>() {
                 @Override
                 protected void sample() {
                     setValue(((AsynchronousWriteBufferFactoryWithoutSids) bufferFactory)
