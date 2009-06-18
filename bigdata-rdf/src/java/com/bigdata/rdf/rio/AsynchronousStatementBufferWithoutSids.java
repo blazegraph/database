@@ -1466,7 +1466,7 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
          * Used for debugging to indicate how many documents have completed
          * their asynchronous writes on TERM2ID.
          */
-        public long getDocumentsTermsDoneCount() {
+        public long getTIDsReadyCount() {
             
             return term2IdLatchDoneCount.get();
             
