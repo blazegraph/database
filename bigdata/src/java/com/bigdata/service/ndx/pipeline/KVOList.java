@@ -58,23 +58,6 @@ public class KVOList<O> extends KVO<O> {
         if (o == this)
             throw new IllegalArgumentException();
 
-        if (o instanceof KVOList) {
-            /*
-             * Do not permit a KVOList having assigned duplicates to be added as
-             * a duplicate of a different KVOList.
-             * 
-             * Note: this does not embed the synchronized requests since that
-             * could cause a deadlock. However, this means that concurrent
-             * requests to this.add(o) and o.add(this) could fail to detect this
-             * problem.
-             */
-            synchronized (o) {
-                if (((KVOList) o).duplicateList != null)
-                    throw new IllegalStateException("this=" + this + ", other="
-                            + o);
-            }
-        }
-
         synchronized (this) {
 
             if (duplicateList == null) {
@@ -84,6 +67,34 @@ public class KVOList<O> extends KVO<O> {
             }
 
             duplicateList.add(o);
+
+            if (o instanceof KVOList) {
+
+                /*
+                 * During a redirect, the last chunk written by the sink may be
+                 * combined with another chunk drained from the master. In these
+                 * cases we can see KVOLists identified as duplicates for
+                 * KVOLists which already have a list of duplicates. We handle
+                 * this by merging those lists.
+                 * 
+                 * Note: This is not really thread-safe since we are not
+                 * synchronized on the other KVOList. However, synchronization
+                 * would make us open to deadlock. And, this code is invoked
+                 * from the sink, and the sink is single threaded, so we don't
+                 * really need all this synchronization in KVOList anyway!
+                 */
+
+                final KVOList<O> t = (KVOList<O>) o;
+
+                if (t.duplicateList != null) {
+
+                    duplicateList.addAll(t.duplicateList);
+
+                    t.duplicateList.clear();
+
+                }
+
+            }
 
         }
         
