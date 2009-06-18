@@ -17,6 +17,10 @@ http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTrip
 http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesLoaded&depth=7&period=Minutes&report=correlated&file=service/cs/toldTriples
 http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load+Service%2FAverage+Queuing+Time&depth=8&correlated=true&file=service/cs/loadServiceQueuingTime
 
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/blockedParserCount&depth=8&correlated=true&file=service/cs/blockedParserCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/blockedParserTaskCount&depth=8&correlated=true&file=service/cs/blockedParserCount
 http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentsDoneCount&depth=8&correlated=true&file=service/cs/documentsDoneCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentsTermsDoneCount&depth=8&correlated=true&file=service/cs/TIDsReadyCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/TIDsReadyCount&depth=8&correlated=true&file=service/cs/TIDsReadyCount
+
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load Service/Task Submit Count&depth=8&correlated=true&file=service/cs/taskSubmitCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load Service/Task Complete Count&depth=8&correlated=true&file=service/cs/taskCompleteCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load Service/Task Success Count&depth=8&correlated=true&file=service/cs/taskSuccessCount
