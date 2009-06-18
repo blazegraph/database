@@ -280,7 +280,7 @@ L>//
         if (subtask == null)
             throw new IllegalArgumentException();
         
-        lock.lock();
+        lock.lockInterruptibly();
         
         try {
     
@@ -588,18 +588,20 @@ L>//
 
                     for (S sink : sinks.values()) {
 
-                        final Future<?> f = sink.buffer.getFuture();
+                        if(sink.buffer.getFuture().isDone()) {
 
-                        if (f.isDone()) {
+                            /*
+                             * Check the future.
+                             * 
+                             * Note: We KNOW that the Future is immediately
+                             * available for this sink (and hence, that the sink
+                             * is no longer executing) so this request can not
+                             * lead to a deadlock where the sink attempts to
+                             * notify the master that it is done.
+                             */
 
-                            // check the future (can throw exception).
-                            f.get();
-
-                            // clear from the map (but ONLY once we have checked
-                            // the Future!)
-                            removeOutputBuffer((L) sink.locator,
-                                    (AbstractSubtask) sink);
-
+                            awaitSink(sink);
+                            
                         }
 
                     }
@@ -831,6 +833,7 @@ L>//
 
         final Future<?> f = sink.buffer.getFuture();
         final long begin = System.nanoTime();
+        long lastLogErrorNanos = begin;
         try {
 
             while (true) {
@@ -845,12 +848,26 @@ L>//
 
                     // Done.
                     return;
-                    
+
                 } catch (TimeoutException ex) {
 
-                    log.warn("Waiting on sink: elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
-                                    - begin) + ", sink=" + sink);
+                    final long now = System.nanoTime();
+
+                    final String msg = "Waiting on sink: elapsed="
+                            + TimeUnit.NANOSECONDS.toMillis(now - begin)
+                            + ", sink=" + sink;
+
+                    if (TimeUnit.NANOSECONDS.toMillis(now - lastLogErrorNanos) > 5000) {
+
+                        log.error(msg, ex);
+
+                        lastLogErrorNanos = now;
+                        
+                    } else {
+
+                        log.warn(msg);
+                        
+                    }
 
                 }
 

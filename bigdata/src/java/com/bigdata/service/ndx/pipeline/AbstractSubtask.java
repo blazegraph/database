@@ -287,6 +287,7 @@ L>//
         
         public String toString() {
             
+            // Note: toString() on the outer class.
             return AbstractSubtask.this.toString() + "{chunkSize=" + chunkSize
                     + "}";
             
