@@ -46,7 +46,7 @@ public interface IAsynchronousWriteStatementBufferFactory<S extends Statement>
     
     /**
      * Cancel all {@link Future}s. The buffers will be automatically closed
-     * when their {@link Future}s are cancelled.
+     * when their {@link Future}s are canceled.
      * 
      * @param mayInterruptIfRunning
      */

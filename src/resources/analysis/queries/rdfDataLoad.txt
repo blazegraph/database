@@ -15,4 +15,8 @@
 ##
 http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesPerSec&depth=7&correlated=true&period=Minutes&file=service/cs/tps
 http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesLoaded&depth=7&period=Minutes&report=correlated&file=service/cs/toldTriples
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load+Service%2FAverage+Queuing+Time&depth=12&correlated=true&file=service/cs/loadServiceQueuingTime
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load+Service%2FAverage+Queuing+Time&depth=8&correlated=true&file=service/cs/loadServiceQueuingTime
+
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/blockedParserCount&depth=8&correlated=true&file=service/cs/blockedParserCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentsDoneCount&depth=8&correlated=true&file=service/cs/documentsDoneCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentsTermsDoneCount&depth=8&correlated=true&file=service/cs/TIDsReadyCount
