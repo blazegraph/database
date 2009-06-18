@@ -22,10 +22,8 @@ import com.bigdata.btree.keys.KVO;
  */
 public class DefaultDuplicateRemover<O> implements IDuplicateRemover<O> {
 
-    static protected transient final Logger log = Logger
-            .getLogger(DefaultDuplicateRemover.class);
-
-    static protected transient final boolean DEBUG = log.isDebugEnabled();
+//    static protected transient final Logger log = Logger
+//            .getLogger(DefaultDuplicateRemover.class);
 
     final private boolean testRefs;
 
@@ -59,96 +57,68 @@ public class DefaultDuplicateRemover<O> implements IDuplicateRemover<O> {
     
     public KVO<O>[] filter(final KVO<O>[] src) {
 
+        final KVO<O>[] tmp = new KVO[src.length];
+
         int ndistinct = 0;
 
-        final int nsrc = src.length;
-        
-        final KVO<O>[] tmp = new KVO[nsrc];
-        
-        {
+        KVO<O> prior = null;
 
-            KVO<O> lastDistinct = null;
+        for (KVO<O> other : src) {
 
-            for (int i = 0; i < nsrc; i++) {
+            if (prior != null) {
 
-                final KVO<O> thisKVO = src[i];
-                
-                if (lastDistinct != null) {
+                if (filterDuplicate(prior, other)) {
+                    
+                    continue;
+                    
+                }
 
-                    if (BytesUtil.bytesEqual(thisKVO.key, lastDistinct.key)) {
+            }
 
-                        // same key
-                        if (log.isTraceEnabled())
-                            log.trace("duplicate key: "
-                                    + BytesUtil.toString(thisKVO.key));
+            tmp[ndistinct++] = prior = other;
 
-                        if (testRefs && thisKVO.obj != null
-                                && thisKVO.obj == lastDistinct.obj) {
+        }
 
-                            // duplicate reference.
+        // Make the array dense.
+        return KVO.dense(tmp, ndistinct);
 
-                            if (DEBUG)
-                                log.debug("duplicate reference: " + thisKVO.obj);
+    }
 
-                            if(lastDistinct instanceof KVOList) {
-                                
-                                // link the duplicates together.
-                                ((KVOList)lastDistinct).add(thisKVO);
-                                
-                            }
-                            
-                            continue;
+    /**
+     * Return <code>true</code> if the <i>other</i> instance is a duplicate and
+     * may be dropped. (This implementation recognizes {@link KVOList} and
+     * handles it appropriately.)
+     * 
+     * @param prior
+     *            The previous {@link KVO} instance.
+     * @param other
+     *            Another {@link KVO} instance.
+     *            
+     * @return <code>true</code> if the <i>other</i> is a duplicate.
+     */
+    protected boolean filterDuplicate(final KVO<O> prior, final KVO<O> other) {
 
-                        }
+        // same key?
+        if (BytesUtil.bytesEqual(prior.key, other.key)) {
 
-                        if (BytesUtil.bytesEqual(lastDistinct.val, thisKVO.val)) {
+            // same reference (if ref testing) or same value?
+            if ((testRefs && prior.obj != null && prior.obj == other.obj)
+                    || BytesUtil.bytesEqual(prior.val, other.val)) {
 
-                            // same value.
+                if (prior instanceof KVOList) {
 
-                            if (DEBUG)
-                                log.debug("duplicate value: " + thisKVO.val);
-
-                            if(lastDistinct instanceof KVOList) {
-                                
-                                // link the duplicates together.
-                                ((KVOList)lastDistinct).add(thisKVO);
-                                
-                            }
-
-                            continue;
-
-                        }
-
-                    }
+                    // link the duplicates together.
+                    ((KVOList) prior).add(other);
 
                 }
 
-                // add to the temporary array.
-                tmp[ndistinct++] = lastDistinct = thisKVO;
+                return true;
 
             }
 
         }
 
-        if (ndistinct == nsrc) {
-
-            // Nothing was filtered so the array is dense and we are done.
-            return tmp;
-
-        }
-
-        /*
-         * Make the array dense (this also covers the case where the array is
-         * empty).
-         */
-        final KVO<O>[] out = new KVO[ndistinct];
-
-        // copy the data
-        System.arraycopy(tmp/* src */, 0/* srcpos */, out/* dst */,
-                0/* dstpos */, ndistinct/* len */);
-
-        // Done.
-        return out;
+        return false;
 
     }
 

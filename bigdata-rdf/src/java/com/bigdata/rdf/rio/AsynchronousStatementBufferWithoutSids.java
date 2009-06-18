@@ -1064,19 +1064,21 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
 
                         // Assign a sort key to each Value.
                         chunkOut[i++] = new KVOC<BigdataValue>(keyBuilder
-                                .value2Key(v), null/* val */, v, latch) {
-                            @Override
-                            public void done() {
-                                /*
-                                 * verify that the term identifier is assigned
-                                 * before we decrement the latch.
-                                 */
-                                if (obj.getTermId() == IRawTripleStore.NULL)
-                                    throw new AssertionError("No termid? "
-                                            + this);
-                                super.done();
-                            }
-                        };
+                                .value2Key(v), null/* val */, v, latch)
+//                                {
+//                            @Override
+//                            public void done() {
+//                                /*
+//                                 * verify that the term identifier is assigned
+//                                 * before we decrement the latch.
+//                                 */
+//                                if (obj.getTermId() == IRawTripleStore.NULL)
+//                                    throw new AssertionError("No termid? "
+//                                            + this);
+//                                super.done();
+//                            }
+//                        }
+                        ;
 
                     }
 
