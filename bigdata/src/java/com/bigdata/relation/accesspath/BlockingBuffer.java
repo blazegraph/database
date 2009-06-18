@@ -1327,7 +1327,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * the {@link BlockingBuffer} will lead to an iterator that appears to
          * be stalled. However, we also must invoke {@link #checkFuture()} no
          * later than when {@link #hasNext(long, TimeUnit)} returns
-         * <code>false</code> in order for the consumer to be guarenteed to
+         * <code>false</code> in order for the consumer to be guaranteed to
          * see any exception thrown by the producer.
          * <p>
          * Note: Once the {@link BlockingBuffer} is closed (except for aborts),

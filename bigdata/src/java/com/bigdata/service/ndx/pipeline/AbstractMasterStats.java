@@ -31,7 +31,11 @@ package com.bigdata.service.ndx.pipeline;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
@@ -48,10 +52,13 @@ import com.bigdata.resources.StaleLocatorException;
  * reference before you update those counters. Without this, the counters might
  * not update correctly as thing like <code>a += 2</code> may not produce the
  * correct result.
+ * <p>
+ * Note: The use of {@link AtomicLong}s provides atomic visibility changes
+ * relied on by some unit tests.
  * 
  * @param <L>
- *            The generic type of the key used to lookup subtasks in the internal
- *            map.
+ *            The generic type of the key used to lookup subtasks in the
+ *            internal map.
  * @param <HS>
  *            The generic type of the subtask statistics.
  * 
@@ -63,25 +70,25 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     /**
      * The #of subtasks which have started.
      */
-    public long subtaskStartCount = 0L;
+    public final AtomicLong subtaskStartCount = new AtomicLong();
 
     /**
      * The #of subtasks which have finished (either the buffer has been closed
      * and all buffered data has been flushed -or- the task was interrupted or
      * otherwise threw an exception).
      */
-    public long subtaskEndCount = 0L;
+    public final AtomicLong subtaskEndCount = new AtomicLong();
 
     /**
      * The #of subtasks which were closed due to an idle timeout.
      */
-    public long subtaskIdleTimeout = 0L;
+    public final AtomicLong subtaskIdleTimeoutCount = new AtomicLong();
 
     /**
      * The maximum #of distinct partitions for which the master has caused
      * subtasks to be created at any given time.
      */
-    private int maximumPartitionCount = 0;
+    final private AtomicInteger maximumPartitionCount = new AtomicInteger();
 
     /**
      * The maximum #of distinct partitions for which the master has caused
@@ -89,7 +96,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      */
     public int getMaximumPartitionCount() {
 
-        return maximumPartitionCount;
+        return maximumPartitionCount.get();
         
     }
     
@@ -105,7 +112,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
     /**
      * The #of redirects ({@link StaleLocatorException}s) that were handled.
      */
-    public long redirectCount = 0L;
+    public final AtomicLong redirectCount = new AtomicLong();
 
     /**
      * Elapsed nanoseconds handling a redirect.
@@ -116,19 +123,19 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * The #of chunks drained from the {@link BlockingBuffer} by the
      * {@link AbstractMasterTask}.
      */
-    public long chunksIn = 0L;
+    public final AtomicLong chunksIn = new AtomicLong();
 
     /**
      * The #of elements drained from the {@link BlockingBuffer} by the
      * {@link AbstractMasterTask}.
      */
-    public long elementsIn = 0L;
+    public final AtomicLong elementsIn = new AtomicLong();
 
     /**
      * The #of elements in the output chunks written onto the index partitions
      * (not including any eliminated duplicates).
      */
-    public long elementsOut = 0L;
+    public final AtomicLong elementsOut = new AtomicLong();
 
     /**
      * The #of elements on the output sink queues. This is incremented when a
@@ -140,7 +147,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * include the #of elements in a prepared or outstanding write on an index
      * partition.
      */
-    public long elementsOnSinkQueues = 0L;
+    public final AtomicLong elementsOnSinkQueues = new AtomicLong();
 
     /**
      * The #of chunks transferred from the master to the sinks. Where there is
@@ -150,7 +157,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * the master will be registered as some larger #of chunks transferred to
      * the sink(s) for that master.
      */
-    public long chunksTransferred = 0L;
+    public final AtomicLong chunksTransferred = new AtomicLong();
 
     /**
      * The #of elements transferred from the master to the sinks. Where there is
@@ -159,12 +166,12 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * key-ranges of the tuples in the chunks.  This reduces the average chunk
      * size entering the sink accordingly.
      */
-    public long elementsTransferred = 0L;
+    public final AtomicLong elementsTransferred = new AtomicLong();
     
     /**
      * The #of chunks written onto index partitions using RMI.
      */
-    public long chunksOut = 0L;
+    public final AtomicLong chunksOut = new AtomicLong();
 
     /**
      * Elapsed nanoseconds the master spends offering a chunk for transfer to a
@@ -206,7 +213,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
      * The #of master tasks which have been created for the index whose
      * asynchronous write statistics are reported on by this object.
      */
-    public int masterCreateCount = 0;
+    public final AtomicInteger masterCreateCount = new AtomicInteger();
 
     /**
      * The approximate #of active master tasks. This is based on a weak value
@@ -237,7 +244,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         
         if (masters.putIfAbsent(master.hashCode(), master) == null) {
 
-            masterCreateCount++;
+            masterCreateCount.incrementAndGet();
             
         }
         
@@ -263,9 +270,11 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 t = newSubtaskStats(locator);
 
                 sinkStats.put(locator, t);
+                
+//                tmp.add(t);
 
-                maximumPartitionCount = Math.max(maximumPartitionCount,
-                        sinkStats.size());
+                maximumPartitionCount.set(Math.max(maximumPartitionCount.get(),
+                        sinkStats.size()));
                 
             }
 
@@ -274,6 +283,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         }
 
     }
+//    private final List<HS> tmp = new LinkedList<HS>();
 
     /**
      * Factory for the subtask statistics.
@@ -333,7 +343,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("masterCreateCount", new Instrument<Integer>() {
             @Override
             protected void sample() {
-                setValue(masterCreateCount);
+                setValue(masterCreateCount.get());
             }
         });
 
@@ -347,28 +357,28 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("subtaskStartCount", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(subtaskStartCount);
+                setValue(subtaskStartCount.get());
             }
         });
 
         t.addCounter("subtaskEndCount", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(subtaskEndCount);
+                setValue(subtaskEndCount.get());
             }
         });
         
         t.addCounter("subtaskIdleTimeout", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(subtaskIdleTimeout);
+                setValue(subtaskIdleTimeoutCount.get());
             }
         });
 
         t.addCounter("maximumPartitionCount", new Instrument<Integer>() {
             @Override
             protected void sample() {
-                setValue(maximumPartitionCount);
+                setValue(maximumPartitionCount.get());
             }
         });
 
@@ -382,7 +392,7 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("redirectCount", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(redirectCount);
+                setValue(redirectCount.get());
             }
         });
 
@@ -396,42 +406,42 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
         t.addCounter("chunksIn", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(chunksIn);
+                setValue(chunksIn.get());
             }
         });
 
         t.addCounter("elementsIn", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(elementsIn);
+                setValue(elementsIn.get());
             }
         });
 
         t.addCounter("chunksOut", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(chunksOut);
+                setValue(chunksOut.get());
             }
         });
 
         t.addCounter("elementsOut", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(elementsOut);
+                setValue(elementsOut.get());
             }
         });
 
         t.addCounter("chunksTransferred", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(chunksTransferred);
+                setValue(chunksTransferred.get());
             }
         });
 
         t.addCounter("elementsTransferred", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(elementsTransferred);
+                setValue(elementsTransferred.get());
             }
         });
         
@@ -521,11 +531,11 @@ abstract public class AbstractMasterStats<L, HS extends AbstractSubtaskStats> {
                 + ", subtaskEndCount="
                 + subtaskEndCount
                 + ", subtaskIdleTimeout="
-                + subtaskIdleTimeout
+                + subtaskIdleTimeoutCount
                 + ", partitionCount="
                 + maximumPartitionCount
                 + ", activePartitionCount="
-                + (subtaskStartCount-subtaskEndCount)
+                + getActiveSinkCount()
                 + ", redirectCount="
                 + redirectCount
                 + ", chunkIn="

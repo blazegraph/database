@@ -35,14 +35,14 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
     /**
      * The #of duplicates which were filtered out.
      */
-    public long duplicateCount = 0L;
+    public final AtomicLong duplicateCount = new AtomicLong();
 
     /**
      * The #of chunks that have passed through
      * {@link IndexWriteTask#handleChunk(com.bigdata.btree.keys.KVO[], boolean)}
      * .
      */
-    public long handledChunkCount = 0L;
+    public final AtomicLong handledChunkCount = new AtomicLong();
     
     /**
      * Elapsed nanoseconds in
@@ -115,9 +115,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageHandleChunkNanos = new MovingAverageTask(
                 "averageHandleChunkNanos", new Callable<Double>() {
                     public Double call() {
-                        return (handledChunkCount == 0L ? 0
-                                : elapsedHandleChunkNanos
-                                        / (double) handledChunkCount);
+                        final long t = handledChunkCount.get();
+                        return (t == 0L ? 0 : elapsedHandleChunkNanos
+                                / (double) t);
                     }
                 });
 
@@ -128,9 +128,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageSplitChunkNanos = new MovingAverageTask(
                 "averageSplitChunkNanos", new Callable<Double>() {
                     public Double call() {
-                        return (handledChunkCount == 0L ? 0
-                                : elapsedSplitChunkNanos
-                                        / (double) handledChunkCount);
+                        final long t = handledChunkCount.get();
+                        return (t == 0L ? 0 : elapsedSplitChunkNanos
+                                / (double) t);
                     }
                 });
 
@@ -141,9 +141,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageSinkOfferNanos = new MovingAverageTask(
                 "averageSinkOfferNanos", new Callable<Double>() {
                     public Double call() {
-                        return (chunksTransferred == 0L ? 0
-                                : elapsedSinkOfferNanos
-                                        / (double) chunksTransferred);
+                        final long t = chunksTransferred.get();
+                        return (t == 0L ? 0 : elapsedSinkOfferNanos
+                                / (double) t);
                     }
                 });
 
@@ -155,9 +155,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageTransferChunkSize = new MovingAverageTask(
                 "averageTransferChunkSize", new Callable<Double>() {
                     public Double call() {
-                        return (chunksTransferred == 0L ? 0
-                                : elementsTransferred
-                                        / (double) chunksTransferred);
+                        final long t = chunksTransferred.get();
+                        return (t == 0L ? 0 : elementsTransferred.get()
+                                / (double) t);
                     }
                 });
 
@@ -168,8 +168,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageSinkChunkWaitingNanos = new MovingAverageTask(
                 "averageSinkChunkWaitingNanos", new Callable<Double>() {
                     public Double call() {
-                        return (chunksOut == 0L ? 0 : elapsedSinkChunkWaitingNanos
-                                / (double) chunksOut);
+                        final long t = chunksOut.get();
+                        return (t == 0L ? 0 : elapsedSinkChunkWaitingNanos
+                                / (double) t);
                     }
                 });
 
@@ -219,8 +220,9 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageSinkChunkWritingNanos = new MovingAverageTask(
                 "averageSinkChunkWritingNanos", new Callable<Double>() {
                     public Double call() {
-                        return (chunksOut == 0L ? 0 : elapsedSinkChunkWritingNanos
-                                / (double) chunksOut);
+                        final long t = chunksOut.get();
+                        return (t == 0L ? 0 : elapsedSinkChunkWritingNanos
+                                / (double) t);
                     }
                 });
 
@@ -270,8 +272,8 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageSinkWriteChunkSize = new MovingAverageTask(
                 "averageSinkWriteChunkSize", new Callable<Double>() {
                     public Double call() {
-                        return (chunksOut == 0L ? 0 : elementsOut
-                                / (double) chunksOut);
+                        final long t = chunksOut.get();
+                        return (t == 0L ? 0 : elementsOut.get() / (double) t);
                     }
                 });
 
@@ -309,7 +311,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
                             final AbstractMasterTask master = itr.next().get();
                             if (master == null)
                                 continue;
-                            n += master.redirectQueue.size();
+                            n += master.getRedirectQueueSize();
                         }
                         return n;
                     }
@@ -483,7 +485,7 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         final MovingAverageTask averageElementsOnSinkQueues = new MovingAverageTask(
                 "averageElementsOnSinkQueues", new Callable<Long>() {
                     public Long call() {
-                        return elementsOnSinkQueues;
+                        return elementsOnSinkQueues.get();
                     }
                 });
 
@@ -529,14 +531,14 @@ public class IndexAsyncWriteStats<L, HS extends IndexPartitionWriteStats> extend
         t.addCounter("duplicateCount", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(duplicateCount);
+                setValue(duplicateCount.get());
             }
         });
         
         t.addCounter("handledChunkCount", new Instrument<Long>() {
             @Override
             protected void sample() {
-                setValue(handledChunkCount);
+                setValue(handledChunkCount.get());
             }
         });
 

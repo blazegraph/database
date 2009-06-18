@@ -383,15 +383,17 @@ public class AbstractMasterTestCase extends TestCase2 {
             
             synchronized (master.stats) {
 
-                master.stats.chunksOut++;
-                master.stats.elementsOut += chunk.length;
+                master.stats.chunksOut.incrementAndGet();
+                master.stats.elementsOut.addAndGet(chunk.length);
                 master.stats.elapsedSinkChunkWritingNanos += elapsed;
 
             }
 
-            stats.chunksOut++;
-            stats.elementsOut += chunk.length;
-            stats.elapsedChunkWritingNanos += elapsed;
+            synchronized (stats) {
+                stats.chunksOut.incrementAndGet();
+                stats.elementsOut.addAndGet(chunk.length);
+                stats.elapsedChunkWritingNanos += elapsed;
+            }
 
             if (log.isInfoEnabled())
                 log.info("wrote chunk: " + this + ", #elements="
@@ -413,11 +415,6 @@ public class AbstractMasterTestCase extends TestCase2 {
     final int masterQueueCapacity = 100;
 
     static final int subtaskQueueCapacity = 100;
-
-    final H masterStats = new H();
-
-    final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
-            masterQueueCapacity);
 
     final ExecutorService executorService = Executors
             .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
@@ -448,7 +445,7 @@ public class AbstractMasterTestCase extends TestCase2 {
 
         while (nanos > 0) {
 
-            if (master.stats.chunksOut >= expectedChunksOut) {
+            if (master.stats.chunksOut.get() >= expectedChunksOut) {
 
                 return;
 

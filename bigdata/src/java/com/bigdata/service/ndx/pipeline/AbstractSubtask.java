@@ -167,7 +167,9 @@ L>//
                 synchronized (master.stats) {
                     master.stats.elapsedSinkChunkWaitingNanos += elapsedChunkWaitNanos;
                 }
-                stats.elapsedChunkWaitingNanos += elapsedChunkWaitNanos;
+                synchronized(stats) {
+                    stats.elapsedChunkWaitingNanos += elapsedChunkWaitNanos;
+                }
 
                 if (handleChunk(chunk)) {
 
@@ -217,22 +219,9 @@ L>//
              * one is checking the Future for the sink tasks (except when we
              * wait for them to complete before we reopen an output buffer).
              */
-            master.halt(t);
-
-            throw new RuntimeException(t);
+            throw master.halt(new RuntimeException(toString(), t));
 
         } finally {
-
-            /*
-             * Increment this counter immediately when the subtask is done
-             * regardless of the outcome. This is used by some unit tests to
-             * verify idle timeouts and the like.
-             */
-            synchronized (master.stats) {
-                master.stats.subtaskEndCount++;
-            }
-            if (log.isDebugEnabled())
-                log.debug("subtaskEndCount incremented: " + locator);
 
             /*
              * Signal the master than the subtask is done.
@@ -359,9 +348,7 @@ L>//
                              * sink MAY be reopened.
                              */
                             buffer.abort(new IdleTimeoutException());
-                            synchronized (master.stats) {
-                                master.stats.subtaskIdleTimeout++;
-                            }
+                            master.stats.subtaskIdleTimeoutCount.incrementAndGet();
                         } else {
                             /*
                              * Since redirects of outstanding writes can cause
@@ -459,11 +446,7 @@ L>//
                     // track the #of elements available across those chunks.
                     chunkSize += a.length;
                     
-                    synchronized (master.stats) {
-
-                        master.stats.elementsOnSinkQueues -= a.length;
-                        
-                    }
+                    master.stats.elementsOnSinkQueues.addAndGet(-a.length);
 
                     // reset the available aspect of the idle timeout.
                     lastChunkAvailableNanos = System.nanoTime();
@@ -553,9 +536,9 @@ L>//
      * This method asynchronously closes the <i>sink</i>, so that no further
      * data may be written on it by setting the <i>cause</i> on
      * {@link BlockingBuffer#abort(Throwable)}. Next, the current chunk is
-     * placed onto the master's {@link AbstractMasterTask#redirectQueue} and the
-     * sink's {@link #buffer} is drained, transferring all chunks which can be
-     * read from that buffer onto the master's redirect queue.
+     * placed onto the master's redirectQueue and the sink's {@link #buffer} is
+     * drained, transferring all chunks which can be read from that buffer onto
+     * the master's redirectQueue.
      * 
      * @param chunk
      *            The chunk which the sink was processing when it discovered
@@ -593,7 +576,7 @@ L>//
          * Handle the chunk for which we got the stale locator exception by
          * placing it onto the master's redirect queue.
          */
-        master.redirectQueue.put(chunk);
+        master.redirectChunk(chunk);
 
         /*
          * Drain the rest of the buffered chunks from the closed sink, feeding
@@ -603,21 +586,15 @@ L>//
 
         while (src.hasNext()) {
 
-            master.redirectQueue.put(src.next());
+            master.redirectChunk(src.next());
 
         }
-        
-        // note: we only do this when the master checks the subtask's Future.
-//        /*
-//         * Remove the buffer from the map.
-//         */
-//        master.removeOutputBuffer(locator, this);
         
         synchronized (master.stats) {
 
             master.stats.elapsedRedirectNanos += System.nanoTime() - begin;
 
-            master.stats.redirectCount++;
+            master.stats.redirectCount.incrementAndGet();
 
         }
         
