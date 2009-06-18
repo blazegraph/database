@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.ndx.pipeline;
 
 import java.util.LinkedList;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -43,7 +42,6 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
-import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
@@ -148,7 +146,7 @@ A//
      *            the {@link AbstractSubtask sink}.
      * @param sinkChunkTimeoutNanos
      *            The maximum amount of time in nanoseconds that a sink will
-     *            combine smaller chunks so that it can satisify the desired
+     *            combine smaller chunks so that it can satisfy the desired
      *            <i>sinkChunkSize</i>.
      * @param duplicateRemover
      *            Removes duplicate key-value pairs from the (optional).
@@ -188,15 +186,9 @@ A//
         
         if (sinkChunkTimeoutNanos <= 0)
             throw new IllegalArgumentException();
-        
-//        if (duplicateRemover == null)
-//            throw new IllegalArgumentException();
 
         if (ctor == null)
             throw new IllegalArgumentException();
-
-//      if (resultHandler == null)
-//      throw new IllegalArgumentException();
 
         this.ndx = ndx;
 
@@ -206,47 +198,23 @@ A//
         
         this.sinkChunkTimeoutNanos = sinkChunkTimeoutNanos;
         
-        this.resultHandler = resultHandler;
+        this.resultHandler = resultHandler; // MAY be null.
 
-        this.duplicateRemover = duplicateRemover;
+        this.duplicateRemover = duplicateRemover; // MAY be null.
 
         this.ctor = ctor;
         
     }
 
-//    * This implementation grabs the {@link AbstractMasterTask#lock}.
-//    * <p>
-//    * Note: Locking is required here so that the splits are computed coherently
-//    * with respect to the buffers to which they will be assigned. Otherwise,
-//    * for example, a set of splits computed before a MOVE is noticed will
-//    * continue to target the pre-MOVE index partition after sink for that index
-//    * partition has noticed the MOVE, closed its buffer, and redirected its
-//    * buffered output to another sink. If we did not hold the lock across the
-//    * split/addToOutputBuffer operation then the master would discover that the
-//    * output buffer assigned by the split had since been closed (due to a
-//    * redirect).
     /**
-     * 
-     * @todo The test suite does not demonstrate this problem which makes
-     *       detection difficult. See
-     *       {@link TestMasterTaskWithRedirect#test_redirectStressTest()}.
-     * 
-     * @todo The test suite failed to demonstrate a problem where reopen was
-     *       false and there had been an idle timeout for a sink and the master
-     *       attempted to write another chunk onto that sink. The problem has
-     *       since been repaired in the code, but the test suite still does not
-     *       detect the issue.
-     * 
-     * @todo the requirement to hold the lock across the add of the splits could
-     *       stifle throughput when writes on some locators are slower and their
-     *       output buffers fill up.
+     * Splits the chunk according to the current index partitions and transfers
+     * each split to the appropriate sink.
      */
     protected void handleChunk(final E[] a, final boolean reopen)
             throws InterruptedException {
 
         final long begin = System.nanoTime();
         
-//        lock.lockInterruptibly();
         try {
 
             final long beforeSplit = System.nanoTime();
@@ -275,11 +243,9 @@ A//
 
         } finally {
 
-//            lock.unlock();
-            
             synchronized (stats) {
              
-                stats.handledChunkCount++;
+                stats.handledChunkCount.incrementAndGet();
                 
                 stats.elapsedHandleChunkNanos += System.nanoTime() - begin;
                 
@@ -288,79 +254,6 @@ A//
         }
 
     }
-
-//    /**
-//     * The master has to: (a) update its locator cache such that no more work is
-//     * assigned to this output buffer; (b) re-split the chunk which failed with
-//     * the StaleLocatorException; and (c) re-split all the data remaining in the
-//     * output buffer since it all needs to go into different output buffer(s).
-//     * <p>
-//     * Note: The handling of a {@link StaleLocatorException} MUST be MUTEX with
-//     * respect to adding data to an output buffer using
-//     * {@link #addToOutputBuffer(Split, KVO[])}. This provides a guarantee that
-//     * no more data will be added to a given output buffer once this method
-//     * holds the monitor. Since a single thread drains any given output buffer
-//     * we will never observe more than one {@link StaleLocatorException} for a
-//     * given index partition within the context of the same
-//     * {@link IndexWriteTask}. Together this allows us to decisively handle the
-//     * {@link StaleLocatorException} and close out the output buffer on which it
-//     * was received.
-//     * 
-//     * @param sink
-//     *            The class draining the output buffer.
-//     * @param chunk
-//     *            The chunk which it was writing when it received the
-//     *            {@link StaleLocatorException}.
-//     * @param cause
-//     *            The {@link StaleLocatorException}.
-//     */
-//    @SuppressWarnings("unchecked")
-//    protected void handleStaleLocator(final S sink, final E[] chunk,
-//            final StaleLocatorException cause) throws InterruptedException {
-//
-//        if (sink == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (chunk == null)
-//            throw new IllegalArgumentException();
-//        
-//        if (cause == null)
-//            throw new IllegalArgumentException();
-//
-//        lock.lockInterruptibly();
-//        try {
-//
-//            stats.redirectCount++;
-//
-//            /*
-//             * Notify the client so it can refresh the information for this
-//             * locator.
-//             */
-//            ndx.staleLocator(ndx.getTimestamp(), (L) sink.locator, cause);
-//
-//            /*
-//             * Redirect the chunk and anything in the buffer to the appropriate
-//             * output sinks.
-//             */
-//            handleRedirect(sink, chunk);
-//
-//            /*
-//             * Remove the buffer from the map
-//             * 
-//             * Note: This could cause a concurrent modification error if we are
-//             * awaiting the various output buffers to be closed. In order to
-//             * handle that code that modifies or traverses the [buffers] map
-//             * MUST be MUTEX or synchronized.
-//             */
-//            removeOutputBuffer((L) sink.locator, sink);
-//
-//        } finally {
-//
-//            lock.unlock();
-//            
-//        }
-//
-//    }
 
     @SuppressWarnings("unchecked")
     @Override
@@ -386,9 +279,7 @@ A//
     protected BlockingBuffer<E[]> newSubtaskBuffer() {
         
         return new BlockingBuffer<E[]>(//
-                // @todo config deque vs queue (deque combines on add() as well)
                 new LinkedBlockingDeque<E[]>(sinkQueueCapacity),//
-//                new ArrayBlockingQueue<E[]>(sinkQueueCapacity), //
                 sinkChunkSize,// 
                 sinkChunkTimeoutNanos,//
                 TimeUnit.NANOSECONDS,//

@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -37,13 +39,19 @@ public class AbstractSubtaskStats {
     /**
      * The #of elements in the output chunks (not including any eliminated
      * duplicates).
+     * <p>
+     * Note: The {@link AtomicLong} provides an atomic update guarantee which
+     * some of the unit tests rely on.
      */
-    public long elementsOut = 0L;
+    public final AtomicLong elementsOut = new AtomicLong(0);
 
     /**
      * The #of chunks written onto the index partition using RMI.
+     * <p>
+     * Note: The {@link AtomicLong} provides an atomic update guarantee which
+     * some of the unit tests rely on.
      */
-    public long chunksOut = 0L;
+    public final AtomicLong chunksOut = new AtomicLong();
 
     /**
      * Elapsed time waiting for another chunk to be ready so that it can be
@@ -63,6 +71,8 @@ public class AbstractSubtaskStats {
      */
     public double getAverageNanosPerWait() {
 
+        final long chunksOut = this.chunksOut.get();
+        
         return (chunksOut == 0L ? 0 : elapsedChunkWaitingNanos
                 / (double) chunksOut);
 
@@ -73,7 +83,9 @@ public class AbstractSubtaskStats {
      * average of the totals to date, not a moving average).
      */
     public double getAverageNanosPerWrite() {
-
+        
+        final long chunksOut = this.chunksOut.get();
+        
         return (chunksOut == 0L ? 0 : elapsedChunkWritingNanos
                 / (double) chunksOut);
 
@@ -84,6 +96,10 @@ public class AbstractSubtaskStats {
      * an average of the totals to date, not a moving average).
      */
     public double getAverageElementsPerWrite() {
+
+        final long chunksOut = this.chunksOut.get();
+
+        final long elementsOut = this.elementsOut.get();
 
         return (chunksOut == 0L ? 0 : elementsOut / (double) chunksOut);
 
@@ -99,7 +115,7 @@ public class AbstractSubtaskStats {
                 + ", elementsOut=" + elementsOut
                 + ", elapsedChunkWaitingNanos=" + elapsedChunkWaitingNanos
                 + ", elapsedChunkWritingNanos=" + elapsedChunkWritingNanos
-                + ", averageNanosPerWait=" + getAverageNanosPerWrite()
+                + ", averageNanosPerWait=" + getAverageNanosPerWait()
                 + ", averageNanosPerWrite=" + getAverageNanosPerWrite()
                 + ", averageElementsPerWrite=" + getAverageElementsPerWrite()
                 + "}";

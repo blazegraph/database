@@ -41,6 +41,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.H;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -66,6 +68,11 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
      */
     public void test_idleTimeout() throws InterruptedException,
             ExecutionException {
+
+        final H masterStats = new H();
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
 
         final M master = new M(masterStats, masterBuffer, executorService,
                 TimeUnit.MILLISECONDS.toNanos(2000)/* sinkIdleTimeout */,
@@ -107,15 +114,15 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
                 TimeUnit.MILLISECONDS);
 
         // verify chunk was output by the sink.
-        assertEquals("elementsIn", 1, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
-        assertEquals("elementsOut", 1, masterStats.elementsOut);
-        assertEquals("chunksOut", 1, masterStats.chunksOut);
+        assertEquals("elementsIn", 1, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 1, masterStats.chunksIn.get());
+        assertEquals("elementsOut", 1, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 1, masterStats.chunksOut.get());
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
         
         // make sure that the subtask is still running.
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount.get());
 
         final long elapsed1 = System.nanoTime() - beforeWrite;
         
@@ -137,8 +144,8 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         }
 
         // the original subtask should still be running.
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount.get());
 
         // now sleep for the entire idle timeout (this give us some padding).
         Thread
@@ -146,9 +153,9 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
                         .toMillis(master.sinkIdleTimeoutNanos));
 
         // the subtask should have terminated and no other subtask should have started.
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
-        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount.get());
+        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeoutCount.get());
 
         /*
          * write another chunk onto the same output buffer.
@@ -168,22 +175,22 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         masterBuffer.getFuture().get();
 
         // verify 2nd chunk was output by the sink.
-        assertEquals("elementsIn", 2, masterStats.elementsIn);
-        assertEquals("chunksIn", 2, masterStats.chunksIn);
-        assertEquals("elementsOut", 2, masterStats.elementsOut);
-        assertEquals("chunksOut", 2, masterStats.chunksOut);
+        assertEquals("elementsIn", 2, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get());
+        assertEquals("elementsOut", 2, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 2, masterStats.chunksOut.get());
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         // verify that another subtask was started by the 2nd write.
-        assertEquals("subtaskStartCount", 2, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 2, masterStats.subtaskEndCount);
+        assertEquals("subtaskStartCount", 2, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 2, masterStats.subtaskEndCount.get());
 
         /*
          * The idle timeout count should still be one since the 2nd instance of
          * the sink should have been closed when the master was exhausted not by
          * an idle timeout.
          */
-        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
+        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeoutCount.get());
 
         // verify writes on each expected partition.
         {
@@ -192,8 +199,8 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 
             assertNotNull(subtaskStats);
 
-            assertEquals("chunksOut", 2, subtaskStats.chunksOut);
-            assertEquals("elementsOut", 2, subtaskStats.elementsOut);
+            assertEquals("chunksOut", 2, subtaskStats.chunksOut.get());
+            assertEquals("elementsOut", 2, subtaskStats.elementsOut.get());
 
         }
 
@@ -209,13 +216,18 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
      */
     public void test_idleTimeout_LT_chunkTimeout() throws InterruptedException, ExecutionException {
 
+        final H masterStats = new H();
+
         final long sinkIdleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(50);
 
         final long sinkChunkTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(140);
         
         // make sure there is enough room for the test to succeed.
         assertTrue(sinkIdleTimeoutNanos * 2 <= sinkChunkTimeoutNanos);
-        
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
+
         final M master = new M(masterStats, masterBuffer, executorService,
                 sinkIdleTimeoutNanos,
                 M.DEFAULT_SINK_POLL_TIMEOUT) {
@@ -260,14 +272,14 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
                     + " chunkTimeout=" + sinkChunkTimeoutNanos);
         
         // verify chunk was output by the sink.
-        assertEquals("elementsIn", 1, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
-        assertEquals("elementsOut", 1, masterStats.elementsOut);
-        assertEquals("chunksOut", 1, masterStats.chunksOut);
+        assertEquals("elementsIn", 1, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 1, masterStats.chunksIn.get());
+        assertEquals("elementsOut", 1, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 1, masterStats.chunksOut.get());
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
         
         // verify the sink was closed by an idle timeout.
-        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
+        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeoutCount.get());
 
         /*
          * Verify that the sink was closed before a chunk timeout would have
@@ -289,8 +301,8 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         masterBuffer.getFuture().get();
 
         // verify only one sink started/ended
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount.get());
     }
 
     /**
@@ -366,7 +378,9 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
          * its chunkSize limit).
          */
         final double expectedAverageOutputChunkSize = N * O;
-        
+
+        final H masterStats = new H();
+
         /*
          * Override the [masterBuffer] so that we can disable its chunk
          * combiner. This way only the sink will be combining chunks together
@@ -442,14 +456,21 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
                                     // halt?
                                     if(halt.get())
                                         throw new HaltedException();
-                                    
-                                    /* Verify the sink WAS NOT closed by an idle timeout.
+
+                                    /*
+                                     * Verify the sink WAS NOT closed by an idle
+                                     * timeout.
                                      * 
-                                     * Note: I have seen this assertion triggered occasionally.
-                                     * However, on re-trial it generally succeeds.
+                                     * Note: I have seen this assertion
+                                     * triggered occasionally. However, on
+                                     * re-trial it generally succeeds [I think
+                                     * that this was related to the visibility
+                                     * of the state change in the field. It is
+                                     * now an AtomicLong, which may fix this.
+                                     * Nope. Still occasionally fails]
                                      */
                                     assertEquals("subtaskIdleTimeout", 0,
-                                            masterStats.subtaskIdleTimeout);
+                                            masterStats.subtaskIdleTimeoutCount.get());
                                     
                                     // add chunk to master's input buffer.
                                     final KVO<O>[] a = new KVO[] { //
@@ -527,7 +548,7 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
 //            assertEquals("chunksIn", counter.get(), masterStats.chunksIn);
             
             // elements out for the master (aggregated across all sinks).
-            assertEquals("elementsOut", counter.get(), masterStats.elementsOut);
+            assertEquals("elementsOut", counter.get(), masterStats.elementsOut.get());
 
             // only a single sink key was used (one index partition).
             assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
@@ -537,16 +558,16 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
              * master was closed (this verifies that we only had a single sink
              * running for the entire test).
              */
-            assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-            assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
-            
+            assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+            assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount.get());
+
             /*
              * verify that chunks were combined until they had on average ~ N
              * elements per sink since the rate of chunk arrival should have
              * been ~ N times the chunk timeout.
              */
             final double actualAverageOutputChunkSize = (double) masterStats.elementsOut
-                    / (double) masterStats.chunksOut;
+                    .get() / (double) masterStats.chunksOut.get();
 
             final double r = actualAverageOutputChunkSize
                     / expectedAverageOutputChunkSize;
@@ -593,6 +614,11 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
     public void test_idleTimeoutInfinite_chunkTimeoutInfinite() throws InterruptedException,
             ExecutionException {
 
+        final H masterStats = new H();
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
+
         final M master = new M(masterStats, masterBuffer, executorService,
                 Long.MAX_VALUE/* sinkIdleTimeout */, M.DEFAULT_SINK_POLL_TIMEOUT) {
 
@@ -634,12 +660,12 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         Thread.sleep(1000/* ms */);
 
         // verify that the master has accepted the 1st chunk. 
-        assertEquals("elementsIn", 1, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
+        assertEquals("elementsIn", 1, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 1, masterStats.chunksIn.get());
         
         // verify that nothing has been output yet.
-        assertEquals("elementsOut", 0, masterStats.elementsOut);
-        assertEquals("chunksOut", 0, masterStats.chunksOut);
+        assertEquals("elementsOut", 0, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 0, masterStats.chunksOut.get());
 
         // write another chunk on the master (distinct values).
         {
@@ -655,12 +681,12 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         Thread.sleep(1000/* ms */);
 
         // verify that the master has accepted the 2nd chunk. 
-        assertEquals("elementsIn", 2, masterStats.elementsIn);
-        assertEquals("chunksIn", 2, masterStats.chunksIn);
+        assertEquals("elementsIn", 2, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get());
         
         // verify that nothing has been output yet.
-        assertEquals("elementsOut", 0, masterStats.elementsOut);
-        assertEquals("chunksOut", 0, masterStats.chunksOut);
+        assertEquals("elementsOut", 0, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 0, masterStats.chunksOut.get());
 
         // close the master - the output sink should now emit a chunk.
         masterBuffer.close();
@@ -669,11 +695,11 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         masterBuffer.getFuture().get();
         
         // verify elements in/out; chunks in/out
-        assertEquals("elementsIn", 2, masterStats.elementsIn);
-        assertEquals("chunksIn", 2, masterStats.chunksIn);
+        assertEquals("elementsIn", 2, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get());
         
-        assertEquals("elementsOut", 2, masterStats.elementsOut);
-        assertEquals("chunksOut", 1, masterStats.chunksOut);
+        assertEquals("elementsOut", 2, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 1, masterStats.chunksOut.get());
         
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
@@ -692,6 +718,11 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
             throws InterruptedException, ExecutionException, TimeoutException {
 
         final long sinkIdleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(100);
+
+        final H masterStats = new H();
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
 
         final M master = new M(masterStats, masterBuffer, executorService,
                 sinkIdleTimeoutNanos, M.DEFAULT_SINK_POLL_TIMEOUT) {
@@ -735,17 +766,17 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         Thread.sleep(TimeUnit.NANOSECONDS.toMillis(sinkIdleTimeoutNanos) / 2);
 
         // verify that the master has accepted the 1st chunk. 
-        assertEquals("elementsIn", 1, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
+        assertEquals("elementsIn", 1, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 1, masterStats.chunksIn.get());
         
         // verify that nothing has been output yet.
-        assertEquals("elementsOut", 0, masterStats.elementsOut);
-        assertEquals("chunksOut", 0, masterStats.chunksOut);
+        assertEquals("elementsOut", 0, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 0, masterStats.chunksOut.get());
 
         // verify subtask has started but not yet ended.
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount);
-        assertEquals("subtaskIdleTimeout", 0, masterStats.subtaskIdleTimeout);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount.get());
+        assertEquals("subtaskIdleTimeout", 0, masterStats.subtaskIdleTimeoutCount.get());
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         // write another chunk on the master (distinct values).
@@ -762,17 +793,17 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         Thread.sleep(TimeUnit.NANOSECONDS.toMillis(sinkIdleTimeoutNanos) / 2);
 
         // verify that the master has accepted the 2nd chunk. 
-        assertEquals("elementsIn", 2, masterStats.elementsIn);
-        assertEquals("chunksIn", 2, masterStats.chunksIn);
+        assertEquals("elementsIn", 2, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get());
         
         // verify that nothing has been output yet.
-        assertEquals("elementsOut", 0, masterStats.elementsOut);
-        assertEquals("chunksOut", 0, masterStats.chunksOut);
+        assertEquals("elementsOut", 0, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 0, masterStats.chunksOut.get());
 
         // verify the same subtask is still running.
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount);
-        assertEquals("subtaskIdleTimeout", 0, masterStats.subtaskIdleTimeout);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 0, masterStats.subtaskEndCount.get());
+        assertEquals("subtaskIdleTimeout", 0, masterStats.subtaskIdleTimeoutCount.get());
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         /*
@@ -783,19 +814,19 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
         Thread.sleep(TimeUnit.NANOSECONDS.toMillis(sinkIdleTimeoutNanos) * 2);
         
         // verify elements in/out; chunks in/out
-        assertEquals("elementsIn", 2, masterStats.elementsIn);
-        assertEquals("chunksIn", 2, masterStats.chunksIn);
+        assertEquals("elementsIn", 2, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get());
         
-        assertEquals("elementsOut", 2, masterStats.elementsOut);
-        assertEquals("chunksOut", 1, masterStats.chunksOut);
+        assertEquals("elementsOut", 2, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 1, masterStats.chunksOut.get());
 
         /*
          * Verify only one subtask started, that it is now ended, and that it
          * ended via an idle timeout.
          */
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
-        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount.get());
+        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeoutCount.get());
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
         // close the master.
@@ -813,19 +844,19 @@ public class TestMasterTaskIdleTimeout extends AbstractMasterTestCase {
          */
         
         // verify elements in/out; chunks in/out
-        assertEquals("elementsIn", 2, masterStats.elementsIn);
-        assertEquals("chunksIn", 2, masterStats.chunksIn);
+        assertEquals("elementsIn", 2, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get());
         
-        assertEquals("elementsOut", 2, masterStats.elementsOut);
-        assertEquals("chunksOut", 1, masterStats.chunksOut);
+        assertEquals("elementsOut", 2, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 1, masterStats.chunksOut.get());
 
         /*
          * Verify only one subtask started, that it is now ended, and that it
          * ended via an idle timeout.
          */
-        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount);
-        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount);
-        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeout);
+        assertEquals("subtaskStartCount", 1, masterStats.subtaskStartCount.get());
+        assertEquals("subtaskEndCount", 1, masterStats.subtaskEndCount.get());
+        assertEquals("subtaskIdleTimeout", 1, masterStats.subtaskIdleTimeoutCount.get());
         assertEquals("partitionCount", 1, masterStats.getMaximumPartitionCount());
 
     }

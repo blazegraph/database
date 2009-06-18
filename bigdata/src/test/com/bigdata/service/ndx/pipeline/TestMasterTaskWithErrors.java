@@ -33,6 +33,8 @@ import java.util.concurrent.Future;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.H;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -61,10 +63,16 @@ public class TestMasterTaskWithErrors extends AbstractMasterTestCase {
     public void test_startWriteErrorStop() throws InterruptedException,
             ExecutionException {
 
+        final H masterStats = new H();
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
+
         /*
-         * Note: The master is overriden so that the 1st chunk written onto
+         * Note: The master is overridden so that the 1st chunk written onto
          * locator(13) will cause an exception to be thrown.
          */
+
         final M master = new M(masterStats, masterBuffer, executorService) {
           
             @Override
@@ -129,9 +137,10 @@ public class TestMasterTaskWithErrors extends AbstractMasterTestCase {
         
         }
 
-        assertEquals("elementsIn", a.length, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
-        assertEquals("partitionCount", 2, masterStats.getMaximumPartitionCount());
+        assertEquals("elementsIn", a.length, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 1, masterStats.chunksIn.get());
+        assertEquals("partitionCount", 2, masterStats
+                .getMaximumPartitionCount());
 
         /*
          * Note: There is no way to predict whether any chunks will have been

@@ -903,9 +903,10 @@ public class TestMasterTaskWithSplits extends AbstractKeyRangeMasterTestCase {
                     if (log.isInfoEnabled())
                         log
                                 .info("Waiting on master: ~subtaskCount="
-                                        + (masterStats.subtaskStartCount - masterStats.subtaskEndCount)
+                                        + masterStats.getActiveSinkCount()
                                         + ", ~elementsRemaining="
-                                        + (masterStats.elementsIn - masterStats.elementsOut));
+                                        + (masterStats.elementsIn.get() - masterStats.elementsOut
+                                                .get()));
                 }
             }
 

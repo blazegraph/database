@@ -46,6 +46,8 @@ import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.ndx.pipeline.AbstractKeyRangeMasterTestCase.L;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.H;
+import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
 
 /**
  * Test ability to handle a redirect (subtask learns that the target service no
@@ -90,6 +92,11 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
      */
     public void test_startWriteRedirectStop() throws InterruptedException,
             ExecutionException {
+
+        final H masterStats = new H();
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
 
         /*
          * Note: The master is overridden so that the 1st chunk written onto
@@ -150,11 +157,12 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
         masterBuffer.getFuture().get();
 
-        assertEquals("elementsIn", a.length, masterStats.elementsIn);
-        assertEquals("chunksIn", 1, masterStats.chunksIn);
-        assertEquals("elementsOut", a.length, masterStats.elementsOut);
-        assertEquals("chunksOut", 2, masterStats.chunksOut);
-        assertEquals("partitionCount", 3, masterStats.getMaximumPartitionCount());
+        assertEquals("elementsIn", a.length, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 1, masterStats.chunksIn.get());
+        assertEquals("elementsOut", a.length, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 2, masterStats.chunksOut.get());
+        assertEquals("partitionCount", 3, masterStats
+                .getMaximumPartitionCount());
 
         final HS subtaskStats_L1 = masterStats.getSubtaskStats(new L(1));
         final HS subtaskStats_L13 = masterStats.getSubtaskStats(new L(13));
@@ -165,8 +173,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
             assertNotNull(subtaskStats_L1);
             
-            assertEquals("chunksOut", 1, subtaskStats_L1.chunksOut);
-            assertEquals("elementsOut", 1, subtaskStats_L1.elementsOut);
+            assertEquals("chunksOut", 1, subtaskStats_L1.chunksOut.get());
+            assertEquals("elementsOut", 1, subtaskStats_L1.elementsOut.get());
             
         }
         
@@ -175,8 +183,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             
             assertNotNull(subtaskStats_L13);
             
-            assertEquals("chunksOut", 0, subtaskStats_L13.chunksOut);
-            assertEquals("elementsOut", 0, subtaskStats_L13.elementsOut);
+            assertEquals("chunksOut", 0, subtaskStats_L13.chunksOut.get());
+            assertEquals("elementsOut", 0, subtaskStats_L13.elementsOut.get());
             
         }
 
@@ -185,8 +193,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             
             assertNotNull(subtaskStats_L14);
             
-            assertEquals("chunksOut", 1, subtaskStats_L14.chunksOut);
-            assertEquals("elementsOut", 1, subtaskStats_L14.elementsOut);
+            assertEquals("chunksOut", 1, subtaskStats_L14.chunksOut.get());
+            assertEquals("elementsOut", 1, subtaskStats_L14.elementsOut.get());
             
         }
 
@@ -214,7 +222,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         final ReentrantLock lck = new ReentrantLock(true/*fair*/);
         
         /*
-         * The redirect has to wait until this condition is signalled. It is
+         * The redirect has to wait until this condition is signaled. It is
          * signaled from within master#awaitAll() once the master has closed the
          * buffers for the existing output sinks.
          */
@@ -224,14 +232,19 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
          * reopened).
          */
         final AtomicBoolean L14WasClosed = new AtomicBoolean(false);
-        
+
+        final H masterStats = new H();
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
+
         final M master = new M(masterStats, masterBuffer, executorService) {
 
             @Override
-            protected void removeOutputBuffer(final L locator,
-                    final AbstractSubtask sink) {
+            protected void moveSinkToFinishedQueueAtomically(final L locator,
+                    final AbstractSubtask sink) throws InterruptedException {
 
-                super.removeOutputBuffer(locator, sink);
+                super.moveSinkToFinishedQueueAtomically(locator, sink);
 
                 if (locator.locator == 14) {
 
@@ -332,7 +345,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
         
         /*
          * Write on L(13). This will be redirected to L(14). The redirect will
-         * not be issured until the master has CLOSED the output buffer for
+         * not be issued until the master has CLOSED the output buffer for
          * L(14). This will force the master to re-open that output buffer.
          */
         {
@@ -346,10 +359,10 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
         masterBuffer.getFuture().get();
 
-        assertEquals("elementsIn", 3, masterStats.elementsIn);
-        assertEquals("chunksIn", 2, masterStats.chunksIn);
-        assertEquals("elementsOut", 3, masterStats.elementsOut);
-        assertEquals("chunksOut", 3, masterStats.chunksOut);
+        assertEquals("elementsIn", 3, masterStats.elementsIn.get());
+        assertEquals("chunksIn", 2, masterStats.chunksIn.get());
+        assertEquals("elementsOut", 3, masterStats.elementsOut.get());
+        assertEquals("chunksOut", 3, masterStats.chunksOut.get());
         assertEquals("partitionCount", 3, masterStats.getMaximumPartitionCount());
 
         // verify writes on each expected partition.
@@ -359,8 +372,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
             assertNotNull(subtaskStats);
             
-            assertEquals("chunksOut", 1, subtaskStats.chunksOut);
-            assertEquals("elementsOut", 1, subtaskStats.elementsOut);
+            assertEquals("chunksOut", 1, subtaskStats.chunksOut.get());
+            assertEquals("elementsOut", 1, subtaskStats.elementsOut.get());
             
         }
         
@@ -371,8 +384,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
             assertNotNull(subtaskStats);
             
-            assertEquals("chunksOut", 0, subtaskStats.chunksOut);
-            assertEquals("elementsOut", 0, subtaskStats.elementsOut);
+            assertEquals("chunksOut", 0, subtaskStats.chunksOut.get());
+            assertEquals("elementsOut", 0, subtaskStats.elementsOut.get());
             
         }
 
@@ -383,8 +396,8 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
             assertNotNull(subtaskStats);
             
-            assertEquals("chunksOut", 2, subtaskStats.chunksOut);
-            assertEquals("elementsOut", 2, subtaskStats.elementsOut);
+            assertEquals("chunksOut", 2, subtaskStats.chunksOut.get());
+            assertEquals("elementsOut", 2, subtaskStats.elementsOut.get());
             
         }
 
@@ -663,6 +676,11 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
             }
             
         }
+
+        final H masterStats = new H();
+
+        final BlockingBuffer<KVO<O>[]> masterBuffer = new BlockingBuffer<KVO<O>[]>(
+                masterQueueCapacity);
 
         final M master = new M(masterStats, masterBuffer, executorService) {
           

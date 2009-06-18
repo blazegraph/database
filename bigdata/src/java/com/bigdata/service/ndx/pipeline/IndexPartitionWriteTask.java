@@ -296,15 +296,17 @@ A//
             final long elapsedNanos = System.nanoTime() - beginNanos;
 
             // update the local statistics.
-            stats.chunksOut++;
-            stats.elementsOut += chunkSize;
-            stats.elapsedChunkWritingNanos += elapsedNanos;
+            synchronized (stats) {
+                stats.chunksOut.incrementAndGet();
+                stats.elementsOut.addAndGet(chunkSize);
+                stats.elapsedChunkWritingNanos += elapsedNanos;
+            }
 
             // update the master's statistics.
             synchronized (master.stats) {
-                master.stats.chunksOut++;
-                master.stats.elementsOut += chunkSize;
-                master.stats.duplicateCount += duplicateCount;
+                master.stats.chunksOut.incrementAndGet();
+                master.stats.elementsOut.addAndGet(chunkSize);
+                master.stats.duplicateCount.addAndGet(duplicateCount);
                 master.stats.elapsedSinkChunkWritingNanos += elapsedNanos;
             }
 

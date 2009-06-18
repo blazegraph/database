@@ -37,7 +37,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -174,6 +173,9 @@ import com.bigdata.util.concurrent.AbstractHaltableProcess;
  * @version $Id$
  * @see ISplitter
  * 
+ * @todo Update javadoc to reflect that the master no longer waits for a closed
+ *       sink in {@link #getSink(Object, boolean)} but instead places the sink
+ *       onto the {@link #finishedSubtaskQueue}.
  */
 public abstract class AbstractMasterTask<//
 H extends AbstractMasterStats<L, ? extends AbstractSubtaskStats>, //
@@ -201,8 +203,41 @@ L>//
      * sink, then this situation would deadlock since the {@link #lock} is
      * already held and the sink is unable to drain.
      */
-    protected final BlockingQueue<E[]> redirectQueue = new LinkedBlockingQueue<E[]>(/* unbounded */);
+    private final BlockingQueue<E[]> redirectQueue = new LinkedBlockingQueue<E[]>(/* unbounded */);
 
+    /**
+     * The #of chunks on the master's redirectQueue.
+     */
+    public final int getRedirectQueueSize() {
+
+        return redirectQueue.size();
+        
+    }
+
+    /**
+     * Places a chunk onto the master's redirectQueue.
+     * 
+     * @param chunk
+     *            The chunk.
+     * 
+     * @throws InterruptedException
+     */
+    protected final void redirectChunk(final E[] chunk)
+            throws InterruptedException {
+
+        /*
+         * @todo Acquiring the lock here should not be (and probably is not)
+         * necessary for the master's atomic termination condition.
+         */
+        lock.lockInterruptibly();
+        try {
+            redirectQueue.put(chunk);
+        } finally {
+            lock.unlock();
+        }
+
+    }
+    
     public BlockingBuffer<E[]> getBuffer() {
 
         return buffer;
@@ -264,14 +299,19 @@ L>//
      * {@link #awaitAll()} and {@link #cancelAll(boolean)} both handle this in
      * their own way.
      */
-    private final BlockingQueue<S> finishedSubtasks = new LinkedBlockingQueue<S>();
+    private final BlockingQueue<S> finishedSubtaskQueue = new LinkedBlockingQueue<S>();
 
     /**
-     * Notify the master that a subtask is done.
+     * Notify the master that a subtask is done. The subtask is placed onto the
+     * {@link #finishedSubtaskQueue} queue. The master polls that queue in
+     * {@link #call()} and {@link #awaitAll()} and checks the {@link Future} of
+     * each finished subtask using {@link #drainFutures()}. If a {@link Future}
+     * reports an error, then the master is halted. This is how we ensure that
+     * all subtasks complete normally.
      * 
      * @param subtask
      *            The subtask.
-     *            
+     * 
      * @throws InterruptedException
      */
     protected void notifySubtaskDone(final AbstractSubtask subtask)
@@ -280,16 +320,20 @@ L>//
         if (subtask == null)
             throw new IllegalArgumentException();
         
+        if (subtask.buffer.isOpen())
+            throw new IllegalStateException();
+
         lock.lockInterruptibly();
         
         try {
     
-            // signal condition (used by awaitAll).
+            // atomic transfer from [sinks] to [finishedSubtasks].
+            moveSinkToFinishedQueueAtomically((L) subtask.locator,
+                    (AbstractSubtask) subtask);
+
+            // signal condition (used by awaitAll()).
             subtaskDone.signalAll();
-            
-            // place on queue (used by call()).
-            finishedSubtasks.put((S) subtask);
-        
+
         } finally {
         
             lock.unlock();
@@ -386,8 +430,8 @@ L>//
     public H call() throws Exception {
 
         /*
-         * Note: If idle timeouts are allowed then we need to reopen the buffer
-         * if it has closed by a timeout.
+         * Note: If idle timeouts are allowed then we need to reopen the sink if
+         * it has closed by a timeout.
          */
 
         final boolean reopen = sinkIdleTimeoutNanos != 0;
@@ -402,21 +446,7 @@ L>//
 
                 halted();
 
-                /*
-                 * Poll the queue of sinks that have finished running
-                 * (non-blocking).
-                 * 
-                 * Note: We don't actually remove the subtask from the queue
-                 * until its Future is available.
-                 */
-                final S finishedSink = finishedSubtasks.peek();
-                if (finishedSink != null
-                        && finishedSink.buffer.getFuture().isDone()) {
-                    // remove the subtask from the queue.
-                    finishedSubtasks.remove();
-                    // check the Future for errors.
-                    awaitSink(finishedSink);
-                }
+                drainFutures();
                 
                 // drain the redirectQueue if not empty.
                 E[] a = redirectQueue.poll();
@@ -435,6 +465,7 @@ L>//
                         /*
                          * Nothing available right now.
                          */
+        
                         if (!buffer.isOpen() && buffer.isEmpty()) {
 
                             /*
@@ -443,6 +474,7 @@ L>//
                              * will continue to drain the redirectQueue in
                              * awaitAll().
                              */
+                            
                             break;
 
                         } else {
@@ -467,13 +499,13 @@ L>//
                 
                 synchronized (stats) {
                     // update the master stats.
-                    stats.chunksIn++;
-                    stats.elementsIn += a.length;
+                    stats.chunksIn.incrementAndGet();
+                    stats.elementsIn.addAndGet(a.length);
                 }
 
                 handleChunk(a, reopen);
                 
-            }
+            } // while(true)
 
             awaitAll();
 
@@ -525,18 +557,21 @@ L>//
      *             tasks.
      * 
      * @todo The test suite should include a case where a set of redirects
-     *       appear just as the sinks are processing their last chunk. This
-     *       corresponds to the conditions for a deadlock, which has been
-     *       resolved in the code. The deadlock would arise because the
-     *       {@link #awaitAll()} was holding the {@link #lock} across
-     *       {@link #handleChunk(Object[], boolean)} such that a
-     *       {@link AbstractSubtask#call()} was unable to gain the {@link #lock}
-     *       so that it could signal {@link #subtaskDone}.
+     *       appear just as the sinks are processing their last chunk.
      */
     private void awaitAll() throws InterruptedException, ExecutionException {
 
-            // close buffer - nothing more may be written on the master.
-        buffer.close();
+        if(buffer.isOpen()) {
+
+            /*
+             * The buffer must be closed as a precondition otherwise the
+             * application can continue to write data on the master's input
+             * queue and the termination conditions can not be satisified.
+             */
+
+            throw new IllegalStateException();
+            
+        }
 
         while (true) {
 
@@ -551,7 +586,8 @@ L>//
              * chunk to be processed, then we MUST NOT hold the lock when
              * processing that chunk. Doing so will lead to a deadlock in
              * AbstractSubtask#call() when it tries to grab the lock so that it
-             * can signal subtaskDone.
+             * can signal subtaskDone. Therefore we process the chunks outside
+             * of this code block, once we have released the lock.
              */
             final E[] a;
             lock.lockInterruptibly();
@@ -562,18 +598,21 @@ L>//
                 if (a == null) {
 
                     /*
-                     * There is nothing available from the redirect queue. 
+                     * There is nothing available from the redirect queue.
                      */
-                    
-                    if (sinks.isEmpty() && redirectQueue.isEmpty()) {
+
+                    if (finishedSubtaskQueue.isEmpty() && sinks.isEmpty()
+                            && redirectQueue.isEmpty()) {
 
                         /*
-                         * We are done since there are no running sinks and the
+                         * We are done since there are no running sinks, and no
+                         * sinks whose Future we still need to test, and the
                          * redirectQueue is empty.
                          * 
                          * Note: We MUST be holding the lock for this
                          * termination condition to be atomic.
                          */
+                        
                         break;
 
                     }
@@ -586,36 +625,21 @@ L>//
                         log.debug("Waiting for " + sinks.size()
                                 + " subtasks : " + this);
 
-                    for (S sink : sinks.values()) {
+                    drainFutures();
+                    
+                    if (!finishedSubtaskQueue.isEmpty()) {
 
-                        if(sink.buffer.getFuture().isDone()) {
+                        /*
+                         * Yield the lock and wait up to a timeout for a sink to
+                         * complete. We can not wait that long because we are
+                         * still polling the redirect queue!
+                         * 
+                         * @todo config timeout
+                         */
 
-                            /*
-                             * Check the future.
-                             * 
-                             * Note: We KNOW that the Future is immediately
-                             * available for this sink (and hence, that the sink
-                             * is no longer executing) so this request can not
-                             * lead to a deadlock where the sink attempts to
-                             * notify the master that it is done.
-                             */
-
-                            awaitSink(sink);
-                            
-                        }
+                        subtaskDone.await(50, TimeUnit.MILLISECONDS);
 
                     }
-
-                    /*
-                     * Yield the lock and wait up to a timeout for a sink to
-                     * complete. We can not wait that long because we are still
-                     * polling the redirect queue!
-                     * 
-                     * @todo config timeout
-                     */
-                    subtaskDone.await(5, TimeUnit.MILLISECONDS);
-
-                    continue;
 
                 }
 
@@ -635,12 +659,10 @@ L>//
 
                 handleChunk(a, true/* reopen */);
 
-                continue;
-
             }
 
-        } // continue
-
+        } // while(true)
+        
         if (log.isInfoEnabled())
             log.info("All subtasks are done: " + this);
 
@@ -653,7 +675,8 @@ L>//
      * <p>
      * Note: The caller should have already invoked {@link #halt(Throwable)}.
      */
-    private void cancelAll(final boolean mayInterruptIfRunning) {
+    private void cancelAll(final boolean mayInterruptIfRunning)
+            throws InterruptedException {
 
         log.warn("Cancelling job: " + this);
 
@@ -668,9 +691,6 @@ L>//
         // Clear the backing queue.
         buffer.clear();
         
-        // clear the redirect queue.
-        redirectQueue.clear();
-        
         // cancel the futures.
         for (S sink : sinks.values()) {
 
@@ -684,12 +704,42 @@ L>//
 
         }
 
+        // wait for all sinks to complete.
+        for( S sink : sinks.values()) {
+            final Future<?> f = sink.buffer.getFuture();
+            try {
+                f.get();
+            } catch (InterruptedException ex) {
+                throw ex;
+            } catch (ExecutionException ex) {
+                /*
+                 * Ignore exceptions here since we are halting anyway and we can
+                 * expect a bunch of canceled tasks because we just interrupted
+                 * all of the subtasks.
+                 */
+                log.warn("sink=" + sink + " : " + ex);
+            }
+            
+        }
+        
+        // clear references to the sinks.
+        sinks.clear();
+        
+        // clear queue of finished sinks (we do not need to check their futures).
+        finishedSubtaskQueue.clear();
+
+        // clear the redirect queue.
+        redirectQueue.clear();
+        
     }
 
     /**
      * Return the sink for the locator. The sink is created if it does not exist
      * using {@link #newSubtaskBuffer()} and
      * {@link #newSubtask(Object, BlockingBuffer)}.
+     * <p>
+     * Note: The caller is single threaded since this is invoked from the
+     * master's thread. This code depends on that assumption.
      * 
      * @param locator
      *            The locator (unique subtask key).
@@ -719,35 +769,58 @@ L>//
 
         S sink = sinks.get(locator);
 
-        if (reopen && sink != null && !sink.buffer.isOpen()) {
+        if (sink != null && sink.buffer.isOpen()) {
 
-            if (log.isInfoEnabled())
-                log.info("Reopening sink (was closed): " + this + ", locator="
-                        + locator);
+            /*
+             * The sink is good, so return it.
+             * 
+             * Note: the caller must handle the exception if the sink is
+             * asynchronously closed before the caller can use it.
+             */
 
-            // wait for the sink to terminate normally.
-            awaitSink(sink);
-
-            sink = null;
+            return sink;
 
         }
 
-        if (sink == null) {
+        /*
+         * @todo This lock should not be necessary (and probably is not) since
+         * the caller is single threaded.
+         */
+        lock.lockInterruptibly();
+        try {
 
-            if (log.isInfoEnabled())
-                log.info("Creating output buffer: " + this + ", locator="
-                        + locator);
+            if (reopen && sink != null && !sink.buffer.isOpen()) {
 
-            /*
-             * Obtain the lock used to guard sink life cycle events.
-             * 
-             * @todo double-check locking or is caller single threaded, in which
-             * case do we need this lock? Document this better either way. [The
-             * caller is single threaded since this is invoked from the master's
-             * thread, at least for now.]
-             */
-            lock.lockInterruptibly();
-            try {
+                if (log.isInfoEnabled())
+                    log.info("Reopening sink (was closed): " + this
+                            + ", locator=" + locator);
+
+                /*
+                 * Note: Instead of waiting for the sink here, the sink will
+                 * notify the master when it is done and be placed onto the
+                 * [finishedSinks] queue. When it's Future#isDone(), we will
+                 * drain it from the queue and check it's Future for errors.
+                 * 
+                 * This allows the master to not block when a sink is closed but
+                 * still awaiting an RMI. It also implies that there can be two
+                 * active sinks for the same locator, but only one will be
+                 * recorded in [sinks] at any given time.
+                 */
+
+                // remove the old sink from the map (IFF that is the reference
+                // found).
+                moveSinkToFinishedQueueAtomically(locator, sink);
+
+                // clear reference so we can re-open the sink.
+                sink = null;
+
+            }
+
+            if (sink == null) {
+
+                if (log.isInfoEnabled())
+                    log.info("Creating output buffer: " + this + ", locator="
+                            + locator);
 
                 final BlockingBuffer<E[]> out = newSubtaskBuffer();
 
@@ -755,35 +828,34 @@ L>//
 
                 final S oldval = sinks.put(locator, sink);
 
-                if (oldval == null) {
+                // should not be an entry in the map for that locator.
+                assert oldval == null : "locator=" + locator;
 
-                    // assign a worker thread to the sink.
-                    final Future<? extends AbstractSubtaskStats> future = submitSubtask(sink);
+                // if (oldval == null) {
 
-                    out.setFuture(future);
+                // assign a worker thread to the sink.
+                final Future<? extends AbstractSubtaskStats> future = submitSubtask(sink);
 
-                    synchronized (stats) {
+                out.setFuture(future);
 
-                        stats.subtaskStartCount++;
+                stats.subtaskStartCount.incrementAndGet();
 
-                    }
+                // } else {
+                //
+                // // concurrent create of the sink.
+                // sink = oldval;
+                //
+                // }
 
-                } else {
-
-                    // concurrent create of the sink.
-                    sink = oldval;
-
-                }
-                
-            } finally {
-
-                lock.unlock();
-                
             }
 
-        }
+            return sink;
 
-        return sink;
+        } finally {
+
+            lock.unlock();
+
+        }
 
     }
 
@@ -816,108 +888,137 @@ L>//
     abstract protected Future<? extends AbstractSubtaskStats> submitSubtask(S subtask);
 
     /**
-     * This is invoked when there is already a sink for that index partition but
-     * it has been closed. This checks the {@link Future} to verify that the
-     * sink completed normally.
+     * Drains any {@link Future}s from {@link #finishedSubtaskQueue} which are done
+     * and halts the master if there is an error for a {@link Future}.
      * 
-     * @throws IllegalStateException
-     *             unless the {@link #buffer} is closed.
+     * @throws InterruptedException
+     *             if interrupted.
      */
-    private void awaitSink(final S sink) {
+    private void drainFutures() throws InterruptedException, ExecutionException {
 
-        if (sink == null)
-            throw new IllegalArgumentException();
+        while (true) {
         
-        if(sink.buffer.isOpen())
-            throw new IllegalStateException();
-
-        final Future<?> f = sink.buffer.getFuture();
-        final long begin = System.nanoTime();
-        long lastLogErrorNanos = begin;
-        try {
-
-            while (true) {
-
-                try {
-
-                    // test the future.
-                    f.get(1000, TimeUnit.MILLISECONDS);
-
-                    // clear from the map (but ONLY once we have checked the Future!)
-                    removeOutputBuffer((L) sink.locator, (AbstractSubtask) sink);
-
-                    // Done.
-                    return;
-
-                } catch (TimeoutException ex) {
-
-                    final long now = System.nanoTime();
-
-                    final String msg = "Waiting on sink: elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(now - begin)
-                            + ", sink=" + sink;
-
-                    if (TimeUnit.NANOSECONDS.toMillis(now - lastLogErrorNanos) > 5000) {
-
-                        log.error(msg, ex);
-
-                        lastLogErrorNanos = now;
-                        
-                    } else {
-
-                        log.warn(msg);
-                        
-                    }
-
-                }
-
+            halted();
+            
+            /*
+             * Poll the queue of sinks that have finished running
+             * (non-blocking).
+             * 
+             * Note: We don't actually remove the subtask from the queue until
+             * its Future is available.
+             */
+            final S sink = finishedSubtaskQueue.peek();
+            
+            if (sink == null) {
+                
+                // queue is empty.
+                return;
+                
             }
 
-        } catch (Throwable t) {
+            if(sink.buffer.isOpen())
+                throw new IllegalStateException(sink.toString());
 
-            halt(t);
+            final Future<?> f = sink.buffer.getFuture();
 
-            throw new RuntimeException(t);
+            if(!sink.buffer.getFuture().isDone()) {
+             
+                // Future is not available for the next sink in the queue.
+                return;
+                
+            }
+            
+            try {
+
+                // check the future.
+                f.get();
+
+                // remove the head of the queue.
+                if (sink != finishedSubtaskQueue.remove()) {
+
+                    // The wrong sink is at the head of the queue.
+                    throw new AssertionError();
+                    
+                }
+                
+            } catch(ExecutionException ex) {
+                
+                // halt on error.
+                throw halt(ex);
+                
+            } finally {
+
+                /*
+                 * Increment this counter immediately when the subtask is done
+                 * regardless of the outcome. This is used by some unit tests to
+                 * verify idle timeouts and the like.
+                 */
+                stats.subtaskEndCount.incrementAndGet();
+                
+                if (log.isDebugEnabled())
+                    log.debug("subtaskEndCount incremented: " + sink.locator);
+            }
 
         }
 
     }
 
     /**
-     * Removes the output buffer (unless it has been replaced by another output
-     * buffer associated with a different sink). DO NOT invoke this method until
-     * you have checked the {@link Future} of the sink for errors.
+     * Transfer a sink from {@link #sinks} to {@link #finishedSubtaskQueue}. The
+     * entry for the locator is removed from {@link #sinks} atomically IFF that
+     * map the given <i>sink</i> is associated with the given <i>locator</i> in
+     * that map.
+     * <p>
+     * This is done atomically using the {@link #lock}. This is invoked both by
+     * {@link AbstractSubtask#call()} (when it is preparing to exit call()) and
+     * by {@link #getSink(Object, boolean)} (when it discovers that the sink for
+     * a locator is closed, but not yet finished with its work).
+     * <p>
+     * Note: The sink MUST be atomically transferred from {@link #sinks} to
+     * {@link #finishedSubtaskQueue} and {@link #awaitAll()} MUST verify that
+     * both are empty in order for the termination condition to be atomic.
      * 
      * @param locator
      *            The locator.
      * @param sink
      *            The sink.
+     * 
+     * @todo this method really should be private. It is exposed for one of the
+     *       unit tests.
      */
-    protected void removeOutputBuffer(final L locator,
-            final AbstractSubtask sink) {
+    protected void moveSinkToFinishedQueueAtomically(final L locator,
+            final AbstractSubtask sink) throws InterruptedException {
 
         if (locator == null)
             throw new IllegalArgumentException();
 
         if (sink == null)
             throw new IllegalArgumentException();
-        
-        /*
-         * Remove map entry IFF it is for the same reference.
-         */
-        if (sinks.remove(locator, sink)) {
 
-            if (log.isDebugEnabled())
-                log.debug("Removed output buffer: " + locator);
+        lock.lockInterruptibly();
+        try {
 
             /*
-             * Note: This should not be invoked on a sink whose Future has not
-             * been checked. That means that nobody is checking the Future for
-             * that sink and that errors could go unreported.
+             * Place on queue (check by call(), awaitAll()). It is safe to do
+             * this even if the sink has already been moved, in which case its
+             * Future will be checked twice, which is not a problem.
              */
-            
-            assert sink.buffer.getFuture().isDone();
+            finishedSubtaskQueue.put((S) sink);
 
+            /*
+             * Remove map entry IFF it is for the same reference.
+             */
+            if (sinks.remove(locator, sink)) {
+
+                if (log.isDebugEnabled())
+                    log.debug("Removed output buffer: " + locator);
+
+            }
+
+        } finally {
+        
+            lock.unlock();
+            
         }
 
     }
@@ -973,7 +1074,6 @@ L>//
 
             try {
 
-//                added = offerChunk(sink, b, reopen);
                 added = sink.buffer.add(b, offerWarningTimeoutNanos,
                         TimeUnit.NANOSECONDS);
                 
@@ -1014,7 +1114,7 @@ L>//
                                 .info("Sink closed asynchronously by stale locator exception: "
                                         + sink);
 
-                    redirectQueue.put( b );
+                    redirectChunk( b );
 
                     added = true;
                     
@@ -1050,91 +1150,14 @@ L>//
 
         synchronized (stats) {
 
-            stats.chunksTransferred += 1;
-            stats.elementsTransferred += b.length;
-            stats.elementsOnSinkQueues += b.length;
+            stats.chunksTransferred.incrementAndGet();
+            stats.elementsTransferred.addAndGet(b.length);
+            stats.elementsOnSinkQueues.addAndGet(b.length);
             stats.elapsedSinkOfferNanos += (System.nanoTime() - begin);
 
         }
 
     }
-
-//    /**
-//     * Add a dense chunk to the sink's input queue. 
-//     * 
-//     * @param sink
-//     *            The sink.
-//     * @param dense
-//     *            A dense chunk to be transferred to the sink's input queue.
-//     * @param reopen
-//     * 
-//     * @return <code>true</code> iff the chunk was added to the sink's input
-//     *         queue.
-//     * 
-//     * @throws InterruptedException
-//     */
-//    @SuppressWarnings("unchecked")
-//    private final boolean offerChunk(final S sink, E[] dense,
-//            final boolean reopen) throws InterruptedException {
-//
-//        boolean added = false;
-//
-//        while (!added) {
-//
-//            halted();
-//
-//            try {
-//
-//                added = sink.buffer.add(dense, offerTimeoutNanos,
-//                        TimeUnit.NANOSECONDS);
-//                
-//            } catch (BufferClosedException ex) {
-//
-//                if (ex.getCause() instanceof StaleLocatorException) {
-//
-//                    /*
-//                     * Note: The sinks sets the exception when closing the
-//                     * buffer when handling the stale locator exception and
-//                     * transfers the outstanding and all queued chunks to the
-//                     * redirectQueue.
-//                     * 
-//                     * When we trap the stale locator exception here we need to
-//                     * transfer the chunk to the redirectQueue since the buffer
-//                     * was closed (and drained) asynchronously.
-//                     */
-//
-//                    if (log.isInfoEnabled())
-//                        log
-//                                .info("Sink closed asynchronously by stale locator exception: "
-//                                        + sink);
-//
-//                    redirectQueue.put(dense);
-//
-//                    added = true;
-//
-//                } else {
-//
-//                    // anything else is a problem.
-//                    throw ex;
-//
-//                }
-//
-//            }
-//
-//        }
-//
-//        return added;
-//
-//    }
-//    
-//    /**
-//     * This is a fast timeout since we want to avoid the possibility that
-//     * another thread require's the master's {@link #lock} while we are waiting
-//     * on a sink's input queue. Whenever this timeout expires we will yield the
-//     * {@link #lock} and then retry in a bit.
-//     */
-//    private final static long offerTimeoutNanos = TimeUnit.MILLISECONDS
-//            .toNanos(1);
 
     /**
      * This timeout is used to log warning messages when a sink is slow.
