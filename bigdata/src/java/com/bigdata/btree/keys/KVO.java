@@ -198,7 +198,8 @@ public class KVO<O> implements Comparable<KVO<O>>{
 
         final KVO<T>[] b = new KVO[len];
 
-        System.arraycopy(a, 0/*srcpos*/, b, 0/*dstpos*/, len);
+        System.arraycopy(a/* src */, 0/* srcpos */, b/* dst */, 0/* dstpos */,
+                len);
 
         return b;
 

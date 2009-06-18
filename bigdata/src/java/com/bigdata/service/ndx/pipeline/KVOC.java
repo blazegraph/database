@@ -47,11 +47,10 @@ public class KVOC<O> extends KVOList<O> {
     }
 
     /**
-     * Extended to decrement the {@link KVOLatch}. This inherits the
-     * {@link KVOList} super class behavior, which maps {@link KVOList#done()}
-     * over the list of duplicates. This ensures that all latches are
-     * decremented once the original value has been successfully written onto an
-     * index partition.
+     * Extended to decrement the {@link KVOLatch}. This inherits from
+     * {@link KVOList}, which maps {@link KVOList#done()} over the list of
+     * duplicates. This ensures that all latches are decremented once the
+     * original value has been successfully written onto an index partition.
      */
     @Override
     public void done() {

@@ -58,27 +58,33 @@ public class KVOList<O> extends KVO<O> {
         if (o == this)
             throw new IllegalArgumentException();
 
-        /*
-         * Do not permit KVOList having assigned duplicates to be added as
-         * duplicates to another KVOList.
-         */
         if (o instanceof KVOList) {
+            /*
+             * Do not permit a KVOList having assigned duplicates to be added as
+             * a duplicate of a different KVOList.
+             * 
+             * Note: this does not embed the synchronized requests since that
+             * could cause a deadlock. However, this means that concurrent
+             * requests to this.add(o) and o.add(this) could fail to detect this
+             * problem.
+             */
             synchronized (o) {
                 if (((KVOList) o).duplicateList != null)
-                    throw new IllegalStateException();
+                    throw new IllegalStateException("this=" + this + ", other="
+                            + o);
             }
         }
-        
-        synchronized(this) {
-            
-            if(duplicateList == null) {
-                
+
+        synchronized (this) {
+
+            if (duplicateList == null) {
+
                 duplicateList = new LinkedList<KVO<O>>();
-                
+
             }
 
-            duplicateList.add( o );
-            
+            duplicateList.add(o);
+
         }
         
     }
@@ -114,7 +120,7 @@ public class KVOList<O> extends KVO<O> {
     }
     
     /**
-     * Extended to map the operation over the list.
+     * Extended to map the operation over the duplicate list.
      */
     @Override
     public void done() {
