@@ -87,8 +87,10 @@ public abstract class AbstractHaltableProcess {
 
     /**
      * Indicate that processing should halt. This method is written defensively
-     * and will not throw anything. The caller is responsible for throwing the
-     * cause out of their own context.
+     * and will not throw anything.
+     * 
+     * <strong>The caller is responsible for throwing the cause out of their own
+     * context.</strong>
      * 
      * @param cause
      *            The cause.

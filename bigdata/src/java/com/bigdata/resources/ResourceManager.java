@@ -27,7 +27,6 @@
 
 package com.bigdata.resources;
 
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -43,7 +42,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.Journal;
-import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
@@ -56,7 +54,7 @@ import com.bigdata.util.ReverseLongComparator;
  * The {@link ResourceManager} has broad responsibility for journal files, index
  * segment files, maintaining index views during overflow processing, and
  * managing the transparent decomposition of scale-out indices and the
- * distribution of the key-range index partitions for those scale-out indidces.
+ * distribution of the key-range index partitions for those scale-out indices.
  * <p>
  * This class is implemented in several layers:
  * <dl>
