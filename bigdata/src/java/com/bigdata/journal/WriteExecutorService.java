@@ -729,11 +729,33 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             lock.unlock();
             
         }
-        
+
         super.beforeExecute(t, r);
         
     }
 
+    /**
+     * Logs a warning if a new task is started when the journal is over-extended.
+     * 
+     * @param task
+     *            The task.
+     */
+    private void journalOverextended(final AbstractTask task) {
+
+        final AbstractJournal journal = resourceManager.getLiveJournal();
+
+        final long overextension = journal.size() / journal.getMaximumExtent();
+
+        if (overextension > 2) {
+
+            // @todo convert to WARN
+            log.error("overextended=" + overextension + "x : "
+                    + task.toString());
+
+        }
+
+    }
+    
     /**
      * Executed before {@link AbstractTask#doTask()}
      * 
@@ -749,6 +771,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         if (r == null)
             throw new NullPointerException();
+
+        // log warnings if new tasks are started when the journal is over extended.
+        journalOverextended( r );
 
         nready.incrementAndGet();
         
@@ -1246,8 +1271,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * enabled for the resource manager. However, if it is enabled then
              * overflow processing can be forced using [forceOverflow].
              */
-            final boolean shouldOverflow = resourceManager.isOverflowEnabled()
-                    && (forceOverflow.get() || resourceManager.shouldOverflow());
+            final boolean shouldOverflow = isShouldOverflow();
 
             if (shouldOverflow && overflowLog.isInfoEnabled()) {
 
@@ -1674,6 +1698,17 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     public final AtomicBoolean forceOverflow = new AtomicBoolean(false);
 
     /**
+     * Return <code>true</code> if the pre-conditions for overflow processing
+     * are met.
+     */
+    private boolean isShouldOverflow() {
+
+        return resourceManager.isOverflowEnabled()
+                && (forceOverflow.get() || resourceManager.shouldOverflow());
+        
+    }
+    
+    /**
      * Once an overflow condition has been recognized and NO tasks are
      * {@link #nrunning} then {@link IResourceManager#overflow()} MAY be invoked
      * to handle synchronous overflow processing, including putting a new
@@ -1971,13 +2006,26 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          */
         {
 
-            final AbstractTask[] a = active.values().toArray(new AbstractTask[0]);
+            final long now = System.nanoTime();
 
-            Arrays.sort(a, new SubmitTimeComparator());
+            final AbstractTask[] a = active.values().toArray(
+                    new AbstractTask[0]);
 
+            TaskAndTime[] b = new TaskAndTime[a.length];
+
+            for (int i = 0; i < a.length; i++) {
+
+                b[i] = new TaskAndTime(a[i], now);
+                
+            }
+
+            // sort by elapsed run time.
+            Arrays.sort(b);
+
+            // log informative message about the tasks that are running/done.
             log.error("timeout: elapsed=" + elapsedMillis + ", runningBefore="
                     + beforeCount + ", runningNow=" + n + " :: runningTasks="
-                    + Arrays.toString(a));
+                    + Arrays.toString(b));
         
         }
 
@@ -1986,30 +2034,96 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
 
     /**
-     * Orders the tasks by their submit time, which permits a stable sort and is
-     * correlated with their run time since we are only logging the running
-     * tasks.
+     * Encapsulates a running task and its elapsed time since the task was
+     * started and extends the toString() representation to give us some more
+     * interesting information. The natural sort order is by the total elapsed
+     * run time (descending), which is noted when the object is instantiated so that the sort
+     * is stable.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
      */
-    private static class SubmitTimeComparator implements
-            Comparator<AbstractTask> {
+    private static class TaskAndTime implements Comparable<TaskAndTime> {
 
-        public int compare(AbstractTask o1, AbstractTask o2) {
+        private final long now;
+        private final AbstractTask task;
+        private final long elapsedRunTime;
+        
+        private static enum State {
+            Waiting,
+            Running,
+            Done;
+        }
+        private final State state;
+        
+        public String toString() {
+            return "TaskAndTime{" + task.toString() + ",elapsedRunTime="
+                    + TimeUnit.NANOSECONDS.toMillis(elapsedRunTime) + ",state="
+                    + state + "}";
+        }
+        
+        TaskAndTime(final AbstractTask task, final long now) {
+            this.task = task;
+            this.now = now;
+            if (task.nanoTime_finishedWork != 0L) {
+                // task is done.
+                this.elapsedRunTime = (task.nanoTime_finishedWork - task.nanoTime_beginWork);
+                this.state = State.Done; 
+            } else if(task.nanoTime_beginWork==0L) {
+                // task has not started (should not occur on the write service).
+                this.elapsedRunTime = 0L;
+                this.state = State.Waiting; 
+            } else {
+                // task is running.
+                this.elapsedRunTime = (now - task.nanoTime_beginWork);
+                this.state = State.Running; 
+            }
+            
+        }
+        
+        /**
+         * Places into order by decreasing {@link #elapsedRunTime}.
+         */
+        public int compareTo(final TaskAndTime o) {
 
-            if (o1.nanoTime_submitTask < o2.nanoTime_submitTask)
+            if (elapsedRunTime < o.elapsedRunTime)
                 return -1;
 
-            if (o1.nanoTime_submitTask > o2.nanoTime_submitTask)
+            if (elapsedRunTime > o.elapsedRunTime)
                 return 1;
 
             return 0;
             
         }
-        
+
     }
+    
+//    /**
+//     * Orders the tasks by their submit time, which permits a stable sort and is
+//     * correlated with their run time since we are only logging the running
+//     * tasks.
+//     * 
+//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//     *         Thompson</a>
+//     * @version $Id$
+//     */
+//    private static class SubmitTimeComparator implements
+//            Comparator<AbstractTask> {
+//
+//        public int compare(AbstractTask o1, AbstractTask o2) {
+//
+//            if (o1.nanoTime_submitTask < o2.nanoTime_submitTask)
+//                return -1;
+//
+//            if (o1.nanoTime_submitTask > o2.nanoTime_submitTask)
+//                return 1;
+//
+//            return 0;
+//            
+//        }
+//        
+//    }
     
     /**
      * Commit the store.

@@ -664,13 +664,13 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
         final int poolCapacity = Integer.parseInt(System.getProperty(
                 Options.POOL_CAPACITY, Options.DEFAULT_POOL_CAPACITY));
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(Options.POOL_CAPACITY + "=" + poolCapacity);
 
         final int bufferCapacity = Integer.parseInt(System.getProperty(
                 Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
 
         BUFFER_POOL = new BufferPool(
@@ -744,7 +744,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
         if (fileMetadata.writeCache != null && !fileMetadata.readOnly
                 && fileMetadata.closeTime == 0L) {
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Enabling writeCache: capacity="
                     + fileMetadata.writeCache.capacity());
 
@@ -1147,7 +1147,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
         // open the file.
         this.raf = new RandomAccessFile(file, fileMode);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("(Re-)opened file: " + file);
 
         try {
@@ -1185,7 +1185,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
              * accidental deletes or overwrites.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("FileLock not supported: file=" + file, ex);
 
         }
@@ -1692,7 +1692,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
 
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("wrote root block: "+rootBlock);
         
         storeCounters.nwriteRootBlock++;
@@ -1739,7 +1739,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
                 log.warn("newLength=" + cf.format(newExtent) + ", file="
                                 + file);
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(getCounters().toString());
             
         } catch(IOException ex) {

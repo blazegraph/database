@@ -924,7 +924,7 @@ abstract public class OverflowManager extends IndexManager {
 
         /**
          * The #of asynchronous overflow tasks (split, join, merge, etc) that
-         * were canceled due to timeout.
+         * were canceled due to timeout.a
          */
         String AsynchronousOverflowTaskCancelledCount = "Asynchronous Overflow Task Cancelled Count";
 

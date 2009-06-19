@@ -368,7 +368,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         // open the file.
         this.raf = new RandomAccessFile(file, fileMode);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("(Re-)opened file: " + file);
 
         if (bufferMode != BufferMode.Mapped) {
@@ -409,7 +409,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
                  * accidental deletes or overwrites.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("FileLock not supported: file=" + file, ex);
 
             }
