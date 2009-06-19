@@ -148,7 +148,7 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/Purge Res
 
 # ResourceService (used for MOVEs).
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceService/writes/bytesWritten&depth=12&period=Minutes&correlated=true&file=service/ds/resourceService/bytesWritten
-http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceService/writes/bytesWrittenPerSecond&depth=12&period=Minutes&correlated=true&file=service/ds/resourceService/bytesWrittenPerSec
+http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceService/writes/bytesWrittenPerSec&depth=12&period=Minutes&correlated=true&file=service/ds/resourceService/bytesWrittenPerSec
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceService/writes/maxWriteSize&depth=12&period=Minutes&correlated=true&file=service/ds/resourceService/maxWriteSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceService/writes/nwrites&depth=12&period=Minutes&correlated=true&file=service/ds/resourceService/nwrites
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceService/writes/writeSecs&depth=12&period=Minutes&correlated=true&file=service/ds/resourceService/writeSecs
