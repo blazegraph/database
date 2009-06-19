@@ -83,7 +83,7 @@ import com.bigdata.util.concurrent.TaskCounters;
  * <p>
  * A read-committed task runs against the most recently committed view of the
  * named index. A historical read task runs against a historical view of the
- * named index, but without guarentees of transactional isolation. Concurrent
+ * named index, but without guarantees of transactional isolation. Concurrent
  * readers are permitted without locking on the same index.
  * <p>
  * An unisolated task reads and writes on the "live" index. Note that only a
@@ -1451,12 +1451,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     }
     
     /**
-     * Returns Task{taskName,timestamp,resource[]}
+     * Returns Task{taskName,timestamp,elapsed,resource[]}
      */
     public String toString() {
         
         return "Task{" + getTaskName() + ",timestamp="
-                + TimestampUtility.toString(timestamp) + ",resource="
+                + TimestampUtility.toString(timestamp)+",resource="
                 + Arrays.toString(resource) + "}";
         
     }
@@ -1476,7 +1476,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Note: Long-running implementations MUST periodically test
      * {@link Thread#interrupted()} and MUST throw an exception, such as
      * {@link InterruptedException}, if they are interrupted. This behavior
-     * allows tasks to be cancelled in a timely manner.
+     * allows tasks to be canceled in a timely manner.
      * <p>
      * If you ignore or fail to test {@link Thread#interrupted()} then your task
      * CAN NOT be aborted. If it is {@link Future#cancel(boolean)} with

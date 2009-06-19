@@ -1664,7 +1664,7 @@ abstract public class IndexManager extends StoreManager {
      * collection once the index has been incorporated into an index partition
      * view or is no longer required (e.g., has been MOVEd). However, the caller
      * MUST NOT remove the {@link IndexSegment} from the hard reference
-     * collection until after the commit point for the task which incoporates it
+     * collection until after the commit point for the task which incorporates it
      * into the index partition view. In practice, this means that those tasks
      * must be encapsulated with either a post-condition action or wrapped by a
      * caller which provides the necessary after-action in a finally{} clause.
