@@ -735,28 +735,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     }
 
     /**
-     * Logs a warning if a new task is started when the journal is over-extended.
-     * 
-     * @param task
-     *            The task.
-     */
-    private void journalOverextended(final AbstractTask task) {
-
-        final AbstractJournal journal = resourceManager.getLiveJournal();
-
-        final long overextension = journal.size() / journal.getMaximumExtent();
-
-        if (overextension > 2) {
-
-            // @todo convert to WARN
-            log.error("overextended=" + overextension + "x : "
-                    + task.toString());
-
-        }
-
-    }
-    
-    /**
      * Executed before {@link AbstractTask#doTask()}
      * 
      * @param t
@@ -771,9 +749,6 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         if (r == null)
             throw new NullPointerException();
-
-        // log warnings if new tasks are started when the journal is over extended.
-        journalOverextended( r );
 
         nready.incrementAndGet();
         
