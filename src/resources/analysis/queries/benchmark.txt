@@ -50,6 +50,7 @@ http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices
 # Note: changed averageSplitChunkNanos to averageSplitChunkMillis on 6/7/09.  This is just a name change.  The historical values were reported in milliseconds. 
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSplitChunkMillis&depth=14&period=Minutes&report=correlated&file=indices/async/averageSplitChunkMillis
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/averageSinkOfferMillis&depth=14&period=Minutes&report=correlated&file=indices/async/averageSinkOfferMillis
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/asynchronous/subtaskIdleTimeout&depth=14&period=Minutes&report=correlated&file=indices/async/subtaskIdleTimeout
 
 ##
 # Synchronous index RPC API.
