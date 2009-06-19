@@ -1781,15 +1781,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     public boolean tryLock(final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
-        if(INFO)
-            log.info("timeout="+timeout+", unit="+unit);
-        
+        if (INFO)
+            log.info("timeout=" + timeout + ", unit=" + unit);
+
         final long begin = System.nanoTime();
-        
+
         long nanos = unit.toNanos(timeout);
-        
+
         boolean granted = false;
-        
+
         lock.lock();
 
         try {
@@ -1797,9 +1797,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             if (!exclusiveLock.tryLock(nanos, TimeUnit.NANOSECONDS)) {
 
                 // can't obtain the exclusive lock.
-                
-                if(INFO)
-                    log.info("timeout");
+
+                // @todo log @ WARN
+                log.error("Exclusive write lock not granted: timeout="
+                        + TimeUnit.NANOSECONDS.toMillis(timeout) + "ms");
 
                 return false;
 
@@ -1828,8 +1829,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                  */
                 granted = quiesce(nanos, TimeUnit.NANOSECONDS);
 
-                if (INFO)
-                    log.info(granted ? "granted" : "timeout");
+                if (!granted) {
+                    // @todo log @ WARN
+                    log.error("Exclusive write lock not granted: timeout="
+                            + TimeUnit.NANOSECONDS.toMillis(timeout) + "ms");
+                }
 
                 return granted;
 
@@ -1998,8 +2002,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             Arrays.sort(b);
 
             // log informative message about the tasks that are running/done.
-            log.error("timeout: elapsed=" + elapsedMillis + ", runningBefore="
-                    + beforeCount + ", runningNow=" + n + " :: runningTasks="
+            log.error("Timeout! : timeout="
+                    + TimeUnit.NANOSECONDS.toMillis(timeout) + "ms,elapsed="
+                    + elapsedMillis + "ms,runningBefore=" + beforeCount
+                    + ",runningNow=" + n + "::runningTasks= "
                     + Arrays.toString(b));
         
         }
@@ -2012,8 +2018,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * Encapsulates a running task and its elapsed time since the task was
      * started and extends the toString() representation to give us some more
      * interesting information. The natural sort order is by the total elapsed
-     * run time (descending), which is noted when the object is instantiated so that the sort
-     * is stable.
+     * run time (descending), which is noted when the object is instantiated so
+     * that the sort is stable.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -2023,7 +2029,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         private final long now;
         private final AbstractTask task;
+        /** The elapsed milliseconds for work performed on this task. */
         private final long elapsedRunTime;
+        /** The #of milliseconds ago that work began on this task. */
+        private final long startAge;
         
         private static enum State {
             Waiting,
@@ -2034,8 +2043,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         public String toString() {
             return "TaskAndTime{" + task.toString() + ",elapsedRunTime="
-                    + TimeUnit.NANOSECONDS.toMillis(elapsedRunTime) + ",state="
-                    + state + "}";
+                    + TimeUnit.NANOSECONDS.toMillis(elapsedRunTime)
+                    + "startAge=" + TimeUnit.NANOSECONDS.toMillis(startAge)
+                    + ",state=" + state + "}";
         }
         
         TaskAndTime(final AbstractTask task, final long now) {
@@ -2044,16 +2054,17 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             if (task.nanoTime_finishedWork != 0L) {
                 // task is done.
                 this.elapsedRunTime = (task.nanoTime_finishedWork - task.nanoTime_beginWork);
-                this.state = State.Done; 
-            } else if(task.nanoTime_beginWork==0L) {
+                this.state = State.Done;
+            } else if (task.nanoTime_beginWork == 0L) {
                 // task has not started (should not occur on the write service).
                 this.elapsedRunTime = 0L;
-                this.state = State.Waiting; 
+                this.state = State.Waiting;
             } else {
                 // task is running.
                 this.elapsedRunTime = (now - task.nanoTime_beginWork);
                 this.state = State.Running; 
             }
+            this.startAge = (now - task.nanoTime_beginWork);
             
         }
         
@@ -2063,10 +2074,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         public int compareTo(final TaskAndTime o) {
 
             if (elapsedRunTime < o.elapsedRunTime)
-                return -1;
+                return 1;
 
             if (elapsedRunTime > o.elapsedRunTime)
-                return 1;
+                return -1;
 
             return 0;
             
