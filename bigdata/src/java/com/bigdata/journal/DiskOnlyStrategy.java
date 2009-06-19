@@ -1281,7 +1281,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         if (fileMetadata.writeCache != null && !fileMetadata.readOnly
                 && fileMetadata.closeTime == 0L) {
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Enabling writeCache: capacity="
                     + fileMetadata.writeCache.capacity());
 
@@ -1298,7 +1298,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         if (fileMetadata.readCacheCapacity > 0) {
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Enabling read cache: capacity="
                     + fileMetadata.readCacheCapacity + ", maxRecordSize="
                     + fileMetadata.readCacheMaxRecordSize);
@@ -1378,7 +1378,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         if(readCache != null) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("readCache: " + readCache.getStatistics());
             
             // Discard the LRU cache.
@@ -1781,7 +1781,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         // open the file.
         this.raf = new RandomAccessFile(file, fileMode);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("(Re-)opened file: " + file);
 
         try {
@@ -1819,7 +1819,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * accidental deletes or overwrites.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("FileLock not supported: file=" + file, ex);
 
         }
@@ -2159,7 +2159,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 
                 reopenChannel();
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Opened backing file for temporary store: "
                                     + file);
                 
@@ -2318,7 +2318,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     : FileMetadata.OFFSET_ROOT_BLOCK1;
 
             /*
-             * Note: Synchronized on [this] to pervent concurrent NIO requests
+             * Note: Synchronized on [this] to prevent concurrent NIO requests
              * which might lead to the channel being closed asynchronously.
              */
             synchronized(this) {
@@ -2339,7 +2339,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("wrote root block: "+rootBlock);
         
         storeCounters.nwriteRootBlock++;
@@ -2397,7 +2397,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                 log.warn("newLength=" + cf.format(newExtent) + ", file="
                                 + file);
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info(getCounters().toString());
             
         } catch(IOException ex) {

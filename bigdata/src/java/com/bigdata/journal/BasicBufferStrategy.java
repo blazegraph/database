@@ -314,7 +314,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         
         userExtent = newUserExtent;
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("Buffer: newCapacity=" + cf.format(newCapacity));
 
     }

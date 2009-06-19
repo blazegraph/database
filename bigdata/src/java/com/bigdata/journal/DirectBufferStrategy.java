@@ -143,7 +143,7 @@ public class DirectBufferStrategy extends DiskBackedBufferStrategy {
              */
             force(true);
             
-            if (INFO)
+            if (log.isDebugEnabled())
                 log.info("Disk file: newLength=" + cf.format(newExtent));
             
         } catch(IOException ex) {

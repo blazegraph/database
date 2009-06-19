@@ -2092,7 +2092,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * service overflow and then pass it into the rest of the process, aborting
      * that tx when overflow is complete.
      * 
-     * FIXME make the atomic update tasks truely atomic using full transactions
+     * FIXME make the atomic update tasks truly atomic using full transactions
      * and/or distributed locks and correcting actions.
      */
     protected List<AbstractTask> chooseTasks() throws Exception {
