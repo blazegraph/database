@@ -14,8 +14,8 @@
 # usage: targetDir
 
 if [ -z "$1" ]; then
-	echo $"usage: $0 <targetDir>"
-	exit 1
+    echo $"usage: $0 <targetDir>"
+    exit 1
 fi
 
 source `dirname $0`/bigdataenv
@@ -26,9 +26,9 @@ targetDir=$1
 # counters. @todo make parameter for this.
 queryDir=src/resources/analysis/queries
 
-if [ ! -d "$targetDir" ]; then
-	echo "Could not find query directory: `hostname` dir=$queryDir"
-	exit 1
+if [ ! -d "$queryDir" ]; then
+    echo "Could not find query directory: `hostname` dir=$queryDir"
+    exit 1
 fi
 
 #
@@ -37,8 +37,8 @@ fi
 lbsDir=`find $LAS/LoadBalancerServer/*/* -type d`
 
 if [ -z "$lbsDir" ]; then
-	echo "Could not find LBS directory: `hostname` LAS=$LAS"
-	exit 1
+    echo "Could not find LBS directory: `hostname` LAS=$LAS"
+    exit 1
 fi
 
 #
@@ -63,16 +63,16 @@ if [ -f "$lockFile" ]; then
     kill -hup $pid
     echo "Waiting $waitDur seconds for the performance counter dump."
     sleep $waitDur
-	ant "-Danalysis.counters.dir=$targetDir/counters"\
+    ant "-Danalysis.counters.dir=$lbsDir"\
         "-Danalysis.queries=src/resources/analysis/queries"\
         "-Danalysis.out.dir=$targetDir/output"\
         analysis
-	tar -cvz -C "$targetDir/.." -f $tarball $targetDir/output
-	echo "extracted performance counter archive is ready: $tarball"
-	ls -lh $tarball
+    tar -cvz -C "$targetDir/.." -f $tarball $targetDir/output
+    echo "extracted performance counter archive is ready: $tarball"
+    ls -lh $tarball
 else
-	echo "bigdata subsystem lock file not found: $lockFile"
-	exit 1
+    echo "bigdata subsystem lock file not found: $lockFile"
+    exit 1
 fi
 
 exit 0
