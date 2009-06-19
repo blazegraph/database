@@ -1194,12 +1194,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
      */
     private void journalOverextended(final AbstractTask task) {
 
-        if(!(resourceManager instanceof ResourceManager)) {
-            
-            return;
-            
-        }
-        
         if(!resourceManager.isOverflowEnabled()) {
             
             return;
