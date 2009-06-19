@@ -25,6 +25,8 @@ package com.bigdata.journal;
 
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -330,12 +332,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * New tasks may begin to execute iff this counter is zero (0). It is
      * incremented by {@link #pause()} and decremented by {@link #resume()}.
      */
-    private int paused = 0;
+    private final AtomicInteger paused = new AtomicInteger();
 
     /**
      * Lock used for exclusive locks on the write service.
      */
-    final protected ReentrantLock exclusiveLock = new ReentrantLock();
+    final private ReentrantLock exclusiveLock = new ReentrantLock();
     
     /**
      * Lock used for {@link Condition}s and to coordinate index checkpoints and
@@ -344,7 +346,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @todo we should be using {@link ReentrantLock#lockInterruptibly()} rather
      *       than lock().  This will let us notice interrupts more readily.
      */
-    final protected ReentrantLock lock = new ReentrantLock();
+    final private ReentrantLock lock = new ReentrantLock();
 
     /** signaled when tasks should resume. */
     final private Condition unpaused = lock.newCondition();
@@ -392,7 +394,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     /**
      * The set of tasks that make it into the commit group (so that we can set
-     * the commit time on each of them iff the goup commit succeeds).
+     * the commit time on each of them iff the group commit succeeds).
      */
     final private Map<Thread,AbstractTask> commitGroup = new LinkedHashMap<Thread, AbstractTask>();
     
@@ -628,7 +630,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     private boolean isPaused() {
         
-        return paused > 0;
+        return paused.get() > 0;
         
     }
     
@@ -646,7 +648,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            if (paused++ == 0) {
+            if (paused.incrementAndGet() == 0) {
 
                 if (DEBUG)
                     log.debug("Pausing write service");
@@ -670,13 +672,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         try {
 
-            if (paused == 0) {
+            if (paused.get() == 0) {
 
                 throw new IllegalStateException("Not paused");
 
             }
 
-            if (--paused == 0) {
+            if (paused.decrementAndGet() == 0) {
 
                 if (DEBUG)
                     log.debug("Resuming write service");
@@ -1673,9 +1675,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
     /**
      * Once an overflow condition has been recognized and NO tasks are
-     * {@link #nrunning running} then {@link IResourceManager#overflow()} MAY be
-     * invoked to handle synchronous overflow processing, including putting a
-     * new {@link IJournal} into place and re-defining the views for all named
+     * {@link #nrunning} then {@link IResourceManager#overflow()} MAY be invoked
+     * to handle synchronous overflow processing, including putting a new
+     * {@link IJournal} into place and re-defining the views for all named
      * indices to include the pre-overflow view with reads being absorbed by a
      * new btree on the new journal.
      * <p>
@@ -1755,10 +1757,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *            The timeout.
      * @param unit
      *            The unit in which the <i>timeout</i> is expressed.
-     *            
+     * 
      * @return <code>true</code> iff the exclusive lock was acquired.
      * 
      * @throws InterruptedException
+     * 
+     * @todo This really should not be public. It was exposed to make it easy to
+     *       force overflow of the service. We should be able to achieve the
+     *       same ends by setting a flag and submitting a task which writes an
+     *       empty record on the raw store just in case there is no task
+     *       running.
      */
     public boolean tryLock(final long timeout, final TimeUnit unit)
             throws InterruptedException {
@@ -1909,8 +1917,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             throw new IllegalMonitorStateException();
             
         }
+
+        final int beforeCount = nrunning.get();
         
-        final long begin = System.nanoTime();
+        final long beginNanos = System.nanoTime();
 
         long nanos = unit.toNanos(timeout);
 
@@ -1931,13 +1941,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             waiting.await(nanos, TimeUnit.NANOSECONDS);
 
-            nanos -= (System.nanoTime() - begin);
+            // subtract out the elapsed time.
+            nanos -= (System.nanoTime() - beginNanos);
 
         }
 
         // elapsed wait time (ms) (for logging only).
-        final long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
-                - begin);
+        final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
+                .nanoTime() - beginNanos);
 
         // #of tasks running (valid while we hold the lock).
         final int n = nrunning.get();
@@ -1948,18 +1959,55 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             if (INFO)
                 log.info("Write service is paused: #running=" + n
-                        + ", elapsed=" + elapsed);
+                        + ", elapsed=" + elapsedMillis);
 
             return true;
 
         }
 
-        // timeout.
+        /*
+         * Timeout. Log the running tasks in order by their submit times, the
+         * elapsed time, and the #of running tasks before/after.
+         */
+        {
 
-        if (INFO)
-            log.info("timeout: elapsed=" + elapsed + ", nrunning=" + n);
+            final AbstractTask[] a = active.values().toArray(new AbstractTask[0]);
+
+            Arrays.sort(a, new SubmitTimeComparator());
+
+            log.error("timeout: elapsed=" + elapsedMillis + ", runningBefore="
+                    + beforeCount + ", runningNow=" + n + " :: runningTasks="
+                    + Arrays.toString(a));
+        
+        }
 
         return false;
+        
+    }
+
+    /**
+     * Orders the tasks by their submit time, which permits a stable sort and is
+     * correlated with their run time since we are only logging the running
+     * tasks.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    private static class SubmitTimeComparator implements
+            Comparator<AbstractTask> {
+
+        public int compare(AbstractTask o1, AbstractTask o2) {
+
+            if (o1.nanoTime_submitTask < o2.nanoTime_submitTask)
+                return -1;
+
+            if (o1.nanoTime_submitTask > o2.nanoTime_submitTask)
+                return 1;
+
+            return 0;
+            
+        }
         
     }
     
