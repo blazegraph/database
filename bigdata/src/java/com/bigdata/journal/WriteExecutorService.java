@@ -1919,7 +1919,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @throws IllegalMonitorStateException
      *             if the caller does not hold the {@link #lock}.
      */
-    private boolean quiesce(final long timeout, final TimeUnit unit)
+    private boolean quiesce(long timeout, final TimeUnit unit)
             throws InterruptedException {
 
         if (!isPaused())
@@ -1936,10 +1936,15 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         
         final long beginNanos = System.nanoTime();
 
-        long nanos = unit.toNanos(timeout);
+        // convert to ns.
+        timeout = unit.toNanos(timeout);
+        
+        // remaining ns.
+        long remaining;
 
         // wait for active tasks to complete, but no longer than the timeout.
-        while (nanos > 0L && nrunning.get() > 0) {
+        while ((remaining = (System.nanoTime() - beginNanos)) < timeout
+                && nrunning.get() > 0) {
 
             /*
              * Each task that completes signals [waiting].
@@ -1953,10 +1958,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Note: Throws InterruptedException
              */
 
-            waiting.await(nanos, TimeUnit.NANOSECONDS);
-
-            // subtract out the elapsed time.
-            nanos -= (System.nanoTime() - beginNanos);
+            waiting.await(remaining, TimeUnit.NANOSECONDS);
 
         }
 
@@ -2044,7 +2046,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         public String toString() {
             return "TaskAndTime{" + task.toString() + ",elapsedRunTime="
                     + TimeUnit.NANOSECONDS.toMillis(elapsedRunTime)
-                    + "startAge=" + TimeUnit.NANOSECONDS.toMillis(startAge)
+                    + ",startAge=" + TimeUnit.NANOSECONDS.toMillis(startAge)
                     + ",state=" + state + "}";
         }
         
