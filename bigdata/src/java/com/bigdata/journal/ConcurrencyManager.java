@@ -1481,7 +1481,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
             for (AbstractTask task : tasks) {
 
-                long now = System.nanoTime();
+                final long now = System.nanoTime();
                 
                 nanos -= now - lastTime;
                 

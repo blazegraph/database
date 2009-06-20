@@ -26,7 +26,6 @@ package com.bigdata.journal;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -1806,6 +1805,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             }
 
+            // subtract out the elapsed time
             nanos -= (System.nanoTime() - begin);
             
             try {
@@ -1906,7 +1906,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * Wait until there are no more tasks running.
      * 
-     * @param timeout
+     * @param nanos
      *            The maximum amount of time to wait. Use {@link Long#MAX_VALUE}
      *            to wait forever.
      * @param unit
@@ -1919,7 +1919,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @throws IllegalMonitorStateException
      *             if the caller does not hold the {@link #lock}.
      */
-    private boolean quiesce(long timeout, final TimeUnit unit)
+    private boolean quiesce(final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
         if (!isPaused())
@@ -1932,19 +1932,73 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         }
 
+        // #of tasks running on entry (used for log message only).
         final int beforeCount = nrunning.get();
+        
+        // remaining nanoseconds.
+        long nanos = unit.toNanos(timeout);
+        
+        long lastTime = System.nanoTime();
         
         final long beginNanos = System.nanoTime();
 
-        // convert to ns.
-        timeout = unit.toNanos(timeout);
-
-        // remaining ns.
-        long elapsed;
-
         // wait for active tasks to complete, but no longer than the timeout.
-        while ((elapsed = (System.nanoTime() - beginNanos)) < timeout
-                && nrunning.get() > 0) {
+        while (true) {
+
+            // #of tasks running (valid while we hold the lock).
+            final int n = nrunning.get();
+            
+            if (n == 0) {
+                
+                // success.
+                return true;
+
+            }
+
+            final long now = System.nanoTime();
+            
+            nanos -= now - lastTime;
+            
+            lastTime = now;
+            
+            if (nanos <= 0) {
+
+                /*
+                 * Timeout.
+                 * 
+                 * Log the running tasks in order by their submit times, the
+                 * elapsed time, and the #of running tasks before/after. This
+                 * is being done in order to help diagnose situations in which
+                 * overflow processing is not triggered because we do not gain
+                 * the lock.  [The problem was actually traced to an error in
+                 * this logic where the code was not waiting long enough.]
+                 */
+                
+                final AbstractTask[] a = active.values().toArray(
+                        new AbstractTask[0]);
+
+                TaskAndTime[] b = new TaskAndTime[a.length];
+
+                for (int i = 0; i < a.length; i++) {
+
+                    b[i] = new TaskAndTime(a[i], now);
+
+                }
+
+                // sort by elapsed run time.
+                Arrays.sort(b);
+
+                log.error("Timeout! : timeout="
+                        + unit.toMillis(timeout)
+                        + "ms,elapsed="
+                        + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
+                                - beginNanos) + "ms,runningBefore="
+                        + beforeCount + ",runningNow=" + n + "::runningTasks="
+                        + Arrays.toString(b));
+
+                return false;
+
+            }
 
             /*
              * Each task that completes signals [waiting].
@@ -1958,63 +2012,10 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Note: Throws InterruptedException
              */
 
-            waiting.await(timeout - elapsed/* remaining */,
-                    TimeUnit.NANOSECONDS);
+            waiting.await(nanos/* remaining */, TimeUnit.NANOSECONDS);
 
         }
 
-        // elapsed wait time (ms) (for logging only).
-        final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
-                .nanoTime() - beginNanos);
-
-        // #of tasks running (valid while we hold the lock).
-        final int n = nrunning.get();
-
-        if (n == 0) {
-        
-            // success.
-            
-            if (INFO)
-                log.info("Write service is paused: #running=" + n
-                        + ", elapsed=" + elapsedMillis);
-
-            return true;
-
-        }
-
-        /*
-         * Timeout. Log the running tasks in order by their submit times, the
-         * elapsed time, and the #of running tasks before/after.
-         */
-        {
-
-            final long now = System.nanoTime();
-
-            final AbstractTask[] a = active.values().toArray(
-                    new AbstractTask[0]);
-
-            TaskAndTime[] b = new TaskAndTime[a.length];
-
-            for (int i = 0; i < a.length; i++) {
-
-                b[i] = new TaskAndTime(a[i], now);
-                
-            }
-
-            // sort by elapsed run time.
-            Arrays.sort(b);
-
-            // log informative message about the tasks that are running/done.
-            log.error("Timeout! : timeout="
-                    + TimeUnit.NANOSECONDS.toMillis(timeout) + "ms,elapsed="
-                    + elapsedMillis + "ms,runningBefore=" + beforeCount
-                    + ",runningNow=" + n + "::runningTasks= "
-                    + Arrays.toString(b));
-        
-        }
-
-        return false;
-        
     }
 
     /**
