@@ -1938,12 +1938,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         // convert to ns.
         timeout = unit.toNanos(timeout);
-        
+
         // remaining ns.
-        long remaining;
+        long elapsed;
 
         // wait for active tasks to complete, but no longer than the timeout.
-        while ((remaining = (System.nanoTime() - beginNanos)) < timeout
+        while ((elapsed = (System.nanoTime() - beginNanos)) < timeout
                 && nrunning.get() > 0) {
 
             /*
@@ -1958,7 +1958,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Note: Throws InterruptedException
              */
 
-            waiting.await(remaining, TimeUnit.NANOSECONDS);
+            waiting.await(timeout - elapsed/* remaining */,
+                    TimeUnit.NANOSECONDS);
 
         }
 
