@@ -37,7 +37,7 @@ import java.util.NoSuchElementException;
  * {@link Iterator} for forward sequential scans and also provides symmetric
  * methods for reverse sequential scans using {@link #hasPrior()} and
  * {@link #prior()}. Random access is supported using {@link #seek(byte[])}.
- * This interface is intentially kept small and does not include methods such as
+ * This interface is intentionally kept small and does not include methods such as
  * first() or last() whose semantics would be misleading when applied to an
  * index partition vs a partitioned index.
  * <p>

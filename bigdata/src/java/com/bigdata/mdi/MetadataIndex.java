@@ -60,7 +60,7 @@ import com.bigdata.service.MetadataService;
  * {@link MetadataIndex} can not undergo {@link IResourceManager#overflow()}.
  * <p>
  * One advantage of this approach is that the {@link MetadataIndex} is
- * guarenteed to hold all historical states of the partition definitions for
+ * guaranteed to hold all historical states of the partition definitions for
  * each index - effectively it is an immortal store for the partition metadata.
  * On the other hand it is not possible to compact the metadata index without
  * taking the database offline.

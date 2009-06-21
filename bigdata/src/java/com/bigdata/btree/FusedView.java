@@ -59,7 +59,7 @@ import com.bigdata.service.Split;
  * recency of their data. Writes will be directed to the first source in the
  * sequence (the most recent source). Deletion markers are used to prevent a
  * miss on a key for a source from reading through to an older source. If a
- * deletion marker is encoutered the index entry will be understood as "not
+ * deletion marker is encountered the index entry will be understood as "not
  * found" in the fused view rather than reading through to an older source where
  * it might still have a binding.
  * </p>
@@ -1001,7 +1001,7 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
 
     /**
      * Returns an iterator that visits the distinct entries. When an entry
-     * appears in more than one index, the entry is choosen based on the order
+     * appears in more than one index, the entry is chosen based on the order
      * in which the indices were declared to the constructor.
      */
     final public ITupleIterator rangeIterator(final byte[] fromKey,
@@ -1379,24 +1379,4 @@ public class FusedView implements IIndex, ILocalBTreeView {//, IValueAge {
         
     }
 
-//    /*
-//     * API used to report how long it has been since the BTree was last used.
-//     * This is used to clear BTrees that are not in active use from a variety of
-//     * caches. This helps us to better manage RAM.
-//     */
-//
-//    final public void touch() {
-//        
-//        timestamp = System.nanoTime();
-//        
-//    }
-//    
-//    final public long timestamp() {
-//        
-//        return timestamp;
-//        
-//    }
-//    
-//    private long timestamp = System.nanoTime();
-    
 }
