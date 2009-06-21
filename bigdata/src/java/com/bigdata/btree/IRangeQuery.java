@@ -137,14 +137,14 @@ public interface IRangeQuery {
     
     /**
      * Flag specifies that keys in the key range will be returned. The keys are
-     * guarenteed to be made available via {@link ITupleIterator#getKey()} only
+     * guaranteed to be made available via {@link ITupleIterator#getKey()} only
      * when this flag is given.
      */
     public static final int KEYS = 1 << 0;
 
     /**
      * Flag specifies that values in the key range will be returned. The values
-     * are guarenteed to be made available via {@link ITupleIterator#next()} and
+     * are guaranteed to be made available via {@link ITupleIterator#next()} and
      * {@link ITupleIterator#getValue()} only when this flag is given.
      */
     public static final int VALS = 1 << 1;
@@ -158,7 +158,7 @@ public interface IRangeQuery {
     /**
      * The flags that should be used by default [{@link #KEYS}, {@link #VALS}]
      * in contexts where the flags are not explicitly specified by the
-     * appliction such as {@link #rangeIterator(byte[], byte[])}.
+     * application such as {@link #rangeIterator(byte[], byte[])}.
      */
     public static final int DEFAULT = KEYS | VALS;
 
@@ -194,7 +194,7 @@ public interface IRangeQuery {
      * {@link ResultSet} is populated.
      * <p>
      * Note: The {@link BigdataFileSystem#deleteHead(String, int)} relies on
-     * this atomic guarentee.
+     * this atomic guarantee.
      * 
      * @todo define rangeRemove(fromKey,toKey,filter)? This method would return
      *       the #of items matching the optional filter that were deleted. It
@@ -224,7 +224,7 @@ public interface IRangeQuery {
      * since it exploits the double-linked leaves of the {@link IndexSegment}
      * and is therefore MORE efficient than the {@link Striterator} based
      * construct.)</li>
-     * <li> This flag enables traveral with concurrent modification (i.e.,
+     * <li> This flag enables traversal with concurrent modification (i.e.,
      * {@link Iterator#remove()}) when used with a local {@link BTree}.
      * Scale-out iterators always support traversal with concurrent modification
      * since they heavily buffer the iterator with {@link ResultSet}s.</li>

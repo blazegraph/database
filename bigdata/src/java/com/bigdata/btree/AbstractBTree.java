@@ -86,7 +86,7 @@ import com.bigdata.service.Split;
  * is support by an integration with ICU4J and applications may choose the
  * locale, strength, and other properties that govern the sort order of sort
  * keys generated from Unicode strings. Sort keys produces by different collator
- * objects are NOT compable and applications that use Unicode data in their keys
+ * objects are NOT compatible and applications that use Unicode data in their keys
  * MUST make sure that they use a collator that imposes the same sort order each
  * time they provision a {@link KeyBuilder}.
  * </p>
@@ -95,7 +95,7 @@ import com.bigdata.service.Split;
  * B+-Tree to perform very fast comparison of a search key with keys in the
  * nodes and leaves of the tree. To support fast search, the leading prefix is
  * factored out each time a node or leaf is made immutable, e.g., directly
- * proceeding serialization. Further, the separator keys are choosen to be the
+ * proceeding serialization. Further, the separator keys are chosen to be the
  * shortest separator key in order to further shorten the keys in the nodes of
  * the tree.
  * </p>
