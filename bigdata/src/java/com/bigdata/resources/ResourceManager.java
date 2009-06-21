@@ -232,21 +232,34 @@ abstract public class ResourceManager extends OverflowManager implements
                             }
                         });
 
-                tmp.addCounter(IOverflowManagerCounters.SynchronousOverflowMillis,
+                tmp.addCounter(
+                        IOverflowManagerCounters.SynchronousOverflowMillis,
                         new Instrument<Long>() {
                             public void sample() {
                                 setValue(synchronousOverflowMillis.get());
                             }
                         });
-                
-                tmp.addCounter(IOverflowManagerCounters.AsynchronousOverflowMillis,
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.AsynchronousOverflowMillis,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue(asynchronousOverflowMillis.get());
+                                long t = asynchronousOverflowMillis.get();
+                                if (isOverflowEnabled() && !isOverflowAllowed()) {
+                                    /*
+                                     * Include time from the active (ongoing)
+                                     * asynchronous overflow operation.
+                                     */ 
+                                    t += (System.currentTimeMillis()
+                                            - asynchronousOverflowStartMillis
+                                                    .get());
+                                }
+                                setValue(t);
                             }
                         });
-                
-                tmp.addCounter(IOverflowManagerCounters.AsynchronousOverflowCount,
+
+                tmp.addCounter(
+                        IOverflowManagerCounters.AsynchronousOverflowCount,
                         new Instrument<Long>() {
                             public void sample() {
                                 setValue(getAsynchronousOverflowCount());
