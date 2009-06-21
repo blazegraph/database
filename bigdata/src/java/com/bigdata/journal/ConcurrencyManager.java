@@ -1531,7 +1531,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                     }
 
-                    long now = System.nanoTime();
+                    final long now = System.nanoTime();
                     
                     nanos -= now - lastTime;
                     
