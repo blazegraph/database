@@ -230,6 +230,14 @@ abstract public class OverflowManager extends IndexManager {
      * The elapsed milliseconds for synchronous overflow processing to date.  
      */
     protected final AtomicLong synchronousOverflowMillis = new AtomicLong(0L);
+
+    /**
+     * The time in milliseconds since the epoch at which the most recent asynchronous overflow started. This is
+     * used to compute the elapsed asynchronous overflow time when the service
+     * is currently performing asynchronous overflow processing. The value is
+     * set each time asynchronous overflow processing starts, but never cleared.
+     */
+    protected final AtomicLong asynchronousOverflowStartMillis = new AtomicLong(0L);
     
     /**
      * #of asynchronous overflows that have taken place. This counter is

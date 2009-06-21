@@ -2531,6 +2531,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
         final long begin = System.currentTimeMillis();
         
+        resourceManager.asynchronousOverflowStartMillis.set(begin);
+        
         final Event e = new Event(resourceManager.getFederation(),
                 new EventResource(), EventType.AsynchronousOverflow).addDetail(
                 "asynchronousOverflowCounter",
@@ -2561,21 +2563,21 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * handle the old journal, all new writes are on the live index.
              */
 
-            final long elapsed = System.currentTimeMillis() - begin;
-
             final long overflowCounter = resourceManager.asynchronousOverflowCounter
                     .incrementAndGet();
 
             log.warn("done: overflowCounter=" + overflowCounter
                     + ", lastCommitTime="
                     + resourceManager.getLiveJournal().getLastCommitTime()
-                    + ", elapsed=" + elapsed + "ms");
+                    + ", elapsed=" + (System.currentTimeMillis() - begin)
+                    + "ms");
 
             // The post-condition views.
-            if(log.isInfoEnabled())
+            if (log.isInfoEnabled())
                 log.info("\npost-condition views: overflowCounter="
-                    + resourceManager.asynchronousOverflowCounter.get() + "\n"
-                    + resourceManager.listIndexPartitions(ITx.UNISOLATED));
+                        + resourceManager.asynchronousOverflowCounter.get()
+                        + "\n"
+                        + resourceManager.listIndexPartitions(ITx.UNISOLATED));
 
             /*
              * Note: I have moved the purge of old resources back into the
