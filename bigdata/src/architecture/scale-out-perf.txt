@@ -1,0 +1,3599 @@
+Notes on various things.  Mostly free form and in temporal order,
+with occasional efforts to collate by topic.
+
+============================================================
+
+Notes on store level record checksums and record compression.
+
+1. many record compression schemes will fail if the data are corrupt,
+   but logically you compress first and then checksum the record.
+
+   compression is often a technique using a stream of blocks.
+
+   checksum is a streaming technique.
+
+   // IRawStore#write()
+   write(ByteBuffer b) : addr
+
+   // AbstractJournal#write()
+
+   if(compress) {
+
+      b = compress(b)
+
+   }
+
+   int chksum;
+   if(useChecksum) {
+
+      bytesRequired = b.remaining() + 4;
+
+      chmsum = computeChecksum( b );
+
+   } else bytesRequired = b.remaining();
+
+   bufferStrategy.write(b,chksum,useChecksum)
+
+   Note: buffer strategy write() probably needs to have the checksum
+   value pass along in addition to the record to avoid re-allocation
+   of the ByteBuffer just to tack on the additional 4 bytes.  We could
+   either always write those additional 4 bytes or optionally write
+   them if checksums are enabled.
+
+2. the root block needs to hold the critical data indicating whether
+   or not checksums in use and what record compression technique, if
+   any, to apply.  We need this on hand before we can either read or
+   write a record on the store.
+
+3. we need 4 bytes (int32) for the checksum.  this should be at the
+   end of the record, so the size in the store is extended by 4 bytes
+   and the address for the record on the store is adjusted to also
+   include those 4 bytes.  However, when you read from the store it
+   will give you a slice WITHOUT those four bytes.  Further, if it is
+   using compression then it will decompress the slice, resulting in a
+   new slice that can be much larger than the record on the store
+   whose size is encoded within the address.  This will probably break
+   a variety of asserts that assume that the returned ByteBuffer will
+   be exactly the size of the byte count encoded in the address.
+
+4. Compression should run on the byte[] not on the slower ByteBuffer.
+   Serialization generally writes on a byte[], but sometimes that is
+   wrapped up as a ByteBuffer - and it can even be a slice() onto a
+   larger array (NodeSerializer does this since it returns a view onto
+   an internal buffer).
+
+    /**
+     * The {@link Adler32} checksum. This is an int32 value, even through the
+     * {@link Checksum} API returns an int64 (aka long integer) value. The
+     * actual checksum is in the lower 32 bit.
+     */
+    static final int SIZEOF_CHECKSUM = Bytes.SIZEOF_INT;
+
+    /**
+     * Offset of the int32 value that is the {@link Adler32} checksum of the
+     * serialized node or leaf. The checksum is computed for all bytes exclusing
+     * the first 4 bytes, on which the value of the computed checksum is
+     * written.
+     */
+    static final int OFFSET_CHECKSUM = 0;
+
+    /**
+     * When <code>true</code>, checksums will be generated for serialized
+     * nodes and leaves and verified on read. Checksums provide a check for
+     * corrupt media and make the database more robust at the expense of some
+     * added cost to compute a validate the checksums.
+     * <p>
+     * Computing the checksum is ~ 40% of the cost of (de-)serialization.
+     * <p>
+     * When the backing store is fully buffered (it is entirely in RAM) then
+     * checksums are automatically disabled.
+     * 
+     * @deprecated See {@link #setUseChecksum(boolean)}
+     */
+    public final boolean getUseChecksum() {return useChecksum;}
+
+============================================================
+Consider block storage / NAS deployment scenario.
+
+  In this scenario we use robust remote storage with a large block
+  size (64M+).  The backing store could be HFS or NAS.  Only large
+  chunks are read at a time.  Index store writes are also large
+  chunks.  Commit point writes will require partial chunk updates
+  unless we stream to the failover services at the commit point and
+  only write to the remote store when we close the journal for writes.
+
+  Use a direct buffer for the live journal, no write cache.
+
+  Use resource lock manager (ala zookeeper) to allocate journal files
+  on the block store.  Commit points write through so that commits are
+  visible to failover services (or are streamed through to those
+  services).  The initial allocation is for the entire target extent.
+  Avoid the need to extent by eager overflow as coordinated with the
+  write executor service.
+
+  Use resource lock manager when obtaining an historical journal or
+  index segment store.  Copy the entire thing to local disk and manage
+  the data locally that will be used by the server.
+
+============================================================
+Consider a RW store variant.
+
+  A read-write store would be useful for scale-up deployments where
+  access to historical commit points is not required.  If you require
+  access to historical commit points, then a read-write store will not
+  satisify since it will release the storage associated with deleted
+  records no later than the commit point.
+
+  Only the WORM allows access to those historical commit points.  This
+  places a RW store somewhat at odds with the rest of the bigdata
+  architecture since we presume that operations read based on a commit
+  time and that the commit time can be mapped onto a commit point.
+  
+  Regardless, a read-write store would use bit maps for allocations.
+  The handles to the bit maps could be stored in the root block addrs.
+  Deletes would be automatic for B+Tree nodes and leaves and in the
+  hands of the application for low-level record writes.
+
+  Each allocation block would handle records in a certain size range.
+  E.g., LT 512, LT 1024, LT 4096, etc.  The block sizes will tend to
+  be fairly large since records are nearly always B+Tree nodes or
+  leaves.  (It may be possible to dynamically determine the best set
+  of block sizes).
+
+  For a given block size, we probably need a chain of allocation
+  blocks.  This is necessary to handle on the one handle widely
+  varying #s of allocations by block size and on the other to not
+  place a limit on how many allocations there may be of a given block
+  size.  This also lets us keep down the size of the allocation block
+  and hence the amount of metadata that needs to be written on each
+  commit.
+
+  The root block could just hold the addr of the allocation block
+  chains record.  
+
+  Is it possible to efficiently persist only the incremental change to
+  a bit vector?  If the changes are from a specific offset on?
+
+============================================================
+
+    - Tune indices
+
+      - The ids index should benefit from value compression since the
+        values are the serialized terms.  This will require custom
+        code to break the values into symbols and then use huffman
+        encoding.  Alternatively, simply treat each value as a symbol
+        and code from that (assuming that value reuse is common - if
+        not then at least URIs can be broken down into common
+        symbols).
+
+      - The terms (term:id) index is on the order of 5x larger than
+        the ids (id:term) index.  Presumably this is because updates
+        are distributed more or less randomly across the terms index
+        as new terms become defined but are strictly append only for
+        the ids index since new ids are always larger than old ids.
+	
+         - A larger branching factor may benefit the ids index.
+
+	 - A compacting merge of the terms index should greatly reduce
+           its size.
+
+	 - Splitting the terms2ids index will allocate more resources
+           and greater parallelism to that index.
+
+	 - Prefix compression may reduce the problem (it is enabled as
+           of 10/1/08).
+
+	 - Nearly ALL _read_ time between the SPO and TERMS index is
+           reading the TERMS index (99%).
+
+	 - Nearly ALL _write_ time between the SPO and the TERMS index
+           is writing the SPO index (99%).  Statements are more likely
+           to be distinct than terms, so it makes sense that we write
+           on the statement index more often.  However, note that this
+           is true even though the TERMS index is 3x larger than the
+           SPO index.
+
+    - BTree
+
+     - Modify to allow a purely transient BTree using ONLY hard
+       references.  This variant does not require a backing store.
+       The parent and child references should be HARD
+       references. Deleted nodes and leaves will be GC'd once they are
+       evicted from the write retention queue.
+
+     - Per-child locks : try using the childRef for this.  Add
+       synchronized(node) to ensure that the childRef[i] is non-null
+       and then synchronized(childRef[i]) for the lock itself.
+
+     - The RecordCompressor as utilized by the NodeSerializer is NOT
+       thread-safe as it relies on a single cbuf field.  Either the
+       static buffer pool (if direct buffers are performant for this),
+       a heap buffer pool, dynamic heap allocations for
+       (de-)compression, or a serialized access to an instance per
+       NodeSerializer instance (and hence per BTree instance).
+
+     - Change checksums to be at the store/record level.  Interpret
+       the record length as having 2 additional bytes for read/write
+       of the checksum.  Put it at the end of the record.
+       Enable/disable at the store level.
+
+       Add an option for read-back validation of writes?
+       
+       Add an option for a fully synchronized raw store interface on
+       the Journal?
+
+     - IAutoboxBTree
+
+       - Write tests of the autobox API for BTree, FusedView,
+         ClientIndexView, and DataServiceIndex.
+
+       - Should be able to instantiate a resource that is a BigdataMap
+         or BigdataSet, so perhaps make these classes extend
+         AbstractResource?  Same for SparseRowStore?
+
+       - Need [isNull] for ClientIndexView and DataServiceIndex impls
+         to reconstruct the object by allowing reconstruction of the
+         ITuple.
+
+	 Could modify the ResultBuffer to provide this additional
+         information as an option and specify an appropriate
+         constructor for the point test to get back that metadata.
+
+	 Really, should define crudTuple() methods and rework the
+	 batch crud methods in terms of tuples.  That is the general
+	 framwork.  Bit flags can be used to indicate that certain
+	 information (keys, vals, etc). are not required for a given
+	 op.  (keys are always available on the client for these ops
+	 so there is never a need to send them with the data: just
+	 {val, isNull, isDeleted} and the option to read deleted
+	 tuples.
+
+	 BigdataMap and BigdataSet will not scale-out until this issue
+	 is resolved.
+
+============================================================
+Lock contention
+
+There are two places where we get a modest amount of lock contention,
+based on -Djrockit.lockprofiling=true.
+
+ - Node#getChild(int)
+
+   This is the gateway for access to child nodes.  It currently uses
+   double-checked locking to avoid synchronization when the desired
+   child is already available.  If the child needs to be read from the
+   disk then the threads are synchronized in order to prevent
+   concurrent requests from reading the same record, deserializing the
+   node or leaf, and then entering different references for that node
+   or leaf into the childRefs[].
+
+   We could allow concurrent resolution of a child that is not in
+   memory if we used an AtomicReference[] and stored the weak
+   references in that and using an atomic operation to set the
+   reference iff it was not already set.  This would require code
+   changes everywhere we use childRefs[] and it is a long shot that
+   this would improve performance at all.
+
+ - DiskOnlyStrategy#reopenChannel().  Contention here arises when an
+   interrupt is recognized during an IO operation and the file channel
+   is closed.  Readers will transparently re-open the channel, but
+   they all want to do so at once which causes contention for this
+   method.  I don't see anyway to improve on this off hand.
+
+============================================================
+Sparse Row Store (SRS)
+
+  - Extract IRowStore interface.
+
+  - Optimize get(Schema,name) in SparseRowStore and
+    AtomicRowWriteRead.
+
+  - AutoIncrement semantics:
+
+    - You can't use an autoinc counter for a primary key.  However,
+      this could be done if we use the maximum value for the auto-inc
+      counter to form the fromKey, which would direct the procedure to
+      the correct index partition.  We would need to notice that the
+      property value was an auto-increment counter and the fromKey
+      would then have to be regenerated on the index partition. We
+      would then lookup the current value for that counter and write
+      its successor into the row store.
+
+      The inability to use auto-inc for the primary key is really
+      quite limiting.
+
+    - Since we have all these successor semantics, we should be able
+      to support auto-increment for more than just int and long.  A
+      better way to form the successor is to pass along an
+      IAutoIncrement method and let it form the successor.  That
+      allows all kinds of interesting patterns.
+
+  - JSON API
+
+     - Add a web application that let's people easily write on or read
+       from the sparse row store using JSON or the like.
+    
+     - It should be easy to view and modify the data in the global row
+       store, which is where locatable resources store their
+       configuration metadata.
+
+     - The JSON API should be compatible to the extent possible with
+       HBASE and GAE.
+
+     - This web application will have to be distributed in order to
+       eliminate bottlenecks.  One approach is to re-direct HTTP
+       clients to an embedded web service co-located with the data
+       service on which the row resides.  HTTP clients can continue to
+       address that server until they receive a redirect.
+
+   - (On reflection, I have decided NOT to go this route.) Add a BLOB
+     reference column type.  There are at least two design options for
+     this.  I think that we should support at least (1) and (2).
+
+       (1) the blocks are stored locally and hence are always
+           available from the same data service as the BLOB reference
+           column value - this might limit the maximum effective blob
+           size (in bytes) since the data will have to fit in the same
+           index partition and hence be co-located on a single host.
+           In fact, the blocks will be in the same index segment as
+           the column value once the journal overflows.  One advantage
+           of this approach is the block updates can be atomic with
+           block metadata updates - a feature that is not otherwise
+           available without full transactions.
+       
+       (2) the blob reference includes the name of the scale-out index
+           on which the blocks for that blob are stored - in this
+           model the blocks can reside anywhere and splits of the
+           blocks will have no relevance to splits of the metadata.
+           This also makes it easier to locate the partitions of the
+           index containing the blocks on data services that are
+           specifically provisioned for large data blocks.
+
+       (3) the blob reference contains the primary key for the blob
+           and the blob is stored either in the same index or in
+           another index.  I am not sure that this variant adds value
+           over (1) and (2).
+
+     - Refactor the BigdataRepository to use the BLOB reference type.
+
+============================================================
+Bigdata File System (BFS)
+
+  - (***) Test failures remain for TestFileMetadataIndex.  It seems as
+    if the logic was bad previously.  If we delete the file Version
+    then how can we increment it and get a different answer?  Maybe we
+    should delete the Id since that would leave the version alone?
+    No, that does not work since all property values will be
+    overwritten.  How about either writing a "deleted" flag or doing
+    some fancy steps to find the most recent non-deleted version and
+    then increment that?
+
+    Bug fix for create/delete/update interaction with Version counter
+    in the row store.
+
+    - test_delete failure
+    
+    - test_createUpdate failure
+
+  - handle overflow of blocks to the index segments during MOVE
+
+  - provide streaming socket api on data service for reading blocks
+    (low level in the DiskOnlyStrategy - if in the write cache then
+    return directly else return buffered input stream reading on the
+    disk file and interrupt if journal is closed).
+
+  - range delete
+
+  - logical row scan for headers of documents in a key range.
+
+  - Write test for forward and reverse scans starting at the fence
+    posts around a partition boundary.
+
+============================================================
+Map/Reduce demos (**)
+
+    - Rework the map/reduce implementation to use local writes and
+      distributed gathers.
+
+    - Download, prepare, extract.
+
+    - Concurrent RDF data load as a map/reduce job.
+
+    - Try jini federation using only the terms index to assign
+      consistent term identifiers, bulk loading into local SPO-only
+      indices, and then range partitioning the indices into global
+      SPO, POS, and OSP orders and bulk loading the global statement
+      indices.  The data loader should be concurrent and a filter
+      should be applied such that each "host" loads only the files
+      that hash MOD N to that host.  (note that only AddTerms and
+      AddIds go across the network API in this case.)
+
+============================================================
+Tune network IO
+
+    - huffman encoding is appropriate for network IO, but hu-tucker is
+      not required since we have to decompress keys to get them
+      inserted into the btree.
+
+    - tokenization needs to be specified for RDF Value types for the
+      purposes of compression.  In fact, we are guarenteed that values
+      are NOT duplicated in a given batch so tokenization needs to
+      uncover common symbols.  This is easy for URIs but less so for
+      literals and impossible for BNodes (which do not really need to
+      be in the lexicon anyway).
+
+============================================================
+TripleStore
+
+    - The temp triple store supports concurrent read only but not
+      concurrent write, so it is not appropriate for a concurrent bulk
+      loader.
+
+    - An extended transaction model can be used for truth maintenance.
+      The focus store is built up within isolated indices (that do not
+      actually correspond to persistent indices, they only exist on
+      the per-tx per-dataservice TemporaryStore).  The application can
+      simply combine sets of assertions or retractions within a single
+      transaction.  Either the application or an extension of the
+      transaction manager MUST serialize the commits.  Within the
+      commit processing, first do retractions then do assertions.
+
+      - Provide for transaction local indices.  The index is dropped
+        when the tx completes.
+
+      - Provide for registration of a global index within a
+        transaction, but the transaction will fail if the index
+        already exists when it commits.
+
+      - For full transactions, explore a synchronous overflow variant
+        from a managed journal hosting named indices (as isolated by
+        the tx) backed by a transient buffer to a managed journal
+        backed by a disk buffer that would let us keep full
+        concurrency.  The overflow should be a buffer -> disk transfer
+        and then the disk file should be allowed to grow without
+        bounds (or to the resource limit of the tx).  Asynchronous
+        overflow processing for transaction journals would add a layer
+        of complexity throughout as the MDI would need to be
+        instantiated on a per-tx basis.
+
+	The WriteExecutorService for the transaction would identify
+	and support synchronous overflow exactly as it does now for
+	unisolated journals.
+
+     - Raw temporary stores such as are used by the index manager must
+       be handled differently since (a) there are no indices in use;
+       and (b) the use is always single threaded (no write executor
+       service).  This case requires a direct buffer to disk transfer,
+       but the API can be declare an assumption that the caller is
+       single threaded and the writer can simply block during that
+       transfer.
+
+     * Some of the buffer strategy implementations appear to assume
+       that by synchronizing one method, such as truncate() or
+       transferTo(), that concurrent writers are automatically
+       synchronized for those operations.  This is NOT true unless the
+       write() method is also synchronized, and it is not for at least
+       the DirectBufferStrategy.  This could show up as a concurrency
+       problem with the indices when the store is used in a mode that
+       is in fact concurrent and an overflow is triggered.
+------------------------------------------------------------
+LexiconRelation:
+
+  - The termCache is currently disabled for the LexiconRelation.  Does
+    this have any positive effect on data load or query when it is
+    enabled?  (It does not help for dataset + query combinations such
+    as LUBM Q6 which have very little reuse of terms within the query
+    or across queries, but it might help for other scenarios.)
+
+  - Performance tuning.
+
+  - Better (de-)serialization of RDF Values?
+
+------------------------------------------------------------
+Short term tasks:
+
+   - (*) Builds and releases.
+   
+      - Change over to subversion so that the edit trail does not get
+        lost (complex process).
+
+      - add alternative license.
+
+      - Maven 2.x build
+      
+         - Start doing snapshot releases.
+
+	 - Start periodic project documentation builds, perhaps on SF.
+           Publish on the www.bigdata.com site.
+
+         - Change the dependency to dsiutils.  I tried to do this with
+           dsiutils-1.0.4 and ran into problems with
+           (de-)serialization when compared to the lgpl-utils versions
+           of the same classes.  Try this again and pay close
+           attention to the lgpl-utils versions of the classes now
+           located in dsiutils and see if I can isolated the problem.
+           The problem was demonstrated by the bigdata-rdf test suites
+           for both the temp and local triple stores but not for the
+           bigdata test suites.
+
+	 - Done. Update the Sesame 2.x dependency.
+
+	 - Put all properties into the com.bigdata namespace.
+
+   - Counters
+
+     - Done. Work the counter path, name, and date(s) into the table
+       which shows the counters history values so that it can all get
+       copied easily into a worksheet.
+
+     - Done. #commit is not being encoded property and shows up as a
+       URL anchor and not as part of the PATH parameter.
+
+     - Done. Counter XML MUST persist the HISTORY in the XML so that
+       the log files can be useful for post-mortem.
+       
+     - Done. Write a final log file ('-final.xml') when the LBS
+       terminates.
+
+     - Done. This is now a configuration property.  The load balancer
+       is not writing its counters into the correct location (logDir).
+       The directory needs to be relative to the service directory, so
+       a method needs to expose that directory to the service.
+
+     - Done.  (Modified to accept samples out of timestamp order and
+       to record the #of and total of samples falling within a given
+       period.)  Loosing some samples through reporting w/in the same
+       period.  Round up to the next period if this period is filled.
+       An alternative is to sum the samples in the period and report
+       their average by also tracking the #of samples in the period!
+
+     - Done. When writing the path in the table rows, only write the
+       path from the selected root.
+
+     - Done. Problem with double-decoding of URL in NanoHTTP.
+
+     - Done. (Can be a bit odd when also using a regex filter.) Add
+       depth query parameter to limit the #of levels resolved from the
+       path.
+
+     - Done. (Currently using engineering notation, should be query
+       parameter).  Set to 6 digits precision, not {3,6} after the
+       decimal.  Or right justify decimal value with fixed N digits
+       after the decimal (could be query param).
+
+     - Done. (Also added the timestamp itself.) When converting to
+       minutes, hours, and days in httpd make sure to have a few
+       digits after the decimal -- otherwise false boundaries.
+
+     - Done. (uses wildcards before and after and ORs together.) The
+       filter needs to accept regex characters or prefix and post-fix
+       with ".*".  Since things are quoted, right now nothing is
+       actually matched.
+
+     - Done. Since the log files provide post-mortem, there should be
+       a way to view the files through the same httpd tool - a mode
+       where it reads a single named counter XML file and then lets
+       you browse it.  This will make it easy to find interesting
+       views.
+
+     - Done. The IndexManager should report the #of index views open
+       concurrently.  Either sample once per second and take a moving
+       average track the total number and compute the instanteous
+       average per minute.
+ 
+     - Done (reports the #of stores in the weak cache). Likewise, the
+       StoreManager should report the #of open journals and index
+       segments.
+
+     - Done. Anything with "%" or "percent" in the name should be
+       formatted as a percentage in [0.00:1.00].
+
+     - Done.  The data service should report its configuration
+       properties under "Info".
+
+       Done. This should be done for the other services as well.
+       Refactor the code in DataService, moving it into the counters
+       package.
+
+       Note: Servers should add their Jini configuration information
+       as well.  This probably has to be done explicitly for the
+       configuration items of interest.
+
+     - Done. Compute average response time.  Throughput is 1/average
+       response time.
+
+     - Done. Add counters for #of index partition split, move, and
+       join operations (OverflowManager).
+
+       Done. Also report #of errors during asynchronous overflow
+       processing.
+
+       Note: There should also be a counter of the #of index
+       partitions moved onto a data service.  However there is no
+       place in the code to easily note this on the target data
+       service since the move is made atomic by an action on the
+       metadata service.
+
+     - Done. Add counter to the write service that reports the #of
+       tasks which have their locks and are actually doing their work
+       concurrently (LockManager defines such a counter but we need
+       its moving average not the instantaneous value).  This is the
+       real concurrency of the tasks.  The #of active tasks in the
+       write service is a red herring since those tasks could be
+       waiting for their locks.
+
+     - Done. Add per-process counters for GarbageCollectorMXBeans.
+
+     - Done. (NanoHTTPD was not reporting errors in the serve() method
+       anywhere and was failing to send back an error to the client.)
+       For some reason a query for the hostname on host3 does not
+       return the counters in the browser.  Response is fast both
+       beneath that level at at the root.  Maybe the problem is in the
+       /host/CPU and /host/Info counter sets - those appear to hang
+       while /host/service is fine.... that does not seem to pay out
+       either.
+
+     - Done.  (I am assuming that Format was not thread safe - it was
+       being used concurrently by the Sar collector and the pidstat
+       collector, even with only one service). pidstat : Problem
+       parsing [02:08:24 PM] as a time for input string "".  This is
+       odd.  I can test this out and it works for the specified
+       format.  And it is the only error reported for pidstat parsing.
+       Ah.  Format is doubtless not thread-safe.
+
+     - Done. Fixed issue where sar and pidstat would overflow the
+       field, eating into whitespace to the right.  The data lines are
+       now split based on whitespace after first skipping over a date
+       field (based on the ISO date format).
+
+     - Done. The per-process counters for linux are not being reported
+       under "service" but instead directly under the service UUID.
+
+     - Done. Group services under their service type in the counters.
+
+     - Done (also fixed a bug where the LDS was not sending a join
+       message to the LBS and modified notify(), warn(), and urgent()
+       to invoke join() on the behalf of remote clients). The LBS
+       should add counters for the host scores.  This will provide
+       transparency in how it interprets the data from the various
+       hosts.
+
+     - Done. The client can discover the LBS and report data every so
+       often.  This would result in redundent reporting when there is
+       more than one client if the counter reflects the database
+       state, but there is no harm in that.
+
+     - Done. Could report the #of files read, #of triples processed,
+       triples in the db, average throughput rate for that client (or
+       all clients), etc
+
+       - (**??) tps appears low as reported by the client to the LBS
+         when compared to the final value computed by the client.
+         This may be a function of the outstanding writers that have
+         not yet completed, in which case the loader clearly needs to
+         force the report of the final counter values when a load
+         completes.
+
+         Maybe this is reporting the upper bound for statements?  That
+         does not make sense though since only deleted entries or
+         views with an index segment cause the upper bound to be
+         higher than the actual entey count.
+
+       - Compute bytes per statement in the db (requires a db op to
+         correlate the journal size with the #of stmts or #of terms)
+
+       - Done. report success and errors from the concurrent data
+         loader.
+
+       - Done. incremental evaulate futures for the concurrent data
+         loader.
+
+     - Done. Report response time measures on the client, which will
+       require a class similar to TaskCounters that is intimate with
+       the ClientIndexView.  That will give a client perspective on
+       the latency of tasks, which will aggregate across the data
+       services that it uses and include the costs of RMI, in contrast
+       to a data service perspective, which aggregates across the
+       clients using that service and discount RMI.
+
+       Note: The LDS does not use RMI - it submits tasks directly to
+       the data service queues.
+
+     - Done. Need to aggregate statistics for the partitions of an
+       index as reported to the LBS for analytics.
+
+     - Need to remove index partitions which are known to be stale
+       from the LBS after a bit, or at least allow them to be hidden.
+       The data will eventually grow beyond what can be held by an LDS
+       if we do nothing.
+
+     - Done. Show metadata about the open index segments in the
+       IndexManager
+
+     - Done. Send stale locator notices to the LBS and replace the
+       counters (or nest them under) on the LBS when the index
+       partition is reported as stale.
+
+       Done. Note: having a local httpd for the data service would
+       make it much easier to inspect the indices.
+    
+     - (**) The IndexManager should report the #of open indices.  We
+       can have an exact count of that if we use a static atomic
+       integer in AbstractBTree.
+       
+       Likewise, we can get the exact count of the #of open journals
+       vs index segment stores and BTree vs IndexSegments using the
+       same technique.
+
+       Done. The statistics that are used by the overflow manager to
+       compute which indices are move candidates are not being exposed
+       via the counters to the LBS.  This includes all of the
+       per-index bytes read, bytes written, etc. data.
+
+     - Done. The IndexManager should report the index partitions on the
+       data service, at least until this exceeds 100s of indices.
+       This should be done not via counters but rather via the httpd
+       service itself making an RMI request to the data service and
+       listing out the named indices. Present additional information
+       when the service is a metadata service, e.g., by listing out
+       the tuples of the index, which are in fact the locators for the
+       index partitions.  Also, provide some aggregation over the MDI,
+       including the total #of partitions and tuples.
+
+     - Done. When restoring the LBS counters from XML, the history on
+       the counters is being ignored.
+
+     - (**) Make it possible to have more than 60 minutes in the
+       buffer but still overflow after 60 minutes onto the hours.
+       This will allow a longer reachback at a given level of
+       aggregation.
+
+       - The counters are overflowing to days before midnight.  Check
+         the locale and see when timestamp causes an overflow to the
+         next hour and the next day in some unit tests.
+
+         It seems that I get at most 10 hours before the hours start
+         to roll over.
+
+       - Add option to report only minutes, hours, days, etc.
+
+     - Add UI elements to set the filter(s), depth, decimalFormat,
+       etc.  These should be a FORM with a GET action.
+
+     - May be loosing some samples by running multiple typeperf's at
+       once.  Explore.  If true, then trying combining all w/in same
+       JVM using reference counter for process or identifying one
+       process in the JVM which will have responsibility for those
+       counters.
+
+     - syslogd integration so that I see ERROR and FATAL messages for
+       the hosts in the federation.
+
+     - Done. Add option to NOT run typeperf and use for the unit tests
+       of the services when performance counters are not required.
+
+     - Done. Add reporting by the client on the indices that it is
+       using.
+
+     - Done. Add reporting to the concurrent data loader for #errors.
+
+     - Done. The CDL tps counter needs to stop counter time once the
+       load is complete.  As it is the rate continues to drop with
+       elapsed non-load time.  This makes the value reported to the
+       load balancer wrong! (Even the value available from the client
+       is wrong since it can be off by up to 60 seconds of load time).
+
+     - Done. Problem w/ correlated view of counters. Was plotting a
+       String[] rather than its elements.
+
+     - Add counters to the client index view showing the times for
+       each operation and also showing the times for querying the
+       metadata index to split an key[] operation or map a key-range
+       operation.  This will be help identify if/when the MDI is a
+       bottleneck for the client.
+
+     - On a long run I begin to see assertion failures in
+       com.bigdata.counters.History#859 ( assert size <= capacity :
+       "size=" + size; ).  The size appears to grow by one every
+       minute, causing assertion failures once it exceeds the buffer
+       capacity.  (The run may have been out of disk space by the time
+       these errors emerged.)
+
+     * It would be useful to have AND as well as OR semantics for
+       "filter=".
+
+     * Change the TITLE for the httpd counter view to the hostname and
+       the last component of the path, e.g.:
+
+	    hostname  ... serviceIFace ... lastComponent
+
+       Or use the last 60 characters of the path, etc.  The point is to
+       have titles that are somewhat easier to figure out.
+
+     * It could be useful to have a view by serviceIface rather than
+       host.  This could be assembled dynamically by a scan of the
+       services across the hosts.
+
+     - The IndexManager view of the LBS needs to aggregate some key
+       statistics by index across the index partitions including the #of
+       index entries on the data service and the time spent on the index
+       (perhaps broken down by IO, serialization, key search, etc., but
+       definately the aggregate time).  I am just not getting enough
+       information from this view and digging down makes it too
+       difficult to get the gestalt state of the indices without copying
+       a correlated view of the counters into Excel.
+
+     - Done. Review the per-service scores, but I really need to have
+       more than one service on a host for this.  It should probably be
+       using a response time measure, e.g., averageQueuingTime.
+
+     - Done (problem was timestamp parsing since only the time of day
+       was being reported, not the UTC time - it now uses the system
+       clock). Now I am not seeing any host CPU scores aggregated by the
+       load balancer.
+
+     - Done. The normalized [score] is not being computed for hosts or
+       services (it is always zero).
+
+     - ResourceManager's performance counters do not reveal
+       read-historical indices (or read-committed?), just those where
+       we write on the index.  This makes the index metadata
+       unavailable during read-only runs, such as the lubm benchmark.
+
+     - use the service name for the performance counter paths, however
+       this can be a problem if service names are modified over time or
+       simply not unique, so maybe make that an option?
+
+     - support performance counter collection, aggregation, httpd
+       service and periodic counter set logging for LTS, which means
+       for the Journal.
+
+     - Add by task reporting of performance counters (#of invocations,
+       time, and RMI latency if available).
+
+       Counters that aggregate across all instances of the same type of
+       task submitted by the client against some service.  There needs
+       to be some handshaking with the service that is executing the
+       task in order for this data to be collected.  E.g., in
+       beforeExecute() and afterExecute().  Those methods need to track
+       a subset of timing data by the Class of the task that is being
+       executed.  The resulting Map<Class,TaskCounters> needs to be
+       reported out by the client along with the rest of the counters
+       collected for that service (reported by the
+       QueueStatisticsTask).
+
+       private final Map<Class, TaskCounters> taskCountersByProc = new
+       HashMap<Class, TaskCounters>();
+      
+   - Admin UI
+   
+     - It would be nice to be able to drill down into the index data,
+       but that should be an admin UI not the counters UI.
+
+     - Expose the known triple stores, a view on the global sparse row
+       store, etc.
+
+     - Offer commands to force overflow of a data service.
+
+   - IndexSegment
+
+     - The read retention queue capacity should be adjusted for an
+       IndexSegment since the branching factor is typically larger
+       than for the corresponding BTree, so a buffer capacity of N
+       will in fact allow more index entries to be buffer and will
+       require more RAM.
+
+     - An index segment build that could operate without the actual #of
+       entries would avoid one pass over the data.  See how expensive
+       that traversal is (it is done in one location) and decide
+       whether it is worth trying to operate without that information
+       on hand.  Eg, by using the upper bound on the entry count and
+       then allowing leaves and nodes to underflow.
+
+     - Explore efficient branching factor sizes for the index
+       segments.  This will vary as a function of (a) the application
+       and query demands; and (b) the compression options in use for
+       the indices.
+
+   - DiskOnlyStrategy
+
+     - Evaluate effect of the write cache capacity.  If 1M is as good
+       as 10M then just use the DirectBufferPool for the write cache
+       for the live journal, which will simplify some things.
+
+     * Add counters reporting the #of bytes written/commit.
+
+     * Test suite for Temporary mode journals.
+
+   - DirectBufferPool
+
+   - Transaction support.
+
+     - Done. Read-historical and read-committed tasks need to hold a
+       read lock on the local resources in order to prevent their
+       being released if there is a concurrent commit followed by a
+       request to the StoreManager to purgeResources.  This problem
+       shows up when there is significant IO Wait for an operation,
+       e.g., a complete row scan on a scale-out index.
+
+     - Overhaul transaction processing and support full, 2-/3- phase
+       transactions
+
+     - A problem is reported by StressTestConcurrentTx.  Revisit this
+       when I overhaul the full transaction support.
+
+     - Transaction identifiers need to be "symbols" that respect the
+       timestamp ordering for historical reads and the transaction
+       start time.  Since the timestamps are discrete it is possible
+       that the factory will have to wait until it can assign a
+       transaction identifier for the interval implied by some desired
+       historical start time.
+
+     - Done. Change tx timestamps to negative and use positive
+       timestamps for historical reads.  Changes to AbstractTask, ITx,
+       ITransactionManager, StoreFileManager, IsolationEnum, and the
+       post-processing tasks.  This will greatly simplify thinking
+       about historical read operations since they will simply use the
+       actual commit time while transactions will use a free
+       (-timestamp) value selected by the transaction manager.
+
+     - ? Modify AbstractTask to interpret a read-committed request by
+       replacing the timestamp with the lastCommitTime as of the
+       moment when the task runs?  (This might break semantics for
+       some uses, including closure).
+
+     - Done. AbstractJournal#getIndex(String,long ) has different
+       semantics from IIndexStore#getIndex(String,long) (it only
+       accepts a positive commitTime vs the more generalized
+       timestamp, which can represent a transaction, an unisolated
+       request, a read-committed request, or a commitTime).  The root
+       of the issue is commitTime vs historical read, so fix this when
+       I address that issue.
+
+     - AbstractResourceManagerTask - documents a potential problem
+       with MDI updates without 2-phase commits.  Look into this
+       further and see if this problem can be addressed without using
+       a full transaction.  If not, then we will need to use a full
+       transaction to avoid this issue.
+
+  - Support hash partitioned indices.  The index would be marked in
+    the IndexMetadata as being hash partitioned, including the #of
+    index partitions (N) and a hash function (can be defaulted).  A
+    data service UUID is assigned to each index partition.  Write a
+    ClientHashPartitionedIndex (vs the ClientIndexView, which could be
+    renamed as KeyRangePartitionedIndex)
+
+    You specify that the index is hash partitioned when it is
+    registered via IndexMetadata.  The index is allocated on N logical
+    data services and those are recorded in the IndexMetadata for the
+    scale-out index on the MDS.  Since there are no key-ranges, no
+    data is stored on the MDS for that scale-out index other that its
+    IndexMetadata.  The choice of the logical data services may be
+    safely replicated since it is immutable.
+
+    The various index procedures need to be examined for compatibility.
+
+    Pipeline joins might not work.
+
+    Is it worth it?
+
+  - Iterator refactor
+
+     * Drive SLICE (offset as well as limit) through the IRangeQuery
+       API and the ITupleIterator implementations so that we can
+       efficiently process a slice without having to materialize the
+       elements that lie before the desired offset.
+       
+       This will also require changes to the AbstractAccessPath,
+       specifically it must drive both the offset and limit through to
+       the ITupleIterator.
+
+     * Change the striterator heirarchy into an implementation
+       heirarchy (StriteratorImpl) for co-varying generics and a use
+       hierarchy (IStriterator and Striterator) in which only the
+       element type is generic. This should be significantly easier to
+       use and understand.
+
+     - Modify the procedure logic to abstract a 'next key/val'
+       iterator using a shared buffer for de-compression in order to
+       minimize heap churn on the data server.
+
+     - Support copy in/out of keys and vals in lookup(), insert(),
+       remove(), and rangeIterator so that we can (a) be more
+       efficient in handling keys and vals by copying; (b) handle keys
+       and vals that are byte aligned or bit aligned in the node or
+       leaf; (c) reduce GC by converting to a compacting record for
+       the node/leaf; and (d) expose the version counter and deletion
+       marker for fused views of indices with isolation.
+
+     - Turn off sendVals for rangeIterators if we recognize the value
+       serialized as the NoDataSerializer?
+
+     - Write unit test for read-consistent semantics for key-range,
+       key-array, and rangeIterator (PartitionedRangeQueryIterator).
+       The test would perform concurrent writes and verify that those
+       writes were not visible to the operation.
+       
+       A stress test variant should also force concurrent overflow
+       operations and verify that the index is reading from a
+       read-consistent view of the metadata index and hence does not
+       see the locator updates.
+
+   - ScaleOutTripleStore
+
+     - ConcurrentDataLoader
+
+       - ? stagger the entrance of the first few tasks to help stagger
+         the nature of the their work.
+
+       - retry long running tasks (map/reduce style).  In fact, this
+         already happens because the ClientIndexView times out the
+         request to the data service which results in a
+         CancelledException and the task is marked as an error and
+         then retried.
+
+       - More cleanup.
+
+       - Reconcile with m/r architecture and bigdata repo.
+
+   - OverflowManager
+
+      - Could optionally convert from  a fully-buffered to a disk-only
+        store  in  order to  reduce  the  memory  footprint for  fully
+        buffered  stores,  but in  that  case  this conversion  should
+        happen once asynchronous overflow handling was complete.
+
+   - StoreManager / IndexManager
+
+      - Should recognize a "disk full" situation and shutdown the data
+        service cleanly.
+
+   - LockManager
+
+       - Use a WeakValueCache to purge unused resources.  The size of
+         its internal map from resource name to resource queue will
+         grow without bound on a data service as index partitions are
+         split and moved around.  There are notes on this issue in the
+         LockManager class.
+
+   - DiskOnlyStrategy
+   
+     - Done. Lazy creation of the backing file.
+
+     - Done (No performance change for small stores - I still need to
+       review the data for large stores.  Of interest, the write cache
+       on a large store is nearly never a hit when trying to read a
+       record - this suggests that a read cache will be of no
+       benefit).  An LRU read cache for records.
+
+       This could be a big win for the DiskOnlyStrategy.  Either make
+       this its own layer that can be interposed between the journal
+       and the DiskOnlyStrategy or add directly to the
+       DiskOnlyStrategy since a read cache is not required for the
+       fully buffered modes. Regardless, allow configuration of the
+       cache size.
+
+       Also, efficient nextLeaf could improve read performance by
+       reducing node reads.
+
+       Write through to the write cache and flush through to the disk.
+       On read, test the read cache.  If not found, read the write
+       cache, then the disk.  These are simple layering semantics.
+
+       Use an LRU with a capacity of ~5k records.  The records are
+       read-only so we do not need to worry about a canonicalizing
+       mapping.
+
+       The read cache is specific to a journal.  Each journal gets its
+       own read cache.  Historical journals might have a smaller read
+       cache capacity, or maybe 2k records is enough for any journal.
+       Experiment and find out.
+
+       (***) Look at the effect [host3] on readSecs, on the ratio of
+       readSecs to writeSecs, and on IOWait, especially as the size of
+       the journal grows.  If the LRU is not paying its way then
+       disable it by default.
+
+     - CounterSets
+
+       - Add counters designed to give insight into whether the write
+         cache tends to full up completely or only partly before the
+         next group command and the #of bytes that tend to be written.
+         What I want to understand is whether the cache is too large
+         and whether an asynchronous of the cache to the disk would be
+         a benefit.
+
+	 *** #bytes/commit (measured delta in offset from commit to
+              commit).
+
+	      Also, #flushes / commit - when ~ 1:1 the write cache is
+	      at least large enough.
+
+	 Note that writes which would exceed the remaining cache size
+         cause the existing cache to be flushed while writes that
+         exceed the cache capacity are written directly to the disk -
+         the cache itself is always dense in terms of the bytes
+         written on the address space.
+
+============================================================
+Full text index.
+
+   - Done. Full text indexing for KB.
+
+       - Done. Analyzers are not thread-safe.
+
+       - Make prefix match an optional feature (e.g., support exact
+         match queries).
+
+Write unit tests for search that verify prefix matching.
+
+brown:
+[43, 75, 69, 85, 67, 32, 127, -6,     : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+browns: 
+[43, 75, 69, 85, 67, 77, 32, 127, -7, : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+successor(brown):
+[43, 75, 69, 85, 68, 32, 127, -6,     : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+successor(brown\0):
+[43, 75, 69, 85, 68, 32, 127, -7,     : -128, 0, 0, 0, 0, 0, 0, 0, -128, 0, 0, 0]
+
+junit.framework.AssertionFailedError: cmp=1,
+a=[43, 75, 69, 85, 67, 32, 127, 250, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0],
+b=[43, 75, 69, 85, 67, 32, 127, 249, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0]
+
+
+Modify search so that prefix matching can be enabled or disabled on a
+per-query basis.
+
+       - Make the fieldId an optional feature.  It is not used by the
+         RDF DB.  Since we do not support suffix compression, that is
+         4 bytes of unused space for every single indexed term in each
+         literal.
+
+       - Do not re-index terms found in the forward index?  This is
+         definately faster but it lacks the robust guarentee of the
+         unisolated write pattern (all clients write on both all
+         indices to guarentee consistent index states).
+
+       - Make sure that we do not re-write an index entry if it
+         exists.
+
+       - Make sure that we are indexing terms with all possible
+         parallelism as it otherwise adds unwanted latency for the
+         single threaded data loader.
+
+       - Compare performance with lucene and mg4j on indexing and
+         search, at least for the RDF DB application.
+
+       - Try out an mg4j integration for an alternative text indexer
+         and search.
+
+       - Try with native JNI library.
+
+       - Try with the fieldId elided for the full text index (for the
+         KB).
+
+============================================================
+Replication
+
+Some notes on replication and failover for data services.
+
+When a physical data service fails the replication manager drops it
+from the set of failover services and begins an asynchronous process
+to bring the replication count for that logical data service up to the
+target value.
+
+The clients should get physical data service UUIDs from the
+replication manager, not this method. This method should be replaced
+by <code>getLogicalDataServiceUUID()</code>. Clients should discover
+the replication manager and use it to translate a logical data service
+UUID into one or more phsyical data service proxies.
+
+The replication manager should hold replication state for key-ranges
+of scale-out indices. A new scale-out index will be provisioned with a
+single key-range on the replication manager and a (configured) default
+replication factor.
+
+Data services should be placed into groups for management purposes.
+There should be a distinct group for the metadata services since their
+data should not be co-mingled with the regular data services.
+
+============================================================
+
+   - Done.  Either never retry an error task when the queue is likely
+     to be full or make the retry itself robust.  Otherwise the CDL
+     risks reporting fatal error for a task which could have been run
+     successfully.
+
+   - Done (uses a static pool). Provide option to pass in a write
+     cache buffer for a temporary store and use that buffer as the
+     in-memory store before it overflows onto the disk.
+
+   - Consider dropping the BasicRioLoader, PresortRioLoader, etc.  All
+     of the benefit is in the use of the StatementBuffer.  These
+     loaders just obscure the RIO mechanism and make them harder to
+     configure.
+
+     The DataLoader might be a utility class.
+
+     The ConcurrentDataLoader is certainly a useful utility class.
+
+   - Done.  Correctness testing for scale-out with index partition
+     split, move, and join.  See services/StressTestConcurrent. It can
+     be parameterized for this purpose.
+ 
+   - write performance test drivers and run on cluster.
+
+      - rdf concurrent query (rdf lubm is not designed to test with
+        concurrent loads).
+
+      - (****) Write script to allocate services to nodes.
+
+        - N data services; 1 MDS; 1 LBS; 1 TS, etc.
+
+	- The script needs to start the services on a LOCAL disk on
+          each machine (I am currently setup on NAS so that means the
+          DISK is REMOTE).  This means replicating the environment
+          onto the local host (at least the configuration) and then
+          starting the service.  The classpath could be resolved on
+          NAS or replicated onto the local host and resolve there. (I
+          just need to copy [policy.all,
+          bigdata-rdf/src/resources/logging/log4j.properties, and
+          bigdata-rdf/src/resources/config/standalone ->
+          .../src/resources/config/standalone {create the directory
+          path first}].  I could also copy the classpath resources,
+          but presumably they will be fetched quickly enough and
+          become stable - or maybe not?
+
+	- Support downloadable code in the configuration, including a
+          an optional security model.
+
+        - Make sure that yum-updatesd does not run on the servers.  It
+          absorbs an entire CPU for quite a while.
+
+	- Still an annoying problem with the service names as
+          displayed by the jini browser....  The problem is that we do
+          not have an httpd server fronting for the JARs and that the
+          CODEBASE is not being set.
+ 
+============================================================
+
+	Looks like virtuoso is running a clustered triple store!
+
+	http://virtuoso.openlinksw.com/wiki/main/Main/VOSArticleLUBMBenchmark
+
+	http://www.openlinksw.com/weblog/oerling/?id=1336
+
+	http://www.openlinksw.com/weblog/oerling/?id=1335
+
+	http://docs.openlinksw.com/virtuoso/clusterprogrammingsqlexmod.html
+
+============================================================
+
+    - Done. (There was a fence post when the releaseTime was less than
+      the first commit time for any journal.) Saw "no data for release
+      time" error.  Twice.  This will prevent overflow from succeeding
+      since it occurs during synchronous overflow.  I have changed the
+      configuration for the data services to set [minReleaseAge = 0],
+      which is probably more appropriate for this test, but this needs
+      to be debugged.
+
+    - Done. Get the basic overflow tests running.
+
+    - Done. ClientIndexView : retry count exceeded - need to report
+      the underlying cause(s)
+
+    - Done. (Added more detailed warnings and made robust to such
+      failures) Fence post for DefaultSplitHandler (#ntuples == 0)
+
+    - Done (DataService needed to notify() the LBS during startup).
+      Jini client is not reporting counters on either machine.  The
+      problem is the client configuration.
+
+    - Done. Dynamically refresh the httpd view for the data service to
+      make the counter set for the index manager live.
+
+	Done. Modify to report the counters retained by the
+	concurrency manager as they are longer lived.
+
+	Done. Report partition metadata for the view, including the
+	checkpoints for the index segments.
+
+	Done. Report stale locators.
+
+	*** I am not seeing StaleLocatorExceptions for read-committed
+            views, at least not in the counter set generated by the
+            concurrency manager.  Part of the problem is that the fast
+            overflow rate is making the views update very quickly.
+
+============================================================
+
+**** The group commit behavior when interrupted during shutdown needs
+     to be reviewed with respect to the recent changes to AbstractTask
+     and Name2Addr.
+
+ERROR: 397768 pool-1-thread-559   commitCounter=397 com.bigdata.resources.SplitIndexPartitionTask$AtomicUpdateSplitIndexPartitionTask [test_POS#18, test_POS#40, test_POS#41] 0 waitingOnCommit  com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:1102): Problem with commit? : java.lang.InterruptedException
+java.lang.InterruptedException
+	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:1878)
+	at com.bigdata.journal.WriteExecutorService.waitForRunningTasks(WriteExecutorService.java:1230)
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:1024)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:655)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:1638)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1546)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1437)
+
+
+============================================================
+
+This indicates passing an old locator that could not be found in the
+MDI.  I've modified the code to report back the old locator in the
+exception.
+
+Caused by: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:205)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:80)
+	at com.bigdata.service.MetadataService.splitIndexPartition(MetadataService.java:280)
+	at com.bigdata.resources.SplitIndexPartitionTask$AtomicUpdateSplitIndexPartitionTask.doTask(SplitIndexPartitionTask.java:805)
+	at com.bigdata.journal.AbstractTask$InnerWriteServiceCallable.call(AbstractTask.java:1829)
+	at com.bigdata.concurrent.LockManagerTask.call(LockManagerTask.java:325)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:1605)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1546)
+	... 6 more
+Caused by: java.lang.NullPointerException
+	at com.bigdata.mdi.PartitionLocator.equals(PartitionLocator.java:231)
+	at com.bigdata.service.MetadataService$SplitIndexPartitionTask.doTask(MetadataService.java:502)
+	... 10 more
+
+============================================================
+
+Observed once: clearly a timing issue.
+
+ERROR: 62 pool-1-thread-5         com.bigdata.resources.StoreManager$Startup.run(StoreManager.java:895): Problem during startup? : java.lang.IllegalStateException
+java.lang.IllegalStateException
+	at com.bigdata.resources.ResourceManager.getConcurrencyManager(ResourceManager.java:340)
+	at com.bigdata.resources.StoreManager$Startup.start(StoreManager.java:963)
+	at com.bigdata.resources.StoreManager$Startup.run(StoreManager.java:888)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:417)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:269)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:123)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:650)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:675)
+	at java.lang.Thread.run()V(Unknown Source)
+
+============================================================
+
+1. Run U10, U100 on host3.
+
+2. Write script and run U10, U100, U1000 on host{1,2,3}.
+
+   - Done. pidstat is reporting under /host/client/UUID not
+     /host/service/iface/UUID
+
+   - Done. sar/pidstat parsing problem.
+
+   - verify syslogd reporting and configure on host{2,3}.
+   
+     I need to look further into how the stuff gets logged by syslog
+     and what, if anything, needs to be configured for this to work.
+     This is only interesting to obtain a combined log of the services
+     - and primarily to obtained a combined log of their ERROR level
+     messages.
+
+   - Done. reduce log levels (review log4j config).
+
+   - Done. Reduced the branching factor default for the indices as it
+     was overflowing the maximum record size.
+
+   - document setup.
+
+   - **** jini class setup, httpd, and codebase property.
+   
+   - Done. The various server setups either all need to be copied into
+     appropriate locations on the host on which they will run or they
+     need to specify a dataDir that is local to the host on which they
+     will run, e.g., /var/bigdata/DataServer0
+
+   - Done. verify jini using nio.
+
+   - Startup should be event driven.
+
+      - The server startup for bigdata should be more event driven.
+        You should be able to discover jini itself and then any of the
+        services in any order.  some services clearly must wait for a
+        join (e.g., the client and the data service must wait for the
+        timestamp service) while others can come and go as they like
+        (if the load balancer is not there then things should run
+        anyway but centralized reporting will not work and index
+        partition moves will not happen).
+
+      - Done? Modify to have an observable event or callback that
+        assigns the service UUID and that indicates when the resource
+        manager is running and refactor the LDS and DS startup logic
+        to use that to configure the reporting of counters and an
+        optional httpd service (at least for the LDS). The relevant
+        Jini method is ServiceIDNotify().  For the moment I have
+        disabled the httpd for the LDS.
+
+   - Done. review jdk (1.6.0_03), sysstat (8.0.3) {version 7 on
+     host{1,2}, solved using rpm -U to update rather than install},
+     /etc/hosts, /etc/fstab{/NAS vs /nas}, jini (not really required
+     on all hosts since we are bundling the jars) for consistency.
+     also emacs install.
+
+   - Done. problem with multicast. solved using unicast to
+     host3. (multicast issue on the servers has since been resolved.)
+
+   - Run multiple clients as well as multiple servers specifying
+     nclients=3 and clientNum={0,1,2}
+
+   - (*) Ala log4j, use a set named property model for property
+     values.  This will let us warn people when the property value is
+     not defined.
+   
+LDS U10 13.6k
+
+JF host3 U10 7.7k
+
+JF host3 U10 startAll 6.7k
+
+====================
+jrockit:
+
+LDS U10 SIDS=true nthreads=10 bufferCapacity=100000 wrkstn : 6.6k
+
+LDS U10 SIDS=false nthreads=10 bufferCapacity=100000 wrkstn : 7.2k
+
+LDS U10 SIDS=false nthreads=10 bufferCapacity=100000 wrkstn 1G : 7.5k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=100000 wrkstn 1G : 8.4k
+
+LDS U10 SIDS=false nthreads=30 bufferCapacity=100000 wrkstn 1G : 7.8k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 wrkstn 1G : 8.6k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=100000 wrkstn 1G noText : 10.8k, 11.6k, 11.3k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 wrkstn 1G noText : 11.6k, 12.7k
+
+LDS U10 SIDS=false nthreads=30 bufferCapacity=200000 wrkstn 1G noText : 11.8k
+
+LDS U10 SIDS=false nthreads=40 bufferCapacity=200000 wrkstn 1G noText : 11.9k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=300000 wrkstn 1G noText : 12.0k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=400000 wrkstn 1G noText : 12.3k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=500000 wrkstn 1G noText : 12.7k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=300000 wrkstn 1G : 9.1k
+
+LDS U10 SIDS=false nthreads=30 bufferCapacity=1000 wrkstn : 4.5k
+
+jdk 1.6.0_03 -server
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 host3 2G noText : 14.5k, 14.4k
+
+LDS U10 SIDS=false nthreads=20 bufferCapacity=200000 host3 2G noText localData : 14.6k, 15.0k
+
+LDS U100 SIDS=false nthreads=20 bufferCapacity=200000 host3 2G noText localData : 16.4k
+	 Run saved as bigdata-rdf/host3-U100-LDS-countersfinal.xml (13M stmts, 3M terms)
+
+LDS U100 SIDS=false nthreads=20 bufferCapacity=200000 host2 2G noText localData : 16.2k
+
+LDS U1000 SIDS=false nthreads=20 bufferCapacity=200000 host2 2G noText localData : 11.4k
+    #terms=32,905,188; #stmts=133,613,894; rate=11412; 68G journal.
+    Run saved as: U1000-host2-countersfinal.xml
+
+    - Done. Add moving average w/ and w/o locks.  Perhaps there is a
+      queue but it is before the locks are obtained?
+
+      Done. Also add the commit wait time and commit service time
+      measures.
+
+    - The LockManager could report the queue size and queue waiting
+      time per resource.  This would let us know which resources are
+      the bottlenecks.
+
+    - Done. The LockManager could report the total #of waiting tasks,
+      which is not showing up anywhere right now.
+
+    - (*) Per-procedure/index/isolation counters {#submitted,
+      #completed, task service time (queue waiting times are always
+      shared by a queue but lock waiting times and task service times
+      can differ by task)}.
+
+(**) Note: Compare the performance for LDS against 16k tps with
+     [autoFlush=false] (before sids and before the text indexing).
+     Experiment more with buffer sizes, combining writes, etc.
+
+============================================================
+
+Main issues:
+
+============================================================
+
+(*) map/reduce processing.
+
+    (-) If the ConcurrentDataLoader was a map/reduce job then I could
+        start the whole thing by running a single master.  I would of
+        course have to have map and reduce services running on the
+        cluster.
+
+    (-) ...
+
+============================================================
+
+(*) Scale-out performance
+
+    - Estimate parameters for the scale-out model.
+
+      Note: Concurrency and throughput SHOULD NOT increase as indices
+      are broken down into index partitions on a single server since
+      we are CPU bound in the unisolated index tasks.  However, an
+      increase SHOULD be observed with or without index partition
+      splits (and with or without overflow) when running on more than
+      one host since we have more CPU resources.
+
+      Note: Caching by the disk controller, the OS, and the B+Tree
+      keep the IO costs quite low when the depth is small and the
+      B+Tree is CPU bound in that regiem.  The B+Tree does become IO
+      bound as the depth of the B+Tree increases.
+
+      Find the LDS baseline for U100.
+
+      Find the EF baseline w/ one data service and no overflow for
+      U100.
+
+      Find the EF baseline w/ two data services and no overflow for
+      U100.      
+
+      Find the intercept for a linear scale-out model using JF with
+      two data services (and hence RMI) on U100 w/o overflow.
+      
+      Find the slope of the linear scale-out using JF where one of
+      data services is located on a second machine, still w/o
+      overflow.
+
+      Done. (Multicast configuration issue was resolved.)  There is
+      still a problem with multicast which is preventing scale-out
+      runs.
+
+      Note: Ideally the client will also be distributed but that is
+      not critical to proving the point as the client is faster than a
+      single host can service.
+
+
+All runs:
+
+    -DtextIndex=true -DstatementIdentifiers=true -Xmx=2G -Dnthreads=20
+    -DbufferCapacity=200000
+
+    Note: EF runs use -DoverflowEnabled=false
+
+    Note: JF runs configure overflowEnabled=false in
+    bigdata.properties for DataService4 on host3.
+
+LDS-U100-host3-noText-noSids : 16784 (798910 ms (13m)) 13M stmts.
+
+LDS-U100-host3 : 16783
+
+EF-U100-host3-1DS-noOverflow: 12877
+
+EF-U100-host3-2DS-noOverflow: 11332
+
+JF-U100-host3-1DS-noOverflow: 8528
+
+JF-U100-host3-2DS-noOverflow: 
+
+JF-U100-host23-2DS-noOverflow: 
+
+	*** Why does EF run so much slower than LDS?  Is the overhead
+            the MDI?  The cost of setup for the client index
+            operations (ClientIndexView vs DataServiceIndex)?
+            Removing the existing journal files (try the EF runs with
+            the [test] directory pre-deleted)?
+
+      Retest all of the above on U1000 (requires use to use host1 or
+      host2 for the additional disk space).
+
+LDS-U1000-host2
+EF-U1000-host2-1DS-noOverflow
+EF-U1000-host2-2DS-noOverflow
+JF-U1000-host2-2DS-noOverflow
+JF-U1000-host12-2DS-noOverflow
+
+============================================================
+
+(*) Dynamic index partitioning
+
+    - What cost is associated with overflow processing?
+
+      Evaluate for:
+
+      (a) EF with one data service;
+
+EF-U100-host3-1DS-5M: 5965
+
+	Note: This used a 5M initial extent and 5M maximum extent.
+	There were 15 overflows in 46 minutes (a stress test run).
+	The initial and maximum extent were configured in the test
+	suite code.  Run was successful.  The only reported errors
+	were index partition split tasks that were still executing
+	when the run was terminated.
+
+EF-U100-host3-1DS: 5922 (this is not the final tally since the client
+		         died during shutdown).
+
+        w/ 200M initial extent and 200M maximum extent.
+
+	--------------------
+
+      (b) for JF with one data services with on one machine; 
+
+JF-U100-host3-1DS: 5543
+
+	Note: This run came close to using all RAM on the machine
+	80%).  The RAM was mostly going to the sole data service.  In
+	fact, the data service RSS was 2G, which is maxed out.
+
+	Note: Some overflow tasks were cancelled! (timeout).  
+
+	Several index partition split tasks began but all were
+	cancelled due to timeout.  I have increased the default
+	timeout and I will run again.  I have also added counters to
+	report failed and cancelled async overflow tasks.
+
+	* Once splits start, look for the overhead of the MDS (there
+          is still an MDS overhead since we need to find the locator
+          to decide that there are no splits)
+
+	* Look at the LBS host and service scores.
+
+	* Look for index _moves_.
+
+	* Network counters begin to become interesting.
+
+	--------------------
+
+      (c) for JF with two data services with on one machine; and
+
+JF-U100-host3-2DS:
+
+	--------------------
+      
+      (d) for JF with two data services on two machines.
+
+JF-U100-host23-2DS:  ******** RUNNING NOW *********
+
+	Note: I am only running a single client for this test.  The
+	client is on host3.  This should be Ok since we are data
+	service bound.  If the client can not keep up with the data
+	services on two machines then that's good news :-)
+
+	--------------------
+
+      Choose runs where we have the data w/o overflow from above.
+
+      Do at least one run with post-facto validation turned on.
+
+      Note: It is important to also save the service nohup.out files
+      since they show interesting data about the asynchronous index
+      partition overflow tasks and any errors reported by the service
+      during such tasks (those errors do not make it back to the
+      clients since the tasks are run by the services themselves).
+
+    --------------------
+
+    Note: It is best to run EF with one data service to test index
+    partitioning questions and JF to test marshalling, robustness, and
+    index move questions.
+
+    Running JF U100 on host3 right now to get some data on queue
+    behavior with dynamic index partitioning.  Some questions are:
+
+    - Are good decisions being made with regard to index partition
+      moves?
+
+    * Observe the metadata service response time and verify that it
+      does not become a bottleneck since the current implementation is
+      NOT caching.
+
+    * Verify that we use read-historical operations whenever possible
+      (e.g., for asynchronous overflow processing, joins, metadata
+      service reads, etc).
+
+    - Should report the #of tasks, action on each index, and the
+      duration of overflow processing for each event, but that event
+      oriented data does not fit well within the counters model.
+
+(*) Load-balancing
+
+    * Watch the load balancer and see how host utilization and service
+      response time change as the run progresses, for different #of
+      client threads, and as index splits occur, and as index moves
+      occur.
+
+    * Review the LBS host and service scores.  Can they predict host
+      and service load well enough to move index partitions around
+      without the host-based physical disk counters under linux?
+
+    - Try U10000 reading the data from NAS with 2 clients, 10 threads
+      each and 2 or 3 servers.  See if scale-out holds as we increase
+      the data size.  The point of comparison is the 1B run that we
+      did on server2 (single host, non-scale-out architecture,
+      non-concurrent load).
+
+    - Delay start of some data services, either on each host or on one
+      of the hosts and then see how the load changes once we start
+      additional data services (this could be expanded into a variety
+      of hardware add and hardware fail tests).
+
+============================================================
+- Scale-out scripts
+
+    - Script to collect nohups, config files, and counters in a
+      directory and tarball for post-mortem.
+
+ - TemporaryRawStore abuse.  
+      
+   * BigdataClient temporary raw store to cache information locally.
+     This should periodically be dropped as it can grow without bound.
+
+   * The StoreManager uses a temporary raw store for the indices it
+     maintains for the resources that is is managing.
+
+   * Each IndexSegmentBuild can use up to THREE distinct temporary
+     stores.  We can probably reduce this by writing the leaves
+     directly onto the output file and then we just need to buffer the
+     nodes (which is always less data) and the blocks (if used).
+
+ - Resource locators
+
+   - Tune the default LRU cache capacity for the resource locator.  It
+     is currently 10.  A larger value would be nice, but there needs
+     to be an time-based expire on the resources in the cache since
+     they will cause their indices to be held open.
+
+   - Configure and tune the access path cache capacity for the
+     SPORelation.  This has a strong effect on the locator cache for
+     the triple store.
+
+============================================================
+
+   - Monitor the [executorService] queue for {Journal, TemporaryStore}
+	 
+   - ScaleOutTripleStore {LDS, EDS, JDS}
+
+         Note: You CAN place indices onto specific data services
+         running on a set of machines and set [enableOverflow :=
+         false] such that the indices never become partitioned. In
+         that case you can have optimized joins for some relations on
+         one data service and for other relations on another data
+         service. E.g., locating the statement indices for the triple
+         store on one data service, the lexicon on another, and a repo
+         on a third. This will give very good performance for Query
+         and Truth Maintenance since the JOINs will be mostly
+         executing against live index objects.
+
+       - *** The LDS is running each round as a separate procedure
+         submitted to the concurrency manager.  Why not run all rounds
+         as a single procedure?
+
+	 Ah.  This was being done so that we could update the read
+	 behind point after (or before) each round of closure.
+	 However, we do NOT need to do that if we are using
+	 UnisolatedReadWriteIndex.
+
+	 If I go this way, then need to change AbstractRelation to use
+	 the UnisolatedReadWrite index in this case as well.  However,
+	 that could decrease performance if there are point tests
+	 since the locks would be requested per point test.
+
+	 *** Perhaps this could be an option to the AbstractTask?
+   	     I.e., whether or not the procedure itself will use
+   	     concurrent threads and therefore needs the unisolated
+   	     indices to be thread-safe.
+
+       - Modify TM to remove constraints on scaling imposed by the use
+         of fully buffered iterators to avoid concurrency problems.
+
+	 Consider the use of magic sets as an alternative to "fixing"
+	 justifications tracking for scale-out.
+
+============================================================
+SPARQL query evaluation and native rule engine optimizations:
+
+  - ** Sesame 2 TCK (integration tests).  This will give us confidence
+       that we are handling all of SPARQL with our native rule
+       execution layer.
+
+       (temp fix) You should add the following URL as a maven
+       repository to your maven settings.xml file:
+
+       http://repo.aduna-software.org/maven2/releases/
+
+  x. *** Native rules have several capabilities that are not being
+         exploited by the SAIL.
+
+       - Define custom operators corresponding to the native rule
+         constructs (step, rule, program, predicate, etc).
+
+       - Rewrite the tupleExpr into an equivalent tuplExpr that uses
+         our custom operators.
+
+       - Modify the execution (BigdataEvaluationStrategyImpl) to have
+         methods for our custom operators and to trap any non-standard
+         operators that we do not define.  The base class will provide
+         standard Sesame semantics for any operators that we do not
+         rewrite.
+      
+  x. Publish on statement level provenance and truth maintenance for
+     SPARQL end points.
+
+  x. Defer "named-graph" style quad store for now.
+
+  x. resolution of terms to term ids and visa versa using JOINs?
+     (batch resolution is done, but not by joins to the lexicon).
+
+  x. filters for various kinds of things, especially those that can be
+     computed directly from the bit markings on the term identifiers.
+
+  x. filters that require JOINs to the lexicon and ordered scans by
+     datatype literals.
+
+  x. LUBM Query 9 is an example where a JOIN can be eliminated given
+     the ontology. Given (?y ub:teacherOf ?z) we can infer (?z
+     rdf:type ub:Course) from the ontology.  Introduce such JOIN
+     eliminations into the query rewrite, maybe w/ the Sesame people
+     since it does not depend on anything in the bigdata layer.
+
+============================================================
+Snapshot release:
+
+  - web app for row store & how to
+
+  - how to for Sesame 2.
+
+  - publish current javadoc.
+
+  - Move the ant build to the bigdata module and also the startup kit
+    and its documentation.
+
+  - update with guide to service setup
+
+    http://bigdata.wiki.sourceforge.net/GettingStarted
+
+============================================================
+
+  - (defer) Optimize by assigning variables in a rule a positional
+    index and use a long[] for bindings for SPORelation self-joins.
+
+  - Write a unit test for the distinct term scan to verify that it can
+    correctly advance across index partition boundaries.  One way to
+    do this is by setting a very small split point and then loading a
+    known data set, computing its closure, and comparing it to ground
+    truth.
+
+  - performance testing for owl:sameAs processing at scale.
+
+============================================================
+
+x. GOM style "rows" for IRelation yeilding schema flexible JOINs.
+   Could even just use GOM for this, but I would also have to extend
+   JOINs to link vs attribute JOINs and make some decisions about
+   object state caching, invalidation and update (only applies if you
+   want an updatable view of the object).
+   
+   There is also a strong relationship to the solutions generated by
+   the rules, which are basically binding sets.
+
+x. Map/reduce harvest pipeline and info arch changes w/ MikeP towards
+   open sourcing the "web 3" framework.
+
+   *** FileVersionDeleter is not quite correct yet.  Make sure that we
+       have good tests for the fence posts on this one.
+
+   *** Block API support is not complete for scale-out.
+
+       - iterators need to be verified for passing through the
+         sourceIndex.
+
+       - block read needs to be verified, including the behavior
+         during synchronous overflow.
+
+       - block write needs to be tuned up.
+
+   *** Text indexer for the repo.
+
+       - define a schema property for the text index.  if the property
+         exists for a file then index the file when it is written
+         (only file at once, not block-based).
+
+       - perf test the text indexer.
+
+       * Handle "delete" from the full text index.  We need to do this
+         when a document is deleted whose indexText property was set.
+
+	 One solution is to filter the results by whether the document
+	 is still in the file metadata index.  That might not be too
+	 bad.
+
+       - consider alternative integration using mg4j and lucene for
+         text indexing.
+
+       * MetadataSchema#IndexText may be too blunt a device.  We may
+         want to specify a variety of metadata for the text indexer,
+         including the URI of the source document, the text index to
+         be used (there can be several, each corresponding to a
+         collection), tokenization preferences (local to the text
+         index I guess), etc.
+
+       - Focus on two CONOPS: incremental updates (crud) and map /
+         reduce style index builds (bulk write).   
+
+x. Resource lock manager
+
+   - This service is deprecated, but might be repurposed as a
+     distributed barrier and queue service.
+
+     Full transactions provide all of the benefits and, zookeeper, can
+     either guarentee no deadlock detection (when it is configured to
+     require that processes predeclare their locks) or it can support
+     2PL with deadlock detection (bigdata does not use the LockManager
+     in this manner, but it is supported).
+
+     The LockManager needs to be rewritten along a single-threaded
+     model in order to be used for non-local processes (it assumes
+     that a process is a Thread). hierarchal locks can be added, but
+     are not strictly necessary with a full transaction since we will
+     pre-declare the locks when the tx commits. bigdata and jini use
+     the java namespace pattern, while zookeeper uses the unix
+     filename pattern so we need to convert between them (which is not
+     possible in the case where the basename has an extension unless
+     the extension is mapped onto something besides ".", e.g., "_").
+
+     Modify the row store to support transactions and then we can
+     register scale-out indices and create relations and their
+     containers within a transaction.  This uses the natural database
+     mechanisms for locking (MVCC with predeclared locks for the tx
+     commit protocol).
+
+============================================================
+
+  - bigdata-sail/TestSearchQuery#test_restart() is failing?!?
+
+  * Re-compare performance of fast vs full and serial vs parallel
+    closure on a server platform and when the joins are using parallel
+    subquery evaluation.  How does this differ by platform and data
+    set?  What is a good default for the various configuration
+    variables?  What about [maxParallelSubqueries]?  Try an
+    'experiment' driver for an LUBM data set with a variety of
+    interesting conditions?
+
+  * We need a pattern for producing tasks that are run on either a
+    local executor service or (map/reduce) on a distributed executor
+    service.  The maximum concurrency imposed on the service by the
+    producer should be limited, at least for some producers.  Others
+    producers will just add tasks directly to the service, e.g., in
+    order to avoid livelock/deadlock conditions which might otherwise
+    arise.  The existing map/reduce system has something which does
+    this but it needs to be refactored for more general reuse.  Other
+    users include closure of a rule set and parallel subquery
+    evaluation for joins.
+    
+*** LUBM 50
+
+    - ant script to build and modify runlubm to execute on server.
+
+    - Query 9
+
+      - Appears to benefit from caching with a 3x speedup on the 2nd
+        presentation.  Is that caching of the lexicon lookups?
+
+    - Query 14
+
+      - Use a native long hash set from mg4j for Longs during lexicon
+        operations (might be worth 2-4%); but hard to get that since
+        we promote to Long for the LRUCache - unless fastutil has one
+        of those too? - no, don't see it there, but I could write it
+        of course.
+
+	In fact, the term cache does VERY poorly for query 14 - it
+	seems that nearly all terms are distinct so the term cache is
+	just overhead.
+
+	Also, 10/12ths of the cost of sorting is the comparison of the
+	term identifiers by indirection and sorting is 1/3 of the
+	total cost of the batch lookup of the term identifiers.
+
+   * Mutation count is busted.  
+
+     1. Modify flush() to either reset the counter or to accept a
+        boolean parameter to optionally reset the counter (if the
+        StatementBuffer is otherwise unhappy).
+
+     2. Modify RuleStats#add() to be transparent - it just rolls up
+        the mutation counter.
+
+     3. The per-round mutation delta should still be correct.
+
+   * Modify the sub-query joins to allocate their buffer based on the
+     expected cardinality of the largest sub-join.  This should wind
+     up being a lot smaller than 20k for most joins and will help to
+     reduce allocation that drives GC in the nursery.
+
+   ** reduce byte[] allocation for DoNotAddFilter. It is
+      single-threaded in use, other than the instance on the
+      InferenceEngine.  It could copy the key out of the KeyBuilder
+      into a per-instance buffer and avoid a lot of allocation!
+
+      This is an example of the general case where we would do better
+      to copy the key / key buffer on demand rather than eagerly.
+
+(14% 1879) com.bigdata.btree.keys.KeyBuilder.getKey [KeyBuilder.java:294]
+(98% 1850) com.bigdata.rdf.spo.SPOTupleSerializer.statement2Key [SPOTupleSerializer.java:341]
+(76% 1413) com.bigdata.rdf.axioms.BaseAxioms.isAxiom [BaseAxioms.java:354]
+(100% 1413) com.bigdata.rdf.rules.DoNotAddFilter.accept [DoNotAddFilter.java:117]
+(100% 1413) com.bigdata.rdf.rules.DoNotAddFilter.accept [DoNotAddFilter.java:1]
+
+** Concurrent programming and Java.
+
+   http://www.ibm.com/developerworks/forums/forum.jspa?forumID=176&start=0       
+
+============================================================
+
+Priority list:
+
+x. *** Get 1-2B scaling numbers on the DPP cluster for DaveL and post
+       at http://esw.w3.org/topic/LargeTripleStores.
+
+       * Running U8000 (1B) or U50000 (7B) will require either a
+         machine with a lot of (local preferred) disk or a larger
+         closure and more 
+
+       - Defer. Setup on Amazon E2C: http://aws.amazon.com/ec2/
+
+       * Setup on clusterondemand: http://www.clusterondemand.com/
+
+       - RDFS++ closure for LUBM on cluster and collect LUBM benchmark
+         results, perhaps without queries 8 and 9 since those may take
+         a very long time to evaluate.
+           
+	   - Done. Requires join optimizations (for JDS closure and
+             query).
+
+	   - Without overflow processing the triple store will take up
+             more space due to the WORM nature of the store.
+
+      - EDS/JDS - Support an option to constrain the placement of the
+        SPO indices onto a specific data service and run with (much
+        of) the same efficiency as the LTS or LDS.  Overflow can be
+        allowed for this condition IF index partition MOVEs are
+        disabled.
+
+      - The LDS should be able to run the entire closure program as a
+	single task on the concurrency manager -- refactor until it
+	does!
+
+       - Do again with dynamic partitioning and load balancing and
+         then run the LUBM benchmarks.
+
+   - Modify SerializerUtil to optionally collect a histogram of
+     serialization size/time by class.  That will be useful for
+     examining JDS costs attributable to Serialization.  Tune
+     serialization for elements materialized by high-level query (it
+     is using java default serialization). (extSer already has a
+     profiler but it does not handle object graph uniquification yet).
+
+   - Add custom serialization for the IAsynchronousIterator via
+     IJoinNexus and RemoteChunkIterator.  extser would actually work
+     here just fine since we can in effect send along the dictionary.
+     so would gom style data records.  however, we should also
+     eliminate common values -- there will be a LOT of duplicate of
+     values in binding sets.  In fact, since Java default
+     serialization uniquifies an object graph and since we do not
+     clone the constants, just the binding sets, it might do pretty
+     well.
+
+	    unit tests for RemoteChunk (de-)serialization - these
+	    exist, right?
+
+	    unit tests for ISolution (de-)serialization and efficient
+	    impls.
+
+   - A scale-out system may well choose to disable the (x type
+     resource) expander, or at least the all unbound variant.
+
+   - LTS on U8000 using NAS (only the 10m load rate intervals will be
+     reported) and then get LUBM benchmark results.
+
+   - LDS on U8000 using NAS (gives us the post-mortem analysis) and
+     then get LUBM benchmark results.
+
+   - Test w/ Sesame 2 custom lubm benchmarking extensions - look for
+     other places where we can boost performance.
+
+============================================================
+
+Reduce GC drivers for U1000
+
+  * Reduce byte[] allocation, which is one of the main drivers of the
+    heap and hence of time lost to GC.
+
+    Create an abstraction for a buffer containing ordered (byte[] key,
+    byte[] val) tuples that is in fact backed by a direct buffer
+    allocated from our DirectBufferPool.  The KeyBuilder will write
+    onto the buffer, rather than allocating a byte[] for each key.
+    Likewise, a DataOutputBuffer can be (re-)used and the data copied
+    onto the direct buffer for each byte[] value written. When writing
+    on the buffer would cause an overflow, trigger the desired
+    operation (batch lookup, batch insert, etc) for just those data in
+    the buffer.  The operation should use a socket to blast across the
+    nio buffer to the server (just like the block API) and transfer
+    the other parameters via RMI.  The server should allocate a direct
+    buffer from the pool to receive the data and apply the operation
+    to those data.
+
+      We should be able to apply leading key compression as part of
+      this abstraction as the data are being written on the buffer.
+
+      Applying dictionary based or other compression techniques is
+      more tricky -- there is an impedence mismatch there that I still
+      have not resolved to my satisifaction.
+
+      Modify the batch operation implementations to use the direct
+      buffer, possibly with one DataOutputBuffer for the key and
+      another for the value to minimize allocation when, for example,
+      we are just doing lookups (or conditional inserts coded as
+      lookup + insert).  On insert, we need to copy the key and value
+      into the leaf.
+
+      There should be some abstraction, perhaps parallel to
+      CharSequence such as ByteSequence, which allows us to operate on
+      byte[] data or on a slide of a byte[] or on a slice of a direct
+      buffer.  This would allow us to keep the BTree API for insert,
+      lookup, contains and delete simple while increasing the
+      flexibility such that we can avoid allocation when copying keys
+      into the BTree.
+
+    - Done. Immutable B+Tree nodes are being converted to normal nodes
+      on de-serialization.  This is a historical artifact and
+      immutable nodes should be scrapped.
+
+    - Reduce key search costs.  Search is a significant part of the
+      costs for the BTree during query.
+
+      - Operate with the keys in their compressed state, e.g., using
+        hu-tucker or prefix coding.
+
+      - (***) 27% of the MutableKeyBuffer search cost is figuring out
+        the prefix length so that we can then perform the search on
+        the remainder of the key against the remainder of the keys in
+        the node or leaf.
+
+      - (***) Try tracking the prefix length. It is only changed when
+        we add or remove the first or last key in the buffer.  Since
+        mutation is single threaded, it can be computed in the ctor
+        and then updated each time we add or remove the first/last key
+        in the buffer.
+
+	Note: at present the node/leaf logic directly manipulates the
+	keys.  That will have to be changed to track the prefix
+	length.
+
+    - The node and leaf need a GOM like data structure to minimize
+      allocation where they are compacted and/or reallocated only as
+      required.
+
+    - Try out a java-specific profiler:
+
+      http://www.yourkit.com/
+
+  - Size chunks by expected end result cardinality for subqueries
+    (this is a bit difficult to get right).
+
+  - Disable the GC overhead limit.
+
+  - Tune GC parameters.
+
+  - Optimize JOINs when SPORelation is locked onto a data service.
+
+  - Setup the other servers and try 2-server runs on U100 and U1000.
+    Look for throughput multipler for data load even if closure is not
+    optimized.
+
+  - Test advisory locks on NFS mount.
+
+============================================================
+
+* Did not handle disk full gracefully. Force client disconnect?
+
+* WorkAddressManager's packAddr() and unpackAddr(), the
+  IAddressSerializer impls, Name2Addr.Entry's serializer, and
+  CommitRecordSerializer need to be reconciled and tested out at scale
+  for packed addresses.  Also, review the code for anything else that
+  might write out store addresses.    
+
+============================================================
+
+- Seeing "Ignoring sample WAY out of timestamp order" messages in the
+  load balancer log.  This is probably a parsing / format error for
+  the sysstat package.
+
+- bigdata-rdf/embedded federation test suite has errors.  Mostly can't
+  find 'testXX' lexicon.  This appears to be a test harness issue or
+  perhaps an issue with how AbstractTripleStore#destroy() is
+  written. The problem shows up during tear down of the test.  The
+  problem does not show up for the LDS, just EDS.
+
+============================================================
+Benchmarks
+
+*** Get a SYSTAP (~100 documents) and NGA benchmark (~1000+) data set
+    and queries from MikeP.  Add to the lubm test harness in CVS.  Add
+    delete test for (a) delete specific entities; and (b) delete
+    specific documents.
+    
+    - delete entity is an ELM command so I really need the generated
+      delete sets or I need to capture the code for that command and
+      run it and then run the delete.
+
+*** Annotator as first class KB citizen.
+
+  - Map/reduce processing:
+
+    * Parallel KB load (CDL refactor).  Allows easy distribution of
+      the load tasks across a federation.  Alternatively, consider as
+      a proper map/reduce job, but they we have to run all kinds of
+      services everywhere.
+
+    - harvest and extractor.
+
+*** Global "do not extract" and mention level false positive handling,
+    plus dropping data structures no longer required in the content
+    repository.
+
+  - Defer. Content repository change over (must handle splits for
+    sparse row store and content repo, plus text index for content
+    repo).
+
+  - TruthMaintenance performance should be optimized and re-vetted.
+
+    - Remove use of deprecated classes.
+
+    - Use ordered reads and writes for operations on the temporary
+      stores.
+
+    - Ordered operations for statements identifiers.
+
+    - Replace the use of fully buffered iterators with incremental
+      chunked iterators.
+
+    - Handling TM at scale is its own issue and might be best solved
+      using: (a) a magic sets integration; and (b) periodic map/reduce
+      style updates with closure.  (Or database at once closure on a
+      new data set, which is similar to how scale-out text indices are
+      built.)
+
+    - Test w/ incremental load data set, e.g., LUBM, or other with
+      owl:sameAs also.
+
+    * Review performance for sameAs processing during query.  Note
+      that transitive for owl:same1b was moved to forward closure.
+      Test with the old classes and owl:sameAs1b backward vs the new
+      rule-based expander and the owl:sameAs1b forward.
+
+      MikeP reports (11/18/08) that TM for owl:sameAs entailments is
+      not working correctly with forward closure of properties turned
+      on.  "Luckily it seems to work with properties being
+      backchained, so I’m not going to dig into it further right now,
+      too busy."
+
+    - Defer. tune up justifications.
+
+    * Fix TruthMaintenance#applyExistingStatements() - should use bulk
+      filter not point tests!
+
+============================================================ 
+
+    - A run with TERM2ID on NAS is taking a MAJOR IOWAIT penalty - up
+      to 20% in the 1st hour.  I am going to restart and see how the
+      indices are distributed and what impact that has.
+
+      With a constrained run and TERM2ID on dp-aether1 I am still
+      seeing a major IOWAIT penalty.  If we were to key-range
+      partition this index then we could distribute that cost across
+      all of the hardware rather than centralizing it on a single
+      machine.
+
+    - Try a performance curve for a single-host run.
+
+    - (***) Average task queuing time for the client may be
+      under-reported due to the rejected tasks.  If those rejected
+      tasks are being reported with their execution time, which will
+      be extremely short, then they can make it essentially impossible
+      to see the time that the tasks that are running are actually
+      running.  In order to diagnose this I need to figure out whether
+      the rejected tasks are being reported by the queue statistics.
+      if so, then they may even have zero latency which would really
+      skew the results.
+
+============================================================
+
+- post-process tasks should run on the concurrency manager thread
+  pools and there should be histogram reporting for that thread pool
+  as well as for the client thread pools.  If the task is an
+  AbstractTask then we need to report the breakdown by the concrete
+  class, but relly that is always the case.
+
+============================================================
+Sesame extended LUBM benchmark:
+
+The instructions for using the benchmark are straight forward
+Check out
+http://repo.aduna-software.org/svn/org.openrdf/benchmark/trunk/
+
+Run "ant package", you need java, ant, and mvn (or mvn.bat) on command
+line.
+
+Create a file like this:
+http://repo.aduna-software.org/svn/org.openrdf/benchmark/trunk/sesame/src/main/java/org/openrdf/benchmark/factories/NativeStoreFactory.java
+
+List the class name in a file with this path:
+META-INF/services/org.openrdf.benchmark.repository.RepositoryFactory
+
+Then look at the .bat/.sh files in the zip file created by the ant task
+to see how to run the benchmark and report tool.
+
+If you need more help I am also available on irc freenode#sesame
+
+James
+
+Bryan,
+
+Here is a benchmark branch that does not depend on Mulgara and includes
+a compatible version of Sesame for Bigdata. I am not seeing the same
+performance in OCT_2_2008 as I did in the June snapshot using the BSBM
+benchmark. When you get a chance please share with me the appropriate
+configuration properties.
+
+http://repo.aduna-software.org/svn/org.openrdf/benchmark/branches/0.2/
+
+James
+
+I am not interested in testing truth maintenance or any type of
+inferencing, I only stumbled on that option because it was on by default
+and because it was preventing the benchmark from completing. So, to
+answer you question: queries are slower with the new version.
+
+> What is the BSBM benchmark?  Can you send me the results that you were
+> getting and that you are seeing now as a basis for comparison?
+> 
+BSBM = http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/spec/
+
+The results, I saw was about 7s vs 70s on an iteration. I was using the
+option "truthMaintenance" set to false. Is this still applicable in the
+new version?
+
+============================================================
+Logging
+
+  - Global search and replace changing DEBUG (and log.debug) to TRACE
+
+  - Global search and replace changing INFO (and log.info) to DEBUG
+
+  - Review WARN logging for instances that could be INFO.
+
+  - Remove code in com.bigdata.Banner that defaults the log level.
+
+============================================================
+Performance tuning
+
+  - I am not seeing all of the elapsed time reported for the closure,
+    at least for the data service variants. Maybe it is the flush
+    buffer time that is missing?  (The time spent writing on the
+    indices after the rule has run and before the next rule in a
+    sequence can be executed?)
+
+  * Finish the TestDefaultResourceLocator
+
+** There is a lot of reading on the globalRowStore.  This is all
+   related to locating the TripleStore resource and its contained
+   SPORelation and LexiconRelations.
+
+  (a) We do not read against the appropriate (historical) view of the
+      global row store.  We need to obtain that view from the
+      federation, which can only return the current view.
+
+  (b) We do not cache recently read property sets for historical reads
+      (because we are always doing read-committed property set reads).
+
+  (c) We should read the properties sets for the container
+      (tripleStore) and all contained resources (lexicon, text index,
+      and spo relation) from the property store using a single
+      operation.  Use a logical row scan to build up the property set
+      for these resources in one go and then return the appropriate
+      layered Properties object on request.  (We need to layer the
+      property sets so that you can override properties on a contained
+      resource, but in fact the contained resources that we are using
+      always have exactly the same property set as their container,
+      which is a bit of redundency that we don't really need.)
+
+  (d) Defer. We should recognize unknown properties, much like log4j.
+
+** LUBM 2,4,10, and 12 are not using a lot of CPU.  What's wrong with
+   this picture?  (This appears to be the same problem for LTS and
+   JDS.)
+
+   - Look into a lock-free ring buffer impl derived from
+     HardReferenceQueue for use with the ConcurrentWeakValueCache.
+
+   - maxParallel should be counted against the then current thread
+     pool size (expensive since requires enumeration of workers) or
+     against a counter maintained by the rule or the thread
+     pool. subqueries should be parallelized if the #of queries would
+     not exceed max parallel.
+
+   - Optimize the chunkCapacity for the synchronized solution buffer
+     based on the data.  Note that we have both chunks and chunks of
+     chunks for query, where the chunks are the unsynchronized
+     solution buffers and the chunks of chunks are the
+     BlockingBuffers.
+
+   - Report the joinCardinality in the RuleStats (cache and expose it
+     in EvaluationPlan2).
+
+   - Optimize the chunkCapacity for the unsynchronized solution buffer
+     based on the data.
+
+     - The buffer is used for all solutions generated within the same
+       thread, so once we decide to run in the caller's thread it is
+       locked to whatever the max cardinality is for the remaining
+       subqueries.
+
+       If we will run the task on the thread pool then the chunk
+       capacity should still be the max cardinality of the remaining
+       subqueries.
+
+       The chunkCapacity for a fully bound pattern is known to be one.
+
+       The chunkCapacity for the iterator any given asBound join is
+       the range count for the subjoin iterator.
+
+  - Modify ClientIndexView to use the ExecutionHelper.
+
+  - Modify AbstractStepTask to use the ExecutionHelper.
+
+============================================================
+
+- MikeP
+
+  - Access to the computed and cached join cardinality values.
+
+============================================================
+Query execution hints
+
+Hi Bryan,
+
+I looked at some of the methods used by rdbms's. Oracle and MySQL can
+use hints that are specified in a special form of comments. The main
+advantage is that it allows a query to be spec compliant even when such
+hints are included. MS SQL Server uses OPTION clauses that are more
+readable, but clearly break query portability.
+
+Some references:
+http://www.dba-oracle.com/art_otn_cbo_p7.htm
+http://www.petefreitag.com/item/613.cfm
+http://technet.microsoft.com/en-us/library/ms190322.aspx
+
+For the query syntax, I'd prefer the comments approach taken by Oracle
+and Mysql. The hints could then be included in the query algebra, or be
+supplied to Sail.evaluate() as a seperate map of key-value pairs.
+
+Comments?
+
+Arjohn
+
+============================================================
+OVERFLOW
+
+- Write overflow tests for the sparse row store since our relation
+  declarations are stored there.
+
+============================================================
+JOIN optimizations:
+
+- Test scale-out query.  (a) done. Closure correctness for pipeline
+  and nested subquery joins (might be Ok now that subquery elimination
+  is correct); (b) done. test on simple data set (U5/EDS) and verify
+  that join tasks are created and terminate correctly; (c) done. test
+  on U5/JDS and work through kinks for proxies; (d) Load data set on
+  cluster; (e) done. test pipeline query w/o type resource expander;
+  and (f) work through correctness when index partition splits are
+  enabled (fanIn GT ONE).
+
+  Note that the best performance for the pipeline join will occur when
+  the indices and their index partitions are scattered over a cluster.
+  For example, if the statement indices are all on a single machine
+  then you only have the resources of that one machine for SPORelation
+  self-joins.  But if those indices are on 3 machines then all 3 will
+  be working the JOIN.
+
+- Full text search queries with SLICE are slow, but the full text
+  index itself is fast.  The problem is that we overgenerate solutions
+  before Sesame can close the iterator so we do too much work.  The
+  solution is to rewrite the Sesame query before evaluation so that we
+  can optimize SLICE by using native JOINs.
+
+- Lexicon resolution is slow (LUBM Q6 and Q14).
+
+- Scattered disk reads?
+
+    DiskOnlyStrategy#read() is fully synchronized during a read on the
+    cache and the FileChannel.  This limits the ability of the OS and
+    disk to schedule IOs more efficiently.
+
+    - Try removing synchronization and seeing how it impacts cold
+      query performance.
+
+      Note that corruptions have been observed with synchronization
+      removed so it might need to stay in.
+
+      Note that FileChannel may well be atomic for read/write (I
+      believe that it is) so removing synchronization might not help
+      where as scatter/gather might since it is a single request, but
+      a more complex request and one that can be more readily
+      optimized by the OS and the disk controller.
+
+      On cold pipeline join for U50 Q9 I see 74 kbytes/s read, disk
+      queue length=.9, reads/s=156.  What is the best that the disk
+      can do?
+
+      Hitachi Travelstar 7K100; 100 GB capacity; 7200 RPM spindle
+      speed; 50 GB/platter; 10.0 millisecond seek time; 8-megabyte
+      buffer.  Tested: average random read time is 10.7 with
+      rotational latency of 4.2ms; seqential read rate is 28-53mbs;
+      400-500 IO/s; [http://www.storagereview.com/2005notebook.sr] and
+      [http://www.hitachigst.com/hdd/support/7k100/7k100.htm]
+
+    - Try queuing up a set of reads and scatter/gather them.  This
+      would be similar to the BlockingBuffer.  Requests would be put
+      into a queue and the queue drained atomically by a read
+      operation.  The read would allocate the buffers for each read
+      request and would issue a scatter/gather request with those
+      buffers.  
+  
+- JoinMaster
+
+    - Handle SLICE at the query buffer.
+
+    - Verify correct handling for OPTIONALs.
+
+    - Consider whether it is possible to reduce the costs associated
+      with a SLICE, which is forced to interrupt() the join tasks.
+      For example, we could modify the JoinTaskFactoryTask to return a
+      proxy for the JoinTask rather than its Future we are able to
+      close() the JoinTask without having to interrupt it.  However,
+      note that IO operations will not be interrupted by an
+      application level protocol, just be interrupt() so this might
+      not be a win.
+
+    - Modify owl:sameAs expansion to be a rule rewrite so it can be
+      distributed just like any other rule.  Each {@link IPredicate}
+      is expanded into 3 predicates with the appropriate anonymous
+      variables since otherwise we will be in a position where the
+      index partition for the stated predicate is local but the index
+      partitions for the owl:sameAs expansion are distributed.
+
+    - Free text search should probably be a foreign key join, but the
+      key needs to be tokenized by the search engine and it then runs
+      the per-keyword searches in parallel against the distributed
+      indices. Its really quite a challenge to do this where the
+      search terms become bound in a join and then applied.
+
+    - Lexicon lookups should be foreign key joins.
+
+    - Revisit handling of (foo type resource) expansion.  The
+      expansion needs to be done at the query buffer level since it
+      requires access to the scale-out index view, not the local index
+      partition.  Note that there will also be an interaction with
+      SLICE.
+
+- NestedSubqueryJoin
+
+    - Modify ProgramTask so that LDS runs the entire program on the
+      data service (may be only a marginal improvement).
+  
+    - Modify so that maxParallelSubqueries is applied per join
+      dimension.  This change would be comparable to how the pipeline
+      join operates.  See if that improves throughput on LUBM and
+      EOSSYS.
+
+  - 1/2 of the cost of query evaluation (for fast queries) right now
+    appears to be converting Sesame Values to BigdataValues.  The cost
+    is mostly resolving the lexicon using the sparse row store.  This
+    could be addressed by some of the issues that I have noted before
+    concerning the resource locator, most notably using a logical row
+    scan to recover all property values for the resources in the
+    tripleStore container.
+
+    Query performance for test harnesses such as LUBM would be better
+    if we obtain the Sail for the [lastCommitTime] directly rather
+    than for the UNISOLATED view first.  That would move the cost of
+    resolving those resources outside of the timed issueQuery() call.
+
+  * Make sure that we have unit tests which cover both nested subquery
+    and pipeline joins for all deployments (LTS, LDS, EDS, JDS) for
+    (closure vs query) and (full text search, optionals) and any other
+    rule features that need testing (DISTINCT, ORDER BY, SLICE, etc).
+
+    - Native rule ORDER_BY support (custom IKeyBuilderFactory).
+      Verify that a descending sort order is accomplished by the
+      bit-wise negation of a field in the key - is this also true for
+      Unicode sort keys?
+
+- Pipeline join text search (LTS,EDS).
+
+  - EDS/JDS: If the predicate defines an IExpander then DO NOT map the
+    predicate.  Instead, use getTailAccessPath() and evaluate the
+    expander in process.  This will force it to use the scale-out
+    index (IClientIndexView) if the expander touches the index.
+
+    There can be more than one bns#search predicate, but they will all
+    be ordered first by the evaluation plan.  This means that the
+    DistributedJoinMaster needs to consume predicates until it finds
+    the first predicate that does NOT use an expander and then map
+    that predicate across the index partitions.
+
+- try vtune 9.1 on java 6.  does this work?  If not then try a
+  different profiler since we have to switch to java 6 for
+  ExecutorService API changes and problems with 1.5 compilers.
+
+============================================================
+Bloom filter
+
+- BTree counters do not reflect Bloom filter.  They need to have the
+  bloom filter counters added when the bloom filter is read from the
+  store and its reference set (and when a new bloom filter is created
+  for a new root leaf).  Verify by examining the counters for BTree
+  and IndexSegment.
+
+- Write unit tests when there is a complex view (a BTree plus one or
+  more index segments).
+
+- Write unit tests when there are multiple index partitions.
+
+- We do not need a bloom for an empty btree until there is an insert.
+  Since the btree is empty we KNOW that the key will be "not found".
+
+============================================================ 
+
+OwlSameAs via rule rewrites using anonymous variables so that the
+costs show up in the rule execution and so that we can use it for
+scale-out.
+
+Mike wrote: I am headed out in a sec, but all I would be doing is
+cutting and pasting from OwlSameAsPropertiesExpandingIterator anyway,
+so take a look in there.
+
+There are four access paths that I rewrite into three tail rules: 
+
+(s ? ?) & (s, p, o) -> accessSP 
+(? ? o) & (?, p, o) -> accessPO 
+(? ? ?) & (?, p, ?) -> accessP 
+(s ? o) & (s, p, o) -> accessSPO 
+
+It works this way because you cannot use owl:sameAs for a property, so p is never the sameAs anything. 
+
+Basically you are taking a cross product of: 
+
+s1 = {s, ? sameAs s} 
+o1 = {o, ? sameAs o} 
+{s1, p, o1} 
+
+It just does it ever so slightly differently for the four cases depending on what is bound, but that is the gist of all of them.
+
+--M 
+============================================================
+Executor services
+
+  - Replace DataService#submit() with a method taking a RunnableFuture
+    and including an interface for collecting queue statistics.  The
+    statistics are important as they allow us to readily measure load
+    on the various work queues.
+
+    AbstractTask should probably become hidden as part of this with an
+    interface exposed for tasks that require access to specific
+    resources, namely, indices on the live journal.
+
+  - Refactor the limited parallelism service to use a proxied
+    RunnableFuture for map/reduce, CDL, pipeline joins, etc.
+
+  - API for submitting abstract tasks is not generic.  I get compiler
+    complaints when I make it generic.
+
+  - IIndexProcedure should be generic (return type only at this
+    point).
+
+  - Zookeeper may be an alternative way to approach a distributed
+    executor service.
+
+============================================================
+CLOSURE CORRECTNESS
+
+x. write unit tests
+
+   - Write unit tests for access to the global row store and bigdata
+     file system from read-only tasks running on the concurrency
+     manager.  This can be expected to fail right now since it appears
+     to see the commitTime as a transaction identifier rather than a
+     commitTime.
+
+   - Write unit tests for access to the global row store and bigdata
+     file system from unisolated tasks running on the concurrency
+     manager.
+
+   - Correct aggregation of mutation counts by ProgramTask and friends
+     for nested and pipeline joins [see notes above on this issue].
+
+============================================================
+Conferences and papers:
+
+Semtech (submitted)
+     
+     http://www.semantic-conference.com/2009/cfptopics/.
+
+     June 14-18, 2009 at the Fairmont Hotel in San Jose, California.
+
+- Semantic Community - Semantic Exchange Workshop, Tuesday, February
+  17, 2009
+
+  You are cordially invited to be attend a one-day conference /
+  workshop in Washington, DC on February 17, 2009, that will be hosted
+  by Computer Science Corporation at their Executive Briefing
+  Center. Please see the agenda at
+  http://semanticommunity.wik.is/Semantic_Community-Semantic_Exchange_February_17%2c_2009
+  and register by providing the following in an email: Name,
+  Organization, Address, Phone Number, and In-person or Remote
+  Attendance to niemann.brand@epa.gov.
+
+  ----------------------------------------
+
+  With a new administration being installed in January, the goal of this
+  conference is to envision changes coming to next stage web-based systems
+  in government, and to map the role of Web 2.0 and Web 3.0 semantic
+  technologies in the evolution of government information systems from
+  e-gov (silos with web front ends) to connected governance (e.g.
+  distributed social computing environments for collaborative work,
+  information sharing, knowledge management, and decision-making.)
+
+  Our keynote session will highlight recent findings, conclusions and
+  recommendations from a recent United Nation's study that examined the
+  current state and direction of evolution of e-government world-wide. It
+  will also feature "running your organization on semantics" by the Dutch
+  government.
+
+  The keynotes will be followed by an overview presentation by Brand
+  Niemann and Mills Davis which will envision the role of Web 2.0 and Web
+  3.0 semantic technologies in next stage government social computing
+  environments for serious collaboration. This presentation will present
+  an overall model, with illustrations, and will reference unique
+  capabilities that each of our panelists brings to next--generation
+  solutions.
+
+  Following the overview, we convene the panel where panelists offer a
+  brief position statement about the capabilities they provide and the
+  value their commercial solutions bring. However, the goal of the panel
+  discussion will be to talk about how the capabilities of different
+  panelists might be combined to further enhance the value to government,
+  business, and citizenry.
+
+  After lunch, the conference will feature demos. Each panelist will have
+  the opportunity (about 15 minutes) to present.  A topic we would like
+  them to feature would be what sort of free trial or quickstart package
+  (s) they offer that government agencies can access to learn more or get
+  started.
+
+  The conference call to action will be to ask government agencies and
+  system integrators present to do pilot projects that integrate their
+  capabilities into next generation environments for collaborative work,
+  information sharing, and knowledge management, and connected governance.
+
+
+Java ONE
+
+     Missed deadline (10 Dec), but maybe....[followup on Jan3rd]
+
+     - http://java.sun.com/javaone/
+     - http://www28.cplan.com/cfp_prod/CFPLogin.jsp?wId=69MQ81 
+     - http://blogs.sun.com/bblfish/entry/javaone_2009_call_for_papers
+     - http://blogs.sun.com/bblfish/entry/three_semantic_web_talks_at
+     - http://bblfish.net/
+
+European Semantic Web Conference (ESWC2009) 
+
+	http://www.eswc2009.org/
+	http://www.eswc2009.org/calls
+
+	31 May - 4 June 2009, Heraklion, Greece
+	
+	Note: Missed the abstract date.  Do they have a late breaking
+	track? 
+
+**** VLDB
+
+     When: Aug 24, 2009 - Aug 28, 2009  
+     Where: Lyon, France  
+     Abstract Due Date: Mar 13, 2009 
+     Submission Deadline: Mar 20, 2009 
+     Notification Date: May 29, 2009 
+     Final Version Due: Jun 20, 2009 
+
+     http://www.wikicfp.com/cfp/servlet/event.showcfp?eventid=3737&copyownerid=2
+Announcement:
+
+     metaweb, eossys, BradB, SteveC, BerryM & SkipM, EmanM, DanK,
+     JohnC, SteveH, BrandN, MillsD, largeTripleStores wiki, blog,
+     project news, JimF, BenB, GeorgeF, Radar Networks, SethE.
+
+Conferences:
+
+     Cloud computing:
+
+     Grid:
+
+     Semantic Web:
+
+     W3C:
+
+     OSCON: O'Reilly Open Source Convention - OSCON
+       July 20-24, 2009
+         San Jose McEnery Convention Center
+	   San Jose, CA
+	     http://en.oreilly.com/oscon2009/public/cfp/57?CMP=EMC-conf_os09_int&ATT=EM1
+	       Due: February 3, 2009
+
+     EmergingTech?
+
+MULTICONF-09, http://www.promoteresearch.org/
+
+  - International Conference on Enterprise Information Systems and Web
+    Technologies (EISWT-09)
+
+  - International Conference on High Performance Computing, Networking
+    and Communication Systems (HPCNCS-09)
+
+  - International Conference on Information Security and Privacy (ISP-09)
+
+  - International Conference on Recent Advances in Information
+    Technology and Applications (RAITA-09)
+
+------------------------------------------------------------
+
+-Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.sparql
+
+-Xmx500m -server -Xrunjavaperf:cg -Dlog4j.configuration=file:src/resources/logging/log4j.properties -Djava.security.policy=policy.all -cp "bigdata-lubm.jar;lib/ctc_utils-5-4-2005.jar;lib/cweb-commons-1.1-b2-dev.jar;lib/cweb-extser-0.1-b2-dev.jar;lib/cweb-junit-ext-1.1-b3-dev.jar;lib/junit-3.8.1.jar;lib/lgpl-utils-1.0-b3-dev.jar;lib/log4j-1.2.8.jar;lib/apache/commons-io-1.4.jar;lib/icu/icu4j-3_6.jar;lib/lucene/lucene-analyzers-2.2.0.jar;lib/lucene/lucene-core-2.2.0.jar;lib/unimi/colt-1.2.0.jar;lib/unimi/fastutil-5.1.4.jar;lib/slf4j-api-1.4.3.jar;lib/slf4j-log4j12-1.4.3.jar;lib/openrdf-sesame-2.2-onejar.jar;lib/jini/classserver.jar;lib/jini/jini-core.jar;lib/jini/jini-ext.jar;lib/jini/jsk-lib.jar;lib/jini/jsk-platform.jar;lib/jini/jsk-resources.jar;lib/jini/reggie.jar;lib/jini/start.jar;lib/jini/sun-util.jar;lib/jini/tools.jar" edu.lehigh.swat.bench.ubt.Test query src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.eossys src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.eossys
+
+------------------------------------------------------------
+
+Odd errors when running TestRuleRdfs03#test_rdfs3_01 for LDS.  Also
+happens on rdfs7, 10 and a slice test.
+
+java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: Aborted.
+	at com.bigdata.service.DataServiceIndex.submit(DataServiceIndex.java:493)
+	at com.bigdata.sparse.SparseRowStore.delete(SparseRowStore.java:841)
+	at com.bigdata.sparse.SparseRowStore.delete(SparseRowStore.java:779)
+	at com.bigdata.relation.AbstractResource.destroy(AbstractResource.java:323)
+	at com.bigdata.rdf.lexicon.LexiconRelation.destroy(LexiconRelation.java:332)
+	at com.bigdata.rdf.store.AbstractTripleStore.destroy(AbstractTripleStore.java:1409)
+	at com.bigdata.rdf.store.ScaleOutTripleStore.closeAndDelete(ScaleOutTripleStore.java:151)
+	at com.bigdata.rdf.rules.TestRuleRdfs03.test_rdfs3_01(TestRuleRdfs03.java:184)
+Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: Aborted.
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:222)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:83)
+	at com.bigdata.service.DataService.submit(DataService.java:991)
+	at com.bigdata.service.DataServiceIndex.submit(DataServiceIndex.java:489)
+	... 35 more
+Caused by: java.lang.RuntimeException: Aborted.
+	at com.bigdata.journal.WriteExecutorService.groupCommit(WriteExecutorService.java:921)
+	at com.bigdata.journal.WriteExecutorService.afterTask(WriteExecutorService.java:636)
+	at com.bigdata.journal.AbstractTask.doUnisolatedReadWriteTask(AbstractTask.java:1676)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1585)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1462)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
+	at java.lang.Thread.run(Thread.java:619)
+
+------------------------------------------------------------
+TestAddDropIndexTask.test_addDropIndex
+
+junit.framework.AssertionFailedError: Not expecting: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at junit.framework.TestCase2.fail(TestCase2.java:118)
+	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:290)
+Caused by: java.util.concurrent.ExecutionException: java.lang.NullPointerException
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:222)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:83)
+	at com.bigdata.journal.TestAddDropIndexTask.test_addDropIndex(TestAddDropIndexTask.java:273)
+	... 26 more
+Caused by: java.lang.NullPointerException
+	at com.bigdata.btree.ReadCommittedView.getIndex(ReadCommittedView.java:148)
+	at com.bigdata.btree.ReadCommittedView.getBTreeCounters(ReadCommittedView.java:326)
+	at com.bigdata.journal.ConcurrencyManager.addIndexCounters(ConcurrencyManager.java:1521)
+	at com.bigdata.journal.AbstractTask.clearIndexCache(AbstractTask.java:444)
+	at com.bigdata.journal.AbstractTask.call2(AbstractTask.java:1570)
+	at com.bigdata.journal.AbstractTask.call(AbstractTask.java:1462)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:885)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:907)
+	at java.lang.Thread.run(Thread.java:619)
+
+------------------------------------------------------------
+junit.framework.AssertionFailedError: Expecting wrapped class com.bigdata.journal.NoSuchIndexException
+	at junit.framework.Assert.fail(Assert.java:47)
+	at com.bigdata.journal.TestAddDropIndexTask.test_NoSuchIndexException(TestAddDropIndexTask.java:481)
+
+------------------------------------------------------------
+junit.framework.AssertionFailedError
+	at junit.framework.Assert.fail(Assert.java:47)
+	at junit.framework.Assert.assertTrue(Assert.java:20)
+	at junit.framework.Assert.assertNull(Assert.java:233)
+	at junit.framework.Assert.assertNull(Assert.java:226)
+	at com.bigdata.journal.TestReadCommittedTx.test_readComittedIsolation(TestReadCommittedTx.java:179)
+------------------------------------------------------------
+
+Problem with EOSSYS load for LTS in LoadClosureAndQueryTest.
+
+WARN : 1438 [main] com.bigdata.test.ExperimentDriver$Experiment.run(ExperimentDriver.java:666): Error running condition: java.lang.RuntimeException: While loading: d:\eossys\data\ranker.nt
+java.lang.RuntimeException: While loading: d:\eossys\data\ranker.nt
+	at com.bigdata.rdf.store.DataLoader.loadFiles(DataLoader.java:836)
+	at com.bigdata.rdf.store.DataLoader.loadFiles(DataLoader.java:782)
+	at com.bigdata.rdf.stress.LoadClosureAndQueryTest.loadSingleThreaded(LoadClosureAndQueryTest.java:1064)
+	at com.bigdata.rdf.stress.LoadClosureAndQueryTest.loadData(LoadClosureAndQueryTest.java:861)
+	at com.bigdata.rdf.stress.LoadClosureAndQueryTest.doComparisonTest(LoadClosureAndQueryTest.java:736)
+	at com.bigdata.test.ExperimentDriver$Experiment.run(ExperimentDriver.java:662)
+	at com.bigdata.test.ExperimentDriver.main(ExperimentDriver.java:1278)
+Caused by: org.openrdf.rio.UnsupportedRDFormatException: No parser factory available for RDF format null
+	at org.openrdf.rio.Rio.createParser(Rio.java:173)
+	at org.openrdf.rio.Rio.createParser(Rio.java:188)
+	at com.bigdata.rdf.rio.BasicRioLoader.getParser(BasicRioLoader.java:131)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf2(BasicRioLoader.java:177)
+	at com.bigdata.rdf.rio.BasicRioLoader.loadRdf(BasicRioLoader.java:147)
+	at com.bigdata.rdf.store.DataLoader.loadData3(DataLoader.java:910)
+	at com.bigdata.rdf.store.DataLoader.loadFiles(DataLoader.java:832)
+	... 6 more
+------------------------------------------------------------
+
+Problem in com.bigdata.rdf.rules.TestCompareFullAndFastClosure for
+LDS.  Compains that historical read is not supports on a temporary
+store.  The test runs fine for LTS.  I am not clear how the LDS setup
+differs such that this is failing (it fails when attempting to compute
+the closure of a data set loaded via the data loader).
+
+------------------------------------------------------------
+
+concurrencyee-interest@altair.cs.oswego.edu and also check this link
+for more active sites to post: http://gee.cs.oswego.edu/dl/
+
+Hello,
+
+I was wondering if anyone has worked on a solution for allowing a client to queue requests that will execute with a parallelism limit specified by the client against either a local or remote executor.  I am thinking here about situations where multiple clients have access to a common executor with whatever internal parallelism limits and each client wants to specify a parallelism limit for its own operations.  Examples might include map/reduce processing where the client is a master and each host exposes an executor on which the tasks from that master will be executed with no more than a parallelism specified by the master.  Another example would be join processing where a join task would queue tasks to process intermediate binding sets against a common thread pool but would limit its own parallelism to some specified value.
+
+I realize that I can create a thread pool executor with a maximum pool size, but what I am interested in doing is reusing both local and remote executors for various clients within an application in which the parallelism limit is specified by the client.
+
+One of the things that motivates this for me is that some processes can not have parallelism limits without causing deadlocks.  So I find that it is best to use a cached thread pool without an upper bound on the #of threads but to then limit the parallelism which can be imposed on tasks submitted to that executor by various clients.
+
+Thanks,
+
+-bryan
+------------------------------------------------------------
+Commit notes:
+
+- (***) Optimize mapping of access path tasks onto join sink tasks
+  since we can't evaluate query or CLOSURE performance with splits
+  enabled until this is done.
+
+    We can request all the locators for a join task when the join task
+    is created and wait until they arrive before processing the source
+    binding chunks, which can already be read from the source join
+    tasks.
+
+    Unlike splits for lookup(), an output binding set can be mapped
+    across multiple index partitions.
+
+    We can easily optimize for the case where there is only a single
+    sink index partition since there will be only one sink and all
+    output binding sets will go to the same sink.
+
+    Once the access path tasks are ordered, the odds are very good
+    that the next output binding set will be mapped onto the same
+    index partition(s) as the last output binding set.
+
+    If the locator is kept as state then we have the left- and
+    right-separators can we can easily test to see if an output
+    binding set would lie within the same index partition.
+  
+- Cluster tools and service starter.
+
+  - Should be able to resume the load from a log indicating which
+    files have already been loaded.  This may be important for a long
+    running process if we hit very rare bugs that would otherwise
+    require a full restart.
+
+- Load balancer
+
+  - No history is saved when the counters are logged for the LBS
+    generated counters (the host and service scores).  Also, it would
+    be nice if the service scores indicated which services qualified
+    for high and low utilization by the set of rules in play, but
+    there is a potential dependency on the set of scores for the
+    services when rating a single service.
+
+  - Should seek to balance the most and least loaded hosts to within
+    10% or 20%.  Make sure that this works with 2DS.  Make sure that a
+    new DS will be tasked once another host overflows (LBS could force
+    overflow of a highly utilized service when the new service joins
+    to help the new service get loaded more quickly).
+
+  - Collect total swap space and factor % swap space used into the
+    hostScore. (When you run out of swap space you are basically
+    hosed, but this condition is generally indicating by a rising
+    count for major page faults, which we already track and use in the
+    hostScore).
+
+  - Fix history bug so that we can have more than 60 minutes of
+    detailed history.  Parameterize the actual #of minutes on the LBS.
+
+- Visualization
+
+  - Generate and visualize a concise summary of how the disk space in
+    the federation is allocated (a) on each data service on each host;
+    and (b) by index.  Also show the #of sources in each index
+    partition.
+
+  - Generate timelines of events correlated to interesting counters,
+    such as % IO Wait and % Processor Time.
+
+  - Tools
+
+    http://www.readwriteweb.com/archives/the_best_tools_for_visualization.php
+
+    http://www.ibm.com/developerworks/linux/library/l-datavistools/
+
+    http://code.google.com/p/flot/, http://solutoire.com/flotr/
+
+    http://flare.prefuse.org/ (also has a treemap) and
+    http://prefuse.org/ (its predecessor).
+
+    treemaps: http://www.cs.umd.edu/hcil/treemap-history/,
+    http://treemap.sourceforge.net/ (MIT),
+    http://code.google.com/p/flex2treemap/ (MIT), 
+
+    http://code.google.com/apis/visualization/
+
+    flash: http://osflash.org/, http://osflash.org/open_source_flash_projects
+
+    hypertree: http://hypertree.sourceforge.net/
+
+    commercial visualization tools (visual analytics, visual analysis)
+
+       http://www.macrofocus.com/
+
+       http://www.labescape.com/info/articles/what-is-a-heat-map.html
+
+- Performance testing on DP for U100, U1500, U8000 with split / join /
+  move / build / merge.
+
+  - Note: 350 bytes per statement w/o overflow but only 53 bytes per
+    statement with, so get overflow working (even w/o moves since we
+    can use a single data service to do 1B triples in 55G).  Moves can
+    be vetted as a second stage once we firmly believe that splits are
+    working correctly.
+
+    Estimate 1M triples at 53M, 1B is would be 53GB, (30B in 1.6TB),
+    and 1 trillion would be 53TB.  However, we also need to plan for
+    some temporary drive space and some duplication during index
+    builds, etc.  Maybe a 1.2 multiplier on top of that?
+
+  - Main issues:
+
+    - Aynchronous overflow is causing contention across services.
+
+      A big culprit is MOVE, but there may be a variety of ways in
+      which throughput can be improved for the application during
+      asynchronous overflow.
+
+    - Bullet proof asynchronous overflow operations;
+
+      Observed failures range from leaving behind empty index segments,
+      to losing an index partition.
+
+      Timeouts on asynchronous overflow raise the likelyhood of
+      failure since operations may be cancelled via interrupt rather
+      than distributed services failures, OOM, etc.
+
+    - Fix the history problem so that I can get 24hours of minutes!
+
+    - Obtain new performance baselines:
+
+      - JDS U1000 w/o overflow and w/ scale-up indices.
+	
+	statementCount=133,614,330; termCount=32,905,352;
+        uriCount=21,735,249; literalCount=11,170,103; tps=29579;
+        #scanned=20020; loadTime=4,517,118ms.  No errors.  Query 
+	results in JDS_U1000_3DS_no_moves2/queryRun.txt.
+
+	Based on this, it appears that allowing overflow has resulted
+        in lost triples as well as lost terms, which should not be any
+        suprise.
+
+	* When starting rdfs2 during closure there is a HUGE period of
+          high IOWAIT where the JOIN appears to be single threaded.
+          This was WITHOUT OVERFLOW, so it was doing a huge amount of
+          random IO against the journal.
+
+	  1) Provide a means to fully buffer the view for a JOIN
+             dimension with a high expected cardinality.  E.g., signal
+             that the index segments nodes should be fully buffered
+             and set a flag for the cursor to read ahead to the end
+             key as long as it does not overrun the leafCache.
+
+	     Test this by re-computing the closure of U1000 using a
+	     cold data set (federation re-start).
+
+	     Note: When overflow is not enabled then we do not have
+	     index segments and the BTree is as well suited to
+	     optimized readers as the index segment.
+
+	  2) Make sure that we permit concurrent threads to consume
+             the binding sets so that we can use more cores in high IO
+             Wait situations.  Test the impact of this on U1000
+             closure using a cold data set (federation re-start).
+
+	     Note: This requires per-thread unsync buffers in the
+	     JoinTask and that has not been implemented yet.
+
+	  x) This can also be tested using cold-start query.  That is
+	     even easier for comparison since there is no side-effect
+	     on the data.
+
+      - JDS U1000 w/ 3 DS, no moves.
+
+        103,037,483 told triples at 9,680 tps w/o closure
+        (statementCount=99,553,587, no term count available).
+        Counters available in JDS_U1000_3DS_nomoves.  Closure ____.
+
+      - LTS U1000: 
+
+      - LDS U1000: (concurrent data loader, pipeline joins?)
+
+      - JDS U1000 w/ 5 DS (rather than 3). How that effects
+        performance?
+
+    - Move is definately the weakness of the system.  Look at making
+      this much faster.  E.g., take a compacting merge and then blast
+      it across to another data service on a raw socket.
+
+    - Pointless having a MOVE during the initial round robin period.
+      Should detect that and avoid moves until we have real scores.
+
+    - Make sure that atomic update tasks notice when the primary task
+      is cancelled (liveness).
+
+    - Limited parallelism might be faster (single threaded is fastest
+      on my 2-core laptop for the compact utility) but could lead to
+      timeouts for the index views for the lastCommitTime on the old
+      journal and if those indices are dropped then performance will
+      suffer.
+
+    - Does IO Wait spike during overflow?
+
+      If so, what about a Direct buffer for the journal?
+ 
+      Note: We will have to force overflow, terminating asynchronous
+      verflow eagerly if necessary including any chained tasks such as
+      the atomic updtes, before we reach the maximum capacity of the
+      journal since it can not be extended (we will be using a direct
+      buffer of a fixed size for the live journal that is passed in
+      and passed from one to the next, much like the write cache).
+      The trigger point will have to be set early enough that we can
+      get the builds done (at a minimum) before the live journal fills
+      up, however copying data off of the live journal should be much
+      faster since it is fully buffered.
+
+    - Occasional RejectedExecutionException during index segment
+      builds.  The write service defaults to a fixed capacity queue,
+      so that is what is happening. It also has a cap on the thread
+      pool size - play around with that when there are a large #of
+      splits on hand.
+
+    - Saw a java.rmi.NoSuchObjectInTable during closure on U1000.
+      I've modified the code to log the original stack trace so that I
+      can see where this is coming from.  It might be related to an
+      OOM since memory is tight.  Or it may be a failure to enable DGC
+      for something (but I would think that I would notice that
+      sooner).
+
+  - *** Compacting merges tend to trigger
+    FileChannelUtility#transferAll().  This is a known Sun bug, but we
+    should implement a work around.
+
+Caused by: java.io.IOException: Map failed
+	at sun.nio.ch.FileChannelImpl.map(FileChannelImpl.java:761)
+	at sun.nio.ch.FileChannelImpl.transferFromFileChannel(FileChannelImpl.java:540)
+	at sun.nio.ch.FileChannelImpl.transferFrom(FileChannelImpl.java:603)
+	at com.bigdata.io.FileChannelUtility.transferAll(FileChannelUtility.java:317)
+	at com.bigdata.journal.AbstractBufferStrategy.transferFromDiskTo(AbstractBufferStrategy.java:424)
+	at com.bigdata.journal.DiskOnlyStrategy.transferTo(DiskOnlyStrategy.java:2191)
+	at com.bigdata.btree.IndexSegmentBuilder.writeIndexSegment(IndexSegmentBuilder.java:1852)
+	at com.bigdata.btree.IndexSegmentBuilder.call(IndexSegmentBuilder.java:1135)
+
+  - Choose the index partitions to compact based on the #of sources
+    (and possibly the rangeCount) NOT just the order in which they are
+    visited by the itr since that is an alpha order and has a
+    sustained bias.
+
+  - Do an LTS run for each of these cases.  This will give us a
+    baseline for load and query performance and "ground truth" for
+    query correctness.  U100 and U1500 should be run on a host in the
+    cluster to provide a good basis for performance comparisons.
+
+  * It appears that new writes for the RDF load always go into the
+    most recently created index partition, which then gets split.  I
+    have seen this for at least the OSP and SPO index on U50.  The POS
+    index does not have this behavior.
+
+    It's pretty clear that this is an artifact of how term identifiers
+    are assigned.  During data load we get new subjects and new
+    objects, but we tend to get all of the predicates up front.  This
+    means that the subject identifiers and the object identifiers for
+    new statements tend to be larger than the previously encountered
+    values, hence they go into the last index partition for SPO and
+    OSP.
+
+    I would think that there will still be writes on the other index
+    partitions for those indices as you might either encounter other
+    statements about the same subject or other statements about the
+    same object, but that depends on the grouping of the data that is
+    being loaded.
+
+    This might also be an LUBM artifact.  I need to examine the
+    TERM2ID index more carefully.  If all the writes there are going
+    into the last index partition then that would explain why the term
+    identifiers are monotonically increasing since each index
+    partition has its own "space" for term identifiers which would
+    otherwise lead to writes in more than just the last index
+    partition of the SPO and OSP indices.
+
+  - Tuning:
+
+    - Compact serialization for ISolution[] and IBindingSet[] to
+      reduce JDS IO costs. Everything is in place for this, but the
+      custom serializers still need to be written and tuned.
+
+    - Run JDS query under the performance analyzer and look for
+      interesting things.
+
+    - Examine memory demands when overflow is enabled and choices for
+      the storeCache, indexCache, and indexSegmentCache capacity and
+      timeout values.
+
+    - Either lower or dynamically set the capacity of the read
+      retention queue for indices.  This is very important for
+      scale-out as the RAM demands otherwise grow far too fast.
+      However, we do want a large read retention queue both for
+      scale-up and early on for a data service when the #of active
+      indices is small since that will give better performance.
+
+      The total RAM for buffered nodes needs to be linked to the
+      maximum memory for the JVM and the real memory for the machine
+      before the JVM would being to swap.  If we assume that the admin
+      does not set the maximum JVM memory too high, then we can use it
+      as a proxy for both.  When we approach the maximum available RAM
+      we need to back down on the read retention queues.
+
+    - Try lowering the fullyBufferedReadThreshold to the
+      chunkCapacity.  How is that for query (not much of an effect)?
+      For closure (larger joins).
+
+    - Try various values of chunk size and maxparallel for pipeline
+      joins.
+
+    - Reduce the CHUNK_TIMEOUT? E.g., from 1000ms to 10ms or 100ms?
+
+    - Try different branching factors for the index segments.
+
+    - Add a thread to periodically touch flush stale entries from
+      these caches even when they are not being used?
+--------------------
+
+Why is the % Processor Time not being reported through to the LBS under WinNT?
+
+       WARN : 723365
+       com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1
+       com.bigdata.service.LoadBalancerService$UpdateTask.getAverageValueForMinutes(LoadBalancerService.java:1493):
+       Could not read double value: counterSet=/dpp2-wrkst13.dpp2.org,
+       counter=CPU/% Processor Time
+
+Why is the LBS reporting that an embedded data service is short on
+tmpDir space under WinNT? 
+
+       WARN : 723365
+       com.bigdata.service.EmbeddedFederation$EmbeddedLoadBalancerServiceImpl.updateService1
+       com.bigdata.service.LoadBalancerService$UpdateTask.computeScore(LoadBalancerService.java:1404):
+       service=dpp2-wrkst13.dpp2.org#interface
+       com.bigdata.service.IDataService : is short on disk:
+       tmpDirBytesAvail=2,147,483,648
+
+Why are all index partitions being moved off of one of the two embedded data services under WinNT U50?
+
+------------------------------------------------------------
+Full distributed transaction support:
+
+Note: At this point I have closure working with read-only tx.  I still
+want full distributed tx commits to make the split/join/move
+operations more robust.  Also, we will need zookeeper for service
+startup, master election (for closure), etc.
+
+- Added support for full transactions, including distributed
+  transactions and both single phase and multi-phase commit protocols.
+
+- Added unit tests for the DistributedTransactionService's protocol
+  using mock ITxCommitProtocol (renamed ITxCommitter).
+
+- Added unit tests for distributed transactions that start on a single
+  data service.
+
+- Added unit tests for distributed transactions that start on more
+  than one data service.
+
+- Added unit tests for rollback of the journal if a distributed commit
+  fails.
+
+- Modified the concurrency control mechanisms in AbstractTask to
+  support the distributed transaction commit protocol.
+
+  Isolation is provided by creating an IsolatedView where the mutable
+  BTree isolates writes and the rest of the view reads from the ground
+  state of the tx.  This needs to be on a tmp store since (A) the
+  journal does not overflow; and (B) for a data service, we do not
+  want to overflow the mutable BTree.  The TemporaryStore is fine for
+  this purpose, excepting only that it is not (verify this) MRMW, so
+  we should use a Temporary Journal instead, probably changing the
+  temp store factory.
+
+  The first time we isolate an index within a tx we assign its name
+  within the then current tmpStore and remember the name of the
+  isolated index inside the LocalTxState object.  This allows for the
+  possibility that one tempStore may fill up and another be created
+  during the live of a tx.  It is just as easy to put all indices
+  isolated by a tx onto the same tempStore - just old its reference
+  directly.
+
+  When an tx operation completes, its indices will be checkpointed by
+  AbstractTask.  The index will write the checkpoint on its backing
+  store, so that is Ok.  However, we do need to have Name2Addr for
+  that backing store updated.  This is very similar to how we handle
+  unisolated tx today.  Among other things, it will let us atomically
+  register an index within a tx, which is nice.
+
+  An tx task essentially is an unisolated task with exclusive access to
+  the isolated indices which it requests and whose mutable btrees are
+  found on tempStores rather than the live journal.  The normal
+  Name2Addr mechanisms would work, except that they are not atomic
+  with group commit.  Hence the same sort of thing will have to be
+  done for each Name2Addr for the backing store of an isolated index.
+
+  The tx commit is an unisolated task that declares the name of the
+  unisolated indices AND the name of the isolated indices. Note that
+  any number of unisolated tasks and single-phase commits may join the
+  same commit group, and at MOST ONE distributed tx.
+
+  When the write service sees a task finish its work it MUST check the
+  task to determine if it is a distributed tx commit.  If so, then it
+  MUST run the group commit with that task and obtain the commit
+  timestamp using the distributed commit protocol rather than
+  nextTimestamp().
+
+  This suggests that DistributedCommitTask extends AbstractTask.
+  doTask() will validate the index using the revisionTime assigned to
+  the task and then wait at the "prepared" barrier.  Once that barrier
+  breaks, the assigned commit time is written onto the AbstractTask
+  and doTask() is done.  The write service notices that this is a
+  distributed commit task.  If there is a problem, including with
+  doTask(), then it will handle the distributed abort (all it needs to
+  do is throw an exception).  Otherwise it immediately runs a
+  groupCommit WITHOUT waiting for other tasks to join using the
+  commitTime already assigned to the task.
+
+- Modified the concurrency control mechanisms in AbstractTask to
+  acquire exclusive write locks for the _isolated_ indices by placing
+  those indices into a namespace for the transaction.  Since the
+  transactions write set will be located on a specific temporary
+  store, that namespace should use "__tx.txid.name" for its pattern
+  and the temporary store should be registered with the locator such
+  that the indices isolated by the transaction are discovered on the
+  temporary store.
+
+- Support full concurrency for writers on transactions.
+
+  Use a Temporary journal rather than a TemporaryStore.
+
+  Use the same write executor service to manage access to the isolated
+  indices, checkpointing isolated indices onto their backing store at
+  the end of an AbstractTask?, etc.
+
+  The locator must be chained to find the indices on the temporary
+  journals.
+
+  The temporary journals either need their own write service instance,
+  but must share the same lock manager (to avoid possible deadlocks)
+  and concurrency manager.
+  
+  This will take some looking into....  We can limit the tx
+  concurrency in the meanwhile (one operation per tx) simply be
+  declaring the tx id as one of the locks.
+
+- Disable split, join and move for index partitions with active
+  transactions (other than those we create to make those operations
+  ACID).
+
+- Support split, join, and move for index partitions with active
+  transactions (must split / join / move the isolated indices along
+  with the unisolated ones).
+
+  This requires that we enumerate the active transactions on the data
+  service and then enumerate the names of the indices which they have
+  isolated in order to identify transactions whose isolated write sets
+  must be split, joined or moved as well.
+
+  The operation which handles the split, join or move must notify the
+  transactionService with the new resources on which the tx will write
+  - these will have new index partition names.  In the case of move,
+  the new index partition will be located on a different data service.
+
+  Note: Build, merge, and copy do not cause problems because they do
+  not change the index partition names.
+
+- Modified AbstractTask to be extended on for special cases and
+  instead provided an interface for access to critical methods which
+  it was exposing: getJournal(), getIndex(), etc.
+
+- Moved the MIN_RELEASE_AGE and related options from the StoreManager
+  to the TransactionService so that they may be globally administered
+  (moved in part since you do configured the minReleaseAge on the
+  txService).
+
+------------------------------------------------------------
+Asynchronous overflow
+
+- Further hardened the split, join, and move index partition
+  operations, including the use of full transactions to ensure ACID
+  updates of the MDS and the source and target data services.  (May
+  require allowing tx identifiers for some MDS operations or using a
+  distributed lock system.)
+
+- Faster and more robust asynchronous overflow processing: ensure that
+  index hard references are not discarded (could be wired via
+  IndexMetadata); ensure that closeForWrites() correctly configures
+  the unisolated indices on the journal as historical indices for the
+  lastCommitTime with their buffers, etc. in place; fully buffered
+  journal for less IO Wait during asynchronous overflow; asynchronous
+  overflow must be 100% complete before the journal may overflow
+  again;
+
+- Move could blast resources across a socket.  We will certainly need
+  to do that for failover, since an index segment will be built by the
+  primary data service and replicated (once built) to the secondaries.
+
+------------------------------------------------------------
+Event logging and graphs with correlated events.
+
+- Added an event logging interface on the federation with reporting to
+  the LBS for now.  The goal is to allow plotting of events against
+  timeline data, such as CPU performance counters.  The interface was
+  refactored from the ResourceManager.  There are event classes.  The
+  service name is in the event.  Reporting includes a timestamp and an
+  event identifier.  Timestamps MAY be global (nextTimestamp) or they
+  may be local times.  The receiver can compute elapsed times and map
+  the timestamps onto its own clock based the receipt time.  Events
+  can be correlated by their event identifiers.
+
+------------------------------------------------------------
+BufferedDiskStrategy
+
+- Introduced a "BufferedDisk" IBufferStrategy for the backing
+  store. This is a persistent on-disk implementation with a direct
+  buffer size to the maximum expected size of the store (nominally
+  200M).  The rationale for this is to fully buffer reads on the
+  historical journal during asynchronous overflow processing in order
+  to reduce latency for that operation.  A new implementation was used
+  rather than the DirectBuffer because the latter can not be extended.
+  The idea is to have asynchronous overflow processing complete (all
+  indices handled) before we allow another overflow event.  Using this
+  approach we will allocate 2 x 200M buffers - one to the live journal
+  and one for the historical journal.  If asynchronous overflow
+  processing can not complete before the live journal would overflow,
+  then the live journal is extended, which is why the DirectBuffer is
+  not a good fit.  When the journal must be extended, the buffer IS
+  NOT extended to cover the new user extent.  The rationale for that
+  is the Sun bug in releasing direct ByteBuffers.  This mode should
+  have higher read concurrency since the data are (typically) fully
+  buffered and much higher read throughput should be expected.
+
+  Some possible drawbacks which may need to be addressed:
+
+  - Higher write throughput is possible if writes treat the buffer as
+    a cache rather than always writing through to the disk, but that
+    might result in higher commit latency unless we asynchronously
+    "catch up".  Consider that 20M have been written onto the end of
+    the buffer since the last commit.  If those data are only on the
+    buffer, then we need to transfer 20M from the buffer to the disk
+    during the commit.  However, if we write through the buffer onto
+    the disk then the OS disk cache should provide much the same
+    throughput AND handle asynchronous writes through to the disk.
+    The only time when this will not be true is when the OS/disk cache
+    is disabled.  For that case, we would definately be better of
+    handling the "write behind" ourselves.
+
+  - On restart, the buffer needs to be filled with data read from the
+    file.  However, we do not what to do that during the StoreManager
+    startup since it may scan files which it does not need to fully
+    open.
+
+  - The writes MUST always be made using a direct buffer in order to
+    avoid memory leaks.  This means that the data must be transferred
+    onto either the backing buffer (if it lies within the user extent)
+    or onto the manditory write cache (if it crosses or lies beyond
+    the user extent).
+
+  - Asynchronous writes could be realized by locks surrounding updates
+    of the last offset written (by the application) and the last
+    offset transferred onto the disk (by a write thread).  The force()
+    method will have to ensure that buffered writes up to the offset
+    at which that method was invoked (or the offset which it
+    specifies) have been transferred to the disk before synching the
+    disk.
+
+------------------------------------------------------------
+
+Clear problem with locking for unisolated B+Tree reads:
+
+java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.IllegalArgumentException: Not our child : child=com.bigdata.btree.Leaf@1f0cf51#1165593256395406
+	at com.bigdata.rdf.rio.AbstractRIOTestCase.doVerify(AbstractRIOTestCase.java:470)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase.doLoadAndVerifyTest(AbstractRIOTestCase.java:101)
+	at com.bigdata.rdf.rio.TestLoadAndVerify.test_loadAndVerify_U1(TestLoadAndVerify.java:115)
+...
+Caused by: java.lang.IllegalArgumentException: Not our child : child=com.bigdata.btree.Leaf@1f0cf51#1165593256395406
+	at com.bigdata.btree.Node.getIndexOf(Node.java:1826)
+	at com.bigdata.btree.Node.getRightSibling(Node.java:1734)
+	at com.bigdata.btree.BTree$LeafCursor.next(BTree.java:2035)
+	at com.bigdata.btree.AbstractBTreeTupleCursor$AbstractCursorPosition.nextLeaf(AbstractBTreeTupleCursor.java:1508)
+	at com.bigdata.btree.AbstractBTreeTupleCursor$MutableCursorPosition.nextLeaf(AbstractBTreeTupleCursor.java:2035)
+	at com.bigdata.btree.AbstractBTreeTupleCursor$AbstractCursorPosition.forwardScan(AbstractBTreeTupleCursor.java:1766)
+	at com.bigdata.btree.AbstractBTreeTupleCursor.nextTuple(AbstractBTreeTupleCursor.java:783)
+	at com.bigdata.btree.AbstractBTreeTupleCursor.next(AbstractBTreeTupleCursor.java:809)
+	at com.bigdata.btree.filter.Advancer$Advancerator.next(Advancer.java:116)
+	at com.bigdata.btree.filter.Advancer$Advancerator.next(Advancer.java:1)
+	at cutthecrap.utils.striterators.Striterator.next(Striterator.java:60)
+	at com.bigdata.btree.filter.FilterConstructor$WrappedTupleIterator.next(FilterConstructor.java:99)
+	at com.bigdata.btree.ResultSet.<init>(ResultSet.java:978)
+	at com.bigdata.btree.ChunkedLocalRangeIterator.getResultSet(ChunkedLocalRangeIterator.java:140)
+	at com.bigdata.btree.UnisolatedReadWriteIndex$ChunkedIterator.getResultSet(UnisolatedReadWriteIndex.java:719)
+	at com.bigdata.btree.AbstractChunkedTupleIterator.rangeQuery(AbstractChunkedTupleIterator.java:305)
+	at com.bigdata.btree.AbstractChunkedTupleIterator.hasNext(AbstractChunkedTupleIterator.java:427)
+	at cutthecrap.utils.striterators.Resolverator.hasNext(Resolverator.java:48)
+	at cutthecrap.utils.striterators.Striterator.hasNext(Striterator.java:55)
+	at com.bigdata.striterator.ChunkedWrappedIterator.hasNext(ChunkedWrappedIterator.java:197)
+	at com.bigdata.rdf.store.AbstractTripleStore.predicateUsage(AbstractTripleStore.java:2379)
+	at com.bigdata.rdf.store.AbstractTripleStore.predicateUsage(AbstractTripleStore.java:2345)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase$VerifyTask.verify(AbstractRIOTestCase.java:618)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase$VerifyTask.call(AbstractRIOTestCase.java:596)
+	at com.bigdata.rdf.rio.AbstractRIOTestCase$VerifyTask.call(AbstractRIOTestCase.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+	at java.lang.Thread.run(Thread.java:619)
+
