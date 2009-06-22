@@ -241,10 +241,10 @@
 		<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}"/>
 		-->
 <exec executable="${ssh.scp}">
-	<arg value="-v" />
 	<!-- verbose protocol. -->
-	<arg value="-C" />
+	<!--<arg value="-v" />-->
 	<!-- compression. -->
+	<arg value="-C" />
 	<!--
 			<arg value="-l"/><arg value="${ssh.username}"/>
 			<arg value="-pw"/><arg value="${ssh.password}"/>
@@ -274,7 +274,7 @@
 <fail message="Javadoc not generated.">
 	<condition>
 		<not>
-			<available file="docs/api" type="dir" />
+			<available file="${build.dir}/docs/api" type="dir" />
 		</not>
 	</condition>
 </fail>
