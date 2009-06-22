@@ -88,7 +88,7 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  * {@link IAccessPath} in chunks. Given the {@link IBindingSet} used to obtain
  * the {@link IAccessPath}, a new {@link IBindingSet} is created for each
  * element in each chunk read from the {@link IAccessPath}. If the new
- * {@link IBindingSet} satisifies the constraint(s) on the {@link IRule} then it
+ * {@link IBindingSet} satisfies the constraint(s) on the {@link IRule} then it
  * will be output to the next join dimension. An {@link IBindingSet} is output
  * by placing it onto the {@link UnsynchronizedArrayBuffer} for the join
  * dimension. Periodically that {@link UnsynchronizedArrayBuffer} will overflow,
@@ -238,11 +238,6 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
     protected static final Logger log = Logger.getLogger(JoinMasterTask.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    /**
      * True iff the {@link #log} level is DEBUG or less.
      */
     protected static final boolean DEBUG = log.isDebugEnabled();
@@ -362,7 +357,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
         if (ruleState.getPlan().isEmpty()) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Rule proven to have no solutions.");
 
             return ruleStats;
@@ -383,7 +378,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * The master itself was interrupted.
              * 
              * Note: The most common reason for this exception is a SLICE. When
-             * the query consumer decides that it has satisified the SLICE it
+             * the query consumer decides that it has satisfied the SLICE it
              * will close the iterator consuming the query and that will cause
              * the the query buffer to be closed and the task (this
              * JoinMasterTask) that is writing on that query buffer to be
@@ -393,7 +388,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * the master is running or deliberately interrupt the master.
              */
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Interrupted");
             
             /*
@@ -402,14 +397,14 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
              * Note: We fall through so that the rule evaluation appears to
              * complete normally for the common case where a SLICE causes the
              * master to be interrupted. For this case the query buffer will
-             * already contain at least those solutions that satisified the
+             * already contain at least those solutions that satisfied the
              * slice and we need do nothing more.
              * 
              * Note: The JoinStats information may be incomplete as one or more
              * JoinTask(s) may still be running.
              */
             
-            if (INFO) {
+            if (log.isInfoEnabled()) {
                 
                 /*
                  * Give the join tasks a chance to complete so that the join
@@ -452,7 +447,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
         
         combineJoinStats();
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("Done");
         
         return ruleStats;
@@ -538,7 +533,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                  * an error.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(ex.getLocalizedMessage(), ex);
                 
             } catch (ExecutionException ex) {
@@ -587,12 +582,12 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
                      * SLICE and the filter can not be evaluated inside of
                      * the the JOINs then the caller must pull solutions
                      * through the filter and close the iterator once the
-                     * slice is satisified. That will trigger an interrupt
+                     * slice is satisfied. That will trigger an interrupt
                      * of join thread(s) unless join processing is already
                      * complete.
                      */
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info(ex.getLocalizedMessage(), ex);
 
                 } else {
@@ -698,7 +693,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             
         }
     
-        if(INFO) {
+        if(log.isInfoEnabled()) {
             
             log.info("\n" + ruleState);
 
@@ -706,7 +701,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             
             /*
              * Note: This provides more detail on this join algorithm than the
-             * RuleStats view, however the per-predicate pre-index partition
+             * RuleStats view, however the per-predicate per-index partition
              * details are not available since these data aggregate across all
              * index partitions for a given tail predicate.
              */
@@ -725,7 +720,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
      */
     public void report(final JoinStats joinStats) {
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("\n"+joinStats.toString());
             
