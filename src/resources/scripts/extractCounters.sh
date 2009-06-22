@@ -67,6 +67,11 @@ if [ -f "$lockFile" ]; then
         "-Danalysis.queries=src/resources/analysis/queries"\
         "-Danalysis.out.dir=$targetDir/output"\
         analysis
+# Copy the configuration file, error log, and rule execution log files.
+	cp -v $BIGDATA_CONFIG \
+   	$ruleLog* \
+   	$errorLog* \
+   	$targetDir
     tar -cvz -C "$targetDir/.." -f $tarball $targetDir/output
     echo "extracted performance counter archive is ready: $tarball"
     ls -lh $tarball

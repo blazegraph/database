@@ -162,11 +162,7 @@ public class MutationTask extends AbstractStepTask {
 
         getMutationCountFromBuffers(totals, buffers);
 
-        if(INFO) {
-            
-            log.info(totals);
-            
-        }
+        RuleLog.log(totals);
         
         return totals;
         
@@ -194,7 +190,7 @@ public class MutationTask extends AbstractStepTask {
 
         if (n == 0) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("No buffers.");
 
             return;
@@ -209,7 +205,7 @@ public class MutationTask extends AbstractStepTask {
             
             final IBuffer<ISolution[]> buffer = buffers.values().iterator().next();
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Flushing one buffer: size="+buffer.size());
 
             buffer.flush();
@@ -222,7 +218,7 @@ public class MutationTask extends AbstractStepTask {
              * them in parallel.
              */
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Flushing " + n +" buffers.");
 
             final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>( n );
@@ -342,7 +338,7 @@ public class MutationTask extends AbstractStepTask {
             final IJoinNexus joinNexus,
             final Map<String, IBuffer<ISolution[]>> buffers) {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("program=" + step.getName());
 
         final List<Callable<RuleStats>> tasks;
@@ -420,7 +416,7 @@ public class MutationTask extends AbstractStepTask {
 
         }
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("Created " + tasks.size() + " mutation tasks: action="
                     + action);

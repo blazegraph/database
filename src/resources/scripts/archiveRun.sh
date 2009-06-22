@@ -48,6 +48,7 @@ fi
 # Copy the configuration file and the various log files.
 cp -v $BIGDATA_CONFIG \
    $eventLog* \
+   $ruleLog* \
    $errorLog* \
    $detailLog* \
    $targetDir
