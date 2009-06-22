@@ -245,28 +245,28 @@
 	<!--<arg value="-v" />-->
 	<!-- compression. -->
 	<arg value="-C" />
-	<!--
+	<!-- pscp specific
 			<arg value="-l"/><arg value="${ssh.username}"/>
 			<arg value="-pw"/><arg value="${ssh.password}"/>
 			-->
-	<arg value="${release.dir}/${version}-bin.tgz" />
 	<!-- from -->
-	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
+	<arg value="${release.dir}/${version}-bin.tgz" />
 	<!-- to -->
+	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
 </exec>
 <exec executable="${ssh.scp}">
-	<arg value="-v" />
 	<!-- verbose protocol. -->
-	<arg value="-C" />
+	<arg value="-v" />
 	<!-- compression. -->
-	<!--
+	<arg value="-C" />
+	<!-- pscp specific
 			<arg value="-l"/><arg value="${ssh.username}"/>
 			<arg value="-pw"/><arg value="${ssh.password}"/>
 			-->
-	<arg value="${release.dir}/${version}-src.tgz" />
 	<!-- from -->
-	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
+	<arg value="${release.dir}/${version}-src.tgz" />
 	<!-- to -->
+	<arg value="${ssh.username}@frs.sourceforge.net:uploads" />
 </exec>
 </target>
 
@@ -281,20 +281,21 @@
 <input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}" />
 <input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}" />
 <exec executable="${ssh.scp}">
-	<arg value="-r" />
 	<!-- recursive. -->
-	<arg value="-v" />
+	<arg value="-r" />
 	<!-- verbose protocol. -->
-	<arg value="-C" />
+	<!-- <arg value="-v" /> -->
 	<!-- compression. -->
+	<arg value="-C" />
+	<!-- pscp specific.
 	<arg value="-l" />
 	<arg value="${ssh.username}" />
 	<arg value="-pw" />
-	<arg value="${ssh.password}" />
-	<arg value="${build.dir}/docs" />
+	<arg value="${ssh.password}" />-->
 	<!-- from -->
-	<arg value="shell.speakeasy.net:systap.com/bigdata/" />
+	<arg value="${build.dir}/docs" />
 	<!-- to -->
+	<arg value="shell.speakeasy.net:systap.com/bigdata/" />
 </exec>
 </target>
 
