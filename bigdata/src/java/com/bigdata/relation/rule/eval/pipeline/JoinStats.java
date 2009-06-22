@@ -76,7 +76,7 @@ public class JoinStats implements Serializable {
      * same bindings, the source {@link IBindingSet}s typically (always?)
      * have variety not represented in the bound {@link IPredicate} and
      * therefore are combined under a single {@link AccessPathTask}. This
-     * reduces redundent reads on an {@link IAccessPath} while producing
+     * reduces redundant reads on an {@link IAccessPath} while producing
      * exactly the same output {@link IBindingSet}s that would have been
      * produced if we did not identify the duplicate {@link IAccessPath}s.
      */

@@ -333,7 +333,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
             final int partitionId = locator.getPartitionId();
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Will submit JoinTask: partitionId="
                         + partitionId);
 
@@ -408,7 +408,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
         final int size = factoryTaskFutures.size();
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("#futures=" + size);
 
         int ndone = 0;
@@ -446,7 +446,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
             // future for the JoinTaskFactoryTask.
             final Future factoryTaskFuture = itr.next();
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("Waiting for factoryTask");
 
             // wait for the JoinTaskFactoryTask to finish.
@@ -502,7 +502,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
             ndone++;
 
-            if (DEBUG)
+            if (log.isDebugEnabled())
                 log.debug("ndone=" + ndone + " of " + size);
 
         }
@@ -520,7 +520,7 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
 
         }
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("All factory tasks done: #futures=" + size);
 
         return joinTaskFutures;
