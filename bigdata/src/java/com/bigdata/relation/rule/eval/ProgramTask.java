@@ -267,30 +267,8 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
                     
                 }
 
-                if(log.isInfoEnabled()) {
-                    
-                    log.info("totals: \n" + totals);
-                    
-                }
+                RuleLog.log(totals);
                 
-//                if (indexManager instanceof IBigdataFederation) {
-//
-//                    /*
-//                     * Reset the release time to 0L after the ProgramTask is
-//                     * finished so that we are no longer holding onto any historical
-//                     * views.
-//                     * 
-//                     * FIXME This is a hack. We should be using a read-historical
-//                     * transaction and letting the transaction manager handle the
-//                     * release time for us. See my notes in executeMutation() for
-//                     * more on this.
-//                     */
-//
-//                    ((IBigdataFederation) indexManager).getTransactionService()
-//                            .setReleaseTime(0L/* releaseTime */);
-//                    
-//                }
-
                 return totals.mutationCount.get();
                 
             } else {
@@ -311,23 +289,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
                 /*
                  * Execute a query.
                  */
-                final IAsynchronousIterator<ISolution[]> ret = executeQuery(step);
-                
-//                if (indexManager instanceof AbstractDistributedFederation) {
-//
-//                    /*
-//                     * Note: The distributed federation (JDS) uses RMI and
-//                     * requires either a "thick" iterator (fully buffered) or a
-//                     * proxy object.
-//                     */
-//                    
-//                    return ((AbstractDistributedFederation) indexManager)
-//                            .getProxy(ret, joinNexusFactory.newInstance(
-//                                    indexManager).getSolutionSerializer());
-//
-//                }
-
-                return new ChunkConsumerIterator<ISolution>(ret);
+                return new ChunkConsumerIterator<ISolution>(executeQuery(step));
 
             }
 

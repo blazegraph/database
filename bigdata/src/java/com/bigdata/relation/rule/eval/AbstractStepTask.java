@@ -71,36 +71,10 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
 
     protected static final transient Logger log = Logger.getLogger(AbstractStepTask.class);
 
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    protected final boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    protected final boolean DEBUG = log.isDebugEnabled();
-
     protected final ActionEnum action;
     protected final IJoinNexusFactory joinNexusFactory;
     protected /*final*/ IIndexManager indexManager;
     protected final IStep step;
-//    protected/* final */ExecutorService executorService;
-//    protected DataService dataService;
-//    
-//    public void setDataService(DataService dataService) {
-//
-//        if (dataService == null)
-//            throw new IllegalArgumentException();
-//
-//        if (INFO)
-//            log.info("Running on data service: dataService=" + dataService);
-//        
-//        this.dataService = dataService;
-//
-////        this.executorService = dataService.getFederation().getExecutorService();
-//        
-//    }
 
     /**
      * Base class handles submit either to the caller's {@link ExecutorService}
@@ -191,7 +165,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
             final List<Callable<RuleStats>> tasks) throws InterruptedException,
             ExecutionException {
     
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("program=" + program.getName() + ", #tasks="
                     + tasks.size());
         
@@ -214,7 +188,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
     
         }
     
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("program=" + program.getName() + ", #tasks="
                     + tasks.size() + " - done");
     
@@ -238,7 +212,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
     
         final int ntasks = tasks.size();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("program=" + program.getName() + ", #tasks=" + ntasks);
     
         if (indexManager == null)
@@ -272,7 +246,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
 
             n++;
 
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
 
                 log.debug("program=" + program.getName() + ", finished " + n
                         + " of " + ntasks + " seqential tasks.");
@@ -281,7 +255,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("program=" + program.getName() + ", #tasks=" + ntasks
                     + " - done");
     
@@ -310,7 +284,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
             final Callable<RuleStats> task) throws InterruptedException,
             ExecutionException {
     
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("program=" + program.getName());
     
         if (indexManager == null)
@@ -335,7 +309,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
             throw new ExecutionException(ex);
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("program=" + program.getName() + " - done");
     
         return stats;
@@ -401,7 +375,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
 
         }
         
-        if(INFO) {
+        if(log.isInfoEnabled()) {
 
             log.info("running w/ concurrency control: " + this);
             
@@ -524,7 +498,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
              // The set of indices that the task will declare.
             resource = indexNames.toArray(new String[] {});
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("resource=" + Arrays.toString(resource));
 
@@ -560,7 +534,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
                 
             }
 
-            if (INFO) {
+            if (log.isInfoEnabled()) {
 
                 log.info("timestamp=" + timestamp + ", task=" + this);
 
@@ -586,7 +560,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
             @Override
             protected Object doTask() throws Exception {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Executing inner task: " + this);
 
                 /*
@@ -603,7 +577,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
 
         };
 
-        if(INFO) {
+        if(log.isInfoEnabled()) {
 
             log.info("running on concurrencyManager: " + this);
             
@@ -647,7 +621,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
         
         getWriteRelationNames(step, c);
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("Found " + c.size() + " relations, program="
                     + step.getName());
@@ -705,7 +679,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
 
         getWriteRelations(indexManager, step, c, timestamp);
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("Located " + c.size()
                     + " relations in the head(s), program=" + step.getName());
@@ -768,7 +742,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
 
         getReadRelations(indexManager, step, c, timestamp);
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("Located " + c.size()
                     + " relations in the tail(s), program=" + step.getName());
@@ -849,7 +823,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
             
         }
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("");
             
@@ -895,7 +869,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
             
         }
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("Created "+c.size()+" mutation buffers: action="+action);
             

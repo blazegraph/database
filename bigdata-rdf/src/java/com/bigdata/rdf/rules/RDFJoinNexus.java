@@ -167,8 +167,6 @@ public class RDFJoinNexus implements IJoinNexus {
 
     protected final static transient Logger log = Logger.getLogger(RDFJoinNexus.class);
     
-    protected final static transient boolean INFO = log.isInfoEnabled();
-
     protected final static transient boolean DEBUG = log.isDebugEnabled();
     
     private final RDFJoinNexusFactory joinNexusFactory;
@@ -472,7 +470,7 @@ public class RDFJoinNexus implements IJoinNexus {
     
     final public boolean forceSerialExecution() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("forceSerialExecution="+forceSerialExecution);
 
         return forceSerialExecution;
@@ -1311,7 +1309,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final long elapsed = System.currentTimeMillis() - begin;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Wrote " + mutationCount
                                 + " statements and justifications in "
                                 + elapsed + "ms");
@@ -1391,7 +1389,7 @@ public class RDFJoinNexus implements IJoinNexus {
         if (step == null)
             throw new IllegalArgumentException();
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("program="+step.getName());
 
         if(isEmptyProgram(step)) {
@@ -1507,7 +1505,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("action=" + action + ", program=" + step.getName());
         
         if(isEmptyProgram(step)) {
@@ -1596,7 +1594,7 @@ public class RDFJoinNexus implements IJoinNexus {
     protected Object runLocalProgram(final ActionEnum action, final IStep step)
             throws Exception {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Running local program: action=" + action + ", program="
                     + step.getName());
 
@@ -1616,7 +1614,7 @@ public class RDFJoinNexus implements IJoinNexus {
     protected Object runDistributedProgram(final IBigdataFederation fed,
             final ActionEnum action, final IStep step) throws Exception {
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("Running distributed program: action=" + action
                     + ", program=" + step.getName());
@@ -1644,7 +1642,7 @@ public class RDFJoinNexus implements IJoinNexus {
             final ActionEnum action, final IStep step)
             throws InterruptedException, ExecutionException {
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("Submitting program to data service: action=" + action
                     + ", program=" + step.getName() + ", dataService="

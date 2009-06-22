@@ -140,6 +140,7 @@ export BIGDATA_LOGGING_CONFIG=@LOGGING_CONFIG@
 # Location of the various log files.
 # 
 export logDir=@LOG_DIR@
+export ruleLog=@RULE_LOG@
 export eventLog=@EVENT_LOG@
 export errorLog=@ERROR_LOG@
 export detailLog=@DETAIL_LOG@

@@ -406,6 +406,7 @@ an "NOP" bash script or edit your crontab.
 	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
 	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
 	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@RULE_LOG@" value="${ruleLog}" />
 	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />
@@ -443,6 +444,7 @@ an "NOP" bash script or edit your crontab.
 	<replacefilter token="@ERROR_LOG@" value="${errorLog}" />
 	<replacefilter token="@DETAIL_LOG@" value="${detailLog}" />
 	<replacefilter token="@EVENT_LOG@" value="${eventLog}" />
+	<replacefilter token="@RULE_LOG@" value="${ruleLog}" />
 	<replacefilter token="@STATE_LOG@" value="${stateLog}" />
 	<replacefilter token="@STATE_FILE@" value="${stateFile}" />
 	<replacefilter token="@FORCE_KILL_ALL@" value="${forceKillAll}" />

@@ -86,7 +86,7 @@ public class QueryTask extends AbstractStepTask {
              * then hasNext() will report false.
              */
 
-            if (DEBUG) {
+            if (log.isDebugEnabled()) {
 
                 log.debug("done - closing the blocking buffer");
 
@@ -95,6 +95,8 @@ public class QueryTask extends AbstractStepTask {
             // producer is done : close the BlockingBuffer.
             buffer.close();
 
+            RuleLog.log(totals);
+            
             return totals;
 
         } catch (Throwable t) {
@@ -178,7 +180,7 @@ public class QueryTask extends AbstractStepTask {
     protected List<Callable<RuleStats>> newQueryTasks(IStep step,
             IJoinNexus joinNexus, IBlockingBuffer<ISolution[]> buffer) {
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("step=" + step.getName());
 
         final List<Callable<RuleStats>> tasks;
@@ -219,7 +221,7 @@ public class QueryTask extends AbstractStepTask {
 
         }
 
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("Created "+tasks.size()+" query tasks");
             
