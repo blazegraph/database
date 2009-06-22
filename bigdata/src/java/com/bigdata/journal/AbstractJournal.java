@@ -61,7 +61,6 @@ import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
@@ -190,10 +189,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * Logger.
      */
     protected static final Logger log = Logger.getLogger(IJournal.class);
-
-//    final static protected boolean log.isInfoEnabled() = log.isInfoEnabled();
-//
-//    final static protected boolean log.isDebugEnabled() = log.isDebugEnabled();
 
     /**
      * The index of the root address containing the address of the persistent
@@ -1138,7 +1133,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         if(_bufferStrategy.isOpen()) {
             
-            log.warn("Closing journal: " + getFile());
+            if(log.isInfoEnabled())
+                log.info("Closing journal: " + getFile());
             
             shutdownNow();
             
