@@ -67,22 +67,33 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
- * Examine the named indices defined on the journal identified by the
- * <i>lastCommitTime</i> and, for each named index registered on that journal,
- * determines which of the following conditions applies and then schedules any
- * necessary tasks based on that decision:
+ * This class examines the named indices defined on the journal identified by
+ * the <i>lastCommitTime</i> and, for each named index registered on that
+ * journal, determines which of the following conditions applies and then
+ * schedules any necessary tasks based on that decision:
  * <ul>
- * <li>Build a new {@link IndexSegment} for an existing index partition - this
- * is essentially a compacting merge (build).</li>
- * <li>Split an index partition into N index partitions (overflow).</li>
- * <li>Join N index partitions into a single index partition (underflow).</li>
+ * <li>Build a new {@link IndexSegment} from the writes buffered on the prior
+ * journal. This is done in order to clear the dependencies on the historical
+ * journals. If there are deleted tuples in the buffered writes, then they are
+ * propagated to the index segment.</li>
+ * <li>Merge all sources in the view for an index partition into a new
+ * {@link IndexSegment}. This is a compacting merge. Delete markers will not be
+ * present in the generated {@link IndexSegment}.</li>
+ * <li>Split an index partition into N index partitions (index partition
+ * overflow). Each generated index partition will have a new partition
+ * identifier. The old index partition identifier is retired except for
+ * historical reads.</li>
+ * <li>Join N index partitions into a single index partition (index partition
+ * underflow). The join requires that the left- and right-sibling index
+ * partitions reside on the same data service. If they do not, then first one
+ * must be moved to the data service on which the other resides.</li>
  * <li>Move an index partition to another data service (redistribution). The
  * decision here is made on the basis of (a) underutilized nodes elsewhere; and
  * (b) over utilization of this node.</li>
- * <li>Nothing. This option is selected when (a) synchronous overflow
- * processing choose to copy the index entries from the old journal onto the new
- * journal (this is cheaper when the index has not absorbed many writes); and
- * (b) the index partition is not identified as the source for a move.</li>
+ * <li>Nothing. This option is selected when (a) synchronous overflow processing
+ * choose to copy the index entries from the old journal onto the new journal
+ * (this is cheaper when the index has not absorbed many writes); and (b) the
+ * index partition is not identified as the source for a move.</li>
  * </ul>
  * Each task has two phases
  * <ol>
@@ -98,41 +109,41 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * will be applied to each index partition.</dd>
  * <dt>{@link #runTasks()}</dt>
  * <dd>This stage reads on the historical state of the named index partitions,
- * building, splitting, joining, or moving their data as appropriate. When each
- * task is finished, it submits and awaits the completion of an
- * {@link AbstractAtomicUpdateTask}. The atomic update tasks run using
+ * building, merging, splitting, joining, or moving their data as appropriate.
+ * When each task is finished, it submits and awaits the completion of an
+ * {@link AbstractAtomicUpdateTask}. The atomic update tasks use
  * {@link ITx#UNISOLATED} operations on the live journal to make atomic updates
  * to the index partition definitions and to the {@link MetadataService} and/or
- * a remote data service where necessary</dd>
+ * a remote data service where necessary.</dd>
  * </dl>
  * <p>
- * Note: This task is invoked after an
- * {@link ResourceManager#overflow(boolean, boolean)}. It is run on the
- * {@link ResourceManager}'s {@link ExecutorService} so that its execution is
- * asynchronous with respect to the {@link IConcurrencyManager}. While it does
- * not require any locks for some of its processing stages, this task relies on
- * the {@link ResourceManager#overflowAllowed} flag to disallow additional
+ * Note: This task is invoked after an {@link ResourceManager#overflow()}. It is
+ * run on the {@link ResourceManager}'s {@link ExecutorService} so that its
+ * execution is asynchronous with respect to the {@link IConcurrencyManager}.
+ * While it does not require any locks for its own processing stages, it relies
+ * on the {@link ResourceManager#overflowAllowed} flag to disallow additional
  * overflow operations until it has completed. The various actions taken by this
- * task are submitted as submits tasks to the {@link IConcurrencyManager} so
- * that they will obtain the appropriate locks as necessary on the named
- * indices.
+ * task are submitted to the {@link IConcurrencyManager} so that they will
+ * obtain the appropriate locks as necessary on the named indices.
  * 
  * @todo consider side-effects of post-processing tasks (build, split, join, or
- *       move) on a distributed index rebuild operation. It is possible that
- *       the new index partitions may have been defined (but not yet registered
- *       in the metadata index) and that new index resources (on journals or
- *       index segment files) may have been defined. However, none of these
- *       operations should produce incoherent results so it should be possible
- *       to restore a coherent state of the metadata index by picking and
- *       choosing carefully. The biggest danger is choosing a new index
- *       partition which does not yet have all of its state on hand, but we have
- *       the {@link LocalPartitionMetadata#getSourcePartitionId()} which
- *       captures that.
+ *       move) on a distributed index rebuild operation. It is possible that the
+ *       new index partitions may have been defined (but not yet registered in
+ *       the metadata index) and that new index resources (on journals or index
+ *       segment files) may have been defined. However, none of these operations
+ *       should produce incoherent results so it should be possible to restore a
+ *       coherent state of the metadata index by picking and choosing carefully.
+ *       The biggest danger is choosing a new index partition which does not yet
+ *       have all of its state on hand, but we have the
+ *       {@link LocalPartitionMetadata#getSourcePartitionId()} which captures
+ *       that.
  * 
- * @todo if an index partition is moved (or split or joined) while an active
+ * @todo If an index partition is moved (or split or joined) while an active
  *       transaction has a write set for that index partition on a data service
- *       then we may need to move (or split and move) the transaction write set
- *       before it can be validated.
+ *       then we need to move/split/join the transaction write set as well so
+ *       that it stays aligned with the index partition definitions. In this way
+ *       the validate and merge operations may be conducted in parallel for each
+ *       index partition which participates in the transaction.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -364,7 +375,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         // set of index partition views to consider.
         final Iterator<ViewMetadata> itr = overflowMetadata.views();
 
-        // lazily initiallized.
+        // lazily initialized.
         UUID[] moveTargets = null;
 
         while(itr.hasNext()) {
@@ -433,7 +444,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                  * we would be better off using the LBS reported move targets
                  * rather than all discovered data services. However, for a new
                  * federation we are better off with all discovered data
-                 * services since there is less uncertainity about which
+                 * services since there is less uncertainty about which
                  * services will be reported.
                  */
                 // Target data services for the new index partitions.
@@ -743,7 +754,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                  * index partition when it is underutilized since it does not,
                  * by definition, have a rightSibling. However, the last index
                  * partition always has an open key range and is far more likely
-                 * than any other index partition to recieve new writes.
+                 * than any other index partition to receive new writes.
                  */
 
                 if (log.isInfoEnabled())
@@ -861,7 +872,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                          * time. It's possible to do more than that if it
                          * happens that N > 2 underutilized sibling index
                          * partitions are on the same data service, but that is
-                         * a relatively unlikley combination of events.
+                         * a relatively unlikely combination of events.
                          */
 
                         // e.g., already joined as the rightSibling with some
@@ -1540,7 +1551,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * 
              * Note: Since the rightSibling of a tail split is always very small
              * we substitute a small "percentOfSplit" (.1) if a tail split would
-             * be choosen. This let's tail split + move candidates rank up there
+             * be chosen. This let's tail split + move candidates rank up there
              * with small index partitions which are equally hot.
              * 
              * Note: This also helps to prevent very small indices that are not
@@ -1643,7 +1654,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                  * of every prior key), then we can move an "empty" tail - this
                  * could even be done during synchronous overflow. However, if
                  * the tail writes are somewhat more distributed, then we need
-                 * to move the key range of the tail that is recieving the
+                 * to move the key range of the tail that is receiving the
                  * writes.
                  * 
                  * Tail splits allow us to move the least possible data. This is
@@ -2039,7 +2050,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * partitions are not consuming any CPU/RAM/IO resources and moving them to
      * another host will not effect the utilization of either the source or the
      * target host. Moving an index partition which is "hot for write" can
-     * impose a noticable latency because the "hot for write" partition will
+     * impose a noticeable latency because the "hot for write" partition will
      * have absorbed more writes on the journal while we are moving the data
      * from the old view and we will need to move those writes as well. When we
      * move those writes the index will be unavailable for write until it
@@ -2327,7 +2338,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             if (!compactingMerge //
                     // move not in progress
                     && vmd.pmd.getSourcePartitionId() == -1//
-                    // satisifies tail split criteria
+                    // satisfies tail split criteria
                     && vmd.isTailSplit()//
                     ) {
 
