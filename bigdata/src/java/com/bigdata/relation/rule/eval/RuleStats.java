@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule.eval;
 
+import java.text.DateFormat;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
@@ -66,7 +67,7 @@ import com.bigdata.striterator.IKeyOrder;
 public class RuleStats {
 
     /**
-     * Initilizes statistics for an {@link IStep}.
+     * Initializes statistics for an {@link IStep}.
      * <p>
      * Note: This form is used when statistics will be aggregated across the
      * execution of multiple {@link IStep}s, such as when computing the closure
@@ -128,7 +129,7 @@ public class RuleStats {
     }
 
     /**
-     * Initilizes statistics from an {@link iRule} and its
+     * Initializes statistics from an {@link iRule} and its
      * {@link IEvaluationPlan}.
      * <p>
      * Note: This ctor variant makes available the order of execution and range
@@ -253,6 +254,14 @@ public class RuleStats {
      * @see #add(RuleStats)
      */
     public AtomicLong mutationCount = new AtomicLong();
+
+    /**
+     * The start time for the rule execution. This is approximate (it is
+     * initialized when the {@link RuleStats} instance is created). The
+     * startTime is mainly intended for use when correlating collected
+     * performance counters with query execution.
+     */
+    public final long startTime = System.currentTimeMillis();
     
     /**
      * Time to compute the entailments (ms).
@@ -328,7 +337,7 @@ public class RuleStats {
      * zero(0).
      */
     public final int[] subqueryCount;
-    
+
     /**
      * Returns the headings.
      * <p>
@@ -336,6 +345,10 @@ public class RuleStats {
      * <dl>
      * <dt>rule</dt>
      * <dd>The name of the rule.</dd>
+     * <dt>startTime</dt>
+     * <dd>Timestamp taken when the rule begins to execute (approximate). This
+     * is primarily used to correlate performance counters with query execution.
+     * </dd>
      * <dt>elapsed</dt>
      * <dd>Elapsed execution time in milliseconds. When the rules are executed
      * concurrently the times will not be additive.</dd>
@@ -344,8 +357,8 @@ public class RuleStats {
      * <dt>solutions/sec</dt>
      * <dd>The #of solutions computed per second.</dd>
      * <dt>mutationCount</dt>
-     * <dd>The #of solutions that resulted in mutations on a relation (i.e.,
-     * the #of distinct and new solutions). This will be zero unless the rule is
+     * <dd>The #of solutions that resulted in mutations on a relation (i.e., the
+     * #of distinct and new solutions). This will be zero unless the rule is
      * writing on a relation.</dd>
      * <dt>mutations/sec</dt>
      * <dd>The #of mutations per second.</dd>
@@ -366,8 +379,8 @@ public class RuleStats {
      * <dd>The #of elements predicated for each tail predicate in the rule by
      * the {@link IRangeCountFactory} on behalf of the {@link IEvaluationPlan}.</dd>
      * <dt>chunkCount</dt>
-     * <dd>The #of chunks that were generated for the left-hand side of the
-     * JOIN for each predicate in the tail of the rule.</dd>
+     * <dd>The #of chunks that were generated for the left-hand side of the JOIN
+     * for each predicate in the tail of the rule.</dd>
      * <dt>elementCount</dt>
      * <dd>The #of elements that were actually visited for each tail predicate
      * in the rule.</dd>
@@ -377,11 +390,10 @@ public class RuleStats {
      * <dt>tailIndex</dt>
      * <dd>The index in which the tail predicate(s) for rule were declared for
      * the rule. This information is present iff
-     * <code>joinDetails == true</code> was specified. Since the tail
-     * predicates will be written into the table in this order, this information
-     * is mainly of use if you want to resort the table while keeping the
-     * relationship between the predicate evaluation order and the declared
-     * predicate order.</dd>
+     * <code>joinDetails == true</code> was specified. Since the tail predicates
+     * will be written into the table in this order, this information is mainly
+     * of use if you want to resort the table while keeping the relationship
+     * between the predicate evaluation order and the declared predicate order.</dd>
      * <dt>tailPredicate</dt>
      * <dd>The tail predicate(s) for rule in the order in which they were
      * declared for the rule. This information is present iff
@@ -399,7 +411,8 @@ public class RuleStats {
      */
     public String getHeadings() {
      
-        return "rule, elapsed"
+        return "rule"//
+                + ", startTime, elapsed"
                 + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
                 + ", evalOrder, keyOrder, nvars, rangeCount, chunkCount, elementCount, subqueryCount"
                 + ", tailIndex, tailPredicate"
@@ -417,7 +430,7 @@ public class RuleStats {
      *            When <code>true</code> the titles will be displayed inline,
      *            e.g., <code>foo=12</code> vs <code>12</code>.
      * @param joinDetails
-     *            When <code>true</code> , presents a tablular display of the
+     *            When <code>true</code> , presents a tabular display of the
      *            details for each JOIN IFF this {@link RuleStats} was collected
      *            for an {@link IRule} (rather than an aggregation of
      *            {@link IRule}).
@@ -457,7 +470,16 @@ public class RuleStats {
         final String ruleNameStr = "\"" + depthStr.substring(0, depth) + name
                 + (closureRound == 0 ? "" : " round#" + closureRound) + "\"";
 
+        /*
+         * Note: This is the same format that is used for the performance
+         * counters. This makes it easier to correlate what is going on in the
+         * query execution log with the performance counter data.
+         */
+        final DateFormat dateFormat = DateFormat.getDateTimeInstance(
+                DateFormat.MEDIUM/* date */, DateFormat.MEDIUM/* time */);
+
         sb.append(ruleNameStr);
+        sb.append( ", "+(titles?"startTime=":"") + dateFormat.format(startTime));
         sb.append( ", "+(titles?"elapsed=":"") + elapsed );
         sb.append( ", "+(titles?"solutionCount=":"") + solutionCountStr);
         sb.append( ", "+(titles?"solutions/sec=":"") + solutionsPerSec);
@@ -534,7 +556,7 @@ public class RuleStats {
      * @param pred
      *            A predicate from the tail of an {@link IRule}.
      * 
-     * @return The representaiton of that predicate.
+     * @return The representation of that predicate.
      */
     protected String toString(IPredicate pred) {
        
@@ -629,7 +651,7 @@ public class RuleStats {
      * @param minElapsed
      *            The minimum elapsed time for which details will be shown.
      * @param joinDetails
-     *            When <code>true</code>, also presents a tablular display of
+     *            When <code>true</code>, also presents a tabular display of
      *            the details for each JOIN in each {@link IRule}.
      */
     public String toString(final long minElapsed, final boolean joinDetails) {
