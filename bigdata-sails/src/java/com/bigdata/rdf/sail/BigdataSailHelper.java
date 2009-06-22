@@ -597,14 +597,8 @@ public class BigdataSailHelper {
             
         case JDS:
 
-            // Should be a Jini config directory
-//
-//            jiniServicesHelper = new JiniServicesHelper(filename);
-//
-//            jiniServicesHelper.start();
-
-            // don't shutdown in finally{} - jiniServicesHelper will do shutdown instead.
-            fed = new JiniClient(args).connect();
+            // Should be a jini configuration file.
+            fed = new JiniClient(new String[] { args[0] }).connect();
 
             sail = helper.getSail(fed, namespace, timestamp);
 
