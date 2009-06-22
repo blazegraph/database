@@ -531,7 +531,7 @@ public class RuleStats {
                 for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
                     
                     if (tailIndex > 0)
-                        sb.append("\n"+ruleNameStr+(sep+sep+sep+sep+sep));//",,,,,");
+                        sb.append("\n"+ruleNameStr+(sep+sep+sep+sep+sep+sep));//",,,,,");
                     
                     final int i = showInEvalOrder?evalOrder[tailIndex]:tailIndex;
                     final int orderIndex = showInEvalOrder?tailIndex:permutation[i];
