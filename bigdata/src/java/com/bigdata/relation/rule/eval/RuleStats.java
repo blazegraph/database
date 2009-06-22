@@ -67,6 +67,14 @@ import com.bigdata.striterator.IKeyOrder;
 public class RuleStats {
 
     /**
+     * Delimiter string used for output.
+     * <p>
+     * Note: I change to tab-delimited because of embedded commas in the
+     * dateFormat e.g., "Jun 22, 2009 ..."
+     */
+    private final String sep = "\t";//", ";
+    
+    /**
      * Initializes statistics for an {@link IStep}.
      * <p>
      * Note: This form is used when statistics will be aggregated across the
@@ -412,12 +420,26 @@ public class RuleStats {
     public String getHeadings() {
      
         return "rule"//
-                + ", startTime, elapsed"
-                + ", solutionCount, solutions/sec, mutationCount, mutations/sec"
-                + ", evalOrder, keyOrder, nvars, rangeCount, chunkCount, elementCount, subqueryCount"
-                + ", tailIndex, tailPredicate"
-        ;
-        
+                + sep + "startTime"//
+                + sep + "elapsed"//
+                //
+                + sep + "solutionCount"//
+                + sep + "solutions/sec"
+                + sep + "mutationCount" //
+                + sep + "mutations/sec"//
+                //
+                + sep + "evalOrder" //
+                + sep + "keyOrder" //
+                + sep + "nvars"
+                + sep + "rangeCount" //
+                + sep + "chunkCount" //
+                + sep + "elementCount"//
+                + sep + "subqueryCount"//
+                //
+                + sep + "tailIndex"// 
+                + sep + "tailPredicate"//
+                ;
+
     }
     
     /**
@@ -478,25 +500,27 @@ public class RuleStats {
         final DateFormat dateFormat = DateFormat.getDateTimeInstance(
                 DateFormat.MEDIUM/* date */, DateFormat.MEDIUM/* time */);
 
+        final String sep = titles ? ", " : this.sep;
+        
         sb.append(ruleNameStr);
-        sb.append( ", "+(titles?"startTime=":"") + dateFormat.format(startTime));
-        sb.append( ", "+(titles?"elapsed=":"") + elapsed );
-        sb.append( ", "+(titles?"solutionCount=":"") + solutionCountStr);
-        sb.append( ", "+(titles?"solutions/sec=":"") + solutionsPerSec);
-        sb.append( ", "+(titles?"mutationCount=":"") + mutationCountStr);
-        sb.append( ", "+(titles?"mutations/sec=":"") + mutationsPerSec);
+        sb.append( sep+(titles?"startTime=":"") + dateFormat.format(startTime));
+        sb.append( sep+(titles?"elapsed=":"") + elapsed );
+        sb.append( sep+(titles?"solutionCount=":"") + solutionCountStr);
+        sb.append( sep+(titles?"solutions/sec=":"") + solutionsPerSec);
+        sb.append( sep+(titles?"mutationCount=":"") + mutationCountStr);
+        sb.append( sep+(titles?"mutations/sec=":"") + mutationsPerSec);
         
         if(!aggregation) {
             
             if(!joinDetails) {
             
-            sb.append(", "+(titles?"evalOrder=":"")+q+toString(evalOrder)+q);
-            sb.append(", "+(titles?"keyOrder=":"")+q+toString(keyOrder)+q);
-            sb.append(", "+(titles?"nvars=":"")+q+toString(nvars)+q);
-            sb.append(", "+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q);
-            sb.append(", "+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q);
-            sb.append(", "+(titles?"elementCount=":"")+q+ toString(elementCount)+q);
-            sb.append(", "+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q);
+            sb.append(sep+(titles?"evalOrder=":"")+q+toString(evalOrder)+q);
+            sb.append(sep+(titles?"keyOrder=":"")+q+toString(keyOrder)+q);
+            sb.append(sep+(titles?"nvars=":"")+q+toString(nvars)+q);
+            sb.append(sep+(titles?"rangeCount=":"")+q+ toString(rangeCount)+q);
+            sb.append(sep+(titles?"chunkCount=":"")+q+ toString(chunkCount)+q);
+            sb.append(sep+(titles?"elementCount=":"")+q+ toString(elementCount)+q);
+            sb.append(sep+(titles?"subqueryCount=":"")+q+toString(subqueryCount)+q);
 
             } else {
                 
@@ -507,23 +531,23 @@ public class RuleStats {
                 for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
                     
                     if (tailIndex > 0)
-                        sb.append("\n"+ruleNameStr+",,,,,");
+                        sb.append("\n"+ruleNameStr+(sep+sep+sep+sep+sep));//",,,,,");
                     
                     final int i = showInEvalOrder?evalOrder[tailIndex]:tailIndex;
                     final int orderIndex = showInEvalOrder?tailIndex:permutation[i];
                     
-                    sb.append(", "+orderIndex);
+                    sb.append(sep+orderIndex);
                     
-                    sb.append(", "+keyOrder[i]);
-                    sb.append(", "+nvars[i]);
-                    sb.append(", "+rangeCount[i]);
-                    sb.append(", "+chunkCount[i]);
-                    sb.append(", "+elementCount[i]);
-                    sb.append(", "+subqueryCount[i]);
+                    sb.append(sep+keyOrder[i]);
+                    sb.append(sep+nvars[i]);
+                    sb.append(sep+rangeCount[i]);
+                    sb.append(sep+chunkCount[i]);
+                    sb.append(sep+elementCount[i]);
+                    sb.append(sep+subqueryCount[i]);
                     
-                    sb.append(", "+i);
+                    sb.append(sep+i);
                     
-                    sb.append(", \""+toString(r.getTail(i))+"\"");
+                    sb.append(sep+"\""+toString(r.getTail(i))+"\"");
                     
                 }
                 
