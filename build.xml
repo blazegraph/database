@@ -179,6 +179,8 @@
 	<fileset dir="${bigdata.dir}/bigdata-sails/src" />
 </copy>
 <!-- common files for the root of the archive. -->
+<include name="build.properties" />
+<include name="build.xml" />
 <copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
 <copy tofile="${build.dir}/overview.html" file="overview.html" />
 <copy tofile="${build.dir}/README-JINI" file="README-JINI" />
@@ -196,6 +198,8 @@
 	<!-- binary distribution (docs, but no source). -->
 	<tarfileset dir="${build.dir}" prefix="${version}">
 		<!-- common files from the root of the archive. -->
+		<include name="build.properties" />
+		<include name="build.xml" />
 		<include name="LICENSE.txt" />
 		<include name="overview.html" />
 		<include name="README-JINI" />
@@ -214,6 +218,8 @@
 	<!-- source, but no jar, compiled, docs, etc. -->
 	<tarfileset dir="${build.dir}" prefix="${version}">
 		<!-- common files from the root of the archive. -->
+		<include name="build.properties" />
+		<include name="build.xml" />
 		<include name="LICENSE.txt" />
 		<include name="overview.html" />
 		<include name="README-JINI" />
