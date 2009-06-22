@@ -68,11 +68,8 @@ public class RuleStats {
 
     /**
      * Delimiter string used for output.
-     * <p>
-     * Note: I change to tab-delimited because of embedded commas in the
-     * dateFormat e.g., "Jun 22, 2009 ..."
      */
-    private final String sep = "\t";//", ";
+    private final String sep = ", ";//"\t";//", ";
     
     /**
      * Initializes statistics for an {@link IStep}.
@@ -351,15 +348,16 @@ public class RuleStats {
      * <p>
      * The following are present for every record.
      * <dl>
-     * <dt>rule</dt>
-     * <dd>The name of the rule.</dd>
      * <dt>startTime</dt>
      * <dd>Timestamp taken when the rule begins to execute (approximate). This
      * is primarily used to correlate performance counters with query execution.
      * </dd>
+     * <dt>rule</dt>
+     * <dd>The name of the rule.</dd>
      * <dt>elapsed</dt>
      * <dd>Elapsed execution time in milliseconds. When the rules are executed
-     * concurrently the times will not be additive.</dd>
+     * concurrently the individual times will not be additive (they will sum to
+     * more than the elapsed clock time owing to parallel execution).</dd>
      * <dt>solutionCount</dt>
      * <dd>The #of solutions computed.</dd>
      * <dt>solutions/sec</dt>
@@ -419,8 +417,8 @@ public class RuleStats {
      */
     public String getHeadings() {
      
-        return "rule"//
-                + sep + "startTime"//
+        return "startTime"//
+                + sep + "rule"//
                 + sep + "elapsed"//
                 //
                 + sep + "solutionCount"//
@@ -489,7 +487,7 @@ public class RuleStats {
 
         final StringBuilder sb = new StringBuilder();
 
-        final String ruleNameStr = "\"" + depthStr.substring(0, depth) + name
+        final String ruleNameStr = "\"" + depthStr.substring(0, depth) + name.replace(",", "")
                 + (closureRound == 0 ? "" : " round#" + closureRound) + "\"";
 
         /*
@@ -500,15 +498,15 @@ public class RuleStats {
         final DateFormat dateFormat = DateFormat.getDateTimeInstance(
                 DateFormat.MEDIUM/* date */, DateFormat.MEDIUM/* time */);
 
-        final String sep = titles ? ", " : this.sep;
+//        final String sep = titles ? ", " : this.sep;
         
-        sb.append(ruleNameStr);
-        sb.append( sep+(titles?"startTime=":"") + dateFormat.format(startTime));
-        sb.append( sep+(titles?"elapsed=":"") + elapsed );
-        sb.append( sep+(titles?"solutionCount=":"") + solutionCountStr);
-        sb.append( sep+(titles?"solutions/sec=":"") + solutionsPerSec);
-        sb.append( sep+(titles?"mutationCount=":"") + mutationCountStr);
-        sb.append( sep+(titles?"mutations/sec=":"") + mutationsPerSec);
+        sb.append((titles?"startTime=":"") + dateFormat.format(startTime).replace(",", ""));
+        sb.append(sep + (titles ? "rule=" : "") + ruleNameStr);
+        sb.append(sep + (titles ? "elapsed=" : "") + elapsed);
+        sb.append(sep + (titles ? "solutionCount=" : "") + solutionCountStr);
+        sb.append(sep + (titles ? "solutions/sec=" : "") + solutionsPerSec);
+        sb.append(sep + (titles ? "mutationCount=" : "") + mutationCountStr);
+        sb.append(sep + (titles ? "mutations/sec=" : "") + mutationsPerSec);
         
         if(!aggregation) {
             
