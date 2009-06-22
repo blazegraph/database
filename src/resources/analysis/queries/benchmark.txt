@@ -58,6 +58,7 @@ http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices
 ##
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/synchronous/averageMillisPerRequest&correlated=true&depth=14&period=Minutes&file=indices/sync/averageMillisPerRequest
 http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/synchronous/averageElementsPerRequest&correlated=true&depth=14&period=Minutes&file=indices/sync/averageElementsPerRequest
+http://localhost:8080/?regex=/([^/]*)/.*(IClientService|IDataService)/.*/Indices/(.*)/synchronous/requestCount&correlated=true&depth=14&period=Minutes&file=indices/sync/requestCount
 
 ##
 # CPU
