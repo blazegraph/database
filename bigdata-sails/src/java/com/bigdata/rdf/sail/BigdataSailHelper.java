@@ -38,7 +38,7 @@ import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
- * Class provides guidence on parameter setup a data set and queries.
+ * Class provides guidance on parameter setup a data set and queries.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
