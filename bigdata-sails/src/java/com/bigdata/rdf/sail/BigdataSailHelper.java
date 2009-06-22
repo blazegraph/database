@@ -5,11 +5,14 @@
 package com.bigdata.rdf.sail;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
+
+import net.jini.config.ConfigurationException;
 
 import org.openrdf.sail.SailException;
 
@@ -34,8 +37,8 @@ import com.bigdata.service.EmbeddedFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.LocalDataServiceFederation;
+import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.util.JiniServicesHelper;
 
 /**
  * Class provides guidance on parameter setup a data set and queries.
@@ -481,8 +484,10 @@ public class BigdataSailHelper {
      *            <i>filename</i> ((LTS|LDS|EDS|JDS (<i>namespace</i> (<i>timestamp</i>)))
      * 
      * @throws SailException
+     * @throws ConfigurationException 
+     * @throws IOException 
      */
-    public static void main(String[] args) throws SailException {
+    public static void main(String[] args) throws SailException, ConfigurationException, IOException {
        
         if (args.length == 0) {
 
@@ -539,8 +544,8 @@ public class BigdataSailHelper {
         final BigdataSail sail;
         // Note: iff we need to shutdown the federation in finally{}
         final AbstractFederation fed;
-        // Note: iff JDS.
-        final JiniServicesHelper jiniServicesHelper;
+//        // Note: iff JDS.
+//        final JiniServicesHelper jiniServicesHelper;
 
         switch (fedType) {
 
@@ -550,13 +555,13 @@ public class BigdataSailHelper {
 
             fed = null;
             
-            jiniServicesHelper = null;
+//            jiniServicesHelper = null;
 
             break;
 
         case LDS: {
 
-            jiniServicesHelper = null;
+//            jiniServicesHelper = null;
 
             final Properties properties = new Properties();
             
@@ -574,7 +579,7 @@ public class BigdataSailHelper {
             
         case EDS: {
 
-            jiniServicesHelper = null;
+//            jiniServicesHelper = null;
 
             final Properties properties = new Properties();
             
@@ -593,16 +598,15 @@ public class BigdataSailHelper {
         case JDS:
 
             // Should be a Jini config directory
-
-            jiniServicesHelper = new JiniServicesHelper(filename);
-
-            jiniServicesHelper.start();
+//
+//            jiniServicesHelper = new JiniServicesHelper(filename);
+//
+//            jiniServicesHelper.start();
 
             // don't shutdown in finally{} - jiniServicesHelper will do shutdown instead.
-            fed = null;
+            fed = new JiniClient(args).connect();
 
-            sail = helper.getSail(jiniServicesHelper.client.connect(),
-                    namespace, timestamp);
+            sail = helper.getSail(fed, namespace, timestamp);
 
             break;
 
@@ -622,9 +626,14 @@ public class BigdataSailHelper {
 
             // change some property values.
             if(true) {
-                final Properties p = new Properties();
 
-                p.setProperty(Options.NESTED_SUBQUERY, "false");
+                final Properties p = new Properties();
+                
+                System.out.println("reading new properties from stdin::");
+                
+                p.load(System.in);
+
+//                p.setProperty(Options.NESTED_SUBQUERY, "false");
 //                p.setProperty(Options.CHUNK_CAPACITY, "100");
 //                p.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "1000");
 //                p.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
@@ -632,6 +641,7 @@ public class BigdataSailHelper {
 //                p.setProperty(Options.QUERY_TIME_EXPANDER, "false");
 
                 System.out.println("\npost-modification properties::");
+
                 showProperties(helper.setProperties(sail, p));
             }
 
@@ -645,11 +655,11 @@ public class BigdataSailHelper {
                 
             }
             
-            if (jiniServicesHelper != null) {
-                
-                jiniServicesHelper.shutdown();
-                
-            }
+//            if (jiniServicesHelper != null) {
+//                
+//                jiniServicesHelper.shutdown();
+//                
+//            }
             
         }
 
