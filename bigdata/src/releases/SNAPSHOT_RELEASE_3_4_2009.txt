@@ -1,0 +1,14 @@
+This is a snapshot release while we continue to work on some throughtput issues for the clustered database.  
+ 
+The single server RDF DB is in good shape, and has been for some time. Single server deployments do not require either jini or zookeeper. 
+ 
+The distributed system uses jini for service registration and discovery. Earlier this year we did a zookeeper integration which provides support for global synchronous locks, configuration management and master elections. However, service failover will be part of a later release. 
+ 
+There are two files in the release. Once is the source code (-src). The other (-bin) contains the bigdata jar, the javadocs, and all dependencies required to run bigdata (other than the JVM). The 
+dependencies are what make the binary file so large, especially ICU, fastutils, and jini. ICU is optional, but it supports compressed Unicode sort keys, which you do not get with the JDK. 
+ 
+About bigdata: 
+ 
+bigdata(R) is a scale-out storage and computing fabric supporting optional transactions, very high concurrency, and very high aggregate 
+IO rates.
+
