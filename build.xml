@@ -128,6 +128,7 @@
 	<target name="javadoc" depends="prepare" if="javadoc">
 		<mkdir dir="${build.dir}/docs/api" />
 		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" overview="../bigdata/overview.html" windowtitle="bigdata&#174;" classpathref="build.classpath">
+			<arg value="-J-Xmx1000m"/>
 			<packageset dir="${bigdata.dir}/bigdata/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-jini/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
