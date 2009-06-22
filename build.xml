@@ -242,7 +242,7 @@
 		-->
 <exec executable="${ssh.scp}">
 	<!-- verbose protocol. -->
-	<!--<arg value="-v" />-->
+	<arg value="-v" />
 	<!-- compression. -->
 	<arg value="-C" />
 	<!-- pscp specific
@@ -285,8 +285,8 @@
 <exec executable="${ssh.scp}">
 	<!-- recursive. -->
 	<arg value="-r" />
-	<!-- verbose protocol. -->
-	<!-- <arg value="-v" /> -->
+	<!-- verbose protocol (too much info, but let's you observe progress during recursive copy). -->
+	<arg value="-v" />
 	<!-- compression. -->
 	<arg value="-C" />
 	<!-- pscp specific.
