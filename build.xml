@@ -278,8 +278,10 @@
 		</not>
 	</condition>
 </fail>
-<input message="username:" addproperty="ssh.username" defaultValue="${ssh.username}" />
-<input message="password:" addproperty="ssh.password" defaultValue="${ssh.password}" />
+<input message="username:" addproperty="ssh.username2" defaultValue="${ssh.username2}" />
+	<!--
+<input message="password:" addproperty="ssh.password2" defaultValue="${ssh.password2}" />
+-->
 <exec executable="${ssh.scp}">
 	<!-- recursive. -->
 	<arg value="-r" />
@@ -289,13 +291,13 @@
 	<arg value="-C" />
 	<!-- pscp specific.
 	<arg value="-l" />
-	<arg value="${ssh.username}" />
+	<arg value="${ssh.username2}" />
 	<arg value="-pw" />
-	<arg value="${ssh.password}" />-->
+	<arg value="${ssh.password2}" />-->
 	<!-- from -->
 	<arg value="${build.dir}/docs" />
 	<!-- to -->
-	<arg value="shell.speakeasy.net:systap.com/bigdata/" />
+	<arg value="${ssh.username2}@shell.speakeasy.net:systap.com/bigdata/" />
 </exec>
 </target>
 
