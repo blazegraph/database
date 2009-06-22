@@ -72,7 +72,7 @@ if [ -f "$lockFile" ]; then
    	$ruleLog* \
    	$errorLog* \
    	$targetDir
-    tar -cvz -C "$targetDir/.." -f $tarball $targetDir/output
+    tar -cvz -C "$targetDir/.." -f $tarball $targetDir
     echo "extracted performance counter archive is ready: $tarball"
     ls -lh $tarball
 else
