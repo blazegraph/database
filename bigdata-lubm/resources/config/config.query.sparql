@@ -19,19 +19,6 @@ WHERE{
  	 ub:takesCourse <http://www.Department0.University0.edu/GraduateCourse0>.
 }
 
-[query2]
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
-SELECT ?x ?y ?z
-WHERE{
-	?x a ub:GraduateStudent .
-	?y a ub:University .
-	?z a ub:Department .
-	?x ub:memberOf ?z .
-	?z ub:subOrganizationOf ?y .
-	?x ub:undergraduateDegreeFrom ?y
-}
-
 [query3]
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
@@ -62,14 +49,6 @@ WHERE{
 	 ub:memberOf <http://www.Department0.University0.edu> .
 }
 	 
-[query6]
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
-SELECT ?x
-WHERE{
-	?x a ub:Student
-}
-
 [query7]
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
@@ -91,20 +70,6 @@ WHERE{
 		ub:memberOf ?y .
 	?y ub:subOrganizationOf <http://www.University0.edu> .
 	?x ub:emailAddress ?z .
-}
-
-# Note: Slow for U50 or JDS.
-[query9]
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
-SELECT ?x ?y ?z
-WHERE{
-	?x a ub:Student .
-	?y a ub:Faculty .
-	?z a ub:Course .
-	?x ub:advisor ?y .
-	?y ub:teacherOf ?z .
-	?x ub:takesCourse ?z .
 }
 
 [query10]
@@ -145,10 +110,48 @@ WHERE{
 	<http://www.University0.edu> ub:hasAlumnus ?x .
 }
 
+# These are the longer running queries.  They are listed here in order
+# by their typical running time.  This makes it easier to gather the
+# fast statistics first.
+
 [query14]
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
 SELECT ?x
 WHERE{
 	?x a ub:UndergraduateStudent .
+}
+
+[query6]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x
+WHERE{
+	?x a ub:Student
+}
+
+[query9]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y ?z
+WHERE{
+	?x a ub:Student .
+	?y a ub:Faculty .
+	?z a ub:Course .
+	?x ub:advisor ?y .
+	?y ub:teacherOf ?z .
+	?x ub:takesCourse ?z .
+}
+
+[query2]
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+SELECT ?x ?y ?z
+WHERE{
+	?x a ub:GraduateStudent .
+	?y a ub:University .
+	?z a ub:Department .
+	?x ub:memberOf ?z .
+	?z ub:subOrganizationOf ?y .
+	?x ub:undergraduateDegreeFrom ?y
 }
