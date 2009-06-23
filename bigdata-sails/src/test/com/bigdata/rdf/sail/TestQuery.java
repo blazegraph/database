@@ -199,7 +199,7 @@ public class TestQuery extends ProxyBigdataSailTestCase {
                             new Var("3", takesCourse),//
                             new Var("4", graduateCourse0)));
 
-            System.err.println("queryString: "+getQueryString(tupleExpr));
+//            System.err.println("queryString: "+getQueryString(tupleExpr));
             
             /*
              * Create a data set consisting of the contexts to be queried.
@@ -283,16 +283,16 @@ public class TestQuery extends ProxyBigdataSailTestCase {
 
     }
     
-    protected static String getQueryString(QueryModelNode node) {
-        
-        while (node.getParentNode() != null) {
-
-            node = node.getParentNode();
-
-        }
-        
-        return node.toString();
-        
-    }
+//    protected static String getQueryString(QueryModelNode node) {
+//        
+//        while (node.getParentNode() != null) {
+//
+//            node = node.getParentNode();
+//
+//        }
+//        
+//        return node.toString();
+//        
+//    }
     
 }
