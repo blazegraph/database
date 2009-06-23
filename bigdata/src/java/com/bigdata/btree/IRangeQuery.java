@@ -308,7 +308,7 @@ public interface IRangeQuery {
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey);
 
     /**
-     * Designated variant (the one that gets overriden) for an iterator that
+     * Designated variant (the one that gets overridden) for an iterator that
      * visits the entries in a half-open key range. When <i>toKey</i>
      * <em>EQ</em> <i>fromKey</i> nothing will be visited. It is an error if
      * <i>toKey</i> <em>LT</em> <i>fromKey</i>.
