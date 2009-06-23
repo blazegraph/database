@@ -100,7 +100,7 @@ public class Banner {
         "\n                  Affordable"+
         "\n      Web-Scale Computing for the Enterprise"+
         "\n"+
-        "\nCopyright SYSTAP, LLC 2006-2008.  All rights reserved."+
+        "\nCopyright SYSTAP, LLC 2006-2009.  All rights reserved."+
         "\n"+
         "\n"+new Date()
         ;
