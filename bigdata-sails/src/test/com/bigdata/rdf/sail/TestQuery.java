@@ -46,6 +46,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Join;
+import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
@@ -90,9 +91,9 @@ public class TestQuery extends ProxyBigdataSailTestCase {
      */
     protected void loadData(BigdataSail sail) throws IOException {
 
-        File dir = new File("src/resources/U1");
+        final File dir = new File("bigdata-rdf/src/resources/data/lehigh/U1");
 
-        String[] filenames = dir.list(new FilenameFilter() {
+        final String[] filenames = dir.list(new FilenameFilter() {
 
             public boolean accept(File parent, String name) {
 
@@ -105,11 +106,11 @@ public class TestQuery extends ProxyBigdataSailTestCase {
 
         final int n = filenames.length;
 
-        String[] resource = new String[n];
+        final String[] resource = new String[n];
 
-        String[] baseURL = new String[n];
+        final String[] baseURL = new String[n];
 
-        RDFFormat[] rdfFormat = new RDFFormat[n];
+        final RDFFormat[] rdfFormat = new RDFFormat[n];
 
         for (int i = 0; i < n; i++) {
 
@@ -198,6 +199,8 @@ public class TestQuery extends ProxyBigdataSailTestCase {
                             new Var("3", takesCourse),//
                             new Var("4", graduateCourse0)));
 
+            System.err.println("queryString: "+getQueryString(tupleExpr));
+            
             /*
              * Create a data set consisting of the contexts to be queried.
              * 
@@ -278,6 +281,18 @@ public class TestQuery extends ProxyBigdataSailTestCase {
             
         }
 
+    }
+    
+    protected static String getQueryString(QueryModelNode node) {
+        
+        while (node.getParentNode() != null) {
+
+            node = node.getParentNode();
+
+        }
+        
+        return node.toString();
+        
     }
     
 }
