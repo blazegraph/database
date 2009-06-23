@@ -9,9 +9,11 @@
 source `dirname $0`/bigdataenv
 
 if [ -z "$1" ]; then
-    echo "usage: $0 namespace [queryFile]"
+    echo "usage: $0 namespace [queryFile [ntrials [nparallel]]]"
     echo "   where 'namespace' is the namespace of the KB."
     echo "   where 'queryFile' is the name of a file containing queries to be executed (defaults to all LUBM queries)."
+    echo "   where 'ntrials is the #of trials for each query in the file (defaults to 10)."
+    echo "   where 'nparallel is the concurrent presentations of a query in each trial (defaults to 1)."
     exit 1;
 fi
 
@@ -24,12 +26,18 @@ if [ -z "$queryFile" ]; then
 fi
 
 # The #of trials for each query.
-ntrials=1
+ntrials=$3
+if [ -z "$ntrials" ]; then
+    ntrials=10
+fi
 
 # The #of current presentation within each query trial.  This does not
 # present a mixture of the queries, but only a concurrent presentation
 # of each query within a given trial.
-nparallel=1
+nparallel=$4
+if [ -z "$nparallel" ]; then
+    nparallel=1
+fi
 
 # Uncomment if you want to see all the httpd requests.
 #verbose=-verbose
