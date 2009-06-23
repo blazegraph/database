@@ -54,8 +54,6 @@
 		<mkdir dir="${build.dir}" />
 		<mkdir dir="${build.dir}/classes" />
 		<mkdir dir="${build.dir}/docs" />
-		<mkdir dir="${build.dir}/lib" />
-		<mkdir dir="${build.dir}/src" />
 	</target>
 
 	<!-- Note: javac error results often if verbose is disabled. -->
@@ -146,7 +144,7 @@
 </target>
 
 <target name="bundle" description="Bundles all dependencies for easier deployments and releases (does not bundle the bigdata jar).">
-<copy toDir="${build.dir}/lib">
+<copy toDir="${build.dir}/bigdata/lib">
 	<fileset dir="${bigdata.dir}/bigdata/lib">
 		<include name="**/*.jar" />
 		<include name="**/*.so" />
@@ -158,12 +156,18 @@
 		<!-- The BytesUtil JNI class is not recommended at this time (no performance gain). -->
 		<exclude name="**/*BytesUtil*" />
 	</fileset>
+</copy>
+<copy toDir="${build.dir}/bigdata-jini/lib">
 	<fileset dir="${bigdata.dir}/bigdata-jini/lib">
 		<include name="**/*.jar" />
 	</fileset>
+</copy>
+<copy toDir="${build.dir}/bigdata-rdf/lib">
 	<fileset dir="${bigdata.dir}/bigdata-rdf/lib">
 		<include name="**/*.jar" />
 	</fileset>
+</copy>
+<copy toDir="${build.dir}/bigdata-sails/lib">
 	<fileset dir="${bigdata.dir}/bigdata-sails/lib">
 		<include name="**/*.jar" />
 	</fileset>
@@ -172,15 +176,21 @@
 
 <target name="release-prepare" depends="jar, bundle, javadoc" description="create a release.">
 <!-- The source tree. -->
-<copy toDir="${build.dir}/src">
+<copy toDir="${build.dir}/bigdata/src">
 	<fileset dir="${bigdata.dir}/bigdata/src" />
+</copy>
+<copy toDir="${build.dir}/bigdata-jini/src">
 	<fileset dir="${bigdata.dir}/bigdata-jini/src" />
+</copy>
+<copy toDir="${build.dir}/bigdata-rdf/src">
 	<fileset dir="${bigdata.dir}/bigdata-rdf/src" />
+</copy>
+<copy toDir="${build.dir}/bigdata-sails/src">
 	<fileset dir="${bigdata.dir}/bigdata-sails/src" />
 </copy>
 <!-- common files for the root of the archive. -->
-<include name="build.properties" />
-<include name="build.xml" />
+<copy tofile="${build.dir}/build.properties" file="build.properties" />
+<copy tofile="${build.dir}/build.xml" file="build.xml" />
 <copy tofile="${build.dir}/LICENSE.txt" file="LICENSE.txt" />
 <copy tofile="${build.dir}/overview.html" file="overview.html" />
 <copy tofile="${build.dir}/README-JINI" file="README-JINI" />
@@ -205,10 +215,16 @@
 		<include name="README-JINI" />
 		<include name="LEGAL/*" />
 		<!-- src, classes, jar, lib, docs. -->
-		<exclude name="src/**" />
+		<exclude name="bigdata/src/**" />
+		<exclude name="bigdata-jini/src/**" />
+		<exclude name="bigdata-rdf/src/**" />
+		<exclude name="bigdata-sails/src/**" />
 		<exclude name="classes/**" />
 		<include name="${version}.jar" />
-		<include name="lib/**" />
+		<include name="bigdata/lib/**" />
+		<include name="bigdata-jini/lib/**" />
+		<include name="bigdata-rdf/lib/**" />
+		<include name="bigdata-sails/lib/**" />
 		<include name="docs/**" />
 	</tarfileset>
 </tar>
@@ -225,10 +241,16 @@
 		<include name="README-JINI" />
 		<include name="LEGAL/*" />
 		<!-- src, classes, jar, lib, docs. -->
-		<include name="src/**" />
+		<include name="bigdata/src/**" />
+		<include name="bigdata-jini/src/**" />
+		<include name="bigdata-rdf/src/**" />
+		<include name="bigdata-sails/src/**" />
 		<exclude name="classes/**" />
 		<exclude name="${version}.jar" />
-		<exclude name="lib/**" />
+		<exclude name="bigdata/lib/**" />
+		<exclude name="bigdata-jini/lib/**" />
+		<exclude name="bigdata-rdf/lib/**" />
+		<exclude name="bigdata-sails/lib/**" />
 		<exclude name="docs/**" />
 	</tarfileset>
 </tar>
