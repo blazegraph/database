@@ -24,16 +24,17 @@ http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load+Ser
 #http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/TIDsReadyCount&depth=8&correlated=true&file=service/cs/TIDsReadyCount
 
 # newer distributed client parser
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/TIDsReadyCount&depth=8&correlated=true&file=service/cs/TIDsReadyCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/TIDsWaitingCount&depth=8&correlated=true&file=service/cs/TIDsWaitingCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentErrorCount&depth=8&correlated=true&file=service/cs/documentErrorCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentRestartSafeCount&depth=8&correlated=true&file=service/cs/documentRestartSafeCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentsParsedCount&depth=8&correlated=true&file=service/cs/documentsParsedCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentsPendingWritesCount&depth=8&correlated=true&file=service/cs/documentsPendingWritesCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/documentsWaitingOnWritesCount&depth=8&correlated=true&file=service/cs/documentsWaitingOnWritesCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesRestartSafeCount&depth=8&correlated=true&file=service/cs/toldTriplesRestartSafeCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesWriteCount&depth=8&correlated=true&file=service/cs/toldTriplesWriteCount
-http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/unfinishedDocumentCount&depth=8&correlated=true&file=service/cs/unfinishedDocumentCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(TIDsReadyCount)&depth=8&correlated=true&file=service/cs/TIDsReadyCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(TIDsWaitingCount)&depth=8&correlated=true&file=service/cs/TIDsWaitingCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(documentErrorCount)&depth=8&correlated=true&file=service/cs/documentErrorCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(documentRestartSafeCount)&depth=8&correlated=true&file=service/cs/documentRestartSafeCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(documentsParsedCount)&depth=8&correlated=true&file=service/cs/documentsParsedCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(documentsPendingWritesCount)&depth=8&correlated=true&file=service/cs/documentsPendingWritesCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(documentsWaitingOnWritesCount)&depth=8&correlated=true&file=service/cs/documentsWaitingOnWritesCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(toldTriplesRestartSafeCount)&depth=8&correlated=true&file=service/cs/toldTriplesRestartSafeCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(toldTriplesWriteCount)&depth=8&correlated=true&file=service/cs/toldTriplesWriteCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/(unfinishedDocumentCount)&depth=8&correlated=true&file=service/cs/unfinishedDocumentCount
+http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/toldTriplesRestartSafePerSec&depth=7&correlated=true&period=Minutes&file=service/cs/toldTriplesRestartSafePerSec
 
 http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load Service/Task Submit Count&depth=8&correlated=true&file=service/cs/taskSubmitCount
 http://localhost:8080/?regex=/([^/]*)/.*/U.*/Concurrent%20Data%20Loader/Load Service/Task Complete Count&depth=8&correlated=true&file=service/cs/taskCompleteCount

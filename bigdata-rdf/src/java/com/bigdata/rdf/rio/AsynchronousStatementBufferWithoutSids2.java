@@ -1645,7 +1645,44 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
          * so we do not double count).
          */
         private final LongAggregator statementResultHandler = new LongAggregator();
+        
+        /**
+         * The timestamp taken when the first statement buffer is requested from
+         * this factory.
+        * @todo Report told triples per second. The class lacks the concept of
+        *       the start time for the data load operation, but that could be
+        *       the time the 1st statement buffer is requested. The end time
+        *       for the load will be set by {@link #close()} or
+        *       {@link #cancelAll(boolean)}.
+        */
+        private long startTime;
+        /**
+         * The timestamp taken when the factory is {@link #close()}d or when
+         * execution is {@link #cancelAll(boolean) cancelled}.
+         */
+        private long endTime;
 
+        /**
+         * The elapsed milliseconds between the time the first statement buffer
+         * was requested and either the current time -or- the time the factory
+         * finished work. In the latter case, the end time is assigned either by
+         * {@link #close()} or by {@link #cancelAll(boolean)}.
+         */
+        public long getElapsedMillis() {
+
+            if (startTime == 0L)
+                return 0L;
+
+            if (endTime == 0L) {
+
+                return System.currentTimeMillis() - startTime;
+                
+            }
+            
+            return endTime - startTime;
+            
+        }
+        
         /**
          * Lock used for making termination conditions in {@link #close()}
          * atomic.
@@ -2047,6 +2084,7 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
 
                 } finally {
                     lock.unlock();
+                    endTime = System.currentTimeMillis();
                 }
                 
             } catch (InterruptedException ex) {
@@ -2105,13 +2143,6 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
 
         }
 
-        /**
-         * @todo Report told triples per second. The class lacks the concept of
-         *       the start time for the data load operation, but that could be
-         *       the time the 1st statement buffer is requested. The end time
-         *       for the load will be set by {@link #close()} or
-         *       {@link #cancelAll(boolean)}.
-         */
         public CounterSet getCounters() {
             
             final CounterSet counterSet = new CounterSet();
@@ -2203,7 +2234,28 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
                     setValue(toldTriplesRestartSafeCount.get());
                 }
             });
-            
+
+            /**
+             * The told triples per second rate which have been made restart
+             * safe by this factory object. When you are loading using multiple
+             * clients, then the total told triples per second rate is the
+             * aggregation across all of those instances.
+             */
+            counterSet.addCounter("toldTriplesRestartSafePerSec", new Instrument<Long>() {
+
+                @Override
+                protected void sample() {
+
+                    final long elapsed = getElapsedMillis();
+
+                    final double tps = (long) (((double) toldTriplesRestartSafeCount.get())
+                            / ((double) elapsed) * 1000d);
+
+                    setValue((long) tps);
+
+                }
+            });
+
             /**
              * The #of documents which have been processed by this client and
              * are restart safe on the database by this client.
