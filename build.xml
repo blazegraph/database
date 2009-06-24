@@ -54,6 +54,7 @@
 		<mkdir dir="${build.dir}" />
 		<mkdir dir="${build.dir}/classes" />
 		<mkdir dir="${build.dir}/docs" />
+		<mkdir dir="${build.dir}/lib" />
 	</target>
 
 	<!-- Note: javac error results often if verbose is disabled. -->
@@ -144,7 +145,7 @@
 </target>
 
 <target name="bundle" description="Bundles all dependencies for easier deployments and releases (does not bundle the bigdata jar).">
-<copy toDir="${build.dir}/bigdata/lib">
+<copy toDir="${build.dir}/lib">
 	<fileset dir="${bigdata.dir}/bigdata/lib">
 		<include name="**/*.jar" />
 		<include name="**/*.so" />
@@ -156,18 +157,12 @@
 		<!-- The BytesUtil JNI class is not recommended at this time (no performance gain). -->
 		<exclude name="**/*BytesUtil*" />
 	</fileset>
-</copy>
-<copy toDir="${build.dir}/bigdata-jini/lib">
 	<fileset dir="${bigdata.dir}/bigdata-jini/lib">
 		<include name="**/*.jar" />
 	</fileset>
-</copy>
-<copy toDir="${build.dir}/bigdata-rdf/lib">
 	<fileset dir="${bigdata.dir}/bigdata-rdf/lib">
 		<include name="**/*.jar" />
 	</fileset>
-</copy>
-<copy toDir="${build.dir}/bigdata-sails/lib">
 	<fileset dir="${bigdata.dir}/bigdata-sails/lib">
 		<include name="**/*.jar" />
 	</fileset>
@@ -221,10 +216,7 @@
 		<exclude name="bigdata-sails/src/**" />
 		<exclude name="classes/**" />
 		<include name="${version}.jar" />
-		<include name="bigdata/lib/**" />
-		<include name="bigdata-jini/lib/**" />
-		<include name="bigdata-rdf/lib/**" />
-		<include name="bigdata-sails/lib/**" />
+		<include name="lib/**" />
 		<include name="docs/**" />
 	</tarfileset>
 </tar>
@@ -247,10 +239,7 @@
 		<include name="bigdata-sails/src/**" />
 		<exclude name="classes/**" />
 		<exclude name="${version}.jar" />
-		<exclude name="bigdata/lib/**" />
-		<exclude name="bigdata-jini/lib/**" />
-		<exclude name="bigdata-rdf/lib/**" />
-		<exclude name="bigdata-sails/lib/**" />
+		<exclude name="lib/**" />
 		<exclude name="docs/**" />
 	</tarfileset>
 </tar>
