@@ -61,6 +61,7 @@ import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
+import com.bigdata.relation.rule.eval.RuleLog;
 import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.service.DataService;
@@ -673,6 +674,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             solutionCount = joinStats[order[tailCount - 1]].bindingSetsOut;
 
         }
+
         ruleStats.solutionCount.addAndGet(solutionCount);
         
         /*
@@ -699,16 +701,16 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
 
             log.info("\n" + ruleStats);
             
-            /*
-             * Note: This provides more detail on this join algorithm than the
-             * RuleStats view, however the per-predicate per-index partition
-             * details are not available since these data aggregate across all
-             * index partitions for a given tail predicate.
-             */
-            
-            log.info("\n"+JoinStats.toString(rule, order, joinStats));
-        
         }
+        
+        /*
+         * Note: This provides more detail on this join algorithm than the
+         * RuleStats view, however the per-predicate per-index partition
+         * details are not available since these data aggregate across all
+         * index partitions for a given tail predicate.
+         */
+        
+        RuleLog.log(rule, ruleState, joinStats);
         
     }
     
@@ -726,6 +728,7 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             
         }
         
+        // the totals for that join dimension.
         final JoinStats total = this.joinStats[joinStats.orderIndex];
 
         total.add(joinStats);

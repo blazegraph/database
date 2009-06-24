@@ -19,6 +19,7 @@ import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.Or;
+import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
@@ -68,7 +69,6 @@ import com.bigdata.relation.rule.QueryOptions;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
-import com.bigdata.relation.rule.eval.FixedEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
@@ -573,7 +573,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         
         // generate native rule
         final IRule rule = new Rule(
-                "nativeJoin",
+                "nativeJoin", // @todo should serialize the query string here for the logs.
                 null, // head
                 tails.toArray(new IPredicate[tails.size()]),
                 queryOptions,//

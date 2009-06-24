@@ -38,7 +38,7 @@ import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.RDFFileLoadTask;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids2.AsynchronousWriteBufferFactoryWithoutSids2;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -47,7 +47,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.service.AbstractFederation;
 
 /**
- * Test suite for {@link AsynchronousStatementBufferWithoutSids}.
+ * Test suite for {@link AsynchronousStatementBufferWithoutSids2}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -62,19 +62,19 @@ import com.bigdata.service.AbstractFederation;
  * @see TestScaleOutTripleStoreWithEmbeddedFederation
  * @see RDFFileLoadTask
  */
-public class TestAsynchronousStatementBufferWithoutSids extends
+public class TestAsynchronousStatementBufferWithoutSids2 extends
         AbstractRIOTestCase {
 
     /**
      * 
      */
-    public TestAsynchronousStatementBufferWithoutSids() {
+    public TestAsynchronousStatementBufferWithoutSids2() {
     }
 
     /**
      * @param name
      */
-    public TestAsynchronousStatementBufferWithoutSids(String name) {
+    public TestAsynchronousStatementBufferWithoutSids2(String name) {
         super(name);
     }
 
@@ -82,9 +82,6 @@ public class TestAsynchronousStatementBufferWithoutSids extends
     final int chunkSize = 20000;
     final int valuesInitialCapacity = 10000;
     final int bnodesInitialCapacity = 16;
-
-    // FIXME syncRPCForTERM2ID parameter.
-    final boolean syncRPCForTERM2ID = false;
     
     /**
      * SHOULD be <code>true</code> since the whole point of this is higher
@@ -114,7 +111,7 @@ public class TestAsynchronousStatementBufferWithoutSids extends
         properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
                 NoVocabulary.class.getName());
 
-        if(!syncRPCForTERM2ID) {
+        {
 
             /*
              * FIXME We MUST specify the KB namespace so we can override this
@@ -254,18 +251,19 @@ public class TestAsynchronousStatementBufferWithoutSids extends
     }
 
     /**
-     * Load using {@link AsynchronousStatementBufferWithoutSids}.
+     * Load using {@link AsynchronousStatementBufferWithoutSids2}.
      */
     protected void doLoad(final AbstractTripleStore store,
             final String resource, final boolean parallel)
             throws Exception {
 
-        final AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement> statementBufferFactory = new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
+        final AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File> statementBufferFactory = new AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File>(
                 (ScaleOutTripleStore) store, chunkSize, valuesInitialCapacity,
-                bnodesInitialCapacity, syncRPCForTERM2ID);
+                bnodesInitialCapacity);
 
         try {
 
+            // parse all documents.
             doLoad(store, resource, parallel, statementBufferFactory);
             
             // wait for the async writes to complete.

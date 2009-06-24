@@ -1,6 +1,10 @@
 package com.bigdata.relation.rule.eval.pipeline;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+
 import java.io.Serializable;
+import java.text.DateFormat;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -8,6 +12,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.RuleStats;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask.AccessPathTask;
 
@@ -28,6 +33,15 @@ public class JoinStats implements Serializable {
     private static final long serialVersionUID = 9028650921831777131L;
 
     /**
+     * The timestamp associated with the start of execution for the join
+     * dimension. This is not aggregated. The timestamp is assigned when the
+     * {@link JoinStats} object is created. That corresponds either to the start
+     * of the distributed {@link JoinMasterTask} execution (aggregated level) or
+     * to the start of some specific {@link JoinTask} (detail level).
+     */
+    public final long startTime;
+    
+    /**
      * The index partition for which these statistics were collected or -1
      * if the statistics are aggregated across index partitions.
      */
@@ -38,15 +52,42 @@ public class JoinStats implements Serializable {
      */
     public final int orderIndex;
 
-    /** #of join tasks writing on this join task. */
+    /**
+     * The maximum observed fan in for this join dimension (maximum #of sources
+     * observed writing on any join task for this join dimension). Since join
+     * tasks may be closed and new join tasks re-opened for the same query, join
+     * dimension and index partition, and since each join task for the same join
+     * dimension could, in principle, have a different fan in based on the
+     * actual binding sets propagated this is not necessarily the "actual" fan
+     * in for the join dimension.
+     */
     public int fanIn;
 
     /**
-     * #of join tasks written on by this join task (zero if last in eval
-     * order).
+     * The maximum observed fan out for this join dimension (maximum #of sinks
+     * on which any join task is writing for this join dimension). Since join
+     * tasks may be closed and new join tasks re-opened for the same query, join
+     * dimension and index partition, and since each join task for the same join
+     * dimension could, in principle, have a different fan out based on the
+     * actual binding sets propagated this is not necessarily the "actual" fan
+     * out for the join dimension.
      */
     public int fanOut;
 
+    /**
+     * The #of index partitions for which join tasks were created for this join
+     * dimension. This is computed by explicitly tracking the distinct index
+     * partition identifiers reported for the join dimension. This is the "real"
+     * fan out for the prior join dimension.
+     */
+    public int partitionCount;
+
+    /**
+     * Map used to track the #of distinct partition identifiers for this join
+     * dimension.
+     */
+    transient private IntSet partitionIds;
+    
     /**
      * The #of binding set chunks read from all source {@link JoinTask}s.
      */
@@ -135,18 +176,20 @@ public class JoinStats implements Serializable {
     public JoinStats(final int orderIndex) {
 
         this(-1, orderIndex);
-
+        
     }
 
     /**
      * Ctor variant used by a {@link JoinTask} to self-report.
      * 
      * @param partitionId
-     *            The index partition.
+     *            The index partition identifier.
      * @param orderIndex
      *            The index in the evaluation order.
      */
     public JoinStats(final int partitionId, final int orderIndex) {
+
+        this.startTime = System.currentTimeMillis();
 
         this.partitionId = partitionId;
 
@@ -154,6 +197,9 @@ public class JoinStats implements Serializable {
 
         fanIn = fanOut = 0;
 
+        // either zero or one depending on the ctor.
+        partitionCount = partitionId == -1 ? 0 : 1;
+        
         bindingSetChunksIn = bindingSetsIn = 0L;
         
         accessPathCount = accessPathDups = 0L;
@@ -169,8 +215,29 @@ public class JoinStats implements Serializable {
         if (this.orderIndex != o.orderIndex)
             throw new IllegalArgumentException();
 
-        this.fanIn += o.fanIn;
-        this.fanOut += o.fanOut;
+        if (partitionIds == null) {
+            /*
+             * Track the distinct partition identifiers for which join tasks
+             * were created for this join dimension. This gives us the real
+             * fanOut of the distributed join. However, this is the fanOut
+             * across the entire execution of the join. The maximum concurrent
+             * fanOut is just [fanOut].
+             */
+            partitionIds = new IntOpenHashSet();
+        }
+        if (partitionIds.add(o.partitionId)) {
+            // one more distinct partition identifier.
+            partitionCount++;
+        }
+        
+        if (o.fanIn > this.fanIn) {
+            // maximum reported fanIn for this join dimension.
+            this.fanIn = o.fanIn;
+        }
+        if (o.fanOut > this.fanOut) {
+            // maximum reported fanOut for this join dimension.
+            this.fanOut += o.fanOut;
+        }
         this.bindingSetChunksIn += o.bindingSetChunksIn;
         this.bindingSetsIn += o.bindingSetsIn;
         this.accessPathCount += o.accessPathCount;
@@ -194,6 +261,8 @@ public class JoinStats implements Serializable {
         sb.append(", fanIn="+fanIn);
         
         sb.append(", fanOut="+fanOut);
+
+        sb.append(", partitionIdCount="+partitionCount);
         
         sb.append(", bindingSetChunksIn="+bindingSetChunksIn);
         
@@ -223,22 +292,33 @@ public class JoinStats implements Serializable {
      * Formats the array of {@link JoinStats} into a CSV table view.
      * 
      * @param rule
-     *            The {@link IRule} whose {@link JoinStats} are being
-     *            reported.
-     * @param order
-     *            The execution order for the {@link IPredicate}s in the
-     *            tail of the <i>rule</i>.
+     *            The {@link IRule} whose {@link JoinStats} are being reported.
+     * @param ruleState
+     *            Contains details about evaluation order for the
+     *            {@link IPredicate}s in the tail of the <i>rule</i>, the access
+     *            paths that were used, etc.
      * @param a
      *            The {@link JoinStats}.
      * 
      * @return The table view.
      */
     public static StringBuilder toString(final IRule rule,
-            final int[] order, final JoinStats[] a) {
+            final IRuleState ruleState, final JoinStats[] a) {
+
+        /*
+         * Note: This is the same format that is used for the performance
+         * counters. This makes it easier to correlate what is going on in the
+         * query execution log with the performance counter data.
+         */
+        final DateFormat dateFormat = DateFormat.getDateTimeInstance(
+                DateFormat.MEDIUM/* date */, DateFormat.MEDIUM/* time */);
+
+        final int[] order = ruleState.getPlan().getOrder();
         
         final StringBuilder sb = new StringBuilder();
         
-        sb.append("rule, orderIndex, partitionId, fanIn, fanOut, bindingSetChunksIn, bindingSetsIn, accessPathCount, accessPathDups, chunkCount, elementCount, bindingSetsOut, bindingSetChunksOut, mutationCount, tailIndex, tailPredicate");
+        // Note: orderIndex is also known as the evalOrder.
+        sb.append("startTime, rule, orderIndex, keyOrder, nvars, rangeCount, fanIn, fanOut, partitionCount, bindingSetChunksIn, bindingSetsIn, accessPathCount, accessPathDups, chunkCount, elementCount, bindingSetsOut, bindingSetChunksOut, mutationCount, tailIndex, tailPredicate");
         
         sb.append("\n");
         
@@ -247,11 +327,17 @@ public class JoinStats implements Serializable {
 
             final int tailIndex = order[i++];
 
+            sb.append(dateFormat.format(s.startTime).replace(",", ""));
             sb.append(rule.getName().replace(',', ' ')+", ");
             sb.append(Integer.toString(s.orderIndex)+", ");
-            sb.append(Integer.toString(s.partitionId)+", ");
+//            sb.append(Integer.toString(s.partitionId)+", "); // always -1 when aggregated.
+            // keyOrder aka evaluation order.
+            sb.append(ruleState.getKeyOrder()[tailIndex].toString().replace(",", ""));
+            sb.append(ruleState.getNVars()[tailIndex]);
+            sb.append(ruleState.getPlan().rangeCount(tailIndex));
             sb.append(Integer.toString(s.fanIn)+", ");
             sb.append(Integer.toString(s.fanOut)+", ");
+            sb.append(Integer.toString(s.partitionCount)+", ");
             sb.append(Long.toString(s.bindingSetChunksIn)+", ");
             sb.append(Long.toString(s.bindingSetsIn)+", ");
             sb.append(Long.toString(s.accessPathCount)+", ");

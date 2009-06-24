@@ -5,7 +5,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
+import com.bigdata.rdf.rio.IAsynchronousWriteStatementBufferFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -138,44 +138,11 @@ public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
             }
         });
 
-        if (bufferFactory instanceof AsynchronousWriteBufferFactoryWithoutSids) {
+        if (bufferFactory instanceof IAsynchronousWriteStatementBufferFactory) {
 
-            /**
-             * The #of documents whose TERM2ID writes are restart-safe on the
-             * database. Each parser thread will block until the TERM2ID writes
-             * are done and then proceed to write on the remaining indices.
-             */
-            counterSet.addCounter("TIDsReadyCount", new Instrument<Long>() {
-                @Override
-                protected void sample() {
-                    setValue(((AsynchronousWriteBufferFactoryWithoutSids) bufferFactory)
-                            .getTIDsReadyCount());
-                }
-            });
-
-            /**
-             * The #of parser tasks that are currently blocked awaiting the results
-             * of a write on the TERM2ID index.
-             */
-            counterSet.addCounter("blockedParserTaskCount", new Instrument<Integer>() {
-                @Override
-                protected void sample() {
-                    setValue(((AsynchronousWriteBufferFactoryWithoutSids) bufferFactory)
-                            .getBlockedParserCount());
-                }
-            });
-
-            /**
-             * The #of documents which have been processed by this client and
-             * are restart safe on the database by this client.
-             */
-            counterSet.addCounter("documentsDoneCount", new Instrument<Long>() {
-                @Override
-                protected void sample() {
-                    setValue(((AsynchronousWriteBufferFactoryWithoutSids) bufferFactory)
-                            .getDocumentsDoneCount());
-                }
-            });
+            counterSet
+                    .attach(((IAsynchronousWriteStatementBufferFactory) bufferFactory)
+                            .getCounters());
 
         }
 
