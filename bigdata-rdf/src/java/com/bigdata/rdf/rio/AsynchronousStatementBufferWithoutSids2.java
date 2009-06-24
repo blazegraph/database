@@ -941,6 +941,17 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
         final List<Callable> tasks = new LinkedList<Callable>();
 
         /*
+         * The #of triples parsed from this document. This is added to the total
+         * #of restart safe told triples loaded by this client when the latch is
+         * triggered. Of course, the actual #of triples on the database is only
+         * available by querying the database since the same triple can occur in
+         * more than one document, and documents are loaded by distributed
+         * clients so there is no way to correct for such duplicate told triples
+         * short of querying the database.
+         */
+        final int toldTriples = statementCount;
+        
+        /*
          * Latch is signaled when all data buffered for this document is RESTART
          * SAFE on the database.
          * 
@@ -975,6 +986,10 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
                     statementBufferFactory.documentRestartSafeCount
                             .incrementAndGet();
 
+                    // increment by the #of told triples in this document.
+                    statementBufferFactory.toldTriplesRestartSafeCount
+                            .addAndGet(statementCount);
+                    
                     // notify that the document is done.
                     statementBufferFactory
                             .documentDone(getDocumentIdentifier());
@@ -1684,8 +1699,21 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
          * The #of documents whose writes have been buffered but are not yet
          * restart safe on the database (current value).
          */
-        private final AtomicLong documentsWaitingOnWritesCount = new AtomicLong(0L);
+        private final AtomicLong documentsWaitingOnWritesCount = new AtomicLong();
 
+        /**
+         * The #of told triples parsed from documents using this factory and
+         * made restart safe on the database. This is incremented each time a
+         * document has been made restart safe by the #of distinct told triples
+         * parsed from that document.
+         * <p>
+         * Note: The same triple can occur in more than one document, and
+         * documents having duplicate triples may be loaded by distributed
+         * clients. The actual #of triples on the database is only available by
+         * querying the database.
+         */
+        private final AtomicLong toldTriplesRestartSafeCount = new AtomicLong();
+        
         /**
          * The #of documents which have been fully processed and are
          * restart-safe on the database (cumulative total).
@@ -2157,6 +2185,24 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
                 }
             });
 
+            /**
+             * The #of told triples parsed from documents using this factory and
+             * made restart safe on the database. This is incremented each time a
+             * document has been made restart safe by the #of distinct told triples
+             * parsed from that document.
+             * <p>
+             * Note: The same triple can occur in more than one document, and
+             * documents having duplicate triples may be loaded by distributed
+             * clients. The actual #of triples on the database is only available by
+             * querying the database.
+             */
+            counterSet.addCounter("toldTriplesRestartSafeCount", new Instrument<Long>() {
+                @Override
+                protected void sample() {
+                    setValue(toldTriplesRestartSafeCount.get());
+                }
+            });
+            
             /**
              * The #of documents which have been processed by this client and
              * are restart safe on the database by this client.
