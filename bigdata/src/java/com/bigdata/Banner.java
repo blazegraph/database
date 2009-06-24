@@ -92,6 +92,18 @@ public class Banner {
         
     }
 
+    /**
+     * Outputs the banner and exits.
+     * 
+     * @param args
+     *            Ignored.
+     */
+    public static void main(final String[] args) {
+        
+        System.out.println(banner);
+
+    }
+    
     private static final String banner =
         "\nBIGDATA(R)"+
         "\n"+
