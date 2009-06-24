@@ -949,7 +949,7 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
          * clients so there is no way to correct for such duplicate told triples
          * short of querying the database.
          */
-        final int toldTriples = statementCount;
+        final int toldTriplesThisDocument = statementCount;
         
         /*
          * Latch is signaled when all data buffered for this document is RESTART
@@ -988,7 +988,7 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
 
                     // increment by the #of told triples in this document.
                     statementBufferFactory.toldTriplesRestartSafeCount
-                            .addAndGet(statementCount);
+                            .addAndGet(toldTriplesThisDocument);
                     
                     // notify that the document is done.
                     statementBufferFactory
