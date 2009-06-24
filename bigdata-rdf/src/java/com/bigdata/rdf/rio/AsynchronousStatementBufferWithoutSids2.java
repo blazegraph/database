@@ -1583,12 +1583,6 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
      * multiple concurrent {@link AsynchronousStatementBufferWithoutSids2}
      * instances.
      * 
-     * FIXME If the TERM2ID master backs up then we need to pause the parser
-     * thread pool and resume it once the backup has cleared. This will be the
-     * main way to limit the pressure on the asynchronous write API and RAM.
-     * This will require an integration with the CDL, which, frankly, could
-     * probably be discarded.
-     * 
      * @todo invert the inner and the outer class (the buffer factory should be
      *       the outer class).
      * 
@@ -1749,7 +1743,7 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
          * and that method MUST NOT block.
          */
         private ExecutorService bufferIndexWritesService;
-        
+
         /**
          * Return an estimate of the #of statements written on the indices.
          * <p>
@@ -1761,6 +1755,8 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
          * chunks and the writes MAY proceed at different rates for each of the
          * statement indices. The counter value will be stable once the
          * {@link #awaitAll()} returns normally.
+         * 
+         * @see SPOIndexWriteProc
          */
         public long getStatementCount() {
 
@@ -1976,8 +1972,6 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
                 buffer_osp.getFuture().cancel(mayInterruptIfRunning);
 
             bufferIndexWritesService.shutdownNow();
-
-            // @todo fed.reportCounters()
             
         }
 
@@ -2095,8 +2089,6 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
              */
             bufferIndexWritesService.shutdown();
 
-            // @todo fed.reportCounters()
-
         }
 
         /**
@@ -2114,13 +2106,11 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
         }
 
         /**
-         * @todo review counters definitions and make sure that they are all
-         *       updated appropriately.
-         * 
-         * @todo report toldTriples (as stable on disk)
-         * 
-         * @todo report tps (based on stable told triples and elapsed time and
-         *       with a cap on the elapsed time per the CDL)?
+         * @todo Report told triples per second. The class lacks the concept of
+         *       the start time for the data load operation, but that could be
+         *       the time the 1st statement buffer is requested. The end time
+         *       for the load will be set by {@link #close()} or
+         *       {@link #cancelAll(boolean)}.
          */
         public CounterSet getCounters() {
             
@@ -2186,6 +2176,17 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
             });
 
             /**
+             * The #of triples written on the SPO index (this does not count
+             * triples that were already present on the index). 
+             */
+            counterSet.addCounter("toldTriplesWriteCount", new Instrument<Long>() {
+                @Override
+                protected void sample() {
+                    setValue(getStatementCount());
+                }
+            });
+            
+            /**
              * The #of told triples parsed from documents using this factory and
              * made restart safe on the database. This is incremented each time a
              * document has been made restart safe by the #of distinct told triples
@@ -2223,14 +2224,6 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
                     setValue(documentErrorCount.get());
                 }
             });
-
-            /*
-             * @todo add counters. for the queues, we want moving averages so we
-             * need to run a task which picks samples them and converts their
-             * data into moving averages. That task needs to be cancelled by the
-             * factory in awaitAll() and cancelAll().
-             */
-//            counterSet.addCounter("tidsReadyQueueSize", ...);
 
             return counterSet;
             
