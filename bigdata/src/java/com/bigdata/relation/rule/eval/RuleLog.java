@@ -30,6 +30,10 @@ package com.bigdata.relation.rule.eval;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.eval.pipeline.JoinStats;
+
 /**
  * Class defines the log on which rule execution statistics are written. This
  * covers both query evaluation and mutation operations such as fixed point
@@ -54,6 +58,32 @@ public class RuleLog {
         if (log.isInfoEnabled()) {
 
             log.info(stats.toString());
+
+        }
+
+    }
+
+    /**
+     * Log distributed join execution statistics using a CSV format.
+     * 
+     * @param rule
+     *            The {@link IRule} whose {@link JoinStats} are being reported.
+     * @param ruleState
+     *            Contains details about evaluation order for the
+     *            {@link IPredicate}s in the tail of the <i>rule</i>, the access
+     *            paths that were used, etc.
+     * @param joinStats
+     *            The statistics for the distributed join tasks for each join
+     *            dimension in the rule.
+     * 
+     * @return The table view.
+     */
+    public static void log(final IRule rule, final IRuleState ruleState,
+            final JoinStats[] joinStats) {
+
+        if (log.isInfoEnabled()) {
+
+            log.info(JoinStats.toString(rule, ruleState, joinStats));
 
         }
 

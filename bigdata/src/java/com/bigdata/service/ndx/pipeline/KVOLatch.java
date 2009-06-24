@@ -40,7 +40,7 @@ import org.apache.log4j.Logger;
 /**
  * A synchronization aid that allows one or more threads to await asynchronous
  * writes on one or more scale-out indices. Once the counter reaches zero, all
- * waiting threads are released. The counter is decemented automatically once a
+ * waiting threads are released. The counter is decremented automatically once a
  * {@link KVOC} has been successfully written onto an index by an asynchronous
  * write operation.
  * <p>
@@ -114,7 +114,7 @@ public class KVOLatch {
         final long c = this.counter.incrementAndGet();
 
         if (log.isDebugEnabled())
-            log.debug("counter=" + c);
+            log.debug(toString());
 
         if (c <= 0) {
             
@@ -136,7 +136,7 @@ public class KVOLatch {
         final long c = this.counter.decrementAndGet();
 
         if (log.isDebugEnabled())
-            log.debug("counter=" + c);
+            log.debug(toString());
 
         if (c < 0) {
 
@@ -187,8 +187,16 @@ public class KVOLatch {
 
         }
 
-        // allow extensions, but not while holding the lock.
-        signal();
+        try {
+            // allow extensions, but not while holding the lock.
+            signal();
+        } catch (InterruptedException t) {
+            // propagate to the caller.
+            throw t;
+        } catch (Throwable t) {
+            // log anything else thrown out.
+            log.error(toString(), t);
+        }
         
     }
 

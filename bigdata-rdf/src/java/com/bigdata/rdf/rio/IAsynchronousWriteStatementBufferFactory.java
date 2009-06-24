@@ -5,6 +5,7 @@ import java.util.concurrent.Future;
 
 import org.openrdf.model.Statement;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -66,5 +67,10 @@ public interface IAsynchronousWriteStatementBufferFactory<S extends Statement>
      *             if interrupted while awaiting any of the {@link Future}s.
      */
     public void awaitAll() throws InterruptedException, ExecutionException;
+    
+    /**
+     * Return performance counters defined by this factory.
+     */
+    public CounterSet getCounters();
     
 }

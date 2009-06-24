@@ -14,11 +14,10 @@ import com.bigdata.journal.ITx;
 import com.bigdata.rdf.load.RDFDataLoadMaster.JobState;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.IAsynchronousWriteStatementBufferFactory;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids2.AsynchronousWriteBufferFactoryWithoutSids2;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.service.DataService;
 import com.bigdata.service.FederationCallable;
 import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
@@ -104,12 +103,13 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
         }
 
         // optionally use asynchronous writes on the statement indices.
-        final IAsynchronousWriteStatementBufferFactory<BigdataStatement> statementfactory = jobState.asynchronousWrites ? new AsynchronousWriteBufferFactoryWithoutSids<BigdataStatement>(
+        final IAsynchronousWriteStatementBufferFactory<BigdataStatement> statementfactory = jobState.asynchronousWrites ? new AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement,File>(
                 (ScaleOutTripleStore) tripleStore,
                 jobState.asynchronousWritesProducerChunkSize,
                 jobState.valuesInitialCapacity,
-                jobState.bnodesInitialCapacity,
-                jobState.syncRPCForTERM2ID)
+                jobState.bnodesInitialCapacity
+//                jobState.syncRPCForTERM2ID
+                )
                 : null;
                 
         // Setup the task factory.

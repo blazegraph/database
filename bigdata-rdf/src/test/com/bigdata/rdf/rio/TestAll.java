@@ -81,6 +81,8 @@ public class TestAll extends TestCase {
          * which does not support SIDs.
          */
         suite.addTestSuite(TestAsynchronousStatementBufferWithoutSids.class);
+        // and for a variant that should fix the blocking parser problems.
+        suite.addTestSuite(TestAsynchronousStatementBufferWithoutSids2.class);
         
         return suite;
         

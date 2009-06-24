@@ -841,7 +841,7 @@ public class DistributedJoinTask extends JoinTask {
 
                 for (Future f : futures) {
 
-                    // make sure that all tasks were successfull.
+                    // make sure that all tasks were successful.
                     f.get();
 
                 }
