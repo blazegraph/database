@@ -469,11 +469,11 @@ public class FileChannelUtility {
     }
 
     /**
-     * {@link FileChannel} to {@link FileChannel} transfer of <i>count</i>
-     * bytes from the <i>sourceChannel</i> starting at the <i>fromPosition</i>
-     * onto the <i>out</i> file starting at its current position. The position
-     * on the <i>sourceChannel</i> is updated by this method and will be the
-     * positioned after the last byte transferred (this is done by
+     * {@link FileChannel} to {@link FileChannel} transfer of <i>count</i> bytes
+     * from the <i>sourceChannel</i> starting at the <i>fromPosition</i> onto
+     * the <i>out</i> file starting at its current position. The position on the
+     * <i>sourceChannel</i> is updated by this method and will be the positioned
+     * after the last byte transferred (this is done by
      * {@link FileChannel#transferFrom(java.nio.channels.ReadableByteChannel, long, long)}
      * so we have no choice about that). The position on the <i>out</i> file is
      * updated by this method and will be located after the last byte
@@ -498,8 +498,8 @@ public class FileChannelUtility {
      * @throws IOException
      * 
      * @issue There is a known bug with large transfers under Windows. See <a
-     *        href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=332d29312f820116d80442f33fb87?bug_id=6431344">
-     *        FileChannel.transferTo() doesn't work if address space runs out
+     *        href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=332d29312f820116d80442f33fb87?bug_id=6431344"
+     *        > FileChannel.transferTo() doesn't work if address space runs out
      *        </a>
      * 
      * @todo as a workaround, detect the Windows platform and do the IO
@@ -509,6 +509,25 @@ public class FileChannelUtility {
      *       threads during a concurrent NIO operation on the same source/dest
      *       file channel (I have never seen this problem and perhaps the NIO
      *       API excludes it).
+     * 
+     * @todo I have seen this exception when the JVM was allocated to much of
+     *       the total RAM on the machine (in this case 2600m out of 3G
+     *       available with 4G installed). The workaround is to reduce the -Xmx
+     *       parameter value. This could also be corrected by failing over to a
+     *       copy based on normal file IO.
+     * 
+     *       <pre>
+     * Caused by: java.io.IOException: Map failed
+     *         at sun.nio.ch.FileChannelImpl.map(FileChannelImpl.java:758)
+     *         at sun.nio.ch.FileChannelImpl.transferFromFileChannel(FileChannelImpl.java:537)
+     *         at sun.nio.ch.FileChannelImpl.transferFrom(FileChannelImpl.java:600)
+     *         at com.bigdata.io.FileChannelUtility.transferAll(FileChannelUtility.java:553)
+     *         at com.bigdata.journal.AbstractBufferStrategy.transferFromDiskTo(AbstractBufferStrategy.java:420)
+     *         at com.bigdata.journal.DiskOnlyStrategy.transferTo(DiskOnlyStrategy.java:2442)
+     *         at com.bigdata.btree.IndexSegmentBuilder.writeIndexSegment(IndexSegmentBuilder.java:1865)
+     *         at com.bigdata.btree.IndexSegmentBuilder.call(IndexSegmentBuilder.java:1148)
+     *         at com.bigdata.resources.IndexManager.buildIndexSegment(IndexManager.java:1755)
+     * </pre>
      */
      static public int transferAll(final FileChannel sourceChannel,
             final long fromPosition, final long count,
