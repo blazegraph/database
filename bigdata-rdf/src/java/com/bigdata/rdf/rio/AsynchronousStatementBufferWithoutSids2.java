@@ -1647,15 +1647,10 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
         private final LongAggregator statementResultHandler = new LongAggregator();
         
         /**
-         * The timestamp taken when the first statement buffer is requested from
-         * this factory.
-        * @todo Report told triples per second. The class lacks the concept of
-        *       the start time for the data load operation, but that could be
-        *       the time the 1st statement buffer is requested. The end time
-        *       for the load will be set by {@link #close()} or
-        *       {@link #cancelAll(boolean)}.
-        */
-        private long startTime;
+         * The timestamp taken when the factory is created.
+         */
+        private final long startTime;
+        
         /**
          * The timestamp taken when the factory is {@link #close()}d or when
          * execution is {@link #cancelAll(boolean) cancelled}.
@@ -1957,6 +1952,8 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
                     new DaemonThreadFactory(getClass().getName()) // threadFactory
             );
 
+            startTime = System.currentTimeMillis();
+            
         }
 
         public boolean isAnyDone() {
@@ -1991,6 +1988,9 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
 
             if(log.isInfoEnabled())
                 log.info("Cancelling futures.");
+            
+            if (endTime == 0L)
+                endTime = System.currentTimeMillis();
 
             if (buffer_t2id != null)
                 buffer_t2id.getFuture().cancel(mayInterruptIfRunning);
@@ -2084,7 +2084,8 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
 
                 } finally {
                     lock.unlock();
-                    endTime = System.currentTimeMillis();
+                    if (endTime == 0L)
+                        endTime = System.currentTimeMillis();
                 }
                 
             } catch (InterruptedException ex) {
