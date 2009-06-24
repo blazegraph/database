@@ -2,11 +2,17 @@
 
 source `dirname $0`/bigdataenv
 
-# Generate an LUBM data set..
+##
+# Generate an LUBM data set.
 #
-# usage: #of universities.
-#
-# WARNING: Output is written into the CURRENT working directory.
+
+if [ -z "$1" ]; then
+	echo $"usage: $0 <univ_num>"
+	echo "	univ_num is the #of universities.
+	echo ""
+	echo "WARNING: Output is written into the CURRENT working directory."
+	exit 1
+fi
 
 java ${JAVA_OPTS} \
 	-Xmx400m \
