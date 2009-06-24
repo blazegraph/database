@@ -262,6 +262,8 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo evaluate this approach for writing on a local triple store. if there is
  *       a performance benefit then refactor accordingly (requires asynchronous
  *       write API for BTree and friends).
+ *       
+     * @deprecated by {@link AsynchronousStatementBufferWithoutSids2}
  */
 public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
         implements IStatementBuffer<S> {
@@ -1398,6 +1400,8 @@ public class AsynchronousStatementBufferWithoutSids<S extends BigdataStatement>
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
+     * 
+     * @deprecated by {@link AsynchronousStatementBufferWithoutSids2}
      */
     public static class AsynchronousWriteBufferFactoryWithoutSids<S extends BigdataStatement> implements
             IAsynchronousWriteStatementBufferFactory<S> {
