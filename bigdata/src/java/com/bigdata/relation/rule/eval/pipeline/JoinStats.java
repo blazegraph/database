@@ -327,7 +327,7 @@ public class JoinStats implements Serializable {
 
             final int tailIndex = order[i++];
 
-            sb.append(dateFormat.format(s.startTime).replace(",", ""));
+            sb.append(dateFormat.format(s.startTime).replace(",", "")+", ");
             sb.append(rule.getName().replace(',', ' ')+", ");
             sb.append(Integer.toString(s.orderIndex)+", ");
 //            sb.append(Integer.toString(s.partitionId)+", "); // always -1 when aggregated.
