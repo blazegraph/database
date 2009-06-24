@@ -2952,8 +2952,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 resourceManager.asyncOverflowTaskFailedCounter
                         .incrementAndGet();
 
-                log.error("Task failed: elapsed=" + elapsed + ", task=" + task
-                        + " : " + t, t);
+                log.error("Child task failed: elapsed=" + elapsed + ", task="
+                        + task + " : " + t, t);
 
             }
 
