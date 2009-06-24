@@ -404,7 +404,7 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
      * [0:N-1] by the master. That integer is used to hash partition the
      * responsibility for generating the data. The master discovers joined
      * {@link IDataService}s and farms out the clients to run on those
-     * services. Each client will generate 1/Nth of the Universitys.
+     * services. Each client will generate 1/Nth of the Universities.
      * 
      * @todo [This logic has been commented out due to difficulties handling the
      *       errors when using a zlock and incomplete handling of client restart
