@@ -74,7 +74,8 @@ fi
 # bigdata source (it looks for the queries to run in a known location but also
 # has a dependency on the build.properties and build.xml files for ant).
 #
-# Note: This creates a 2nd archive with just the extracted performance counters.
+# Note: This creates a 2nd archive with just the extracted performance counters,
+# the configuration file, the rule execution log, and the error log.
 #
 if [ -d "src/resources/analysis/queries" ]; then
 	ant \
@@ -82,7 +83,10 @@ if [ -d "src/resources/analysis/queries" ]; then
 		"-Danalysis.queries=src/resources/analysis/queries"\
 		"-Danalysis.out.dir=$targetDir/output"\
 		analysis
-	tar -cvz -C "$targetDir/.." -f $targetDir-output.tgz $targetDir/output
+	tar -cvz -C "$targetDir/.." -f $targetDir-output.tgz $targetDir/output \
+	$BIGDATA_CONFIG \
+   	$ruleLog* \
+   	$errorLog* 
 fi
 
 tar -cvz -C "$targetDir/.." -f $targetDir.tgz $targetDir
