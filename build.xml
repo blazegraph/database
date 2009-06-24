@@ -593,6 +593,7 @@ ${postInstallMessage}</echo>
 <fileset dir="${install.bin.dir}" id="lubm-scripts" description="The lubm scripts.">
 	<include name="lubmMaster.sh" />
 	<include name="lubmQuery.sh" />
+	<include name="lubmGen.sh" />
 </fileset>
 
 <!-- While this installs the LUBM integration into the same place as the
