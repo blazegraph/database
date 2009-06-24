@@ -30,9 +30,11 @@ package com.bigdata.service.jini.util;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
@@ -210,6 +212,9 @@ public class ListServices {
             // running.
             final Map<String, List<ServiceItem>> bigdataServicesByHost = new HashMap<String, List<ServiceItem>>(
                     a.length);
+            
+            // map caches the ServiceID to hostname relationship.
+            final Map<ServiceID,String> hostnames = new HashMap<ServiceID, String>();
 
             // maps caches the ServiceID to serviceIface relationship.
             final Map<ServiceID, Class<? extends IService>> serviceId2serviceIface = new HashMap<ServiceID, Class<? extends IService>>(
@@ -243,6 +248,8 @@ public class ListServices {
                         hostname = ((IService) serviceItem.service)
                                 .getHostname();
 
+                        hostnames.put(serviceItem.serviceID, hostname);
+                        
                     } catch (IOException ex) {
 
                         log.warn("RMI error: " + ex + " for " + serviceItem);
@@ -355,8 +362,19 @@ public class ListServices {
                     final List<ServiceItem> list = bigdataServicesByIface
                             .get(serviceIface);
 
+                    final Set<String> hosts = new HashSet<String>();
+                    for(ServiceItem serviceItem : list) {
+
+                        final String hostname = hostnames
+                                .get(serviceItem.serviceID);
+                        
+                        hosts.add(hostname);
+                        
+                    }
+                    
                     sb.append("  There are " + list.size() + " instances of "
-                            + serviceIface.getName() + "\n");
+                            + serviceIface.getName() + " on " + hosts.size()
+                            + " hosts\n");
 
                     if (showServiceItems)
                         for (ServiceItem t : list) {
