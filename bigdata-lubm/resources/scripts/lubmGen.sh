@@ -8,7 +8,7 @@ source `dirname $0`/bigdataenv
 
 if [ -z "$1" ]; then
 	echo $"usage: $0 <univ_num>"
-	echo "	univ_num is the #of universities.
+	echo "	univ_num is the #of universities."
 	echo ""
 	echo "WARNING: Output is written into the CURRENT working directory."
 	exit 1
