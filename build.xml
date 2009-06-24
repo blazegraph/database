@@ -318,6 +318,15 @@
 </exec>
 </target>
 
+<target name="banner" depends="jar" description="Displays the banner (verifies runtime classpath).">
+
+	<java classname="com.bigdata.Banner"
+		failonerror="true" fork="false" logerror="true">
+		<classpath refid="runtime.classpath" />
+	</java>
+
+</target>
+			
 <!--
 
 This is the cluster-based install.  You need to edit build.properties, decide
@@ -345,7 +354,7 @@ When that is done, you can remove the shared $NAS directory.  The cron job
 will still be trying to run the 'bigdata' script, so either replace it with
 an "NOP" bash script or edit your crontab. 
 -->
-<target name="install" depends="jar, javadoc, bundle" description="Install bigdata on a cluster.">
+<target name="install" depends="jar, banner, javadoc, bundle" description="Install bigdata on a cluster.">
 <!-- create NAS/LAS directories. -->
 <mkdir dir="${NAS}" />
 <mkdir dir="${LAS}" />
