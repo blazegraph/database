@@ -85,6 +85,12 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
     final protected static Logger log = Logger
             .getLogger(LubmGeneratorMaster.class);
 
+    static enum RunMode {
+        Load,
+        Generate,
+        GenerateAndLoad
+    }
+    
     /**
      * {@link Configuration} options for the {@link LubmGeneratorMaster}.
      * <p>
@@ -153,10 +159,16 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
         String GENERATOR_QUEUE_CAPACITY = "generatorQueueCapacity";
 
         /**
-         * When <code>true</code> the generator writes files into the
-         * {@link #OUT_DIR} but does not run the tasks to bulk load those data.
+         * This controls the behavior of the generator. You can either generate
+         * an LUBM data set, writing files into the {@link #OUT_DIR}, load data
+         * from the {@link #OUT_DIR}, or run both phases in parallel. Note that
+         * the LUBM generator is single threaded. On a server class machine in a
+         * cluster, the generator can not run fast enough to supply the parsers
+         * or the database.
+         * 
+         * @see RunMode
          */
-        String GENERATE_ONLY = "generateOnly";
+        String RUN_MODE = "RunMode";
         
     }
 
@@ -212,9 +224,9 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
         final int generatorQueueCapacity;
 
         /**
-         * @see ConfigurationOptions#GENERATE_ONLY
+         * @see ConfigurationOptions#RUN_MODE
          */
-        final boolean generateOnly;
+        final RunMode runMode;
 
         @Override
         protected void toString(StringBuilder sb) {
@@ -237,8 +249,8 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
             sb.append(", " + ConfigurationOptions.LOG_DIR + "="
                     + logDir);
 
-            sb.append(", " + ConfigurationOptions.GENERATE_ONLY + "="
-                    + generateOnly);
+            sb.append(", " + ConfigurationOptions.RUN_MODE + "="
+                    + runMode);
 
         }
         
@@ -280,8 +292,8 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
                             ConfigurationOptions.GENERATOR_QUEUE_CAPACITY,
                             Integer.TYPE);
 
-            generateOnly = (Boolean) config.getEntry(component,
-                    ConfigurationOptions.GENERATE_ONLY, Boolean.TYPE);
+            runMode = RunMode.valueOf((String) config.getEntry(component,
+                    ConfigurationOptions.RUN_MODE, String.class));
 
         }
 
@@ -337,16 +349,20 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
         final S jobState = getJobState();
 
-        if (jobState.generateOnly) {
+        switch (jobState.runMode) {
 
-            // just generate.
-            return (T)new LubmGeneratorClientTask(jobState, clientNum);
+        case Load:
+            return (T) new LoadDataTask<S, ClientState>(jobState, clientNum);
 
-        } else {
+        case Generate:
+            return (T) new LubmGeneratorClientTask(jobState, clientNum);
 
+        case GenerateAndLoad:
             // generate, writing on zqueue and file system, and bulk load data.
-            return (T)new LubmGenerateAndLoadClientTask(jobState, clientNum);
+            return (T) new LubmGenerateAndLoadClientTask(jobState, clientNum);
 
+        default:
+            throw new AssertionError("Unknown mode: " + jobState.runMode);
         }
 
     }
@@ -1043,6 +1059,31 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
         }
 
+    }
+
+    /**
+     * Glue class knows how to consume the files from the local file system.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * @param <S>
+     *            The generic for the {@link JobState}.
+     * @param <V>
+     *            The generic type of the client state (stored in zookeeper).
+     */
+    public static class LoadDataTask<S extends LubmGeneratorMaster.JobState, V extends LubmGeneratorMaster.ClientState>
+            extends RDFFileLoadTask<S, V> {
+
+        /**
+         * @param clientTask
+         */
+        public LoadDataTask(final S jobState, final int clientNum) {
+
+            super(jobState, clientNum);
+
+        }
+        
     }
 
 }
