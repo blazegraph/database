@@ -107,7 +107,7 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
             final DataLoader dataLoader = sail.database.getDataLoader();
 
             dataLoader.loadData(
-                    "src/test/com/bigdata/rdf/sail/provenance01.rdf",
+                    "bigdata-sails/src/test/com/bigdata/rdf/sail/provenance01.rdf",
                     ""/*baseURL*/, RDFFormat.RDFXML);
             
         }
