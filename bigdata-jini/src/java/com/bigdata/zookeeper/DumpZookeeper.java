@@ -59,7 +59,7 @@ public class DumpZookeeper {
     /**
      * @param z
      */
-    public DumpZookeeper(ZooKeeper z) {
+    public DumpZookeeper(final ZooKeeper z) {
 
         this.z = z;
         
@@ -138,8 +138,31 @@ public class DumpZookeeper {
         // the current znode (last path component).
         final String znode = zpath.substring(zpath.lastIndexOf('/') + 1);
         
+        final List<String> children;
+        try {
+
+            // Get children as an Array.
+            final String[] a = z
+                    .getChildren(zpath, false/* watch */).toArray(
+                            new String[0]);
+
+            // sort the array.
+            Arrays.sort(a);
+
+            // wrap as list again.
+            children = Arrays.asList(a);
+
+        } catch (NoNodeException ex) {
+
+            System.err.println("Not found: [" + zpath + "]");
+            
+            return;
+
+        }
+
         System.out.print(i(depth)
                 + znode
+                + (children.isEmpty()?"":"("+children.size()+" children)")
                 + (stat.getEphemeralOwner() != 0 ? " (Ephemeral"
                         + (showData ? "" + stat.getEphemeralOwner() : "") + ")"
                         : "") + " ");
@@ -175,28 +198,6 @@ public class DumpZookeeper {
         }
             
         System.out.println();
-
-        final List<String> children;
-        try {
-
-            // Get children as an Array.
-            final String[] a = z
-                    .getChildren(zpath, false/* watch */).toArray(
-                            new String[0]);
-
-            // sort the array.
-            Arrays.sort(a);
-
-            // wrap as list again.
-            children = Arrays.asList(a);
-
-        } catch (NoNodeException ex) {
-
-            System.err.println("Not found: [" + zpath + "]");
-            
-            return;
-
-        }
 
         for (String child : children) {
 
