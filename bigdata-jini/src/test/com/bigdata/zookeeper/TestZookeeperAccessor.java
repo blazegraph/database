@@ -54,7 +54,7 @@ public class TestZookeeperAccessor extends AbstractZooTestCase {
 
     public void test_handleExpiredSession() throws InterruptedException {
 
-        ZooKeeperAccessor accessor = new ZooKeeperAccessor("localhost:"
+        final ZooKeeperAccessor accessor = new ZooKeeperAccessor("localhost:"
                 + clientPort, sessionTimeout);
 
         assertTrue(accessor
@@ -79,6 +79,7 @@ public class TestZookeeperAccessor extends AbstractZooTestCase {
         zookeeper = accessor.getZookeeper();
         
         assertTrue(zookeeper.getState().isAlive());
+
     }
     
 }

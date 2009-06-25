@@ -28,10 +28,11 @@ import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.LockFutureTask
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
-import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
+import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
@@ -1191,21 +1192,36 @@ public class ConcurrencyManager implements IConcurrencyManager {
      */
     private void journalOverextended(final AbstractTask task) {
 
-        if(!resourceManager.isOverflowEnabled()) {
-            
+        // Only for the data service with overflow enabled.
+        if (!resourceManager.isOverflowEnabled()) {
+
             return;
             
         }
         
-        // Only for the DS with overflow enabled.
-
+        // And even then only for the distributed federation
+        try {
+            if (!(resourceManager.getFederation() instanceof AbstractDistributedFederation)) {
+                return;
+            }
+        } catch (UnsupportedOperationException ex) {
+            // note: thrown by some unit tests, but not by real services.
+            return;
+        }
+        
         final AbstractJournal journal = resourceManager.getLiveJournal();
 
         final long overextension = journal.size() / journal.getMaximumExtent();
 
         if (overextension > 2) {
 
-            // @todo convert to WARN
+            /*
+             * Note: This is being used to diagnose a problem where the live
+             * journal can continue to grow because asynchronous overflow tasks
+             * are not being scheduled with enough intelligence.
+             * 
+             * @todo convert to WARN
+             */
             log.error("overextended=" + overextension + "x : "
                     + task.toString());
 

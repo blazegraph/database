@@ -146,7 +146,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
         if (ZooHelper.isRunning(InetAddress.getLocalHost(), serverConfig.clientPort)) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Zookeeper already running: "
                         + InetAddress.getLocalHost().getCanonicalHostName()
                         + ":" + serverConfig.clientPort);
@@ -178,12 +178,12 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
             if (entry.isLocalHost()) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Zookeeper instance is local: " + entry);
 
                 try {
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("Will try to start: " + entry);
 
                     serverConfig.newServiceStarter(listener, entry).call();
@@ -192,7 +192,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
                 } catch (ZookeeperRunningException ex) {
                     
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("Already running: "+entry);
                     
                 } catch (Exception ex) {
@@ -205,7 +205,7 @@ public class ZookeeperProcessHelper extends ProcessHelper {
 
         } // next entry
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("started=" + nstart + " instances");
 
         return nstart;

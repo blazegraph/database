@@ -26,11 +26,7 @@ import com.bigdata.jini.start.IServiceListener;
 public class ProcessHelper {
 
     protected static final Logger log = Logger.getLogger(ProcessHelper.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
 
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * A useful name for the process.
      */
@@ -347,10 +343,10 @@ public class ProcessHelper {
 
         log.warn("Process starting: name=" + name);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("cmd=" + getCommandString(processBuilder));
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("env=" + processBuilder.environment());
 
     }
@@ -379,7 +375,7 @@ public class ProcessHelper {
              */
             while ((s = is.readLine()) != null) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(s);
 
             }
@@ -437,7 +433,7 @@ public class ProcessHelper {
 //                        // force a wait until the exitValue has been set.
 //                        final int exitValue = exitValue();
                         
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Process is dead: name=" + name
                                     + ", exitValue=" + exitValue);
                         

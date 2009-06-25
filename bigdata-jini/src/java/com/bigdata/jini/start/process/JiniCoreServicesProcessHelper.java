@@ -118,7 +118,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
 
             if (!new HostAllowConstraint(allowed).allow()) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Host not selected by locator(s).");
                 
                 return false;
@@ -131,7 +131,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
 
             // will not start this service.
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Constraint(s) do not allow service start: " + config);
 
             return false;
@@ -146,13 +146,13 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
                         clientConfig.groups, clientConfig.locators, 1500,
                         TimeUnit.MILLISECONDS);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("registrars: #found=" + registrars.length + ", #desired="
                     + serviceConfig.serviceCount);
 
         if (registrars.length >= serviceConfig.serviceCount) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Enough instances - will not start another.");
 
             return false;
@@ -163,7 +163,7 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
          * Start a new instance.
          */
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Will start instance: " + InetAddress.getLocalHost()
                     + ", config=" + config);
 

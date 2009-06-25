@@ -149,6 +149,8 @@ public abstract class AbstractZooTestCase extends TestCase2 {
     
     public void setUp() throws Exception {
 
+        try {
+            
         if (log.isInfoEnabled())
             log.info(getName());
         
@@ -218,6 +220,15 @@ public abstract class AbstractZooTestCase extends TestCase2 {
             if (log.isInfoEnabled())
                 log.info("/test already exits.");
 
+        }
+
+        } catch (Throwable t) {
+
+            // don't leave around the dataDir if the setup fails.
+            recursiveDelete(dataDir);
+            
+            throw new Exception(t);
+            
         }
 
     }

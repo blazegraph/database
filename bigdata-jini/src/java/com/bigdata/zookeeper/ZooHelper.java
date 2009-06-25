@@ -101,10 +101,12 @@ public class ZooHelper {
     
         } finally {
     
-            socket.shutdownOutput();
+//            socket.shutdownOutput();
+//    
+//            socket.shutdownInput();
     
-            socket.shutdownInput();
-    
+            socket.close();
+
         }
     
     }
@@ -215,10 +217,12 @@ public class ZooHelper {
     
         } finally {
     
-            socket.shutdownOutput();
-    
-            socket.shutdownInput();
-    
+//            socket.shutdownOutput();
+//    
+//            socket.shutdownInput();
+
+            socket.close();
+
         }
     
     }
@@ -284,9 +288,11 @@ public class ZooHelper {
 
         } finally {
 
-            socket.shutdownOutput();
+//            socket.shutdownOutput();
+//
+//            socket.shutdownInput();
 
-            socket.shutdownInput();
+            socket.close();
 
         }
 

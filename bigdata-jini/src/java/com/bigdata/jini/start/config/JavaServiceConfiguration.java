@@ -91,6 +91,10 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
          * Note: When NOT specified the classpath of the current JVM will be
          * used. If you specify ANY value for this property, then the classpath
          * of the JVM WILL NOT be passed onto to the child process.
+         * <p>
+         * Note: The JVM will be started in the service directory.  Therefore
+         * you MUST use absolute path names to locate files outside of that
+         * directory!
          */
         String CLASSPATH = "classpath";
 
@@ -98,6 +102,9 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
          * The default log4j configuration for {@link JavaServiceConfiguration}
          * service instances. This may be overridden on a per-service type basis.
          * It is required for {@link BigdataServiceConfiguration}s.
+         * <p>
+         * Note: The JVM will be started in the service directory.  Therefore
+         * you MUST use an absolute URL to locate the log4j configuration file!
          */
         String LOG4J = "log4j";
         
