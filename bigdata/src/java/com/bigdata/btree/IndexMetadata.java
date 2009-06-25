@@ -438,12 +438,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * shared {@link Object} for all children of a given {@link Node}.
          * However, per-child locks require more {@link Object} allocation (for
          * the locks) and thus contribute to heap demand.
+         * <p>
+         * Note: While this can improve read concurrency, this option imposes
+         * additional RAM demands since there is on {@link Object} allocated for
+         * each {@link Node} in the {@link BTree}.  This is why it is turned off
+         * by default.
          */
         String CHILD_LOCKS = com.bigdata.btree.AbstractBTree.class.getPackage()
                 .getName()
                 + ".childLocks";
 
-        String DEFAULT_CHILD_LOCKS = "true";
+        String DEFAULT_CHILD_LOCKS = "false";
         
         /*
          * Options that are valid for any AbstractBTree but which are not
