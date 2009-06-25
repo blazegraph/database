@@ -98,11 +98,13 @@ public abstract class BackchainOwlSameAsIterator implements IChunkedOrderedItera
     protected TempTripleStore createTempTripleStore() {
         // log.info("creating temp triple store for owl:sameAs backchainer");
         // System.err.println("creating temp triple store for owl:sameAs backchainer");
-        Properties props = db.getProperties();
+        final Properties props = db.getProperties();
         // do not store terms
         props.setProperty(AbstractTripleStore.Options.LEXICON, "false");
         // only store the SPO index
         props.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
+        // @todo MikeP : test w/ SPO bloom filter enabled and see if this improves performance.
+        props.setProperty(AbstractTripleStore.Options.BLOOM_FILTER, "false");
         return new TempTripleStore(db.getIndexManager().getTempStore(), props, db);
     }
 

@@ -282,7 +282,7 @@ public class BigdataSail extends SailBase implements Sail {
     final protected static boolean DEBUG = log.isDebugEnabled();
     
     /**
-     * The equivilent of a null identifier for an internal RDF Value.
+     * The equivalent of a null identifier for an internal RDF Value.
      */
     protected static final long NULL = IRawTripleStore.NULL;
 

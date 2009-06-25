@@ -169,6 +169,15 @@ public class TruthMaintenance {
                 com.bigdata.rdf.store.AbstractTripleStore.Options.LEXICON,
                 "false");
 
+        /*
+         * @todo MikeP : verify that turning off the bloom filter on the
+         * temporary triple store is a good idea. we might actually benefit from
+         * it substantially.
+         */
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.BLOOM_FILTER,
+                "false");
+        
         final TempTripleStore tempStore = new TempTripleStore(database
                 .getIndexManager().getTempStore(), properties, database);
 
