@@ -148,6 +148,13 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         String INDEX_DUMP_NAMESPACE = "indexDumpNamespace";
 
         /**
+         * Boolean option may be used to delete the exiting job with the same
+         * name during startup (default <code>false</code>). This can be used if
+         * the last job terminated abnormally and you want to re-run the job.
+         */
+        String DELETE_JOB = "deleteJob";
+        
+        /**
          * The #of clients to start. The clients will be distributed across the
          * discovered {@link IRemoteExecutor}s in the federation matching the
          * {@link #CLIENTS_TEMPLATE}.
@@ -490,6 +497,14 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         private static final long serialVersionUID = -340273551639560974L;
 
         /**
+         * Set to <code>true</code> iff a pre-existing instance of the same job
+         * should be delete before starting this job.
+         * 
+         * @see ConfigurationOptions#DELETE_JOB
+         */
+        private transient final boolean deleteJob;
+        
+        /**
          * Set <code>true</code> iff an existing job is being resumed
          * (defaults to <code>false</code> until proven otherwise).
          */
@@ -679,6 +694,10 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             
             jobName = (String) config.getEntry(component,
                     ConfigurationOptions.JOB_NAME, String.class);
+
+            deleteJob = (Boolean) config.getEntry(component,
+                    ConfigurationOptions.DELETE_JOB, Boolean.TYPE,
+                    Boolean.FALSE);
 
             nclients = (Integer) config.getEntry(component,
                     ConfigurationOptions.NCLIENTS, Integer.TYPE);
@@ -1310,6 +1329,20 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         try {
 
             final String jobZPath = jobState.getJobZPath(fed);
+
+            if (jobState.deleteJob
+                    && zookeeper.exists(jobZPath, false/* watch */) != null) {
+
+                /*
+                 * Delete old job.
+                 */
+
+                log.warn("Deleting old job: " + jobZPath);
+
+                ZooHelper.destroyZNodes(fed.getZookeeperAccessor()
+                        .getZookeeper(), jobZPath, 0/* depth */);
+                
+            }
             
             try {
 

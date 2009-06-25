@@ -219,55 +219,47 @@ public class RDFFileLoadTask<S extends JobState, V extends Serializable>
     }
 
     /**
-     * Starts a {@link RunnableFileSystemLoader} which loads data from the
+     * Runs a {@link RunnableFileSystemLoader} to loads data from the
      * {@link JobState#dataDir} and optionally deletes files after they have
-     * been loaded successfully. This task is designed to run forever. It
-     * SHOULD be interrupted in order to halt processing. You MUST specify
-     * {@link JobState#deleteAfter} or it will continually re-load the same
-     * data.
+     * been loaded successfully.
      * 
      * @throws InterruptedException
      * @throws Exception
-     * 
-     * @todo It would be better to set a flag on the CDL to halt processing
-     *       so that we do not interrupt processing in the middle of a file
-     *       load. That could also be accomplished by draining the CDL's
-     *       input queue. Interrupt of the CDL should be reserved for a very
-     *       long running data load task where you really need to abort the
-     *       data load operation, e.g., when processing some extremely large
-     *       file.
      */
     protected void loadDataFromFiles(final ConcurrentDataLoader loader,
             final AbstractRDFTaskFactory taskFactory,
             final AbstractTripleStore tripleStore) throws InterruptedException,
             Exception {
 
-        // @todo config delay
-        final long initialDelay = 0;
-        final long delay = 5000;
-
-        /*
-         * Start a scheduled task. It will run until explicitly canceled.
-         */
-        final ScheduledFuture f = getFederation().addScheduledTask(
-                new RunnableFileSystemLoader(loader, taskFactory, tripleStore,
-                        jobState.dataDir), initialDelay, delay,
-                TimeUnit.MILLISECONDS);
-
-        /*
-         * The scheduled task should run forever so this blocks until this
-         * thread is interrupted.
-         */
-        try {
-
-            f.get();
-            
-        } finally {
-
-            // cancel the scheduled task.
-            f.cancel(true/* mayInterruptIfRunning */);
-
-        }
+        new RunnableFileSystemLoader(loader, taskFactory, tripleStore,
+                jobState.dataDir).run();
+        
+//        // @todo config delay
+//        final long initialDelay = 0;
+//        final long delay = 5000;
+//
+//        /*
+//         * Start a scheduled task. It will run until explicitly canceled.
+//         */
+//        final ScheduledFuture f = getFederation().addScheduledTask(
+//                new RunnableFileSystemLoader(loader, taskFactory, tripleStore,
+//                        jobState.dataDir), initialDelay, delay,
+//                TimeUnit.MILLISECONDS);
+//
+//        /*
+//         * The scheduled task should run forever so this blocks until this
+//         * thread is interrupted.
+//         */
+//        try {
+//
+//            f.get();
+//            
+//        } finally {
+//
+//            // cancel the scheduled task.
+//            f.cancel(true/* mayInterruptIfRunning */);
+//
+//        }
 
     }
 

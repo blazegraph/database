@@ -52,10 +52,6 @@ public class ZooHelper {
 
     protected static final Logger log = Logger.getLogger(ZooHelper.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * Inquires whether a zookeeper instance is running in a non-error state and
      * returns iff the service reports "imok".
@@ -72,7 +68,7 @@ public class ZooHelper {
     static public void ruok(final InetAddress addr, final int clientPort)
             throws IOException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Querying service: hostname=" + addr + ", port="
                     + clientPort);
 
@@ -98,7 +94,7 @@ public class ZooHelper {
             // read : will timeout if no response.
             is.read(b);
     
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(new String(b, "ASCII"));
     
             return;
@@ -126,7 +122,7 @@ public class ZooHelper {
     public static void kill(final int clientPort) throws UnknownHostException,
             IOException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Killing service: @ port=" + clientPort);
 
         final Socket socket = new Socket(InetAddress.getLocalHost(), clientPort);
@@ -141,7 +137,7 @@ public class ZooHelper {
     
             os.flush();
     
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Message sent");
     
             return;
@@ -177,7 +173,7 @@ public class ZooHelper {
     public static String stat(final InetAddress addr, final int clientPort)
             throws UnknownHostException, IOException {
     
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("hostname=" + addr + ", port=" + clientPort);
     
         final Socket socket = new Socket(InetAddress.getLocalHost(), clientPort);
@@ -194,7 +190,7 @@ public class ZooHelper {
     
                 os.flush();
     
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Message sent");
     
             }
@@ -246,7 +242,7 @@ public class ZooHelper {
     public static String dump(final InetAddress addr, final int clientPort)
             throws UnknownHostException, IOException {
     
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("hostname=" + addr + ", port=" + clientPort);
     
         final Socket socket = new Socket(InetAddress.getLocalHost(), clientPort);
@@ -263,7 +259,7 @@ public class ZooHelper {
     
                 os.flush();
     
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Message sent");
     
             }
@@ -309,7 +305,7 @@ public class ZooHelper {
 
             ZooHelper.ruok(addr, clientPort);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Zookeeper running: " + addr.getCanonicalHostName()
                         + ":" + clientPort);
 
@@ -318,7 +314,7 @@ public class ZooHelper {
         } catch (IOException ex) {
 
             // ignore.
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Zookeeper not found: " + addr.getCanonicalHostName()
                         + ":" + clientPort);
 
@@ -327,10 +323,10 @@ public class ZooHelper {
         }
 
     }
-    
+
     /**
      * Destroys all znodes under the specified zpath and then the znode at the
-     * specified zpath.
+     * specified zpath. If there is no such znode, then return immediately.
      * 
      * @param zookeeper
      * @param zpath
@@ -364,7 +360,7 @@ public class ZooHelper {
 
         }
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("delete: " + zpath);
 
         try {
