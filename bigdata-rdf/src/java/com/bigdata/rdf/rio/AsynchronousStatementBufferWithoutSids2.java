@@ -852,6 +852,8 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
 
         }
 
+        // At this point the writes on TERM2ID have been buffered.
+        
     }
 
     /**
