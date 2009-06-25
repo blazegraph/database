@@ -214,7 +214,7 @@ public class InferenceEngine {
         String FORWARD_CHAIN_OWL_INVERSE_OF = InferenceEngine.class.getName()
                 + ".forwardChainOwlInverseOf";
 
-        String DEFAULT_FORWARD_CHAIN_OWL_INVERSE_OF = "false";
+        String DEFAULT_FORWARD_CHAIN_OWL_INVERSE_OF = "true";
 
         /**
          * When <code>true</code> (default
@@ -229,7 +229,7 @@ public class InferenceEngine {
                 .getName()
                 + ".forwardChainOwlTransitiveProperty";
 
-        String DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = "false";
+        String DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = "true";
 
     }
 
