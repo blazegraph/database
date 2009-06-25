@@ -41,6 +41,10 @@ import com.bigdata.service.AbstractTransactionService;
 /**
  * Test release (aka purge) of old resources.
  * 
+ * FIXME This set of unit tests needs to be updated to reflect that
+ * purgeResources() is invoked during synchronous overflow. The tests are
+ * written with a different assumption, which is why they are failing.
+ * 
  * @todo Write a unit test for purge before, during and after the 1st overflow
  *       and after a restart. Before, there should be nothing to release.
  *       During, the views that are being constructed should remain safe. After,
@@ -225,6 +229,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertTrue(createTime0 < createTime1);
 
             // verify can still open the original journal.
+            // @todo unit test needs to be updated to reflect purge in sync overflow.
             assertTrue(j0 == resourceManager.openStore(j0.getResourceMetadata()
                     .getUUID()));
 
@@ -368,8 +373,9 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
 
             /*
              * Note: the old journal should have been closed for writes during
-             * syncronous overflow processing.
+             * synchronous overflow processing.
              */
+            // @todo unit test needs to be updated to reflect purge in sync overflow.
             assertTrue(j0.isOpen()); // still open
             assertTrue(j0.isReadOnly()); // but no longer accepts writes.
             
@@ -538,6 +544,7 @@ public class TestReleaseResources extends AbstractResourceManagerTestCase {
             assertEquals(1,resourceManager.getAsynchronousOverflowCount());
 
             // two journals.
+            // @todo unit test needs to be updated to reflect purge in sync overflow.
             assertEquals(2,resourceManager.getManagedJournalCount());
             
             // no index segments.
