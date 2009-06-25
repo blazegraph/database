@@ -66,6 +66,8 @@
 # Note: when run as root we can use the standard subsystem lock file
 # but not when run as a normal user.
 #
+# Note: Convert DOS cr-lf to unix style in emacs: C-x RET f then unix 
+#
 # @todo rollover the stateLog file.  The log4j log files are rolled over by
 # the log4jServer.properties configuration.
 #
