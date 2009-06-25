@@ -110,6 +110,7 @@ import org.openrdf.sail.helpers.SailBase;
 
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -475,7 +476,11 @@ public class BigdataSail extends SailBase implements Sail {
         this.properties = database.getProperties();
         
         // truthMaintenance
-        {
+        if(database.getAxioms() instanceof NoAxioms) {
+            
+            truthMaintenance = false;
+            
+        } else {
             
             truthMaintenance = Boolean.parseBoolean(properties.getProperty(
                     BigdataSail.Options.TRUTH_MAINTENANCE,
