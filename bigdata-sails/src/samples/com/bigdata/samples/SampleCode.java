@@ -332,8 +332,8 @@ WHERE{
             // use one of our pre-configured option-sets or "modes"
             Properties properties = 
                 //sampleCode.loadProperties("bulkload.properties"); // loaded: 1752215 in 107110 millis: 16359 stmts/sec
-                sampleCode.loadProperties("fullfeature.properties"); // loaded: 1752215 in 340469 millis: 5146 stmts/sec
-                //sampleCode.loadProperties("rdfonly.properties"); // loaded: 1272871 in 108156 millis: 11768 stmts/sec
+                //sampleCode.loadProperties("fullfeature.properties"); // loaded: 1752215 in 340469 millis: 5146 stmts/sec
+                sampleCode.loadProperties("rdfonly.properties"); // loaded: 1272871 in 108156 millis: 11768 stmts/sec
             
             // create a backing file
             File journal = File.createTempFile("bigdata", ".jnl");
@@ -349,15 +349,15 @@ WHERE{
             repo.initialize();
             
             // run one of the LUBM tests
-            //sampleCode.doU10(repo);
+            sampleCode.doU10(repo);
             //sampleCode.doU1(repo);
-            
+            /*
             URI MIKE = new URIImpl("http://www.bigdata.com/rdf#Mike");
             sampleCode.loadSomeData(repo);
             sampleCode.readSomeData(repo, MIKE);
             sampleCode.executeSelectQuery(repo, "select ?p ?o where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
             sampleCode.executeConstructQuery(repo, "construct { <"+MIKE.toString()+"> ?p ?o . } where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
-           
+            */
             repo.shutDown();
             
         } catch (Exception ex) {
