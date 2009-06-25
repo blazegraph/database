@@ -245,7 +245,7 @@ public abstract class DistributedTransactionService extends
              * New service if its data directory does not exist.
              */
 
-            if (!dataDir.mkdirs()) {
+            if (!dataDir.mkdirs() && !dataDir.mkdirs()) {
 
                 throw new RuntimeException("Could not create: " + dataDir);
 
@@ -367,7 +367,7 @@ public abstract class DistributedTransactionService extends
     /**
      * A task that writes a snapshot of the commit time index onto a pair of
      * alternating files. This is in the spirit of the Challis algorithm, but
-     * the approach is less rigerous.
+     * the approach is less rigorous.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
@@ -397,6 +397,16 @@ public abstract class DistributedTransactionService extends
                 final int i = (int) snapshotCount % 2;
 
                 final File file = new File(dataDir, BASENAME + i + EXT);
+                
+                if (!dataDir.exists()) {
+
+                    if (!dataDir.mkdirs() && !dataDir.mkdirs()) {
+
+                        throw new RuntimeException("Could not create: " + dataDir);
+
+                    }
+                    
+                }
 
                 final int entryCount;
                 synchronized (commitTimeIndex) {
