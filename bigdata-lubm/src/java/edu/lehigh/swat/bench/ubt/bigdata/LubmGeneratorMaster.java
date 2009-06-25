@@ -520,8 +520,19 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
             
             jobState.logDir.mkdirs();
 
-            final File logFile = new File(jobState.logDir, "lubmGenerator"
-                    + clientNum + ".log");
+            final File logFile;
+            if (jobState.logDir.getPath().equals("/dev/null")) {
+
+                logFile = new File("/dev/null");
+                
+            } else {
+
+                jobState.logDir.mkdirs();
+
+                logFile = new File(jobState.logDir, "lubmGenerator" + clientNum
+                        + ".log");
+                
+            }
 
             /*
              * Note: This task does not declare the IDataServiceAwareProcedure
