@@ -57,7 +57,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("RDF(S)+ inference and truth maintenance");
+        TestSuite suite = new TestSuite("Inference and truth maintenance");
 
         /*
          * test ability to insert, update, or remove elements from a relation
