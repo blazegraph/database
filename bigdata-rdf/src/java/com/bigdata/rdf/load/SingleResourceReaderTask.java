@@ -24,19 +24,9 @@ import com.bigdata.rdf.rio.PresortRioLoader;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReaderTask implements Runnable {
+public class SingleResourceReaderTask implements Runnable {
 
-    protected static final Logger log = Logger.getLogger(ReaderTask.class);
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    protected static final Logger log = Logger.getLogger(SingleResourceReaderTask.class);
 
     /**
      * The resource to be loaded.
@@ -97,7 +87,7 @@ public class ReaderTask implements Runnable {
      * @param bufferFactory
      * @param toldTriples
      */
-    public ReaderTask(String resource, String baseURL, RDFFormat rdfFormat,
+    public SingleResourceReaderTask(String resource, String baseURL, RDFFormat rdfFormat,
             final boolean verifyData, final boolean deleteAfter,
             IStatementBufferFactory bufferFactory, AtomicLong toldTriples) {
 
@@ -115,7 +105,7 @@ public class ReaderTask implements Runnable {
 
         if (toldTriples == null)
             throw new IllegalArgumentException();
-        
+
         this.resource = resource;
         
         this.baseURL = baseURL;
@@ -172,7 +162,7 @@ public class ReaderTask implements Runnable {
         // make sure that the buffer is empty.
         buffer.reset();
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("loading: " + resource);
 
         final PresortRioLoader loader = new PresortRioLoader(buffer);
@@ -211,7 +201,7 @@ public class ReaderTask implements Runnable {
              * through to the database when that file is processed rather
              * than being accumulated in a thread-local buffer).
              */
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(stats.toString());
 
             return stats;
