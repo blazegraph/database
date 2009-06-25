@@ -1,0 +1,50 @@
+This is a bigdata (R) snapshot release.  This release is capable of loading 1B
+triples in under one hour on a 15 node cluster and has been used to load up to
+13B triples on the same cluster.  This release captures substantial improvements
+in the scale-out architecture.  While query performance has not been optimized
+recently, it is nevertheless reasonable.  BFS is NOT supported in this release.
+JDK 1.6 is required.
+
+See [1] for instructions on installing bigdata(R), [2] for the javadoc and [3]
+and [4] for news, questions, and the latest developments.
+
+[1] http://bigdata.wiki.sourceforge.net/GettingStarted
+[2] http://www.bigdata.com/bigdata/docs/api/
+[3] http://sourceforge.net/projects/bigdata/
+[4] http://www.bigdata.com/blog 
+
+New features:
+
+- Improved performance for the scale-out architecture.
+
+- Cluster based install (un*x).
+
+Know deficiencies:
+
+- After hours of sustained heavy write load the data service is occasionally
+unable to clear the buffered writes from the previous journal in a timely
+manner.  If the write load continues without relief then the journal extent
+will grow without bound.  While the journal can become very large (10s of GB),
+it will eventually be cleared if the load is reduced.  The main danger is that
+asynchronous overflow tasks are required to load balance the data service. Thus,
+if the buffered writes on the live journal journal are not cleared on a regular
+basis, asynchronous overflow processing is not performed and the host will 
+eventually run out of local disk.  Workarounds include periodic relief of 
+sustained heavy write loads and hosting the persistent state of the data
+service on a shared volume.  This issue is related only to sustained heavy
+write load.  It will be resolved by introducing a priority schedule for the
+asynchronous overflow tasks, giving priority to clearing the buffered writes
+before performing splits, and not starting new tasks once the journal has
+reached some multiple of its nominal maximum extent (200M). 
+
+- There is a bottleneck in the RDF distributed bulk load on the client side.
+After approximately 1 hour all parser tasks are regularly blocking.  This
+limits throughput to a mere 250,000 triples per second on the test platform.
+
+We are actively working on both of these issues and expect to have them 
+resolved in SVN shortly, at which point we will focus on query performance.
+
+About bigdata: 
+
+bigdata(R) is a scale-out storage and computing fabric supporting optional transactions, very high concurrency, and very high aggregate 
+IO rates.
