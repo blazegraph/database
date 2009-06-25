@@ -87,8 +87,22 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
     // @todo consider also a GenerateThenLoad (sequential rather than parallel)
     static enum RunMode {
+        /**
+         * Load the data from the configured data directory on each client.
+         */
         Load,
+        /**
+         * Generate the LUBM data using a hash partitioned scheme, writing it
+         * into the configured data directory for each client. This will also
+         * create the KB and load the ontology, but not load the generated data.
+         */
         Generate,
+        /**
+         * Runs an LUBM generator thread feeding the client via a blocking queue
+         * and the file system.  For a cluster with server class hardware, the
+         * LUBM generator thread is unable to supply the data fast enough and
+         * will be the limited factor.
+         */
         GenerateAndLoad
     }
     
