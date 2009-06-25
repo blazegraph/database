@@ -1137,9 +1137,6 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         + task.getClass().getName() + ", timestamp="
                         + task.timestamp);
 
-            // log warnings if new tasks are started when the journal is over extended.
-            journalOverextended( task );
-
             return submitWithDynamicLatency(task, readService, countersHR);
 
         } else {
@@ -1263,6 +1260,17 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         "StoreManager is not available");
 
             }
+            
+        }
+
+        if(service == readService) {
+            
+            /*
+             * Log warnings if new tasks are started when the journal is over
+             * extended.
+             */
+           
+            journalOverextended( task );
             
         }
 
