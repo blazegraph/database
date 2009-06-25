@@ -85,6 +85,7 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
     final protected static Logger log = Logger
             .getLogger(LubmGeneratorMaster.class);
 
+    // @todo consider also a GenerateThenLoad (sequential rather than parallel)
     static enum RunMode {
         Load,
         Generate,
@@ -168,7 +169,7 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
          * 
          * @see RunMode
          */
-        String RUN_MODE = "RunMode";
+        String RUN_MODE = "runMode";
         
     }
 
