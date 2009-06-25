@@ -24,7 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.load;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Date;
 import java.util.Properties;
 import java.util.concurrent.Callable;
@@ -42,6 +44,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.inf.ClosureStats;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids2;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -68,8 +71,8 @@ import com.bigdata.service.jini.master.TaskMaster;
  *       subclassing and overriding {@link #newClientTask(int)} and
  *       {@link #newJobState(String, Configuration)} as necessary.
  * 
- * @todo Delete after semantics are weak with asynchronous writes until I get
- *       the asynchronous eventual notifier integrated.
+ * @todo Strengthen the delete after semantics using
+ *       {@link AsynchronousStatementBufferWithoutSids2}.
  */
 public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends Callable<U>, U>
         extends TaskMaster<S, T, U> {
@@ -95,6 +98,13 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
          */
         String DATA_DIR = "dataDir";
 
+        /**
+         * Only files matched by the filter will be loaded from the
+         * {@link #DATA_DIR} (optional, but must be {@link Serializable} if
+         * given).
+         */
+        String DATA_DIR_FILTER = "dataDirFilter";
+        
         /**
          * A file or directory whose data will be loaded into the KB when it is
          * created. If it is a directory, then all data in that directory will
@@ -250,9 +260,19 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
 
         /**
          * The directory from which files will be read.
+         * 
+         * @see ConfigurationOptions#DATA_DIR
          */
         public final File dataDir;
 
+        /**
+         * Only files matched by the filter in the {@link #dataDir} will be
+         * processed (optional, but must be {@link Serializable}).
+         * 
+         * @see ConfigurationOptions#DATA_DIR_FILTER
+         */
+        public final FilenameFilter dataDirFilter;
+        
         /**
          * The file or directory from which files will be loaded when the
          * {@link ITripleStore} is first created.
@@ -369,6 +389,9 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
             sb.append(", " + ConfigurationOptions.DATA_DIR+ "="
                     + dataDir);
         
+            sb.append(", " + ConfigurationOptions.DATA_DIR_FILTER + "="
+                    + dataDirFilter);
+        
             sb.append(", " + ConfigurationOptions.NTHREADS + "="
                     + nthreads);
             
@@ -423,6 +446,10 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
 
             dataDir = (File) config.getEntry(component,
                     ConfigurationOptions.DATA_DIR, File.class);
+
+            dataDirFilter = (FilenameFilter) config.getEntry(component,
+                    ConfigurationOptions.DATA_DIR_FILTER, FilenameFilter.class,
+                    null/* default */);
 
             ontology = (File) config
                     .getEntry(component, ConfigurationOptions.ONTOLOGY,
@@ -504,12 +531,6 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
      * @throws ExecutionException
      * @throws InterruptedException
      * @throws KeeperException
-     * 
-     * @todo clients could report a throughput measure such as operations per
-     *       second and the master should aggregate and report that back on the
-     *       console (this data is available via the LBS).
-     * 
-     * @todo could report as tasks complete (#running, outcome).
      */
     static public void main(final String[] args) throws ConfigurationException,
             ExecutionException, InterruptedException, KeeperException {
@@ -589,7 +610,7 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         if (jobState.computeClosure) {
 
             /*
-             * FIXME (Robustly) Compute database-at-once closure.
+             * Compute database-at-once closure.
              * 
              * @todo Given the long running nature of closure over a large data
              * set, clients could write the set of rules that have reached fixed
@@ -697,11 +718,6 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         
         if (jobState.forceOverflow) {
 
-            /*
-             * @todo this is another operation that we only want to run once
-             * even if there are multiple masters.
-             */
-            
             System.out.println("Forcing overflow: now=" + new Date());
 
             fed.forceOverflow(true/* truncateJournal */);
@@ -733,10 +749,6 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
                     .append("indexManager\t"
                             + tripleStore.getIndexManager().getClass()
                                     .getName() + "\n");
-
-            // @todo exact?
-//            sb.append("exactStatementCount\t"
-//                    + tripleStore.getExactStatementCount() + "\n");
             
             sb.append("statementCount\t" + tripleStore.getStatementCount()
                     + "\n");

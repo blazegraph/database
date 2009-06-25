@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.load;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -599,7 +601,7 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         } // while(true)
 
     } // awaitTermination
-    
+
     /**
      * Submits a task to the {@link #loadService}. If the queue is full then
      * this will block until the task can be submitted.
@@ -608,9 +610,13 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
      * loaded is taken as the baseURI for that file. This is standard practice.
      * 
      * @param resource
-     *            The resource to be loader (a File or a URL).
+     *            The resource to be loader (a File or a URL, but NOT a
+     *            directory).
      * @param taskFactory
      * 
+     * @throws IOException
+     *             if the resource identifies a directory rather than a plain
+     *             file or a URL.
      * @throws InterruptedException
      *             if the caller is interrupted while waiting to submit the
      *             task.
@@ -624,6 +630,18 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
             Exception {
         
         if(log.isDebugEnabled()) log.debug("Processing: resource=" + resource);
+        
+        {
+            
+            final File tmp = new File(resource);
+         
+            if (tmp.isDirectory()) {
+            
+                throw new IOException(resource + " is a directory.");
+            
+            }
+            
+        }
         
         final T target = taskFactory.newTask(resource);
         

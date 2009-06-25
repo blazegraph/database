@@ -122,7 +122,7 @@ public class AbstractRDFTaskFactory<S extends Statement,T extends Runnable> impl
     }
     
     /**
-     * #of told triples loaded into the database by successfully completed {@link ReaderTask}s.
+     * #of told triples loaded into the database by successfully completed {@link SingleResourceReaderTask}s.
      */
     final AtomicLong toldTriples = new AtomicLong(0);
 
@@ -191,7 +191,7 @@ public class AbstractRDFTaskFactory<S extends Statement,T extends Runnable> impl
 
         }
         
-        return (T) new ReaderTask(resource, baseURL, rdfFormat, verifyData,
+        return (T) new SingleResourceReaderTask(resource, baseURL, rdfFormat, verifyData,
                 deleteAfter, bufferFactory, toldTriples);
         
     }
