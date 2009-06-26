@@ -8,6 +8,12 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+/**
+ * Demonstrate how to use bigdata.  You are free to use this code for whatever
+ * purpose without restriction.
+ * 
+ * @author mikep
+ */
 public class SparqlBuilder {
     private Graph where, construct;
 
