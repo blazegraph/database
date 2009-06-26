@@ -1,7 +1,5 @@
 package com.bigdata.samples;
 
-import info.aduna.xml.XMLWriter;
-
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -10,7 +8,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Properties;
 import java.util.Set;
@@ -22,15 +19,16 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQuery;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
@@ -39,11 +37,11 @@ import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.store.BNS;
 
 /**
  * Demonstrate how to use bigdata.
@@ -59,7 +57,14 @@ public class SampleCode {
      * performance.
      */
     protected static final Logger log = Logger.getLogger(SampleCode.class);
-    
+
+    /**
+     * Load a Properties object from a file.
+     * 
+     * @param resource
+     * @return
+     * @throws Exception
+     */
     public Properties loadProperties(String resource) throws Exception {
         Properties p = new Properties();
         InputStream is = getClass().getResourceAsStream(resource);
@@ -67,8 +72,230 @@ public class SampleCode {
         return p;
     }
     
-    public void doLUBMTest(Repository repo, final String lubmResource, 
-        final String filter) throws Exception {
+    /**
+     * Add a statement to a repository.
+     * 
+     * @param repo
+     * @throws Exception
+     */
+    public void loadSomeData(Repository repo) throws Exception {
+        RepositoryConnection cxn = repo.getConnection();
+        cxn.setAutoCommit(false);
+        try {
+            Resource s = new URIImpl("http://www.bigdata.com/rdf#Mike");
+            URI p = new URIImpl("http://www.bigdata.com/rdf#loves");
+            Value o = new URIImpl("http://www.bigdata.com/rdf#RDF");
+            Statement stmt = new StatementImpl(s, p, o);
+            cxn.add(stmt);
+            cxn.commit();
+        } catch (Exception ex) {
+            cxn.rollback();
+            throw ex;
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+    }
+
+    /**
+     * Load a document into a repository.
+     * 
+     * @param repo
+     * @param resource
+     * @param baseURL
+     * @throws Exception
+     */
+    public void loadSomeDataFromADocument(Repository repo, String resource, 
+        String baseURL) throws Exception {
+        
+        RepositoryConnection cxn = repo.getConnection();
+        cxn.setAutoCommit(false);
+        try {
+            InputStream is = getClass().getResourceAsStream(resource);
+            Reader reader = new InputStreamReader(new BufferedInputStream(is));
+            cxn.add(reader, baseURL, RDFFormat.RDFXML);
+            cxn.commit();
+        } catch (Exception ex) {
+            cxn.rollback();
+            throw ex;
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+        
+    }
+    
+    /**
+     * Read some statements from a repository.
+     * 
+     * @param repo
+     * @param uri
+     * @throws Exception
+     */
+    public void readSomeData(Repository repo, URI uri) throws Exception {
+        
+        RepositoryConnection cxn = repo.getConnection();
+        try {
+            
+            RepositoryResult<Statement> stmts = 
+                cxn.getStatements(uri, null, null, true /* include inferred */);
+            while (stmts.hasNext()) {
+                Statement stmt = stmts.next();
+                Resource s = stmt.getSubject();
+                URI p = stmt.getPredicate();
+                Value o = stmt.getObject();
+                // do something with the statement
+                log.info(stmt);
+                
+                // cast to BigdataStatement to get at additional information
+                BigdataStatement bdStmt = (BigdataStatement) stmt;
+                if (bdStmt.isExplicit()) {
+                    // do one thing
+                } else if (bdStmt.isInferred()) {
+                    // do another thing
+                } else { // bdStmt.isAxiom()
+                    // do something else
+                }
+                log.info(bdStmt.getStatementType());
+            }
+            
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+        
+    }
+    
+    /**
+     * Execute a "select" query.
+     * 
+     * @param repo
+     * @param query
+     * @param ql
+     * @throws Exception
+     */
+    public void executeSelectQuery(Repository repo, String query, 
+        QueryLanguage ql) throws Exception {
+        
+        RepositoryConnection cxn = repo.getConnection();
+        try {
+
+            final TupleQuery tupleQuery = cxn.prepareTupleQuery(ql, query);
+            tupleQuery.setIncludeInferred(true /* includeInferred */);
+            TupleQueryResult result = tupleQuery.evaluate();
+            // do something with the results
+            while (result.hasNext()) {
+                BindingSet bindingSet = result.next();
+                log.info(bindingSet);
+            }
+            
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+        
+    }
+        
+    /**
+     * Execute a "construct" query.
+     * 
+     * @param repo
+     * @param query
+     * @param ql
+     * @throws Exception
+     */
+    public void executeConstructQuery(Repository repo, String query, 
+        QueryLanguage ql) throws Exception {
+        
+        RepositoryConnection cxn = repo.getConnection();
+        try {
+
+            // silly construct queries, can't guarantee distinct results
+            final Set<Statement> results = new LinkedHashSet<Statement>();
+            final GraphQuery graphQuery = cxn.prepareGraphQuery(ql, query);
+            graphQuery.setIncludeInferred(true /* includeInferred */);
+            graphQuery.evaluate(new StatementCollector(results));
+            // do something with the results
+            for (Statement stmt : results) {
+                log.info(stmt);
+            }
+
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+        
+    }
+
+    /**
+     * Demonstrate execution of a free-text query.
+     * 
+     * @param repo
+     * @throws Exception
+     */
+    public void executeFreeTextQuery(Repository repo) throws Exception {
+        
+            RepositoryConnection cxn = repo.getConnection();
+            cxn.setAutoCommit(false);
+            try {
+                cxn.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
+                        new LiteralImpl("Yellow Rose"));
+                cxn.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
+                        new LiteralImpl("Red Rose"));
+                cxn.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
+                        new LiteralImpl("Old Yellow House"));
+                cxn.add(new URIImpl("http://www.bigdata.com/D"), RDFS.LABEL,
+                        new LiteralImpl("Loud Yell"));
+                cxn.commit();
+            } catch (Exception ex) {
+                cxn.rollback();
+                throw ex;
+            } finally {
+                // close the repository connection
+                cxn.close();
+            }
+            
+            String query = "select ?x where { ?x <"+BNS.SEARCH+"> \"Yell\" . }";
+            executeSelectQuery(repo, query, QueryLanguage.SPARQL);
+            // will match A, C, and D
+        
+    }
+
+    /**
+     * Run a simple LUBM load and query benchmark.
+     * 
+     * @param lubmResource the ZIP file containng the LUBM data files
+     * @param filter helps filter out non-data files in the ZIP file
+     * @throws Exception
+     */
+    public void doLUBMTest(final String lubmResource, final String filter) 
+        throws Exception {
+        
+        /*
+         We are going to use the "fast load" mode for this LUBM test.  In fast 
+         mode, we lose certain features, like the full text index and statement 
+         identifiers.  The database also does not do inference automatically, so
+         we have to tell the inference engine explicitly when to compute 
+         closure.  Also, there is no recording of justification chains for 
+         inferences, so this mode is extremely bad for retraction.  If we were 
+         to retract a statement, we would have to tell the inference engine to 
+         remove all inferences and completely re-compute the closure for the 
+         entire database!
+         */
+        Properties properties = loadProperties("fastload.properties");
+        
+        // create a backing file
+        File journal = File.createTempFile("bigdata", ".jnl");
+        journal.deleteOnExit();
+        properties.setProperty(
+            BigdataSail.Options.FILE, 
+            journal.getAbsolutePath()
+            );
+        
+        // instantiate a sail
+        BigdataSail sail = new BigdataSail(properties);
+        Repository repo = new BigdataSailRepository(sail);
+        repo.initialize();
         
         RepositoryConnection cxn = repo.getConnection();
         cxn.setAutoCommit(false);
@@ -112,21 +339,15 @@ public class SampleCode {
             // autocommit is false, we need to commit our SAIL "transaction"
             cxn.commit();
             
-            // this is some custom code beneath the SAIL API that allows us
-            // to do more efficient database-at-once inference when in 
-            // "bulk load" mode
-            BigdataSail sail = (BigdataSail) ((BigdataSailRepository) repo).getSail();
+            // when we are in "fast load" mode there is no automatic inference
+            // as statements are loaded.  we therefore must invoke the inference
+            // engine ourselves when we are done loading data.
             BigdataSailConnection sailCxn = (BigdataSailConnection)
                 ((BigdataSailRepositoryConnection) cxn).getSailConnection();
-            if (sail.getTruthMaintenance() == false) {
-                // we are in bulk load mode
-                if (sail.getDatabase().getAxioms().isRdfSchema()) {
-                    // we are not in "rdf-only" mode
-                    sailCxn.computeClosure();
-                    sailCxn.getTripleStore().commit();
-                }
-            }
-            
+            sailCxn.computeClosure();
+            sailCxn.getTripleStore().commit();
+
+            // gather statistics
             long elapsed = System.currentTimeMillis() - start;
             long stmtsAfter = cxn.size();
             long stmtsAdded = stmtsAfter - stmtsBefore;
@@ -185,12 +406,12 @@ WHERE{
         
     }
     
-    public void doU10(Repository repo) throws Exception {
-        doLUBMTest(repo, "U10.zip", "U10/University");
+    public void doU10() throws Exception {
+        doLUBMTest("U10.zip", "U10/University");
     }
 
-    public void doU1(Repository repo) throws Exception {
-        doLUBMTest(repo, "U1.zip", "U1/University");
+    public void doU1() throws Exception {
+        doLUBMTest("U1.zip", "U1/University");
     }
 
     public Reader getReader(Class c, String resource) {
@@ -198,126 +419,6 @@ WHERE{
         return new InputStreamReader(new BufferedInputStream(is));
     }
     
-    public void loadSomeData(Repository repo) throws Exception {
-        RepositoryConnection cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
-        try {
-            Resource s = new URIImpl("http://www.bigdata.com/rdf#Mike");
-            URI p = new URIImpl("http://www.bigdata.com/rdf#loves");
-            Value o = new URIImpl("http://www.bigdata.com/rdf#RDF");
-            Statement stmt = new StatementImpl(s, p, o);
-            cxn.add(stmt);
-            cxn.commit();
-        } catch (Exception ex) {
-            cxn.rollback();
-            throw ex;
-        } finally {
-            // close the repository connection
-            cxn.close();
-        }
-    }
-
-    public void loadSomeDataFromADocument(Repository repo, String resource, 
-        String baseURL) throws Exception {
-        
-        RepositoryConnection cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
-        try {
-            InputStream is = getClass().getResourceAsStream(resource);
-            Reader reader = new InputStreamReader(new BufferedInputStream(is));
-            cxn.add(reader, baseURL, RDFFormat.RDFXML);
-            cxn.commit();
-        } catch (Exception ex) {
-            cxn.rollback();
-            throw ex;
-        } finally {
-            // close the repository connection
-            cxn.close();
-        }
-        
-    }
-    
-    public void readSomeData(Repository repo, URI uri) throws Exception {
-        
-        RepositoryConnection cxn = repo.getConnection();
-        try {
-            
-            RepositoryResult<Statement> stmts = 
-                cxn.getStatements(uri, null, null, true /* include inferred */);
-            while (stmts.hasNext()) {
-                Statement stmt = stmts.next();
-                Resource s = stmt.getSubject();
-                URI p = stmt.getPredicate();
-                Value o = stmt.getObject();
-                // do something with the statement
-                log.info(stmt);
-                
-                // cast to BigdataStatement to get at additional information
-                BigdataStatement bdStmt = (BigdataStatement) stmt;
-                if (bdStmt.isExplicit()) {
-                    // do one thing
-                } else if (bdStmt.isInferred()) {
-                    // do another thing
-                } else { // bdStmt.isAxiom()
-                    // do something else
-                }
-                log.info(bdStmt.getStatementType());
-            }
-            
-        } finally {
-            // close the repository connection
-            cxn.close();
-        }
-        
-    }
-    
-    public void executeSelectQuery(Repository repo, String query, 
-        QueryLanguage ql) throws Exception {
-        
-        RepositoryConnection cxn = repo.getConnection();
-        try {
-
-            final TupleQuery tupleQuery = cxn.prepareTupleQuery(ql, query);
-            tupleQuery.setIncludeInferred(true /* includeInferred */);
-            TupleQueryResult result = tupleQuery.evaluate();
-            // do something with the results
-            while (result.hasNext()) {
-                BindingSet bindingSet = result.next();
-                log.info(bindingSet);
-            }
-            
-        } finally {
-            // close the repository connection
-            cxn.close();
-        }
-        
-    }
-        
-    public void executeConstructQuery(Repository repo, String query, 
-        QueryLanguage ql) throws Exception {
-        
-        RepositoryConnection cxn = repo.getConnection();
-        try {
-
-            // silly construct queries, can't guarantee distinct results
-            final Set<Statement> results = new LinkedHashSet<Statement>();
-            final GraphQuery graphQuery = cxn.prepareGraphQuery(ql, query);
-            graphQuery.setIncludeInferred(true /* includeInferred */);
-            graphQuery.evaluate(new StatementCollector(results));
-            // do something with the results
-            for (Statement stmt : results) {
-                log.info(stmt);
-            }
-
-        } finally {
-            // close the repository connection
-            cxn.close();
-        }
-        
-    }
-            
-    
-
     /**
      * Are you running with the -server JVM option?  You should be.  Also, try
      * increasing heap size with -Xmx512m or even -Xmx1024m if you have enough
@@ -331,9 +432,9 @@ WHERE{
             
             // use one of our pre-configured option-sets or "modes"
             Properties properties = 
-                //sampleCode.loadProperties("bulkload.properties"); // loaded: 1752215 in 107110 millis: 16359 stmts/sec
-                //sampleCode.loadProperties("fullfeature.properties"); // loaded: 1752215 in 340469 millis: 5146 stmts/sec
-                sampleCode.loadProperties("rdfonly.properties"); // loaded: 1272871 in 108156 millis: 11768 stmts/sec
+                sampleCode.loadProperties("fullfeature.properties");
+                //sampleCode.loadProperties("rdfonly.properties");
+            //sampleCode.loadProperties("fastload.properties");
             
             // create a backing file
             File journal = File.createTempFile("bigdata", ".jnl");
@@ -348,17 +449,19 @@ WHERE{
             Repository repo = new BigdataSailRepository(sail);
             repo.initialize();
             
-            // run one of the LUBM tests
-            sampleCode.doU10(repo);
-            //sampleCode.doU1(repo);
-            /*
+            // demonstrate some basic functionality
             URI MIKE = new URIImpl("http://www.bigdata.com/rdf#Mike");
             sampleCode.loadSomeData(repo);
             sampleCode.readSomeData(repo, MIKE);
             sampleCode.executeSelectQuery(repo, "select ?p ?o where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
             sampleCode.executeConstructQuery(repo, "construct { <"+MIKE.toString()+"> ?p ?o . } where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
-            */
+            sampleCode.executeFreeTextQuery(repo);
+            
             repo.shutDown();
+            
+            // run one of the LUBM tests
+            sampleCode.doU10(); // I see loaded: 1752215 in 116563 millis: 15032 stmts/sec, what do you see?
+            //sampleCode.doU1();
             
         } catch (Exception ex) {
             ex.printStackTrace();
