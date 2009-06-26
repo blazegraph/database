@@ -44,7 +44,8 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.BNS;
 
 /**
- * Demonstrate how to use bigdata.
+ * Demonstrate how to use bigdata.  You are free to use this code for whatever
+ * purpose without restriction.
  * 
  * @author mikep
  */
