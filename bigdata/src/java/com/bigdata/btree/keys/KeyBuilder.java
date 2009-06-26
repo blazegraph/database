@@ -1571,11 +1571,11 @@ public class KeyBuilder implements IKeyBuilder {
      *            Either an {@link Integer} or a {@link StrengthEnum} specifying
      *            the strength to be set on the collator object (optional). When
      *            <code>null</code> the default strength of the collator will
-     *            not be overriden.
+     *            not be overridden.
      * @param mode
      *            The decomposition mode to be set on the collator object
      *            (optional). When <code>null</code> the default decomposition
-     *            mode of the collator will not be overriden.
+     *            mode of the collator will not be overridden.
      * 
      * @return The new instance.
      * 
