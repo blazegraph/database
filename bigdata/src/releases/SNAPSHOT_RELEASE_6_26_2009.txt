@@ -6,7 +6,10 @@ recently, it is nevertheless reasonable.  BFS is NOT supported in this release.
 JDK 1.6 is required.
 
 See [1] for instructions on installing bigdata(R), [2] for the javadoc and [3]
-and [4] for news, questions, and the latest developments.
+and [4] for news, questions, and the latest developments.  There are a number
+of dependencies which are only required for the scale-out architecture (jini
+and zookeeper) or compressed unicode sort keys (ICU).  There are notes on the
+wiki if you want to exclude these dependencies from your installation.
 
 [1] http://bigdata.wiki.sourceforge.net/GettingStarted
 [2] http://www.bigdata.com/bigdata/docs/api/
