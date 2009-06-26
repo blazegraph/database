@@ -132,6 +132,7 @@
 			<packageset dir="${bigdata.dir}/bigdata-jini/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
 			<packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
+			<packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
 			<doctitle>
 				<![CDATA[<h1>bigdata&#174;</h1>]]></doctitle>
 		<bottom>
