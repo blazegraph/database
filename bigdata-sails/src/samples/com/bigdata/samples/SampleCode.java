@@ -235,29 +235,76 @@ public class SampleCode {
      */
     public void executeFreeTextQuery(Repository repo) throws Exception {
         
-            RepositoryConnection cxn = repo.getConnection();
-            cxn.setAutoCommit(false);
-            try {
-                cxn.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
-                        new LiteralImpl("Yellow Rose"));
-                cxn.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
-                        new LiteralImpl("Red Rose"));
-                cxn.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
-                        new LiteralImpl("Old Yellow House"));
-                cxn.add(new URIImpl("http://www.bigdata.com/D"), RDFS.LABEL,
-                        new LiteralImpl("Loud Yell"));
-                cxn.commit();
-            } catch (Exception ex) {
-                cxn.rollback();
-                throw ex;
-            } finally {
-                // close the repository connection
-                cxn.close();
+        RepositoryConnection cxn = repo.getConnection();
+        cxn.setAutoCommit(false);
+        try {
+            cxn.add(new URIImpl("http://www.bigdata.com/A"), RDFS.LABEL,
+                    new LiteralImpl("Yellow Rose"));
+            cxn.add(new URIImpl("http://www.bigdata.com/B"), RDFS.LABEL,
+                    new LiteralImpl("Red Rose"));
+            cxn.add(new URIImpl("http://www.bigdata.com/C"), RDFS.LABEL,
+                    new LiteralImpl("Old Yellow House"));
+            cxn.add(new URIImpl("http://www.bigdata.com/D"), RDFS.LABEL,
+                    new LiteralImpl("Loud Yell"));
+            cxn.commit();
+        } catch (Exception ex) {
+            cxn.rollback();
+            throw ex;
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+        
+        String query = "select ?x where { ?x <"+BNS.SEARCH+"> \"Yell\" . }";
+        executeSelectQuery(repo, query, QueryLanguage.SPARQL);
+        // will match A, C, and D
+        
+    }
+
+    /**
+     * Demonstrate execution of statement level provenance.
+     * 
+     * @param repo
+     * @throws Exception
+     */
+    public void executeProvenanceQuery(Repository repo) throws Exception {
+        
+        RepositoryConnection cxn = repo.getConnection();
+        cxn.setAutoCommit(false);
+        try {
+            cxn.remove((Resource)null, (URI)null, (Value)null);
+            cxn.commit();
+            
+            cxn.add(getReader(getClass(), "provenance.rdf"), 
+                "", RDFFormat.RDFXML);
+            cxn.commit();
+            
+            RepositoryResult<Statement> results = 
+                cxn.getStatements(null, null, null, false);
+            while(results.hasNext()) {
+                log.info(results.next());
             }
             
-            String query = "select ?x where { ?x <"+BNS.SEARCH+"> \"Yell\" . }";
-            executeSelectQuery(repo, query, QueryLanguage.SPARQL);
-            // will match A, C, and D
+        } catch (Exception ex) {
+            cxn.rollback();
+            throw ex;
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+
+        String NS = "http://www.bigdata.com/rdf#";
+        String MIKE = NS + "Mike";
+        String LOVES = NS + "loves";
+        String RDF = NS + "RDF";
+        String query = 
+            "construct { ?sid ?p ?o } " +
+            "where { " +
+            "  ?sid ?p ?o ." +
+            "  graph ?sid { <"+MIKE+"> <"+LOVES+"> <"+RDF+"> } " +
+            "}";
+        executeConstructQuery(repo, query, QueryLanguage.SPARQL);
+        // should see the provenance information for { Mike loves RDF }
         
     }
 
@@ -456,11 +503,12 @@ WHERE{
             sampleCode.executeSelectQuery(repo, "select ?p ?o where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
             sampleCode.executeConstructQuery(repo, "construct { <"+MIKE.toString()+"> ?p ?o . } where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
             sampleCode.executeFreeTextQuery(repo);
+            sampleCode.executeProvenanceQuery(repo);
             
             repo.shutDown();
             
             // run one of the LUBM tests
-            sampleCode.doU10(); // I see loaded: 1752215 in 116563 millis: 15032 stmts/sec, what do you see?
+            //sampleCode.doU10(); // I see loaded: 1752215 in 116563 millis: 15032 stmts/sec, what do you see?
             //sampleCode.doU1();
             
         } catch (Exception ex) {
