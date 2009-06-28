@@ -16,6 +16,8 @@ wiki if you want to exclude these dependencies from your installation.
 [3] http://sourceforge.net/projects/bigdata/
 [4] http://www.bigdata.com/blog 
 
+Revision: 1889.
+
 New features:
 
 - Improved performance for the scale-out architecture.
