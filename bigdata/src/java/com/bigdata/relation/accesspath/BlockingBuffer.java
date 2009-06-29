@@ -1099,7 +1099,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         // clear nextE on the inner class?
         
     }
-    
+
     /**
      * The iterator is NOT thread-safe and does NOT support remove().
      * <p>
@@ -1107,8 +1107,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * {@link ICloseableIterator#close()}d before the {@link Future} of the
      * process writing on the {@link BlockingBuffer} is done, then the
      * {@link Future} will be cancelled using {@link Thread#interrupt()}. Owing
-     * to a feature of {@link FileChannel}, this will cause the backing store
-     * to be asynchronously closed if the interupt is detected during an IO. T
+     * to a feature of {@link FileChannel}, this will cause the backing store to
+     * be asynchronously closed if the interrupt is detected during an IO. The
      * backing store will be re-opened transparently, but there is overhead
      * associated with that (locks to be re-acquired, etc).
      * <p>
@@ -1119,7 +1119,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * produce {@link IAsynchronousIterator}s will automatically terminate when
      * they reach the desired limit, thereby avoiding issuing interrupts. Those
      * processes include {@link IAccessPath} scans where the #of elements to be
-     * visited exceeds the fully materialized chunk threashold and {@link IRule}
+     * visited exceeds the fully materialized chunk threshold and {@link IRule}
      * evaluation, e.g., by {@link NestedSubqueryWithJoinThreadsTask}.
      * 
      * @return The iterator (this is a singleton).
