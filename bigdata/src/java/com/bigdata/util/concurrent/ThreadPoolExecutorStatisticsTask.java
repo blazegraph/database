@@ -19,18 +19,9 @@ import com.bigdata.util.concurrent.IQueueCounters.IWriteServiceExecutorCounters;
  * Class tracks a variety of information about a {@link ThreadPoolExecutor}
  * including the moving average of its queue length, queuing times, etc.
  * 
- * @todo {@link ThreadPoolExecutor#getActiveCount()},
- *       {@link ThreadPoolExecutor#getTaskCount()}, and
- *       {@link ThreadPoolExecutor#getCompletedTaskCount()} all obtain a lock
- *       and then iterate over the workers. This makes them heavier operations
- *       than you might otherwise expect!
- *       <p>
- *       Consider subclassing {@link ThreadPoolExecutor} to maintain these
- *       counters more cheaply.
- * 
  * @todo refactor to layer {@link QueueSizeMovingAverageTask} then
- *       {@link ThreadPoolExecutorStatisticsTask} then for the
- *       {@link WriteServiceExecutor}.
+ *       {@link ThreadPoolExecutorBaseStatisticsTask}, then this class, then a
+ *       derived class for the {@link WriteServiceExecutor}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -68,7 +59,7 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * There are several different moving averages which are computed.
      */
     
-    private double averageQueueSize   = 0d;
+//    private double averageQueueSize   = 0d;
     private double averageActiveCount = 0d;
     private double averageQueueLength = 0d;
     private double averageActiveCountWithLocksHeld = 0d;
@@ -247,6 +238,16 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
     }
 
     /**
+     * The moving average of the queue size.
+     */
+    private final MovingAverageTask queueSizeTask = new MovingAverageTask(
+            "queueSize", new Callable<Integer>() {
+                public Integer call() {
+                    return service.getQueue().size();
+                }
+            });
+
+    /**
      * The moving average of the change in the total inter-arrival time.
      * 
      * @see TaskCounters#interArrivalNanoTime
@@ -282,6 +283,8 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
         try {
 
             {
+
+                queueSizeTask.run();
                 
                 // queueSize := #of tasks in the queue.
                 final int queueSize = service.getQueue().size();
@@ -289,10 +292,10 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
                 // activeCount := #of tasks assigned a worker thread
                 final int activeCount = service.getActiveCount();
 
-                // This is just the tasks that are currently waiting to run (not
-                // assigned to any thread).
-                averageQueueSize = getMovingAverage(averageQueueSize,
-                        queueSize, w);
+////                 This is just the tasks that are currently waiting to run (not
+////                 assigned to any thread).
+//                averageQueueSize = getMovingAverage(averageQueueSize,
+//                        queueSize, w);
 
                 // This is just the tasks that are currently running (assigned
                 // to a worker thread).
@@ -547,12 +550,9 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
      * 
      * @return The caller's <i>counterSet</i>
      */
-    public CounterSet addCounters(final CounterSet counterSet) {
+    public CounterSet getCounters() {
 
-        if (counterSet == null)
-            throw new IllegalArgumentException();
-        
-        synchronized(counterSet) {
+        final CounterSet counterSet = new CounterSet();
         
         /*
          * Defined for ThreadPoolExecutor.
@@ -575,393 +575,401 @@ public class ThreadPoolExecutorStatisticsTask implements Runnable {
 //                });
 //
 
-            /*
-             * Computed variables based on just the Queue.
-             */
-            {
+        /*
+         * Computed variables based on just the Queue.
+         */
+        {
 
-                counterSet.addCounter(IQueueCounters.AverageQueueSize,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageQueueSize);
-                            }
-                        });
+//            counterSet.addCounter(IQueueCounters.AverageQueueSize,
+//                    new Instrument<Double>() {
+//                        @Override
+//                        protected void sample() {
+//                            setValue(averageQueueSize);
+//                        }
+//                    });
 
-            }
+            counterSet.addCounter(
+                    IQueueCounters.AverageQueueSize,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(queueSizeTask
+                                    .getMovingAverage());
+                        }
+                    });
 
-            /*
-             * Computed variables based on the service itself.
-             */
-            {
+        }
 
-                if (taskCounters == null) {
+        /*
+         * Computed variables based on the service itself.
+         */
+        {
 
-                    /*
-                     * Report iff not being reported via the TaskCounters.
-                     */
-
-                    counterSet.addCounter(
-                            IThreadPoolExecutorCounters.TaskCompleteCount,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(service.getCompletedTaskCount());
-                                }
-                            });
-
-                }
-
-                counterSet.addCounter(IThreadPoolExecutorCounters.PoolSize,
-                        new Instrument<Integer>() {
-                            public void sample() {
-                                setValue(service.getPoolSize());
-                            }
-                        });
-
-                counterSet.addCounter(IThreadPoolExecutorCounters.LargestPoolSize,
-                        new Instrument<Integer>() {
-                            public void sample() {
-                                setValue(service.getLargestPoolSize());
-                            }
-                        });
-
-                counterSet.addCounter(
-                        IThreadPoolExecutorCounters.AverageActiveCount,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageActiveCount);
-                            }
-                        });
-
-                counterSet.addCounter(
-                        IThreadPoolExecutorCounters.AverageQueueLength,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageQueueLength);
-                            }
-                        });
-
-            }
-
-            /*
-             * Computed variables based on the per-task counters.
-             */
-            if (taskCounters != null) {
+            if (taskCounters == null) {
 
                 /*
-                 * Simple counters.
+                 * Report iff not being reported via the TaskCounters.
                  */
 
-                // count of all tasks submitted to the service.
-                counterSet.addCounter(
-                        IThreadPoolExecutorTaskCounters.TaskSubmitCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(taskCounters.taskSubmitCount.get());
-                            }
-                        });
-
-                // count of all tasks completed by the service (failed +
-                // success).
                 counterSet.addCounter(
                         IThreadPoolExecutorCounters.TaskCompleteCount,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue(taskCounters.taskCompleteCount.get());
+                                setValue(service.getCompletedTaskCount());
                             }
                         });
 
-                // count of all tasks which failed during execution.
-                counterSet.addCounter(
-                        IThreadPoolExecutorTaskCounters.TaskFailCount,
+            }
+
+            counterSet.addCounter(IThreadPoolExecutorCounters.PoolSize,
+                    new Instrument<Integer>() {
+                        public void sample() {
+                            setValue(service.getPoolSize());
+                        }
+                    });
+
+            counterSet.addCounter(IThreadPoolExecutorCounters.LargestPoolSize,
+                    new Instrument<Integer>() {
+                        public void sample() {
+                            setValue(service.getLargestPoolSize());
+                        }
+                    });
+
+            counterSet.addCounter(
+                    IThreadPoolExecutorCounters.AverageActiveCount,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageActiveCount);
+                        }
+                    });
+
+            counterSet.addCounter(
+                    IThreadPoolExecutorCounters.AverageQueueLength,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageQueueLength);
+                        }
+                    });
+
+        }
+
+        /*
+         * Computed variables based on the per-task counters.
+         */
+        if (taskCounters != null) {
+
+            /*
+             * Simple counters.
+             */
+
+            // count of all tasks submitted to the service.
+            counterSet.addCounter(
+                    IThreadPoolExecutorTaskCounters.TaskSubmitCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(taskCounters.taskSubmitCount.get());
+                        }
+                    });
+
+            // count of all tasks completed by the service (failed +
+            // success).
+            counterSet.addCounter(
+                    IThreadPoolExecutorCounters.TaskCompleteCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(taskCounters.taskCompleteCount.get());
+                        }
+                    });
+
+            // count of all tasks which failed during execution.
+            counterSet.addCounter(
+                    IThreadPoolExecutorTaskCounters.TaskFailCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(taskCounters.taskFailCount.get());
+                        }
+                    });
+
+            // count of all tasks which were successfully executed.
+            counterSet.addCounter(
+                    IThreadPoolExecutorTaskCounters.TaskSuccessCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(taskCounters.taskSuccessCount.get());
+                        }
+                    });
+
+            /*
+             * Running totals for various things.
+             */
+
+            {
+
+                counterSet.addCounter(ITaskCounters.InterArrivalTime,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue(taskCounters.taskFailCount.get());
+                                setValue(TimeUnit.NANOSECONDS
+                                        .toMillis(taskCounters.interArrivalNanoTime
+                                                .get()));
                             }
                         });
 
-                // count of all tasks which were successfully executed.
-                counterSet.addCounter(
-                        IThreadPoolExecutorTaskCounters.TaskSuccessCount,
+                counterSet.addCounter(ITaskCounters.QueueWaitingTime,
                         new Instrument<Long>() {
                             public void sample() {
-                                setValue(taskCounters.taskSuccessCount.get());
+                                setValue(TimeUnit.NANOSECONDS
+                                        .toMillis(taskCounters.queueWaitingNanoTime
+                                                .get()));
                             }
                         });
 
-                /*
-                 * Running totals for various things.
-                 */
-
-                {
-
-                    counterSet.addCounter(ITaskCounters.InterArrivalTime,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(TimeUnit.NANOSECONDS
-                                            .toMillis(taskCounters.interArrivalNanoTime
-                                                    .get()));
-                                }
-                            });
-
-                    counterSet.addCounter(ITaskCounters.QueueWaitingTime,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(TimeUnit.NANOSECONDS
-                                            .toMillis(taskCounters.queueWaitingNanoTime
-                                                    .get()));
-                                }
-                            });
-
-                    counterSet.addCounter(ITaskCounters.ServiceTime,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(TimeUnit.NANOSECONDS
-                                            .toMillis(taskCounters.serviceNanoTime
-                                                    .get()));
-                                }
-                            });
-
-                    counterSet.addCounter(ITaskCounters.CheckpointTime,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(TimeUnit.NANOSECONDS
-                                            .toMillis(taskCounters.checkpointNanoTime
-                                                    .get()));
-                                }
-                            });
-
-                    counterSet.addCounter(ITaskCounters.QueuingTime,
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(TimeUnit.NANOSECONDS
-                                            .toMillis(taskCounters.queuingNanoTime
-                                                    .get()));
-                                }
-                            });
-
-                }
-
-                /*
-                 * Moving averages.
-                 */
-
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageArrivalRate,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                final double t = interArrivalNanoTimeTask
-                                        .getMovingAverage()
-                                        * scalingFactor;
-                                if (t != 0d)
-                                    setValue(1d / t);
+                counterSet.addCounter(ITaskCounters.ServiceTime,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(TimeUnit.NANOSECONDS
+                                        .toMillis(taskCounters.serviceNanoTime
+                                                .get()));
                             }
                         });
 
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageServiceRate,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                final double t = serviceNanoTimeTask
-                                        .getMovingAverage()
-                                        * scalingFactor;
-                                if (t != 0d)
-                                    setValue(1d / t);
-                            }
-                        });
-                
-                counterSet
-                        .addCounter(
-                                IThreadPoolExecutorTaskCounters.AverageQueueWaitingTime,
-                                new Instrument<Double>() {
-                                    @Override
-                                    protected void sample() {
-                                        setValue(averageQueueWaitingTime);
-                                    }
-                                });
-
-                counterSet.addCounter(
-                        IThreadPoolExecutorTaskCounters.AverageServiceTime,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageServiceTime);
+                counterSet.addCounter(ITaskCounters.CheckpointTime,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(TimeUnit.NANOSECONDS
+                                        .toMillis(taskCounters.checkpointNanoTime
+                                                .get()));
                             }
                         });
 
-                counterSet.addCounter(
-                        IThreadPoolExecutorTaskCounters.AverageQueuingTime,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageQueuingTime);
+                counterSet.addCounter(ITaskCounters.QueuingTime,
+                        new Instrument<Long>() {
+                            public void sample() {
+                                setValue(TimeUnit.NANOSECONDS
+                                        .toMillis(taskCounters.queuingNanoTime
+                                                .get()));
                             }
                         });
 
             }
 
             /*
-             * These data are available only for the write service.
+             * Moving averages.
              */
-            if (service instanceof WriteExecutorService) {
 
-                final WriteExecutorService writeService = (WriteExecutorService) service;
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageArrivalRate,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            final double t = interArrivalNanoTimeTask
+                                    .getMovingAverage()
+                                    * scalingFactor;
+                            if (t != 0d)
+                                setValue(1d / t);
+                        }
+                    });
 
-                /*
-                 * Simple counters.
-                 */
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageServiceRate,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            final double t = serviceNanoTimeTask
+                                    .getMovingAverage()
+                                    * scalingFactor;
+                            if (t != 0d)
+                                setValue(1d / t);
+                        }
+                    });
+            
+            counterSet
+                    .addCounter(
+                            IThreadPoolExecutorTaskCounters.AverageQueueWaitingTime,
+                            new Instrument<Double>() {
+                                @Override
+                                protected void sample() {
+                                    setValue(averageQueueWaitingTime);
+                                }
+                            });
 
-                counterSet.addCounter(IWriteServiceExecutorCounters.CommitCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getGroupCommitCount());
-                            }
-                        });
+            counterSet.addCounter(
+                    IThreadPoolExecutorTaskCounters.AverageServiceTime,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageServiceTime);
+                        }
+                    });
 
-                counterSet.addCounter(IWriteServiceExecutorCounters.AbortCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getAbortCount());
-                            }
-                        });
-
-                counterSet.addCounter(IWriteServiceExecutorCounters.OverflowCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getOverflowCount());
-                            }
-                        });
-
-                counterSet.addCounter(IWriteServiceExecutorCounters.RejectedExecutionCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService
-                                        .getRejectedExecutionCount());
-                            }
-                        });
-
-                /*
-                 * Maximum observed values.
-                 */
-
-                counterSet.addCounter(IWriteServiceExecutorCounters.MaxCommitWaitingTime,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getMaxCommitWaitingTime());
-                            }
-                        });
-
-                counterSet.addCounter(IWriteServiceExecutorCounters.MaxCommitServiceTime,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getMaxCommitServiceTime());
-                            }
-                        });
-
-                counterSet.addCounter(IWriteServiceExecutorCounters.MaxCommitGroupSize,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue((long) writeService
-                                        .getMaxCommitGroupSize());
-                            }
-                        });
-
-                counterSet.addCounter(IWriteServiceExecutorCounters.MaxRunning,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(writeService.getMaxRunning());
-                            }
-                        });
-
-                /*
-                 * Moving averages available only for the write executor
-                 * service.
-                 */
-
-                counterSet
-                        .addCounter(
-                                IWriteServiceExecutorCounters.AverageActiveCountWithLocksHeld,
-                                new Instrument<Double>() {
-                                    @Override
-                                    protected void sample() {
-                                        setValue(averageActiveCountWithLocksHeld);
-                                    }
-                                });
-
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageReadyCount,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageReadyCount);
-                            }
-                        });
-
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageCommitGroupSize,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageCommitGroupSize);
-                            }
-                        });
-
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageLockWaitingTime,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageLockWaitingTime);
-                            }
-                        });
-
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageCheckpointTime,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageCheckpointTime);
-                            }
-                        });
-
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageCommitWaitingTime,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageCommitWaitingTime);
-                            }
-                        });
-
-                counterSet.addCounter(
-                        IWriteServiceExecutorCounters.AverageCommitServiceTime,
-                        new Instrument<Double>() {
-                            @Override
-                            protected void sample() {
-                                setValue(averageCommitServiceTime);
-                            }
-                        });
-
-                counterSet
-                        .addCounter(
-                                IWriteServiceExecutorCounters.AverageByteCountPerCommit,
-                                new Instrument<Double>() {
-                                    @Override
-                                    protected void sample() {
-                                        setValue(averageByteCountPerCommit);
-                                    }
-                                });
-
-            }
-
-            return counterSet;
+            counterSet.addCounter(
+                    IThreadPoolExecutorTaskCounters.AverageQueuingTime,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageQueuingTime);
+                        }
+                    });
 
         }
 
-    }
+        /*
+         * These data are available only for the write service.
+         */
+        if (service instanceof WriteExecutorService) {
+
+            final WriteExecutorService writeService = (WriteExecutorService) service;
+
+            /*
+             * Simple counters.
+             */
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.CommitCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService.getGroupCommitCount());
+                        }
+                    });
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.AbortCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService.getAbortCount());
+                        }
+                    });
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.OverflowCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService.getOverflowCount());
+                        }
+                    });
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.RejectedExecutionCount,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService
+                                    .getRejectedExecutionCount());
+                        }
+                    });
+
+            /*
+             * Maximum observed values.
+             */
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.MaxCommitWaitingTime,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService.getMaxCommitWaitingTime());
+                        }
+                    });
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.MaxCommitServiceTime,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService.getMaxCommitServiceTime());
+                        }
+                    });
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.MaxCommitGroupSize,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue((long) writeService
+                                    .getMaxCommitGroupSize());
+                        }
+                    });
+
+            counterSet.addCounter(IWriteServiceExecutorCounters.MaxRunning,
+                    new Instrument<Long>() {
+                        public void sample() {
+                            setValue(writeService.getMaxRunning());
+                        }
+                    });
+
+            /*
+             * Moving averages available only for the write executor
+             * service.
+             */
+
+            counterSet
+                    .addCounter(
+                            IWriteServiceExecutorCounters.AverageActiveCountWithLocksHeld,
+                            new Instrument<Double>() {
+                                @Override
+                                protected void sample() {
+                                    setValue(averageActiveCountWithLocksHeld);
+                                }
+                            });
+
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageReadyCount,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageReadyCount);
+                        }
+                    });
+
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageCommitGroupSize,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageCommitGroupSize);
+                        }
+                    });
+
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageLockWaitingTime,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageLockWaitingTime);
+                        }
+                    });
+
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageCheckpointTime,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageCheckpointTime);
+                        }
+                    });
+
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageCommitWaitingTime,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageCommitWaitingTime);
+                        }
+                    });
+
+            counterSet.addCounter(
+                    IWriteServiceExecutorCounters.AverageCommitServiceTime,
+                    new Instrument<Double>() {
+                        @Override
+                        protected void sample() {
+                            setValue(averageCommitServiceTime);
+                        }
+                    });
+
+            counterSet
+                    .addCounter(
+                            IWriteServiceExecutorCounters.AverageByteCountPerCommit,
+                            new Instrument<Double>() {
+                                @Override
+                                protected void sample() {
+                                    setValue(averageByteCountPerCommit);
+                                }
+                            });
+
+        }
+
+        return counterSet;
+
+}
 
 }

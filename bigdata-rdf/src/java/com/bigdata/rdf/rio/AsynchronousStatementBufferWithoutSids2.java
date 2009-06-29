@@ -270,6 +270,13 @@ import cutthecrap.utils.striterators.Striterator;
  * @todo evaluate this approach for writing on a local triple store. if there is
  *       a performance benefit then refactor accordingly (requires asynchronous
  *       write API for BTree and friends).
+ * 
+ * @deprecated by {@link AsynchronousStatementBufferFactory} which refactors to
+ *             place the factory class as the outer class and the statement
+ *             buffer impl as the inner class. They are otherwise the same
+ *             functionality, but only the
+ *             {@link AsynchronousStatementBufferFactory} will be carried
+ *             forward.
  */
 public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,F>
         implements IStatementBuffer<S> {
@@ -1597,6 +1604,9 @@ public class AsynchronousStatementBufferWithoutSids2<S extends BigdataStatement,
      * @param <F>
      *            The generic type of the file, URI, URL, etc which identifies
      *            the document to be loaded.
+     * 
+     * @deprecated by {@link AsynchronousStatementBufferFactory} which is just a
+     *             refactor with this class as the outer class.
      */
     public static class AsynchronousWriteBufferFactoryWithoutSids2<S extends BigdataStatement,F>
         implements IAsynchronousWriteStatementBufferFactory<S> {

@@ -32,13 +32,14 @@ import java.io.File;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import org.openrdf.rio.RDFFormat;
+
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.RDFFileLoadTask;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids2.AsynchronousWriteBufferFactoryWithoutSids2;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -78,10 +79,10 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
         super(name);
     }
 
-    // FIXME chunkSize parameter.
     final int chunkSize = 20000;
     final int valuesInitialCapacity = 10000;
     final int bnodesInitialCapacity = 16;
+    final long bufferedStatementThreshold = Long.MAX_VALUE;
     
     /**
      * SHOULD be <code>true</code> since the whole point of this is higher
@@ -154,6 +155,34 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
     }
 
     /**
+     * Test with the "broken.rdf" data set (does not contain valid RDF). This
+     * tests that the factory will shutdown correctly if there are processing
+     * errors.
+     * 
+     * @throws Exception
+     */
+    public void test_loadFails() throws Exception {
+        
+        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/broken.rdf";
+
+        final AbstractTripleStore store = getStore();
+        try {
+
+            // only do load since we expect an error to be reported.
+            final AsynchronousStatementBufferFactory<BigdataStatement> factory = doLoad2(
+                    store, resource, parallel);
+            
+            assertEquals("errorCount", 1, factory.getDocumentErrorCount());
+            
+        } finally {
+            
+            store.destroy();
+            
+        }
+
+    }
+
+    /**
      * Test with the "sample data.rdf" data set.
      * 
      * @throws Exception
@@ -209,7 +238,7 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
      */
     protected void doLoadAndVerifyTest(final String resource) throws Exception {
 
-        AbstractTripleStore store = getStore();
+        final AbstractTripleStore store = getStore();
         
         if(!(store instanceof ScaleOutTripleStore)) {
             
@@ -254,24 +283,58 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
      * Load using {@link AsynchronousStatementBufferWithoutSids2}.
      */
     protected void doLoad(final AbstractTripleStore store,
-            final String resource, final boolean parallel)
-            throws Exception {
+            final String resource, final boolean parallel) throws Exception {
 
-        final AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File> statementBufferFactory = new AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File>(
-                (ScaleOutTripleStore) store, chunkSize, valuesInitialCapacity,
-                bnodesInitialCapacity);
+        doLoad2(store, resource, parallel);
+        
+    }
+
+    /**
+     * Load using {@link AsynchronousStatementBufferWithoutSids2}.
+     */
+    protected AsynchronousStatementBufferFactory<BigdataStatement> doLoad2(
+            final AbstractTripleStore store, final String resource,
+            final boolean parallel) throws Exception {
+
+        final AsynchronousStatementBufferFactory<BigdataStatement> statementBufferFactory = new AsynchronousStatementBufferFactory<BigdataStatement>(
+                (ScaleOutTripleStore) store,//
+                chunkSize, //
+                valuesInitialCapacity,//
+                bnodesInitialCapacity,//
+                RDFFormat.RDFXML, // defaultFormat
+                false, // verifyData
+                false, // deleteAfter
+                parallel?5:1,  // parserPoolSize,
+                20, // parserQueueCapacity
+                parallel?5:1,  // term2IdWriterPoolSize,
+                parallel?5:1,  // otherWriterPoolSize
+                bufferedStatementThreshold
+                );
+
+//        final AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File> statementBufferFactory = new AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File>(
+//                (ScaleOutTripleStore) store, chunkSize, valuesInitialCapacity,
+//                bnodesInitialCapacity);
 
         try {
 
-            // parse all documents.
-            doLoad(store, resource, parallel, statementBufferFactory);
-            
+            // tasks to load the resource or file(s)
+            if(new File(resource).exists()) {
+
+                statementBufferFactory
+                        .submitAll(new File(resource), null/* filter */);
+                
+            } else {
+                
+                statementBufferFactory.submitOne(resource);
+                
+            }
+
             // wait for the async writes to complete.
             statementBufferFactory.awaitAll();
 
             // dump write statistics for indices used by kb.
-            System.err.println(((AbstractFederation) store.getIndexManager())
-                    .getServiceCounterSet().getPath("Indices").toString());
+//            System.err.println(((AbstractFederation) store.getIndexManager())
+//                    .getServiceCounterSet().getPath("Indices").toString());
 
             // dump factory specific counters.
             System.err.println(statementBufferFactory.getCounters().toString());
@@ -285,6 +348,8 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
 
         }
 
+        return statementBufferFactory;
+        
     }
 
 }
