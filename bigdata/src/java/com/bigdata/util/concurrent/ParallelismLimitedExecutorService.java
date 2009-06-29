@@ -131,6 +131,8 @@ import com.bigdata.service.DataService;
  * taken out of service until it can be fixed. Users include the
  * {@link CompactTask} and the {@link JoinMasterTask}. Prospective users
  * include the ConcurrentDataLoader (RDF DB) and map/reduce processing.
+ * 
+ * @deprecated It is easier to use a purpose specific {@link ExecutorService}.
  */
 public class ParallelismLimitedExecutorService extends AbstractExecutorService {
 

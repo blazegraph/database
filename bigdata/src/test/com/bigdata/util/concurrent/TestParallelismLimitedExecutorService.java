@@ -44,6 +44,8 @@ import junit.framework.TestCase2;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated It is easier to use a purpose specific {@link ExecutorService}.
  */
 public class TestParallelismLimitedExecutorService extends TestCase2 {
 
