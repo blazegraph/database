@@ -153,7 +153,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             }
 
             // terminate sampling and reporting tasks.
-            new ShutdownHelper(sampleService, 10L/*logTimeout*/, TimeUnit.SECONDS) {
+            new ShutdownHelper(scheduledExecutorService, 10L/*logTimeout*/, TimeUnit.SECONDS) {
 
                 public void logTimeout() {
 
@@ -229,7 +229,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         }
 
         // terminate sampling and reporting tasks immediately.
-        sampleService.shutdownNow();
+        scheduledExecutorService.shutdownNow();
 
         // discard any events still in the queue.
         events.clear();
@@ -275,9 +275,19 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * Used to sample and report on the queue associated with the
      * {@link #threadPool}.
      */
-    private final ScheduledExecutorService sampleService = Executors
+    private final ScheduledExecutorService scheduledExecutorService = Executors
             .newSingleThreadScheduledExecutor(new DaemonThreadFactory
                     (getClass().getName()+".sampleService"));
+    
+    /**
+     * A service which may be used to schedule performance counter sampling
+     * tasks.
+     */
+    public ScheduledExecutorService getScheduledExecutorService() {
+        
+        return scheduledExecutorService;
+        
+    }
     
     /**
      * httpd reporting the live counters for the client while it is connected to
@@ -435,7 +445,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                     + ", initialDelay=" + initialDelay + ", delay=" + delay
                     + ", unit=" + unit);
 
-        return sampleService.scheduleWithFixedDelay(task, initialDelay, delay,
+        return scheduledExecutorService.scheduleWithFixedDelay(task, initialDelay, delay,
                 unit);
 
     }
@@ -1103,8 +1113,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
             final ThreadPoolExecutorStatisticsTask threadPoolExecutorStatisticsTask = new ThreadPoolExecutorStatisticsTask(
                     relpath, threadPool, taskCounters);
 
-            threadPoolExecutorStatisticsTask.addCounters(getServiceCounterSet()
-                    .makePath(relpath));
+            getServiceCounterSet().makePath(relpath).attach(
+                    threadPoolExecutorStatisticsTask.getCounters());
 
             addScheduledTask(threadPoolExecutorStatisticsTask, initialDelay,
                     delay, unit);
