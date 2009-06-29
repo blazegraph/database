@@ -82,7 +82,7 @@ public class TestAll extends TestCase {
             
         }
         
-        TestSuite suite = new TestSuite("bigdata");
+        final TestSuite suite = new TestSuite("bigdata");
 
         suite.addTest( com.bigdata.cache.TestAll.suite() );
         suite.addTest( com.bigdata.io.TestAll.suite() );
