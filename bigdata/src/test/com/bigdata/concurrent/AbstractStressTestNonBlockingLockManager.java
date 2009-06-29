@@ -341,8 +341,8 @@ public abstract class AbstractStressTestNonBlockingLockManager extends TestCase 
                     "delegateService", delegateService,
                     null/* delegateServiceCounters */, w);
             
-            delegateQueueStatisticsTask.addCounters(delegateCounterSet
-                    .makePath("delegate"));
+            delegateCounterSet.makePath("delegate").attach(
+                    delegateQueueStatisticsTask.getCounters());
 
             sampleService.scheduleWithFixedDelay(delegateQueueStatisticsTask,
                     initialDelay, delay, unit);

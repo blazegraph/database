@@ -53,11 +53,11 @@ public class WorkflowTask<T extends Runnable, F> implements Runnable {
     final protected static boolean DEBUG = log.isDebugEnabled();
 
     /**
-     * The {@link Future} for this {@link SingleResourceReaderTask}.
+     * The {@link Future}.
      * <p>
-     * Note: this field is set each time the {@link SingleResourceReaderTask} is submitted
-     * to the {@link ConcurrentDataLoader#loadService}. It is never
-     * cleared, so it always reflects the last {@link Future}.
+     * Note: this field is set each time the task is submitted to the
+     * {@link ConcurrentDataLoader#loadService}. It is never cleared, so it
+     * always reflects the last {@link Future}.
      */
     private Future<F> future;
 

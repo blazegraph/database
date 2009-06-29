@@ -28,21 +28,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.apache.log4j.Logger;
-
+import com.bigdata.util.concurrent.Latch;
 
 /**
  * A synchronization aid that allows one or more threads to await asynchronous
  * writes on one or more scale-out indices. Once the counter reaches zero, all
  * waiting threads are released. The counter is decremented automatically once a
  * {@link KVOC} has been successfully written onto an index by an asynchronous
- * write operation.
+ * write operation. This class may also be used as a synchronization aid
+ * independent of a {@link KVOC}
  * <p>
  * Since it is possible that the counter could be transiently zero as chunks are
  * being added and drained concurrently, you MUST {@link #inc() increment} the
@@ -53,19 +47,11 @@ import org.apache.log4j.Logger;
  * pre-incrementing the counter, the threads will not be released until the
  * asynchronous write operations are successfully completed.
  * <p>
- * The notification is based on {@link KVOC}, which associates an atomic
- * counter and a user-defined key with each tuple. Notices are generated when
- * the atomic counter is zero on decrement. Notices are aligned with the
- * appropriate scope by creating an instance of the {@link KVOScope} with that
- * scope and then pairing it with each {@link KVOC}.
- * <P>
- * For any significant workload, notification should be quite fast. However, if
- * GC is not being driven by heap churn then notification may not occur. In
- * practice, this is mainly an issue when writing unit tests since you can not
- * force the JVM to clear the weak references.
- * <p>
- * Note: This class is very similar to a {@link CountDownLatch}, however the
- * counter maximum is not specified in advance.
+ * The notification is based on {@link KVOC}, which associates an atomic counter
+ * and a user-defined key with each tuple. Notices are generated when the atomic
+ * counter is zero on decrement. Notices are aligned with the appropriate scope
+ * by creating an instance of the {@link KVOScope} with that scope and then
+ * pairing it with each {@link KVOC}.
  * 
  * @see KVOC
  * 
@@ -77,212 +63,10 @@ import org.apache.log4j.Logger;
  * @see IndexPartitionWriteTask, which is responsible for invoking
  *      {@link #dec()}.
  */
-public class KVOLatch {
+public class KVOLatch extends Latch {
 
-    protected transient static final Logger log = Logger.getLogger(KVOLatch.class);
-    
-    private final AtomicLong counter = new AtomicLong();
-    
-    private final ReentrantLock lock = new ReentrantLock();
-    
-    private final Condition cond = lock.newCondition();
-    
-    public String toString() {
-        
-        return getClass().getName() + "{counter=" + counter + "}";
-        
-    }
-    
     public KVOLatch() {
 
-    }
-
-    /**
-     * The counter value.
-     */
-    public long get() {
-
-        return counter.get();
-        
-    }
-    
-    /**
-     * Increments the internal counter.
-     */
-    public void inc() {
-        
-        final long c = this.counter.incrementAndGet();
-
-        if (log.isDebugEnabled())
-            log.debug(toString());
-
-        if (c <= 0) {
-            
-            // counter is/was negative.
-            throw new AssertionError();
-            
-        }
-        
-    }
-
-    /**
-     * Decrements the internal counter and notifies the listener if the counter
-     * reaches zero. Callers do not block unless the counter is decremented to
-     * zero, and then they only block long enough to obtain the internal lock
-     * and release the threads in {@link #await(long, TimeUnit)}.
-     */
-    public void dec() {
-
-        final long c = this.counter.decrementAndGet();
-
-        if (log.isDebugEnabled())
-            log.debug(toString());
-
-        if (c < 0) {
-
-            // counter has become negative.
-            throw new AssertionError();
-
-        }
-
-        if (c > 0) {
-
-            // Return immediately.
-            return;
-            
-        }
-
-        try {
-
-            // signal blocked threads.
-            _signal();
-            
-        } catch (InterruptedException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-    /**
-     * Signal any threads blocked in {@link #await(long, TimeUnit)}.
-     * 
-     * @throws InterruptedException
-     */
-    private final void _signal() throws InterruptedException {
-
-        lock.lockInterruptibly();
-        try {
-
-            if (log.isInfoEnabled())
-                log.info("signalAll()");
-
-            // release anyone awaiting our signal.
-            cond.signalAll();
-
-        } finally {
-
-            lock.unlock();
-
-        }
-
-        try {
-            // allow extensions, but not while holding the lock.
-            signal();
-        } catch (InterruptedException t) {
-            // propagate to the caller.
-            throw t;
-        } catch (Throwable t) {
-            // log anything else thrown out.
-            log.error(toString(), t);
-        }
-        
-    }
-
-    /**
-     * Invoked when the latch reaches zero after any threads blocked at
-     * {@link #await(long, TimeUnit)} have been released. This may be overridden
-     * to perform additional processing, such as moving an associated object
-     * onto another queue.
-     * <p>
-     * CAUTION: DO NOT invoke any operation from within this method which could
-     * block as that would cause the thread running the asynchronous write task
-     * in which this method is invoked to block. If you are transferring objects
-     * to a queue, the queue MUST be unbounded.
-     */
-    protected void signal() throws InterruptedException {
-
-    }
-
-    /**
-     * Await the counter to become zero unless interrupted.
-     * 
-     * @throws InterruptedException
-     */
-    public void await() throws InterruptedException {
-
-        await(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-
-    }
-
-    /**
-     * Await the counter to become zero, but no longer than the timeout.
-     * <p>
-     * Note: A duplicate remover MUST NOT eliminate "duplicate" {@link KVOC}s
-     * when one or the other has {@link KVOLatch} not shared by the other.
-     * Eliminating a "duplicate" in this case would cause a
-     * {@link KVOLatch#dec()} to be "lost" and generally results in
-     * non-termination of {@link KVOLatch#await()} since the count for the
-     * "lost" latch would never reach zero.
-     * 
-     * @param timeout
-     *            The timeout.
-     * @param unit
-     *            The unit in which the timeout is expressed.
-     * 
-     * @return <code>true</code> if the counter reached zero and
-     *         <code>false</code> if the timeout was exceeded before the counter
-     *         reached zero.
-     * 
-     * @throws InterruptedException
-     */
-    public boolean await(long timeout, final TimeUnit unit)
-            throws InterruptedException {
-
-        if (counter.get() == 0) {
-
-            if (log.isInfoEnabled())
-                log.info("Not waiting");
-
-            // don't wait.
-            return true;
-            
-        }
-        
-        lock.lockInterruptibly();
-        try {
-
-            if(cond.await(timeout, unit)) {
-
-                if (log.isInfoEnabled())
-                    log.info("Done waiting (true)");
-
-                return true;
-                
-            }
-
-            if (log.isInfoEnabled())
-                log.info("Done waiting (false)");
-
-            return false;
-            
-        } finally {
-            
-            lock.unlock();
-            
-        }
-        
     }
 
 }

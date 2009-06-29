@@ -309,20 +309,22 @@ public class ConcurrentDataLoader<T extends Runnable, F> {
         /*
          * Setup reporting to the load balancer.
          */
-        final CounterSet tmp = getCounters();
+        {
+            final CounterSet tmp = getCounters();
 
-        final ThreadPoolExecutorStatisticsTask loadServiceStatisticsTask = new ThreadPoolExecutorStatisticsTask(
-                "Load Service", loadService, counters);
+            final ThreadPoolExecutorStatisticsTask loadServiceStatisticsTask = new ThreadPoolExecutorStatisticsTask(
+                    "Load Service", loadService, counters);
 
-        // setup sampling for the [loadService]
-        loadServiceStatisticsFuture = this.fed.addScheduledTask(
-                loadServiceStatisticsTask, 0/* initialDelay */,
-                1000/* delay */, TimeUnit.MILLISECONDS);
+            // setup sampling for the [loadService]
+            loadServiceStatisticsFuture = this.fed.addScheduledTask(
+                    loadServiceStatisticsTask, 0/* initialDelay */,
+                    1000/* delay */, TimeUnit.MILLISECONDS);
 
-        // add sampled counters to those reported by the client.
-        loadServiceStatisticsTask.addCounters(tmp
-                .makePath("Load Service"));
-
+            // add sampled counters to those reported by the client.
+            tmp.makePath("Load Service").attach(
+                    loadServiceStatisticsTask.getCounters());
+        }
+        
     }
 
     /**

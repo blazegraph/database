@@ -1014,26 +1014,27 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 // readService
                 {
-                    readServiceQueueStatisticsTask.addCounters(countersRoot
-                            .makePath(IConcurrencyManagerCounters.ReadService));
+                    countersRoot.makePath(
+                            IConcurrencyManagerCounters.ReadService).attach(
+                            readServiceQueueStatisticsTask.getCounters());
 
                 }
 
                 // txWriteService
                 {
 
-                    txWriteServiceQueueStatisticsTask
-                            .addCounters(countersRoot
-                                    .makePath(IConcurrencyManagerCounters.TXWriteService));
+                    countersRoot.makePath(
+                            IConcurrencyManagerCounters.TXWriteService).attach(
+                            txWriteServiceQueueStatisticsTask.getCounters());
 
                 }
 
                 // writeService
                 {
 
-                    writeServiceQueueStatisticsTask
-                            .addCounters(countersRoot
-                                    .makePath(IConcurrencyManagerCounters.writeService));
+                    countersRoot.makePath(
+                            IConcurrencyManagerCounters.writeService).attach(
+                            writeServiceQueueStatisticsTask.getCounters());
 
                     /*
                      * The lock manager for the write service.
