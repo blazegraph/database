@@ -44,7 +44,6 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.Split;
 import com.bigdata.sparse.SparseRowStore;
-import com.bigdata.test.ExperimentDriver;
 
 /**
  * Unit tests for the {@link DefaultSplitHandler}.

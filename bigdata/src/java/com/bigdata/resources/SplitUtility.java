@@ -60,10 +60,6 @@ public class SplitUtility {
 
     protected static final Logger log = Logger.getLogger(SplitUtility.class);
     
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
     /**
      * Validate splits, including: that the separator keys are strictly
      * ascending, that the separator keys perfectly cover the source key range
@@ -572,7 +568,7 @@ public class SplitUtility {
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Generated " + splits.length
                     + " index segments: name=" + vmd.name);
 

@@ -177,6 +177,10 @@ import com.bigdata.util.NV;
  *       do a magic sets integration which will eliminate the requirement for
  *       the justifications index and allow an option for eager, incremental, or
  *       query time closure.
+ * 
+ * @deprecated This class is no longer used. it has been replaced by the scatter
+ *             split and by placing some fast moving bits into the high bits of
+ *             the assigned term identifiers, which solves the problem entirely.
  */
 public class SplitFinder {
 
