@@ -62,8 +62,19 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("resources");
         
+        /*
+         * unit tests for identifying separator keys for a split based on the
+         * traversal of the key-range.
+         */
         suite.addTestSuite(TestDefaultSplitHandler.class);
 
+        /*
+         * unit tests for identifying separator keys for a split based on seach
+         * across the nodes of the sources in the view using the combined #of
+         * spanned tuples for each source.
+         */ 
+        suite.addTestSuite(TestViewSplitter.class);
+        
         /*
          * Test management of local resources.
          * 
