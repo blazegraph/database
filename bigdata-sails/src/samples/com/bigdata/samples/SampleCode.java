@@ -344,6 +344,13 @@ public class SampleCode {
         BigdataSail sail = new BigdataSail(properties);
         Repository repo = new BigdataSailRepository(sail);
         repo.initialize();
+
+        doLUBMTest(repo, lubmResource, filter);
+        
+    }
+        
+    public void doLUBMTest(Repository repo, final String lubmResource, 
+        final String filter) throws Exception {
         
         RepositoryConnection cxn = repo.getConnection();
         cxn.setAutoCommit(false);
@@ -460,6 +467,14 @@ WHERE{
 
     public void doU1() throws Exception {
         doLUBMTest("U1.zip", "U1/University");
+    }
+
+    public void doU10(Repository repo) throws Exception {
+        doLUBMTest(repo, "U10.zip", "U10/University");
+    }
+
+    public void doU1(Repository repo) throws Exception {
+        doLUBMTest(repo, "U1.zip", "U1/University");
     }
 
     public Reader getReader(Class c, String resource) {
