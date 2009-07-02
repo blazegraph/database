@@ -72,16 +72,6 @@ public class ScaleOut {
             
         } finally {
 
-            try {
-            
-                sail.shutDown();
-
-            } catch (Exception ex) {
-
-                ex.printStackTrace();
-                
-            }
-            
             fed.shutdownNow();
                 
         }
