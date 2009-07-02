@@ -652,6 +652,19 @@ ${postInstallMessage}</echo>
 
 <target name="scale-out-sample" description="Run the scale-out sample code.">
 
+		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
+		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+	     encoding="${javac.encoding}"
+	     	>
+			<src path="${bigdata.dir}/bigdata-sails/src/samples" />
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/classes">
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/samples">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+		</copy>
 	<java classname="com.bigdata.samples.ScaleOut"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
