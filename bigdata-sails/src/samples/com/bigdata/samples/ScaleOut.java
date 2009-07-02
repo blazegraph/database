@@ -63,8 +63,6 @@ public class ScaleOut {
             sampleCode.readSomeData(repo, MIKE);
             sampleCode.executeSelectQuery(repo, "select ?p ?o where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
             sampleCode.executeConstructQuery(repo, "construct { <"+MIKE.toString()+"> ?p ?o . } where { <"+MIKE.toString()+"> ?p ?o . }", QueryLanguage.SPARQL);
-            sampleCode.executeFreeTextQuery(repo);
-            sampleCode.executeProvenanceQuery(repo);
             
             repo.shutDown();
 
