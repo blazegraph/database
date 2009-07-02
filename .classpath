@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="bigdata-rdf/src/java"/>
+	<classpathentry kind="src" path="bigdata-sails/src/samples"/>
+	<classpathentry kind="src" path="bigdata-rdf/src/resources/logging"/>
 	<classpathentry kind="src" path="bigdata-jini/src/test"/>
 	<classpathentry kind="src" path="bigdata-sails/src/java"/>
 	<classpathentry kind="src" path="bigdata/src/java"/>
@@ -8,7 +10,6 @@
 	<classpathentry kind="src" path="bigdata/src/test"/>
 	<classpathentry kind="src" path="bigdata-sails/src/test"/>
 	<classpathentry kind="src" path="bigdata-jini/src/java"/>
-	<classpathentry kind="src" path="bigdata/src/resources/logging"/>
 	<classpathentry kind="src" path="bigdata-lubm/src/java"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/commons-io-1.4.jar"/>
@@ -25,12 +26,11 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4jni.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-core-2.2.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-5.1.4.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.2-onejar.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.4.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.1.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/iris-0.58.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/jgrapht-jdk1.5-0.7.1.jar"/>
+	<classpathentry kind="lib" path="bigdata-rdf/lib/iris-0.58.jar"/>
+	<classpathentry kind="lib" path="bigdata-rdf/lib/jgrapht-jdk1.5-0.7.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/browser.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/classserver.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/fiddler.jar"/>
@@ -47,5 +47,6 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/start.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/sun-util.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/tools.jar"/>
+	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.2.4-onejar.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

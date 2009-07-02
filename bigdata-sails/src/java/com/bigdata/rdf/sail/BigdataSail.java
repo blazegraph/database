@@ -795,6 +795,7 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * Strengthens the return type.
      */
+    @Override
     public BigdataSailConnection getConnection() throws SailException {
         
         return (BigdataSailConnection) super.getConnection();
