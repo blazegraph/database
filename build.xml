@@ -650,4 +650,17 @@ ${postInstallMessage}</echo>
 	</chmod>
 </target>
 
+<target name="scale-out-sample" description="Run the scale-out sample code.">
+
+	<java classname="com.bigdata.samples.ScaleOut"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="runtime.classpath" />
+		<jvmarg value="-Xmx1500m" />
+		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties"/>
+		<arg value="${bigdata.config}" />
+	</java>
+	
+</target>
+
 </project>
