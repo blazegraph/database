@@ -1181,7 +1181,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         }
 
     }
-    
+
     /**
      * Callback invoked when the job is done executing (normal completion) but
      * is still holding the {@link ZLock} for the {@link JobState}. The default
@@ -1191,6 +1191,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @throws Exception
      */
     protected void success(final S jobState) throws Exception {
+
+        /*
+         * This is the commit point corresponding to the end of the job.
+         */
+        System.out.println("commit point: "
+                + getFederation().getLastCommitTime());
         
         /*
          * Delete zookeeper state when the job completes successfully.
