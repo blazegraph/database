@@ -6,29 +6,45 @@
 
   <p>
 
-	  bigdata&#174; is a scale-out data and computing fabric designed for commodity hardware. 
+	  <em>bigdata&#174;</em> is a scale-out data and computing
+	  fabric designed for commodity hardware.  The bigdata
+	  architecture provides named scale-out indices that are
+	  transparently and dynamically key-range partitioned and
+	  distributed across a cluster or grid of commodity server
+	  platforms.  The scale-out indices are B+Trees and remain
+	  balanced under insert and removal operations.  Keys and
+	  values for btrees are variable length byte[]s (the keys are
+	  interpreted as unsigned byte[]s).
 
-  </p>
-  <p>
+	  Atomic "row" operations are supported for very high
+	  concurrency.  However, full transactions are also available
+	  for applications needing less concurrency but requiring
+	  atomic operations that read or write on more than one row,
+	  index partition, or index.
 
-	  The bigdata architecture provides named scale-out indices that are transparently
-	  partitioned and distributed across a cluster or grid of commodity server platforms.
-	  Atomic "row" operations are supported for very high concurrency.  However, full
-	  transactions are also available for applications needing less concurrency but
-	  requiring atomic operations that read or write on more than one row, index partition,
-	  or index.  The scale-out indices are B+Trees and remain balanced under insert and
-	  removal operations.  Keys and values for btrees are variable length byte[]s (the
-	  keys are interpreted as unsigned byte[]s).  Writes are absorbed on mutable btree instances in append only
-	  "journals" of ~200M capacity.  On overflow, data in a journal is evicted onto read-
-	  optimized, immutable "index segments".  The metadata service manages the index 
-	  definitions, the index partitions, and the assignment of index partitions to data
-	  services.  A data service encapsulates a journal to zero or more index partitions
-	  have been assigned, including the logic to handle overflow.  A deployment is made
-	  up of one logical metadata service (with failover redundency) and many distinct
-	  data services.  bigdata can provide data redundency internally (by pipelining
-	  writes bound for a partition across primary, secondary, ... data service instances
-	  for that partition) or it can be deployed over distributed RAID.  bigdata itself
-	  is 100% Java and requires a 1.5 or better JVM.
+	  Writes are absorbed on mutable btree instances in append
+	  only "journals" of ~200M capacity.  On overflow, data in a
+	  journal is evicted onto read-optimized, immutable "index
+	  segments".  The metadata service manages the index
+	  definitions, the index partitions, and the assignment of
+	  index partitions to data services.  A data service
+	  encapsulates a journal and zero or more index partitions
+	  assigned to that data service, including the logic to handle
+	  overflow. 
+
+</p><p>
+
+          A deployment is made up of a transaction service, a load
+	  balancer service, and a metadata service (with failover
+	  redundency) and many data service instances.  bigdata can
+	  provide data redundency internally (by pipelining writes
+	  bound for a partition across primary, secondary, ... data
+	  service instances for that partition) or it can be deployed
+	  over NAS/SAN.  bigdata itself is 100% Java and requires a
+	  JDK 1.6.  There are additional dependencies for the
+	  installer (un*x) and for collecting performance counters
+	  from the OS (<a
+	  href="http://pagesperso-orange.fr/sebastien.godard/">sysstat</a>).
 	  
   </p>
   
@@ -36,43 +52,85 @@
   
   <p>
   
-  	  The bigdata SOA defines two essential services and some additional services.  The
-  	  essential services are the metadata service (provides a locator service for index
-  	  partitions on data services) and the data service (provides read, write, and concurrency
-  	  control for index partitions). Optional services include a transaction manager (transactions
-  	  are NOT required, so you can use bigdata as a scale-out row store ) and a job scheduler (the
-  	  integration point for map/reduce style distributed functional programming).  
+  	  The bigdata SOA defines three essential services and some
+  	  additional services.  The essential services are the
+  	  metadata service (provides a locator service for index
+  	  partitions on data services), the data service (provides
+  	  read, write, and concurrency control for index partitions),
+  	  and the transaction service (provides consistent timestamps
+  	  for commits, facilitates the release of data associated with
+  	  older commit points, read locks, and transactions).  Full
+  	  transactions are NOT required, so you can use bigdata as a
+  	  scale-out row store.  The load balancer service guides the
+  	  dynamic redistribution of data across a bigdata federation.
+  	  There are also client services, which are containers for
+  	  executing distributed jobs.
   
   </p>
   
   <p>
   
-  	  While other service fabric architectures are contemplated, bigdata services
-  	  today use JINI 2.x to advertise themselves and do perform service discovery.
-  	  This means that you must be running a JINI registrar in order for services to be
-  	  able to register themselves or discover other services.  The JINI integration is
-  	  bundled in a separate module - see <strong>bigdata-jini</strong>.
+  	  While other service fabric architectures are contemplated,
+  	  bigdata services today use JINI 2. to advertise themselves
+  	  and do service discovery.  This means that you must be
+  	  running a JINI registrar in order for services to be able to
+  	  register themselves or discover other services.  The JINI
+  	  integration is bundled and installed automatically by
+  	  default. 
   
+  </p>
+
+  <p>
+
+          Zookeeper handles master election, configuration management
+	  and global synchronous locks.  Zookeeper was developed by
+	  Yahoo! as a distributed lock and configuration management
+	  service and is now an Apache subproject (part of
+	  Hadoop). Among other things, it gets master election
+	  protocols right.  Zookeeper is bundled and installed
+	  automatically by default.
+
   </p>
   
   <p>
   
-  	  The main building blocks for the bigdata architecture are the journal (append-only
-  	  persistence store), the mutable B+Tree (used to absorb writes), and the read-optimized
-  	  immutable B+Tree (aka the index segment).  Highly efficient bulk index builds are used
-  	  to transfer data absorbed by a mutable B+Tree on a journal into index segment files.
-  	  Each for index segment contains data for a single partition of a scale-out index.  In
-  	  order to read from an index partition, a consistent view is created by dynamically
-  	  fusing data for that index partition, including any recent writes on the current
-  	  journal, any historical writes that are in the process of being transferred onto
-  	  index segments, and any historical index segments that also contain data for that
-  	  view.  Periodically, index segments are merged together.  Both merging index segments
-  	  and overflow of a journal onto index segments cause historical states of the database
-  	  to be purged in favor of the current state.  Periodically, the metadata service will
-  	  direct data services to physically delete old journals and index segments, thereby
-  	  releasing the local disk resources.  (An immortal or temporal database can be
-	  realized by choosing not to delete old journals, since journals have all committed
-  	  states for the distributed database.) 
+  	  The main building blocks for the bigdata architecture are
+  	  the journal (append-only persistence store), the mutable
+  	  B+Tree (used to absorb writes), and the read-optimized
+  	  immutable B+Tree (aka the index segment).  Highly efficient
+  	  bulk index builds are used to transfer data absorbed by a
+  	  mutable B+Tree on a journal into index segment files.  Each
+  	  for index segment contains data for a single partition of a
+  	  scale-out index.  In order to read from an index partition,
+  	  a consistent view is created by dynamically fusing data for
+  	  that index partition, including any recent writes on the
+  	  current journal, any historical writes that are in the
+  	  process of being transferred onto index segments, and any
+  	  historical index segments that also contain data for that
+  	  view. Periodically, index segments are merged together, at
+  	  which point deleted tuples are purged from the view.
+
+</p>
+
+<p>
+
+	  Bigdata periodically releases data associated with older
+	  commit points, freeing up disk resources.  The transaction
+	  service is configured with a minimum release age in
+	  milliseconds.  This can be ZERO (0L) milliseconds, in which
+	  case historical views may be released if there are no read
+	  locks for that commit point.  The minimum release age can
+	  also be hours or days if you want to keep historical states
+	  around for a while.  When a data service overflows, it will
+	  consult the transaction service to determine the effective
+	  release time and release any old journals or index segments
+	  no longer required to maintain views GT that release time.
+</p><p>	  
+	  An immortal or temporal database can be realized by
+	  specifying Long#MAX_VALUE for the minimum release age.  In
+	  this case, the old journals and index segments will all be
+	  retained and you can query any historical commit point of
+	  the database at any time.
   
   </p>
   
@@ -80,12 +138,24 @@
   
   <p>
   
- 	  People familiar with Google's bigtable architecture will recognize the similarity.
- 	  bigtable provides very high concurrency with atomic "row" updates and a space data
- 	  model.  In fact, it is trivial to realize bigtable semantics with bigdata - you 
- 	  need to exercise a specific protocol when forming the keys for your scale-out
- 	  indices and you simply choose to NOT use transactions.  A bigtable style key-value
- 	  is formed as:
+ 	  The <em>SparseRowStore</em> provides a column flexible row
+ 	  store similar to Google's bigtable or HBase, including very
+ 	  high read/write concurrency and ACID operations on logical
+ 	  "rows".  Internally, a "global row store" instance is used
+ 	  to maintain metadata on relations declared within a bigdata
+ 	  federation.  You can use this instance to store your own
+ 	  data, or you can create your own named row store instances.
+ 	  However, there is no REST api for the row store at this time
+ 	  (trivial to be sure, but not something that we have gotten
+ 	  around to yet).
+
+</p><p>
+
+          In fact, it is trivial to realize bigtable semantics with
+ 	  bigdata - all you need to do is exercise a specific protocol
+ 	  when forming the keys for your scale-out indices and then
+ 	  you simply choose to NOT use transactions.  A bigtable style
+ 	  key-value is formed as:
 
   </p>
   
@@ -97,140 +167,253 @@
   
   <p>
  	  
- 	  By placing the column family identifier up front, all data in the same column
- 	  family will be clustered together by the index.  The next component is the "row"
- 	  identifier, what you would think of as the primary key in a relational table.
- 	  The column name comes next - only column names for non-null columns are written
- 	  into the index.  Finally, there is a timestamp column that is used either to
- 	  record a timestamp specified by the application or a datum write time.  The
- 	  value associated with the key is simply the datum for that column in that row.
- 	  The use of nul byte separators makes it possible to parse the key, which is
- 	  required for various operations including index partition splits and filtering
- 	  key scans based on column names or timestamps.
- 	  See the KeyBuilder class
- 	  in com.bigdata.btree for utilities that may be used to construct keys from a variety
- 	  of components.
+ 	  By placing the column family identifier up front, all data
+ 	  in the same column family will be clustered together by the
+ 	  index.  The next component is the "row" identifier, what you
+ 	  would think of as the primary key in a relational table.
+ 	  The column name comes next - only column names for non-null
+ 	  columns are written into the index.  Finally, there is a
+ 	  timestamp column that is used either to record a timestamp
+ 	  specified by the application or a datum write time.  The
+ 	  value associated with the key is simply the datum for that
+ 	  column in that row.  The use of nul byte separators makes it
+ 	  possible to parse the key, which is required for various
+ 	  operations including index partition splits and filtering
+ 	  key scans based on column names or timestamps.  See the
+ 	  <em>KeyBuilder</em> class in
+ 	  <code>com.bigdata.btree.keys</code> for utilities that may
+ 	  be used to construct keys for variety of data types.
   
   </p>
   
-  <p>
-  
-      Filter row scans are realized using the filter mechanism on the key scan
-      interface of the data service.  The history policy is specified when the
-      index is created and is applied during compacting merges of index segments,
-      effectively removing entries for the index partition that do not pass the
-      history filter.
-  
-  </p>
-
-  <h2>Map/reduce</h2>
+  <h2>Map/reduce, Asynchronous Write API, and Query</h2>
   
   <p>
   
-  	  Google's map/reduce architecture has received a lot of attention, along with
-  	  its bigtable architecture.  Map/reduce provides a means to transparently
-  	  decompose processing across a cluster.  The "map" process examines a series
-  	  of key-value pair, emitting a set of intermediate key-value pairs for each
-  	  input.  Those intermediate key-values are then hashed (module R) onto R reduce
-  	  processes.  The inputs for the reduce processes are pre-sorted.  The reduce
-  	  process then runs some arbitrary operation on the sorted data, such as computing
-  	  an inverted index file or loading the data into a scale-out index.
+  	  Google's map/reduce architecture has received a lot of
+  	  attention, along with its bigtable architecture.  Map/reduce
+  	  provides a means to transparently decompose processing
+  	  across a cluster.  The "map" process examines a series of
+  	  key-value pairs, emitting a set of intermediate key-value
+  	  pairs for each input.  Those intermediate key-values are
+  	  then hashed (module R) onto R reduce processes.  The inputs
+  	  for the reduce processes are pre-sorted.  The reduce process
+  	  then runs some arbitrary operation on the sorted data, such
+  	  as computing an inverted index file or loading the data into
+  	  a scale-out index.
   
   </p>
 
-  <h2>Data Replication</h2>
-  
   <p>
-  
-  	  If you know much about Google's architecture, you know that they deploy on
-  	  a distributed file system named "GFS" (Google File System).  bigdata is
-  	  designed to provide its own data replication using pipelining of writes
-  	  across multiple data services, such that each index partition has some
-  	  target #of replicated indices.  However, an alternative deployment strategy
-  	  is to deploy on a distributed file system or using NAS with built in RAID.
-  	  The best deployment configuration undoubtedly depends on the specifics of
-  	  your data center.  bigtable makes an effort throughout its architecture to
-  	  only perform sustained IOs.  This means that it can be a very efficient user
-  	  of both local file systems and networked file systems.
-  
+
+          bigdata&#174; supports an <em>asynchronous index write
+          API</em>, which delivers extremely high throughput for
+          scattered writes.  While map/reduce is tremendously
+          effective when there is good locality in the data, it is not
+          the right tool for processing ordered data.  Instead, you
+          execute a master job, which spawns client(s) running in
+          <em>client service</em>(s) associated with the bigdata
+          federation.  Those clients process data, writing onto
+          blocking buffers.  The writes are automatically split and
+          buffered for each key-range shard.  This maximizes the chunk
+          size for ordered writes and provides a tremendous throughput
+          boost.  Bigdata can work well in combination with
+          map/reduce.  The basic paradigm is you use map/reduce jobs
+          to generate data, which is then bulk loaded into a bigdata
+          federation using bigdata jobs and the asynchronous write
+          API.
+
+  </p><p>
+
+          bigdata&#174; has built in support for distributed rule
+          execution.  This can be used for high-level query or for
+          materializing derived views, including maintaining the RDFS+
+          closure of a semantic web database.  The implementation is
+          highly efficient and propagates binding sets to the data
+          service for each key-range shard touched by the query, so
+          the JOINs happen right up against the data.  Unlike using
+          map/reduce for join processing, bigdata query processing is
+          very low latency.  Distributed query execution can be
+          substantially faster than local query execution, even for
+          low-latency queries.
+
   </p>
 
-  <h2>Embedded database</h2>
+  <h2>HA Architecture</h2>
+  
+  <p>
+
+          There are two alternatives here.  The data service (DS) is
+	  the container for the index partitions (key-range shards).
+	  There are logical data services and physical data services.
+	  Clients always write on the master DS for a given logical
+	  DS.  The #of physical DS per logical DS is <i>k</i>.  For
+	  HA, <i>k</i> is greater than ONE (1).
+
+  </p><p>
+	  <em>Alternative 1.</em> Clients read from any physical DS
+	  for a given logical DS. Storage is either on either local
+	  disk or SAN/NAS. Local disk is acceptable for this
+	  alternative because the data are replicated across multiple
+	  machines, which provides built in media redundancy. For each
+	  logical DS, master pipelines writes to a failover chain of
+	  <i>k</i> secondary DS. That pipeline is flushed during the
+	  commit protocol by the master. The commit succeeds once the
+	  writes are on stable storage on the master and the
+	  secondaries or fails and is rolled back. If the master
+	  fails, then the 1st secondary is elected as the new master.
+	  Master election has handled by zookeeper.
+
+  </p><p>
+
+          <em>Alternative 2.</em> Storage is a shared volume
+	  (SAN/NAS).  The secondaries DS are registered but inactive
+	  until the master fails, at which point the 1st secondary in
+	  the failover chain re-opens the same persistence store from
+	  the service directory on the SAN/NAS.
+
+  </p>
+
+  <h2>Standalone Journals and Embedded Federations</h2>
   
   <p>
   
-  	  While bigdata is targetted at scale-out federations, it can also be deployed as an
-  	  embedded database - and embedded federations are available to make testing easier.
-  	  The key points when deploying as an embedded database are: (1) that journals MAY
-  	  range up to 4T in size; and (2) that the journal is at heart a WORM (Write Once
-  	  Read Many) (also known as an immortal database or a log-structured store).  This
-  	  means that you have to manage the journal size.  The basic means for doing this
-  	  is to export optimized read-only index segments corresponding to either entire
-  	  indices or key ranges of indices.  Once no live data remains on a journal it may
-  	  be discarded (unless you want an immortal database).  Tools are in the works to
-  	  make this process transparent - new journals are opened while indices are exported
-  	  from old ones with the net result that the total storage of the database remains
-  	  very compact.  (This is similar to the concept of a compacting merge.)
+  	  While bigdata&#174; is targetted at scale-out federations,
+  	  it can also be deployed as simple persistence store using
+  	  just the <code>com.bigdata.journal.Journal</code> API or as
+  	  an <em>embedded federation</em>.
+
+  </p><p>
+
+	  The journal can scale up to 4TB, but it is a WORM (Write
+	  Once Read Many) aka also known as an immortal database or a
+	  log-structured store.  This works great for some
+	  applications, and it is used for the data service write
+	  buffers.  We will probably do a read-write (RW) version of
+	  the journal at some point which is capable of reclaiming
+	  storage, but that is not necessary for the scale-out
+	  architecture which uses index segments builds and compacting
+	  merges to clear the old write buffers.
+
+  </p><p> 
+
+	  The embedded federation can be used to test things out on a
+  	  single machine.  It will start instances of each of the
+  	  services, and also start N data services.  We use this to
+  	  write unit tests for the federation, and it can make testing
+  	  your application easier as well.
   
   </p>
   
   <h2>Status</h2>
   
   <p>
-  	  
-  	  The basic index structures (mutable and immutable btrees and
-  	  bulk index build operations) and the persistent store
-  	  structure (the journal) have all been implemented, tested
-  	  and are showing good performance.  The basic distributed
-  	  services architecture is up and running, but indices must be
-  	  statically range partitioned.  The "sparse row store" API
-  	  has been implemented, offering an interface similar to HBase
-  	  or bigtable.  The map/reduce services are slated for a refactor.
-  	  Asynchronous overflow of the indices (aka compacting merge) is
-  	  done but is still going through shake down. Data replication and
-  	  service failover are not finished.
 
-	  </p><p>
+          bigdata&#174; has been tested on clusters of up to 15 nodes.
+	  We have loaded data sets of 10B+ rows, at rates of over
+	  300,000 rows per second.  Overall, 100s of billions of rows
+	  have been put down safe on disk.  People should be able to
+	  reach petabyte scale today, and exabyte scale once we
+	  introduce a partitioned metadata service (data service
+	  locators).  In theory, the architecture can scale to ~ 400
+	  exabytes per scale-out index.
 
-	  There is an RDF database application layer (bigdata-rdf)
-  	  that is being used to benchmark and tune the bigdata
-  	  implementation. We have plans to provide an transactional
-  	  OODBMS integration (based on the Generic Object Model) as
-  	  well as a media index and search service.
+   </p><p>
 
-	  </p><p>
+          The following features are not finished yet: <ul>
 
-	  We are seeking beta users to vet the architecture and work
-  	  through robust scaling.  
+	  <li>HA architecture. Alternative 2 is the easiest to realize
+	  and many organizations perfer to manage storage separately
+	  from servers. Alternative 1 probably has the best
+	  price/performance for deployments since it can use local
+	  disk.  Let us know what you think.</li>
+
+	  <li>REST API for the sparse row store (this is a Hadoop
+	  integration point).</li>
+
+	  <li>Bigdata has distributed job support for clients writing
+	  on scale-out indices and distributed query support, neither
+	  of which uses the map/reduce model.  The map/reduce services
+	  are slated for a refactor or might be deprecated entirely in
+	  favor of a Hadoop integration.</li>
+
+	  <li>Backup and recovery.</li>
+
+	  <li>Full transactions.  Read-only transaction support is
+	  done, but we still have some work to do on the commit
+	  protocol for read-write transactions.</li>
+
+	  <li>OODBMS.  We have plans for an OODBM layer based on the
+	  Generic Object Model.</li>
+
+	  </ul>
   	  
   </p>
+
+  <h2>Getting Started</h2>
+
+   <p>
+
+         See the wiki for <a
+         href="http://bigdata.wiki.sourceforge.net/GettingStarted">Getting
+         Started</a> and our <a
+         href="http://www.bigdata.com/bigdata/blog/">blog</a> for
+         what's new.  The javadoc is <a
+         href="http://www.bigdata.com/bigdata/docs/api/">online</a>
+         and you can also build it with the ant script.  If you have a
+         question, please post it on the blog or the forum.
+
+   </p>
+
+<h2>Getting Involved</h2>
+
+<p>
+
+         bigdata&#174; is an open source project.  Contributors and
+         contributions are welcome.  Like most open source project,
+         contributions must be submitted under a contributor
+         agreement, which must be signed by someone with the
+         appropriate authority.  This is necessary to ensure that the
+         code base remains open.
+
+   </p><p>
+
+	 If you want to help out, please check out what is going on
+	 our <a href="http://www.bigdata.com/bigdata/blog/">blog</a>
+	 and on the <a
+	 href="https://sourceforge.net/projects/bigdata/">main project
+	 site</a>.  Post your questions and we will help you figure
+	 out where you can contribute or how to create that new
+	 feature that you need.
+
+   </p>
   
-  <h2>License</h2>
+  <h2>Licenses and Services</h2>
   
   <p>
   
-  	  bigdata is currently being released under GPL (version 2).  However, it is
-  	  our intention to make bigdata usable by non-GPL Free/Libre and Open Source
-  	  Software (FLOSS) projects.  To this end, we are considering either a FLOSS
-  	  exclusion (such as MySQL AB has issued) or a license change to something
-  	  with the same semantics as the SleepyCat License.  We are also considering
-  	  the Open Software License v 3.0.  Please bear with us while we work through
-  	  this issue.  If you have any questions concerning the license, write
-  	  <a href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.
+  	  bigdata&#174; is distributed under GPL(v2).  SYSTAP, LLC
+  	  offers commercial licenses for customers who either want the
+  	  value add (warranty, technical support, additional
+  	  regression testing), who want to redistribute bigdata with
+  	  their own commercial products, or who are not "comfortable"
+  	  with the GPL license.  For inquiries or further information,
+  	  please write <a
+  	  href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.
   
-  </p>
-  
-  <p>
-  
-  	  SYSTAP, LLC offers commercial licenses for customers who either want the
-  	  value add (warranty, technical support, additional regression testing), who
-  	  want to redistribute bigdata with their own commercial products, or who are
-  	  not "comfortable" with the GPL license.  For inquiries or further information,
-  	  please write <a href="mailto:licenses@bigdata.com">licenses@bigdata.com</a>.
+  </p><p>
+
+          Please let us know if you need specific feature development
+  	  or help in applying bigdataa&#174; to your problem.  We are
+  	  especially interested in working directly with people who
+  	  are trying to handle massive data, especially for the
+  	  semantic web.  Please <a
+  	  href="http://www.systap.com/contact.htm">contact us</a>
+  	  directly.
   
   </p>
 
-  <h2> Related links </h2>
+  <h2>Related links</h2>
 
   <p>
   
@@ -247,6 +430,12 @@
 
   <dt>Hadoop</dt>
   <dd>http://lucene.apache.org/hadoop/</dd>
+
+  <dt>Zookeeper</dt>
+  <dd>http://hadoop.apache.org/zookeeper/</dd>
+
+  <dt>Jini/River</dt>
+  <dd>http://www.jini.org/wiki/Main_Page, http://incubator.apache.org/river/RIVER/index.html</dd>
 
   <dt>Pig</dt>
   <dd>http://research.yahoo.com/node/90</dd>
