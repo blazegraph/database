@@ -32,44 +32,66 @@ import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 
+/**
+ * This class demonstrates concurrent reading and writing with the U10 data set
+ * on the scale-out architecture.  One thread writes the U10 data files, doing
+ * a commit after every file (this is not the fastest way to perform load, as
+ * it simulates incremental updates vs bulk load).  Another thread asks for
+ * the number of "FullProfessors" every three seconds.  You can watch the
+ * number of results rise as more data is loaded.
+ * 
+ * @author mikep
+ *
+ */
 public class ScaleOut {
     
     protected final static Logger log = Logger.getLogger(ScaleOut.class);
     
-    private static final String namespace = "kb1";
+    /**
+     * The name of the triple store instance inside the scale-out database.
+     */
+    private static final String namespace = "kb";
     
+    /**
+     * A query asking for the full professors instances.
+     */
     private static final String query = 
         "select ?x where { ?x <"+RDF.TYPE+"> <"+LUBM.FULL_PROFESSOR+"> . }";
     
+    /**
+     * Manage the control flow of the program.  Open a proxy to the federation,
+     * kick off the writer, kick off the reader, wait for the writer to 
+     * complete, kill the reader, wait for the reader to complete, shutdown the 
+     * federation.
+     * 
+     * @param args specify the location of the cluster's JINI config file
+     */
     public static final void main(String[] args) {
         
         if (args.length == 0) {
-
             System.err.println("usage: filename");
-
             System.exit(1);
-            
         }
         
         final String config = args[0];
-        
         log.info("config: " + config);
 
         JiniFederation fed = null;
 
         try {
 
-            fed = new JiniClient(new String[] { config }).connect();
+            fed = new JiniClient(args).connect();
 
             // force the triple store to be created if it doesn't already exist
             createTripleStore(fed);
-           
+
+            // create the writer and reader
             BigdataWriter writer = new BigdataWriter(fed);
-            
             BigdataReader reader = new BigdataReader(fed);
             
+            // launch the threads and get their futures
+            // bigdata has an executor service but any executor service will do
             Future writerFuture = fed.getExecutorService().submit(writer);
-            
             Future readerFuture = fed.getExecutorService().submit(reader);
             
             // wait for writer to complete
@@ -81,20 +103,25 @@ public class ScaleOut {
             // wait for reader to complete
             readerFuture.get();
 
-            // testQuery(fed);
-            
         } catch (Exception ex) {
             
             ex.printStackTrace();
             
         } finally {
 
-            if (fed != null) fed.shutdownNow();
+            if (fed != null) fed.shutdown();
                 
         }
 
     }
     
+    /**
+     * Create our triple store instance if it doesn't exist.
+     * 
+     * @param fed the jini federation
+     * @return the triple store instance
+     * @throws Exception
+     */
     private static AbstractTripleStore createTripleStore(JiniFederation fed) 
         throws Exception {
 
@@ -123,7 +150,18 @@ public class ScaleOut {
         return tripleStore;
         
     }
-    
+
+    /**
+     * Lookup the triple store instance using the specified timestamp.  Pass in
+     * ITx.UNISOLATED for the writable instance (not safe for concurrent 
+     * readers), otherwise use a transaction id or timestamp for a historical 
+     * view.  This is demonstrated below.  
+     * 
+     * @param fed the jini federation
+     * @param timestamp the timestamp or transaction id
+     * @return the triple store instance
+     * @throws Exception
+     */
     private static AbstractTripleStore openTripleStore(
         JiniFederation fed, long timestamp) throws Exception {
         
@@ -142,7 +180,7 @@ public class ScaleOut {
         return tripleStore;
         
     }
-    
+/*    
     private static void testQuery(JiniFederation fed) throws Exception {
         
         long transactionId =  
@@ -167,7 +205,7 @@ public class ScaleOut {
 
                 final TupleQuery tupleQuery = 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                tupleQuery.setIncludeInferred(true);
                 TupleQueryResult result = tupleQuery.evaluate();
                 // do something with the results
                 int resultCount = 0;
@@ -196,19 +234,34 @@ public class ScaleOut {
         }
         
     }
+*/
     
+    /**
+     * A writer task to load the U10 data set.
+     */
     private static class BigdataWriter implements Runnable {
         
+        /**
+         * The jini federation.
+         */
         private JiniFederation fed;
         
-        private boolean kill = false;
-        
+        /**
+         * Construct the writer task.
+         * 
+         * @param fed the jini federation
+         */
         public BigdataWriter(JiniFederation fed) {
             
             this.fed = fed;
             
         }
         
+        /**
+         * Opens the triple store and writes the LUBM ontology and U10 data
+         * files.  Does a commit after every file, which is not the most
+         * efficient way to bulk load, but simulates incremental updates. 
+         */
         public void run() {
 
             try {
@@ -216,13 +269,16 @@ public class ScaleOut {
                 // get the unisolated triple store for writing
                 final AbstractTripleStore tripleStore = 
                     openTripleStore(fed, ITx.UNISOLATED);
-                
+
+                // wrap the triple store in a Sesame SAIL
                 final BigdataSail sail = new BigdataSail(tripleStore);
                 final Repository repo = new BigdataSailRepository(sail);
                 repo.initialize();
                 
+                // load the data
                 loadU10(repo);
                 
+                // shut it down
                 repo.shutDown();
                 
             } catch (Exception ex) {
@@ -233,8 +289,15 @@ public class ScaleOut {
             
         }
         
+        /**
+         * Load the LUBM ontology and U10 data into a Sesame Repository.
+         * 
+         * @param repo the sesame repository
+         * @throws Exception
+         */
         private void loadU10(Repository repo) throws Exception {
             
+            // always, always autocommit = false
             RepositoryConnection cxn = repo.getConnection();
             cxn.setAutoCommit(false);
             
@@ -303,24 +366,47 @@ public class ScaleOut {
         
     }
     
+    /**
+     * A reader task to issue concurrent queries.  Asks for the # of full
+     * professors every three seconds.
+     */
     private static class BigdataReader implements Runnable {
         
+        /**
+         * The jini federation.
+         */
         private JiniFederation fed;
         
-        private boolean kill = false;
+        /**
+         * Allows the reader to be stopped gracefully.
+         */
+        private volatile boolean kill = false;
         
+        /**
+         * Create the reader.
+         * 
+         * @param fed the jini federation
+         */
         public BigdataReader(JiniFederation fed) {
             
             this.fed = fed;
             
         }
         
+        /**
+         * Kills the reader gracefully.
+         */
         public void kill() {
             
             this.kill = true;
             
         }
         
+        /**
+         * Opens a read-committed view of the triple store using the last
+         * commit point and issues a query for a list of all LUBM full 
+         * professors.  Does this every three seconds until killed.
+         */
         public void run() {
             
             try {
@@ -341,15 +427,25 @@ public class ScaleOut {
             
         }
         
+        /**
+         * Issue the query.
+         * 
+         * @throws Exception
+         */
         private void doQuery() throws Exception {
-            
+           
+            // this is how you get a read-only transaction.  MUST be
+            // committed or aborted later, see below.
             long transactionId = 
                 fed.getTransactionService().newTx(ITx.READ_COMMITTED);
             
             try {
 
+                // open the read-only triple store
                 final AbstractTripleStore tripleStore = 
                     openTripleStore(fed, transactionId);
+                
+                // wrap it in a Sesame SAIL
                 final BigdataSail sail = new BigdataSail(tripleStore);
                 final Repository repo = new BigdataSailRepository(sail);
                 repo.initialize();
@@ -379,6 +475,7 @@ public class ScaleOut {
                 
             } finally {
                 
+                // MUST close the transaction, abort is sufficient
                 fed.getTransactionService().abort(transactionId);
                 
             }
