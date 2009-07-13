@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Properties;
+import java.util.Map.Entry;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -64,6 +65,12 @@ public class ScaleOut {
             final Properties properties = fed.getClient().getProperties(
                     ScaleOut.class.getName());
             
+            for (Entry<Object,Object> e : properties.entrySet()) {
+                
+                log.info("property: " + e.getKey() + " = " + e.getValue());
+                
+            }
+            
             final AbstractTripleStore tripleStore = new ScaleOutTripleStore(
                     fed, namespace, ITx.UNISOLATED, properties);
             final BigdataSail sail = new BigdataSail(tripleStore);
@@ -87,7 +94,7 @@ public class ScaleOut {
         reader.kill();
         
         try {
-            Thread.sleep(5000);
+            Thread.sleep(10000);
         } catch (Exception ex) { }
         
     }
@@ -178,7 +185,7 @@ public class ScaleOut {
         
         private String config;
         
-        private boolean kill;
+        private boolean kill = false;
         
         private String query;
         
@@ -249,10 +256,13 @@ public class ScaleOut {
                     tupleQuery.setIncludeInferred(true /* includeInferred */);
                     TupleQueryResult result = tupleQuery.evaluate();
                     // do something with the results
+                    int resultCount = 0;
                     while (result.hasNext()) {
                         BindingSet bindingSet = result.next();
-                        log.info(bindingSet);
+                        // log.info(bindingSet);
+                        resultCount++;
                     }
+                    log.info(resultCount + " results");
                     
                 } finally {
                     // close the repository connection
