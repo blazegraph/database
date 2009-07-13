@@ -254,7 +254,7 @@ public class ScaleOut {
                 
                 { // then process the LUBM sample data files one at a time
                     InputStream is = 
-                        ScaleOut.class.getResourceAsStream("U1.zip");
+                        ScaleOut.class.getResourceAsStream("U10.zip");
                     ZipInputStream zis = 
                         new ZipInputStream(new BufferedInputStream(is));
                     ZipEntry ze = null;
@@ -345,10 +345,6 @@ public class ScaleOut {
             
             long transactionId = 
                 fed.getTransactionService().newTx(ITx.READ_COMMITTED);
-            
-            log.info("transaction id = " + 
-                    (transactionId == ITx.UNISOLATED ? "UNISOLATED" : 
-                                                       transactionId));
             
             try {
 
