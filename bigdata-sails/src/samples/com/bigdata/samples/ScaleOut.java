@@ -63,7 +63,7 @@ public class ScaleOut {
 
             // force the triple store to be created if it doesn't already exist
             createTripleStore(fed);
-            
+/*            
             BigdataWriter writer = new BigdataWriter(fed);
             
             BigdataReader reader = new BigdataReader(fed);
@@ -80,7 +80,9 @@ public class ScaleOut {
             
             // wait for reader to complete
             readerFuture.get();
-
+*/
+            testQuery(fed);
+            
         } catch (Exception ex) {
             
             ex.printStackTrace();
@@ -138,6 +140,49 @@ public class ScaleOut {
         }
         
         return tripleStore;
+        
+    }
+    
+    private static void testQuery(JiniFederation fed) {
+        
+        try {
+            
+            // get the unisolated triple store for writing
+            final AbstractTripleStore tripleStore = 
+                openTripleStore(fed, ITx.UNISOLATED);
+            
+            final BigdataSail sail = new BigdataSail(tripleStore);
+            final Repository repo = new BigdataSailRepository(sail);
+            repo.initialize();
+            
+            RepositoryConnection cxn = repo.getConnection();
+            try {
+
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+                // do something with the results
+                int resultCount = 0;
+                while (result.hasNext()) {
+                    BindingSet bindingSet = result.next();
+                    log.info(bindingSet);
+                    resultCount++;
+                }
+                log.info(resultCount + " results");
+                
+            } finally {
+                // close the repository connection
+                cxn.close();
+            }
+            
+            repo.shutDown();
+            
+        } catch (Exception ex) {
+            
+            ex.printStackTrace();
+            
+        }
         
     }
     
