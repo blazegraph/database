@@ -316,7 +316,7 @@ public class SampleCode {
      * @param filter helps filter out non-data files in the ZIP file
      * @throws Exception
      */
-    public void doLUBMTest(final String lubmResource, final String filter) 
+    public void doLUBMTest(final String lubmResource) 
         throws Exception {
         
         /*
@@ -345,13 +345,6 @@ public class SampleCode {
         Repository repo = new BigdataSailRepository(sail);
         repo.initialize();
 
-        doLUBMTest(repo, lubmResource, filter);
-        
-    }
-        
-    public void doLUBMTest(Repository repo, final String lubmResource, 
-        final String filter) throws Exception {
-        
         RepositoryConnection cxn = repo.getConnection();
         cxn.setAutoCommit(false);
         try {
@@ -374,9 +367,6 @@ public class SampleCode {
                 }
                 String name = ze.getName();
                 log.info(name);
-                if (!name.startsWith(filter)) {
-                    continue;
-                }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 byte[] bytes = new byte[4096];
                 int count;
@@ -413,19 +403,19 @@ public class SampleCode {
                     + " millis: " + throughput + " stmts/sec");
             
             // ok, now let's do one of the LUBM queries
-/*
-[query4]
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
-SELECT ?x ?y1 ?y2 ?y3
-WHERE{
-    ?x a ub:Professor;
-        ub:worksFor <http://www.Department0.University0.edu>;
-        ub:name ?y1;
-        ub:emailAddress ?y2;
-        ub:telephone ?y3.
-}
-*/
+            /*
+            [query4]
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+            SELECT ?x ?y1 ?y2 ?y3
+            WHERE{
+                ?x a ub:Professor;
+                    ub:worksFor <http://www.Department0.University0.edu>;
+                    ub:name ?y1;
+                    ub:emailAddress ?y2;
+                    ub:telephone ?y3.
+            }
+            */
             // build LUBM query 4 using the handy SparqlBuilder utility
             // note: SparqlBuilder is for "construct" queries only
             // but you could modify it easily to do "select" instead
@@ -450,7 +440,7 @@ WHERE{
             
             // if you want to see the output, here it is:
             log.info(sw.toString());
-            
+                        
         } catch (Exception ex) {
             cxn.rollback();
             throw ex;
@@ -458,23 +448,15 @@ WHERE{
             // close the repository connection
             cxn.close();
         }
-        
+                    
     }
     
     public void doU10() throws Exception {
-        doLUBMTest("U10.zip", "U10/University");
+        doLUBMTest("U10.zip");
     }
 
     public void doU1() throws Exception {
-        doLUBMTest("U1.zip", "U1/University");
-    }
-
-    public void doU10(Repository repo) throws Exception {
-        doLUBMTest(repo, "U10.zip", "U10/University");
-    }
-
-    public void doU1(Repository repo) throws Exception {
-        doLUBMTest(repo, "U1.zip", "U1/University");
+        doLUBMTest("U1.zip");
     }
 
     public Reader getReader(Class c, String resource) {
@@ -501,7 +483,8 @@ WHERE{
             
             // create a backing file
             File journal = File.createTempFile("bigdata", ".jnl");
-            journal.deleteOnExit();
+            log.info(journal.getAbsolutePath());
+            // journal.deleteOnExit();
             properties.setProperty(
                 BigdataSail.Options.FILE, 
                 journal.getAbsolutePath()
