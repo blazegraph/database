@@ -9,6 +9,8 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Properties;
 import java.util.Map.Entry;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -36,6 +38,9 @@ public class ScaleOut {
     
     private static final String namespace = "kb";
     
+    private static final String query = 
+        "select ?x where { ?x <"+RDF.TYPE+"> <"+LUBM.PROFESSOR+"> . }";
+    
     public static final void main(String[] args) {
         
         if (args.length == 0) {
@@ -46,157 +51,211 @@ public class ScaleOut {
             
         }
         
-        final String filename = args[0];
+        final String config = args[0];
         
-        System.out.println("filename: " + filename);
+        log.info("config: " + config);
 
-        String query = 
-            "select ?x where { ?x <"+RDF.TYPE+"> <"+LUBM.PROFESSOR+"> . }";
-/*        
-        ConcurrentReader reader = new ConcurrentReader(filename, query);
-        Thread t = new Thread(reader);
-        t.start();
-*/        
         JiniFederation fed = null;
 
         try {
 
-            fed = new JiniClient(new String[] { filename }).connect();
+            fed = new JiniClient(new String[] { config }).connect();
 
-            final Properties properties = fed.getClient().getProperties(
-                    ScaleOut.class.getName());
+            // force the triple store to be created if it doesn't already exist
+            createTripleStore(fed);
             
-            for (Entry<Object,Object> e : properties.entrySet()) {
-                
-                log.info("property: " + e.getKey() + " = " + e.getValue());
-                
-            }
+            BigdataWriter writer = new BigdataWriter(fed);
             
-            final AbstractTripleStore tripleStore = new ScaleOutTripleStore(
-                    fed, namespace, ITx.UNISOLATED, properties);
-            final BigdataSail sail = new BigdataSail(tripleStore);
-            final Repository repo = new BigdataSailRepository(sail);
-            repo.initialize();
+            BigdataReader reader = new BigdataReader(fed);
+            
+            Future writerFuture = fed.getExecutorService().submit(writer);
+            
+            Future readerFuture = fed.getExecutorService().submit(reader);
+            
+            // wait for writer to complete
+            writerFuture.get();
+            
+            // kill the reader
+            reader.kill();
+            
+            // wait for reader to complete
+            readerFuture.get();
 
-            loadU10(repo);
-            
-            ConcurrentReader.doQuery(fed, properties, query);
-            
-            repo.shutDown();
-            
         } catch (Exception ex) {
             
             ex.printStackTrace();
             
         } finally {
 
-            fed.shutdownNow();
+            if (fed != null) fed.shutdownNow();
                 
         }
-/*
-        reader.kill();
-        
-        try {
-            Thread.sleep(10000);
-        } catch (Exception ex) { }
-*/       
+
     }
     
-    private static void loadU10(Repository repo) throws Exception {
+    private static AbstractTripleStore createTripleStore(JiniFederation fed) 
+        throws Exception {
+
+        AbstractTripleStore tripleStore = null;
         
-        RepositoryConnection cxn = repo.getConnection();
-        cxn.setAutoCommit(false);
+        // locate the resource declaration (aka "open").
+        tripleStore = (AbstractTripleStore) fed.getResourceLocator().locate(
+            namespace, ITx.UNISOLATED);
         
-        try {
-            long stmtsBefore = cxn.size();
-            log.info("statements before: " + stmtsBefore);
-            long start = System.currentTimeMillis();
+        if (tripleStore == null) {
             
-            { // first add the LUBM ontology
-                InputStream is = 
-                    ScaleOut.class.getResourceAsStream("univ-bench.owl");
-                Reader reader = 
-                    new InputStreamReader(new BufferedInputStream(is));
-                cxn.add(reader, LUBM.NS, RDFFormat.RDFXML);
-                cxn.commit();
-            }
+            /*
+             * Pick up properties configured for the client as defaults.
+             */
+            final Properties properties = fed.getClient().getProperties(
+                    ScaleOut.class.getName());
             
-            { // then process the LUBM sample data files one at a time
-                InputStream is = ScaleOut.class.getResourceAsStream("U10.zip");
-                ZipInputStream zis = 
-                    new ZipInputStream(new BufferedInputStream(is));
-                ZipEntry ze = null;
-                while ((ze = zis.getNextEntry()) != null) {
-                    if (ze.isDirectory()) {
-                        continue;
-                    }
-                    String name = ze.getName();
-                    log.info(name);
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    byte[] bytes = new byte[4096];
-                    int count;
-                    while ((count = zis.read(bytes, 0, 4096)) != -1) {
-                        baos.write(bytes, 0, count);
-                    }
-                    baos.close();
-                    Reader reader = new InputStreamReader(
-                        new ByteArrayInputStream(baos.toByteArray())
-                        );
-                    cxn.add(reader, LUBM.NS, RDFFormat.RDFXML);
-                    cxn.commit();
-                }
-                zis.close();
-            }
+            tripleStore = new ScaleOutTripleStore(
+                fed, namespace, ITx.UNISOLATED, properties);
+
+            // create the triple store.
+            tripleStore.create();
             
-            // gather statistics
-            long elapsed = System.currentTimeMillis() - start;
-            long stmtsAfter = cxn.size();
-            long stmtsAdded = stmtsAfter - stmtsBefore;
-            int throughput =
-                    (int) ((double) stmtsAdded / (double) elapsed * 1000d);
-            log.info("statements after: " + stmtsAfter);
-            log.info("loaded: " + stmtsAdded + " in " + elapsed
-                    + " millis: " + throughput + " stmts/sec");
-        
-        } catch (Exception ex) {
-            cxn.rollback();
-            throw ex;
-        } finally {
-            // close the repository connection
-            cxn.close();
         }
         
+        return tripleStore;
+        
     }
     
-    private class Writer implements Runnable {
+    private static AbstractTripleStore openTripleStore(
+        JiniFederation fed, long timestamp) throws Exception {
         
-        private File config;
+        AbstractTripleStore tripleStore = null;
         
-        public Writer(File config) {
+        // locate the resource declaration (aka "open").
+        tripleStore = (AbstractTripleStore) fed.getResourceLocator().locate(
+            namespace, timestamp);
+        
+        if (tripleStore == null) {
+
+            throw new RuntimeException("triple store does not exist!");
             
-            this.config = config;
+        }
+        
+        return tripleStore;
+        
+    }
+    
+    private static class BigdataWriter implements Runnable {
+        
+        private JiniFederation fed;
+        
+        private boolean kill = false;
+        
+        public BigdataWriter(JiniFederation fed) {
+            
+            this.fed = fed;
             
         }
         
         public void run() {
+
+            try {
+                
+                // get the unisolated triple store for writing
+                final AbstractTripleStore tripleStore = 
+                    openTripleStore(fed, ITx.UNISOLATED);
+                
+                final BigdataSail sail = new BigdataSail(tripleStore);
+                final Repository repo = new BigdataSailRepository(sail);
+                repo.initialize();
+                
+                loadU10(repo);
+                
+                repo.shutDown();
+                
+            } catch (Exception ex) {
+                
+                ex.printStackTrace();
+                
+            }
+            
+        }
+        
+        private void loadU10(Repository repo) throws Exception {
+            
+            RepositoryConnection cxn = repo.getConnection();
+            cxn.setAutoCommit(false);
+            
+            try {
+                long stmtsBefore = cxn.size();
+                log.info("statements before: " + stmtsBefore);
+                long start = System.currentTimeMillis();
+                
+                { // first add the LUBM ontology
+                    InputStream is = 
+                        ScaleOut.class.getResourceAsStream("univ-bench.owl");
+                    Reader reader = 
+                        new InputStreamReader(new BufferedInputStream(is));
+                    cxn.add(reader, LUBM.NS, RDFFormat.RDFXML);
+                    cxn.commit();
+                }
+                
+                { // then process the LUBM sample data files one at a time
+                    InputStream is = 
+                        ScaleOut.class.getResourceAsStream("U10.zip");
+                    ZipInputStream zis = 
+                        new ZipInputStream(new BufferedInputStream(is));
+                    ZipEntry ze = null;
+                    while ((ze = zis.getNextEntry()) != null) {
+                        if (ze.isDirectory()) {
+                            continue;
+                        }
+                        String name = ze.getName();
+                        log.info(name);
+                        ByteArrayOutputStream baos = 
+                            new ByteArrayOutputStream();
+                        byte[] bytes = new byte[4096];
+                        int count;
+                        while ((count = zis.read(bytes, 0, 4096)) != -1) {
+                            baos.write(bytes, 0, count);
+                        }
+                        baos.close();
+                        Reader reader = new InputStreamReader(
+                            new ByteArrayInputStream(baos.toByteArray())
+                            );
+                        cxn.add(reader, LUBM.NS, RDFFormat.RDFXML);
+                        cxn.commit();
+                    }
+                    zis.close();
+                }
+                
+                // gather statistics
+                long elapsed = System.currentTimeMillis() - start;
+                long stmtsAfter = cxn.size();
+                long stmtsAdded = stmtsAfter - stmtsBefore;
+                int throughput =
+                        (int) ((double) stmtsAdded / (double) elapsed * 1000d);
+                log.info("statements after: " + stmtsAfter);
+                log.info("loaded: " + stmtsAdded + " in " + elapsed
+                        + " millis: " + throughput + " stmts/sec");
+            
+            } catch (Exception ex) {
+                cxn.rollback();
+                throw ex;
+            } finally {
+                // close the repository connection
+                cxn.close();
+            }
             
         }
         
     }
     
-    private static class ConcurrentReader implements Runnable {
+    private static class BigdataReader implements Runnable {
         
-        private String config;
+        private JiniFederation fed;
         
         private boolean kill = false;
         
-        private String query;
-        
-        public ConcurrentReader(String config, String query) {
+        public BigdataReader(JiniFederation fed) {
             
-            this.config = config;
-            
-            this.query = query;
+            this.fed = fed;
             
         }
         
@@ -208,18 +267,11 @@ public class ScaleOut {
         
         public void run() {
             
-            JiniFederation fed = null;
-            
             try {
 
-                fed = new JiniClient(new String[] { config }).connect();
-
-                final Properties properties = fed.getClient().getProperties(
-                        ScaleOut.class.getName());
-                
                 while (!kill) {
                     
-                    doQuery(fed, properties);
+                    doQuery();
                     
                     Thread.sleep(3000);
                     
@@ -229,32 +281,19 @@ public class ScaleOut {
                 
                 ex.printStackTrace();
                 
-            } finally {
-                
-                fed.shutdownNow();
-                
             }
             
         }
         
-        private void doQuery(JiniFederation fed, Properties properties) 
-            throws Exception {
-            
-            doQuery(fed, properties, query);
-            
-        }
-        
-        public static void doQuery(JiniFederation fed, Properties properties, 
-                String query) 
-            throws Exception {
+        private void doQuery() throws Exception {
             
             long transactionId = 
                 fed.getTransactionService().newTx(ITx.READ_COMMITTED);
             
             try {
 
-                final AbstractTripleStore tripleStore = new ScaleOutTripleStore(
-                        fed, namespace, transactionId, properties);
+                final AbstractTripleStore tripleStore = 
+                    openTripleStore(fed, transactionId);
                 final BigdataSail sail = new BigdataSail(tripleStore);
                 final Repository repo = new BigdataSailRepository(sail);
                 repo.initialize();
