@@ -39,7 +39,7 @@ public class ScaleOut {
     private static final String namespace = "kb";
     
     private static final String query = 
-        "select ?x where { ?x <"+RDF.TYPE+"> <"+LUBM.PROFESSOR+"> . }";
+        "select ?x where { ?x <"+RDF.TYPE+"> <"+LUBM.FULL_PROFESSOR+"> . }";
     
     public static final void main(String[] args) {
         
