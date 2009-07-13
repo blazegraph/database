@@ -143,13 +143,20 @@ public class ScaleOut {
         
     }
     
-    private static void testQuery(JiniFederation fed) {
+    private static void testQuery(JiniFederation fed) throws Exception {
+        
+        long transactionId =  
+            //ITx.UNISOLATED;
+            fed.getTransactionService().newTx(ITx.READ_COMMITTED);
+        
+        log.info("transaction id = " + 
+            (transactionId == ITx.UNISOLATED ? "UNISOLATED" : transactionId));
         
         try {
             
             // get the unisolated triple store for writing
             final AbstractTripleStore tripleStore = 
-                openTripleStore(fed, ITx.UNISOLATED);
+                openTripleStore(fed, transactionId);
             
             final BigdataSail sail = new BigdataSail(tripleStore);
             final Repository repo = new BigdataSailRepository(sail);
@@ -178,9 +185,13 @@ public class ScaleOut {
             
             repo.shutDown();
             
-        } catch (Exception ex) {
+        } finally {
             
-            ex.printStackTrace();
+            if (transactionId != ITx.UNISOLATED) {
+                
+                fed.getTransactionService().abort(transactionId);
+                
+            }
             
         }
         
