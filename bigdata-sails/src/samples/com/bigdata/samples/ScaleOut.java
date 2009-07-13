@@ -63,7 +63,7 @@ public class ScaleOut {
 
             // force the triple store to be created if it doesn't already exist
             createTripleStore(fed);
-/*            
+           
             BigdataWriter writer = new BigdataWriter(fed);
             
             BigdataReader reader = new BigdataReader(fed);
@@ -80,8 +80,8 @@ public class ScaleOut {
             
             // wait for reader to complete
             readerFuture.get();
-*/
-            testQuery(fed);
+
+            // testQuery(fed);
             
         } catch (Exception ex) {
             
@@ -254,7 +254,7 @@ public class ScaleOut {
                 
                 { // then process the LUBM sample data files one at a time
                     InputStream is = 
-                        ScaleOut.class.getResourceAsStream("U10.zip");
+                        ScaleOut.class.getResourceAsStream("U1.zip");
                     ZipInputStream zis = 
                         new ZipInputStream(new BufferedInputStream(is));
                     ZipEntry ze = null;
@@ -345,6 +345,10 @@ public class ScaleOut {
             
             long transactionId = 
                 fed.getTransactionService().newTx(ITx.READ_COMMITTED);
+            
+            log.info("transaction id = " + 
+                    (transactionId == ITx.UNISOLATED ? "UNISOLATED" : 
+                                                       transactionId));
             
             try {
 
