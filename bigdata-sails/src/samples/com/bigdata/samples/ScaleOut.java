@@ -36,7 +36,7 @@ public class ScaleOut {
     
     protected final static Logger log = Logger.getLogger(ScaleOut.class);
     
-    private static final String namespace = "kb";
+    private static final String namespace = "kb1";
     
     private static final String query = 
         "select ?x where { ?x <"+RDF.TYPE+"> <"+LUBM.FULL_PROFESSOR+"> . }";
