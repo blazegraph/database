@@ -52,10 +52,11 @@ public class ScaleOut {
 
         String query = 
             "select ?x where { ?x <"+RDF.TYPE+"> <"+LUBM.PROFESSOR+"> . }";
+/*        
         ConcurrentReader reader = new ConcurrentReader(filename, query);
         Thread t = new Thread(reader);
         t.start();
-        
+*/        
         JiniFederation fed = null;
 
         try {
@@ -79,6 +80,8 @@ public class ScaleOut {
 
             loadU10(repo);
             
+            ConcurrentReader.doQuery(fed, properties, query);
+            
             repo.shutDown();
             
         } catch (Exception ex) {
@@ -90,13 +93,13 @@ public class ScaleOut {
             fed.shutdownNow();
                 
         }
-
+/*
         reader.kill();
         
         try {
             Thread.sleep(10000);
         } catch (Exception ex) { }
-        
+*/       
     }
     
     private static void loadU10(Repository repo) throws Exception {
@@ -235,6 +238,14 @@ public class ScaleOut {
         }
         
         private void doQuery(JiniFederation fed, Properties properties) 
+            throws Exception {
+            
+            doQuery(fed, properties, query);
+            
+        }
+        
+        public static void doQuery(JiniFederation fed, Properties properties, 
+                String query) 
             throws Exception {
             
             long transactionId = 
