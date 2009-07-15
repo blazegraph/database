@@ -20,14 +20,35 @@ public class BigdataSailRepository extends SailRepository {
         return ((BigdataSail) getSail()).getDatabase();
         
     }
+    
+    private BigdataSail getBigdataSail() {
+        
+        return (BigdataSail) getSail();
+        
+    }
 
     @Override
     public SailRepositoryConnection getConnection() throws RepositoryException {
         
         try {
         
-            return new BigdataSailRepositoryConnection(this, getSail()
-                    .getConnection());
+            return new BigdataSailRepositoryConnection(this, 
+                getSail().getConnection());
+            
+        } catch (SailException e) {
+            
+            throw new RepositoryException(e);
+            
+        }
+        
+    }
+    
+    public SailRepositoryConnection getQueryConnection() throws RepositoryException {
+        
+        try {
+            
+            return new BigdataSailRepositoryConnection(this, 
+                getBigdataSail().getQueryConnection());
             
         } catch (SailException e) {
             

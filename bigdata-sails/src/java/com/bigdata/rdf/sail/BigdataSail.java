@@ -801,7 +801,19 @@ public class BigdataSail extends SailBase implements Sail {
         return (BigdataSailConnection) super.getConnection();
         
     }
-
+    
+    /**
+     * Return a query connection based on a the last commit point.
+     */
+    public BigdataSailConnection getQueryConnection() throws SailException {
+        
+        final long timestamp = database.getIndexManager().getLastCommitTime();
+        
+        return getReadHistoricalView(timestamp);
+        
+    }
+    
+    
     /**
      * Inner class implements the {@link SailConnection}. Some additional
      * functionality is available on this class, including
