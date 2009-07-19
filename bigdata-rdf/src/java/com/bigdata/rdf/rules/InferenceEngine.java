@@ -157,6 +157,9 @@ public class InferenceEngine {
          * presented with a specific triple pattern. While more computation is
          * performed if a fill triple scan is frequently requested, that is an
          * unusual case and significantly less data will be stored regardless.
+         * <p>
+         * Note: I've changed the default to true until we fix the query
+         * time computation, which is currently broken. --MP
          * 
          * @see BackchainAccessPath
          */
@@ -164,7 +167,7 @@ public class InferenceEngine {
                 .getName()
                 + ".forwardChainOwlSameAsProperties";
 
-        String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "false";
+        String DEFAULT_FORWARD_CHAIN_OWL_SAMEAS_PROPERTIES = "true";
 
         /**
          * When <code>true</code> (default
