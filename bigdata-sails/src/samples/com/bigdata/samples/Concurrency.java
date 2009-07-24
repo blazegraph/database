@@ -47,7 +47,7 @@ public class Concurrency {
     /**
      * The # of reader threads to create.
      */
-    private static final int numReaders = 2;
+    private static final int numReaders = 3;
     
     /**
      * A query asking for the full professors instances.
@@ -247,7 +247,7 @@ public class Concurrency {
                 
                 { // then process the LUBM sample data files one at a time
                     InputStream is = 
-                        Concurrency.class.getResourceAsStream("U1.zip");
+                        Concurrency.class.getResourceAsStream("U10.zip");
                     ZipInputStream zis = 
                         new ZipInputStream(new BufferedInputStream(is));
                     ZipEntry ze = null;
