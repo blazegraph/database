@@ -125,6 +125,15 @@ public class TestAll extends TestCase {
         // test owl:equivalentProperty
         suite.addTestSuite(TestRuleOwlEquivalentProperty.class);
 
+        // test owl:transitiveProperty
+        suite.addTestSuite(TestRuleOwlTransitiveProperty.class);
+
+        // test owl:inverseOf
+        suite.addTestSuite(TestRuleOwlInverseOf.class);
+
+        // test owl:hasValue
+        suite.addTestSuite(TestRuleOwlHasValue.class);
+
         /*
          * Test for optionals and for query options applied during native rule
          * and program evaluation.

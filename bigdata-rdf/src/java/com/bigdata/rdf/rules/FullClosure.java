@@ -104,6 +104,11 @@ public class FullClosure extends BaseClosure {
                 
             }
             
+            if (forwardChainOwlHasValue) {
+                
+                program.addStep(new RuleOwlHasValue(db, vocab));
+
+            }
             if (forwardChainOwlSameAsClosure) {
 
                 program.addStep(new RuleOwlSameAs1(db,vocab));

@@ -27,6 +27,7 @@ abstract public class BaseClosure {
     final protected boolean forwardChainOwlEquivalentClass;
     final protected boolean forwardChainOwlTransitiveProperty;
     final protected boolean forwardChainOwlInverseOf;
+    final protected boolean forwardChainOwlHasValue;
 
     /**
      * The {@link Axioms} declared for the database.
@@ -77,6 +78,8 @@ abstract public class BaseClosure {
         forwardChainOwlTransitiveProperty = inf.forwardChainOwlTransitiveProperty;
         
         forwardChainOwlInverseOf = inf.forwardChainOwlInverseOf;
+        
+        forwardChainOwlHasValue = inf.forwardChainOwlHasValue;
         
     }
 

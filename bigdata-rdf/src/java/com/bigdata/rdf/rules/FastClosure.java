@@ -221,6 +221,12 @@ public class FastClosure extends BaseClosure {
     
                 }
     
+                if (forwardChainOwlHasValue) {
+                    
+                    tmp.add(new RuleOwlHasValue(db, vocab));
+    
+                }
+    
                 if (!tmp.isEmpty()) {
     
                     /*
