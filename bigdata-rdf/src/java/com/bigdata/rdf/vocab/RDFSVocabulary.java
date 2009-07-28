@@ -90,6 +90,9 @@ public class RDFSVocabulary extends BaseVocabulary {
         add(OWL.OBJECTPROPERTY);
         add(OWL.TRANSITIVEPROPERTY);
         add(OWL.DATATYPEPROPERTY);
+        add(OWL.RESTRICTION);
+        add(OWL.ONPROPERTY);
+        add(OWL.HASVALUE);
 
     }
 

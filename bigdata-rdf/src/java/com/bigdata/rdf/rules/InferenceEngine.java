@@ -234,6 +234,21 @@ public class InferenceEngine {
 
         String DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = "true";
 
+        /**
+         * When <code>true</code> (default
+         * {@value #DEFAULT_FORWARD_CHAIN_OWL_HAS_VALUE}) the
+         * entailments for <code>owl:hasValue</code> are computed by
+         * forward chaining and stored in the database. When <code>false</code>,
+         * rules that produce those entailments are turned off such that they
+         * are neither computed NOR stored and a backward chainer or magic sets
+         * technique must be used to generate the entailments at query time.
+         */
+        String FORWARD_CHAIN_OWL_HAS_VALUE = InferenceEngine.class
+                .getName()
+                + ".forwardChainOwlHasValue";
+
+        String DEFAULT_FORWARD_CHAIN_OWL_HAS_VALUE = "true";
+
     }
 
     /**
@@ -274,6 +289,7 @@ public class InferenceEngine {
             this.forwardChainOwlEquivalentClass = false;
             this.forwardChainOwlInverseOf = false;
             this.forwardChainOwlTransitiveProperty = false;
+            this.forwardChainOwlHasValue = false;
             
         } else {
             
@@ -337,6 +353,15 @@ public class InferenceEngine {
             if(INFO)
             log.info(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY + "="
                     + forwardChainOwlTransitiveProperty);
+
+            this.forwardChainOwlHasValue = Boolean
+                    .parseBoolean(properties.getProperty(
+                            Options.FORWARD_CHAIN_OWL_HAS_VALUE,
+                            Options.DEFAULT_FORWARD_CHAIN_OWL_HAS_VALUE));
+            
+            if(INFO)
+            log.info(Options.FORWARD_CHAIN_OWL_HAS_VALUE + "="
+                    + forwardChainOwlHasValue);
 
         }
         
@@ -414,6 +439,13 @@ public class InferenceEngine {
      * When <code>false</code>, those entailments will NOT be available.
      */
     final protected boolean forwardChainOwlTransitiveProperty;
+    
+    /**
+     * Set based on {@link Options#FORWARD_CHAIN_OWL_HAS_VALUE}. When
+     * <code>true</code>, we will forward chain and store those entailments.
+     * When <code>false</code>, those entailments will NOT be available.
+     */
+    final protected boolean forwardChainOwlHasValue;
     
     /**
      * Compute the forward closure of a focusStore against the database using

@@ -93,6 +93,23 @@ public class OwlAxioms extends RdfsAxioms {
         axioms.add( valueFactory.createStatement( OWL.INVERSEOF, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
         axioms.add( valueFactory.createStatement( OWL.INVERSEOF, RDFS.SUBPROPERTYOF, OWL.INVERSEOF, null, StatementEnum.Axiom));
  
+        // axioms for owl:onProperty
+        axioms.add( valueFactory.createStatement( OWL.ONPROPERTY, RDF.TYPE, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.ONPROPERTY, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.ONPROPERTY, RDFS.SUBPROPERTYOF, OWL.ONPROPERTY, null, StatementEnum.Axiom));
+        
+        // axioms for owl:hasValue
+        axioms.add( valueFactory.createStatement( OWL.HASVALUE, RDF.TYPE, RDF.PROPERTY, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.HASVALUE, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.HASVALUE, RDFS.SUBPROPERTYOF, OWL.HASVALUE, null, StatementEnum.Axiom));
+
+        // axioms for owl:Restriction
+        axioms.add( valueFactory.createStatement( OWL.RESTRICTION, RDFS.SUBCLASSOF, RDFS.CLASS, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.RESTRICTION, RDFS.SUBCLASSOF, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.RESTRICTION, RDFS.SUBCLASSOF, OWL.RESTRICTION, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.RESTRICTION, RDF.TYPE, RDFS.CLASS, null, StatementEnum.Axiom));
+        axioms.add( valueFactory.createStatement( OWL.RESTRICTION, RDF.TYPE, RDFS.RESOURCE, null, StatementEnum.Axiom));
+        
         // axioms for owl:Class, owl:ObjectProperty, owl:TransitiveProperty, and owl:DatatypeProperty
         axioms.add( valueFactory.createStatement( OWL.CLASS, RDFS.SUBCLASSOF, RDFS.CLASS, null, StatementEnum.Axiom));
         axioms.add( valueFactory.createStatement( OWL.CLASS, RDFS.SUBCLASSOF, RDFS.RESOURCE, null, StatementEnum.Axiom));

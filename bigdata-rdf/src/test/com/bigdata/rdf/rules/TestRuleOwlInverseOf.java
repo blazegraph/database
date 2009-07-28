@@ -51,19 +51,19 @@ import com.bigdata.relation.rule.Rule;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestRuleOwlSameInverseOf extends AbstractRuleTestCase {
+public class TestRuleOwlInverseOf extends AbstractRuleTestCase {
 
     /**
      * 
      */
-    public TestRuleOwlSameInverseOf() {
+    public TestRuleOwlInverseOf() {
         super();
     }
 
     /**
      * @param name
      */
-    public TestRuleOwlSameInverseOf(String name) {
+    public TestRuleOwlInverseOf(String name) {
         super(name);
     }
 
