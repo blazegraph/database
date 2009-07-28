@@ -135,7 +135,18 @@ public class SampleCode {
      */
     public void readSomeData(Repository repo, URI uri) throws Exception {
         
-        RepositoryConnection cxn = repo.getConnection();
+        /*
+         * With MVCC, you read from a historical state to avoid blocking and
+         * being blocked by writers.  BigdataSailRepository.getQueryConnection
+         * gives you a view of the repository at the last commit point.
+         */
+        RepositoryConnection cxn;
+        if (repo instanceof BigdataSailRepository) { 
+            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+        } else {
+            cxn = repo.getConnection();
+        }
+        
         try {
             
             RepositoryResult<Statement> stmts = 
@@ -178,7 +189,18 @@ public class SampleCode {
     public void executeSelectQuery(Repository repo, String query, 
         QueryLanguage ql) throws Exception {
         
-        RepositoryConnection cxn = repo.getConnection();
+        /*
+         * With MVCC, you read from a historical state to avoid blocking and
+         * being blocked by writers.  BigdataSailRepository.getQueryConnection
+         * gives you a view of the repository at the last commit point.
+         */
+        RepositoryConnection cxn;
+        if (repo instanceof BigdataSailRepository) { 
+            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+        } else {
+            cxn = repo.getConnection();
+        }
+        
         try {
 
             final TupleQuery tupleQuery = cxn.prepareTupleQuery(ql, query);
@@ -208,7 +230,18 @@ public class SampleCode {
     public void executeConstructQuery(Repository repo, String query, 
         QueryLanguage ql) throws Exception {
         
-        RepositoryConnection cxn = repo.getConnection();
+        /*
+         * With MVCC, you read from a historical state to avoid blocking and
+         * being blocked by writers.  BigdataSailRepository.getQueryConnection
+         * gives you a view of the repository at the last commit point.
+         */
+        RepositoryConnection cxn;
+        if (repo instanceof BigdataSailRepository) { 
+            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+        } else {
+            cxn = repo.getConnection();
+        }
+        
         try {
 
             // silly construct queries, can't guarantee distinct results
@@ -294,6 +327,30 @@ public class SampleCode {
             cxn.close();
         }
 
+        /*
+         * With MVCC, you read from a historical state to avoid blocking and
+         * being blocked by writers.  BigdataSailRepository.getQueryConnection
+         * gives you a view of the repository at the last commit point.
+         */
+        if (repo instanceof BigdataSailRepository) { 
+            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+        } else {
+            cxn = repo.getConnection();
+        }
+
+        try {
+
+            RepositoryResult<Statement> results = 
+                cxn.getStatements(null, null, null, false);
+            while(results.hasNext()) {
+                log.info(results.next());
+            }
+            
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+        
         String NS = "http://www.bigdata.com/rdf#";
         String MIKE = NS + "Mike";
         String LOVES = NS + "loves";
