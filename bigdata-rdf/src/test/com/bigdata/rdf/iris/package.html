@@ -1,0 +1,135 @@
+<html>
+<head>
+<title>Data definition layer (DDL)</title>
+</head>
+<body>
+
+<p>
+
+    This package includes an abstraction layer for declaring
+    containers of relations, relations, the relationships between the
+    relations (foreign keys), and the indices for a relation,
+    including what goes into the key and the value for the index.
+
+</p>
+
+<pre>
+
+container := relation(s)
+
+relation := generic object type / data fields, indices, foreign keys
+
+index := key order (in terms of the fields for the relation), key
+         serializer, value serializer, bloom filter (T/F), etc.
+    
+
+tripleStore := lexicon, triple
+	;
+	
+lexicon := objectType=BigdataValue.class,
+	indices={term2id, id2term},
+	;
+
+lexicon.term2id :=
+	key = {BigdataValue.stringValue()} // look at RDFKeyBuilder - it is more complex than stringValue().
+	value = {BigdataValue.getTermId()} // long integer.
+	;
+
+lexicon.id2term :=
+	key = {BigdataValue.getTermId()} // long integer.
+	val = {BigdataValue} // stores the serialized java object using a custom serializer for RDF Values.
+	;
+		
+triple :=
+	objectType=SPO.class,
+	indices={spo, pos, osp},
+	foreignKeys={
+		SPO.s := lexicon.term2id.getTermId(),
+		SPO.p := lexicon.term2id.getTermId(),
+		SPO.o := lexicon.term2id.getTermId(),
+		SPO.sid := lexicon.term2id.getTermId() // iff SIDs are enabled
+		}
+	;
+
+/* Note: For the triple relation, we reconstruct the {s,p,o} from the key.
+ * You can safely decode ASCII text from a key, as well as int, long, double,
+ * etc.  See KeyBuilder which handles all of this.
+ *
+ * Note: Multi-field keys which include one (or more) Unicode fields are the
+ * most complex.  KeyBuilder has special methods for generating Unicode sort
+ * keys which deal with this.
+ *
+ * Note: We need to be able to choose the right access path (really, the right
+ * index) for an IPredicate of the same generic type as the relation.
+ */	
+triple.spo :=
+	key = {SPO.s,SPO.p,SPO.o}, // the key order for this index.
+	val = {SPO.getStatementType(), SPO.sid} // sid iff SIDs enabled
+	bloomFilter=true
+	;
+
+triple.pos :=
+	key = {SPO.p,SPO.o,SPO.s}
+	val = {SPO.getStatementType(), SPO.sid} // sid iff SIDs enabled
+	;
+
+triple.osp :=
+	key = {SPO.o,SPO.s,SPO.p}
+	val = {SPO.getStatementType(), SPO.sid} // sid iff SIDs enabled
+	;
+
+Need to create a relation for each magic predicate in the magic program.  The
+magic relations for a give program can be stored inside a magic relation
+container.  For now, I think I'll just create these magic relations inside
+the triple store and delete them when the program finishes.  I'm sure this is
+not the best way, since the journal will grow and grow.  When Bryan gets back
+we can figure out where to put these things (maybe in some sort of 
+TempMagicStore or something.
+
+Bryan: How do I create temporary relations in a container that can be used for 
+rule & query execution, that can be persisted on disk if it gets large, but that 
+will go away entirely without a lasting trace when I'm done with it?
+
+TempMagicStore:
+Use TemporaryStore from database.getIndexManager().getTempStore()
+TempMagicStore will create the necessary magic relations.
+TempMagicStore should probably be a variant (subclass) of TempTripleStore, that
+way we can use it as the focus store for program execution and it can hold both
+magic tuples and SPOs.
+
+MagicRelation:
+Responsible for:
+-figuring out what indices are needed based on arity
+-creating indices
+-creating an access path for a given predicate
+-writing and deleting from the indices
+Need a MagicIndexWriter and MagicIndexRemover.
+Need a MagicAccessPath.
+
+MagicAccessPath:
+Going to have to do some trickery to get the from and to keys right without
+knowing the arity in advance.
+Also going to have to have a MagicTupleKeySerializer.
+
+To update relation metadata in the global row store:
+AbstractTripleStore.create(final Map<IKeyOrder, AssignedSplits> assignedSplits)
+line 971
+also demonstrates how to create a relation
+
+How do we fixed point the program against the TempMagicStore + 
+
+MagicPredicate:
+The relation name is NOT the magic symbol, it's the fully qualified name of
+the relation inside the database, it's how the relation is actually located
+based on the predicate.  This is how the join is able to find the appropriate
+relation for a give predicate.  
+See RDFJoinNexus.getTailRelationView(final IPredicate pred)
+line 635
+This in turn is used by RDFJoinNexus.getTailAccessPath(final IPredicate predicate)
+Which is how the join nexus actually reads data
+
+</pre>
+
+
+</body>
+</html>

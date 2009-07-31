@@ -249,7 +249,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                 TRIPLE,
                 BASIC.createTuple(
                     TERM.createString(String.valueOf(U.getTermId())), 
-                    TERM.createString(String.valueOf(V.getTermId())), 
+                    TERM.createString(String.valueOf(sco.getTermId())), 
                     TERM.createString(String.valueOf(X.getTermId()))
                     )
                 );
@@ -724,7 +724,7 @@ type (triple vs. NOT_EQUAL for example).
             org.deri.iris.api.basics.IPredicate predicate = 
                 literal.getAtom().getPredicate();
             
-            IVariableOrConstant[] terms = 
+            IVariableOrConstant<Long>[] terms = 
                 new IVariableOrConstant[predicate.getArity()];
             
             for (int i = 0; i < terms.length; i++) {
@@ -733,9 +733,8 @@ type (triple vs. NOT_EQUAL for example).
                 
             }
             
-            return new MagicPredicate(
-                db.getSPORelation().getNamespace(),
-                predicate.getPredicateSymbol(),
+            return new BryanMagicPredicate(
+                predicate.getPredicateSymbol(), predicate.getPredicateSymbol(),
                 terms
                 );
             
