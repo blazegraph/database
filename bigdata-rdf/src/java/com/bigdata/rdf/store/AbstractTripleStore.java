@@ -2573,7 +2573,7 @@ abstract public class AbstractTripleStore extends
 
         sb.append("dumpStore: #statements=" + nstmts + ", #explicit="
                 + nexplicit + ", #inferred=" + ninferred + ", #axioms="
-                + naxioms + (justifications ? ", #just=" + njust : "")+"\n");
+                + naxioms + (justifications ? ", #just=" + njust : ""));
 
         return sb;
         

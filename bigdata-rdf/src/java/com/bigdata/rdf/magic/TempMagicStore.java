@@ -208,8 +208,8 @@ public class TempMagicStore extends TempTripleStore {
             int i = 0;
             while (itr.hasNext()) {
                 IMagicTuple tuple = itr.next();
-                sb.append(relation.getNamespace()).append("#").append(i++)
-                  .append("\t").append(tuple).append("\n");
+                sb.append("\n").append(relation.getNamespace()).append("#").append(i++)
+                  .append("\t").append(tuple);
             }
         }
         
