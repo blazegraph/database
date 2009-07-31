@@ -1,0 +1,198 @@
+/*
+
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+*/
+/*
+ * Created on Jun 23, 2008
+ */
+
+package com.bigdata.rdf.iris;
+
+import com.bigdata.btree.DefaultTupleSerializer;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleSerializer;
+import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
+
+public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,MagicTuple> {
+
+    /**
+     * The natural order for the index.
+     */
+    private MagicKeyOrder keyOrder;
+    
+    /**
+     * De-serialization constructor.
+     */
+    public MagicTupleSerializer() {
+        
+    }
+
+    /**
+     * Create an {@link ITupleSerializer} for the indicated access path.
+     * 
+     * @param keyOrder
+     *            The access path.
+     */
+    public MagicTupleSerializer(MagicKeyOrder keyOrder) {
+
+        super(new ASCIIKeyBuilderFactory(
+                keyOrder.getArity() * Bytes.SIZEOF_LONG), 
+                getDefaultLeafKeySerializer(),
+                getDefaultValueKeySerializer());
+        
+        if (keyOrder == null)
+            throw new IllegalArgumentException();
+        
+        this.keyOrder = keyOrder;
+        
+    }
+    
+    public MagicTuple deserialize(final ITuple tuple) {
+
+        if (tuple == null)
+            throw new IllegalArgumentException();
+
+        // copy of the key in a reused buffer.
+        final byte[] key = tuple.getKeyBuffer().array(); 
+
+        final int arity = keyOrder.getArity();
+        
+        final int[] keyMap = keyOrder.getKeyMap();
+        
+        /*
+         * Note: GTE since the key is typically a reused buffer which may be
+         * larger than the #of bytes actually holding valid data.
+         */
+        assert key.length >= 8 * arity;
+
+        /*
+         * Decode the key.
+         */
+        
+        final long[] terms = new long[arity];
+        
+        for (int i = 0; i < arity; i++) {
+            
+            terms[keyMap[i]] = KeyBuilder.decodeLong(key, 8*i);
+            
+        }
+        
+        // Note: No type or statement identifier information.
+        final MagicTuple magicTuple = new MagicTuple(terms);
+        
+        return magicTuple;
+        
+    }
+
+    public MagicTuple deserializeKey(final ITuple tuple) {
+        
+        // just de-serialize the whole tuple.
+        return deserialize(tuple);
+        
+    }
+
+    public byte[] serializeKey(final Object obj) {
+
+        if (obj == null)
+            throw new IllegalArgumentException();
+        
+        if (obj instanceof MagicTuple)
+            return serializeKey((MagicTuple) obj);
+
+        //@todo could allow long[].
+        throw new UnsupportedOperationException();
+        
+    }
+
+    public byte[] serializeKey(final MagicTuple magicTuple) {
+        
+        return magicTuple2Key(keyOrder, magicTuple);
+        
+    }
+
+    /**
+     * Forms the magic tuple key.
+     * 
+     * @param keyOrder
+     *            The key order.
+     * @param magicTuple
+     *            The magic tuple.
+     * 
+     * @return The key.
+     */
+    public byte[] magicTuple2Key(final MagicKeyOrder keyOrder, 
+            final IMagicTuple magicTuple) {
+        
+        final int arity = keyOrder.getArity();
+        
+        final int[] keyMap = keyOrder.getKeyMap();
+        
+        final long[] terms = new long[arity];
+        
+        for (int i = 0; i < arity; i++) {
+            
+            terms[i] = magicTuple.getTerm(keyMap[i]); 
+                  
+        }
+        
+        return magicTuple2Key(terms);
+            
+    }
+    
+    /**
+     * Encodes a magic tuple represented as a set of long integers as an 
+     * unsigned byte[] sort key.
+     * <p>
+     * 
+     * @param terms
+     *            RDF value identifiers from the term index.
+     * 
+     * @return The sort key for the magic tuple with those values.
+     */
+    public byte[] magicTuple2Key(final long[] terms) {
+
+        IKeyBuilder keyBuilder = getKeyBuilder().reset();
+        
+        for (long term : terms) {
+            
+            keyBuilder.append(term);
+            
+        }
+                
+        return keyBuilder.getKey();
+
+    }
+
+    public byte[] serializeVal(MagicTuple spo) {
+
+        return null; // new byte[0];
+        
+    }
+
+}
