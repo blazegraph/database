@@ -733,8 +733,8 @@ type (triple vs. NOT_EQUAL for example).
                 
             }
             
-            return new BryanMagicPredicate(
-                predicate.getPredicateSymbol(), predicate.getPredicateSymbol(),
+            return new MagicPredicate(
+                predicate.getPredicateSymbol(),
                 terms
                 );
             

@@ -82,4 +82,10 @@ public class MagicKeyOrder implements IKeyOrder<IMagicTuple>, Serializable {
         
     }
     
+    public boolean canService(int[] bound) {
+        
+        return MagicKeyOrderStrategy.match(bound, keyMap);
+        
+    }
+    
 }
