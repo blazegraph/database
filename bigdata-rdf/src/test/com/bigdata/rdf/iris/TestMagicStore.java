@@ -173,4 +173,72 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
         
     }
     
+    public void testQuadStore() {
+        
+        final Properties properties = getProperties();
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        properties.setProperty(Options.CLOSURE_CLASS, SimpleClosure.class.getName());
+        
+        final AbstractTripleStore store = getStore(properties);
+
+        final Properties tmp = store.getProperties();
+        tmp.setProperty(AbstractTripleStore.Options.LEXICON, "false");
+        tmp.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
+
+        final TempMagicStore tempStore = new TempMagicStore(
+                store.getIndexManager().getTempStore(), tmp, store);
+
+        try {
+
+            final String symbol = "quad";
+            final int arity = 4;
+            tempStore.createRelation(symbol, arity);
+            MagicRelation relation = tempStore.getMagicRelation(symbol);
+            Collection<String> symbols = tempStore.getMagicSymbols();
+            for (String s : symbols) {
+                System.out.println(s);
+            }
+
+            final IMagicTuple[] tuples = {
+                new MagicTuple(96, 44, 108, 31),
+                new MagicTuple(14, 44, 82, 31),
+                new MagicTuple(14, 73, 65, 31),
+                new MagicTuple(50, 10, 65, 49),
+                new MagicTuple(36, 13, 18, 49)
+            };
+                
+            relation.insert(tuples, tuples.length);
+            
+            IVariableOrConstant<Long>[] terms = new IVariableOrConstant[arity];
+            terms[0] = Var.var("a");
+            terms[1] = new Constant<Long>(13l);
+            terms[2] = new Constant<Long>(18l);
+            terms[3] = new Constant<Long>(49l);
+            
+            IPredicate<IMagicTuple> predicate = 
+                new MagicPredicate(relation.getNamespace(), terms);
+            IAccessPath<IMagicTuple> accessPath = 
+                relation.getAccessPath(predicate);
+            String fqn = relation.getFQN(accessPath.getKeyOrder());
+            System.err.println("fqn: " + fqn);
+            IChunkedOrderedIterator<IMagicTuple> itr = accessPath.iterator();
+            while (itr.hasNext()) {
+                IMagicTuple next = itr.next();
+                System.err.println(next);
+            }
+            
+            tempStore.destroy();
+            
+        } catch( Exception ex ) {
+            
+            throw new RuntimeException(ex);
+            
+        } finally {
+            
+            store.closeAndDelete();
+            
+        }
+        
+    }
+    
 }
