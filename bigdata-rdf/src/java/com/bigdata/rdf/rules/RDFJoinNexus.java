@@ -53,6 +53,8 @@ import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.rdf.iris.IMagicTuple;
+import com.bigdata.rdf.iris.MagicTuple;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
@@ -872,13 +874,26 @@ public class RDFJoinNexus implements IJoinNexus {
         if (bindingSet == null)
             throw new IllegalArgumentException();
         
-        final SPO spo = (SPO) e;
+        if (e instanceof SPO) {
         
-        final IPredicate<ISPO> pred = (IPredicate<ISPO>)predicate;
+            copyValues((SPO) e, (IPredicate<ISPO>) predicate, bindingSet);
+            
+        } else {
+
+            copyValues((MagicTuple) e, 
+                    (IPredicate<IMagicTuple>) predicate, bindingSet);
+            
+        }
         
+    }
+    
+    @SuppressWarnings("unchecked")
+    private void copyValues(final SPO spo, final IPredicate<ISPO> predicate,
+            final IBindingSet bindingSet) {
+    
         {
 
-            final IVariableOrConstant<Long> t = pred.get(0);
+            final IVariableOrConstant<Long> t = predicate.get(0);
             
             if(t.isVar()) {
 
@@ -894,7 +909,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         {
 
-            final IVariableOrConstant<Long> t = pred.get(1);
+            final IVariableOrConstant<Long> t = predicate.get(1);
             
             if(t.isVar()) {
 
@@ -910,7 +925,7 @@ public class RDFJoinNexus implements IJoinNexus {
 
         {
 
-            final IVariableOrConstant<Long> t = pred.get(2);
+            final IVariableOrConstant<Long> t = predicate.get(2);
             
             if(t.isVar()) {
 
@@ -924,11 +939,11 @@ public class RDFJoinNexus implements IJoinNexus {
 
         }
         
-        if (pred.arity() == 4) {
+        if (predicate.arity() == 4) {
 
             // context position (the statement identifier).
 
-            final IVariableOrConstant<Long> t = pred.get(3);
+            final IVariableOrConstant<Long> t = predicate.get(3);
             
             if (t != null && t.isVar() && spo.hasStatementIdentifier()) {
 
@@ -936,6 +951,28 @@ public class RDFJoinNexus implements IJoinNexus {
 
                 final Constant newval = new Constant<Long>(spo
                         .getStatementIdentifier());
+
+                bindingSet.set(var, newval);
+                
+            }
+
+        }
+        
+    }
+
+    @SuppressWarnings("unchecked")
+    private void copyValues(final MagicTuple tuple, 
+            final IPredicate<IMagicTuple> pred, final IBindingSet bindingSet) {
+    
+        for (int i = 0; i < pred.arity(); i++) {
+            
+            final IVariableOrConstant<Long> t = pred.get(i);
+            
+            if(t.isVar()) {
+
+                final IVariable<Long> var = (IVariable<Long>)t;
+                
+                final Constant newval = new Constant<Long>(tuple.getTerm(i));
 
                 bindingSet.set(var, newval);
                 

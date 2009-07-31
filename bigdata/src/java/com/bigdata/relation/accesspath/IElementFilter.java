@@ -48,4 +48,12 @@ public interface IElementFilter<E> extends Serializable {
      */
     public boolean accept(E e);
     
+    /**
+     * Can this filter be used on the specified class.
+     * 
+     * @param c
+     * @return
+     */
+    public boolean canAccept(Class c);
+    
 }

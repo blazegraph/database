@@ -2472,7 +2472,7 @@ abstract public class AbstractTripleStore extends
      * @param keyOrder
      *            The access path to use.
      */
-    final public StringBuilder dumpStore(
+    public StringBuilder dumpStore(
             final AbstractTripleStore resolveTerms, final boolean explicit,
             final boolean inferred, final boolean axioms,
             final boolean justifications, final IKeyOrder<ISPO> keyOrder) {

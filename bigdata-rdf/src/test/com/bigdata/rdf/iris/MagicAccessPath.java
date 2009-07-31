@@ -112,6 +112,8 @@ public class MagicAccessPath extends AbstractAccessPath<IMagicTuple> {
         
         int[] keyMap = keyOrder.getKeyMap();
         
+        boolean noneBound = true;
+        
         for (int i = 0; i < arity; i++) {
             
             IVariableOrConstant<Long> term = predicate.get(keyMap[i]);
@@ -123,6 +125,8 @@ public class MagicAccessPath extends AbstractAccessPath<IMagicTuple> {
             } else {
                 
                 fromTerms[i] = toTerms[i] = term.get();
+                
+                noneBound = false;
                 
             }
             
@@ -144,9 +148,11 @@ public class MagicAccessPath extends AbstractAccessPath<IMagicTuple> {
             
         }
 
-        final byte[] fromKey = tupleSer.magicTuple2Key(fromTerms);
+        final byte[] fromKey = 
+            noneBound ? null : tupleSer.magicTuple2Key(fromTerms);
 
-        final byte[] toKey = tupleSer.magicTuple2Key(toTerms);
+        final byte[] toKey = 
+            noneBound ? null : tupleSer.magicTuple2Key(toTerms);
         
         setFromKey(fromKey);
 

@@ -27,13 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.iris;
 
-import static org.deri.iris.factory.Factory.BASIC;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+
 import org.deri.iris.api.IProgramOptimisation.Result;
 import org.deri.iris.api.basics.IAtom;
 import org.deri.iris.api.basics.ILiteral;
@@ -46,17 +46,17 @@ import org.deri.iris.api.factory.ITermFactory;
 import org.deri.iris.api.terms.ITerm;
 import org.deri.iris.basics.BasicFactory;
 import org.deri.iris.builtins.BuiltinsFactory;
-import org.deri.iris.builtins.EqualBuiltin;
-import org.deri.iris.builtins.NotEqualBuiltin;
 import org.deri.iris.optimisations.magicsets.MagicSets;
 import org.deri.iris.terms.TermFactory;
 import org.openrdf.model.vocabulary.RDFS;
+
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.rules.AbstractInferenceEngineTestCase;
 import com.bigdata.rdf.rules.BaseClosure;
-import com.bigdata.rdf.rules.FullClosure;
+import com.bigdata.rdf.rules.DoNotAddFilter;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.rules.RuleRdfs11;
@@ -64,6 +64,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.EQ;
 import com.bigdata.relation.rule.EQConstant;
@@ -72,11 +73,11 @@ import com.bigdata.relation.rule.IN;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IStep;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.NEConstant;
 import com.bigdata.relation.rule.OR;
+import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
@@ -182,7 +183,10 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             final BigdataValueFactory f = store.getValueFactory();
             final BigdataURI U = f.createURI("http://www.bigdata.com/U");
             final BigdataURI V = f.createURI("http://www.bigdata.com/V");
+            final BigdataURI W = f.createURI("http://www.bigdata.com/W");
             final BigdataURI X = f.createURI("http://www.bigdata.com/X");
+            final BigdataURI Y = f.createURI("http://www.bigdata.com/Y");
+            final BigdataURI Z = f.createURI("http://www.bigdata.com/Z");
             final BigdataURI sco = f.asValue(RDFS.SUBCLASSOF);
             
             // set the stage
@@ -196,7 +200,11 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             store.addStatement(U, sco, V);
             
-            store.addStatement(V, sco, X);
+            store.addStatement(V, sco, W);
+            
+            store.addStatement(X, sco, Y);
+            
+            store.addStatement(Y, sco, Z);
             
             if (log.isInfoEnabled())
                 log.info("\n\nstore:\n"
@@ -250,7 +258,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                 BASIC.createTuple(
                     TERM.createString(String.valueOf(U.getTermId())), 
                     TERM.createString(String.valueOf(sco.getTermId())), 
-                    TERM.createString(String.valueOf(X.getTermId()))
+                    TERM.createString(String.valueOf(W.getTermId()))
                     )
                 );
             
@@ -285,11 +293,18 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                 
             }
             
+            final Properties tmp = store.getProperties();
+            tmp.setProperty(AbstractTripleStore.Options.LEXICON, "false");
+            // tmp.setProperty(AbstractTripleStore.Options.ONE_ACCESS_PATH, "true");
+
+            final TempMagicStore tempStore = new TempMagicStore(
+                    store.getIndexManager().getTempStore(), tmp, store);
+            
             // now we take the optimized set of rules and convert it back to a
             // bigdata program
             
-            MappedProgram magicProgram = 
-                convertToBigdataProgram(store, result.rules);
+            Program magicProgram = 
+                convertToBigdataProgram(store, tempStore, result.rules);
                 // convertToBigdataProgram(store, rules);
             
             log.info("bigdata program after magic sets:");
@@ -307,12 +322,15 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                 
             }
 
-            if (true) return;
-            
             // then we somehow run the magic program and see if the fact in
             // question exists in the resulting closure, if it does, then the
             // statement is supported by other facts in the database
             
+            computeClosure(store, tempStore, magicProgram);
+            
+            log.info("\n"+store.dumpStore(store, true, true, true).toString());
+            log.info("\n"+tempStore.dumpStore(store, true, true, true).toString());
+/*            
             // run the query as a native rule.
             final IEvaluationPlanFactory planFactory =
                     DefaultEvaluationPlanFactory2.INSTANCE;
@@ -336,7 +354,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                 System.err.println(solution.get().toString(store));
 
             }
-            
+*/            
         } catch( Exception ex ) {
             
             throw new RuntimeException(ex);
@@ -348,6 +366,59 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
         }
         
     }
+
+    public synchronized ClosureStats computeClosure(
+            AbstractTripleStore database, AbstractTripleStore focusStore, 
+            Program program) {
+
+        final boolean justify = false;
+        
+        final DoNotAddFilter doNotAddFilter = new DoNotAddFilter(
+                database.getVocabulary(), database.getAxioms(), 
+                true /*forwardChainRdfTypeRdfsResource*/);
+        
+        try {
+
+            final long begin = System.currentTimeMillis();
+
+            /*
+             * FIXME remove IJoinNexus.RULE once we we can generate the
+             * justifications from just the bindings and no longer need the rule
+             * to generate the justifications (esp. for scale-out).
+             */
+            final int solutionFlags = IJoinNexus.ELEMENT//
+                    | (justify ? IJoinNexus.RULE | IJoinNexus.BINDINGS : 0)//
+//                  | IJoinNexus.RULE  // iff debugging.
+                  ;
+          
+            final RuleContextEnum ruleContext = focusStore == null
+                ? RuleContextEnum.DatabaseAtOnceClosure
+                : RuleContextEnum.TruthMaintenance
+                ;
+            
+            final IJoinNexusFactory joinNexusFactory = database
+                    .newJoinNexusFactory(ruleContext, ActionEnum.Insert,
+                            solutionFlags, doNotAddFilter, justify,
+                            false/* backchain */,
+                            DefaultEvaluationPlanFactory2.INSTANCE);
+
+            final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
+                    .getIndexManager());
+
+            final long mutationCount = joinNexus.runMutation(program);
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            return new ClosureStats(mutationCount, elapsed);
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+            
+        }
+        
+    }
+    
     
     /**
      * Turn a bigdata IStep (either a program or a rule) into a set of IRIS
@@ -634,8 +705,8 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
      * @return
      *                  the bigdata program
      */
-    private MappedProgram convertToBigdataProgram(
-        AbstractTripleStore db, Collection<IRule> rules) {
+    private Program convertToBigdataProgram(AbstractTripleStore db, 
+            TempMagicStore focus, Collection<IRule> rules) {
 
 /*
 All IRIS rules seem to have one literal in the head and zero or more body 
@@ -644,8 +715,13 @@ automatically fire (create the head).  I'll need to check the literal in
 the body and create a bigdata predicate or constraint based on the literal
 type (triple vs. NOT_EQUAL for example).
  */
-        MappedProgram program = new MappedProgram("magicProgram",
-                null/* focusStore */, true/* parallel */, true/* closure */
+//        MappedProgram program = new MappedProgram("magicProgram",
+//                null/* focusStore */, true/* parallel */, true/* closure */
+//                );
+        
+        MagicProgram program = new MagicProgram("magicProgram",
+                focus.getSPORelation().getNamespace(), 
+                true/* parallel */, true/* closure */
                 );
         
         int i = 0;
@@ -654,7 +730,8 @@ type (triple vs. NOT_EQUAL for example).
             
             assert(rule.getHead().size() == 1);
             
-            IPredicate head = convertToBigdataPredicate(db, rule.getHead().get(0));
+            IPredicate head = 
+                convertToBigdataPredicate(db, focus, rule.getHead().get(0));
             
             Collection<IPredicate> tails = new LinkedList<IPredicate>();
             
@@ -672,18 +749,53 @@ type (triple vs. NOT_EQUAL for example).
                     
                 } else {
 
-                    tails.add(convertToBigdataPredicate(db, literal));
+                    tails.add(convertToBigdataPredicate(db, focus, literal));
                     
                 }
 
             }
             
-            program.addStep(new Rule(
-                "magic"+i++,
-                head,
-                tails.toArray(new IPredicate[tails.size()]),
-                constraints.toArray(new IConstraint[constraints.size()])
-                ));
+            // the datalog program has facts that need to be asserted
+            if (tails.size() == 0) {
+            
+                if (head instanceof MagicPredicate) {
+                    
+                    MagicPredicate p = (MagicPredicate) head;
+                    
+                    if (p.isFullyBound() == false) {
+                        
+                        throw new RuntimeException("????");
+                        
+                    }
+                    
+                    MagicRelation relation = (MagicRelation)
+                        focus.getIndexManager().getResourceLocator().locate(
+                                p.getOnlyRelationName(), focus.getTimestamp());
+                    
+                    IMagicTuple tuple = p.toMagicTuple();
+                    
+                    log.info("inserting magic tuple: " + tuple);
+                    
+                    long numInserted = relation.insert(new IMagicTuple[] { tuple }, 1);
+                    
+                    log.info("inserted: " + numInserted);
+                    
+                } else {
+                    
+                    throw new RuntimeException("????");
+                    
+                }
+                
+            } else {
+            
+                program.addStep(new Rule(
+                    "magic"+i++,
+                    head,
+                    tails.toArray(new IPredicate[tails.size()]),
+                    constraints.toArray(new IConstraint[constraints.size()])
+                    ));
+
+            }
             
         }
         
@@ -700,7 +812,7 @@ type (triple vs. NOT_EQUAL for example).
      *              the bigdata predicate
      */
     private IPredicate convertToBigdataPredicate(
-        AbstractTripleStore db, ILiteral literal) {
+        AbstractTripleStore db, TempMagicStore focus, ILiteral literal) {
 
         if (TRIPLE.equals(literal.getAtom().getPredicate())) {
             
@@ -713,7 +825,7 @@ type (triple vs. NOT_EQUAL for example).
             IVariableOrConstant<Long> o = convertToBigdataTerm(tuple.get(2));
             
             return new SPOPredicate(
-                db.getSPORelation().getNamespace(),
+                db.getSPORelation().getNamespace(), // will get set correctly later by TMUtility
                 s, p, o
                 );
 
@@ -733,12 +845,17 @@ type (triple vs. NOT_EQUAL for example).
                 
             }
             
+            // createRelation tests for existence first
+            MagicRelation relation = focus.createRelation(
+                    predicate.getPredicateSymbol(), predicate.getArity());
+            
             return new MagicPredicate(
-                predicate.getPredicateSymbol(),
+                relation.getNamespace(),
                 terms
                 );
             
         }
+        
     }
     
     /**

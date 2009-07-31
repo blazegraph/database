@@ -263,4 +263,12 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      */
     public int hashCode();
     
+    /**
+     * Make a copy.
+     * 
+     * @return the copy
+     */
+    public IPredicate<E> copy();
+    
+    
 }

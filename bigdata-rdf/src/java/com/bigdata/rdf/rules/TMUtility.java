@@ -70,7 +70,7 @@ public class TMUtility {
      */
     public static final transient TMUtility DEBUG = new TMUtility(false/*parallel*/);
     
-    private final boolean parallel;
+    protected final boolean parallel;
     
     /**
      * @param parallel

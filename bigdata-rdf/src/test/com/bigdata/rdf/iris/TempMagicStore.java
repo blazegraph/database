@@ -14,10 +14,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationSchema;
+import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 
 public class TempMagicStore extends TempTripleStore {
 
@@ -184,6 +187,33 @@ public class TempMagicStore extends TempTripleStore {
             unlock(resourceLock);
             
         }
+        
+    }
+    
+    @Override
+    public StringBuilder dumpStore(
+            final AbstractTripleStore resolveTerms, final boolean explicit,
+            final boolean inferred, final boolean axioms,
+            final boolean justifications, final IKeyOrder<ISPO> keyOrder) {
+        
+        StringBuilder sb = super.dumpStore(
+            resolveTerms, explicit, inferred, axioms, justifications, keyOrder);
+        
+        Collection<String> symbols = getMagicSymbols();
+        for (String symbol : symbols) {
+            MagicRelation relation = getMagicRelation(symbol);
+            MagicAccessPath accessPath = 
+                relation.getAccessPath(relation.getPrimaryKeyOrder());
+            IChunkedOrderedIterator<IMagicTuple> itr = accessPath.iterator();
+            int i = 0;
+            while (itr.hasNext()) {
+                IMagicTuple tuple = itr.next();
+                sb.append(relation.getNamespace()).append("#").append(i++)
+                  .append("\t").append(tuple).append("\n");
+            }
+        }
+        
+        return sb;
         
     }
     

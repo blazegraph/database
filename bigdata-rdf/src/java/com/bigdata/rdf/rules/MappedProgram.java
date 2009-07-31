@@ -74,6 +74,17 @@ public class MappedProgram extends Program {
         this.focusStore = focusStore;
         
     }
+    
+    /**
+     * Allow subclasses to use a different TM Utility.
+     * 
+     * @return TMUtility instance
+     */
+    protected TMUtility getTMUtility() {
+        
+        return TMUtility.INSTANCE;
+        
+    }
 
     /**
      * Extended to add the N steps that map the given <i>step</i> across the
@@ -90,7 +101,7 @@ public class MappedProgram extends Program {
 
         } else {
 
-            final Program subProgram = TMUtility.INSTANCE
+            final Program subProgram = getTMUtility()
                     .mapForTruthMaintenance(step, focusStore);
 
             /*

@@ -27,6 +27,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+
+import org.apache.log4j.Logger;
+
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
@@ -43,6 +46,14 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  * @version $Id$
  */
 public class MagicPredicate implements IPredicate<IMagicTuple> {
+
+    protected static final Logger log = Logger.getLogger(MagicPredicate.class);
+    
+    public MagicPredicate copy() {
+        
+        return new MagicPredicate(this, relationName);
+        
+    }
 
     /**
      * 
@@ -303,28 +314,22 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
     
     public MagicPredicate asBound(IBindingSet bindingSet) {
         
-        final Collection<IVariableOrConstant<Long>> terms =
-            new LinkedList<IVariableOrConstant<Long>>();
-        
+        final IVariableOrConstant<Long>[] newTerms =
+            new IVariableOrConstant[this.terms.size()];
+
+        int i = 0;
         for (IVariableOrConstant<Long> term : this.terms) {
-            
             IVariableOrConstant<Long> newTerm;
-            
             if (term.isVar() && bindingSet.isBound((IVariable<Long>) term)) {
-                
                 newTerm = bindingSet.get((IVariable<Long>) term);
-                
             } else {
-                
                 newTerm = term;
-                
             }
-            
+            newTerms[i++] = newTerm;
         }
         
         return new MagicPredicate(relationName, partitionId, 
-                constraint, expander, 
-                terms.toArray(new IVariableOrConstant[terms.size()]));
+                constraint, expander, newTerms);
         
     }
 
@@ -338,6 +343,22 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
 
         return new MagicPredicate(this, partitionId);
 
+    }
+    
+    public IMagicTuple toMagicTuple() {
+        
+        final long[] terms = new long[this.terms.size()];
+        int i = 0;
+        for (IVariableOrConstant<Long> term : this.terms) {
+            if (term.isVar()) {
+                throw new RuntimeException("predicate not fully bound");
+            } else {
+                terms[i++] = term.get();
+            }
+        }
+        
+        return new MagicTuple(terms);
+        
     }
 
     public String toString() {
