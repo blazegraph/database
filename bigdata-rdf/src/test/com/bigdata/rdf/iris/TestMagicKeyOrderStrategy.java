@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.iris;
 
+import com.bigdata.rdf.iris.MagicKeyOrderStrategy.CharFormatter;
+
 import junit.framework.TestCase;
 
 public class TestMagicKeyOrderStrategy extends TestCase {
@@ -51,18 +53,18 @@ public class TestMagicKeyOrderStrategy extends TestCase {
             System.out.println(i + ": " + MagicKeyOrderStrategy.calculateNumIndices(i));
         }
         
-        for (int i = 1; i <= 10; i++) {
-            Object[][] indices = MagicKeyOrderStrategy.calculateKeyOrderArrays(i);
-            System.out.println(i + ": " + MagicKeyOrderStrategy.format(indices) + ", " + "num indices = " + indices.length);
+        for (int i = 1; i <= 15; i++) {
+            int[][] indices = MagicKeyOrderStrategy.calculateKeyOrderArrays(i);
+            System.out.println(i + ": " + MagicKeyOrderStrategy.format(indices, CharFormatter.INSTANCE) + ", " + "num indices = " + indices.length);
             boolean correct = checkIndices(indices, i);
             assertTrue(correct);
         }
         
     }
     
-    public static boolean checkIndices(Object[][] indices, int arity) {
+    public static boolean checkIndices(int[][] indices, int arity) {
         for (int i = 1; i <= arity; i++) {
-            Object[][] allCombos = MagicKeyOrderStrategy.allCombinations(arity, i);
+            int[][] allCombos = MagicKeyOrderStrategy.allCombinations(arity, i);
             for (int j = 0; j < allCombos.length; j++) {
                 boolean match = false;
                 for (int k = 0; k < indices.length; k++) {

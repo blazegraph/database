@@ -25,19 +25,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.iris;
 
 import java.math.BigInteger;
+import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
 public class MagicKeyOrderStrategy {
     
+    protected static final int NULL = -1;
+    
     protected static final Logger log = 
         Logger.getLogger(MagicKeyOrderStrategy.class);
     
-    public static String format(Object[][] indices) {
+    public static String format(int[][] indices) {
+        return format(indices, null);
+    }
+     
+    public static String format(int[][] indices, Formatter formatter) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\n");
         for (int i = 0; i < indices.length; i++) {
-            sb.append(format(indices[i]));
+            sb.append(format(indices[i], formatter));
             sb.append(",\n");
         }
         if (sb.length() > 1) {
@@ -47,14 +54,39 @@ public class MagicKeyOrderStrategy {
         return sb.toString();
     }
     
-    public static String format(Object[] index) {
+    public static String format(int[] index) {
+        return format(index, null);
+    }
+    
+    public static String format(int[] index, Formatter formatter) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < index.length; i++) {
-            sb.append(index[i] != null ? index[i] : '.');
+            sb.append(formatter != null ? formatter.format(index[i]) : index[i]);
         }
         return sb.toString();
     }
+    
+    public static interface Formatter {
+        String format(int i);
+    }
+    
+    public static class CharFormatter implements Formatter {
 
+        public static final CharFormatter INSTANCE = new CharFormatter();
+        
+        public static final char[] alphabet = new char[] {
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 
+            'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' 
+        };
+        
+        public String format(int i) {
+            if (i < 0) return ".";
+            if (i > alphabet.length) return "?";
+            return String.valueOf(alphabet[i]);
+        }
+        
+    }
+    
     public static int calculateNumIndices(int arity) {
         
         final int half = arity / 2;
@@ -81,60 +113,55 @@ public class MagicKeyOrderStrategy {
         
     }
     
-    public static Object[][] allCombinations(int x, int y) {
-        Object[][] combos = new Object[countCombinations(x, y)][];
-        for (int i = 0; i < combos.length; i++) {
-            combos[i] = new Object[y];
-        }
-        
+    public static int[][] allCombinations(int x, int y) {
+
+        int[][] combos = new int[countCombinations(x, y)][];
         CombinationGenerator gen = new CombinationGenerator(x, y);
         for (int i = 0; i < combos.length; i++) {
-            int[] next = gen.getNext();
-            for (int j = 0; j < next.length; j++) {
-                combos[i][j] = val(next[j]);
-            }
+            combos[i] = Arrays.copyOf(gen.getNext(), y);
         }
-        
         return combos;
+
     }
     
     public static MagicKeyOrder[] calculateKeyOrders(int arity) {
         
-        Object[][] arrays = calculateKeyOrderArrays(arity);
+        int[][] arrays = calculateKeyOrderArrays(arity);
         MagicKeyOrder[] keyOrders = new MagicKeyOrder[arrays.length];
         for (int i = 0; i < arrays.length; i++) {
             StringBuilder indexName = new StringBuilder();
-            int[] keyMap = new int[arity];
             for (int j = 0; j < arity; j++) {
                 indexName.append(arrays[i][j]);
-                keyMap[j] = (Integer) arrays[i][j];
             }
-            keyOrders[i] = new MagicKeyOrder(indexName.toString(), keyMap);
+            keyOrders[i] = new MagicKeyOrder(indexName.toString(), arrays[i]);
         }
         
         return keyOrders;
         
     }
     
-    public static Object[][] calculateKeyOrderArrays(int arity) {
+    public static int[][] calculateKeyOrderArrays(int arity) {
         
-        final Object[][] indices = new Object[calculateNumIndices(arity)][]; 
+        final int[][] indices = new int[calculateNumIndices(arity)][]; 
                     
         for (int i = 0; i < indices.length; i++) {
-            indices[i] = new Object[arity];
+            indices[i] = new int[arity];
+            for (int j = 0; j < arity; j++) {
+                indices[i][j] = NULL;
+            }
         }
 
         //System.out.println("generating initial scramble...");
         for (int i = 0; i < arity; i++) {
             for (int j = 0; j < arity; j++) {
-                indices[i][j] = val((i+j)%arity);
+                indices[i][j] = (i+j)%arity;
             }
         }
         //System.out.println("done.");
         
         for (int i = 2; i < arity-1; i++) {
             //System.out.println("calculating all combinations of length " + i + "...");
-            Object[][] combos = allCombinations(arity, i);
+            int[][] combos = allCombinations(arity, i);
            // System.out.println("done.");
             for (int j = 0; j < combos.length; j++) {
                 //System.out.println("checking match for combo # " + j + "...");
@@ -157,12 +184,11 @@ public class MagicKeyOrderStrategy {
         for (int i = 0; i < indices.length; i++) {
             //System.out.println("filling in the gaps for index # " + i + "...");
             for (int j = 0; j < arity; j++) {
-                Object o = val(j);
                 for (int k = 0; k < arity; k++) {
-                    if (indices[i][k] == null) {
-                        indices[i][k] = o;
+                    if (indices[i][k] == NULL) {
+                        indices[i][k] = j;
                         break;
-                    } else if (indices[i][k].equals(o)) {
+                    } else if (indices[i][k] == j) {
                         break;
                     }
                 }
@@ -174,7 +200,7 @@ public class MagicKeyOrderStrategy {
         
     }
     
-    public static boolean match(Object[] small, Object[] big) {
+    public static boolean match(int[] small, int[] big) {
         if (small.length > big.length) {
             throw new IllegalArgumentException();
         }
@@ -182,7 +208,7 @@ public class MagicKeyOrderStrategy {
         for (int i = 0; i < small.length; i++) {
             boolean matchOne = false;
             for (int j = 0; j < small.length; j++) {
-                matchOne |= small[i].equals(big[j]);
+                matchOne |= small[i] == big[j];
                 if (matchOne) {
                     break;
                 }
@@ -192,18 +218,17 @@ public class MagicKeyOrderStrategy {
         return matchAll;
     }
     
-    public static boolean makeMatch(Object[] small, Object[] big) {
+    public static boolean makeMatch(int[] small, int[] big) {
         if (small.length > big.length) {
             throw new IllegalArgumentException();
         }
         for (int i = 0; i < big.length; i++) {
-            Object o = big[i];
-            if (o == null) {
+            if (big[i] == NULL) {
                 continue;
             }
             boolean match = false;
             for (int j = 0; j < small.length; j++) {
-                match |= o.equals(small[j]);
+                match |= big[i] == small[j];
             }
             if (match == false) {
                 return false;
@@ -212,11 +237,11 @@ public class MagicKeyOrderStrategy {
         for (int i = 0; i < small.length; i++) {
             boolean match = false;
             for (int j = 0; j < big.length; j++) {
-                match |= small[i].equals(big[j]);
+                match |= small[i] == big[j];
             }
             if (match == false) {
                 for (int j = 0; j < big.length; j++) {
-                    if (big[j] == null) {
+                    if (big[j] == NULL) {
                         big[j] = small[i];
                         break;
                     }
@@ -224,15 +249,6 @@ public class MagicKeyOrderStrategy {
             }
         }
         return true;
-    }
-    
-    public static final char[] alphabet = new char[] {
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 
-        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' 
-    };
-    
-    public static Object val(int index) {
-        return index;
     }
     
     public static class CombinationGenerator {

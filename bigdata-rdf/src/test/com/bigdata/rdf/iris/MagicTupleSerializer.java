@@ -28,6 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.iris;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
@@ -195,4 +199,15 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
         
     }
 
+    public void readExternal(ObjectInput in) throws IOException,
+            ClassNotFoundException {
+        super.readExternal(in);
+        keyOrder = (MagicKeyOrder)in.readObject();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(keyOrder);
+    }
+    
 }

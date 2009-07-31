@@ -142,7 +142,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
                 System.out.println(s);
             }
             relation.insert(new IMagicTuple[] { tuple }, 1);
-            /*
+            
             IVariableOrConstant<Long>[] terms = new IVariableOrConstant[arity];
             terms[0] = Var.var("a");
             terms[1] = new Constant<Long>(44l);
@@ -158,7 +158,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
                 IMagicTuple next = itr.next();
                 System.err.println(next);
             }
-            */
+            
             tempStore.destroy();
             
         } catch( Exception ex ) {
