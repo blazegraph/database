@@ -165,8 +165,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
      * @fixme what do we do about the IConstraints on bigdata rules?  do they
      * get promoted to full-fledged IRIS rules in the IRIS program?
      */
-    public void testRetractionWithIRIS() {
-        
+    public void testMagicSets() {
         
         Properties properties = getProperties();
         
@@ -207,7 +206,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             store.addStatement(Y, sco, Z);
             
             if (log.isInfoEnabled())
-                log.info("\n\nstore:\n"
+                log.info("database contents:\n"
                         + store.dumpStore(store,
                                 true, true, true, true));
             
@@ -271,7 +270,8 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             if (log.isInfoEnabled()) {
                 
-                log.info("query: " + query);
+                log.info("query:");
+                log.info(query);
                 
             }
             
@@ -292,6 +292,8 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
                 }
                 
             }
+      
+            log.info("creating a TempMagicStore focus store...");
             
             final Properties tmp = store.getProperties();
             tmp.setProperty(AbstractTripleStore.Options.LEXICON, "false");
@@ -302,6 +304,8 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
             // now we take the optimized set of rules and convert it back to a
             // bigdata program
+            
+            log.info("converting the datalog program back to a bigdata program...");
             
             Program magicProgram = 
                 convertToBigdataProgram(store, tempStore, result.rules);
@@ -326,10 +330,13 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             // question exists in the resulting closure, if it does, then the
             // statement is supported by other facts in the database
             
+            log.info("executing bigdata program...");
+            
             computeClosure(store, tempStore, magicProgram);
             
-            log.info("\n"+store.dumpStore(store, true, true, true).toString());
-            log.info("\n"+tempStore.dumpStore(store, true, true, true).toString());
+            log.info("done.");
+            log.info("database contents\n"+store.dumpStore(store, true, true, true).toString());
+            log.info("focus store contents\n"+tempStore.dumpStore(store, true, true, true).toString());
 /*            
             // run the query as a native rule.
             final IEvaluationPlanFactory planFactory =
@@ -846,8 +853,16 @@ type (triple vs. NOT_EQUAL for example).
             }
             
             // createRelation tests for existence first
-            MagicRelation relation = focus.createRelation(
+            MagicRelation relation = focus.getMagicRelation(predicate.getPredicateSymbol());
+            
+            if (relation == null) {
+                
+                log.info("creating new magic relation: " + predicate.getPredicateSymbol());
+            
+                relation = focus.createRelation(
                     predicate.getPredicateSymbol(), predicate.getArity());
+                
+            }
             
             return new MagicPredicate(
                 relation.getNamespace(),
