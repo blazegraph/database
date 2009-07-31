@@ -145,7 +145,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             
             IVariableOrConstant<Long>[] terms = new IVariableOrConstant[arity];
             terms[0] = Var.var("a");
-            terms[1] = new Constant<Long>(44l);
+            terms[1] = Var.var("b");
             terms[2] = Var.var("c");
             IPredicate<IMagicTuple> predicate = 
                 new MagicPredicate(relation.getNamespace(), terms);
@@ -211,9 +211,9 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             
             IVariableOrConstant<Long>[] terms = new IVariableOrConstant[arity];
             terms[0] = Var.var("a");
-            terms[1] = new Constant<Long>(13l);
-            terms[2] = new Constant<Long>(18l);
-            terms[3] = new Constant<Long>(49l);
+            terms[1] = Var.var("b");
+            terms[2] = Var.var("c");
+            terms[3] = Var.var("d");
             
             IPredicate<IMagicTuple> predicate = 
                 new MagicPredicate(relation.getNamespace(), terms);

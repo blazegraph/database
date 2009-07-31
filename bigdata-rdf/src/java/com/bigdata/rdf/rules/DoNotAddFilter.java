@@ -32,6 +32,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -49,7 +50,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DoNotAddFilter implements IElementFilter<ISPO> {
+public class DoNotAddFilter extends SPOFilter {
 
     /**
      * 
@@ -91,7 +92,7 @@ public class DoNotAddFilter implements IElementFilter<ISPO> {
         this.forwardChainRdfTypeRdfsResource = forwardChainRdfTypeRdfsResource;
         
     }
-
+    
     public boolean accept(final ISPO spo) {
         
         if(AbstractTripleStore.isLiteral(spo.s())) {

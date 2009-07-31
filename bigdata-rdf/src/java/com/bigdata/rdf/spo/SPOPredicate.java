@@ -42,6 +42,12 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class SPOPredicate implements IPredicate<ISPO> {
 
+    public SPOPredicate copy() {
+        
+        return new SPOPredicate(this, relationName);
+        
+    }
+    
     /**
      * 
      */

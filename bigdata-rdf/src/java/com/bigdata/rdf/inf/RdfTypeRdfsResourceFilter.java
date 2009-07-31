@@ -10,6 +10,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.relation.accesspath.IElementFilter;
 
@@ -19,7 +20,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RdfTypeRdfsResourceFilter implements IElementFilter<ISPO>, Externalizable {
+public class RdfTypeRdfsResourceFilter extends SPOFilter implements Externalizable {
 
     /**
      * 

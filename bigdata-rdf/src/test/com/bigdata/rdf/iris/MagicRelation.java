@@ -38,6 +38,7 @@ import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -296,6 +297,8 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         if (predicate == null)
             throw new IllegalArgumentException();
         
+        checkPredicate(predicate);
+        
         final MagicPredicate pred = (MagicPredicate) predicate;
 
         // skip the cache for now
@@ -387,7 +390,51 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         return accessPath;
 
     }
+    
+    public MagicKeyOrder getPrimaryKeyOrder() {
+        
+        return getKeyOrders()[0];
+        
+    }
+    
+    public MagicAccessPath getAccessPath(
+            final IKeyOrder<IMagicTuple> keyOrder) {
+        
+        final IVariableOrConstant<Long>[] terms = 
+            new IVariableOrConstant[arity];
+        
+        for (int i = 0; i < terms.length; i++) {
+            
+            terms[i] = Var.var("v"+i);
+            
+        }
+        
+        MagicPredicate predicate = new MagicPredicate(getNamespace(), terms);
+        
+        if (INFO) {
+            
+            log.info(predicate);
+            
+        }
+        
+        return getAccessPath(keyOrder, predicate);
+        
+    }
 
+    private void checkPredicate(final IPredicate<IMagicTuple> predicate) {
+        
+        if (predicate.arity() != this.arity) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("bad predicate:\n");
+            sb.append("relation: " + getNamespace()).append("\n");
+            sb.append("arity: " + getArity()).append("\n");
+            sb.append("predicate: " + predicate).append("\n");
+            sb.append("predicate arity: " + predicate.arity());
+            throw new IllegalArgumentException(sb.toString());
+        }
+        
+    }
+    
     /**
      * Return the {@link MagicKeyOrder} for the given predicate.
      * 
@@ -398,9 +445,7 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
      */
     public MagicKeyOrder getKeyOrder(final IPredicate<IMagicTuple> predicate) {
 
-        if (predicate.arity() != this.arity) {
-            throw new IllegalArgumentException("bad predicate");
-        }
+        checkPredicate(predicate);
         
         int numBound = 0;
         int[] bound = new int[predicate.arity()];
@@ -463,6 +508,8 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
         if (predicate == null)
             throw new IllegalArgumentException();
+        
+        checkPredicate(predicate);
         
         final IIndex ndx = getIndex(keyOrder);
 

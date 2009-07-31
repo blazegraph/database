@@ -32,6 +32,11 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
         final E e = solution.get();
         
         return delegate.accept( e );
+    }
+    
+    public boolean canAccept(Class c) {
+
+        return delegate.canAccept( c );
         
     }
  

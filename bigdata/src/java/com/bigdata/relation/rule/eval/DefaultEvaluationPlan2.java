@@ -504,17 +504,12 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      */
     protected Set<String> getVars(int tail) {
         final Set<String> vars = new HashSet<String>();
-        IVariableOrConstant s = rule.getTail(tail).get(0);
-        if (s.isVar()) {
-            vars.add(s.getName());
-        }
-        IVariableOrConstant p = rule.getTail(tail).get(1);
-        if (p.isVar()) {
-            vars.add(p.getName());
-        }
-        IVariableOrConstant o = rule.getTail(tail).get(2);
-        if (o.isVar()) {
-            vars.add(o.getName());
+        IPredicate pred = rule.getTail(tail);
+        for (int i = 0; i < pred.arity(); i++) {
+            IVariableOrConstant term = pred.get(i);
+            if (term.isVar()) {
+                vars.add(term.getName());
+            }
         }
         return vars;
     }

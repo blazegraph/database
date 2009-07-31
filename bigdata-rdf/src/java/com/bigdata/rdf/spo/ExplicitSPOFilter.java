@@ -39,7 +39,7 @@ import com.bigdata.relation.accesspath.IElementFilter;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class ExplicitSPOFilter implements IElementFilter<ISPO> {
+final public class ExplicitSPOFilter extends SPOFilter {
 
     /**
      * 
