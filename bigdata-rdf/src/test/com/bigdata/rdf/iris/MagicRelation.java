@@ -214,6 +214,13 @@ public class MagicRelation extends AbstractRelation<IMagicTuple> {
         
         if (numTuples > tuples.length)
             throw new IllegalArgumentException();
+
+        for (IMagicTuple tuple : tuples) {
+            if (tuple.getTermCount() != arity) {
+                throw new IllegalArgumentException(
+                    "bad tuple, incorrect arity: " + tuple.toString());
+            }
+        }
         
         if (numTuples == 0)
             return 0L;
