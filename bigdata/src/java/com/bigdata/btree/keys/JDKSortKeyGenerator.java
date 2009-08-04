@@ -26,9 +26,6 @@ package com.bigdata.btree.keys;
 import java.text.Collator;
 import java.util.Locale;
 
-import com.bigdata.btree.keys.KeyBuilder.DecompositionEnum;
-import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
-import com.bigdata.btree.keys.KeyBuilder.UnicodeSortKeyGenerator;
 
 
 /**

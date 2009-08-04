@@ -147,6 +147,52 @@ public class Latch {
     }
 
     /**
+     * Adds the delta to the internal counter.
+     * 
+     * @return The post-increment value of the counter.
+     */
+    public long addAndGet(final long delta) {
+
+        lock.lock();
+        try {
+
+            if (this.counter.get() + delta <= 0) {
+                
+                throw new IllegalStateException();
+                
+            }
+
+            final long c = this.counter.addAndGet(delta);
+
+            if (log.isDebugEnabled())
+                log.debug(toString());
+
+            if (c == 0) {
+                
+                try {
+
+                    // signal blocked threads.
+                    _signal();
+
+                } catch (InterruptedException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+            }
+
+            return c;
+
+        } finally {
+
+            lock.unlock();
+
+        }
+        
+    }
+
+    /**
      * Decrements the internal counter and releases the blocked thread(s) if the
      * counter reaches zero.
      * 

@@ -31,7 +31,6 @@ package com.bigdata.btree.keys;
 import java.util.Properties;
 
 import com.bigdata.btree.AbstractUnicodeKeyBuilderTestCase;
-import com.bigdata.btree.keys.KeyBuilder.CollatorEnum;
 import com.bigdata.btree.keys.KeyBuilder.Options;
 
 /**

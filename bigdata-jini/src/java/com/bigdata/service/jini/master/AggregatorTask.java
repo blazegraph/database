@@ -45,7 +45,6 @@ import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.Session;
 import com.bigdata.service.Split;
 import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.master.TaskMaster.ServiceMap;
 import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;

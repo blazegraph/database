@@ -72,6 +72,7 @@ import com.bigdata.service.IDataService;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.IService;
+import com.bigdata.service.Session;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -237,6 +238,8 @@ public class AbstractResourceManagerTestCase extends
 
         private AtomicInteger partitionId = new AtomicInteger(0);
        
+        private final Session session = new Session();
+        
         public int nextPartitionId(String name) throws IOException, InterruptedException, ExecutionException {
             return partitionId.incrementAndGet();
         }
@@ -388,6 +391,10 @@ public class AbstractResourceManagerTestCase extends
 
             throw new UnsupportedOperationException();
 
+        }
+
+        public Session getSession() {
+            return session;
         }
 
     }

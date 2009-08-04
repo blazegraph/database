@@ -52,4 +52,5 @@ be able to read/write files in that directory.
 	
 This is only necessary when you installed as 'root' and want to run as 'root
 as well, in which case you would probably specify "wheel" as the install group,
-at least for Linux.
+at least for Linux. (The ant script now attempts to do this for you during the
+install.)

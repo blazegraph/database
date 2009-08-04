@@ -451,15 +451,22 @@ public class ThroughputMaster
 
         final JiniFederation fed = new JiniClient(args).connect();
 
-        final TaskMaster task = new ThroughputMaster(fed);
+        try {
 
-        // execute master wait for it to finish.
-        task.innerMain().get();
+            final TaskMaster task = new ThroughputMaster(fed);
+
+            // execute master wait for it to finish.
+            task.execute();
+
+        } finally {
+
+            fed.shutdown();
+        }
         
     }
 
     /**
-     * Extended to register a scale-out index in the specified namespace. 
+     * Extended to register a scale-out index in the specified namespace.
      */
     @Override
     protected void beginJob(final JobState jobState) throws Exception {

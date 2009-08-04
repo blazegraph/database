@@ -3,6 +3,7 @@ package com.bigdata.jini.start.process;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -13,6 +14,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 
 import com.bigdata.jini.start.IServiceListener;
 
@@ -518,6 +520,30 @@ public class ProcessHelper {
     }
 
     /**
+     * Return a {@link String} containing commands to set the environment for
+     * the processs.
+     */
+    static public String getEnvironment(final ProcessBuilder processBuilder) {
+        
+        final StringBuilder sb = new StringBuilder();
+        
+        for(Map.Entry<String,String> entry : processBuilder.environment().entrySet()) {
+
+            sb.append("set ");
+            sb.append(entry.getKey());
+            sb.append("=");
+//            sb.append("\"");
+            sb.append(entry.getValue());
+//            sb.append("\"");
+            sb.append("\n");
+            
+        }
+    
+        return sb.toString();
+        
+    }
+    
+    /**
      * Return the command line that would be executed.
      * 
      * @param processBuilder
@@ -538,7 +564,11 @@ public class ProcessHelper {
                 
             }
             
-            sb.append(s);
+            sb.append("\"");
+
+            sb.append(escape(s));
+            
+            sb.append("\"");
             
             first = false;
             
@@ -548,4 +578,33 @@ public class ProcessHelper {
         
     }
 
+    /**
+     * Escape any sequences that can not appear within a quoted context on a
+     * command line.
+     * 
+     * @param s
+     *            A string that will appear within a quoted context on a command
+     *            line.
+     * 
+     * @return The escaped version of that string.
+     */
+    private static String escape(String s) {
+        
+        if(SystemUtil.isWindows()) {
+            
+            /*
+             * Windows uses the sequence %XXX% for shell variable substitution.
+             * However, URI encoding uses the % character as an escape sequence.
+             * For example, "%20" is used for a single space character. We
+             * translate the % character into the sequence %% to get it through
+             * the Windows shell.
+             */
+            s = s.replaceAll("%", "%%");
+            
+        }
+        
+        return s;
+        
+    }
+    
 }

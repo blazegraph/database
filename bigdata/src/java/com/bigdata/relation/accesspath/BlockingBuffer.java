@@ -560,6 +560,12 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         return open;
         
     }
+
+    public boolean isOrdered() {
+        
+        return ordered;
+        
+    }
     
     /**
      * Closes the {@link BlockingBuffer} such that it will not accept new
@@ -915,6 +921,10 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                 return true;
 
             }
+
+            assert ((Object[]) e) != null : "chunk with nulls: chunkSize="
+                    + ((Object[]) e).length + ", chunk="
+                    + Arrays.toString(((Object[]) e));
             
         }
 
@@ -2154,13 +2164,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         
         final Object[] e1 = (Object[]) chunk1;
         
-        final Object[] e2 = (Object[]) chunk2;
-
         if (e1.length == 0) {
 
             // empty chunk - return the other argument.
             return chunk2;
         }
+
+        final Object[] e2 = (Object[]) chunk2;
 
         if (e2.length == 0) {
 
@@ -2168,6 +2178,9 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             return chunk1;
 
         }
+        
+        assert e1[0] != null;
+        assert e2[0] != null;
         
         if (log.isDebugEnabled()) {
 
@@ -2179,14 +2192,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         final int chunkSize = e1.length + e2.length;
         
         // Dynamic instantiation of array of the same component type.
-        final Object[] a = (E[]) java.lang.reflect.Array.newInstance(e1[0]
+        final Object[] a = (Object[]) java.lang.reflect.Array.newInstance(e1[0]
                 .getClass(), chunkSize);
         
         // copy first chunk onto the new array.
-        System.arraycopy(chunk1, 0, a, 0, e1.length);
+        System.arraycopy(e1, 0, a, 0, e1.length);
         
         // copy second chunk onto the new array.
         System.arraycopy(e2, 0, a, e1.length, e2.length);
+
+        assert a[0] != null;
         
         // return the combined chunk.
         return (E) a;

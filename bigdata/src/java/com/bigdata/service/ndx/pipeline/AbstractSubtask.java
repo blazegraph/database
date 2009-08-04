@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx.pipeline;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
@@ -117,6 +118,13 @@ L>//
      */
     protected volatile long lastChunkAvailableNanos = lastChunkNanos;
 
+    public String toString() {
+
+        return getClass().getName() + "{locator=" + locator + ", open="
+                + buffer.isOpen() + "}";
+
+    }
+
     public AbstractSubtask(final M master, final L locator,
             final BlockingBuffer<E[]> buffer) {
 
@@ -192,6 +200,12 @@ L>//
             if (log.isInfoEnabled())
                 log.info("Done: " + locator);
 
+            /*
+             * Wait until any asynchronous processing for the subtask is done
+             * (extension hook).
+             */ 
+            awaitPending();
+            
             // done.
             return stats;
 
@@ -210,6 +224,9 @@ L>//
             
             // clear the backing queue.
             buffer.clear();
+            
+            // interrupt the remote task (extension hook).
+            cancelRemoteTask(true/* mayInterruptIfRunning */);
             
             /*
              * Halt processing.
@@ -230,6 +247,33 @@ L>//
 
         }
 
+    }
+
+    /**
+     * Wait until any asynchronous processing for the subtask is done. This is
+     * an extension hook which is used if the remote task accepts chunks for
+     * processing and uses an asynchronous notification mechanism to indicate
+     * the success or failure of elements. The default implementation is a NOP.
+     */
+    protected void awaitPending() throws InterruptedException {
+
+        // NOP - overriden by subclass which supports pendingSets.
+        
+    }
+
+    /**
+     * Cancel the remote task. This is an extension hook which is used if the
+     * remote task accepts chunks for processing and uses an asynchronous
+     * notification mechanism to indicate the success or failure of elements.
+     * The default implementation is a NOP.
+     * 
+     * @throws InterruptedException
+     */
+    protected void cancelRemoteTask(boolean mayInterruptIfRunning)
+            throws InterruptedException {
+
+        // NOP - overriden by subclass which supports pendingSets.
+        
     }
 
     /**
@@ -382,12 +426,17 @@ L>//
                 }
 
                 if (chunkSize > 0
-                        && ((elapsedNanos > buffer.getChunkTimeout()) || (!buffer
-                                .isOpen() && !src.hasNext()))) {
+                        && (   (elapsedNanos > buffer.getChunkTimeout())//
+                            || (!buffer.isOpen() && !src.hasNext())//
+                            )) {
                     /*
                      * We have SOME data and either (a) the chunk timeout has
                      * expired -or- (b) the buffer is closed and there is
-                     * nothing more to be read from the iterator.
+                     * nothing more to be read from the iterator. Note that the
+                     * sink was closed above if the master's buffer was closed.
+                     * The master's buffer is closed as a precondition to
+                     * master.awaitAll(), so the sink WILL NOT block once the
+                     * master enter's awaitAll().
                      */
                     if (log.isInfoEnabled())
                         log.info("Partial chunk: " + chunkSize + ", elapsed="
@@ -400,7 +449,7 @@ L>//
                 /*
                  * Poll the source iterator for another chunk.
                  * 
-                 * @todo I need to review the logic for choosing a shorting poll
+                 * @todo I need to review the logic for choosing a short poll
                  * duration here. I believe that this choice is leading to high
                  * CPU utilization when there are a lot of index partitions and
                  * hence a large #of threads running on the clients. In fact, I
@@ -439,6 +488,8 @@ L>//
 
                     assert a != null;
                     assert a.length != 0;
+                    assert a[0] != null : "chunk with nulls: chunkSize="
+                            + a.length + ", chunk=" + Arrays.toString(a);
 
                     // add to the list of chunks which are already available.
                     chunks.add(a);
@@ -480,10 +531,10 @@ L>//
 
         /**
          * Return the buffered chunk(s) as a single combined chunk. If more than
-         * one chunk is combined to produce the returned chunk, then a merge
-         * sort is applied to the the elements of the chunk before it is
-         * returned to the caller in order to keep the data in the chunk fully
-         * ordered.
+         * one chunk is combined to produce the returned chunk and
+         * {@link BlockingBuffer#isOrdered()}, then a merge sort is applied to
+         * the the elements of the chunk before it is returned to the caller in
+         * order to keep the data in the chunk fully ordered.
          */
         public E[] next() {
 
@@ -494,10 +545,18 @@ L>//
 
             }
 
+            final E[] firstChunk = chunks.getFirst();
+            
+            assert firstChunk != null;
+            
+            assert firstChunk.length != 0;
+            
+            assert firstChunk[0] != null;
+            
             // Dynamic instantiation of array of the same component type.
             @SuppressWarnings("unchecked")
-            final E[] a = (E[]) java.lang.reflect.Array.newInstance(chunks
-                    .get(0)[0].getClass(), chunkSize);
+            final E[] a = (E[]) java.lang.reflect.Array.newInstance(
+                    firstChunk[0].getClass(), chunkSize);
 
             // Combine the chunk(s) into a single chunk.
             int dstpos = 0;
@@ -514,7 +573,7 @@ L>//
 
             }
 
-            if (ncombined > 0) {
+            if (ncombined > 0 && buffer.isOrdered()) {
 
                 ChunkMergeSortHelper.mergeSort(a);
 
@@ -582,8 +641,6 @@ L>//
          * Drain the rest of the buffered chunks from the closed sink, feeding
          * them onto the master's redirect queue.
          */
-        final IAsynchronousIterator<E[]> itr = src;
-
         while (src.hasNext()) {
 
             master.redirectChunk(src.next());

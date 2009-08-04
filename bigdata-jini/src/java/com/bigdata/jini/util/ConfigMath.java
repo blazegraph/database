@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.jini.util;
 
+import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
@@ -130,6 +131,48 @@ public class ConfigMath {
 
         return TimeUnit.MINUTES.toMillis(m);
 
+    }
+
+    /**
+     * Return the absolute path for the file.
+     * 
+     * @param file
+     *            The file.
+     *            
+     * @return The absolute path for that file.
+     */
+    public static String getAbsolutePath(final File file) {
+    
+        return file.getAbsolutePath();
+        
+    }
+
+    /**
+     * Return the absolute file for the file.
+     * 
+     * @param file
+     *            The file.
+     *            
+     * @return The absolute file for that file.
+     */
+    public static File getAbsoluteFile(final File file) {
+        
+        return file.getAbsoluteFile();
+        
+    }
+    
+    /**
+     * Convert a file into an absolute URI and return its representation.
+     * 
+     * @param file
+     *            The file.
+     *            
+     * @return The respresentation of the corresponding absolute URI.
+     */
+    public static String getURIString(final File file) {
+        
+        return file.getAbsoluteFile().toURI().toString();
+        
     }
 
 }

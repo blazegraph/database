@@ -317,6 +317,7 @@ A//
     /**
      * Notifies the client that the locator is stale.
      */
+    @Override
     protected void notifyClientOfRedirect(L locator, Throwable cause) {
 
         master.ndx.staleLocator(master.ndx.getTimestamp(), (L) locator,

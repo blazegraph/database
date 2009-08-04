@@ -79,4 +79,34 @@ public class NV implements Serializable, Comparable<NV> {
         
     }
     
+    /**
+     * Combines the two arrays, appending the contents of the 2nd array to the
+     * contents of the first array.
+     * 
+     * @param a
+     * @param b
+     * @return
+     */
+    public static NV[] concat(final NV[] a, final NV[] b) {
+
+        if (a == null && b == null)
+            return a;
+
+        if (a == null)
+            return b;
+
+        if (b == null)
+            return a;
+
+        final NV[] c = (NV[]) java.lang.reflect.Array.newInstance(a.getClass()
+                .getComponentType(), a.length + b.length);
+
+        System.arraycopy(a, 0, c, 0, a.length);
+
+        System.arraycopy(b, 0, c, a.length, b.length);
+
+        return c;
+
+    }
+
 }

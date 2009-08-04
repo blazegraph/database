@@ -1,26 +1,26 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 /*
  * Created on Jan 16, 2009
  */
@@ -30,7 +30,6 @@ package com.bigdata.service.jini.master;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.rmi.RemoteException;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
@@ -40,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -47,7 +47,6 @@ import java.util.concurrent.TimeoutException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
-import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import net.jini.core.lookup.ServiceTemplate;
 
@@ -58,10 +57,9 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.data.Stat;
 
+import com.bigdata.counters.CounterSet;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.BigdataZooDefs;
-import com.bigdata.jini.util.JiniUtil;
-import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
@@ -114,7 +112,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @version $Id$
      */
     public interface ConfigurationOptions {
-        
+
         /**
          * When <code>true</code> as an after action on the job, the
          * {@link DataService}s in the federation will be made to undergo
@@ -149,11 +147,11 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         /**
          * Boolean option may be used to delete the exiting job with the same
-         * name during startup (default <code>false</code>). This can be used if
-         * the last job terminated abnormally and you want to re-run the job.
+         * name during startup (default <code>false</code>). This can be used
+         * if the last job terminated abnormally and you want to re-run the job.
          */
         String DELETE_JOB = "deleteJob";
-        
+
         /**
          * The #of clients to start. The clients will be distributed across the
          * discovered {@link IRemoteExecutor}s in the federation matching the
@@ -176,13 +174,13 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * access to the index partitions locally on each {@link IDataService}.
          * 
          * @see #NCLIENTS
-         */ 
+         */
         String CLIENTS_TEMPLATE = "clientsTemplate";
 
         /**
          * The #of aggregators to start (default is ZERO(0)). The aggregators
-         * will be distributed across the discovered {@link IRemoteExecutor}s in
-         * the federation matching the {@link #AGGREGATORS_TEMPLATE}.
+         * will be distributed across the discovered {@link IRemoteExecutor}s
+         * in the federation matching the {@link #AGGREGATORS_TEMPLATE}.
          * 
          * @see #AGGREGATORS_TEMPLATE
          * 
@@ -193,8 +191,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         /**
          * A {@link ServiceTemplate} describing the types of services, and the
          * minimum #of services, on which aggregation for asynchronous index
-         * writes will be performed (default is <code>null</code>, which means
-         * that aggregators will not be discovered).
+         * writes will be performed (default is <code>null</code>, which
+         * means that aggregators will not be discovered).
          * <p>
          * The aggregator plays a role similar to the "reduce" of a map/reduce
          * architecture. However, unlike map/reduce, an aggregator does not
@@ -220,9 +218,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * able to get around the single machine limit.
          * <p>
          * Aggregators are essentially specialized clients and may execute in
-         * any {@link IClientService} container.  They may be restricted to
-         * execute on only those services having specific attributes using
-         * this template.
+         * any {@link IClientService} container. They may be restricted to
+         * execute on only those services having specific attributes using this
+         * template.
          * 
          * @see #NAGGREGATORS
          * 
@@ -230,22 +228,14 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * 
          * @todo Each aggregator can be its own service so each index could be
          *       aggregated by a different aggregator on a different host.
-         * 
-         * @todo Aggregator failure requires either restart of the job or
+         *       <p>
+         *       Aggregator failure requires either restart of the job or
          *       re-processing of all source "documents" whose write set has not
          *       yet been made restart safe. In order to track that, we need to
          *       use a proxy for a {@link KVOLatch} for scale-out index for each
          *       document processed. When the write set for a scale-out index
          *       for that document is complete, the latch is triggered and the
          *       client is notified.
-         *       <p>
-         *       This raises the issue of duplicate elimination with
-         *       {@link KVOLatch} again. Perhaps we should pass a counter of the
-         *       #of source writes which were merged onto a single tuple
-         *       (treating duplicate elimination as a merge). In that way, a
-         *       client is not notified until the write set is restart safe and
-         *       we can still perform duplicate elimination, even for the
-         *       TERM2ID index.
          * 
          * @deprecated This is a trial feature which is not fully implemented.
          */
@@ -255,12 +245,13 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * An array of zero or more {@link ServicesTemplate} describing the
          * types of services, and the minimum #of services of each type, that
          * must be discovered before the job may begin.
-         */ 
+         */
         String SERVICES_TEMPLATES = "servicesTemplates";
-        
+
         /**
-         * The timeout in milliseconds to await the discovery of the various services
-         * described by the {@link #SERVICES_TEMPLATES} and {@link #CLIENTS_TEMPLATE}.
+         * The timeout in milliseconds to await the discovery of the various
+         * services described by the {@link #SERVICES_TEMPLATES} and
+         * {@link #CLIENTS_TEMPLATE}.
          */
         String SERVICES_DISCOVERY_TIMEOUT = "awaitServicesTimeout";
 
@@ -290,201 +281,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @see JobState#getClientZPath(JiniFederation, int)
          */
         String JOB_NAME = "jobName";
-        
-    }
-
-    /**
-     * An ordered mapping of indices in <code>[0:N-1]</code> onto the services
-     * on which the task with the corresponding index will be executed.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     * 
-     * @todo Stable assignments across re-runs are only required if the client
-     *       will be reading or writing data local to the host on which it is
-     *       executing. Otherwise we are free to choose new assignments on
-     *       restart or even to add more clients over time in an m/r model.
-     */
-    public static class ServiceMap implements Serializable {
-        
-        /**
-         * 
-         */
-        private static final long serialVersionUID = 5704885443752980274L;
-
-        /**
-         * The #of tasks to be mapped over the services.
-         */
-        public final int ntasks;
-
-        /**
-         * The mapping of tasks onto the {@link IRemoteExecutor}s on which that
-         * task will execute. The index is the task#. The value is the
-         * {@link ServiceItem} for the {@link IRemoteExecutor} on which that
-         * client will execute.
-         * <p>
-         * This provides richer information than the {@link #serviceUUIDs}, but
-         * this information can be (and is) recovered on demand from just the
-         * {@link #serviceUUIDs}.
-         * <p>
-         * Note: This is private since it is used by the master to assign tasks to
-         * services. In contrast, the {@link #serviceUUIDs} are serialized
-         * and have public scope.
-         */
-        private final transient ServiceItem[] serviceItems;
-        
-        /**
-         * The mapping of tasks onto the {@link IRemoteExecutor}s on which
-         * that task will execute. The index is the task#. The value is the
-         * {@link IRemoteExecutor} {@link UUID service UUID}.
-         */
-        public final UUID serviceUUIDs[];
-
-        /**
-         * 
-         * @param ntasks
-         *            The #of tasks to be mapped over the services.
-         */
-        public ServiceMap(final int ntasks) {
-
-            if (ntasks < 0)
-                throw new IllegalArgumentException();
-            
-            this.ntasks = ntasks;
-            
-            this.serviceItems = new ServiceItem[ntasks];
-
-            this.serviceUUIDs = new UUID[ntasks];
-
-        }
-
-        /**
-         * Populates the elements of the {@link #serviceItems} array by
-         * resolving the {@link #serviceUUIDs} to the corresponding
-         * {@link ServiceItem}s. For each service, this tests the service cache
-         * for {@link IClientService}s and {@link IDataService}s and only then
-         * does a lookup with a timeout for the service.
-         * 
-         * @throws InterruptedException
-         *             If interrupted during service lookup.
-         * @throws IOException
-         *             If there is an RMI problem.
-         */
-        private void resolveServiceUUIDs(final JiniFederation fed) throws RemoteException,
-                InterruptedException {
-
-            for (int i = 0; i < ntasks; i++) {
-
-                final UUID serviceUUID = serviceUUIDs[i];
-
-                final ServiceID serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
-
-                ServiceItem serviceItem = null;
-
-                // test client service cache.
-                serviceItem = fed.getClientServicesClient().getServiceCache()
-                        .getServiceItemByID(serviceID);
-
-                if (serviceItem == null) {
-
-                    // test data service cache.
-                    serviceItem = fed.getDataServicesClient().getServiceCache()
-                            .getServiceItemByID(serviceID);
-
-                    if (serviceItem == null) {
-
-                        // direct lookup.
-                        serviceItem = fed.getServiceDiscoveryManager()
-                                .lookup(
-                                        new ServiceTemplate(
-                                                serviceID,
-                                                new Class[] { IRemoteExecutor.class }/* types */,
-                                                null/* attr */),
-                                        null/* filter */, 1000/* timeoutMillis */);
-
-                        if (serviceItem == null) {
-
-                            throw new RuntimeException(
-                                    "Could not discover service: " + serviceUUID);
-
-                        }
-
-                    }
-
-                }
-
-                serviceItems[i] = serviceItem;
-
-            }
-            
-        }
-
-        /**
-         * Assigns clients to services. The assignments are made in the given
-         * order MODULO the #of service items.
-         * 
-         * @param serviceItems
-         *            The ordered array of services to which each client will be
-         *            assigned.
-         */
-        protected void assignClientsToServices(final ServiceItem[] serviceItems)
-                throws Exception {
-            
-            if (serviceItems == null)
-                throw new IllegalArgumentException();
-            
-            for (int clientNum = 0; clientNum < ntasks; clientNum++) {
-
-                final int i = clientNum % serviceItems.length;
-
-                final ServiceItem serviceItem = serviceItems[i];
-                
-                assert serviceItem != null : "No service item @ index=" + i;
-
-                this.serviceItems[clientNum] = serviceItem;
-
-                this.serviceUUIDs[clientNum] = JiniUtil
-                        .serviceID2UUID(serviceItem.serviceID);
-
-            }
-            
-        }
-
-        /**
-         * Return the {@link UUID} of the service to which the Nth client was
-         * assigned.
-         * 
-         * @param clientNum
-         *            The client number in [0:N-1].
-         *            
-         * @return The {@link UUID} of the service on which that client should
-         *         execute.
-         */
-        public UUID getServiceUUID(final int clientNum) {
-            
-            return serviceUUIDs[clientNum];
-            
-        }
-
-        /**
-         * Return the {@link ServiceItem} of the service to which the Nth client
-         * was assigned.
-         * 
-         * @param clientNum
-         *            The client number in [0:N-1].
-         * 
-         * @return The {@link ServiceItem} of the service on which that client
-         *         should execute.
-         */
-        private ServiceItem getServiceItem(final int clientNum) {
-            
-            return serviceItems[clientNum];
-            
-        }
 
     }
-    
+
     /**
      * State describing the job to be executed. The various properties are all
      * defined by {@link ConfigurationOptions}.
@@ -497,35 +296,82 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         private static final long serialVersionUID = -340273551639560974L;
 
         /**
-         * Set to <code>true</code> iff a pre-existing instance of the same job
-         * should be delete before starting this job.
+         * Set to <code>true</code> iff a pre-existing instance of the same
+         * job should be delete before starting this job.
          * 
          * @see ConfigurationOptions#DELETE_JOB
          */
         private transient final boolean deleteJob;
-        
+
         /**
          * Set <code>true</code> iff an existing job is being resumed
          * (defaults to <code>false</code> until proven otherwise).
          */
         private boolean resumedJob = false;
-        
+
         /**
          * Return <code>true</code> iff an existing job is being resumed.
          */
         public boolean isResumedJob() {
-            
+
             return resumedJob;
-            
+
         }
-        
-        /*
-         * Public options and configuration information. 
-         */
-        
+
         /**
-         * The name of the class that is the master (aka the component for the
-         * jini {@link Configuration}).
+         * The time at which the job started to execute and 0L if the job has
+         * not started to execute.
+         */
+        private transient long beginMillis = 0L;
+
+        /**
+         * The time at which the job was done executing and 0L if the job has
+         * not finished executing.
+         */
+        private transient long endMillis = 0L;
+
+        /**
+         * Elapsed run time for the job in milliseconds. This is ZERO (0L) until
+         * the job starts. Once the job is done executing the elapsed time will
+         * no longer increase.
+         */
+        public long getElapsedMillis() {
+
+            if (beginMillis == 0L)
+                return 0L;
+
+            if (endMillis == 0L) {
+
+                return System.currentTimeMillis() - beginMillis;
+
+            }
+
+            return endMillis - beginMillis;
+
+        }
+
+        /**
+         * A map giving the {@link Future} for each client. The keys of the map
+         * are the client numbers in [0:N-1].
+         * 
+         * @see #startClients()
+         * @see #awaitAll(Map)
+         * @see #cancelAll(Map, boolean)
+         */
+        protected transient Map<Integer/* client# */, Future<?/* U */>> futures;
+
+        /*
+         * Public options and configuration information.
+         */
+
+        /**
+         * The name <em>component</em> in the jini {@link Configuration} whose
+         * values will be used to configure the {@link JobState}. This defaults
+         * to the name of the concrete {@link TaskMaster} instance. You may
+         * override this value using <code>-Dbigdata.component=foo</code> on
+         * the command line. This makes it possible to have multiple
+         * parameterizations for the same master class in a single
+         * {@link Configuration} file.
          */
         public final String component;
 
@@ -558,7 +404,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @see ConfigurationOptions#NAGGREGATORS
          */
         public final int naggregators;
-        
+
         /**
          * The {@link ServicesTemplate} describing the types of services and the
          * minimum #of services for aggregating asynchronous index writes
@@ -567,7 +413,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @see ConfigurationOptions#AGGREGATORS_TEMPLATE
          */
         public final ServicesTemplate aggregatorsTemplate;
-        
+
         /**
          * An array of zero or more {@link ServicesTemplate} describing the
          * types of services, and the minimum #of services of each type, that
@@ -585,7 +431,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         /*
          * Debugging and benchmarking options.
          */
-        
+
         /**
          * <code>true</code> iff overflow will be forced on the data services
          * after the client tasks are done.
@@ -609,70 +455,67 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @see ConfigurationOptions#INDEX_DUMP_NAMESPACE
          */
         public final String indexDumpNamespace;
-        
+
         /**
          * Allows extension of {@link #toString()}
          * 
          * @param sb
          */
         protected void toString(StringBuilder sb) {
-            
+
         }
-        
+
         public String toString() {
 
             final StringBuilder sb = new StringBuilder();
-            
+
             sb.append(getClass().getName());
-            
+
             sb.append("{ resumedJob=" + isResumedJob());
 
             /*
              * General options.
              */
-            
+
             sb.append(", component=" + component);
 
             sb.append(", " + ConfigurationOptions.JOB_NAME + "=" + jobName);
 
             sb.append(", " + ConfigurationOptions.NCLIENTS + "=" + nclients);
 
-            sb.append(", " + ConfigurationOptions.NAGGREGATORS + "="
-                    + naggregators);
+//            sb.append(", " + ConfigurationOptions.NAGGREGATORS + "="
+//                    + naggregators);
 
             sb.append(", " + ConfigurationOptions.CLIENTS_TEMPLATE + "="
                     + clientsTemplate);
 
-            sb.append(", " + ConfigurationOptions.AGGREGATORS_TEMPLATE + "="
-                    + aggregatorsTemplate);
+//            sb.append(", " + ConfigurationOptions.AGGREGATORS_TEMPLATE + "="
+//                    + aggregatorsTemplate);
 
             sb.append(", " + ConfigurationOptions.SERVICES_TEMPLATES + "="
                     + Arrays.toString(servicesTemplates));
 
-            sb.append(", " + ConfigurationOptions.SERVICES_DISCOVERY_TIMEOUT + "="
-                    + servicesDiscoveryTimeout);
+            sb.append(", " + ConfigurationOptions.SERVICES_DISCOVERY_TIMEOUT
+                    + "=" + servicesDiscoveryTimeout);
 
             /*
              * Debugging and benchmarking options.
              */
-            
+
             sb.append(", " + ConfigurationOptions.FORCE_OVERFLOW + "="
                     + forceOverflow);
 
             /*
-             * Run state stuff. 
+             * Run state stuff.
              */
-            
-//            sb.append(", client2DataService="
-//                    + Arrays.toString(client2DataService));
 
             /*
              * Subclass's options.
              */
             toString(new StringBuilder());
-            
+
             sb.append("}");
-            
+
             return sb.toString();
 
         }
@@ -691,7 +534,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             /*
              * general options.
              */
-            
+
             jobName = (String) config.getEntry(component,
                     ConfigurationOptions.JOB_NAME, String.class);
 
@@ -702,27 +545,29 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             nclients = (Integer) config.getEntry(component,
                     ConfigurationOptions.NCLIENTS, Integer.TYPE);
 
-            naggregators = (Integer) config.getEntry(component,
-                    ConfigurationOptions.NAGGREGATORS, Integer.TYPE, 0/*default*/);
+            naggregators = (Integer) config
+                    .getEntry(component, ConfigurationOptions.NAGGREGATORS,
+                            Integer.TYPE, 0/* default */);
 
             clientsTemplate = (ServicesTemplate) config.getEntry(component,
-                    ConfigurationOptions.CLIENTS_TEMPLATE, ServicesTemplate.class);
+                    ConfigurationOptions.CLIENTS_TEMPLATE,
+                    ServicesTemplate.class);
 
             aggregatorsTemplate = (ServicesTemplate) config.getEntry(component,
-                    ConfigurationOptions.AGGREGATORS_TEMPLATE, ServicesTemplate.class, null/*default*/);
+                    ConfigurationOptions.AGGREGATORS_TEMPLATE,
+                    ServicesTemplate.class, null/* default */);
 
             servicesTemplates = (ServicesTemplate[]) config.getEntry(component,
-                    ConfigurationOptions.SERVICES_TEMPLATES, ServicesTemplate[].class);
+                    ConfigurationOptions.SERVICES_TEMPLATES,
+                    ServicesTemplate[].class);
 
-            servicesDiscoveryTimeout = (Long) config
-                    .getEntry(component,
-                            ConfigurationOptions.SERVICES_DISCOVERY_TIMEOUT,
-                            Long.TYPE);
+            servicesDiscoveryTimeout = (Long) config.getEntry(component,
+                    ConfigurationOptions.SERVICES_DISCOVERY_TIMEOUT, Long.TYPE);
 
             /*
              * Benchmarking and debugging options.
              */
-            
+
             forceOverflow = (Boolean) config.getEntry(component,
                     ConfigurationOptions.FORCE_OVERFLOW, Boolean.TYPE,
                     Boolean.FALSE);
@@ -733,7 +578,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             indexDumpNamespace = (String) config.getEntry(component,
                     ConfigurationOptions.INDEX_DUMP_NAMESPACE, String.class,
                     null);
-            
+
             /*
              * Client/service maps.
              */
@@ -755,11 +600,11 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         final public ServiceMap clientServiceMap;
 
         /**
-         * The mapping of aggregators onto the {@link IRemoteExecutor}s on which
-         * that aggregator will execute.
+         * The mapping of aggregators onto the {@link IRemoteExecutor}s on
+         * which that aggregator will execute.
          */
         final public ServiceMap aggregatorServiceMap;
-        
+
         /**
          * Return the zpath of the node for all jobs which are instances of the
          * configured master's class.
@@ -767,12 +612,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          * @see #component
          */
         final public String getJobClassZPath(final JiniFederation fed) {
-            
+
             return fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS + "/"
                     + component;
-            
+
         }
-        
+
         /**
          * Return the zpath to the znode which corresponds to the job which is
          * being executed. The data for this znode is this {@link JobState}.
@@ -824,15 +669,15 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     /**
      * The federation (from the ctor).
      */
-    protected final JiniFederation fed;
+    protected final JiniFederation<?> fed;
 
     /**
      * The federation (from the ctor).
      */
-    public JiniFederation getFederation() {
-        
+    public JiniFederation<?> getFederation() {
+
         return fed;
-        
+
     }
 
     /**
@@ -841,32 +686,16 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * unchanging.
      */
     public S getJobState() {
-        
+
         return jobState;
-        
+
     }
+
     private S jobState;
 
     /**
      * Runs the master. SIGTERM (normal kill or ^C) will cancel the job,
-     * including any running clients. A simple <code>main()</code> can be
-     * written as follows:
-     * 
-     * <pre>
-     * public static void main(String[] args) {
-     * 
-     *     final JiniFederation fed = new JiniClient(args).connect();
-     * 
-     *     final TaskMaster task = new MyMaster(fed);
-     * 
-     *     // execute master wait for it to finish.
-     *     task.innerMain().get();
-     * 
-     * }
-     * </pre>
-     * 
-     * Where <code>MyMaster</code> is a concrete subclass of
-     * {@link TaskMaster}.
+     * including any running clients.
      * 
      * @return The {@link Future} for the master. Use {@link Future#get()} to
      *         await the outcome of the master.
@@ -874,7 +703,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    final public Future<Void> innerMain() {
+    final protected Future<Void> innerMain() {
 
         final Future<Void> future = fed.getExecutorService().submit(this);
 
@@ -889,7 +718,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 future.cancel(true/* mayInterruptIfRunning */);
 
                 System.err.println("Shutdown: " + new Date());
-                
+
             }
 
         });
@@ -897,14 +726,14 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         return future;
 
     }
-    
+
     /**
      * 
      * @param fed
      * 
      * @throws ConfigurationException
      */
-    protected TaskMaster(final JiniFederation fed)
+    protected TaskMaster(final JiniFederation<?> fed)
             throws ConfigurationException {
 
         if (fed == null)
@@ -912,9 +741,86 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         this.fed = fed;
 
+        /*
+         * Use the name of the concrete instance of this class by default but
+         * permit override of the component name on the command line.
+         */
+        final String component = System.getProperty("bigdata.component",
+                getClass().getName());
+
+        // The jini configuration specified on the command line.
         final Configuration config = fed.getClient().getConfiguration();
 
-        jobState = newJobState(getClass().getName(), config);
+        // Initialize the job state.
+        jobState = newJobState(component, config);
+
+    }
+
+    /**
+     * Execute the master. If the master is interrupted, including by the signal
+     * handler installed by {@link #innerMain()}, then the client tasks will be
+     * cancelled. A simple <code>main()</code> can be written as follows:
+     * 
+     * <pre>
+     * public static void main(final String[] args) {
+     * 
+     *     final JiniFederation fed = new JiniClient(args).connect();
+     * 
+     *     try {
+     * 
+     *         final TaskMaster task = new MyMaster(fed);
+     * 
+     *         task.execute();
+     *         
+     *     } finally {
+     *     
+     *         fed.shutdown();
+     *         
+     *     }
+     * 
+     * }
+     * </pre>
+     * 
+     * Where <code>MyMaster</code> is a concrete subclass of
+     * {@link TaskMaster}.
+     * 
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void execute() throws InterruptedException, ExecutionException {
+
+        // execute master wait for it to finish.
+        try {
+
+            innerMain().get();
+
+        } catch (CancellationException ex) {
+
+            // cancel any running clients.
+            cancelAll(true/* mayInterruptIfRunning */);
+
+            throw ex;
+
+        } catch (InterruptedException ex) {
+
+            // cancel any running clients.
+            cancelAll(true/* mayInterruptIfRunning */);
+
+            throw ex;
+
+        } catch (ExecutionException ex) {
+
+            // cancel any running clients.
+            cancelAll(true/* mayInterruptIfRunning */);
+
+            throw ex;
+
+        } finally {
+
+            // always write the date when the master terminates.
+            System.err.println("Done: " + new Date());
+
+        }
 
     }
 
@@ -924,6 +830,8 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * service.
      * 
      * @return <code>null</code>
+     * 
+     * @see #execute()
      * 
      * @todo In my experience zookeeper (at least 3.0.1 and 3.1.0) has a
      *       tendency to drop sessions for the java client when under even
@@ -945,14 +853,14 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         try {
 
             // note: take timestamp after discovering services!
-            final long begin = System.currentTimeMillis();
+            jobState.beginMillis = System.currentTimeMillis();
 
             // callback for overrides.
             beginJob(getJobState());
 
             // run the clients and wait for them to complete.
-            runClients();
-            
+            runJob();
+
             if (jobState.forceOverflow) {
 
                 forceOverflow();
@@ -961,16 +869,18 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             success(jobState);
 
-            if (log.isInfoEnabled())
-                log.info("All done: elapsed="
-                        + (System.currentTimeMillis() - begin));
-
         } finally {
 
+            // timestamp after the job is done.
+            jobState.endMillis = System.currentTimeMillis();
+
+            if (log.isInfoEnabled())
+                log.info("All done: elapsed=" + jobState.getElapsedMillis());
+
             tearDownJob(jobState, zlock);
-            
+
         }
-        
+
         return null;
 
     }
@@ -978,15 +888,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
     /**
      * Start the client tasks and await their futures.
      * 
+     * @throws Exception
+     *             Client execution problem.
      * @throws InterruptedException
      *             Master interrupted awaiting clients.
-     * @throws ExecutionException
-     *             Client execution problem.
-     * @throws IOException
-     *             RMI problem.
      */
-    protected void runClients() throws ExecutionException,
-            InterruptedException, IOException, ConfigurationException {
+    protected void runJob() throws Exception, InterruptedException {
 
         final long begin = System.currentTimeMillis();
 
@@ -995,7 +902,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         try {
 
-            awaitAll(startClients());
+            startClients();
+
+            awaitAll();
 
             failure = false;
 
@@ -1010,7 +919,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         }
 
     }
-    
+
     /**
      * Distributes the clients to the services on which they will execute and
      * returns a map containing their {@link Future}s. The kind of service on
@@ -1020,24 +929,22 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * stable ordered assignment {@link JobState#clientServiceUUIDs}. If there
      * are more clients than services, then some services will be tasked with
      * more than one client. If there is a problem submitting the clients then
-     * any clients already submitted will be canceled and the original
-     * exception will be thrown out of this method.
-     * 
-     * @return A map giving the {@link Future} for each client. The keys of the
-     *         map are the client numbers in [0:N-1].
+     * any clients already submitted will be canceled and the original exception
+     * will be thrown out of this method.
      * 
      * @throws IOException
      *             If there is an RMI problem submitting the clients to the
      *             {@link IRemoteExecutor}s.
      * @throws ConfigurationException
+     * 
+     * @see {@link JobState#futures}
      */
-    protected Map<Integer/* client# */, Future<U>> startClients()
-            throws IOException, ConfigurationException {
+    protected void startClients() throws IOException {
 
         if (log.isInfoEnabled())
             log.info("Will run " + jobState.nclients);
 
-        final Map<Integer/* client# */, Future<U>> futures = new LinkedHashMap<Integer, Future<U>>(
+        jobState.futures = new LinkedHashMap<Integer, Future<?/* U */>>(
                 jobState.nclients/* initialCapacity */);
 
         // #of clients that were started successfully.
@@ -1066,26 +973,23 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                     throw new RuntimeException("Service does not implement "
                             + IRemoteExecutor.class + ", serviceItem="
                             + serviceItem);
-                    
+
                 }
 
                 final IRemoteExecutor service = (IRemoteExecutor) serviceItem.service;
-                
+
                 final Callable<U> clientTask = newClientTask(clientNum);
 
                 if (log.isInfoEnabled())
                     log.info("Running client#=" + clientNum + " on "
                             + serviceItem);
 
-                futures.put(clientNum,
-                        (Future<U>) service
-                                .submit(clientTask));
+                jobState.futures.put(clientNum, (Future<U>) service
+                        .submit(clientTask));
 
                 nstarted++;
-                
-            } // start the next client.
 
-            return futures;
+            } // start the next client.
 
         } finally {
 
@@ -1094,37 +998,33 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 log.error("Aborting : could not start client(s): nstarted="
                         + nstarted + ", nclients=" + jobState.nclients);
 
-                cancelAll(futures, true/* mayInterruptIfRunning */);
-                
+                cancelAll(true/* mayInterruptIfRunning */);
+
             }
-            
+
         }
-        
+
     }
-    
+
     /**
      * Await the completion of the {@link Future}. If any client fails then the
      * remaining clients will be cancelled.
      * 
-     * @param futures
-     *            A map of the client futures. The keys are the client numbers
-     *            in [0:N-1]. The values are the {@link Future}s for each
-     *            client.
-     * 
+     * @throws IllegalStateException
+     *             if {@link JobState#futures} is <code>null</code>.
      * @throws ExecutionException
      *             for the first client whose failure is noticed.
      * @throws InterruptedException
      *             if the master is interrupted while awaiting the
      *             {@link Future}s.
      */
-    protected void awaitAll(final Map<Integer/* client# */, Future<U>> futures)
-            throws ExecutionException, InterruptedException {
+    protected void awaitAll() throws ExecutionException, InterruptedException {
 
         try {
 
-            while (!allDone(futures)) {
+            while (!allDone()) {
 
-                final int nremaining = futures.size();
+                final int nremaining = jobState.futures.size();
 
                 if (log.isDebugEnabled())
                     log.debug("#remaining futures=" + nremaining);
@@ -1148,7 +1048,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             try {
 
-                cancelAll(futures, true/* mayInterruptIfRunning */);
+                cancelAll(true/* mayInterruptIfRunning */);
 
             } catch (Throwable t2) {
 
@@ -1168,7 +1068,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             try {
 
-                cancelAll(futures, true/* mayInterruptIfRunning */);
+                cancelAll(true/* mayInterruptIfRunning */);
 
             } catch (Throwable t2) {
 
@@ -1197,7 +1097,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
          */
         System.out.println("commit point: "
                 + getFederation().getLastCommitTime());
-        
+
         /*
          * Delete zookeeper state when the job completes successfully.
          */
@@ -1205,7 +1105,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                 jobState.getJobZPath(fed), 0/* depth */);
 
     }
-    
+
     /**
      * Callback invoked when the job is done executing (any completion) but has
      * not yet release the {@link ZLock} for the {@link JobState}. The default
@@ -1227,17 +1127,17 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      *            The component.
      * @param config
      *            The configuration.
-     *            
+     * 
      * @return The {@link JobState}.
      */
     abstract protected S newJobState(String component, Configuration config)
             throws ConfigurationException;
-    
+
     /**
      * Return a client to be executed on a remote data service. The client can
      * obtain access to the {@link IBigdataFederation} when it executes on the
-     * remote data service if it implements {@link IDataServiceCallable}.
-     * You can use {@link AbstractClientTask} as a starting point.
+     * remote data service if it implements {@link IDataServiceCallable}. You
+     * can use {@link AbstractClientTask} as a starting point.
      * 
      * @param clientNum
      *            The client number.
@@ -1246,13 +1146,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * 
      * @see AbstractClientTask
      */
-    abstract protected T newClientTask(final int clientNum)
-            throws ConfigurationException;
+    abstract protected T newClientTask(final int clientNum);
 
     /**
      * Callback invoked when the job is ready to execute and is holding the
      * {@link ZLock} for the {@link JobState}. This may be extended to register
-     * indices, etc.  The default implementation handles the setup of the
+     * indices, etc. The default implementation handles the setup of the
      * optional index partition metadata dumps.
      * 
      * @throws Exception
@@ -1285,7 +1184,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         }
 
     }
-    
+
     /**
      * Sets up the {@link JobState} in zookeeper, including the assignment of
      * service {@link UUID}s to each client. {@link #jobState} will be replaced
@@ -1298,20 +1197,20 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @throws InterruptedException
      * @throws TimeoutException
      */
-    protected ZLock setupJob() throws KeeperException,
-            InterruptedException, TimeoutException {
+    protected ZLock setupJob() throws KeeperException, InterruptedException,
+            TimeoutException {
 
         final ZooKeeper zookeeper = fed.getZookeeperAccessor().getZookeeper();
-        
+
         try {
             // ensure znode exists.
-            zookeeper.create(
-                    fed.getZooConfig().zroot + "/" + BigdataZooDefs.JOBS,
-                    new byte[0], fed.getZooConfig().acl, CreateMode.PERSISTENT);
+            zookeeper.create(fed.getZooConfig().zroot + "/"
+                    + BigdataZooDefs.JOBS, new byte[0], fed.getZooConfig().acl,
+                    CreateMode.PERSISTENT);
         } catch (NodeExistsException ex) {
             // ignore.
         }
-        
+
         final String jobClassZPath = jobState.getJobClassZPath(fed);
 
         try {
@@ -1347,9 +1246,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
                 ZooHelper.destroyZNodes(fed.getZookeeperAccessor()
                         .getZookeeper(), jobZPath, 0/* depth */);
+
+                // detach the performance counters for the old job.
+                detachPerformanceCounters();
                 
             }
-            
+
             try {
 
                 // create znode that is the root for the job.
@@ -1406,53 +1308,78 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
                  * from the znode data which are part of the jobState
                  * 
                  * @todo stable assignments are only required when clients will
-                 * read or write local data or local indices and should be a
-                 * declarative configuration option.
+                 * read or write local data. This is not the common case and
+                 * should be a declarative configuration option.
                  */
 
                 jobState = (S) SerializerUtil.deserialize(zookeeper.getData(
                         jobZPath, false, new Stat()));
 
                 jobState.clientServiceMap.resolveServiceUUIDs(fed);
-                
+
                 jobState.aggregatorServiceMap.resolveServiceUUIDs(fed);
-                
+
                 jobState.resumedJob = true;
-                
+
                 log.warn("Pre-existing job: " + jobZPath);
 
             }
-            
-//            for (int clientNum = 0; clientNum < jobState.nclients; clientNum++) {
-//
-//                setupClientState(zookeeper, clientNum);
-//
-//            }
-            
-        } catch(KeeperException t) {
+
+        } catch (KeeperException t) {
 
             zlock.unlock();
 
             throw t;
-            
-        } catch(InterruptedException t) {
-            
+
+        } catch (InterruptedException t) {
+
             zlock.unlock();
 
             throw t;
-            
-        } catch(Throwable t) {
+
+        } catch (Throwable t) {
 
             zlock.unlock();
 
-            throw new RuntimeException( t );
-            
+            throw new RuntimeException(t);
+
         }
-        
+
         return zlock;
 
     }
 
+    /**
+     * Detach the performance counters for the job.
+     * 
+     * @todo does not remove the counters on the LBS, just in local memory so
+     *       this is not much help. It would only be useful if we re-ran the
+     *       same job within the same JVM instance.
+     */
+    protected void detachPerformanceCounters() {
+
+        getFederation().getServiceCounterSet().makePath("Jobs").detach(
+                jobState.jobName);
+
+    }
+    
+    /**
+     * Attach to the counters reported by the client to the LBS.
+     */
+    protected void attachPerformanceCounters(final CounterSet counterSet) {
+
+        if(counterSet == null) {
+            
+            throw new IllegalArgumentException();
+            
+        }
+        
+        getFederation().getServiceCounterSet().makePath("Jobs").makePath(
+                getJobState().jobName).attach(counterSet, true/* replace */);
+        
+
+    }
+    
     /**
      * Class used to return the discovered services.
      * 
@@ -1486,9 +1413,9 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             this.aggregatorServiceItems = aggregatorServiceItems;
 
         }
-        
+
     }
-    
+
     /**
      * Class awaits discovery of all services required by the {@link JobState}
      * up to the {@link JobState#servicesDiscoveryTimeout} and returns the
@@ -1571,20 +1498,21 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             final List<Throwable> causes = new LinkedList<Throwable>();
 
             /*
-			 * Get the future, which gives the services on which we will execute
-			 * the clients.
-			 */
-            final ServiceItem[] clientServiceItems = discoverClientServicesFuture.get();
-            
+             * Get the future, which gives the services on which we will execute
+             * the clients.
+             */
+            final ServiceItem[] clientServiceItems = discoverClientServicesFuture
+                    .get();
+
             if (clientServiceItems.length < jobState.clientsTemplate.minMatches) {
 
-            	final String msg = "Not enough services to run clients: found="
-                    + clientServiceItems.length + ", required="
-                    + jobState.clientsTemplate.minMatches
-                    + ", template=" + jobState.clientsTemplate;
-            	
+                final String msg = "Not enough services to run clients: found="
+                        + clientServiceItems.length + ", required="
+                        + jobState.clientsTemplate.minMatches + ", template="
+                        + jobState.clientsTemplate;
+
                 log.error(msg);
-                
+
                 causes.add(new RuntimeException(msg));
 
             }
@@ -1622,42 +1550,42 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
                 final Future<ServiceItem[]> f = futures[i];
 
-				final ServicesTemplate servicesTemplate = jobState.servicesTemplates[i];
+                final ServicesTemplate servicesTemplate = jobState.servicesTemplates[i];
 
-				try {
+                try {
 
-					final ServiceItem[] a = f.get();
+                    final ServiceItem[] a = f.get();
 
-					if (a.length < servicesTemplate.minMatches) {
+                    if (a.length < servicesTemplate.minMatches) {
 
-						final String msg = "Not enough services: found="
-								+ a.length + ", required="
-								+ servicesTemplate.minMatches + ", template="
-								+ servicesTemplate;
+                        final String msg = "Not enough services: found="
+                                + a.length + ", required="
+                                + servicesTemplate.minMatches + ", template="
+                                + servicesTemplate;
 
                         // log error w/ specific cause of rejected run.
                         log.error(msg);
 
                         // add msg to list of causes.
                         causes.add(new RuntimeException(msg));
-                        
+
                     }
-                    
+
                 } catch (Throwable ex) {
 
                     // add thrown exception to list of causes.
                     causes.add(ex);
-                    
+
                 }
 
             }
 
-            if(!causes.isEmpty()) {
-                
+            if (!causes.isEmpty()) {
+
                 throw new ExecutionExceptions(causes);
 
             }
-            
+
             return new DiscoveredServices(clientServiceItems,
                     aggregatorServiceItems);
 
@@ -1665,97 +1593,46 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
     }
 
-//    /**
-//     * Verify the existence of the client's zpath. If it does not exist then it
-//     * is created but its data will be an empty byte[]. The client, when it
-//     * runs, can examine the data in this znode and decide whether it is a new
-//     * start or resuming an existing run.
-//     * 
-//     * @param clientNum
-//     *            The client number.
-//     * 
-//     * @see JobState#getClientZPath(JiniFederation, int)
-//     * 
-//     * @throws InterruptedException
-//     * @throws KeeperException
-//     */
-//    protected void setupClientState(final ZooKeeper zookeeper,
-//            final int clientNum) throws KeeperException, InterruptedException {
-//
-//        final String clientZPath = jobState.getClientZPath(fed, clientNum);
-//
-//        try {
-//
-//            zookeeper.create(clientZPath, new byte[0], fed.getZooConfig().acl,
-//                    CreateMode.PERSISTENT);
-//
-//            if (log.isInfoEnabled())
-//                log.info("New client: " + clientZPath);
-//
-//        } catch (NodeExistsException ex) {
-//
-//            if (log.isInfoEnabled())
-//                log.info("Existing client: " + clientZPath);
-//
-//            // fall through.
-//
-//        }
-//
-//    }
-    
     /**
      * Check the futures.
-     * <p>
-     * Note: This polls the futures of the spawned clients. Those tasks are
-     * running with the {@link ZooKeeper} client of the {@link DataService}'s
-     * {@link JiniFederation}, so they will only appear to be "disconnected"
-     * and their ephemeral znodes will only disappear if the {@link DataService}
-     * itself becomes disconnected from the zookeeper ensemble.
-     * 
-     * @param futures
-     *            The futures of the client tasks that are being executed.
      * 
      * @return <code>true</code> when no more tasks are running.
      * 
      * @throws ExecutionException
      * @throws InterruptedException
-     * 
-     * @todo An alternative is to re-submit the client relying on the state in
-     *       zookeeper so the new client can pick up where the previous one left
-     *       off in its efforts.
      */
-    protected boolean allDone(final Map<Integer/* client */, Future<U>> futures)
-            throws InterruptedException, ExecutionException {
+    protected boolean allDone() throws InterruptedException, ExecutionException {
 
-        if (futures == null)
-            throw new IllegalArgumentException();
-        
+        if (jobState.futures == null)
+            throw new IllegalStateException();
+
         // Note: used to avoid concurrent modification of [futures].
         final List<Integer> finished = new LinkedList<Integer>();
 
-        int nremaining = futures.size();
-        
-        for (Map.Entry<Integer, Future<U>> entry : futures.entrySet()) {
+        int nremaining = jobState.futures.size();
+
+        for (Map.Entry<Integer, Future<?/* U */>> entry : jobState.futures
+                .entrySet()) {
 
             final int clientNum = entry.getKey();
 
-            final Future<U> future = entry.getValue();
+            final Future<?/* U */> future = entry.getValue();
 
             if (future.isDone()) {
 
                 /*
                  * Note: test the client's future and halt if the client fails.
                  */
-                final U value = future.get();
-                
+                final Object value = future.get();
+
                 nremaining--;
-                
+
                 System.out.println("Done: " + new Date() + " : clientNum="
                         + clientNum + " of " + jobState.nclients + " with "
                         + nremaining + " remaining : result=" + value);
 
                 try {
-                    notifyOutcome(clientNum, value);
+                    notifyOutcome(clientNum, (U) value);
                 } catch (Throwable t) {
                     log.error("Ignoring thrown exception: " + t);
                 }
@@ -1768,12 +1645,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         for (int clientNum : finished) {
 
-            futures.remove(clientNum);
+            jobState.futures.remove(clientNum);
 
         }
 
         // finished iff no more futures.
-        return futures.isEmpty();
+        return jobState.futures.isEmpty();
 
     }
 
@@ -1785,12 +1662,25 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      * @param mayInterruptIfRunning
      *            If the tasks for the futures may be interrupted.
      */
-    protected void cancelAll(final Map<Integer, Future<U>> futures,
-            final boolean mayInterruptIfRunning) {
+    synchronized// since is invoked from execute() and runClients()
+    protected void cancelAll(final boolean mayInterruptIfRunning) {
 
-        log.warn("Cancelling all futures: nfutures=" + futures.size());
+        if (jobState.futures == null) {
 
-        final Iterator<Future<U>> itr = futures.values().iterator();
+            /*
+             * Note: This is ignored since it is possible that cancelAll() is
+             * invoked from execute() before the client tasks have been assigned
+             * their futures.
+             */
+
+            return;
+
+        }
+
+        log.warn("Cancelling all futures: nfutures=" + jobState.futures.size());
+
+        final Iterator<Future<?/* U */>> itr = jobState.futures.values()
+                .iterator();
 
         while (itr.hasNext()) {
 
@@ -1828,7 +1718,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
         System.out.println("Forced overflow: now=" + new Date());
 
     }
-    
+
     /**
      * Callback for the master to consume the outcome of the client's
      * {@link Future} (default is NOP).
@@ -1839,7 +1729,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      *            The value returned by the {@link Future}.
      */
     protected void notifyOutcome(final int clientNum, final U value) {
-        
+
     }
 
 }

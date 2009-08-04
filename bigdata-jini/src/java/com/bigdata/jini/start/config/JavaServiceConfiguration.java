@@ -71,7 +71,7 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
          * Note: {@link ACL}s may be used to restrict who can set this
          * property.
          */
-        String JAVA = "java";
+        String JAVA_HOME = "javaHome";
 
         /**
          * Command line arguments represented as a {@link String}[] that will
@@ -120,11 +120,11 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
     }
 
     /**
-     * The java executable.
+     * The JAVA_HOME directory.
      * 
-     * @see Options#JAVA
+     * @see Options#JAVA_HOME
      */
-    public final String java;
+    public final File javaHome;
 
     /**
      * Default JVM command line arguments.
@@ -151,7 +151,7 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
 
         super.toString(sb);
 
-        sb.append(", " + Options.JAVA + "=" + java);
+        sb.append(", " + Options.JAVA_HOME + "=" + javaHome);
 
         sb.append(", " + Options.DEFAULT_JAVA_ARGS + "="
                 + Arrays.toString(defaultJavaArgs));
@@ -175,7 +175,7 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
 
         super(getClassName(component, config), config);
 
-        this.java = getJava(component, config);
+        this.javaHome = getJavaHome(component, config);
 
         this.defaultJavaArgs = getDefaultJavaArgs(component, config);
 
@@ -257,12 +257,15 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
         }
         
         /**
-         * Adds {@link Options#JAVA}.
+         * Adds the path of the java executable. This is based on the configured
+         * value of {@link Options#JAVA_HOME}.
+         * 
+         * @see Options#JAVA_HOME
          */
         @Override
-        protected void addCommand(List<String>cmds) {
+        protected void addCommand(final List<String> cmds) {
 
-            cmds.add(java != null ? java : "java");
+            cmds.add(new File(new File(javaHome, "bin"), "java").toString());
 
         }
 
@@ -274,7 +277,7 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
          * @param cmds
          */
         @Override
-        protected void addCommandArgs(List<String> cmds) {
+        protected void addCommandArgs(final List<String> cmds) {
 
             /*
              * Add optional properties to be specified to java on the command
@@ -358,20 +361,31 @@ public class JavaServiceConfiguration extends ServiceConfiguration {
 
     }
 
-    public static String getJava(final String component,
+    /**
+     * Return the configured JAVA_HOME property value or the current value as
+     * reported by the <code>java.home</code> system property if the value was
+     * not explicitly configured.
+     * 
+     * @param component
+     * @param config
+     * @return
+     * @throws ConfigurationException
+     */
+    public static File getJavaHome(final String component,
             final Configuration config) throws ConfigurationException {
 
-        String java = (String) config.getEntry(component, Options.JAVA,
-                String.class, null/* defaultValue */);
+        File javaHome = (File) config.getEntry(component, Options.JAVA_HOME,
+                File.class, null/* defaultValue */);
 
-        if (java == null) {
+        if (javaHome == null) {
 
-            java = (String) config.getEntry(Options.NAMESPACE, Options.JAVA,
-                    String.class, "java");
+            javaHome = (File) config.getEntry(Options.NAMESPACE,
+                    Options.JAVA_HOME, File.class, new File(System
+                            .getProperty("java.home")));
 
         }
 
-        return java;
+        return javaHome;
 
     }
 

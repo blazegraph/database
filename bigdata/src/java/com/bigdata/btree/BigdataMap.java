@@ -54,6 +54,7 @@ import com.bigdata.journal.ConcurrencyManager;
  * handle this constraint. Also, note that point tests for the scale-out indices
  * are VERY expensive when compared to ordered reads and writes.
  * <p>
+ * <p>
  * Note: The total order of the {@link BigdataMap} is completely determined by
  * {@link ITupleSerializer#serializeKey(Object)}. There is NO concept of a
  * {@link Comparator}. The {@link ITupleSerializer} is responsible for coercing
@@ -73,6 +74,12 @@ import com.bigdata.journal.ConcurrencyManager;
  * {@link KeyBuilder#asSortKey(Object)} which does not attenpt to partition the
  * key space by the application key type (keys are not safely polymorphic by
  * default).
+ * <p>
+ * Note: When storing Java objects in the tuple value, the value MUST be treated
+ * as if it is immutable since it will be serialized on insert or update and
+ * deserialized on read. In particular, the pattern of updating the value stored
+ * in the map without {@link #put(Object, Object)}ting the value back into the
+ * map WILL NOT cause the value associated with the tuple to be updated.
  * <p>
  * Note: Both {@link Map#equals(Object)} and {@link Map#hashCode()} are VERY
  * expensive, but that is how they are defined.

@@ -27,15 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package edu.lehigh.swat.bench.ubt.bigdata;
 
+import static edu.lehigh.swat.bench.ubt.bigdata.LubmGeneratorMaster.RunMode.Generate;
+import static edu.lehigh.swat.bench.ubt.bigdata.LubmGeneratorMaster.RunMode.GenerateAndLoad;
+import static edu.lehigh.swat.bench.ubt.bigdata.LubmGeneratorMaster.RunMode.Load;
+
 import java.io.File;
 import java.io.Serializable;
-import java.util.Date;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
@@ -43,13 +45,10 @@ import net.jini.config.ConfigurationException;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 
-import com.bigdata.rdf.load.AbstractRDFTaskFactory;
-import com.bigdata.rdf.load.ConcurrentDataLoader;
-import com.bigdata.rdf.load.IStatementBufferFactory;
 import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.rdf.load.RDFFileLoadTask;
-import com.bigdata.rdf.rio.IAsynchronousWriteStatementBufferFactory;
-import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
 import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -245,7 +244,9 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
         @Override
         protected void toString(StringBuilder sb) {
-        
+
+            super.toString(sb);
+            
             sb.append(", " + ConfigurationOptions.UNIV_NUM + "="
                     + univNum);
 
@@ -316,7 +317,8 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
     /**
      * Runs the master. SIGTERM (normal kill or ^C) will cancel the job,
-     * including any running clients.
+     * including any running clients. Use <code>-Dbigdata.component</code> to
+     * override the configuration component name.
      * 
      * @param args
      *            The {@link Configuration} and any overrides.
@@ -331,20 +333,18 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
         final JiniFederation fed = new JiniClient(args).connect();
 
-        final TaskMaster task = new LubmGeneratorMaster(fed);
-
-        // execute master wait for it to finish.
         try {
 
-            task.innerMain().get();
-            
+            final TaskMaster task = new LubmGeneratorMaster(fed);
+
+            task.execute();
+
         } finally {
-            
-            // always write the date when the master terminates.
-            System.err.println("Done: " + new Date());
-            
+
+            fed.shutdown();
+
         }
-        
+
     }
 
     public LubmGeneratorMaster(final JiniFederation fed)
@@ -984,67 +984,34 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
         }
 
         @Override
-        protected void loadData(final ConcurrentDataLoader loader,
-                final AbstractRDFTaskFactory taskFactory,
-                final AbstractTripleStore tripleStore)
+        protected void loadData(
+                final AsynchronousStatementBufferFactory<BigdataStatement,File> bufferFactory)
                 throws InterruptedException, Exception {
 
             while (true) {
 
                 final boolean isQueueEmpty = clientTask.queue.isEmpty();
 
-                final IStatementBufferFactory bufferFactory = taskFactory.getBufferFactory();
-                
-                if (bufferFactory instanceof IAsynchronousWriteStatementBufferFactory) {
+                if (bufferFactory.isAnyDone()) {
 
-                    if (((IAsynchronousWriteStatementBufferFactory) bufferFactory)
-                            .isAnyDone()) {
-                    
-                        /*
-                         * This should report 'done' until we close the factory
-                         * below and once we close the factory this loop should
-                         * not be repeated.
-                         */
-                        throw new RuntimeException("Consumer is done?");
-                        
-                    }
-                    
+                    /*
+                     * This should report 'done' until we close the factory
+                     * below and once we close the factory this loop should not
+                     * be repeated.
+                     */
+
+                    throw new RuntimeException("Consumer is done?");
+
                 }
 
                 if (isQueueEmpty && clientTask.producerDone) {
 
                     /*
                      * Note: There are no more elements to be taken from the
-                     * queue but there may be tasks still running in the
-                     * ConcurrentDataLoader. Therefore we now wait until all of
-                     * those tasks are complete.
+                     * lubm generator queue so we are done here. The caller will
+                     * await the completion of the statement buffer factory's
+                     * internal tasks.
                      */
-
-                    if (log.isInfoEnabled())
-                        log.info("Will await completion of loader tasks.");
-
-                    loader.awaitCompletion(Long.MAX_VALUE, TimeUnit.SECONDS);
-
-//                    if (bufferFactory instanceof IAsynchronousWriteBufferFactory) {
-//
-//                        /*
-//                         * Now that there are no more tasks running in the CDL
-//                         * we can close the buffer factory. This will close the
-//                         * blocking buffers for the async writes, which will
-//                         * allow the iterators to drain out anything left in the
-//                         * buffers and then report that they are exhausted.
-//                         */
-//                        
-//                        if (log.isInfoEnabled())
-//                            log.info("Closing factory.");
-//
-//                        ((IAsynchronousWriteBufferFactory) bufferFactory)
-//                                .close();
-//                        
-//                    }
-
-                    if (log.isInfoEnabled())
-                        log.info("Done.");
 
                     // done.
                     return;
@@ -1074,12 +1041,10 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
                 /*
                  * Submit a task which will load everything in the file or
                  * directory into the triple store. The task will run
-                 * asynchronously. If the task fails then it will be retried up
-                 * to a configured retry count before being placed into a failed
-                 * state. Metadata about task outcomes is reported via counters
-                 * to the load balancer.
+                 * asynchronously. Metadata about task outcomes is reported via
+                 * performance counters to the load balancer.
                  */
-                loader.submitTask(file.getPath(), taskFactory);
+                bufferFactory.submitOne(file, jobState.rejectedExecutionDelay);
 
             }
 
@@ -1102,6 +1067,11 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
             extends RDFFileLoadTask<S, V> {
 
         /**
+         * 
+         */
+        private static final long serialVersionUID = -5139910859778541040L;
+
+        /**
          * @param clientTask
          */
         public LoadDataTask(final S jobState, final int clientNum) {
@@ -1110,6 +1080,66 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
         }
         
+        /*
+         * @todo This modification does not work. The problem is that the client
+         * assignment is not stable between the generate and the load phase.
+         * 
+         * There are a few workarounds and a few fixes.
+         * 
+         * workaround1: one client per CS host and use jobState.outDir. This
+         * works because the same named directory is used on each host so it
+         * does not matter which client is assigned to which host in the load
+         * phase. This does not let me experiment with two clients per CS.
+         * 
+         * workaround2: modify main() to run two jobs back to back with the same
+         * client assignments but different runMode - first generate, then load.
+         * this is a bit of a hack (quite a bit of a hack), but let's me test
+         * two clients per CS host.
+         * 
+         * fix: modify generate to write onto shared storage and load to use a
+         * master which hands off chunks of files to the clients, handles client
+         * failure, ensures that clients do not attempt to all load the same
+         * files, etc. This is nice (necessary) step for the master, but the
+         * test cluster does not have enough shared storage for large runs...
+         * This would also work if the data were pre-generated.
+         * 
+         * To be robust, the master would have to watch for zk/jini service
+         * disconnect events and retask the last chunk if the client goes
+         * down.  This is really very much like the index write pipeline,
+         * which could be abstracted to cover this case.  Even to the point
+         * of a redirect handling a failed client.  The hash partitioning
+         * is different, but not much else. 
+         * 
+         * The master would have the scan logic, which should be abstract
+         * or an interface.  E.g., read from FS, HDFS, index, SPARQL, etc.
+         * 
+         * The client should be parameterized for the data type of the
+         * resource identifier and should have an abstract method or 
+         * interface for resolving the resource from the identifier.
+         */
+        
+//        /**
+//         * Overriden to use the per-client directory based on
+//         * {@link JobState#outDir} and the assigned client#.
+//         */
+//        @Override
+//        protected void loadData(//
+//                final AsynchronousStatementBufferFactory<BigdataStatement> factory)
+//                throws InterruptedException, Exception {
+//
+//            final File outDir = new File(jobState.outDir, "client" + clientNum);
+//
+//            if(!outDir.exists()) {
+//                
+//                throw new FileNotFoundException(outDir.toString());
+//                
+//            }
+//            
+//            factory.submitAll(outDir, jobState.dataDirFilter,
+//                    jobState.rejectedExecutionDelay);
+//
+//        }
+
     }
 
 }

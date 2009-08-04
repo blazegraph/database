@@ -1,8 +1,10 @@
 package com.bigdata.jini.start.config;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.Writer;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -16,13 +18,16 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.ServicesManagerServer;
+import com.bigdata.jini.start.config.ManagedServiceConfiguration.ManagedServiceStarter;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.jini.IReplicatableService;
 import com.bigdata.service.jini.JiniFederation;
 import com.sun.jini.config.ConfigUtil;
+import com.sun.jini.resource.ServiceConfigurationError;
 import com.sun.jini.tool.ClassServer;
 
 /**
@@ -78,12 +83,10 @@ abstract public class ServiceConfiguration implements Serializable {
         String OPTIONS = "options";
 
         /**
-         * The default path used when creating the directory for a new service
-         * instance. This value may be overridden on a per-service type basis.
-         * <p>
-         * Note: For logical services that support failover, the concrete
-         * service directory is assigned dynamically when a physical service
-         * instance is created.
+         * The base directory for the persistent state service instances.
+         * Services are normally started in a subdirectory path reflecting the
+         * service type, the logical service instance, and the physical service
+         * instance.
          */
         String SERVICE_DIR = "serviceDir";
 
@@ -146,8 +149,10 @@ abstract public class ServiceConfiguration implements Serializable {
     public String[] options;
 
     /**
-     * The directory for the persistent state of the instances of this service
-     * type.
+     * The base directory for the persistent state service instances. Services
+     * are normally started in a subdirectory path reflecting the service type,
+     * the logical service instance, and the physical service instance. For
+     * example, see {@link ManagedServiceStarter#getServiceDir()}.
      * 
      * @see Options#SERVICE_DIR
      */
@@ -497,6 +502,9 @@ abstract public class ServiceConfiguration implements Serializable {
             // setup the process builder.
             final ProcessBuilder processBuilder = newProcessBuilder();
             
+            // write "start" file containing command line to start the service.
+            writeStartFile(processBuilder);
+            
             // start the process.
             final V processHelper = (V) newProcessHelper(className,
                     processBuilder, listener);
@@ -606,9 +614,13 @@ abstract public class ServiceConfiguration implements Serializable {
         }
 
         /**
-         * Hook for overriding the service directory.
+         * Hook for overriding the service directory. The default returns the
+         * {@link ServiceConfiguration#serviceDir}. It SHOULD be overriden to
+         * return the actual directory in which the specific service instance
+         * will be started.
          * 
-         * @throws Exception
+         * @see ServiceConfiguration#serviceDir
+         * @see ServiceConfiguration#getServiceDir(String, Configuration)
          */
         protected File getServiceDir()  {
          
@@ -786,6 +798,42 @@ abstract public class ServiceConfiguration implements Serializable {
 
         }
 
+        /**
+         * Write a file named <code>start</code> in the <i>serviceDir</i>
+         * whose contents are the command line which may be used to start the
+         * service. This file is not normally used to start the service, but it
+         * may be used as a debugging aid permitting service start from the
+         * command line.
+         * 
+         * @param processBuilder
+         *            The configured process builder.
+         * 
+         * @throws IOException
+         */
+        protected void writeStartFile(final ProcessBuilder processBuilder) throws IOException {
+            
+            final File file = new File(getServiceDir(), "startService"
+                    + (SystemUtil.isWindows() ? ".bat" : ""));
+            
+            final Writer os = new FileWriter(file);
+            
+            try {
+
+                os
+                        .write(ProcessHelper.getEnvironment(processBuilder)
+                                + "\n"
+                                + ProcessHelper
+                                        .getCommandString(processBuilder)
+                                + "\n");
+                
+            } finally {
+            
+                os.close();
+                
+            }
+            
+        }
+        
     }
     
     /*

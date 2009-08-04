@@ -476,6 +476,16 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
         final File configFile;
         final File myidFile;
         
+
+        /**
+         * Returns the actual service directory, which is {@link #dataDir}.
+         */
+        protected File getServiceDir() {
+            
+            return dataDir;
+            
+        }
+        
         /**
          * @param entry
          *            Identifies the specific server instance to start.
@@ -649,7 +659,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
          * class name.
          */
         @Override
-        protected void addCommandArgs(List<String> cmds) {
+        protected void addCommandArgs(final List<String> cmds) {
 
             super.addCommandArgs(cmds);
         

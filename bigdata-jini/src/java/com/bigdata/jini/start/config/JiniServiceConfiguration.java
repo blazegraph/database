@@ -150,23 +150,23 @@ abstract public class JiniServiceConfiguration extends
      * @param config
      * @throws ConfigurationException
      */
-    public JiniServiceConfiguration(final String className, final Configuration config)
-            throws ConfigurationException {
- 
+    public JiniServiceConfiguration(final String className,
+            final Configuration config) throws ConfigurationException {
+
         super(className, config);
-        
-        JiniClientConfig tmp = new JiniClientConfig(className,config);
-        
+
+        JiniClientConfig tmp = new JiniClientConfig(className, config);
+
         entries = tmp.entries;
 
         groups = tmp.groups;
-        
+
         locators = tmp.locators;
-        
-        properties = JiniClient.getProperties(className,config);
-        
+
+        properties = JiniClient.getProperties(className, config);
+
         jiniOptions = getJiniOptions(className, config);
-        
+
     }
 
     /**
@@ -175,10 +175,10 @@ abstract public class JiniServiceConfiguration extends
      * @param logicalServiceZPath
      *            This zpath of the logicalService instance.
      * @param attributes
-     *            This provides the information required to restart a
-     *            persistent service. When not given a new service instance
-     *            will be started. When given, the same service instance
-     *            will be restarted.
+     *            This provides the information required to restart a persistent
+     *            service. When not given a new service instance will be
+     *            started. When given, the same service instance will be
+     *            restarted.
      */
     public JiniServiceStarter newServiceStarter(JiniFederation fed,
             IServiceListener listener, String zpath, Entry[] attributes)
@@ -388,7 +388,7 @@ abstract public class JiniServiceConfiguration extends
          * 
          * @throws IOException
          */
-        protected void writeConfigFile(Writer out) throws IOException {
+        protected void writeConfigFile(final Writer out) throws IOException {
 
             // write comments on the file.
             writeComments(out);
@@ -427,7 +427,7 @@ abstract public class JiniServiceConfiguration extends
         /**
          * Write comments at the top of the configuration file.
          */
-        protected void writeComments(Writer out) throws IOException {
+        protected void writeComments(final Writer out) throws IOException {
             
             out.write("// className=" + className + "\n");
 
@@ -477,7 +477,7 @@ abstract public class JiniServiceConfiguration extends
          * @param out
          * @throws IOException
          */
-        protected void writeEntries(Writer out) throws IOException {
+        protected void writeEntries(final Writer out) throws IOException {
 
             final Entry[] entries = getEntries(JiniServiceConfiguration.this.entries);
 
@@ -626,7 +626,7 @@ abstract public class JiniServiceConfiguration extends
             
             out.write("\nproperties = new NV[]{\n");
 
-            Enumeration e = properties.propertyNames();
+            final Enumeration e = properties.propertyNames();
 
             while(e.hasMoreElements()) {
 

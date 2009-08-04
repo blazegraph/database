@@ -38,7 +38,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
-import org.apache.log4j.MDC;
 
 import com.bigdata.Banner;
 import com.bigdata.btree.IIndex;
@@ -59,7 +58,6 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.DropIndexTask;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.ILocalTransactionManager;
-import com.bigdata.journal.IResourceLockService;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
@@ -112,66 +110,6 @@ import com.bigdata.service.jini.DataServer;
  *       bidirectional. Can that rate be sustained with a fully connected
  *       bi-directional transfer?
  * 
- * FIXME LockManager and FutureCompletionService
- * <p>
- * I have figured out the cause of the concurrency bottleneck. We can patch it
- * by increasing the thread pool size, but the cause is the lock manager which
- * requires a thread for a task to await a lock rather than being purely state
- * based. E.g., it is based on a queue of threads executing tasks awaiting
- * access to resources rather than a queue of tasks. I can refactor to fix this
- * issue, but I think that we can defer that for now. There is a similar thread
- * consumption issue arising in the RMI interface. Even through RMI is using NIO
- * for communications, each remote request is attached to a worker thread. So
- * each task submitted to a data service is immediately attached to a thread and
- * then to another thread if it needs to await a resource lock. The way to fix
- * this is to change the API to always return a Future for the operation
- * immediately (so we don't have as many threads awaiting RMI outcomes) and then
- * use a future completion service on the bigdata federation class that accepts
- * asynchronous outcomes for the submitted events. This will correspond nicely
- * to the Java ExecutorService and Future APIs, will simplify the API, will
- * consume fewer resources on the services, and will allow greater concurrency.
- * <p>
- * The following notes in fact describe very much the same problem:
- * <p>
- * RPC requests are currently made via RPC using JERI. While you can elect to
- * use the TCP/NIO server via configuration options (see
- * http://java.sun.com/products/jini/2.0.1/doc/api/net/jini/jeri/tcp/package-summary.html),
- * there will still be a thread allocated per concurrent RPC and no throttling
- * will be imposed by JERI.
- * <p>
- * The present design of the {@link IDataService} API requires that a server
- * thread be dedicated to each request against that interface - in this way it
- * exactly matches the RPC semantics supported by JERI. The underlying reason is
- * that the RPC calls are all translated into {@link Future}s when the are
- * submitted via {@link ConcurrencyManager#submit(AbstractTask)}. The
- * {@link DataService} itself then invokes {@link Future#get()} in order to
- * await the completion of the request and return the response (object or thrown
- * exception).
- * <p>
- * A re-design based on an asynchronous response from the server could remove
- * this requirement, thereby allowing a handful of server threads to handle a
- * large volume of concurrent client requests. The design would use asynchronous
- * callback to the client via JERI RPC calls to return results, indications that
- * the operation was complete, or exception information. A single worker thread
- * on the server could monitor the various futures and RPC clients when
- * responses become available or on request timeout. (This would be the
- * FutureCompletionService).
- * 
- * FIXME It is possible that a deadlock could arise due to the current design of
- * the {@link LockManager} as outlined above. The deadlock situation would occur
- * when a running task (A) needs to run an unisolated operation (B) on another
- * index partition on the same data service. If all threads in the write service
- * for the target data service are blocked awaiting access to a resource that is
- * being created by (A) then (A) will block since (B) will not be executed
- * because the thread pool is already saturated by tasks awaiting access to (A).
- * A variant across data services might also be possible.
- * <p>
- * This situation is only likely to arise for asynchronous overflow tasks since
- * they can introduce this kind of dependency during their atomic update phase.
- * The workaround is to increase the core thread pool size for the
- * {@link ConcurrencyManager}. The issue will be resolved by a re-design of the
- * {@link LockManager}.
- * 
  * FIXME Probably ALL of the methods {@link IDataService} should be subsumed
  * under {@link #submit(Callable)} or
  * {@link #submit(long, String, IIndexProcedure)} so they do not block on the
@@ -183,7 +121,7 @@ import com.bigdata.service.jini.DataServer;
  *       case. Do we have to handle it specially?
  */
 abstract public class DataService extends AbstractService
-    implements IDataService, IServiceShutdown //IWritePipeline
+    implements IDataService, IServiceShutdown, ISession //IWritePipeline
 {
 
     protected static final Logger log = Logger.getLogger(DataService.class);
@@ -333,23 +271,10 @@ abstract public class DataService extends AbstractService
     }
 
     /**
-     * The dynamic property set associated with the data service instance.
+     * The dynamic property set associated with the service instance.
      */
     private final Session session = new Session();
     
-    /**
-     * The dynamic property set (aka session) associated with the
-     * {@link DataService} instance. The state of the {@link Session} is NOT
-     * persistent.
-     * <p>
-     * <strong>This is an experimental feature</strong>
-     * <p>
-     * Note: These {@link Session} properties are transient and local to a
-     * specific {@link DataService} instance. if failover support is desired,
-     * then you should probably use the {@link IResourceLockService} so that the
-     * updates can be atomic across the replicated instances of the data
-     * service.
-     */
     public Session getSession() {
 
         return session;

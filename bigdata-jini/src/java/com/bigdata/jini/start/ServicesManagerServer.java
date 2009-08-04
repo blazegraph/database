@@ -310,20 +310,6 @@ import com.sun.jini.start.ServiceStarter;
  * implemented yet) and providing failover for the various bigdata services (not
  * implemented yet).
  * 
- * FIXME Start httpd for downloadable code. (contend for lock on node, start
- * instance if insufficient instances are running). The codebase URI should be
- * the concatenation of the URIs for each httpd instance that has been
- * configured. Unlike some other configuration properties, I am not sure that
- * the codebase URI can be changed once a service has been started. We will have
- * to unpack all of the classes into the file system, and then possibly create a
- * single JAR from them, and expose that use the ClassServer. This should be
- * done BEFORE starting jini since jini can then recognize our services in the
- * service browser (the codebase URI needs to be set for that to work).
- * <p>
- * See https://deployutil.dev.java.net/
- * <p>
- * Use class server URL(s) when starting services for their RMI codebase.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
@@ -332,10 +318,6 @@ import com.sun.jini.start.ServiceStarter;
 public class ServicesManagerServer extends AbstractServer {
 
     protected static final Logger log = Logger.getLogger(ServicesManagerServer.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * {@link Configuration} options.
@@ -425,7 +407,7 @@ public class ServicesManagerServer extends AbstractServer {
 
             this.oldHandler = Signal.handle(signal, this);
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Installed handler: " + signal + ", oldHandler="
                         + this.oldHandler);
 
@@ -531,7 +513,7 @@ public class ServicesManagerServer extends AbstractServer {
         
         public Object getAdmin() throws RemoteException {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("" + getServiceUUID());
 
             return server.proxy;

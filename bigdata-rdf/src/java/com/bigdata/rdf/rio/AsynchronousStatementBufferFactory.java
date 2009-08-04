@@ -33,9 +33,11 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -49,10 +51,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
@@ -61,6 +63,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipInputStream;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
@@ -77,6 +81,7 @@ import com.bigdata.btree.proc.IAsyncResultHandler;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractTask;
@@ -98,7 +103,6 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids2.AsynchronousWriteBufferFactoryWithoutSids2;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOIndexWriteProc;
 import com.bigdata.rdf.spo.SPOIndexWriter;
@@ -127,17 +131,12 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.Latch;
 import com.bigdata.util.concurrent.ShutdownHelper;
 import com.bigdata.util.concurrent.ThreadPoolExecutorBaseStatisticsTask;
-import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Configuration object specifies the {@link BlockingBuffer}s which will be used
- * to write on each of the indices and the reference for the TERM2ID index since
- * we will use synchronous RPC on that index. The same
- * {@link AsynchronousWriteBufferFactoryWithoutSids2} may be used for multiple
- * concurrent {@link AsynchronousStatementBufferImpl} instances.
+ * Factory object for high-volume RDF data load.
  * <p>
  * The asynchronous statement buffer w/o SIDs is much simpler that w/. If we
  * require that the document is fully buffered in memory, then we can simplify
@@ -175,15 +174,14 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- *          FIXME Modify to support SIDs. We basically need to loop in the
- *          {@link #workflowLatch_bufferTerm2Id} workflow state until all SIDs
- *          have been assigned. However, the termination conditions will be a
- *          little more complex. During termination, if we have the TIDs but not
- *          yet the SIDs then we need to flush the SID requests rather than
- *          allowing them to timeout. Since SID processing is cyclic, we may
- *          have to do this one or more times.
+ * FIXME Modify to support SIDs. We basically need to loop in the
+ * {@link #workflowLatch_bufferTerm2Id} workflow state until all SIDs have been
+ * assigned. However, the termination conditions will be a little more complex.
+ * During termination, if we have the TIDs but not yet the SIDs then we need to
+ * flush the SID requests rather than allowing them to timeout. Since SID
+ * processing is cyclic, we may have to do this one or more times.
  * 
- *          <pre>
+ * <pre>
  * AsynchronousStatementBufferWithSids:
  * 
  * When SIDs are enabled, we must identify the minimum set of statements
@@ -306,9 +304,11 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * @param <S>
  *            The generic type of the statement objects.
+ * @param <R>
+ *            The generic type of the resource identifier (File, URL, etc).
  */
-public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
-    implements IAsynchronousWriteStatementBufferFactory<S> {
+public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
+        implements IAsynchronousWriteStatementBufferFactory<S> {
 
     final protected transient static Logger log = Logger
             .getLogger(AsynchronousStatementBufferFactory.class);
@@ -407,6 +407,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      * If the TERM2ID asynchronous write buffer is open, then close it to flush
      * any buffered writes and, regardless, re-open the buffer if it is
      * configured for use.
+     * 
+     * @todo re-opening is not required so this could be moved into the ctor and
+     *       the fields made final.
      */
     private void reopenBuffer_term2Id() {
 
@@ -433,6 +436,9 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      * For each of the non-TERM2ID asynchronous write buffers, if it is open,
      * then close it to flush any buffered writes and, regardless, re-open the
      * buffer if it is configured for use.
+     * 
+     * @todo re-opening is not required so this could be moved into the ctor and
+     *       the fields made final.
      */
     private final void reopenBuffer_others() {
 
@@ -636,7 +642,26 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      * The #of documents whose TIDs have been assigned (cumulative total).
      */
     private final AtomicLong documentTIDsReadyCount = new AtomicLong(0L);
-    
+
+    /**
+     * The #of documents that are waiting on their TIDs (current value). The
+     * counter is incremented when a document begins to buffer writes on the
+     * TERM2ID index. The counter is decremented as soon as those writes are
+     * restart safe.
+     * <p>
+     * Note: The {@link #workflowLatch_bufferTerm2Id} is only decremented when
+     * the document begins to write on the other indices, so
+     * {@link #documentTIDsWaitingCount} will be decremented before
+     * {@link #workflowLatch_bufferTerm2Id}. The two counters will track very
+     * closely unless the {@link #otherWriterService} has a backlog.
+     * <p>
+     * Note: The {@link #workflowLatch_bufferOther} is decremented as soon as
+     * the writes on the other indices are restart safe since there is no
+     * transition to another workflow state. This is why there is no counter for
+     * "documentOtherWaitingCount".
+     */
+    private final AtomicLong documentTIDsWaitingCount = new AtomicLong(0L);
+
     /**
      * The #of told triples parsed from documents using this factory and
      * made restart safe on the database. This is incremented each time a
@@ -696,8 +721,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
     /**
      * A {@link Latch} guarding documents which have been accepted for parsing
-     * but have not been transferred to the {@link #workflowLatch_bufferTerm2Id}
-     * .
+     * but have not been transferred to the {@link #workflowLatch_bufferTerm2Id}.
      * 
      * @todo We could add a resolver latch for network IO required to buffer the
      *       document locally. E.g., a read from a DFS or a web page.
@@ -753,40 +777,48 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      */
 
     /**
-     * The maximum #of statements which may be buffered before the
-     * {@link #parserService} will be paused in order to permit buffered
-     * statements to drain from memory. In order to ensure liveness, pausing the
-     * write service MUST be combined with flushing writes through the
-     * asynchronous write buffers, which will otherwise wait for an idle timeout
-     * or a chunk timeout if they are not being driven by demand.
+     * New parser tasks submitted to the {@link #parserService} will block when
+     * the {@link #unbufferedStatementCount} is GT this value. This is used to
+     * control the RAM demand of the parsed (but not yet buffered) statements.
+     * The RAM demand of the buffered statements is controlled by the capacity
+     * of the master and sink queues on which those statements are buffered.
      * 
-     * FIXME Ensure liveness by closing and re-opening the asynchronous write
-     * buffers if the parser service is paused and the work queue for the
-     * corresponding stage (term2Id or other index writes) is empty. The
-     * close/open needs to be atomic of course, and it should be triggered when
-     * parser tasks are blocking (paused) AND the master is empty. That could be
-     * done with a timeout in the {@link ParserThreadPoolExecutor} when it is
-     * awaiting the {@link #unpaused} {@link Condition}.
-     * <p>
-     * Use small value on U1 test variant to look for fence posts.
+     * @todo it is possible that the buffered writes on term2id could limit
+     *       throughput when the parser pool is paused since the decision to
+     *       pause the parser pool is based on the #of unbuffered statements
+     *       overall not just those staged for the term2id or the other indices.
      */
-    private final long bufferedStatementThreshold;
-    
+    private final long pauseParserPoolStatementThreshold;
+
     /**
-     * The #of RDF {@link Statement}s that are buffered. This is incremented
-     * when all statements for a given document have been parsed by the #of
-     * distinct statements in that document. This is decremented all writes for
-     * that document have been made restart safe on the database, or if
-     * processing fails for that document. This may be used as a proxy for the
-     * amount of data which is unavailable for garbage collection and thus for
-     * the size of the heap entailed by processing.
+     * The #of statements which have been parsed but not yet written onto the
+     * asynchronous index write buffers. This is incremented when all statements
+     * for a given document have been parsed by the #of distinct statements in
+     * that document. This is decremented when all statements for that document
+     * have been placed onto the asynchronous index write buffers, or if
+     * processing fails for that document. This is used to prevent new parser
+     * threads from overrunning the database when the parsers are faster than
+     * the database.
      */
-    private final AtomicLong bufferedStatementCount = new AtomicLong();
+    private final AtomicLong unbufferedStatementCount = new AtomicLong();
+
+    /**
+     * The #of RDF {@link Statement}s that have been parsed but which are not
+     * yet restart safe on the database. This is incremented when all statements
+     * for a given document have been parsed by the #of distinct statements in
+     * that document. This is decremented when all writes for that document have
+     * been made restart safe on the database, or if processing fails for that
+     * document. This may be used as a proxy for the amount of data which is
+     * unavailable for garbage collection and thus for the size of the heap
+     * entailed by processing.
+     */
+    private final AtomicLong outstandingStatementCount = new AtomicLong();
 
     /**
      * In order to prevent runaway demand on RAM, new parser tasks must await
-     * this {@link Condition} if the #of buffered statements is GTE the
-     * configured {@link #bufferedStatementThreshold} threshold.
+     * this {@link Condition} if the #of parsed but not yet buffered statements
+     * is GTE the configured {@link #pauseParserPoolStatementThreshold}
+     * threshold.
      */
     private Condition unpaused = lock.newCondition();
 
@@ -856,11 +888,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
     private final ThreadPoolExecutor otherWriterService;
 
     /**
-     * Bounded thread pool with an unbounded work queue used to delete files
-     * once they are restart safe on the database. This thread pool is created
-     * iff the {@link #deleteAfter} option was specified.
+     * Bounded thread pool with an unbounded work queue used process per file
+     * success or failure notices.
      */
-    private final ThreadPoolExecutor deleteService;
+    private final ThreadPoolExecutor notifyService;
 
     /**
      * {@link Runnable} collects performance counters on services used by the
@@ -919,7 +950,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
     }
 
     protected AsynchronousStatementBufferImpl newStatementBuffer(
-            final String resource) {
+            final R resource) {
 
         return new AsynchronousStatementBufferImpl(resource);
 
@@ -932,8 +963,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      *            The resource (file or URL, but not a directory).
      * 
      * @throws Exception
+     *             if there is a problem creating the parser task.
+     * @throws RejectedExecutionException
+     *             if the work queue for the parser service is full.
      */
-    public void submitOne(final String resource) throws Exception {
+    public void submitOne(final R resource) throws Exception {
 
         lock.lock();
         try {
@@ -958,17 +992,113 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
         }
 
-        /*
-         * Submit resource for parsing.
-         * 
-         * @todo it would be nice to return a Future here that tracked the
-         * document through the workflow.
-         */
+        try {
+        
+            /*
+             * Submit resource for parsing.
+             * 
+             * @todo it would be nice to return a Future here that tracked the
+             * document through the workflow.
+             */
 
-        parserService.submit(newParserTask(resource));
+            parserService.submit(newParserTask(resource));
+            
+        } catch (RejectedExecutionException ex) {
+
+            /*
+             * Back out the document since the task was not accepted for
+             * execution.
+             */
+
+            lock.lock();
+            try {
+                assertSumOfLatchs();
+                workflowLatch_document.dec();
+                workflowLatch_parser.dec();
+                assertSumOfLatchs();
+            } finally {
+                lock.unlock();
+            }
+            
+            throw ex;
+
+        }
 
     }
 
+    /**
+     * Submit a resource for processing.
+     * 
+     * @param resource
+     *            The resource (file or URL, but not a directory).
+     * @param retryMillis
+     *            The number of millisseconds to wait between retrys when the
+     *            parser service work queue is full. When ZERO (0L), a
+     *            {@link RejectedExecutionException} will be thrown out instead.
+     * 
+     * @throws Exception
+     *             if there is a problem creating the parser task.
+     * @throws RejectedExecutionException
+     *             if the service is shutdown -or- the retryMillis is ZERO(0L).
+     */
+    public void submitOne(final R resource, final long retryMillis)
+            throws InterruptedException {
+
+        if (resource == null)
+            throw new IllegalArgumentException();
+
+        if (retryMillis < 0)
+            throw new IllegalArgumentException();
+        
+        int retryCount = 0;
+        
+        while (true) {
+            
+            try {
+
+                // submit resource for processing.
+                submitOne(resource);
+                
+                return;
+
+            } catch (RejectedExecutionException ex) {
+
+                if(parserService.isShutdown()) {
+                    
+                    // Do not retry since service is closed.
+                    throw ex;
+                    
+                }
+                
+                if (retryMillis == 0L) {
+
+                    // Do not retry since if retry interval is 0L.
+                    throw ex;
+
+                }
+
+                // sleep for the retry interval.
+                Thread.sleep(retryMillis);
+                
+                retryCount++;
+                
+                // retry
+                continue;
+
+            } catch (InterruptedException ex) {
+
+                throw ex;
+
+            } catch (Exception ex) {
+
+                log.error(resource, ex);
+
+            }
+
+        }
+
+    }
+    
     /**
      * Submit all files in a directory for processing via
      * {@link #submitOne(String)}.
@@ -978,18 +1108,66 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      * @param filter
      *            An optional filter. Only the files selected by the filter will
      *            be processed.
+     * @param retryMillis
+     *            The number of millisseconds to wait between retrys when the
+     *            parser service work queue is full. When ZERO (0L), a
+     *            {@link RejectedExecutionException} will be thrown out instead.
      * 
      * @return The #of files that were submitted for processing.
      * 
      * @throws Exception
      */
-    public int submitAll(final File fileOrDir, final FilenameFilter filter)
+    public int submitAll(final File fileOrDir, final FilenameFilter filter,
+            final long retryMillis)
             throws Exception {
 
-        return new RunnableFileSystemLoader(fileOrDir, filter).call();
+        return new RunnableFileSystemLoader(fileOrDir, filter, retryMillis)
+                .call();
 
     }
 
+    /**
+     * Open an buffered input stream reading from the resource. If the resource
+     * ends with <code>.gz</code> or <code>.zip</code> then the appropriate
+     * decompression will be applied.
+     * 
+     * @param resource
+     *            The resource identifier.
+     */
+    protected InputStream getInputStream(R resource) throws IOException {
+        
+        InputStream is;
+
+        if (resource instanceof File) {
+
+            is = new FileInputStream((File) resource);
+
+            final String name = ((File) resource).getName(); 
+            
+            if (name.endsWith(".gz")) {
+                
+                is = new GZIPInputStream(is);
+                
+            } else if(name.endsWith(".zip")) {
+                
+                is = new ZipInputStream(is);
+                
+            }
+            
+        } else if (resource instanceof URL) {
+
+            is = ((URL) resource).openStream();
+
+        } else {
+
+            throw new UnsupportedOperationException();
+
+        }
+
+        return is;
+        
+    }
+    
     /**
      * Return a task to parse the document. The task should allocate an
      * {@link AsynchronousStatementBufferImpl} for the document. When
@@ -1002,16 +1180,19 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      * 
      * @throws Exception
      */
-    protected Callable<?> newParserTask(final String resource) throws Exception {
+    protected Callable<?> newParserTask(final R resource) throws Exception {
 
-        if (log.isInfoEnabled())
-            log.info("resource=" + resource);
+        final String resourceStr = resource.toString();
         
-        final RDFFormat defaultFormat= getDefaultRDFFormat();
+        if (log.isInfoEnabled())
+            log.info("resource=" + resourceStr);
+        
+        final RDFFormat defaultFormat = getDefaultRDFFormat();
 
+        // @todo when resource is URL use reported MimeTYPE also.
         final RDFFormat rdfFormat = (defaultFormat == null //
-                ? RDFFormat.forFileName(resource) //
-                : RDFFormat.forFileName(resource, defaultFormat)//
+                ? RDFFormat.forFileName(resourceStr) //
+                : RDFFormat.forFileName(resourceStr, defaultFormat)//
         );
         
         if (rdfFormat == null) {
@@ -1024,21 +1205,21 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
         // Convert the resource identifier to a URL.
         final String baseURI; ;
-        if (getClass().getResource(resource) != null) {
+        if (getClass().getResource(resourceStr) != null) {
             
-            baseURI = getClass().getResource(resource).toURI()
+            baseURI = getClass().getResource(resourceStr).toURI()
                     .toString();
             
         } else {
             
-            baseURI = new File(resource).toURI().toString();
+            baseURI = new File(resourceStr).toURI().toString();
             
         }
 
         return new ParserTask(resource, baseURI, rdfFormat);
 
     }
-
+    
     /**
      * Tasks either loads a RDF resource or verifies that the told triples found
      * in that resource are present in the database. The difference between data
@@ -1052,7 +1233,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
         /**
          * The resource to be loaded.
          */
-        private final String resource;
+        private final R resource;
         
         /**
          * The base URL for that resource.
@@ -1074,7 +1255,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
          * @param rdfFormat
          *            The RDF interchange syntax that the file uses.
          */
-        public ParserTask(final String resource, final String baseURL,
+        public ParserTask(final R resource, final String baseURL,
                 final RDFFormat rdfFormat) {
 
             if (resource == null)
@@ -1097,7 +1278,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                     .newStatementBuffer(resource);
             try {
                 // open reader on the file.
-                final InputStream rdfStream = new FileInputStream(resource);
+                final InputStream rdfStream = getInputStream(resource);
                 try {
                     // Obtain a buffered reader on the input stream.
                     final Reader reader = new BufferedReader(new InputStreamReader(
@@ -1119,8 +1300,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                     // queue task to buffer the writes.
                     term2IdWriterService
                             .submit(new BufferTerm2IdWrites(buffer));
-                    // increment #of buffered statements.
-                    bufferedStatementCount.addAndGet(buffer.statementCount);
+                    // increment #of outstanding statements (parsed but not restart safe). 
+                    outstandingStatementCount.addAndGet(buffer.statementCount);
+                    // increment #of unbuffered statements.
+                    unbufferedStatementCount.addAndGet(buffer.statementCount);
                 } finally {
                     lock.unlock();
                 }
@@ -1142,6 +1325,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
         }
 
     } // ParserTask
+
+    public String toString() {
+
+        return super.toString() + "::" + getCounters();
+        
+    }
 
     /**
      * 
@@ -1177,11 +1366,16 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      * @param otherWriterPoolSize
      *            The #of worker threads in the thread pool for buffering
      *            asynchronous index writes on the other indices.
-     * @param bufferedStatementThreshold
-     *            The maximum #of statements which can be buffered before new
-     *            parser tasks are paused and the buffered writes are flushed to
-     *            the database. This allows you to place a constraint on the RAM
-     *            demand of the buffered documents.
+     * @param notifyPoolSize
+     *            The #of worker threads in the thread pool for handling
+     *            document success and document error notices.
+     * @param pauseParsedPoolStatementThreshold
+     *            The maximum #of statements which can be parsed but not yet
+     *            buffered before requests for new parser tasks are paused [0:
+     *            {@link Long#MAX_VALUE}]. This allows you to place a
+     *            constraint on the RAM of the parsers. The RAM demand of the
+     *            asynchronous index write buffers is controlled by their master
+     *            and sink queue capacity and chunk size.
      * 
      * @todo CDL still used for validation by some unit tests. Do a variant of
      *       this that does read-only TERM2ID requests and then validates the
@@ -1199,7 +1393,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
             final int parserQueueCapacity,//
             final int term2IdWriterPoolSize,//
             final int otherWriterPoolSize,//
-            final long bufferedStatementThreshold//
+            final int notifyPoolSize,//
+            final long pauseParsedPoolStatementThreshold//
             ) {
 
         if (tripleStore == null)
@@ -1210,7 +1405,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
             throw new IllegalArgumentException();
         if (bnodesInitialCapacity <= 0)
             throw new IllegalArgumentException();
-        if (bufferedStatementThreshold <= 0)
+        if (pauseParsedPoolStatementThreshold < 0)
             throw new IllegalArgumentException();
         
         this.tripleStore = tripleStore;
@@ -1231,7 +1426,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
         
         this.deleteAfter = deleteAfter;
 
-        this.bufferedStatementThreshold = bufferedStatementThreshold;
+        this.pauseParserPoolStatementThreshold = pauseParsedPoolStatementThreshold;
         
         if (tripleStore.isStatementIdentifiers()) {
 
@@ -1278,11 +1473,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
          * the maximumPoolSize and idle threads will be retired, but only after
          * several minutes. 
          */
-
         parserService = new ParserThreadPoolExecutor(//
                 1, // corePoolSize
                 parserPoolSize, // maximumPoolSize
-                4, // keepAliveTime
+                1, // keepAliveTime
                 TimeUnit.MINUTES, // keepAlive units.
                 new LinkedBlockingQueue<Runnable>(parserQueueCapacity),// workQueue
                 new DaemonThreadFactory(getClass().getName()+"_parserService") // threadFactory
@@ -1294,12 +1488,15 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
          * unbounded workQueue and a bounded thread pool. The #of threads in
          * the pool should build up to the maximumPoolSize and idle threads
          * will be retired, but only after several minutes.
+         * 
+         * Note: Since we are using an unbounded queue, at most corePoolSize
+         * threads will be created. Therefore we interpret the caller's argument
+         * as both the corePoolSize and the maximumPoolSize.
          */
-
         term2IdWriterService = new ThreadPoolExecutor(//
-                1, // corePoolSize
+                term2IdWriterPoolSize, // corePoolSize
                 term2IdWriterPoolSize, // maximumPoolSize
-                4, // keepAliveTime
+                1, // keepAliveTime
                 TimeUnit.MINUTES, // keepAlive units.
                 new LinkedBlockingQueue<Runnable>(/* unbounded */),// workQueue
                 new DaemonThreadFactory(getClass().getName()+"_term2IdWriteService") // threadFactory
@@ -1307,32 +1504,43 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
         /*
          * Note: This service MUST NOT block or reject tasks as long as the
-         * statement buffer factory is open. It is configured with an
-         * unbounded workQueue and a bounded thread pool. The #of threads in
-         * the pool should build up to the maximumPoolSize and idle threads
-         * will be retired, but only after several minutes.
+         * statement buffer factory is open. It is configured with an unbounded
+         * workQueue and a bounded thread pool. The #of threads in the pool
+         * should build up to the maximumPoolSize and idle threads will be
+         * retired, but only after several minutes.
+         * 
+         * Note: Since we are using an unbounded queue, at most corePoolSize
+         * threads will be created. Therefore we interpret the caller's argument
+         * as both the corePoolSize and the maximumPoolSize.
          */
-
         otherWriterService = new ThreadPoolExecutor(//
-                1, // corePoolSize
+                otherWriterPoolSize, // corePoolSize
                 otherWriterPoolSize, // maximumPoolSize
-                4, // keepAliveTime
+                1, // keepAliveTime
                 TimeUnit.MINUTES, // keepAlive units.
                 new LinkedBlockingQueue<Runnable>(/* unbounded */),// workQueue
                 new DaemonThreadFactory(getClass().getName()+"_otherWriteService") // threadFactory
         );
 
-        if(deleteAfter) {
-            
-            deleteService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    1, new DaemonThreadFactory(getClass().getName()
-                            + "_deleteService"));
-
-        } else {
-            
-            deleteService = null;
-
-        }
+        /*
+         * Note: This service MUST NOT block or reject tasks as long as the
+         * statement buffer factory is open. It is configured with an unbounded
+         * workQueue and a bounded thread pool. The #of threads in the pool
+         * should build up to the maximumPoolSize and idle threads will be
+         * retired, but only after several minutes.
+         * 
+         * Note: Since we are using an unbounded queue, at most corePoolSize
+         * threads will be created. Therefore we interpret the caller's argument
+         * as both the corePoolSize and the maximumPoolSize.
+         */
+        notifyService = new ThreadPoolExecutor(//
+                notifyPoolSize, // corePoolSize
+                notifyPoolSize, // maximumPoolSize
+                1, // keepAliveTime
+                TimeUnit.MINUTES, // keepAlive units.
+                new LinkedBlockingQueue<Runnable>(/* unbounded */),// workQueue
+                new DaemonThreadFactory(getClass().getName()+"_notifyService") // threadFactory
+                );
 
         /*
          * @todo If sampling should be done for non-federation cases then we
@@ -1373,13 +1581,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                             new ThreadPoolExecutorBaseStatisticsTask(
                                     otherWriterService));
 
-            if (deleteAfter) {
-
-                tasks.put("deleteService",
-                                new ThreadPoolExecutorBaseStatisticsTask(
-                                        deleteService));
-
-            }
+            tasks.put("notifyService",
+                    new ThreadPoolExecutorBaseStatisticsTask(notifyService));
 
             // schedule this task to sample performance counters.
             serviceStatisticsFuture = scheduledService.scheduleWithFixedDelay(
@@ -1438,42 +1641,54 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
     
     public boolean isAnyDone() {
 
-        if (buffer_t2id != null)
-            if (buffer_t2id.getFuture().isDone())
+        /*
+         * Note: lock is required to make this test atomic with respect to
+         * re-opening of buffers.
+         */
+        lock.lock();
+        try {
+
+            if (buffer_t2id != null)
+                if (buffer_t2id.getFuture().isDone())
+                    return true;
+
+            if (buffer_id2t.getFuture().isDone())
                 return true;
 
-        if (buffer_id2t.getFuture().isDone())
-            return true;
+            if (buffer_text != null)
+                if (buffer_text.getFuture().isDone())
+                    return true;
 
-        if (buffer_text != null)
-            if (buffer_text.getFuture().isDone())
+            if (buffer_spo.getFuture().isDone())
                 return true;
 
-        if (buffer_spo.getFuture().isDone())
-            return true;
+            if (buffer_pos != null)
+                if (buffer_pos.getFuture().isDone())
+                    return true;
 
-        if (buffer_pos != null)
-            if (buffer_pos.getFuture().isDone())
+            if (buffer_osp != null)
+                if (buffer_osp.getFuture().isDone())
+                    return true;
+
+            if (parserService.isTerminated())
                 return true;
 
-        if (buffer_osp != null)
-            if (buffer_osp.getFuture().isDone())
+            if (term2IdWriterService.isTerminated())
                 return true;
 
-        if (parserService.isTerminated())
-            return true;
+            if (otherWriterService.isTerminated())
+                return true;
 
-        if (term2IdWriterService.isTerminated())
-            return true;
+            if (notifyService != null && notifyService.isTerminated())
+                return true;
 
-        if (otherWriterService.isTerminated())
-            return true;
+            return false;
+        } finally {
 
-        if (deleteService != null && deleteService.isTerminated())
-            return true;
-                
-        return false;
-        
+            lock.unlock();
+
+        }
+
     }
     
     public void cancelAll(final boolean mayInterruptIfRunning) {
@@ -1585,10 +1800,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
                 assertSumOfLatchs();
 
-                if (deleteService != null) {
+                if (notifyService != null) {
                     // shutdown and wait until all files have been delete.
-                    deleteService.shutdown();
-                    new ShutdownHelper(deleteService, 10L, TimeUnit.SECONDS) {
+                    notifyService.shutdown();
+                    new ShutdownHelper(notifyService, 10L, TimeUnit.SECONDS) {
                         protected void logTimeout() {
                             log.warn("Waiting for delete service shutdown.");
                         }
@@ -1643,41 +1858,37 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
     }
 
     /**
-     * This method may be overridden to trigger additional processing when a
-     * document has become restart safe on the database -- <strong>the
-     * implementation MUST NOT block</strong>. One technique is to add the
-     * <i>documentIdentifier</i> to an <em>unbounded</em> queue which is then
-     * drained by another thread. The default implementation logs the event @
-     * INFO.
+     * Invoked after a document has become restart safe. If
+     * {@link #newSuccessTask(Object)} returns a {@link Runnable} then that will
+     * be executed on the {@link #notifyService}.
      * 
      * @param resource
      *            The document identifier.
      */
-    protected void documentDone(final String resource) {
+    final protected void documentDone(final R resource) {
 
-        if (log.isInfoEnabled())
-            log.info("resource=" + resource + " : "+this);
-
-    }
-
-    public String toString() {
-
-        return super.toString() + "::" + getCounters();
+        final Runnable task = newSuccessTask(resource);
+       
+        if (task != null) {
         
+            // queue up success notice.
+            notifyService.submit(task);
+            
+        }
+
     }
     
     /**
-     * This method may be <em>extended</em> to trigger additional processing
-     * when a document processing error has occurs -- <strong>the implementation
-     * MUST NOT block</strong>. The default implementation logs the event @
-     * ERROR.
+     * Invoked after a document has failed. If
+     * {@link #newFailureTask(Object, Throwable)} returns a {@link Runnable}
+     * then that will be executed on the {@link #notifyService}.
      * 
      * @param resource
      *            The document identifier.
      * @param t
      *            The exception.
      */
-    protected void documentError(final String resource, Throwable t) {
+    final protected void documentError(final R resource, final Throwable t) {
 
         lock.lock();
         try {
@@ -1701,14 +1912,120 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
             
         }
 
-        /*
-         * Note: log error since no one watches the future for this task.
-         */
-
-        log.error("resource=" + resource + " : " + this, t);
+        final Runnable task = newFailureTask(resource, t);
+        
+        if (task != null) {
+        
+            // queue up success notice.
+            notifyService.submit(task);
+            
+        }
 
     }
 
+    /**
+     * Return the optional task to be executed for a resource which has been
+     * successfully processed and whose assertions are now restart safe on the
+     * database. The task, if any, will be run on the {@link #notifyService}.
+     * <p>
+     * The default implementation runs a {@link DeleteTask} IFF <i>deleteAfter</i>
+     * was specified as <code>true</code> to the ctor and otherwise returns
+     * <code>null</code>. The event is logged @ INFO.
+     * 
+     * @param resource
+     *            The resource.
+     * 
+     * @return The task to run -or- <code>null</code> if no task should be
+     *         run.
+     */
+    protected Runnable newSuccessTask(final R resource) {
+        
+        if (log.isInfoEnabled())
+            log.info("resource=" + resource);
+        
+        if (deleteAfter) {
+            
+            return new DeleteTask(resource);
+            
+        }
+
+        return null;
+        
+    }
+
+    /**
+     * Return the optional task to be executed for a resource for which
+     * processing has failed. The task, if any, will be run on the
+     * {@link #notifyService}.
+     * <p>
+     * The default implementation logs a message @ ERROR.
+     * 
+     * @param resource
+     *            The resource.
+     * @param cause
+     *            The cause.
+     * 
+     * @return The task to run -or- <code>null</code> if no task should be
+     *         run.
+     */
+    protected Runnable newFailureTask(final R resource, final Throwable cause) {
+
+        return new Runnable() {
+
+            public void run() {
+
+                log.error(resource, cause);
+
+            }
+
+        };
+
+    }
+    
+    /**
+     * Task deletes a resource from the local file system.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    protected class DeleteTask implements Runnable {
+
+        private final R resource;
+
+        public DeleteTask(final R resource) {
+
+            if (resource == null)
+                throw new IllegalArgumentException();
+            
+            this.resource = resource;
+            
+        }
+        
+        public void run() {
+
+            deleteResource(resource);
+
+        }
+
+    }
+
+    /**
+     * Delete a resource whose data have been made restart safe on the database
+     * from the local file system.
+     * 
+     * @param resource
+     *            The resource.
+     */
+    protected void deleteResource(final R resource) {
+
+        if(resource instanceof File) {
+
+            ((File)resource).delete();
+            
+        }
+
+    }
+    
     public CounterSet getCounters() {
         
         final CounterSet counterSet = new CounterSet();
@@ -1734,9 +2051,19 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
         });
 
         /**
+         * The #of documents whose TERM2ID writes have begun to be buffered but
+         * are not yet restart-safe on the database.
+         */
+        counterSet.addCounter("documentTIDsWaitingCount", new Instrument<Long>() {
+            @Override
+            protected void sample() {
+                setValue(documentTIDsWaitingCount.get());
+            }
+        });
+
+        /**
          * The #of documents whose TERM2ID writes are restart-safe on the
-         * database. Each parser thread will block until the TERM2ID writes are
-         * done and then proceed to write on the remaining indices.
+         * database.
          */
         counterSet.addCounter("documentTIDsReadyCount", new Instrument<Long>() {
             @Override
@@ -1890,23 +2217,37 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
             
             final CounterSet pauseSet = counterSet.makePath("pause");
 
-            // The #of buffered RDF Statements.
-            pauseSet.addCounter("bufferedStatementCount",
+            /*
+             * The #of parsed or buffered RDF Statements not yet restart safe
+             * (current value).
+             */
+            pauseSet.addCounter("outstandingStatementCount",
                     new Instrument<Long>() {
                         @Override
                         protected void sample() {
-                            setValue(bufferedStatementCount.get());
+                            setValue(outstandingStatementCount.get());
                         }
                     });
 
-            // The maximum #of statements before we suspend new parse requests.
-            pauseSet.addCounter("bufferedStatementThreshold",
+            /*
+             * The #of parsed but not yet buffered RDF Statements (current
+             * value).
+             */
+            pauseSet.addCounter("unbufferedStatementCount",
                     new Instrument<Long>() {
                         @Override
                         protected void sample() {
-                            setValue(bufferedStatementThreshold);
+                            setValue(unbufferedStatementCount.get());
                         }
                     });
+
+            /*
+             * The maximum #of statements parsed but not yet buffered before we
+             * suspend new parse requests.
+             */
+            pauseSet.addCounter("pauseParserPoolStatementThreshold",
+                    new OneShotInstrument<Long>(
+                            pauseParserPoolStatementThreshold));
 
             // The #of suspended parse request threads (current value).
             pauseSet.addCounter("pausedThreadCount", new Instrument<Long>() {
@@ -1948,10 +2289,14 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
         private int count = 0;
 
+        private long retryCount = 0L;
+        
         final File fileOrDir;
 
         final FilenameFilter filter;
 
+        final long retryMillis;
+        
         /**
          * 
          * @param fileOrDir
@@ -1959,17 +2304,27 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
          * @param filter
          *            An optional filter on files that will be accepted when
          *            processing a directory.
+         * @param retryMillis
+         *            The number of milliseconds to wait between retrys when the
+         *            parser service work queue is full. When ZERO (0L), a
+         *            {@link RejectedExecutionException} will be thrown out
+         *            instead.
          */
         public RunnableFileSystemLoader(final File fileOrDir,
-                final FilenameFilter filter) {
+                final FilenameFilter filter, final long retryMillis) {
 
             if (fileOrDir == null)
                 throw new IllegalArgumentException();
 
+            if (retryMillis < 0)
+                throw new IllegalArgumentException();
+            
             this.fileOrDir = fileOrDir;
 
             this.filter = filter; // MAY be null.
 
+            this.retryMillis = retryMillis;
+            
         }
 
         /**
@@ -2029,11 +2384,16 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                  * Processing a standard file.
                  */
 
+                if(log.isInfoEnabled())
+                    log.info("Will load: "+file);
+                    
                 try {
 
-                    submitOne(file.getPath());
+                    submitOne((R) file, retryMillis);
 
                     count++;
+
+                    return;
 
                 } catch (InterruptedException ex) {
 
@@ -2063,8 +2423,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
      * chunk that is processed have correlated indices and that the offset into
      * the array is given by {@link Split#fromIndex}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
     static private class Term2IdWriteProcAsyncResultHandler
@@ -2615,7 +2974,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
             IStatementBuffer<S> {
 
         /** The document identifier. */
-        private final String resource;
+        private final R resource;
 
         private final AbstractTripleStore database;
 
@@ -2682,7 +3041,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
         /**
          * Return the identifier for the document.
          */
-        public String getDocumentIdentifier() {
+        public R getDocumentIdentifier() {
 
             return resource;
 
@@ -2692,7 +3051,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
          * @param resource
          *            The document identifier.
          */
-        protected AsynchronousStatementBufferImpl(final String resource) {
+        protected AsynchronousStatementBufferImpl(final R resource) {
 
             this.resource = resource;
 
@@ -3081,6 +3440,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
                     super.signal();
 
+                    documentTIDsWaitingCount.decrementAndGet();
+                    
                     documentTIDsReadyCount.incrementAndGet();
 
                     otherWriterService.submit(new BufferOtherWritesTask(
@@ -3205,15 +3566,16 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                         documentRestartSafeCount.incrementAndGet();
                         toldTriplesRestartSafeCount
                                 .addAndGet(toldTriplesThisDocument);
-                        bufferedStatementCount
+                        outstandingStatementCount
                                 .addAndGet(-toldTriplesThisDocument);
                     } finally {
-                        lock.unlock();
-                    }
 
-                    // notify that the document is done.
-                    AsynchronousStatementBufferFactory.this
-                            .documentDone(getDocumentIdentifier());
+                        lock.unlock();
+
+                        // notify that the document is done.
+                        documentDone(getDocumentIdentifier());
+
+                    }
 
                 }
 
@@ -3285,19 +3647,37 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
             }
 
-            // make sure that no errors were reported by those tasks.
-            for (Object f : futures) {
+            try {
 
-                ((Future) f).get();
+                /*
+                 * Make sure that no errors were reported by those tasks.
+                 */
+                for (Object f : futures) {
 
+                    ((Future) f).get();
+
+                }
+                
+            } finally {
+                
+                /*
+                 * At this point all writes have been buffered. We now discard
+                 * the buffered data (RDF Values and statements) since it will
+                 * no longer be used.
+                 */
+                reset();
+
+                lock.lock();
+                try {
+                    if (unbufferedStatementCount
+                            .addAndGet(-toldTriplesThisDocument) <= pauseParserPoolStatementThreshold) {
+                        unpaused.signalAll();
+                    }
+                } finally {
+                    lock.unlock();
+                }
+                
             }
-
-            /*
-             * At this point all writes have been buffered. We now discard the
-             * buffered data (RDF Values and statements) since it will no longer
-             * be used.
-             */
-            reset();
 
         }
 
@@ -3327,6 +3707,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                 bufferGuard_term2Id.inc();
                 workflowLatch_parser.dec();
                 workflowLatch_bufferTerm2Id.inc();
+                documentTIDsWaitingCount.incrementAndGet();
                 assertSumOfLatchs();
             } finally {
                 lock.unlock();
@@ -3351,8 +3732,13 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                 try {
                     bufferGuard_term2Id.dec();
                     workflowLatch_bufferTerm2Id.dec();
+                    documentTIDsWaitingCount.decrementAndGet();
                     documentError(buffer.getDocumentIdentifier(), t);
-                    bufferedStatementCount.addAndGet(-buffer.statementCount);
+                    outstandingStatementCount.addAndGet(-buffer.statementCount);
+                    if (unbufferedStatementCount
+                            .addAndGet(-buffer.statementCount) <= pauseParserPoolStatementThreshold) {
+                        unpaused.signalAll();
+                    }
                     throw new Exception(t);
                 } finally {
                     lock.unlock();
@@ -3418,7 +3804,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
                     bufferGuard_other.dec();
                     workflowLatch_bufferOther.dec();
                     documentError(buffer.getDocumentIdentifier(), t);
-                    bufferedStatementCount.addAndGet(-buffer.statementCount);
+                    outstandingStatementCount.addAndGet(-buffer.statementCount);
+                    if (unbufferedStatementCount
+                            .addAndGet(-buffer.statementCount) <= pauseParserPoolStatementThreshold) {
+                        unpaused.signalAll();
+                    }
                     throw new Exception(t);
                 } finally {
                     lock.unlock();
@@ -3463,7 +3853,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
          */
         private boolean isPaused() {
 
-            return bufferedStatementCount.get() >= bufferedStatementThreshold;
+            return unbufferedStatementCount.get() > pauseParserPoolStatementThreshold;
 
         }
 
@@ -3492,7 +3882,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
                     poolPausedCount.incrementAndGet();
                     
-                    System.err.println("PAUSE : "+AsynchronousStatementBufferFactory.this.toString());
+                    if (log.isInfoEnabled())
+                        log.info("PAUSE : "
+                                + AsynchronousStatementBufferFactory.this
+                                        .toString());
                     
                     while (isPaused()) {
 
@@ -3502,7 +3895,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement>
 
                     pausedThreadCount.decrementAndGet();
 
-                    System.err.println("RESUME: "+AsynchronousStatementBufferFactory.this.toString());
+                    if (log.isInfoEnabled())
+                        log.info("RESUME: "
+                                + AsynchronousStatementBufferFactory.this
+                                        .toString());
 
                 }
 

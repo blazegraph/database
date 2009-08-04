@@ -28,7 +28,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * FIXME The counters are being updated on each incremental write rather
+ * @todo The counters are being updated on each incremental write rather
  * than tracked on a per-task basis and then updated iff the task as a whole
  * succeeds. This causes double-counting of both found and not found totals
  * when a task errors and then retries. The counters need to be attached to

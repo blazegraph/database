@@ -1249,92 +1249,6 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    /**
-     * Interface allows us to encapsulate differences between the ICU and JDK
-     * libraries for generating sort keys from Unicode strings.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static interface UnicodeSortKeyGenerator {
-        
-        /**
-         * The {@link Locale} used to configure this object.
-         */
-        public Locale getLocale();
-
-        /**
-         * Append a Unicode sort key to the {@link KeyBuilder}.
-         * 
-         * @param keyBuilder
-         *            The {@link KeyBuilder}.
-         * @param s
-         *            The Unicode string.
-         */
-        public void appendSortKey(KeyBuilder keyBuilder, String s);
-        
-    }
-    
-    /**
-     * Type safe enumeration for the strength.
-     * <p>
-     * Note: ICU and the JDK use different integer constants for the
-     * #IDENTICAL strength
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static enum StrengthEnum {
-        
-        /**
-         * See {@link Collator#PRIMARY}.
-         */
-        Primary,
-        /**
-         * See {@link Collator#SECONDARY}.
-         */
-        Secondary,
-        /**
-         * See {@link Collator#TERTIARY}.
-         */
-        Tertiary,
-        /**
-         * Note: this option is NOT supported by the JDK.
-         */
-        Quaternary,
-        /**
-         * See {@link Collator#IDENTICAL}.
-         */
-        Identical;
-        
-    }
-    
-    /**
-     * Type safe enumeration for the decomposition mode.
-     * <p>
-     * Note: ICU and the JDK use different integer constants for the
-     * decomposition modes!
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static enum DecompositionEnum {
-        
-        /**
-         * See {@link Collator#NO_DECOMPOSITION}.
-         */
-        None,
-        /**
-         * See {@link Collator#FULL_DECOMPOSITION}.
-         */
-        Full,
-        /**
-         * See {@link Collator#CANONICAL_DECOMPOSITION}.
-         */
-        Canonical;
-        
-    }
-    
     public static IKeyBuilder newInstance() {
 
         return newInstance(DEFAULT_INITIAL_CAPACITY);
@@ -1356,45 +1270,6 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    /**
-     * Type-safe enumeration of collators that may be configured.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public static enum CollatorEnum {
-      
-        /**
-         * The JDK bundles support for generating Unicode sort keys, but that
-         * support does NOT include compressed sort keys.
-         */
-        JDK,
-        
-        /**
-         * ICU is the basis for the Unicode support in the JDK and also supports
-         * compressed sort keys, which can be a big savings in an index.
-         */
-        ICU,
-        
-        /**
-         * A JNI plugin for ICU (native code for faster generation of sort
-         * keys).
-         * 
-         * @todo this is notionally faster but I have never made it work myself,
-         *       or at least I have not found it to be stable in my experience.
-         */
-        ICU4JNI,
-
-        /**
-         * A configuration option to force the interpretation of Unicode text as
-         * ASCII (only the low byte is considered). This option can be useful
-         * when you know that your data is not actually Unicode and offers a
-         * substantial performance benefit in such cases.
-         */
-        ASCII;
-        
-    };
-    
     /**
      * Configuration options for {@link DefaultKeyBuilderFactory} and the
      * {@link KeyBuilder} factory methods. <strong>The use of

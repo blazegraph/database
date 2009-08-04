@@ -41,7 +41,7 @@ import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;

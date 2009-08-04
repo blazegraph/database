@@ -88,11 +88,12 @@ export CLASSPATH="@CLASSPATH@"
 # configuration file.
 #
 export JAVA_OPTS="-server -ea \
+    -showversion \
     -Dcom.sun.jini.jeri.tcp.useNIO=@USE_NIO@ \
     -Djava.security.policy=${BIGDATA_POLICY} \
     -Dlog4j.configuration=${BIGDATA_LOG4J_CONFIG} \
     -Djava.util.logging.config.file=${BIGDATA_LOGGING_CONFIG} \
-	-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME} \
+    -Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME} \
 "
 
 #

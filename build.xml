@@ -506,14 +506,23 @@ an "NOP" bash script or edit your crontab.
 <chmod perm="g+rw,o-rw" file="${stateFile}" />
 <chmod perm="g+rw,o-rw" file="${stateLog}" />
 <!-- Make sure that the entire shared directory structure is read/write for the group. -->
-<chmod perm="g+rwx" file="${NAS}" />
-<!-- Make sure that it is all accessible to the install group. -->
-<!-- Unfortunately, chown is an optional ant component so we have to do this by hand 
-     in the post-install.
-
- <chown file="${NAS}" type="both" owner="${install.user}.${install.group}"/>
- 
- -->
+<chmod perm="g+rwx" type="both" dir="${NAS}" verbose="true"/>
+<!-- Make sure that it is all accessible to the install group (ant 1.6+ plus extension module required). 
+<chown file="${NAS}" type="both" owner="${install.user}.${install.group}" verbose="true"/>
+-->
+<!-- Works for earlier versions of ant LT 1.6 which do not bundle "chown". -->
+<apply executable="chown" description="set owner on NAS files" osfamily="unix">
+        <arg value="-R"/>
+        <arg value="${install.user}.${install.group}"/>
+        <dirset dir="${NAS}"/>
+</apply>
+<!-- @todo check the installed configuration file (after parameter substitution). -->
+<!-- @todo also check the installed jini configuration files. -->
+<java classname="com.bigdata.jini.util.CheckConfiguration"
+	failonerror="true" fork="true" logerror="true">
+	<classpath refid="install.classpath" />
+	<arg value="${bigdata.config}" />
+</java>
 <loadfile property="postInstallMessage" srcFile="${install.bin.dir}/POST-INSTALL" />
 <echo>
 
