@@ -283,7 +283,7 @@ A//
                 sinkChunkSize,// 
                 sinkChunkTimeoutNanos,//
                 TimeUnit.NANOSECONDS,//
-                true // ordered
+                buffer.isOrdered()
         );
         
     }

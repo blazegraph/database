@@ -53,7 +53,7 @@ public class MasterExhaustedException extends RuntimeException {
     /**
      * @param message
      */
-    public MasterExhaustedException(String message) {
+    public MasterExhaustedException(final String message) {
         super(message);
     }
 

@@ -38,6 +38,7 @@ public final class SystemUtil
     private static final String m_architecture;
     private static final String m_osName;
     private static final String m_osVersion;
+    private static final boolean m_windows;
 
     private static final Logger log = Logger.getLogger(SystemUtil.class);
     
@@ -78,7 +79,8 @@ public final class SystemUtil
 
         m_processors = procs;
         m_cpuInfo = info;
-
+        m_windows = SystemUtil.operatingSystem().startsWith("Windows");
+        
         if(log.isInfoEnabled()) {
         log.info("architecture: "+m_architecture);
         log.info("operating system: "+m_osName);
@@ -154,5 +156,14 @@ public final class SystemUtil
     {
         return m_osVersion;
     }
-}
 
+    /**
+     * Return <code>true</code> if running on Microsoft Windows.
+     */
+    public static final boolean isWindows() {
+
+        return m_windows;
+        
+    }
+
+}

@@ -19,6 +19,9 @@ import com.bigdata.service.ndx.pipeline.AbstractSubtask;
  * @see IAsynchronousWriteBufferFactory
  * @see AbstractMasterTask
  * @see AbstractSubtask
+ * 
+ * @todo rename since not specific to asynchronous index writes, even if normally
+ * used in that context.
  */
 public class AsynchronousIndexWriteConfiguration implements Externalizable {
 

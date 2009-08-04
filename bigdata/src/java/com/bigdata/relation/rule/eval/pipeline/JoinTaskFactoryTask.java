@@ -324,7 +324,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
 
     }
    
-    protected Future<Void> submit(DistributedJoinTask task) {
+    protected Future<Void> submit(final DistributedJoinTask task) {
 
         if (log.isDebugEnabled())
             log.debug("Submitting new JoinTask: orderIndex=" + orderIndex

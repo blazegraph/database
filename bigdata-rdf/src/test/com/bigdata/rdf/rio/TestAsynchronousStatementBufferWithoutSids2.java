@@ -45,7 +45,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.service.AbstractFederation;
 
 /**
  * Test suite for {@link AsynchronousStatementBufferWithoutSids2}.
@@ -82,7 +81,8 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
     final int chunkSize = 20000;
     final int valuesInitialCapacity = 10000;
     final int bnodesInitialCapacity = 16;
-    final long bufferedStatementThreshold = Long.MAX_VALUE;
+    final long unbufferedStatementThreshold = 5000L;//Long.MAX_VALUE;
+    final long rejectedExecutionDelay = 250L; // milliseconds.
     
     /**
      * SHOULD be <code>true</code> since the whole point of this is higher
@@ -169,8 +169,8 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
         try {
 
             // only do load since we expect an error to be reported.
-            final AsynchronousStatementBufferFactory<BigdataStatement> factory = doLoad2(
-                    store, resource, parallel);
+            final AsynchronousStatementBufferFactory<BigdataStatement, File> factory = doLoad2(
+                    store, new File(resource), parallel);
             
             assertEquals("errorCount", 1, factory.getDocumentErrorCount());
             
@@ -285,18 +285,18 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
     protected void doLoad(final AbstractTripleStore store,
             final String resource, final boolean parallel) throws Exception {
 
-        doLoad2(store, resource, parallel);
+        doLoad2(store, new File(resource), parallel);
         
     }
 
     /**
      * Load using {@link AsynchronousStatementBufferWithoutSids2}.
      */
-    protected AsynchronousStatementBufferFactory<BigdataStatement> doLoad2(
-            final AbstractTripleStore store, final String resource,
+    protected AsynchronousStatementBufferFactory<BigdataStatement,File> doLoad2(
+            final AbstractTripleStore store, final File resource,
             final boolean parallel) throws Exception {
 
-        final AsynchronousStatementBufferFactory<BigdataStatement> statementBufferFactory = new AsynchronousStatementBufferFactory<BigdataStatement>(
+        final AsynchronousStatementBufferFactory<BigdataStatement,File> statementBufferFactory = new AsynchronousStatementBufferFactory<BigdataStatement,File>(
                 (ScaleOutTripleStore) store,//
                 chunkSize, //
                 valuesInitialCapacity,//
@@ -308,7 +308,8 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
                 20, // parserQueueCapacity
                 parallel?5:1,  // term2IdWriterPoolSize,
                 parallel?5:1,  // otherWriterPoolSize
-                bufferedStatementThreshold
+                parallel?5:1,  // notifyPoolSize
+                unbufferedStatementThreshold
                 );
 
 //        final AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File> statementBufferFactory = new AsynchronousWriteBufferFactoryWithoutSids2<BigdataStatement, File>(
@@ -318,10 +319,10 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
         try {
 
             // tasks to load the resource or file(s)
-            if(new File(resource).exists()) {
+            if (resource.exists()) {
 
-                statementBufferFactory
-                        .submitAll(new File(resource), null/* filter */);
+                statementBufferFactory.submitAll(resource, null/* filter */,
+                        rejectedExecutionDelay);
                 
             } else {
                 

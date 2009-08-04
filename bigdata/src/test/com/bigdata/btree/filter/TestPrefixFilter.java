@@ -47,7 +47,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.TestTuple;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**

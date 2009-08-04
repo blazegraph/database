@@ -62,7 +62,7 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 

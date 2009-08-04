@@ -34,10 +34,7 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.keys.KeyBuilder.CollatorEnum;
-import com.bigdata.btree.keys.KeyBuilder.DecompositionEnum;
 import com.bigdata.btree.keys.KeyBuilder.Options;
-import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 
 
 /**

@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.IOException;
+import java.rmi.RemoteException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -455,7 +456,7 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      * @see IDataServiceCallable
      */
     public Future<? extends Object> submit(Callable<? extends Object> proc)
-            throws IOException;
+            throws RemoteException;
 
     /**
      * Read a low-level record from the described {@link IRawStore} described by

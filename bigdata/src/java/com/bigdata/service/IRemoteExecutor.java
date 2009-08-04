@@ -30,6 +30,7 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.Remote;
+import java.rmi.RemoteException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -63,7 +64,7 @@ public interface IRemoteExecutor extends Remote {
      * @todo change API to <T> Future<T> submit(Callable<T> proc). This will
      *       break existing code but reflects the correct use of generics.
      */
-    public Future<? extends Object> submit(Callable<? extends Object> proc)
-            throws IOException;
-
+    public Future<? extends Object> submit(Callable<? extends Object> task)
+            throws RemoteException;
+    
 }

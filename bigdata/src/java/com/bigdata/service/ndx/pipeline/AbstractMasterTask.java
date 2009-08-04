@@ -165,8 +165,8 @@ import com.bigdata.util.concurrent.AbstractHaltableProcess;
  * @param <S>
  *            The generic type of the subtask implementation class.
  * @param <L>
- *            The generic type of the key used to lookup a subtask in the
- *            internal map (must be unique and must implement hashCode() and
+ *            The generic type of the locator object used to lookup a subtask in
+ *            the internal map (must be unique and must implement hashCode() and
  *            equals() per their contracts).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -265,15 +265,25 @@ L>//
      *            The operation, which should be light weight
      * 
      * @throws InterruptedException
+     * @throws ExecutionException
+     *             if a subtask throws an exception.
      */
     public void mapOperationOverSubtasks(final SubtaskOp<S> op)
-            throws InterruptedException, Exception {
+            throws InterruptedException, ExecutionException {
 
         final Iterator<S> itr = sinks.values().iterator();
 
         while(itr.hasNext()) {
             
-            op.call(itr.next());
+            try {
+
+                op.call(itr.next());
+                
+            } catch (Exception ex) {
+                
+                throw new ExecutionException(ex);
+                
+            }
             
         }
 
@@ -345,7 +355,7 @@ L>//
     /**
      * Statistics for this (and perhaps other) masters.
      */
-    protected final H stats;
+    public final H stats;
     
     public H getStats() {
         
@@ -387,6 +397,12 @@ L>//
      *            then the sink will block for noticeable lengths of time and
      *            will be less responsive to interrupts. Something in the 10s of
      *            milliseconds is appropriate.
+     * 
+     * @todo sinkQueueCapacity, sinkChunkSize, and sinkChunkTimeoutNanos should
+     *       be arguments for this class and a default
+     *       {@link #newSubtaskBuffer()} implementation should be provided. The
+     *       unit tests for the {@link AbstractMasterTask} need to be updated
+     *       for that change, as do the other derived classes.
      */
     public AbstractMasterTask(final H stats, final BlockingBuffer<E[]> buffer,
             final long sinkIdleTimeoutNanos, final long sinkPollTimeoutNanos) {
@@ -546,6 +562,47 @@ L>//
             throws InterruptedException;
 
     /**
+     * Extension hook for implementations where the clients accept work for
+     * asynchronous processing and notify the master as work items completed
+     * successfully or fail. The {@link AbstractMasterTask} will not terminate
+     * unless this method returns <code>true</code> when queried while holding
+     * the {@link #lock}. A true return indicates that there are no pending
+     * work items. The default implementation returns <code>true</code>.
+     * <p>
+     * The work perform by the client must be idempotent (it must be safe to
+     * re-perform the operation). Pending work items may be in an unknown state,
+     * the master may submit the same work item to multiple clients (where that
+     * is permitted by the locator semantics), the client task may fail before
+     * the work item is complete, and a failed client can cause work items
+     * associated with that client to be posted to another client.
+     * <p>
+     * To handle master termination, the pending set must track outstanding work
+     * items. Those work item should be removed from the pending set as soon as
+     * any client has successfully completed that work item (since the work is
+     * idempotent).
+     * <p>
+     * To handle client failure, the subtask must track the pending set for its
+     * client. If the client dies, then the subtask must handle the client by
+     * placing all pending work items for that client (including any in the
+     * chunk for the current request) onto the {@link #redirectQueue}.
+     */
+    protected boolean nothingPending() {
+
+        return true;
+        
+    }
+
+    /**
+     * Extension hook invoked when the master's buffer is exhausted by
+     * {@link #awaitAll()}. The default implementation is a NOP.
+     */
+    protected void willShutdown() throws InterruptedException {
+        
+        // NOP.
+        
+    }
+    
+    /**
      * Await the completion of the writes on each index partition. The master
      * will terminate when there are no active subtasks and the redirect queue
      * is empty. That condition is tested atomically.
@@ -573,6 +630,12 @@ L>//
             
         }
 
+        /*
+         * Extension hook may be used to map the pending set over the available
+         * clients during shutdown.
+         */
+        willShutdown();
+        
         while (true) {
 
             halted();
@@ -600,9 +663,9 @@ L>//
                     /*
                      * There is nothing available from the redirect queue.
                      */
-
+                    
                     if (finishedSubtaskQueue.isEmpty() && sinks.isEmpty()
-                            && redirectQueue.isEmpty()) {
+                            && redirectQueue.isEmpty() && nothingPending()) {
 
                         /*
                          * We are done since there are no running sinks, and no
@@ -613,7 +676,10 @@ L>//
                          * termination condition to be atomic.
                          */
                         
-                        break;
+                        if (log.isInfoEnabled())
+                            log.info("All subtasks are done: " + this);
+                        
+                        return;
 
                     }
 
@@ -658,13 +724,10 @@ L>//
                  */
 
                 handleChunk(a, true/* reopen */);
-
+                
             }
 
         } // while(true)
-        
-        if (log.isInfoEnabled())
-            log.info("All subtasks are done: " + this);
 
     }
 
@@ -744,8 +807,8 @@ L>//
      * @param locator
      *            The locator (unique subtask key).
      * @param reopen
-     *            <code>true</code> IFF a closed buffer should be re-opened (in
-     *            fact, this causes a new buffer to be created and the new
+     *            <code>true</code> IFF a closed buffer should be re-opened
+     *            (in fact, this causes a new buffer to be created and the new
      *            buffer will be drained by a new
      *            {@link IndexPartitionWriteTask}).
      * 
@@ -758,7 +821,7 @@ L>//
      * @throws RuntimeException
      *             if {@link #halted()}
      */
-    private S getSink(final L locator, final boolean reopen)
+    protected S getSink(final L locator, final boolean reopen)
             throws InterruptedException {
 
         if (locator == null)

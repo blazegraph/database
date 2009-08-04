@@ -44,11 +44,9 @@ import com.bigdata.Banner;
  * @version $Id$
  */
 abstract public class ClientService extends AbstractService implements
-        IClientService {
+        IClientService, ISession {
 
     protected static final Logger log = Logger.getLogger(DataService.class);
-
-    private final Properties properties;
 
     /**
      * Configuration options.
@@ -57,6 +55,22 @@ abstract public class ClientService extends AbstractService implements
      * @version $Id$
      */
     public interface Options extends IBigdataClient.Options {
+        
+    }
+    
+    /**
+     * Properties from the ctor.
+     */
+    private final Properties properties;
+
+    /**
+     * The dynamic property set associated with the service instance.
+     */
+    private final Session session = new Session();
+    
+    public Session getSession() {
+
+        return session;
         
     }
     

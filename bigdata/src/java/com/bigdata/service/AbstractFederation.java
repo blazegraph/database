@@ -871,20 +871,22 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     }
 
     public void serviceJoin(IService service, UUID serviceUUID) {
-        
-        if(log.isInfoEnabled()) {
-            
+
+        if (!isOpen()) return;
+
+        if (log.isInfoEnabled()) {
+
             log.info("service=" + service + ", serviceUUID" + serviceUUID);
-            
+
         }
 
-        assertOpen();
-
         client.getDelegate().serviceJoin(service, serviceUUID);
-        
+
     }
 
     public void serviceLeave(UUID serviceUUID) {
+
+        if(!isOpen()) return;
         
         if(log.isInfoEnabled()) {
             

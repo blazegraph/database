@@ -71,6 +71,8 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestMasterTaskWithRedirect.class);
         
+        suite.addTestSuite(TestFileSystemScanner.class);
+        
         // FIXME stress test is not finished yet. 
 //        suite.addTestSuite(TestMasterTaskWithSplits.class);
         

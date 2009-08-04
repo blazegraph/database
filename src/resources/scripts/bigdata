@@ -74,8 +74,25 @@
 # @todo could use nc (netcat) to read the argument file a url and thus define
 # a 'url' as well the 'file' option for this script.
 
-# Source function library (just used for 'action').
-. /etc/init.d/functions
+# Source function library (just used for 'action').  If you don't have this
+# it SHOULD automatically use the inline definition for "action()".
+if [ -f "/etc/init.d/functions" ]; then
+    . /etc/init.d/functions
+else
+# Run some action. Log its output. No fancy colors. First argument is the
+# label for the log file.  Remaining arguments are the command to execute
+# and its arguments, if any.
+    action() {
+        local STRING rc
+        STRING=$1
+        echo -n "$STRING "
+        shift
+        "$@" && echo -n "[OK]" || echo -n "[FAILED]"
+        rc=$?
+        echo
+        return $rc
+    }
+fi
 
 # Where the scripts live.
 cd `dirname $0`

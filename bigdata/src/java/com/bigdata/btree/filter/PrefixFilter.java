@@ -10,8 +10,8 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.btree.keys.SuccessorUtil;
-import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
 
 /**
  * <p>

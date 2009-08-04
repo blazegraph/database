@@ -31,9 +31,6 @@ import java.util.Locale;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.keys.KeyBuilder.DecompositionEnum;
-import com.bigdata.btree.keys.KeyBuilder.StrengthEnum;
-import com.bigdata.btree.keys.KeyBuilder.UnicodeSortKeyGenerator;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RawCollationKey;
 import com.ibm.icu.text.RuleBasedCollator;
