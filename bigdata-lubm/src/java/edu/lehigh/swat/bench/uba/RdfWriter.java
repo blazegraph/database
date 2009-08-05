@@ -19,7 +19,10 @@
 
 package edu.lehigh.swat.bench.uba;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
 
 public abstract class RdfWriter implements Writer {
   /** abbreviation of univ-bench ontology namesapce */
@@ -106,7 +109,7 @@ public abstract class RdfWriter implements Writer {
       }
     String s;
     try {
-      out = new PrintStream(new BufferedOutputStream(new FileOutputStream(fileName)),false/*autoflush*/);
+      out = new PrintStream(new BufferedOutputStream(generator.compress.getOutputStream(fileName)),false/*autoflush*/);
       s = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>";
       println(s);
       s = "<" + T_RDF_PREFIX + "RDF";

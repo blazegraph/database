@@ -58,6 +58,7 @@ import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.master.AbstractClientTask;
 import com.bigdata.service.jini.master.TaskMaster;
 
+import edu.lehigh.swat.bench.uba.CompressEnum;
 import edu.lehigh.swat.bench.uba.Generator;
 
 /**
@@ -139,7 +140,7 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
          * accessible at that URL. It is just written into the generated data.
          */
         String ONTOLOGY_URL = "ontologyURL";
-
+        
         /**
          * The {@link File} in the file system of the clients where the data
          * will be written. The {@link File} identifies a directory. The actual
@@ -183,6 +184,12 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
          * @see RunMode
          */
         String RUN_MODE = "runMode";
+        
+        /**
+         * The compression technique to be applied to the files as they are
+         * generated.
+         */
+        String COMPRESS = "compress";
         
     }
 
@@ -242,6 +249,11 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
          */
         final RunMode runMode;
 
+        /**
+         * @see ConfigurationOptions#COMPRESS 
+         */
+        final CompressEnum compress;
+        
         @Override
         protected void toString(StringBuilder sb) {
 
@@ -267,6 +279,9 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
             sb.append(", " + ConfigurationOptions.RUN_MODE + "="
                     + runMode);
+
+            sb.append(", " + ConfigurationOptions.COMPRESS + "="
+                    + compress);
 
         }
         
@@ -310,6 +325,9 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
 
             runMode = RunMode.valueOf((String) config.getEntry(component,
                     ConfigurationOptions.RUN_MODE, String.class));
+
+            compress = CompressEnum.valueOf((String) config.getEntry(component,
+                    ConfigurationOptions.COMPRESS, String.class));
 
         }
 
@@ -566,7 +584,8 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
                     outDir, //
                     logFile, //
                     jobState.nclients,//
-                    clientNum //
+                    clientNum, //
+                    jobState.compress
                     );
 
             return null;
@@ -709,7 +728,8 @@ public class LubmGeneratorMaster<S extends LubmGeneratorMaster.JobState, T exten
                                     outDir, //
                                     logFile, //
                                     jobState.nclients,//
-                                    clientNum //
+                                    clientNum, //
+                                    jobState.compress
                                     );
 
                             // done.
