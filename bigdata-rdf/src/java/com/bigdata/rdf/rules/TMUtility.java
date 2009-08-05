@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
@@ -134,8 +135,19 @@ public class TMUtility {
             throw new IllegalArgumentException("No head for this rule: rule="
                     + rule);
         
-        final IPredicate head = rule.getHead().setRelationName(
-                new String[] { focusStore });
+        IPredicate head = rule.getHead();
+        
+        if (head instanceof SPOPredicate) {
+            
+            head = head.setRelationName(new String[] { focusStore });
+            
+        } else { 
+            
+            // head is a magic predicate with the relation already correctly set
+            // it will write on the appropriate magic relation, wherever that
+            // may be (probably in the focus store)
+            
+        }
 
         /*
          * Populate an array with the same predicate instances that are found
@@ -199,31 +211,43 @@ public class TMUtility {
             
             for (int j = 0; j < tailCount; j++) {
 
-                final IPredicate<SPO> p = tail[j];
-                final IPredicate<SPO> p2;
+                final IPredicate p = tail[j];
+                final IPredicate p2;
 
-                if (i == j || tailCount == 1) {
-
-                    /*
-                     * Override the [ith] predicate in the tail so that it reads
-                     * only from the focusStore.
-                     * 
-                     * Note: This is also done if there is only one predicate in
-                     * the tail.
-                     */
-
-                    p2 = p.setRelationName(new String[]{focusStore});
-
+                if (p instanceof SPOPredicate) {
+                
+                    if (i == j || tailCount == 1) {
+    
+                        /*
+                         * Override the [ith] predicate in the tail so that it 
+                         * reads only from the focusStore.
+                         * 
+                         * Note: This is also done if there is only one 
+                         * predicate in the tail.
+                         */
+    
+                        p2 = p.setRelationName(new String[]{focusStore});
+    
+                    } else {
+    
+                        /*
+                         * Override the predicate so that it reads from the 
+                         * fused view of the focusStore and the database.
+                         */
+    
+                        p2 = p.setRelationName(new String[] {
+                                p.getOnlyRelationName(), focusStore });
+    
+                    }
+                    
                 } else {
-
-                    /*
-                     * Override the predicate so that it reads from the fused
-                     * view of the focusStore and the database.
-                     */
-
-                    p2 = p.setRelationName(new String[] {
-                            p.getOnlyRelationName(), focusStore });
-
+                    
+                    p2 = p.copy();
+                    
+                    // tail is a magic predicate with the relation already correctly set
+                    // it will read from the appropriate magic relation, wherever that
+                    // may be (probably in the focus store)
+                    
                 }
 
                 // save a reference to the modified predicate.

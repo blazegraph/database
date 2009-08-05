@@ -2,6 +2,8 @@ package com.bigdata.rdf.magic;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IVariableOrConstant;
 
 public class MagicTuple implements IMagicTuple {
     static long NULL = IRawTripleStore.NULL;
@@ -10,6 +12,14 @@ public class MagicTuple implements IMagicTuple {
 
     public MagicTuple(long... terms) {
         this.terms = terms;
+    }
+    
+    public MagicTuple(IPredicate<IMagicTuple> pred) {
+        terms = new long[pred.arity()];
+        for (int i = 0; i < pred.arity(); i++) {
+            final IVariableOrConstant<Long> t = pred.get(i);
+            terms[i] = t.isVar() ? NULL : t.get();
+        }
     }
 
     public long getTerm(int index) {

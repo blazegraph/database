@@ -128,6 +128,24 @@ public class SPOPredicate implements IPredicate<ISPO> {
     }
 
     /**
+     * Partly specified ctor. The context will be <code>null</code>. The
+     * predicate is NOT optional. No constraint is specified. No expander is
+     * specified.
+     * 
+     * @param relationName
+     * @param s
+     * @param p
+     * @param o
+     */
+    public SPOPredicate(String[] relationName, IVariableOrConstant<Long> s,
+            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
+
+        this(relationName, -1/* partitionId */, s, p, o,
+                null/* c */, false/* optional */, null/* constraint */, null/* expander */);
+
+    }
+
+    /**
      * Partly specified ctor. The context will be <code>null</code>. No
      * constraint is specified. No expander is specified.
      * 
