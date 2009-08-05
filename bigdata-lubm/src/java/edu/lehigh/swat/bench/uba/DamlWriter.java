@@ -19,8 +19,6 @@
 
 package edu.lehigh.swat.bench.uba;
 
-import java.io.*;
-
 public class DamlWriter
     extends RdfWriter {
   /** abbreviation of DAML+OIL namesapce */
