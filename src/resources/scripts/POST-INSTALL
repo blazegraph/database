@@ -41,16 +41,3 @@ service, the bigdata load balancer service, and the bigdata metadata
 service.  Once you know that the basic services on those machines can
 be started, you can change the run state for the entire federation and
 the rest of your services should also come online.
-
-Note: If you are doing an install as 'root' then you MUST issue the following
-commands BEFORE you start the bigdata federation.  These commands set the
-group and group permissions on the shared directory such that all hosts will
-be able to read/write files in that directory.
-
-	chown -R @INSTALL_USER@.@INSTALL_GROUP@ @NAS@
-	chmod -R g+rwx @NAS@
-	
-This is only necessary when you installed as 'root' and want to run as 'root
-as well, in which case you would probably specify "wheel" as the install group,
-at least for Linux. (The ant script now attempts to do this for you during the
-install.)
