@@ -281,7 +281,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
     
-    final public boolean isNull(int index) {
+    final public boolean isNull(final int index) {
         
         return values[index] == null;
         

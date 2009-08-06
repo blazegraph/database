@@ -1,5 +1,6 @@
 package com.bigdata.btree.compression;
 
+import it.unimi.dsi.fastutil.bytes.ByteArrayFrontCodedList;
 import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
 
 import java.io.DataInput;
@@ -14,6 +15,10 @@ import org.apache.log4j.Logger;
 
 /**
  * Prefix compression.
+ * <p>
+ * Note: This uses a {@link CustomByteArrayFrontCodedList} which was derived
+ * from a {@link ByteArrayFrontCodedList} but which was modified to support
+ * {@link DataOutput}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

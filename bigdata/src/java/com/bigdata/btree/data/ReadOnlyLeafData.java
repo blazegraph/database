@@ -30,9 +30,8 @@ package com.bigdata.btree.data;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.IAbstractNodeData;
 import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.compression.HuffmanSerializer;
+import com.bigdata.btree.data.codec.HuffmanCodedValues;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -56,7 +55,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      * Offset of the encoded timestamp[] in the buffer -or- <code>-1</code> if
      * the leaf does not report those data.
      */
-    private final int O_timestamps;
+    private final int O_versionTimestamps;
 
     /**
      * Offset of the encoded delete markers in the buffer -or- <code>-1</code>
@@ -132,31 +131,49 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         
         final int valuesSize = b.getInt();
 
+        // version timestamps
         if (hasVersionTimestamps) {
-            O_timestamps = b.position();
+
+            O_versionTimestamps = b.position();
+            
+            // advance past the timestamps.
             b.position(b.position() + nkeys * SIZEOF_TIMESTAMP);
+            
         } else {
-            O_timestamps = -1;
+            
+            O_versionTimestamps = -1;
+            
         }
 
+        // delete markers
         if (hasDeleteMarkers) {
-            O_deleteMarkers = O_timestamps + nkeys;// @todo pack 8 to the byte.
-            b.position(b.position() + nkeys);// @todo pack 8 to the byte.
+            
+            O_deleteMarkers = b.position();
+
+            // advance past the bit flags.
+            b.position(b.position() + bitFlagByteLength(nkeys));// bit coded.
+            
         } else {
+            
             O_deleteMarkers = -1;
+            
         }
-        
+
+        // keys
         O_keys = b.position();
         b.position(b.position() + keysSize);
 
+        // values
         O_values = b.position();
         b.position(b.position() + valuesSize);
 
         assert b.position() == b.limit();
         
+        // flip [limit=pos; pos=0].
         b.flip();
-        
-        this.b = b.asReadOnlyBuffer();
+
+        // save reference to buffer
+        this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
 
     }
 
@@ -178,9 +195,13 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         // encode the keys.
         final byte[] encodedKeys = encodeKeys(leaf);
 
-        // encode the values.
-        final byte[] encodedValues = encodeValues(leaf);
-
+//        // encode the values.
+//        this.values = new HuffmanCodedValues(leaf);
+//
+//        // serialize the coded values onto a byte[].
+//        final byte[] encodedValues = values.toByteArray();
+        final byte[] encodedValues = null; // FIXME encode values!
+        
         // figure out how the size of the buffer (exact fit).
         final int capacity = //
                 SIZEOF_TYPE + //
@@ -191,8 +212,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
                 Bytes.SIZEOF_INT + // keysSize
                 Bytes.SIZEOF_INT + // valuesSize
                 (leaf.hasVersionTimestamps() ? SIZEOF_TIMESTAMP * nkeys : 0) + //
-                (leaf.hasDeleteMarkers() ? nkeys : 0) + // @todo bit code 8 to
-                                                        // the byte
+                (leaf.hasDeleteMarkers() ? bitFlagByteLength(nkeys) : 0) + // 
                 encodedKeys.length + // keys
                 encodedValues.length // values
         ;
@@ -237,7 +257,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         // timestamps
         if (leaf.hasVersionTimestamps()) {
 
-            O_timestamps = b.position();
+            O_versionTimestamps = b.position();
             
             for (int i = 0; i < nkeys; i++) {
 
@@ -247,18 +267,30 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
         } else {
         
-            O_timestamps = -1;
+            O_versionTimestamps = -1;
             
         }
 
-        // delete markers @todo bit code 8 markers to the byte.
+        // delete markers (bit coded).
         if (leaf.hasDeleteMarkers()) {
 
             O_deleteMarkers = b.position();
-            
-            for (int i = 0; i < nkeys; i++) {
 
-                b.put((byte) (leaf.getDeleteMarker(i) ? 1 : 0));
+            for (int i = 0; i < nkeys;) {
+
+                byte bits = 0;
+                
+                for (int j = 0; j < 8 && i < nkeys; j++, i++) {
+
+                    if(leaf.getDeleteMarker(i)) {
+
+                        bits |= 1;
+                            
+                    }
+                    
+                }
+
+                b.put(bits);
 
             }
 
@@ -281,7 +313,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         
         // save read-only reference to the buffer.
         this.b = b.asReadOnlyBuffer();
-        
+
     }
     
     /**
@@ -321,45 +353,30 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         
     }
 
-    /**
-     * Encode the values into a byte[].
-     * 
-     * @return The encoded values.
-     * 
-     * @see HuffmanSerializer
-     * 
-     *      FIXME implement at least huffman encoding for the values.
-     */
-    protected byte[] encodeValues(final IAbstractNodeData data) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-    
     final public int getValueCount() {
         
         return nkeys;
         
     }
     
-    public boolean hasVersionTimestamps() {
+    final public boolean hasVersionTimestamps() {
         
         return (flags & FLAG_VERSION_TIMESTAMPS) != 0;
         
     }
 
-    public boolean hasDeleteMarkers() {
+    final public boolean hasDeleteMarkers() {
 
         return (flags & FLAG_DELETE_MARKERS) != 0;
         
     }
 
-    public long getVersionTimestamp(final int index) {
+    final public long getVersionTimestamp(final int index) {
 
         if (!hasVersionTimestamps())
             throw new UnsupportedOperationException();
 
-        return b.getLong(O_timestamps + index * SIZEOF_TIMESTAMP);
+        return b.getLong(O_versionTimestamps + index * SIZEOF_TIMESTAMP);
 
     }
 
@@ -368,24 +385,68 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         if (!hasDeleteMarkers())
             throw new UnsupportedOperationException();
 
-        // @todo pack 8 to the byte.
-        return b.get(O_timestamps + index) == 1;
+        return getBit(O_deleteMarkers, index);
         
     }
 
-    public void copyValue(int index, OutputStream os) {
+    final public void copyValue(int index, OutputStream os) {
+
         // TODO Auto-generated method stub
+        throw new UnsupportedOperationException();
         
     }
 
-    public byte[][] getValues() {
+    final public byte[] getValue(int index) {
+
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException();
+
     }
 
-    public boolean isNull(int index) {
+//    /**
+//     * Return the object for accessing the coded values. This is lazily decoded.
+//     */
+//    protected HuffmanCodedValues decodeValues() {
+//
+//        // double-checked locking (values must be volatile).
+//        if (values == null) {
+//            
+//            synchronized (this) {
+//
+//                if (values == null) {
+//
+//                    // setup slice on the coded values.
+//                    final ByteBuffer slice = this.b.slice();
+//                    slice.position(O_values);
+//                    slice.limit(this.b.limit() - O_values);
+//                    values = new HuffmanCodedValues(nkeys, slice);
+//
+//                }
+//
+//            }
+//            
+//        }
+//        
+//        return values;
+//
+//    }
+//    private volatile HuffmanCodedValues values;
+    
+    /**
+     * @deprecated by {@link #getValue(int)} and
+     *             {@link #copyValue(int, OutputStream)}
+     */
+    final public byte[][] getValues() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    final public boolean isNull(int index) {
+
         // TODO Auto-generated method stub
-        return false;
+        throw new UnsupportedOperationException();
+        
     }
 
 }

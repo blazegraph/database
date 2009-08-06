@@ -23,12 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree.data;
 
-import com.bigdata.btree.TestChunkedIterators;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -59,6 +56,8 @@ public class TestAll extends TestCase {
     {
 
         final TestSuite suite = new TestSuite("B+Tree data records");
+
+        suite.addTest(com.bigdata.btree.data.codec.TestAll.suite());
         
         suite.addTestSuite(TestDataRecord.class);
         

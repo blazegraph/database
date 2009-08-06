@@ -63,10 +63,12 @@ public interface ILeafData extends IAbstractNodeData {
      * @see AbstractNode#copyKey(int, OutputStream)
      */
     public byte[][] getValues();
-    
+
     /**
      * Return <code>true</code> iff the value stored at the specified index is
-     * <code>null</code>.
+     * <code>null</code>. If you are visiting deleted tuples, then check to see
+     * if the tuple is deleted and only invoke this method on the non-deleted
+     * tuples.
      * 
      * @param index
      *            The index into the leaf.

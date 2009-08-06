@@ -2069,7 +2069,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         // mutable.
         IKeyBuffer keys;
-        
+
         /**
          * We precompute the #of children to be assigned to each node and the
          * #of values to be assigned to each leaf and store that value in this
@@ -2078,8 +2078,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         int max = -1;
 
-        protected AbstractSimpleNodeData(int level,int m,byte[][] keys) {
-            
+        protected AbstractSimpleNodeData(final int level, final int m,
+                final byte[][] keys) {
+
             this.level = level;
             
             this.m = m;
@@ -2096,12 +2097,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
         
-        final public int getBranchingFactor() {
-            
-            return m;
-            
-        }
-
         final public int getKeyCount() {
 
             return keys.getKeyCount();
@@ -2120,12 +2115,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
     
-        final public int getEntryCount() {
-            
-            return keys.getKeyCount();
-            
-        }
-
         final public void copyKey(final int index, final OutputStream os) {
             
             try {
@@ -2163,9 +2152,15 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         final byte[][] vals;
         
-        public byte[][] getValues() {
+        final public byte[][] getValues() {
             
             return vals;
+            
+        }
+        
+        final public byte[] getValue(final int index) {
+        
+            return vals[index];
             
         }
         
@@ -2204,6 +2199,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 //            
 //        }
         
+        final public int getEntryCount() {
+            
+            return keys.getKeyCount();
+            
+        }
+
         final public int getValueCount() {
             
             return keys.getKeyCount();
@@ -2222,10 +2223,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        final public boolean isNull(int index) {
-            
-            if(vals[index]==null) {
-            
+        final public boolean isNull(final int index) {
+
+            if (vals[index] == null) {
+
                 return true;
                 
             }
@@ -2234,7 +2235,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
         
-        public void copyValue(int index, OutputStream os) {
+        final public void copyValue(int index, OutputStream os) {
 
             final byte[] val = vals[index];
 
@@ -2250,10 +2251,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 throw new RuntimeException(e);
                 
             }
-            
+
         }
 
-        public boolean getDeleteMarker(int index) {
+        final public boolean getDeleteMarker(final int index) {
 
             if (deleteMarkers == null)
                 throw new UnsupportedOperationException();
@@ -2262,7 +2263,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         }
 
-        public long getVersionTimestamp(int index) {
+        final public long getVersionTimestamp(final int index) {
 
             if (versionTimestamps == null)
                 throw new UnsupportedOperationException();
@@ -2271,16 +2272,16 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         }
 
-        public boolean hasDeleteMarkers() {
-            
-            return deleteMarkers!=null;
-            
+        final public boolean hasDeleteMarkers() {
+
+            return deleteMarkers != null;
+
         }
 
-        public boolean hasVersionTimestamps() {
-            
-            return versionTimestamps!=null;
-            
+        final public boolean hasVersionTimestamps() {
+
+            return versionTimestamps != null;
+
         }
 
     }
@@ -2337,7 +2338,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         int nchildren = 0;
         
         /**
-         * #of entries spanned by this node.
+         * The #of entries spanned by this node.
          */
         int nentries;
         
@@ -2346,16 +2347,22 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         int[] childEntryCount;
         
+        final public int getEntryCount() {
+            
+            return nentries;
+            
+        }
+
         final public int[] getChildEntryCounts() {
             
             return childEntryCount;
             
         }
-        
-        public SimpleNodeData(int level,int m) {
 
-            super(level,m, new byte[m-1][]);
-            
+        public SimpleNodeData(final int level, final int m) {
+
+            super(level, m, new byte[m - 1][]);
+
             this.childAddr = new long[m];
             
             this.childEntryCount = new int[m];
@@ -2368,7 +2375,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          * @param max
          *            The new limit on the #of children to fill on this node.
          */
-        public void reset(int max) {
+        protected void reset(final int max) {
 
             super.reset(max);
             

@@ -435,7 +435,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
     
-    final public boolean isNull(int index) {
+    final public boolean isNull(final int index) {
         
         assert index >= 0 && index < maxKeys;
         
@@ -451,7 +451,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
      *            
      * @return A new byte[] containing a copy of the remainder of the key.
      */
-    public byte[] getRemainder(int index) {
+    public byte[] getRemainder(final int index) {
 
         final int len = getRemainderLength(index);
         

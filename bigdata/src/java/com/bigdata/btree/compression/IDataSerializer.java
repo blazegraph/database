@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.compression;
 
-import it.unimi.dsi.mg4j.io.InputBitStream;
-import it.unimi.dsi.mg4j.io.OutputBitStream;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.DataInput;
 import java.io.DataOutput;
