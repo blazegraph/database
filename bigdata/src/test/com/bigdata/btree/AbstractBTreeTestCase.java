@@ -452,8 +452,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         int[] actual = (int[]) node.getChildEntryCounts();
         
-        // verify the capacity of the keys[] on the node.
-        assertEquals("childEntryCounts[] capacity", node.getBranchingFactor()+1, actual.length );
+//        // verify the capacity of the keys[] on the node.
+//        assertEquals("childEntryCounts[] capacity", node.getBranchingFactor()+1, actual.length );
         
         // verify the #of defined elements.
         assertEquals("nchildren", len, node.getChildCount());

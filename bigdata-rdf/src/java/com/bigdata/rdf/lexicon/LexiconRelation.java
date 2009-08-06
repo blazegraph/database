@@ -1330,7 +1330,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 
 //                System.err.println("N="+N+", M="+M+", nchunks="+nchunks+", perChunk="+perChunk);
                 
-                final List tasks = new ArrayList<Callable>(nchunks);
+                final List<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
+                        nchunks);
 
                 int fromIndex = 0;
                 int remaining = numNotFound;
@@ -1356,14 +1357,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                     
                 }
                 
-                final List<Future> futures;
+                final List<Future<Void>> futures;
                 try {
                     futures = getExecutorService().invokeAll(tasks);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
                 
-                for(Future f : futures) {
+                for(Future<?> f : futures) {
                     
                     // verify task executed Ok.
                     try {

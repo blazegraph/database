@@ -24,10 +24,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 /**
- * Interface for creating nodes or leaves.
+ * Interface for creating mutable nodes or leaves.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated This will be replaced with a factory suitable for creating a node
+ *             or leaf data object from a ByteBuffer.
  */
 public interface INodeFactory {
 

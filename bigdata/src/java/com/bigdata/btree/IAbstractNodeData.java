@@ -42,16 +42,20 @@ public interface IAbstractNodeData {
      */
     public boolean isLeaf();
 
+//    /**
+//     * The branching factor is maximum the #of children for a node or maximum
+//     * the #of values for a leaf.
+//     * 
+//     * @return The branching factor.
+//     * 
+//     * @deprecated This is a field on the AbstractBTree. It is not stored on the
+//     *             node/leaf data record and should not be accessed here.
+//     */
+//    public int getBranchingFactor();
+
     /**
-     * The branching factor is maximum the #of children for a node or maximum
-     * the #of values for a leaf.
-     * 
-     * @return The branching factor.
-     */
-    public int getBranchingFactor();
-    
-    /**
-     * The #of entries (aka keys or values) spanned by this node or leaf.
+     * The #of tuples spanned by this node or leaf. For a leaf this is always
+     * the #of keys.
      * 
      * @see INodeData#getChildEntryCounts()
      */
@@ -65,16 +69,19 @@ public interface IAbstractNodeData {
      * @return The #of defined keys.
      */
     public int getKeyCount();
-    
+
     /**
      * The object used to contain and manage the keys.
      * 
-     * @deprecated in favor of {@link #copyKey(int, OutputStream)}
+     * @deprecated in favor of {@link #copyKey(int, OutputStream)} or even
+     *             {@link #getKey(int)} if you must.
      */
     public IKeyBuffer getKeys();
-    
+
     /**
-     * Copy the indicated key onto the callers stream.
+     * Copy the indicated key onto the callers stream. This can be more
+     * efficient than {@link #getKey(int)} when the caller is single threaded
+     * and a buffer can be reused for each request.
      * 
      * @param index
      *            The index of the key in the node or leaf.
@@ -82,6 +89,16 @@ public interface IAbstractNodeData {
      * @param os
      *            The stream onto which to copy the key.
      */
-    public void copyKey(int index,OutputStream os);
+    public void copyKey(int index, OutputStream os);
+
+    /**
+     * Return the key at the indicated index.
+     * 
+     * @param index
+     *            The index of the key in the node or leaf.
+     * 
+     * @return The key at that index.
+     */
+    public byte[] getKey(int index);
 
 }

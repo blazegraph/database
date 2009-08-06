@@ -2088,7 +2088,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        protected void reset(int max) {
+        protected void reset(final int max) {
             
             this.keys = new MutableKeyBuffer(m);
             
@@ -2114,6 +2114,32 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
+        public final byte[] getKey(final int index) {
+            
+            return keys.getKey(index);
+            
+        }
+    
+        final public int getEntryCount() {
+            
+            return keys.getKeyCount();
+            
+        }
+
+        final public void copyKey(final int index, final OutputStream os) {
+            
+            try {
+                
+                os.write(keys.getKey(index));
+                
+            } catch (IOException e) {
+                
+                throw new RuntimeException(e);
+                
+            }
+            
+        }
+        
     }
     
     /**
@@ -2153,9 +2179,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         final long[] versionTimestamps;
 
-        public SimpleLeafData(int level,int m, IndexMetadata metadata) {
+        public SimpleLeafData(final int level, final int m,
+                final IndexMetadata metadata) {
 
-            super(level,m,new byte[m][]);
+            super(level, m, new byte[m][]);
 
             this.vals = new byte[m][];
 
@@ -2195,26 +2222,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        final public int getEntryCount() {
-            
-            return keys.getKeyCount();
-            
-        }
-
-        public void copyKey(int index, OutputStream os) {
-            
-            try {
-                
-                os.write(keys.getKey(index));
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
-            
-        }
-    
         final public boolean isNull(int index) {
             
             if(vals[index]==null) {
@@ -2339,12 +2346,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         int[] childEntryCount;
         
-        final public int getEntryCount() {
-            
-            return nentries;
-            
-        }
-
         final public int[] getChildEntryCounts() {
             
             return childEntryCount;
@@ -2394,20 +2395,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final public boolean isLeaf() {
             
             return false;
-            
-        }
-
-        public void copyKey(int index, OutputStream os) {
-            
-            try {
-                
-                os.write(keys.getKey(index));
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
             
         }
         

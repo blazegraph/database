@@ -540,7 +540,7 @@ public class NodeSerializer {
         assert _writeBuffer.pos() == 0;
         assert node != null;
 
-        assert branchingFactor == node.getBranchingFactor();
+//        assert branchingFactor == node.getBranchingFactor();
         final int nentries = node.getEntryCount();
         final int[] childEntryCounts = node.getChildEntryCounts();
         final int nkeys = node.getKeyCount();
@@ -804,7 +804,7 @@ public class NodeSerializer {
         assert _writeBuffer != null;
         assert _writeBuffer.pos() == 0;
         assert leaf != null;
-        assert branchingFactor == leaf.getBranchingFactor();
+//        assert branchingFactor == leaf.getBranchingFactor();
 
         /*
          * Either (a) no compression and we can write the body bytes directly

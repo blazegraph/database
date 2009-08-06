@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -683,6 +682,9 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
+        // Parallel scan of each index partition?
+        final boolean parallel = ((flags & PARALLEL) != 0);
+
         /*
          * Does the iterator declare that it will not write back on the index?
          */
@@ -720,8 +722,27 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
-        return new PartitionedTupleIterator(this, ts, isReadConsistentTx,
-                fromKey, toKey, capacity, flags, filter);
+        if (parallel) {
+
+            /*
+             * Parallel iterator scan. This breaks the total ordering guarantee
+             * of the iterator in exchange for faster visitation of the tuples
+             * in key range which spans multiple index partitions.
+             * 
+             * FIXME Implement the parallel iterator scan.
+             */
+            throw new UnsupportedOperationException();
+            
+        } else {
+
+            /*
+             * Process the index partitions in key order so the total order of
+             * the keys is preserved by the iterator visitation ordering.
+             */
+            return new PartitionedTupleIterator(this, ts, isReadConsistentTx,
+                    fromKey, toKey, capacity, flags, filter);
+
+        }
         
     }
 

@@ -1549,7 +1549,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @return <code>true</code> unless the current key is LT [fromKey] or
          *         GTE [toKey].
          */
-        private boolean rangeCheck(L leaf,int index) {
+        private boolean rangeCheck(final L leaf, final int index) {
 
             // optional inclusive lower bound (may be null).
             final byte[] fromKey = cursor.getFromKey();
@@ -1569,70 +1569,78 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
              * 
              * @todo Try to optimize out this allocation of a copy of the key
              * using an inline comparison. I've made one pass at this but it
-             * causes problems for TestIterator so there is clearly something
-             * wrong.
+             * causes problems for TestIterators so there is clearly something
+             * wrong.  Alternatively, raise this into the IAbstractNodeData
+             * interface.
              */
-            final byte[] key = leaf.getKeys().getKey(index);
-//            if (tbuf == null) {
-//                tbuf = new DataOutputBuffer(0);
-//            }
-//            try {
-//                leafCursor.leaf().getKeys().copyKey(index, tbuf);
-//            } catch(IOException ex) {
-//                // Note: Should never be thrown.
-//                throw new RuntimeException(ex);
-//            }
-//            final int tlen = tbuf.limit();
-//            final byte[] a = tbuf.array();
-
-            if (fromKey != null) {
-
-                if(BytesUtil.compareBytes(key, fromKey)<0) {
-//                if (BytesUtil.compareBytesWithLenAndOffset(0, tlen, a, 0,
-//                        fromKey.length, fromKey) < 0) {
-
-//                    if (DEBUG) {
-//
-//                        log.debug("key=" + BytesUtil.toString(key) + " LT fromKey"
-//                                + BytesUtil.toString(fromKey));
-//
-//                    }
-
+            if (true) {
+                final byte[] key = leaf.getKey(index);
+                if (BytesUtil.compareBytes(key, fromKey) < 0) {
                     // key is LT then the optional inclusive lower bound.
                     return false;
-
                 }
-
-            }
-
-            if (toKey != null) {
-
                 if (BytesUtil.compareBytes(key, toKey) >= 0) {
-//                if (BytesUtil.compareBytesWithLenAndOffset(0, tlen, a, 0,
-//                        toKey.length, toKey) >= 0) {
-
-//                    if (DEBUG) {
-//
-//                        log.debug("key=" + BytesUtil.toString(key) + " GTE toKey"
-//                                + BytesUtil.toString(toKey));
-//
-//                    }
-
                     // key is GTE the optional exclusive upper bound
                     return false;
 
                 }
 
-            }
+            } else {
+                
+                if (tbuf == null) {
+                    tbuf = new DataOutputBuffer(0);
+                }
+                leafCursor.leaf().copyKey(index, tbuf);
+                final int tlen = tbuf.limit();
+                final byte[] a = tbuf.array();
 
+                if (fromKey != null) {
+
+                    if (BytesUtil.compareBytesWithLenAndOffset(0, tlen, a, 0,
+                            fromKey.length, fromKey) < 0) {
+
+                        if (DEBUG) {
+
+                            log.debug("key=" + BytesUtil.toString(a, 0, tlen)
+                                    + " LT fromKey" + BytesUtil.toString(fromKey));
+
+                        }
+
+                        // key is LT then the optional inclusive lower bound.
+                        return false;
+
+                    }
+
+                }
+
+                if (toKey != null) {
+
+                    if (BytesUtil.compareBytesWithLenAndOffset(0, tlen, a, 0,
+                            toKey.length, toKey) >= 0) {
+
+                        if (DEBUG) {
+
+                            log.debug("key=" + BytesUtil.toString(a, 0, tlen)
+                                    + " GTE toKey" + BytesUtil.toString(toKey));
+
+                        }
+
+                        // key is GTE the optional exclusive upper bound
+                        return false;
+
+                    }
+
+                }
+
+            }
             return true;
             
         }
-//      /**
-//      * Buffer used to range check the current key before it is copyed into
-//      * #kbuf.
-//      */
-//     private DataOutputBuffer tbuf;
+      /**
+      * Buffer used to range check the current key before it is copied into
+      * #kbuf.
+      */
+     private DataOutputBuffer tbuf;
 
 //        private AbstractCursorPosition<L,E> priorPosition;
 //        private AbstractCursorPosition<L,E> nextPosition;
