@@ -15,20 +15,217 @@ Goals:
        which makes it difficult is the double-linked leaves in the
        index segment.  The record size must be known when we obtain
        the address of the record from the store.  This means that the
-       priorAddr/nextAddr are outside of the compressed region.
+       priorAddr/nextAddr are outside of the compressed region.  Thus
+       generalized record compression at the store level requires us
+       to mark the #of header bytes.  Otherwise we can handle record
+       compression at the B+Tree level.
 
-    2. Leaf:
+    2.
 
-	  key:byte[][]
-	  value:byte[][]
-	  timestamp:long[]
-	  deleteMarker:bit[]
+     Header:
+
+	  -- header --
+	  headerDataLength(byte) // node=1;leaf=1;linkedLeaf=17(1+sizeof(long)*2)) 
+	  [ // This field exists iff compression was used.
+	   bodyDataLength(int)
+	  ]
+
+       The [headerDataLength] gives the #of bytes of application data
+       in the header exclusive of the header metadata. If there is no
+       application header data then this field is zero.  The header
+       data is intended used to represent data which can not be
+       compressed.  For example, the priorAddr and nextAddr fields of
+       an IndexSegment leaf can not be compressed because we need to
+       know the total size of the record before they can be
+       assigned. If the byte count is negative, then it is interpreted
+       as the #of 32-bit words containing (uncompressed) header data.
+
+       Either all records in the store are compressed by a common
+       technique or none are.  This is indicated when the store is
+       created.  The compression method should be something fast for
+       the journal when used to absorb writes for a data service and
+       could even be "none".  The compression method can also be set
+       for each index and will be applied to all IndexSegmentStore
+       files generated for that scale-out index.
+
+       When the records for a store are compressed, [bodyDataLength]
+       gives the #of bytes in the decompressed record body and is used
+       to pre-allocate a right sized ByteBuffer when compressing the
+       record.  The actual size of that ByteBuffer is the decoded
+       headerDataLength plus the bodyDataLength.
+
+       IRawStore#write(ByteBuffer) always writes a record with zero
+       header data bytes.  IRawStore#write(int,ByteBuffer) writes a
+       record whose first N bytes are stored in the header data
+       section (outside of the compressed record body).  On read,
+       the returned ByteBuffer always has exactly the same data.
+
+       There will need to be alternative IRawStore#write() methods
+       which accept the #of header data bytes.  The header data itself
+       appears in the ByteBuffer to be written just as it would appear
+       when the record was deserialized.  Compression may be applied
+       to all records on the store.  The root blocks are fixed length
+       regions which lie outside of the user space for the store and
+       are not compressed. 
+
+       Compression and decompression will need to pay attention to the
+       header.  When we ready from the backing file we will get a
+       ByteBuffer.  If the record in that ByteBuffer is compressed,
+       then we automatically decompress the record.  The origin of the
+       ByteBuffer is automatically adjusted to the start of the header
+       data area.  The body data bytes follow the header data bytes so
+       the ByteBuffer provides an uninterrupted view of the header
+       data + body data to the application.
+
+	    @todo Write a compression service.  It can have a queue
+		  and use a small thread pool to (de-)compress
+		  records.  Each worker thread will have its own
+		  compression buffer, which should grow until "right
+		  sized".
+
+            FIXME review the use of byteCount as decoded from the addr
+            in application level data structures.  If we allow
+            optional compression then this will break code which
+            assumes that the byteCount reflects the pre-compression
+            record size. 
+	    
+	    @todo The IndexSegmentBuilder will have to explicitly
+	          apply the selected record compression and we will
+	          then have to patch the priorAddr and nextAddr on the
+	          record.
+
+       Checksums are a store-level option.  The checksum is computed
+       for the entire record, including the record header and any
+       application data stored in the header data bytes.  If both
+       compression and checksums are enabled, then the checksum is
+       taken of the compressed record.  When enabled, the checksum is
+       written into the last 4 bytes of the record, and the size of
+       the record is automatically adjusted to store those additional
+       bytes.  The checksum itself is be visible at the {@link
+       IRawStore} API layer (the ByteBuffer view is adjusted so as to
+       hide the checksum).
+
+	    @todo Write a checksum service.  It can have a queue and
+		  use a small thread pool to compute or verify
+		  checksums for records.  Notification should be
+		  synchronous to avoid use of records whose checksums
+		  indicate a media error.  This could be layered over
+		  the compression service or the same worker thread
+		  could be assigned both tasks.  Each worker thread
+		  should have a thread local
+		  com.bigdata.util.ChecksumUtility instance.
+
+	    @todo The key and value compression APIs may need to be
+		  changed since they were written with the assumption
+		  that we were encoding onto an OutputStream.  
+
+		  Can we apply record level compression to keys and
+		  values serialized for RMI?
+
+		  Can we serialize key/value data as ByteBuffer's
+		  wrapped as INodeData for RMI?
+
+	    @todo Move various interfaces and tests related to the
+	          node and leaf data records into their own package.
 
        Node:
 
-	  key:byte[][]
+	  -- header data --
+          type(byte) // 0=node
+	  -- body (compressed) --
+	  version(short)
+          nkeys(int)
+	  nentries(int)
 	  childAddr[]:long[]
 	  childEntryCounts:int[]
+	  keys:byte[][] // encoded as dictionary plus byte aligned code strings.
+
+       new Node(ByteBuffer) // wrap ByteBuffer as NodeData, initialize
+			    // nkeys and nentries from the ByteBuffer
+			    // and set a ref to the NodeData
+
+       ReadOnlyNodeData(ByteBuffer) // wrap and decode.
+
+       ReadOnlyNodeData(INodeData) // allocate ByteBuffer, encode on
+				   // ByteBuffer as [header+body], and
+				   // wrap.
+
+       Leaf:
+
+	  -- header data --
+          type(byte) // 1=leaf; 2=linkedLeaf
+	  [ // iff linked leaf.
+	   priorAddr(long)
+	   nextAddr(long)
+	  ]
+	  -- body (compressed) --
+	  version(short)
+    	  nkeys(int)
+	  timestamp:long[] // optional, based on B+Tree provisioning.
+	  deleteMarker:bit[] // optional, based on B+Tree provisioning.
+	  keys:byte[][] // encoded as dictionary plus byte aligned code strings.
+	  values:byte[][] // encoded as dictionary plus byte aligned code strings.
+
+       new Leaf(ByteBuffer) // wrap ByteBuffer as LeafData, initialize
+			    // nkeys from the ByteBuffer and set a ref
+			    // to the LeafData.  priorAddr and nextAddr
+			    // are available iff type==2.
+
+       ReadOnlyLeafData(ByteBuffer) // wrap and decode.
+
+       ReadOnlyLeafData(ILeafData) // allocate ByteBuffer, encode on
+				   // ByteBuffer as [header+body], and
+				   // wrap.
+
+       These record layouts order the fixed length fields and arrays
+       with known dimensions to the front of the record.  The keys and
+       values are ordered to the back of the record.
+
+       The node/leaf type byte is in the header because we must
+       inspect it before we can interpret the bytes which could
+       correspond to the priorAddr and nextAddr fields and those
+       fields can not be compressed, which is why they are stored in
+       the header data.  This means that the type field itself must be
+       in the header data as well.  This means that writing a B+Tree
+       node or leaf will always use IRawStore#write(int,ByteBuffer).
+
+       The keys and values 
+
+       - The key compression and value compression methods are stored
+         on the BTree.  So is the branching factor.
+
+       - Done. IAbstractNodeData#getBranchingFactor() is deprecated
+         (the field is not stored in node/leaf data record and the
+         branchingFactor field is on the AbstractBTree and should be
+         accessed there).
+
+       - The priorAddr and nextAddr fields need to be exposed by the
+         ILeafData API.  The getter methods should throw an exception
+         if the fields are not present in the data record (e.g., for a
+         BTree vs an IndexSegment).
+
+       - I just need to replace the INodeData and ILeafData
+         implementations, but to do that I need to remove the use of
+         the IKeyBuffer interface and factor the INodeData and
+         ILeafData interfaces off of the INode and ILeaf
+         implementations.  This will allow me to direct the operations
+         to the appropriate node/leaf implementation object.
+
+       - Persistence of a mutable node should always produce the same
+	 binary image as an immutable node.  If the immutable node
+	 needs to be modified, then explode it into java objects.
+
+       - INodeFactory must be replaced or modified such that it
+         creates a Node or Leaf from a ByteBuffer or allocates and
+         writes the representation of a Node or Leaf on a ByteBuffer,
+         which is more or less the role of the NodeSerializer.  The
+         INodeFactory passes all of the arguments, including the
+         byte[][]s, int[]s, and long[]s which will not work when we
+         have a AbstractBTree and a ByteBuffer.
+
+       - The IndexSegment's Node and Leaf instances must remain
+         immutable (various methods are overriden to throw
+         exceptions for unsupported operations).
 
     x. prefix or hu-tucker coding for keys.
 
@@ -81,6 +278,56 @@ Access:
     filter (used for storing asynchronous writes in a compressed
     form).
 
+  - Fast index partition splits.  Record #of spanned tuples (already
+    done) and the #of spanned undeleted tuples.  The latter will be
+    used for fast index partition splits, fast exact range counts,
+    etc.  (I wonder if I really need to know the total #of tuples
+    spanned or just the #of undeleted tuples spanned.) 
+
+    The split can be identified by a search for keys whose undeleted
+    tuple count equally partitions the view.  For a split into two
+    index partitions, the search identifies a key such that the
+    undeleted tuple range counts are for the left and right sibling
+    are approximately equal.  [In fact, I am not sure if this is
+    possible since whether a tuple is deleted or not is only decidable
+    in two cases: (a) when the view is compact; and (b) when an
+    undeleted tuple scan reports the tuple.  So the fast split might
+    only be possible as part of a compacting merge when we have a view
+    without deleted tuples.  It is probably Ok if there are deleted
+    tuples on the mutable B+Tree if we track the deleted tuple count
+    there and know that the sole index segment in the view does not
+    have any deleted tuples.]
+
+  - Parallel iterator scan at the ClientIndexView level (process the
+    index partitions in parallel).  This should be implemented using a
+    BlockingBuffer on the client.  The iterator is distributed in
+    parallel to the DS.  Chunks are added to the client's blocking
+    buffer as they arrive.  The max parallelism of the client index
+    view should be respected for this operation.  The only real catch
+    will be handling redirects for the unisolated index view.
+    
+    This flag should be used in the high-level query and turned on
+    only for purposes where we can tolerate the partial delivery order
+    of the parallel iterator.  In fact, we can probably tolerate that
+    form most use cases but some care still needs to be excercised
+    when enabling this.
+
+    Compare performance with this flag against performance without the
+    flag and against differing degrees of limited parallelism.
+
+  - Fix the sparse row store splitter (must respect the logical row
+    boundaries).
+
+  - Raise AbstractBTreeTupleCursor::rangeCheck(final L leaf, final int
+    index) into the ILeafData API?  The method signature would have to
+    be changed to accept the optional fromKey and toKey constraints
+    and the test would then be answered by the ILeafData
+    implementation.
+
+  - Strongly type the AbstractBTree's IAutoBox interface for the
+    key/value types and link that with the ITupleSerializer types.
+    
+
 API: 
 
     Use the same API for mutable nodes and leaves and immutable nodes
@@ -92,3 +339,166 @@ Questions:
 
     Do we need to code "null" as well as variable length byte[] and
     allow values[] itself to be null?
+
+
+
+B+Tree node buffering.
+
+       - set of large native buffers.
+
+       - hash map <UUID,addr> : <buffer#,offset>
+
+       - strict unbounded LRU for eviction.
+
+       - guard for node/leaf data access (latch) protect critical
+         regions using a nested inc/dec approach and ensures that the
+         data mapped to a given buffer and offset is neither moved nor
+         evicted during access.  avoid guards across recursive methods
+         since that can lead to deadlock with compact.
+
+       - compact buffers - must not deadlock with record access as
+         mediated by guards.
+
+       - bitmap might help to write compact logic.
+
+       - use an allocation unit for the slots in the buffer which is a
+         multiple of some power of two, e.g., 128 or 256 bytes per
+         slot.  all slots for a given record are contiguous.
+
+       - Could use the same buffers for the index segment nodes
+         region, but this raises the opportunity for fragmentation
+         significantly.  This is a kind of double-buffering.  If the
+         nodes region is not compressed but only the individual nodes,
+         then the uncompressed nodes would also be buffered on a
+         strict LRU basis.
+
+       - Compact should maintain a free region at the end of each
+         buffer, prefer to fill a buffer to capacity, and perform the
+         minimum movement possible to fill gaps (incremental) or
+         simply compact onto a different buffer (batch).  With buffer
+         and buffer to buffer copy should be DMA.  The challenge is to
+         hold all necessary locks so that we can relocate the records
+         within or across buffers.
+
+	 You know, this variable length record compacting thing is
+	 exactly the problem that Java memory management is already
+	 solving.  What I need to do is use normal java memory (since
+	 it leaks native byte buffers) and impose a soft maximum on
+	 the desired #of bytes allocated to B+Tree nodes, clear
+	 references for nodes in an LRU pattern until the weakly
+	 referenced byte count is LTE the soft maximum, and also track
+	 the bytes recovered when weak references are cleared so I
+	 know the min/max allocation.  There is some overhead for both
+	 byte[] and a ByteBuffer, but not that much when compared to
+	 the overhead of the byte[][] keys and values and the other
+	 node/leaf metadata.
+
+       - Reading from the store already returns a ByteBuffer on the
+         heap.
+
+       - The DiskOnlyStrategy already defines a read cache.  That
+         could be refactored as an IIndexStore scope B+Tree node
+         cache.  The records would be read from the underlying store
+         and the obtained ByteBuffer would be entered into the cache.
+         Since the cache is global, the key would have to be
+         <UUID,addr> or <File,addr>.  The records should remain
+         available until purged by the LRU policy even if the backing
+         store is closed (in order words, do not attempt to remove
+         records from the cache when the store is closed).  Purging
+         records on delete of the backing store could be considered,
+         but it is unlikely to be much benefit.  One way to do that is
+         to scan from the LRU position backwards an arbitrary distance
+         clearing references for any nodes associated with a deleted
+         store.
+	 
+         The cache could also support write through so an newly
+         persisted B+Tree node would either be buffered (if write
+         through was enabled) or discarded (if it was not enabled).
+	 
+         While newly persisted nodes are unlikely to be re-read within
+         the context of an ACID operation, they are relatively likely
+         to be re-read within the context of following operation.
+
+	 We could also install records into the cache when building an
+	 index segment, but again that might not be a benefit.
+
+       - Use Hu-Tucker or prefix coding for keys, Huffman for values.
+         But compare costs (space and time) when using gzip w/o
+         Huffman compression for the values.
+
+       - An alternative to variable length records and managing the
+         buffer space is to choose both a branchingFactor (m) and a
+         pageSize (in bytes).  There are several complications here,
+         but several advantages.  
+
+	     - Mutable nodes would be in-memory and might be in the
+               exploded format.  Once persisted, they would use the
+               same binary format as the index segment.
+
+	     - The index segment build would not be solely top-down
+               since a node could underflow or overflow based on its
+               bytes used.
+
+	     - I can not see any way to dynamically maintain the
+               huffman encoding on the page, so there is really no way
+               to predict the encoded (but not compressed) page size.
+
+	     - Pages would be compressed on the disk, so the on disk
+               storage would not be fixed length - only the in memory
+               image.
+
+Paul,
+
+We are looking to tune the use of RAM to buffer B+Tree nodes and
+leaves for the scale-out database.  I would expect that at least 50%
+of the RAM should be dedicated to this task on each JVM instance.  I
+am trying to decide on the approach to managing this memory.  I am
+considering either (A) a large ByteBuffer on the native heap and
+managing the memory myself; or (B) allocating a large number of
+perfect fit ByteBuffers on the Java heap and letting the JVM manage
+them.
+
+As someone with roots in C, my first inclination is to allocate a
+large ByteBuffer on the native heap and then manage the memory within
+that buffer myself.  We made the decision to impose a constraint only
+on the B+Tree branching factor, but not on the size of the B+Tree node
+or leaf representation on the disk. This gives us perfect fit records
+on the disk so the on disk image corresponds to perfect utilization
+within the B+Tree even if nodes and leaves are not 100% full. As a
+consequence, the B+Tree nodes and leaves use variable length records
+rather than fixed size pages.  Given that, the buffer memory
+management problem would probably rely on mechanisms such as those
+already used by the JVM to handle Java allocations.  However, Java
+already has great garbage collectors.
+
+So it occurs to me that we might be better off allocating ByteBuffer's
+on the Java heap and then letting the JVM manage the memory on our
+behalf.  I believe that we could achieve the desired degree of
+buffering using a hash map with weak reference values combined with a
+hard reference retention cache using an LRU eviction policy.  If we
+cleared hard references from the LRU position whenever the total of
+the buffered byte[]s exceeded the desired percentage of the JVM heap,
+then those byte[]s would be automatically discarded once they were
+only weakly reachable.
+
+While I would like to use native ByteBuffers for these data, but it is
+my understanding that Java "leaks" ByteBuffer's whose backing storage
+is on the native heap.  Also, it is my expectation that a large part
+of the memory savings will come from operating on a binary image of
+the B+Tree node/leaf rather than de-serializing the (de-compressed)
+image read from the disk.  This will allow us to get rid of the
+(de-)serialization time and the entailed memory demand on the Java
+data structures used to model the nodes and leaves.  Running with the
+expanded (deserialized Java objects) version of the B+Tree nodes and
+leaves we typically buffer .3G of data on disk in RAM on a server with
+a 12G JVM process.  I expect that we could increase that to 6G with
+either of the proposed approaches, which would of course drammatically
+improve the database performance by reducing IO Wait and
+(de-)serialization costs.
+
+I would appreciate it if you have any insight on this question which
+you could share.
+
+Thanks,
+
+-bryan

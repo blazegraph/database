@@ -87,7 +87,7 @@ public interface ILeafData extends IAbstractNodeData {
      * 
      * @see #isNull(int)
      */
-    public void copyValue(int index,OutputStream os);
+    public void copyValue(int index, OutputStream os);
 
     /**
      * The timestamp for the entry at the specified index.

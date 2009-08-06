@@ -74,8 +74,11 @@ public class TestAll extends TestCase {
         // test key search routines on the key buffer implementations.
         suite.addTestSuite(TestKeyBufferSearch.class);
 
+        // test suite for the B+Tree node and leaf data records.
+        suite.addTest(com.bigdata.btree.data.TestAll.suite());
+        
         /*
-         * test btree fundementals.
+         * test btree fundamentals.
          */
         // test static and instance utility methods on AbstractNode and ArrayType.
         suite.addTestSuite( TestUtilMethods.class );
@@ -97,14 +100,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIndexCounter.class );
         
         // test iterator semantics.
-        suite.addTestSuite(TestBTreeLeafCursors.class);
-        suite.addTestSuite(TestIterators.class);
-        suite.addTestSuite(TestReadOnlyBTreeCursors.class);
-        suite.addTestSuite(TestMutableBTreeCursors.class);
-        // stackable tuple filters
-        suite.addTest(com.bigdata.btree.filter.TestAll.suite());
-        // chunked iterators.
-        suite.addTestSuite(TestChunkedIterators.class);
+        suite.addTest(TestAll_Iterators.suite());
 
         // test delete semantics (also see the isolation package).
         suite.addTestSuite( TestRemoveAll.class );

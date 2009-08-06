@@ -82,7 +82,7 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTes
 
     public void test_baseCase() {
         
-        BTree btree = getBaseCaseBTree();
+        final BTree btree = getBaseCaseBTree();
 
         btree.setReadOnly(isReadOnly());
         
@@ -96,7 +96,7 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTes
      */
     public void test_keyRange_correctRejection() {
 
-        BTree btree = BTree.create(new SimpleMemoryRawStore(),
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(),
                 new IndexMetadata(UUID.randomUUID()));
 
         if(isReadOnly()) {

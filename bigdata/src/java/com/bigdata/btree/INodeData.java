@@ -49,10 +49,18 @@ public interface INodeData extends IAbstractNodeData {
      * first {@link #getChildCount()} entries in the returned array are defined.
      * If an entry is zero(0L), then the corresponding child is not persistent.
      * The use of this array is dangerous since mutations are directly reflected
-     * in the node, but it may be highly efficient. Callers MUST excercise are
-     * to perform only read-only operations against the returned array.
+     * in the node, but it may be highly efficient. Callers MUST exercise are to
+     * perform only read-only operations against the returned array.
      * 
      * @return The backing array of persistent child addresses.
+     * 
+     * @deprecated This is only used to persistent the child addresses, which is
+     *             done by the {@link NodeSerializer}. With the refactor to use
+     *             a binary image for the persistent nodes and leaves we will no
+     *             need this method. It can disappear into the implementation.
+     *             <p>
+     *             However, getChildAddr(int) will be needed by
+     *             {@link Node#getChild(int)}.
      */
     public long[] getChildAddr();
 
@@ -62,6 +70,8 @@ public interface INodeData extends IAbstractNodeData {
      * value returned by {@link #getEntryCount()}. These data are used to
      * support fast computation of the index at which a key occurs and the #of
      * entries in a given key range.
+     * 
+     * @deprecated by #getChildEntryCount(int).
      */
     public int[] getChildEntryCounts();
 

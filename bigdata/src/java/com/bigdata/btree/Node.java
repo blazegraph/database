@@ -108,24 +108,24 @@ public class Node extends AbstractNode<Node> implements INodeData {
     /**
      * The #of entries spanned by this node. This value should always be equal
      * to the sum of the defined values in {@link #childEntryCounts}.
-     * 
+     * <p>
      * When a node is split, the value is updated by subtracting off the counts
      * for the children that are being moved to the new sibling.
-     * 
+     * <p>
      * When a node is joined, the value is updated by adding in the counts for
      * the children that are being moved to the new sibling.
-     * 
+     * <p>
      * When a key is redistributed from a node to a sibling, the value is
      * updated by subtracting off the count for the child from the source
      * sibling and adding it in to this node.
-     * 
+     * <p>
      * This field is initialized by the various {@link Node} constructors.
      */
     protected int nentries;
     
     /**
      * The #of entries spanned by each direct child of this node.
-     * 
+     * <p>
      * The appropriate element in this array is incremented on all ancestor
      * nodes by {@link Leaf#insert(Object, Object)} and decremented on all
      * ancestors nodes by {@link Leaf#remove(Object)}. Since the ancestors are

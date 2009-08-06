@@ -172,7 +172,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      * 
      * @param btree A mutable btree.
      */
-    protected Leaf(AbstractBTree btree) {
+    protected Leaf(final AbstractBTree btree) {
 
         super(btree, btree.branchingFactor, true /*dirty*/ );
 
@@ -208,7 +208,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      * 
      * @see AbstractNode#copyOnWrite()
      */
-    protected Leaf(Leaf src) {
+    protected Leaf(final Leaf src) {
 
         super(src);
 

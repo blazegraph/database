@@ -179,7 +179,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * on the store. This mechanism is critical because it prevents a node
      * entering the queue from forcing IO for the same node in the edge case
      * where the node is also on the tail on the queue. Since the counter is
-     * incremented before it is added to the queue, it is guarenteed to be
+     * incremented before it is added to the queue, it is guaranteed to be
      * non-zero when the node forces its own eviction from the tail of the
      * queue. Preventing this edge case is important since the node can
      * otherwise become immutable at the very moment that it is touched to
@@ -368,14 +368,14 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * @param src
      *            The source node.
      */
-    protected AbstractNode(AbstractNode<T> src) {
+    protected AbstractNode(final AbstractNode<T> src) {
 
         /*
-         * Note: We do NOT clone the base class since this is a new
-         * persistence capable object, but it is not yet persistent and we
-         * do not want to copy the persistent identity of the source object.
+         * Note: We do NOT clone the base class since this is a new persistence
+         * capable object, but it is not yet persistent and we do not want to
+         * copy the persistent identity of the source object.
          */
-        this(src.btree,src.branchingFactor,true/*dirty*/);
+        this(src.btree, src.branchingFactor, true/* dirty */);
 
         // This node must be mutable (it is a new node).
         assert isDirty();
@@ -887,6 +887,12 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
             
         }
 
+    }
+    
+    final public byte[] getKey(final int index) {
+
+        return keys.getKey(index);
+        
     }
     
     /**

@@ -2105,7 +2105,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    public void force(boolean metadata) {
+    public void force(final boolean metadata) {
 
         assertOpen();
 
@@ -2119,7 +2119,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
     
-    public long write(ByteBuffer data) {
+    public long write(final ByteBuffer data) {
 
         assertOpen();
 
@@ -2133,7 +2133,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    public ByteBuffer read(long addr) {
+    public ByteBuffer read(final long addr) {
 
         assertOpen();
 
@@ -2141,7 +2141,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    final public long getRootAddr(int index) {
+    final public long getRootAddr(final int index) {
 
         assertOpen();
 

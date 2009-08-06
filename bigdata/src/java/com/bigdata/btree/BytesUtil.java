@@ -518,17 +518,38 @@ public class BytesUtil {
      * 
      * @return The string representation of the array as unsigned bytes.
      */
-    final public static String toString(byte[] key) {
+    final public static String toString(final byte[] key) {
+        
+        return toString(key, 0, key.length);
+        
+    }
 
-        if(key==null) return NULL;
-        
-        StringBuilder sb = new StringBuilder(key.length*4+2);
-        
+    /**
+     * Formats a key as a series of comma delimited unsigned bytes.
+     * 
+     * @param key
+     *            The key.
+     * @param off
+     *            The index of the first byte that will be visited.
+     * @param len
+     *            The #of bytes to visit.
+     * 
+     * @return The string representation of the array as unsigned bytes.
+     */
+    final public static String toString(final byte[] key, final int off,
+            final int len) {
+
+        if (key == null)
+            return NULL;
+
+        final StringBuilder sb = new StringBuilder(len * 4 + 2);
+
         sb.append("[");
         
-        for( int i=0; i<key.length; i++) {
+        for (int i = off; i < off + len; i++) {
             
-            if( i>0 ) sb.append(", ");
+            if (i > 0)
+                sb.append(", ");
             
             // as an unsigned integer.
 //            sb.append(Integer.toHexString(key[i] & 0xff));

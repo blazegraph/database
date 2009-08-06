@@ -1,0 +1,32 @@
+<html>
+<head>
+<title>B+-Tree data record</title>
+</head>
+<body>
+
+<p>
+A package for the B+Tree data records.  This is a binary image which can be
+processed directly in RAM.  The on disk record is normally compressed using
+the compression provider for the {@link com.bigdata.store.IRawStore}. The
+in-memory image is a variable length immutable record encoding the persistent
+data for a node or leaf of a B+Tree.  The binary image supports random access
+to all data fields, to the keys, and to the values.  This means that the image
+can not use "packed" or nibble coded representations of integer values and can
+not use bit encoded representations of compression codes.  However, the entire
+record is typically compressed by the backing store using GZip or the like, so
+the representation of the record on disk is quite compact. 
+</p>
+<p>
+Key compression and value compression are applied when the recorded is encoded. 
+The representation of the compressed keys or values generally consists of a
+dictionary followed the code strings for the keys or values.  The code strings
+are byte aligned so they can be accessed easily in RAM without having to scan
+through the image.  Hu-Tucker coding is preferred to prefix coding for keys
+because prefix coding requires a sequential scan to process the coded keys.
+Huffman coding is preferred for values because it is fast and efficient and
+the assigned codes do not need to preserve the lexical order of the values,
+which is not true for the keys.
+</p>
+
+</body>
+</html>

@@ -1,0 +1,261 @@
+/*
+
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Aug 5, 2009
+ */
+
+package com.bigdata.btree.data;
+
+import java.nio.ByteBuffer;
+
+import com.bigdata.btree.INodeData;
+import com.bigdata.rawstore.Bytes;
+
+/**
+ * A read-only view of the data for a B+Tree node.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
+public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
+        implements INodeData {
+    
+    /** A read-only view of the backing {@link ByteBuffer}. */
+    private final ByteBuffer b;
+    
+    // fields which are cached by the ctor.
+    private final int nkeys;
+    private final int nentries;
+
+    /**
+     * Offset of the encoded childAddr[] in the buffer.
+     */
+    private final int O_childAddr;
+    
+    /**
+     * Offset of the encoded childEntryCount[] in the buffer.
+     */
+    private final int O_childEntryCount;
+
+    /**
+     * Offset of the encoded keys in the buffer.
+     */
+    private final int O_keys;
+
+    public final ByteBuffer buf() {
+
+        return b;
+        
+    }
+    
+    /**
+     * Constructor wraps a buffer containing an encoded node data record.
+     * 
+     * @param b
+     *            The buffer containing the data for the node.
+     */
+    public ReadOnlyNodeData(final ByteBuffer b) {
+
+        if (b == null)
+            throw new IllegalArgumentException();
+        
+        this.b = b.asReadOnlyBuffer();
+
+        final byte type = b.get();
+
+        switch (type) {
+        case NODE:
+            break;
+        case LEAF:
+            throw new AssertionError();
+        case LINKED_LEAF:
+            throw new AssertionError();
+        default:
+            throw new AssertionError("type=" + type);
+        }
+
+        final int version = b.getInt();
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new AssertionError("version=" + version);
+        }
+        
+        // skip over flags (they are unused for a node).
+        b.getShort();
+        
+        this.nkeys = b.getInt();
+        
+        this.nentries = b.getInt();
+        
+        final int keysSize = b.getInt();
+        
+        O_childAddr = b.position();
+        
+        O_childEntryCount = O_childAddr + (nkeys + 1) * SIZEOF_ADDR;
+
+        O_keys = O_childEntryCount + (nkeys + 1) * SIZEOF_ENTRY_COUNT;
+        
+    }
+
+    /**
+     * Serialize the node onto a newly allocated buffer.
+     * 
+     * @param data
+     *            The data to be encoded.
+     */
+    public ReadOnlyNodeData(final INodeData node) {
+
+        // cache some fields.
+        this.nkeys = node.getKeyCount();
+        this.nentries = node.getEntryCount();
+
+        // encode the keys.
+        final byte[] encodedKeys = encodeKeys(node);
+        
+        // figure out how the size of the buffer (exact fit).
+        final int capacity = //
+                SIZEOF_TYPE + //
+                SIZEOF_VERSION + //
+                SIZEOF_FLAGS + //
+                SIZEOF_NKEYS + //
+                SIZEOF_ENTRY_COUNT + //
+                Bytes.SIZEOF_INT + // keysSize
+                SIZEOF_ADDR * (nkeys + 1) + // childAddr[]
+                SIZEOF_ENTRY_COUNT * (nkeys + 1) + // childEntryCount[]
+                encodedKeys.length // keys
+        ;
+        
+        final ByteBuffer b = ByteBuffer.allocate(capacity);
+
+        b.put(NODE);
+
+        b.putShort(VERSION0);
+        
+        b.putShort((short) 0/* flags */);
+        
+        b.putInt(nkeys);
+        
+        b.putInt(nentries);
+
+        b.putInt(encodedKeys.length); // keySize
+        
+        // childAddr[]
+        O_childAddr = b.position();
+        for (int i = 0; i <= nkeys; i++) {
+            
+            b.putLong(node.getChildAddr()[i]);
+            
+        }
+        
+        // childEntryCount[]
+        O_childEntryCount = b.position();
+        for (int i = 0; i <= nkeys; i++) {
+            
+            b.putInt(node.getChildEntryCounts()[i]);
+            
+        }
+        
+        // write the encoded keys on the buffer.
+        O_keys = b.position();
+        b.put(encodedKeys);
+
+        assert b.position() == b.limit();
+        
+        // prepare buffer for writing on the store [limit := pos; pos : =0] 
+        b.flip();
+        
+        // save read-only reference to the buffer.
+        this.b = b.asReadOnlyBuffer();
+        
+    }
+
+    /**
+     * Always returns <code>false</code>.
+     */
+    final public boolean isLeaf() {
+
+        return false;
+
+    }
+
+    /**
+     * {@inheritDoc}. This field is cached.
+     */
+    final public int getKeyCount() {
+        
+        return nkeys;
+        
+    }
+
+    /**
+     * {@inheritDoc}. This field is cached.
+     */
+    final public int getChildCount() {
+        
+        return nkeys + 1;
+        
+    }
+
+    /**
+     * {@inheritDoc}. This field is cached.
+     */
+    final public int getEntryCount() {
+        
+        return nentries;
+        
+    }
+
+    /**
+     * @deprecated by #getChildAddr(int)
+     */
+    public long[] getChildAddr() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    final public long getChildAddr(final int index) {
+        
+        return b.getLong(O_childAddr + index * SIZEOF_ADDR);
+        
+    }
+
+    /**
+     * @deprecated by {@link #getChildEntryCount(int)}
+     */
+    public int[] getChildEntryCounts() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    final public int getChildEntryCount(final int index) {
+
+        return b.getInt(O_childEntryCount + index * SIZEOF_ENTRY_COUNT);
+
+    }
+    
+}
