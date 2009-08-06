@@ -68,6 +68,7 @@
 	     	>
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
+			<src path="${bigdata.dir}/lgpl-utils/src/java" />
 			<src path="${bigdata.dir}/bigdata/src/java" />
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />

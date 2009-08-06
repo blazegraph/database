@@ -1,11 +1,12 @@
 package com.bigdata.btree.compression;
 
+
+import it.unimi.dsi.compression.Coder;
+import it.unimi.dsi.compression.Decoder;
+import it.unimi.dsi.compression.HuffmanCodec;
 import it.unimi.dsi.fastutil.bytes.Byte2IntOpenHashMap;
-import it.unimi.dsi.mg4j.compression.Coder;
-import it.unimi.dsi.mg4j.compression.Decoder;
-import it.unimi.dsi.mg4j.compression.HuffmanCodec;
-import it.unimi.dsi.mg4j.io.InputBitStream;
-import it.unimi.dsi.mg4j.io.OutputBitStream;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
@@ -56,7 +57,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         // example: [ mike ], [ personick ]
         // 2 4 9 10 c e i k m n o p r s 1 2 2 2 1 1 1 1 1 1 <num compressed bytes> <compressed bytes> 
         
-        final StringBuilder info = new StringBuilder();
+        final StringBuilder info = (INFO ? new StringBuilder() : null);
         
         final int n = raba.getKeyCount();
 
@@ -189,15 +190,17 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         final HuffmanCodec codec = new HuffmanCodec(packedFrequency);
         
-        final Coder coder = codec.getCoder();
+        final Coder coder = codec.coder();
 
         final ByteArrayOutputStream data = new ByteArrayOutputStream();
         
+        // This ctor variant is faster based on testStress().
         final OutputBitStream obs = new OutputBitStream(data);
-        // Use this ctor variant directly on the [out] arg - it is much faster.
-//        new OutputBitStream((OutputStream) out,
-//                0/* unbuffered */, false/*reflectionTest*/);
-        
+      
+        // This ctor variant is slower based on testStress().
+//        final OutputBitStream obs = new OutputBitStream((OutputStream) data,
+//                0/* unbuffered */, false/* reflectionTest */);
+
         for (byte[] bytes : raba) {
 
             for (byte b : bytes) {
@@ -252,7 +255,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
 
         }
 
-        final StringBuilder info = new StringBuilder();
+        final StringBuilder info = (INFO ? new StringBuilder() : null);
         
         if (INFO) {
             
@@ -339,7 +342,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         final HuffmanCodec codec = new HuffmanCodec(frequency);
 
-        final Decoder decoder = codec.getDecoder();
+        final Decoder decoder = codec.decoder();
         
         final InputBitStream ibs = new InputBitStream(data);
         

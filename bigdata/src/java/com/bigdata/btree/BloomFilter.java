@@ -71,7 +71,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
      * 
      * @serial
      */
-    private it.unimi.dsi.mg4j.util.BloomFilter2 filter;
+    private it.unimi.dsi.util.BloomFilter2 filter;
 
     /**
      * The natural logarithm of 2, used in the computation of the number of
@@ -208,7 +208,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
 
         final int d = getHashFunctionCount(p);
         
-        filter = new it.unimi.dsi.mg4j.util.BloomFilter2(n, d);
+        filter = new it.unimi.dsi.util.BloomFilter2(n, d);
 
         if (DEBUG)
             log.debug("n=" + n + ", p=" + p + ", d=" + d + ", m=" + filter.m());
@@ -623,7 +623,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
 
         p = in.readDouble();
         
-        filter = (it.unimi.dsi.mg4j.util.BloomFilter2) in.readObject();
+        filter = (it.unimi.dsi.util.BloomFilter2) in.readObject();
 
         dirty = false;
 

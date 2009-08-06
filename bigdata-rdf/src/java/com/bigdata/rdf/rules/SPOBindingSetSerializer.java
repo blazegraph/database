@@ -28,24 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import it.unimi.dsi.mg4j.io.OutputBitStream;
-
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-
-import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.relation.rule.IBindingSet;
-import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.eval.ISolution;
 
 /**

@@ -79,8 +79,6 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
 
         if (b == null)
             throw new IllegalArgumentException();
-        
-        this.b = b.asReadOnlyBuffer();
 
         final byte type = b.get();
 
@@ -118,6 +116,9 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
 
         O_keys = O_childEntryCount + (nkeys + 1) * SIZEOF_ENTRY_COUNT;
         
+        // save reference to buffer
+        this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
+
     }
 
     /**
@@ -231,7 +232,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
     /**
      * @deprecated by #getChildAddr(int)
      */
-    public long[] getChildAddr() {
+    final public long[] getChildAddr() {
 
         throw new UnsupportedOperationException();
         
@@ -246,7 +247,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
     /**
      * @deprecated by {@link #getChildEntryCount(int)}
      */
-    public int[] getChildEntryCounts() {
+    final public int[] getChildEntryCounts() {
         
         throw new UnsupportedOperationException();
         

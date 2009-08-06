@@ -129,7 +129,7 @@ public class RandomAccessByteArray implements IRandomAccessByteArray {
         
     }
     
-    public boolean isNull(int index) {
+    public boolean isNull(final int index) {
 
         assert rangeCheck(index);
 
