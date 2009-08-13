@@ -21,9 +21,11 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.btree;
+package com.bigdata.btree.raba;
 
 import java.util.Iterator;
+
+import com.bigdata.btree.IKeyBuffer;
 
 /**
  * Class with implementations supporting mutable and immutable variable length
@@ -83,11 +85,11 @@ public abstract class AbstractKeyBuffer implements IKeyBuffer {
             int i = 0;
             
             public boolean hasNext() {
-                return i < getKeyCount();
+                return i < size();
             }
 
             public byte[] next() {
-                return getKey(i++);
+                return get(i++);
             }
 
             public void remove() {

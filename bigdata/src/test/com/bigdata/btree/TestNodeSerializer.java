@@ -35,6 +35,8 @@ import java.util.UUID;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
@@ -601,7 +603,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         Leaf leaf = new Leaf(btree, addr, branchingFactor,
 //                new ImmutableKeyBuffer(nkeys, branchingFactor + 1, keys),
                 new MutableKeyBuffer(nkeys, keys),
-                values,//
+                new MutableValueBuffer(nkeys, values),//
                 versionTimestamps,//
                 deleteMarkers//
                 ); // ,previous,next);

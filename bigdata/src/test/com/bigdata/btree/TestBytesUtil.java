@@ -29,6 +29,7 @@ package com.bigdata.btree;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.ImmutableKeyBuffer;
 
 import junit.framework.TestCase2;
 

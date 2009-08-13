@@ -21,22 +21,17 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.btree;
+package com.bigdata.btree.raba;
 
 import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
+import java.io.OutputStream;
+
+import com.bigdata.btree.BytesUtil;
 
 /**
- * A flyweight mutable implementation of {@link IKeyBuffer} (does not support
- * the concept of a non-zero fromIndex and treats the number of keys in the
- * buffer as the toIndex).
- * 
- * @todo 27% of the search cost is dealing with the prefix.
- * 
- * @todo track prefix length for mutable keys (update when first/last key are
- *       updated). at present the node/leaf logic directly manipulates the keys.
- *       that will have to be changed to track the prefix length.
+ * A flyweight mutable implementation exposing the backing byte[][] and
+ * supporting search.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -45,21 +40,14 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
 
     /**
      * The #of defined keys.
-     * 
-     * @todo must become private in order to decouple the btree implementation
-     *       from the {@link MutableKeyBuffer} implementation.
      */
-    int nkeys;
+    public int nkeys;
     
     /**
      * An array containing the keys. The size of the array is the maximum
      * capacity of the key buffer.
-     * 
-     * @todo must become private in order to decouple the btree implementation
-     *       from the {@link MutableKeyBuffer} implementation. Callers should
-     *       use random access API and copy key by value.
      */
-    final byte[][] keys;
+    final public byte[][] keys;
 
     /**
      * Allocate a mutable key buffer capable of storing <i>capacity</i> keys.
@@ -67,7 +55,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * @param capacity
      *            The capacity of the key buffer.
      */
-    public MutableKeyBuffer(int capacity) {
+    public MutableKeyBuffer(final int capacity) {
 
         nkeys = 0;
         
@@ -122,29 +110,37 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         }
         
     }
-    
+
     /**
-     * Builds a mutable key buffer from an immutable key buffer.
+     * Builds a mutable key buffer.
      * 
      * @param src
-     *            The immutable key buffer.
+     *            The source data.
      */
-    public MutableKeyBuffer(ImmutableKeyBuffer src) {
-  
-        assert nkeys >= 0; // allow deficient root.
+    public MutableKeyBuffer(final IRandomAccessByteArray src) {
 
-        assert src != null;
-
-        nkeys = src.nkeys;
+        if (src == null)
+            throw new IllegalArgumentException();
         
-        keys = src.toKeyArray();
+        nkeys = src.size();
+
+        assert nkeys >= 0; // allows deficient root.
+        
+        keys = new byte[src.capacity()][];
+        
+        int i = 0;
+        for(byte[] a : src) {
+            
+            keys[i++] = a;
+            
+        }
         
     }
 
     /**
      * Returns a reference to the key at that index.
      */
-    final public byte[] getKey(final int index) {
+    final public byte[] get(final int index) {
 
         /*
          * @todo nkeys is not always updated before using this method by the
@@ -157,7 +153,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
 
     }
 
-    final public int getLength(final int index) {
+    final public int length(final int index) {
 
         assert index >= 0 && index < nkeys;
 
@@ -169,13 +165,21 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
 
     }
     
-    final public int copyKey(final int index, final DataOutput out) throws IOException {
+    final public int copy(final int index, final OutputStream out) {
 
         assert index >= 0 && index < nkeys : "index="+index+" not in [0:"+nkeys+"]";
 
         final byte[] tmp = keys[index];
 
-        out.write(tmp, 0, tmp.length);
+        try {
+            
+            out.write(tmp, 0, tmp.length);
+            
+        } catch (IOException ex) {
+            
+            throw new RuntimeException(ex);
+            
+        }
         
         return tmp.length;
         
@@ -189,7 +193,13 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
                 
     }
     
-    final public int getKeyCount() {
+    final public boolean isEmpty() {
+        
+        return nkeys == 0;
+        
+    }
+    
+    final public int size() {
 
         return nkeys;
 
@@ -198,7 +208,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     /**
      * The maximum #of keys that may be held in the buffer (its capacity).
      */
-    final public int getMaxKeys() {
+    final public int capacity() {
 
         return keys.length;
         
@@ -213,12 +223,33 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         
     }
     
+    /**
+     * Mutable.
+     */
     final public boolean isReadOnly() {
         
         return false;
         
     }
     
+    /**
+     * <code>null</code>s are not allowed.
+     */
+    final public boolean isNullAllowed() {
+
+        return false;
+        
+    }
+
+    /**
+     * Searchable.
+     */
+    final public boolean isSearchable() {
+        
+        return true;
+        
+    }
+
     /*
      * Mutation api. The contents of individual keys are never modified. Some of
      * the driver logic in Leaf and Node uses loops where nkeys is being
@@ -256,7 +287,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * 
      * @todo Who uses this? Track prefixLength?
      */
-    final public void setKey(int index, byte[] key) {
+    final public void set(final int index, final byte[] key) {
         
         assert index >= 0 && index < nkeys;
         
@@ -264,23 +295,23 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         
     }
     
-    /**
-     * Set the key at the specified index to <code>null</code>. This is used
-     * to clear elements of {@link #keys} that are no longer defined. The caller
-     * is responsible for updating {@link #nkeys} when using this method.
-     * 
-     * @param index
-     *            The key index in [0:maxKeys-1];
-     */
-    final public void zeroKey(int index) {
-        
-//        assert index >= 0 && index < nkeys;
-        
-        keys[index] = null;
-        
-    }
+//    /**
+//     * Set the key at the specified index to <code>null</code>. This is used
+//     * to clear elements of {@link #keys} that are no longer defined. The caller
+//     * is responsible for updating {@link #nkeys} when using this method.
+//     * 
+//     * @param index
+//     *            The key index in [0:maxKeys-1];
+//     */
+//    final public void zeroKey(int index) {
+//        
+////        assert index >= 0 && index < nkeys;
+//        
+//        keys[index] = null;
+//        
+//    }
     
-    final public int add(byte[] key) {
+    final public int add(final byte[] key) {
         
         assert nkeys < keys.length;
         
@@ -413,7 +444,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     
     public String toString() {
 
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
 
         sb.append("nkeys=" + nkeys);
         sb.append(", maxKeys=" + keys.length);
@@ -444,19 +475,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
         return sb.toString();
 
     }
-
-    public MutableKeyBuffer toMutableKeyBuffer() {
-        
-//        if( capacity < nkeys + 1 ) throw new IllegalArgumentException();
-
-//        return new MutableKeyBuffer(capacity,this);
-        
-//        return new MutableKeyBuffer(this);
-        
-        return this;
-        
-    }
-    
+   
     final public int search(final byte[] searchKey) {
 
         if (searchKey == null)
@@ -650,11 +669,11 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * Verifies that the keys are in sort order and that undefined keys are
      * [null].
      */
-    protected final void assertKeysMonotonic() {
-        
+    public final void assertKeysMonotonic() {
+
         for (int i = 1; i < nkeys; i++) {
 
-            if (BytesUtil.compareBytes(keys[i], keys[ i - 1] ) <= 0) {
+            if (BytesUtil.compareBytes(keys[i], keys[i - 1]) <= 0) {
 
                 throw new AssertionError("Keys out of order at index=" + i
                         + ", keys=" + this.toString());
@@ -662,13 +681,13 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
             }
 
         }
-        
-        for( int i=nkeys; i<keys.length; i++ ) {
-            
-            if( keys[i] != null ) {
-                
-                throw new AssertionError("Expecting null at index="+i);
-                
+
+        for (int i = nkeys; i < keys.length; i++) {
+
+            if (keys[i] != null) {
+
+                throw new AssertionError("Expecting null at index=" + i);
+
             }
             
         }

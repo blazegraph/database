@@ -25,9 +25,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 16, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.btree.raba;
 
 import java.util.Arrays;
+
+import com.bigdata.btree.BytesUtil;
 
 /**
  * Test of an immutable representation of keys that is both compact and
@@ -71,10 +73,10 @@ public class TestImmutableKeyBuffer extends AbstractKeyBufferTestCase {
         System.err.println("buf="+BytesUtil.toString(kbuf.buf)); // as unsigned byte[].
         // verify #of keys.
         assertEquals("nkeys",nkeys,kbuf.nkeys);
-        assertEquals("nkeys",nkeys,kbuf.getKeyCount());
+        assertEquals("nkeys",nkeys,kbuf.size());
         // verify maximum #of keys.
         assertEquals("maxKeys",maxKeys,kbuf.maxKeys);
-        assertEquals("maxKeys",maxKeys,kbuf.getMaxKeys());
+        assertEquals("maxKeys",maxKeys,kbuf.capacity());
         // verify prefix.
         assertEquals(2,kbuf.getPrefixLength());
         // verify prefix bytes.
@@ -92,10 +94,10 @@ public class TestImmutableKeyBuffer extends AbstractKeyBufferTestCase {
         assertEquals(2,kbuf.getRemainderLength(2));
         assertEquals(1,kbuf.getRemainderLength(3));
         // verify getKey
-        assertEquals(new byte[]{1,2},kbuf.getKey(0));
-        assertEquals(new byte[]{1,2,2},kbuf.getKey(1));
-        assertEquals(new byte[]{1,2,4,1},kbuf.getKey(2));
-        assertEquals(new byte[]{1,2,5},kbuf.getKey(3));
+        assertEquals(new byte[]{1,2},kbuf.get(0));
+        assertEquals(new byte[]{1,2,2},kbuf.get(1));
+        assertEquals(new byte[]{1,2,4,1},kbuf.get(2));
+        assertEquals(new byte[]{1,2,5},kbuf.get(3));
 
         /*
          * verify convertion to a mutable byte[][].
@@ -129,7 +131,7 @@ public class TestImmutableKeyBuffer extends AbstractKeyBufferTestCase {
         assertEquals("nkeys",maxKeys,kbuf.maxKeys);
         assertEquals("prefixLength",1,kbuf.getPrefixLength());
         assertEquals("prefix",new byte[]{1},kbuf.getPrefix());
-        assertEquals("keys[0]",new byte[]{1},kbuf.getKey(0));
+        assertEquals("keys[0]",new byte[]{1},kbuf.get(0));
         
     }
     

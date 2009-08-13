@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.btree;
+package com.bigdata.btree.raba;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -29,11 +29,13 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.io.OutputStream;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.compression.IRandomAccessByteArray;
 import com.bigdata.btree.compression.PrefixSerializer;
 
 /**
@@ -94,7 +96,13 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
      */
     final byte[] buf;
     
-    final public int getKeyCount() {
+    final public boolean isEmpty() {
+        
+        return nkeys == 0;
+        
+    }
+    
+    final public int size() {
         
         return nkeys;
         
@@ -108,7 +116,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
     
-    public int getMaxKeys() {
+    public int capacity() {
         
         return maxKeys;
         
@@ -125,7 +133,19 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         return true;
         
     }
-    
+
+    final public boolean isNullAllowed() {
+
+        return false;
+        
+    }
+
+    final public boolean isSearchable() {
+        
+        return true;
+        
+    }
+
     /**
      * Creates an immutable key buffer from a mutable one.
      */
@@ -331,12 +351,12 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
     }
 
     /**
-     * Returns an array of variable length keys suitable for managment as part
+     * Returns an array of variable length keys suitable for management as part
      * of a mutable node or leaf. The keys in the returned array are full length
      * (the prefix is replicated for each key).
      * 
-     * @return The mutable keys. The keys array will have {@link #getMaxKeys()}
-     *         elements. The first {@link #getKeyCount()} elements will be
+     * @return The mutable keys. The keys array will have {@link #capacity()}
+     *         elements. The first {@link #size()} elements will be
      *         non-null.
      */
     final public byte[][] toKeyArray() {
@@ -345,7 +365,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
         for (int i = 0; i < nkeys; i++) {
 
-            keys[i] = getKey(i);
+            keys[i] = get(i);
 
         }
 
@@ -353,7 +373,11 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
     }
 
-    final public void setKey(int index, byte[] key) {
+    /*
+     * Mutation is not allowed.
+     */
+    
+    final public void set(int index, byte[] key) {
         
         throw new UnsupportedOperationException();
         
@@ -385,7 +409,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
      *            
      * @return The full key (prefix plus remainder).
      */
-    final public byte[] getKey(int index) {
+    final public byte[] get(int index) {
         
 //        assert index >= 0 && index <= nkeys;
         assert index >= 0 && index < nkeys;
@@ -407,7 +431,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
 
-    final public int getLength(int index) {
+    final public int length(int index) {
         
         assert index >= 0 && index < nkeys;
 
@@ -419,7 +443,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
     
-    final public int copyKey(int index, DataOutput out) throws IOException {
+    final public int copy(final int index, final OutputStream out) {
         
         assert index >= 0 && index < nkeys;
 
@@ -427,9 +451,17 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
         final int remainderLength = getRemainderLength(index);
 
-        out.write(buf, 0, prefixLength);
-        
-        out.write(buf, offsets[index], remainderLength);
+        try {
+
+            out.write(buf, 0, prefixLength);
+
+            out.write(buf, offsets[index], remainderLength);
+            
+        } catch(IOException ex) {
+
+            throw new RuntimeException(ex);
+            
+        }
         
         return prefixLength + remainderLength;
         
@@ -510,12 +542,6 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
     
-    public MutableKeyBuffer toMutableKeyBuffer() {
-
-        return new MutableKeyBuffer(this);
-        
-    }
-
     final public int search(final byte[] searchKey) {
 
         if (searchKey == null)
@@ -790,7 +816,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
         public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
 
-            final int nkeys = raba.getKeyCount();
+            final int nkeys = raba.size();
                 
             // #of keys in the node or leaf.
 //            LongPacker.packLong(os, nkeys);
@@ -855,11 +881,11 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
                     
                 } else if (nkeys == 1) {
                     
-                    prefixLength = raba.getKey(0).length;
+                    prefixLength = raba.get(0).length;
                     
                 } else {
                  
-                    prefixLength = BytesUtil.getPrefixLength(raba.getKey(0), raba.getKey(nkeys - 1));
+                    prefixLength = BytesUtil.getPrefixLength(raba.get(0), raba.get(nkeys - 1));
                     
                 }
                 
@@ -874,7 +900,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
                     // offset to the remainder of the ith key in the buffer.
                     offsets[i] = bufferLength;
                     
-                    int remainder = raba.getKey(i).length - prefixLength;
+                    int remainder = raba.get(i).length - prefixLength;
                     
                     assert remainder >= 0;
                     
@@ -929,11 +955,11 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
     
                 if (nkeys > 0) {
     
-                    out.write(raba.getKey(0), 0, prefixLength);
+                    out.write(raba.get(0), 0, prefixLength);
     
                     for (int i = 0; i < nkeys; i++) {
     
-                        final byte[] key = raba.getKey(i);
+                        final byte[] key = raba.get(i);
                         
                         final int remainder = key.length - prefixLength;
     

@@ -36,6 +36,8 @@ import java.util.Set;
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.IndexMetadata.Options;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.MutableKeyBuffer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -135,15 +137,33 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     protected int[] childEntryCounts;
     
-    public int getEntryCount() {
+    public int getSpannedTupleCount() {
     
         return nentries;
         
     }
     
-    public int[] getChildEntryCounts() {
+//    public int[] getChildEntryCounts() {
+//        
+//        return childEntryCounts;
+//        
+//    }
+
+    public long getChildAddr(final int index) {
+
+        if (index < 0 || index > getKeys().size() + 1)
+            throw new IndexOutOfBoundsException();
         
-        return childEntryCounts;
+        return childAddr[index];
+        
+    }
+
+    public int getChildEntryCount(final int index) {
+
+        if (index < 0 || index > getKeys().size() + 1)
+            throw new IndexOutOfBoundsException();
+        
+        return childEntryCounts[index];
         
     }
 
@@ -230,7 +250,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
     @SuppressWarnings("unchecked")
     protected Node(final AbstractBTree btree, final long addr,
             final int branchingFactor, final int nentries,
-            final IKeyBuffer keys, final long[] childAddr,
+            final IRandomAccessByteArray keys, final long[] childAddr,
             final int[] childEntryCounts) {
 
         super( btree, branchingFactor, false /* The node is NOT dirty */ );
@@ -247,7 +267,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         this.nentries = nentries;
         
-        this.nkeys = keys.getKeyCount();
+        this.nkeys = keys.size();
         
         this.keys = keys; // steal reference.
         
@@ -351,7 +371,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 //        childRefs[0] = btree.newRef(oldRoot);
 
         // #of entries from the old root _after_ the split.
-        childEntryCounts[0] = oldRoot.getEntryCount();
+        childEntryCounts[0] = oldRoot.getSpannedTupleCount();
         
 //        dirtyChildren.add(oldRoot);
 
@@ -702,7 +722,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         final int childIndex = findChild(key);
 
-        final AbstractNode child = (AbstractNode) getChild(childIndex);
+        final AbstractNode<?> child = (AbstractNode<?>) getChild(childIndex);
 
         return child.remove(key, tuple);
         
@@ -1012,7 +1032,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * among the leaves of the tree. This issue is covered by Bayer's
          * article on prefix trees.
          */
-        final byte[] separatorKey = keys.getKey(splitIndex);
+        final byte[] separatorKey = keys.get(splitIndex);
 
         // create the new rightSibling node.
         final Node rightSibling = new Node(btree);
@@ -1089,7 +1109,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
             if (i + 1 < nchildren) {
             
-                keys.zeroKey(i);
+                keys.keys[i] = null;
                 
                 nkeys--; keys.nkeys--; // one less key here.
 
@@ -1108,7 +1128,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         /* 
          * Clear the key that is being move into the parent.
          */
-        keys.zeroKey(splitIndex);
+        keys.keys[splitIndex] = null;
         
         nkeys--; keys.nkeys--;
         
@@ -1257,7 +1277,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             System.arraycopy(s.childEntryCounts, 1, s.childEntryCounts, 0, s.nkeys);
 
             // erase exposed key/value on rightSibling that is no longer defined.
-            skeys.zeroKey(s.nkeys-1);
+            skeys.keys[s.nkeys-1] = null;
             s.childRefs[s.nkeys] = null;
             s.childAddr[s.nkeys] = NULL;
             s.childEntryCounts[s.nkeys] = 0;
@@ -1314,7 +1334,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 //                    if(!dirtyChildren.add(child)) throw new AssertionError();
 //                }
             }
-            skeys.zeroKey(s.nkeys-1);
+            skeys.keys[s.nkeys-1] = null;
             s.childRefs[s.nkeys] = null;
             s.childAddr[s.nkeys] = NULL;
             s.childEntryCounts[s.nkeys] = 0;
@@ -1379,7 +1399,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 //            }
         }
 
-        final int siblingEntryCount = s.getEntryCount();
+        final int siblingEntryCount = s.getSpannedTupleCount();
         
         /*
          * The index of this node in its parent. we note this before we
@@ -1399,7 +1419,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          */
         final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
         final MutableKeyBuffer skeys = (s.keys instanceof MutableKeyBuffer ? (MutableKeyBuffer) s.keys
-                : ((ImmutableKeyBuffer) s.keys).toMutableKeyBuffer());
+                : new MutableKeyBuffer(s.keys));
 
         /*
          * determine which node is earlier in the key ordering so that we know
@@ -1521,7 +1541,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             this.nkeys += s.nkeys + 1; keys.nkeys += s.nkeys + 1;
 
             // reallocate spanned entries from the sibling to this node.
-            p.childEntryCounts[index] += s.getEntryCount();
+            p.childEntryCounts[index] += s.getSpannedTupleCount();
             this.nentries += siblingEntryCount;
 
             if(btree.debug) assertInvariants();
@@ -1621,7 +1641,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         childAddr[childIndex + 1] = NULL;
 
-        final int childEntryCount = child.getEntryCount();
+        final int childEntryCount = child.getSpannedTupleCount();
         
         childEntryCounts[ childIndex + 1 ] = childEntryCount;
         
@@ -1961,7 +1981,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         if (nkeys > 0) {
 
             // erase the last key position.
-            keys.zeroKey(nkeys - 1);
+            keys.keys[nkeys - 1] = null;
 
         }
 
@@ -2803,9 +2823,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
                         }
                     }
 
-                    if( childEntryCounts[i] != child.getEntryCount() ) {
+                    if( childEntryCounts[i] != child.getSpannedTupleCount() ) {
                         out.println(indent(height) + "  ERROR child[" + i
-                                + "] spans " + child.getEntryCount()
+                                + "] spans " + child.getSpannedTupleCount()
                                 + " entries, but childEntryCount[" + i + "]="
                                 + childEntryCounts[i]);
                         ok = false;                
@@ -2990,8 +3010,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
                          * Note: All keys on the first child MUST be LT the
                          * first key on this node.
                          */
-                        final byte[] k0 = keys.getKey(0);
-                        final byte[] ck0 = child.keys.getKey(0);
+                        final byte[] k0 = keys.get(0);
+                        final byte[] ck0 = child.keys.get(0);
                         if( BytesUtil.compareBytes(ck0,k0) >= 0 ) {
 //                          if( child.compare(0,keys,0) >= 0 ) {
 
@@ -3007,7 +3027,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
                         if (child.nkeys >= 1 ) {
                             
-                            final byte[] ckn = child.keys.getKey(child.nkeys-1);
+                            final byte[] ckn = child.keys.get(child.nkeys-1);
                             if (BytesUtil.compareBytes(ckn, k0) >= 0) {
 //                            if (child.compare(child.nkeys-1, keys, 0) >= 0) {
 

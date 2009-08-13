@@ -40,6 +40,8 @@ import java.util.Random;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.MutableRaba;
 
 /**
  * Test suite for {@link WrapSerializer}.
@@ -173,7 +175,7 @@ public class TestWrapSerializer extends TestCase2 {
         Arrays.sort(data, 0, data.length, UnsignedByteArrayComparator.INSTANCE);
         
         // layer on interface.
-        final IRandomAccessByteArray raba = new RandomAccessByteArray(
+        final IRandomAccessByteArray raba = new MutableRaba(
                 0/* fromIndex */, data.length/* toIndex */, data);
         
         doRoundTripTest(raba);
@@ -199,7 +201,7 @@ public class TestWrapSerializer extends TestCase2 {
         Arrays.sort(data, 0, n, UnsignedByteArrayComparator.INSTANCE);
         
         // layer on interface.
-        final IRandomAccessByteArray raba = new RandomAccessByteArray(
+        final IRandomAccessByteArray raba = new MutableRaba(
                 0/* fromIndex */, n/* toIndex */, data);
         
         doRoundTripTest(raba);
@@ -234,9 +236,9 @@ public class TestWrapSerializer extends TestCase2 {
 
 //            final int n = raba.getKeyCount();
             
-            final int capacity = raba.getMaxKeys();
+            final int capacity = raba.capacity();
             
-            raba2 = new RandomAccessByteArray(0/* fromIndex */,
+            raba2 = new MutableRaba(0/* fromIndex */,
                     0/* toIndex */, new byte[capacity][]);
 
             final DataInput in = new DataInputStream(new ByteArrayInputStream(
@@ -288,15 +290,15 @@ public class TestWrapSerializer extends TestCase2 {
     protected void assertEquals(IRandomAccessByteArray expected,
             IRandomAccessByteArray actual) {
 
-        assertEquals("n", expected.getKeyCount(), actual.getKeyCount());
+        assertEquals("n", expected.size(), actual.size());
 
-        assertEquals("capacity", expected.getMaxKeys(), actual.getMaxKeys());
+        assertEquals("capacity", expected.capacity(), actual.capacity());
 
-        final int n = expected.getKeyCount();
+        final int n = expected.size();
 
         for (int i = 0; i < n; i++) {
 
-            assertTrue(Arrays.equals(expected.getKey(i), actual.getKey(i)));
+            assertTrue(Arrays.equals(expected.get(i), actual.get(i)));
             
         }
 

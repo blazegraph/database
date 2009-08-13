@@ -6,8 +6,11 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.io.OutputStream;
 
 import org.CognitiveWeb.extser.LongPacker;
+
+import com.bigdata.btree.raba.IRandomAccessByteArray;
 
 
 /**
@@ -32,7 +35,8 @@ public class DefaultDataSerializer implements IDataSerializer, Externalizable {
 
     }
     
-    public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+    public void read(final DataInput in,
+            final IRandomAccessByteArray raba) throws IOException {
 //            final boolean notNull = in.readBoolean();
 //            if (!notNull) {
 //                return null;
@@ -51,9 +55,9 @@ public class DefaultDataSerializer implements IDataSerializer, Externalizable {
 //            return new RandomAccessByteArray(0/*fromIndex*/,n/*toIndex*/,a);
     }
 
-    public void write(DataOutput out, IRandomAccessByteArray raba)
+    public void write(final DataOutput out, final IRandomAccessByteArray raba)
             throws IOException {
-        final int n = raba.getKeyCount();
+        final int n = raba.size();
 //            if (a == null && n != 0)
 //                throw new IllegalArgumentException();
 //            out.writeBoolean(a != null); // notNull
@@ -65,11 +69,22 @@ public class DefaultDataSerializer implements IDataSerializer, Externalizable {
               for(int i=0; i<n; i++) {
                   // differentiate a null value from an empty byte[].
                   final boolean isNull = raba.isNull(i);
-                  final int lenPlus1 = isNull ? 0 : raba.getLength(i) + 1;
+                  final int lenPlus1 = isNull ? 0 : raba.length(i) + 1;
                   LongPacker.packLong(out, lenPlus1);
                   if (!isNull) {
-                      raba.copyKey(i, out);
-                  }
+                if (out instanceof OutputStream) {
+                    raba.copy(i, (OutputStream) out);
+                } else {
+                    /*
+                     * @todo Normally the DataOutput instance extends
+                     * OutputStream. If that is not the case for some execution
+                     * context then we really need to have parallel methods for
+                     * DataOutput on raba#copy() so this can be efficient (avoid
+                     * the byte[] allocation) for that execution context.
+                     */
+                    out.write(raba.get(i));
+                }
+            }
             }
 //            }
     }

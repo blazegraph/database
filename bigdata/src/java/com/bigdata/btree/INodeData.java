@@ -65,14 +65,39 @@ public interface INodeData extends IAbstractNodeData {
     public long[] getChildAddr();
 
     /**
-     * The #of entries (aka keys or values) spanned by each child of this node.
-     * The sum of the defined values in this array should always be equal to the
-     * value returned by {@link #getEntryCount()}. These data are used to
-     * support fast computation of the index at which a key occurs and the #of
-     * entries in a given key range.
+     * Return the persistent addresses of the specified child node.
      * 
-     * @deprecated by #getChildEntryCount(int).
+     * @param index
+     *            The index of the child in [0:nkeys+1].
+     * 
+     * @return The persistent child address -or- zero(0L) if the child is not
+     *         persistent.
      */
-    public int[] getChildEntryCounts();
+    public long getChildAddr(int index);
+
+//    /**
+//     * The #of entries (aka keys or values) spanned by each child of this node.
+//     * The sum of the defined values in this array should always be equal to the
+//     * value returned by {@link #getSpannedTupleCount()}. These data are used to
+//     * support fast computation of the index at which a key occurs and the #of
+//     * entries in a given key range.
+//     * 
+//     * @deprecated by #getChildEntryCount(int).
+//     */
+//    public int[] getChildEntryCounts();
+
+    /**
+     * Return the #of tuples spanned by the indicated child of this node. The
+     * sum of the values returned by this method across the children of the node
+     * should always equal the value returned by {@link #getSpannedTupleCount()}
+     * . These data are used to support fast computation of the index at which a
+     * key occurs and the #of entries in a given key range.
+     * 
+     * @param index
+     *            The index of the child in [0:nkeys+1].
+     * 
+     * @return The #of tuples spanned by that child.
+     */
+    public int getChildEntryCount(int index);
 
 }

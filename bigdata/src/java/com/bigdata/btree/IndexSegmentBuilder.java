@@ -40,6 +40,9 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.btree.raba.ReadOnlyRaba;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.TemporaryRawStore;
@@ -1293,7 +1296,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         if (log.isDebugEnabled())
             log.debug("closing " + (node.isLeaf() ? "leaf" : "node") + "; h="
                     + h + ", col=" + col + ", max=" + node.max + ", nkeys="
-                    + node.keys.getKeyCount());
+                    + node.keys.size());
         
         // Note: This uses shared buffers!
         final long addr = writeNodeOrLeaf(node);
@@ -1303,7 +1306,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         if(parent != null) {
 
             // #of entries spanned by this node.
-            final int nentries = node.getEntryCount();
+            final int nentries = node.getSpannedTupleCount();
             
             addChild(parent, addr, nentries);
             
@@ -1461,7 +1464,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * copy the first key from the leaf into the next free position on
              * the parent.
              */
-            parentKeys.keys[parentKeys.nkeys++] = leaf.keys.getKey(0);
+            parentKeys.keys[parentKeys.nkeys++] = leaf.keys.get(0);
 //            parent.copyKey(parentKeys.nkeys++, leaf, 0 );
 
         } else {
@@ -2099,7 +2102,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         
         final public int getKeyCount() {
 
-            return keys.getKeyCount();
+            return keys.size();
             
         }
 
@@ -2111,7 +2114,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         public final byte[] getKey(final int index) {
             
-            return keys.getKey(index);
+            return keys.get(index);
             
         }
     
@@ -2119,7 +2122,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             try {
                 
-                os.write(keys.getKey(index));
+                os.write(keys.get(index));
                 
             } catch (IOException e) {
                 
@@ -2152,9 +2155,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         final byte[][] vals;
         
-        final public byte[][] getValues() {
+        final public IRandomAccessByteArray getValues() {
             
-            return vals;
+            return new ReadOnlyRaba(vals);
             
         }
         
@@ -2199,15 +2202,15 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 //            
 //        }
         
-        final public int getEntryCount() {
+        final public int getSpannedTupleCount() {
             
-            return keys.getKeyCount();
+            return keys.size();
             
         }
 
         final public int getValueCount() {
             
-            return keys.getKeyCount();
+            return keys.size();
             
         }
 
@@ -2347,15 +2350,33 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         int[] childEntryCount;
         
-        final public int getEntryCount() {
+        final public int getSpannedTupleCount() {
             
             return nentries;
             
         }
 
-        final public int[] getChildEntryCounts() {
+//        final public int[] getChildEntryCounts() {
+//            
+//            return childEntryCount;
+//            
+//        }
+
+        final public long getChildAddr(final int index) {
+
+            if (index < 0 || index > keys.size() + 1)
+                throw new IllegalArgumentException();
+
+            return childAddr[index];
             
-            return childEntryCount;
+        }
+
+        final public int getChildEntryCount(final int index) {
+
+            if (index < 0 || index > keys.size() + 1)
+                throw new IllegalArgumentException();
+
+            return childEntryCount[index];
             
         }
 
@@ -2395,7 +2416,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         final public int getChildCount() {
 
-            return keys.getKeyCount() + 1;
+            return keys.size() + 1;
             
         }
 
@@ -2417,23 +2438,23 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         private NOPNodeFactory() {
         }
 
-        public ILeafData allocLeaf(IIndex btree, long addr,
-                int branchingFactor, IKeyBuffer keys, byte[][] values,
-                long[] versionTimestamps, boolean[] deleteMarkers,
-                long priorAddr, long nextAddr) {
-            
+        public ILeafData allocLeaf(AbstractBTree btree, long addr,
+                int branchingFactor, IRandomAccessByteArray keys,
+                IRandomAccessByteArray values, long[] versionTimestamps,
+                boolean[] deleteMarkers, long priorAddr, long nextAddr) {
+
             throw new UnsupportedOperationException();
-            
+
         }
 
-        public INodeData allocNode(IIndex btree, long addr,
-                int branchingFactor, int nentries, IKeyBuffer keys,
+        public INodeData allocNode(AbstractBTree btree, long addr,
+                int branchingFactor, int nentries, IRandomAccessByteArray keys,
                 long[] childAddr, int[] childEntryCount) {
 
             throw new UnsupportedOperationException();
-            
+
         }
 
     }
-    
+
 }

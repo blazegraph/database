@@ -357,7 +357,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
 
             kbuf.reset();
 
-            leaf.copyKey(index, kbuf);
+            leaf.getKeys().copy(index, kbuf);
 
         }
 
@@ -367,11 +367,11 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
 
             if (!versionDeleted) {
              
-                isNull = leaf.isNull(index);
+                isNull = leaf.getValues().isNull(index);
                 
                 if(!isNull) {
 
-                    leaf.copyValue(index, vbuf);
+                    leaf.getValues().copy(index, vbuf);
                     
                 }
                 

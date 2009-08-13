@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.btree.raba.MutableValueBuffer;
+
 
 
 /**
@@ -131,7 +134,14 @@ public class TestUtilMethods extends AbstractBTreeTestCase {
                         new byte[] { 3 },//
                         null }),//
                 // vals
-                new byte[][] { new byte[]{1}, new byte[]{2}, new byte[]{3}, new byte[]{0} }, //
+                new MutableValueBuffer(nkeys, //
+                        // vals
+                        new byte[][] { //
+                        new byte[] { 1 },//
+                        new byte[] { 2 },//
+                        new byte[] { 3 },//
+                        new byte[] { 0 }} //
+                ),
                 null,// timestamps
                 null// deleteMarkers
                 );

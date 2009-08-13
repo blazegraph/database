@@ -9,6 +9,8 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+
 
 /**
  * Wrap two serializers, one for small # of keys and one for large.
@@ -72,7 +74,7 @@ public class WrapSerializer implements IDataSerializer, Externalizable {
     public void write(DataOutput out, IRandomAccessByteArray raba)
             throws IOException {
         
-        final int n = raba.getKeyCount();
+        final int n = raba.size();
         
         if (n < numkeys) {
             

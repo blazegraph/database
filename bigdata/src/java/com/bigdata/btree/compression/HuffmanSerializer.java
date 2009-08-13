@@ -19,6 +19,8 @@ import java.io.ObjectOutput;
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+
 /**
  * Huffman compression.
  * 
@@ -59,7 +61,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
         
         final StringBuilder info = (INFO ? new StringBuilder() : null);
         
-        final int n = raba.getKeyCount();
+        final int n = raba.size();
 
         LongPacker.packLong(out, n);
         

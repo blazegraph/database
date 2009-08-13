@@ -29,6 +29,7 @@ import java.util.Iterator;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
@@ -662,23 +663,23 @@ public class IndexSegment extends AbstractBTree {
         private ImmutableNodeFactory() {
         }
 
-        public ILeafData allocLeaf(IIndex btree, long addr,
-                int branchingFactor, IKeyBuffer keys, byte[][] values,
-                long[] versionTimestamps, boolean[] deleteMarkers,
-                long priorAddr, long nextAddr) {
+        public ILeafData allocLeaf(AbstractBTree btree, long addr,
+                int branchingFactor, IRandomAccessByteArray keys,
+                IRandomAccessByteArray values, long[] versionTimestamps,
+                boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
-            return new ImmutableLeaf((AbstractBTree) btree, addr,
-                    branchingFactor, keys, values, versionTimestamps,
-                    deleteMarkers, priorAddr, nextAddr);
+            return new ImmutableLeaf(btree, addr, branchingFactor, keys,
+                    values, versionTimestamps, deleteMarkers, priorAddr,
+                    nextAddr);
 
         }
 
-        public INodeData allocNode(IIndex btree, long addr,
-                int branchingFactor, int nentries, IKeyBuffer keys,
+        public INodeData allocNode(AbstractBTree btree, long addr,
+                int branchingFactor, int nentries, IRandomAccessByteArray keys,
                 long[] childAddr, int[] childEntryCount) {
 
-            return new ImmutableNode((AbstractBTree) btree, addr,
-                    branchingFactor, nentries, keys, childAddr, childEntryCount);
+            return new ImmutableNode(btree, addr, branchingFactor, nentries,
+                    keys, childAddr, childEntryCount);
 
         }
 
@@ -702,7 +703,7 @@ public class IndexSegment extends AbstractBTree {
              * @param childKeys
              */
             protected ImmutableNode(AbstractBTree btree, long addr,
-                    int branchingFactor, int nentries, IKeyBuffer keys,
+                    int branchingFactor, int nentries, IRandomAccessByteArray keys,
                     long[] childKeys, int[] childEntryCount) {
 
                 super(btree, addr, branchingFactor, nentries, keys, childKeys,
@@ -776,9 +777,9 @@ public class IndexSegment extends AbstractBTree {
              * @param values
              */
             protected ImmutableLeaf(AbstractBTree btree, long addr,
-                    int branchingFactor, IKeyBuffer keys, byte[][] values,
-                    long[] versionTimestamps, boolean[] deleteMarkers,
-                    long priorAddr, long nextAddr) {
+                    int branchingFactor, IRandomAccessByteArray keys,
+                    IRandomAccessByteArray values, long[] versionTimestamps,
+                    boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
                 super(btree, addr, branchingFactor, keys, values,
                         versionTimestamps, deleteMarkers);

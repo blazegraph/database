@@ -13,6 +13,8 @@ import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+
 /**
  * Prefix compression.
  * <p>
@@ -54,17 +56,16 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
             throws IOException {
 
         /*
-         * The ratio as defined by {@link ByteArrayFrontCodedList}. If you
-         * are only using serial access for the data, then this should be
-         * the maximum capacity of the array, e.g., the branching factor of
-         * the B+Tree, as that will give the best compression.
+         * The ratio as defined by {@link ByteArrayFrontCodedList}. If you are
+         * only using serial access for the data, then this should be the array
+         * size as that will give the best compression.
          */
-        final int n = raba.getKeyCount();
+        final int n = raba.size();
         final int ratio = n;
 
         if (INFO)
-            log.info("ratio=" + ratio + ", n=" + raba.getKeyCount()
-                    + ", capacity=" + raba.getMaxKeys());
+            log.info("ratio=" + ratio + ", n=" + raba.size()
+                    + ", capacity=" + raba.capacity());
 
         // note: zero length indicates NO data.
         out.writeInt(n);
@@ -81,7 +82,7 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
             
             // one key.
             
-            final byte[] key = raba.getKey(0);
+            final byte[] key = raba.get(0);
             
             out.writeInt(key.length);
             
@@ -95,12 +96,12 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
         
         final byte[] data;
         {
-            final Iterator<byte[]> itr = raba.iterator();
 
             final CustomByteArrayFrontCodedList c = new CustomByteArrayFrontCodedList(
-                    itr, ratio);
+                    raba.iterator(), ratio);
 
-            data = c.getArray();
+            data = c.getBackingBuffer().toArray();
+//            data = c.getArray();
             // final byte[] data = SerializerUtil.serialize(c);
         
         }

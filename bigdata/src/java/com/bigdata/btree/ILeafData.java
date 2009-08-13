@@ -29,6 +29,8 @@ package com.bigdata.btree;
 
 import java.io.OutputStream;
 
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+
 /**
  * Interface for low-level data access for the leaves of a B+-Tree.
  * 
@@ -46,23 +48,10 @@ public interface ILeafData extends IAbstractNodeData {
     public int getValueCount();
 
     /**
-     * The backing array in which the values are stored. Only the first
-     * {@link #getValueCount()} entries in the array are defined. A
-     * <code>null</code> value for a define entry is used to indicate that the
-     * entry has been deleted. Non-deleted values MUST be non-null.
-     * 
-     * The use of this array is dangerous since mutations are directly reflected
-     * in the leaf, but it may be highly efficient. Callers MUST excercise are
-     * to perform only read-only operations against the returned array.
-     * 
-     * @return The backing array in which the values are stored.
-     * 
-     * @deprecated this will be replaced by a random access API suitable for
-     *             storing compressed keys.
-     * 
-     * @see AbstractNode#copyKey(int, OutputStream)
+     * Return the object storing the logical byte[][] containing the values for
+     * the leaf.
      */
-    public byte[][] getValues();
+    public IRandomAccessByteArray getValues();
 
     /**
      * Return <code>true</code> iff the value stored at the specified index is
@@ -72,22 +61,37 @@ public interface ILeafData extends IAbstractNodeData {
      * 
      * @param index
      *            The index into the leaf.
+     * 
+     * @deprecated by {@link IRandomAccessByteArray#isNull(int)}
      */
     public boolean isNull(int index);
-    
+
     /**
-     * Copy the indicated value onto the callers stream.
+     * Copy the indicated value onto the callers stream unless the tuple is
+     * flagged as deleted or the value associated with the tuple is
+     * <code>null</code>.
      * 
      * @param index
-     *            The index of the value in the leaf.
+     *            The index of the tuple in the leaf.
      * 
      * @param os
      *            The stream onto which to copy the value.
      * 
      * @throws UnsupportedOperationException
-     *             if the value stored at that index is <code>null</code>.
+     *             if the value stored at that index is <code>null</code> -or-
+     *             the tuple is flagged as deleted.
      * 
      * @see #isNull(int)
+     * 
+     *      FIXME Do we need to defined and use getValue(int), copy(int,OS),
+     *      etc. are on the ILeafData interface because they must also test the
+     *      deleted flag? Or does that happen at the Tuple and AbstractBTree API
+     *      level? The danger is that we could permit unintended access to a
+     *      delete value, which would be reported as a <code>null</code> (or for
+     *      copy() by throwing a NullPointerException).
+     * 
+     * @deprecated by
+     *             {@link IRandomAccessByteArray#copy(int, java.io.DataOutput)}.
      */
     public void copyValue(int index, OutputStream os);
 

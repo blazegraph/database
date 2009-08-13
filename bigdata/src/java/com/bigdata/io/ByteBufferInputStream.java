@@ -40,6 +40,10 @@ import java.nio.ByteBuffer;
  *       the position. if that is not the desired behavior then either modify
  *       this class or invoke {@link ByteBuffer#asReadOnlyBuffer()} and pass the
  *       result into the constructor instead.
+ * 
+ * @todo dsiutils now defines its own implementation of this but does not define
+ *       a ByteBufferOutputStream class.  if it did, then we might just use its
+ *       implementations instead.
  */
 public class ByteBufferInputStream extends InputStream {
 

@@ -30,6 +30,9 @@ package com.bigdata.btree.data;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.INodeData;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.codec.IDataCoder;
+import com.bigdata.btree.raba.codec.IRabaDecoder;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -63,6 +66,8 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
      */
     private final int O_keys;
 
+    private final IRandomAccessByteArray keys;
+
     public final ByteBuffer buf() {
 
         return b;
@@ -75,7 +80,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
      * @param b
      *            The buffer containing the data for the node.
      */
-    public ReadOnlyNodeData(final ByteBuffer b) {
+    public ReadOnlyNodeData(final ByteBuffer b, final IDataCoder keysCoder) {
 
         if (b == null)
             throw new IllegalArgumentException();
@@ -115,6 +120,10 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         O_childEntryCount = O_childAddr + (nkeys + 1) * SIZEOF_ADDR;
 
         O_keys = O_childEntryCount + (nkeys + 1) * SIZEOF_ENTRY_COUNT;
+        b.position(O_keys);
+        b.limit(b.position() + keysSize);
+        this.keys = keysCoder.decode(nkeys, b.slice());
+        assert b.position() == O_keys + keysSize;
         
         // save reference to buffer
         this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
@@ -127,15 +136,16 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
      * @param data
      *            The data to be encoded.
      */
-    public ReadOnlyNodeData(final INodeData node) {
+    public ReadOnlyNodeData(final INodeData node, final IDataCoder keysCoder) {
 
         // cache some fields.
         this.nkeys = node.getKeyCount();
-        this.nentries = node.getEntryCount();
+        this.nentries = node.getSpannedTupleCount();
 
         // encode the keys.
-        final byte[] encodedKeys = encodeKeys(node);
-        
+        this.keys = keysCoder.encode(node.getKeys());
+        final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
+
         // figure out how the size of the buffer (exact fit).
         final int capacity = //
                 SIZEOF_TYPE + //
@@ -146,7 +156,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
                 Bytes.SIZEOF_INT + // keysSize
                 SIZEOF_ADDR * (nkeys + 1) + // childAddr[]
                 SIZEOF_ENTRY_COUNT * (nkeys + 1) + // childEntryCount[]
-                encodedKeys.length // keys
+                encodedKeys.capacity() // keys
         ;
         
         final ByteBuffer b = ByteBuffer.allocate(capacity);
@@ -161,13 +171,13 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         
         b.putInt(nentries);
 
-        b.putInt(encodedKeys.length); // keySize
+        b.putInt(encodedKeys.capacity()); // keySize
         
         // childAddr[]
         O_childAddr = b.position();
         for (int i = 0; i <= nkeys; i++) {
             
-            b.putLong(node.getChildAddr()[i]);
+            b.putLong(node.getChildAddr(i));
             
         }
         
@@ -175,12 +185,14 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         O_childEntryCount = b.position();
         for (int i = 0; i <= nkeys; i++) {
             
-            b.putInt(node.getChildEntryCounts()[i]);
+            b.putInt(node.getChildEntryCount(i));
             
         }
         
         // write the encoded keys on the buffer.
         O_keys = b.position();
+        encodedKeys.limit(encodedKeys.capacity());
+        encodedKeys.rewind();
         b.put(encodedKeys);
 
         assert b.position() == b.limit();
@@ -223,7 +235,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
     /**
      * {@inheritDoc}. This field is cached.
      */
-    final public int getEntryCount() {
+    final public int getSpannedTupleCount() {
         
         return nentries;
         
@@ -244,19 +256,25 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         
     }
 
-    /**
-     * @deprecated by {@link #getChildEntryCount(int)}
-     */
-    final public int[] getChildEntryCounts() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * @deprecated by {@link #getChildEntryCount(int)}
+//     */
+//    final public int[] getChildEntryCounts() {
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
     final public int getChildEntryCount(final int index) {
 
         return b.getInt(O_childEntryCount + index * SIZEOF_ENTRY_COUNT);
 
+    }
+
+    final public IRandomAccessByteArray getKeys() {
+
+        return keys;
+        
     }
     
 }

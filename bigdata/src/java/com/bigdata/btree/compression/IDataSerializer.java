@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.compression;
 
+
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
@@ -39,9 +40,11 @@ import java.io.Serializable;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IKeyBuffer;
-import com.bigdata.btree.MutableKeyBuffer;
 import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
+import com.bigdata.btree.raba.IMutableRandomAccessByteArray;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.MutableKeyBuffer;
 
 /**
  * Interface for custom serialization of logical <code>byte[][]</code> data
@@ -54,7 +57,7 @@ import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
  * for the keys and values in the {@link AbstractBTree} and for the keys and
  * values in {@link IKeyArrayIndexProcedure}s, which are auto-split against the
  * index partitions and hence use a {fromIndex, toIndex}. This leads to the
- * requirement that the caller allocate the {@link IRandomAccessByteArray} into
+ * requirement that the caller allocate the {@link IMutableRandomAccessByteArray} into
  * which the data will be de-serialized so that they can specify the capacity of
  * that object.
  * <p>

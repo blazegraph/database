@@ -25,28 +25,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 6, 2009
  */
 
-package com.bigdata.btree.data.codec;
+package com.bigdata.btree.raba.codec;
 
-import junit.framework.TestCase2;
 
 /**
+ * Test suite for the {@link CanonicalHuffmanDataCoder}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestHuffmanCodedValues extends TestCase2 {
+public class TestCanonicalHuffmanDataCoder extends AbstractDataCoderTestCase {
 
     /**
      * 
      */
-    public TestHuffmanCodedValues() {
+    public TestCanonicalHuffmanDataCoder() {
     }
 
     /**
      * @param name
      */
-    public TestHuffmanCodedValues(String name) {
+    public TestCanonicalHuffmanDataCoder(String name) {
         super(name);
     }
 
-    
+    protected void setUp() throws Exception {
+        
+        dataCoder = new CanonicalHuffmanDataCoder();
+        
+    }
+
 }

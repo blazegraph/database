@@ -21,9 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.btree.data.codec;
+package com.bigdata.btree.raba;
 
-import com.bigdata.btree.data.codec.TestHuffmanCodedValues;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -57,20 +56,29 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("B+Tree key and value codecs");
+        final TestSuite suite = new TestSuite("Random Access Byte Arrays (RABA)");
 
-//        suite.addTestSuite(TestUncodedKeys.class);
-//
-//        suite.addTestSuite(TestUncodedValues.class);
-//
-//        suite.addTestSuite(TestPrefixCodedKeys.class);
-//
-//        suite.addTestSuite(TestHuffmanCodedKeys.class);
-//
-//        suite.addTestSuite(TestHuTuckerCodedKeys.class);
+        suite.addTestSuite(TestMutableRaba.class);
         
-        suite.addTestSuite(TestHuffmanCodedValues.class);
+        // test mutable key buffer.
+        suite.addTestSuite(TestMutableKeyBuffer.class);
+
+        // test immutable key buffer.
+        suite.addTestSuite(TestImmutableKeyBuffer.class);
         
+        // test key search routines on the key buffer implementations.
+        suite.addTestSuite(TestKeyBufferSearch.class);
+
+        // compressed data implementations.
+        suite.addTest(com.bigdata.btree.raba.codec.TestAll.suite());
+
+        /*
+         * FIXME Must test all implementations and test search for all which
+         * support search! Try refactoring the existing unit tests a bit to do
+         * that.  Make sure that we test size vs capacity for raba read and
+         * mutation operations.
+         */
+
         return suite;
         
     }

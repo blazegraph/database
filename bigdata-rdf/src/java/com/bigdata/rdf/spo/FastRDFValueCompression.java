@@ -13,7 +13,7 @@ import java.io.ObjectOutput;
 import java.io.OutputStream;
 
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.compression.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -93,7 +93,7 @@ public class FastRDFValueCompression implements IDataSerializer, Externalizable 
          * write the values.
          */
 
-        final int n = raba.getKeyCount();
+        final int n = raba.size();
         
         assert n >= 0;
         
@@ -108,7 +108,7 @@ public class FastRDFValueCompression implements IDataSerializer, Externalizable 
                 
             } else {
 
-                final byte[] val = raba.getKey(i);
+                final byte[] val = raba.get(i);
 
                 obs.writeInt((int) val[0], 3);
                 

@@ -178,7 +178,7 @@ class DirtyChildIterator implements INodeIterator {
             
         }
         
-        return node.keys.getKey(lastVisited);
+        return node.keys.get(lastVisited);
         
     }
 

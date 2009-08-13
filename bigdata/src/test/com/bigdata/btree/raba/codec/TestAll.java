@@ -1,6 +1,6 @@
-/*
+/**
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,43 +21,52 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on Aug 5, 2009
- */
+package com.bigdata.btree.raba.codec;
 
-package com.bigdata.btree.data;
+import com.bigdata.btree.raba.codec.TestCanonicalHuffmanDataCoder;
 
-import junit.framework.TestCase2;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
- * Test suite for the B+Tree node and leaf data records.
- * 
+ * Aggregates test suites into increasing dependency order.
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo test round trip for node, leaf, and linked-leaf.
- * 
- * @todo test hu-tucker key compression.
- * 
- * @todo test huffman value compression.
  */
-public class TestDataRecord extends TestCase2 {
+public class TestAll extends TestCase {
 
     /**
      * 
      */
-    public TestDataRecord() {
+    public TestAll() {
     }
 
     /**
-     * @param name
+     * @param arg0
      */
-    public TestDataRecord(String name) {
-        super(name);
+    public TestAll(String arg0) {
+        super(arg0);
     }
 
-    public void test_something() {
-        fail("write tests");
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
+
+        final TestSuite suite = new TestSuite("B+Tree key and value codecs");
+
+        suite.addTestSuite(TestFrontCodedDataCoder.class);
+
+        suite.addTestSuite(TestCanonicalHuffmanDataCoder.class);
+
+        suite.addTestSuite(TestHuffmanEncoder.class);
+
+        return suite;
+        
     }
     
 }
