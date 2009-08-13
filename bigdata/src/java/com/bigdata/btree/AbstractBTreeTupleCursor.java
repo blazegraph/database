@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.IOException;
 import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
@@ -533,7 +532,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                  * Lookup the key in the leaf at that index.
                  */
                 
-                key = leaf.getKeys().getKey(index);
+                key = leaf.getKeys().get(index);
                 
             }
             
@@ -1567,14 +1566,14 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             /*
              * The key for the cursor position.
              * 
-             * @todo Try to optimize out this allocation of a copy of the key
-             * using an inline comparison. I've made one pass at this but it
-             * causes problems for TestIterators so there is clearly something
-             * wrong.  Alternatively, raise this into the IAbstractNodeData
-             * interface.
+             * @todo Performance optimization. Try to optimize out this
+             * allocation of a copy of the key using an inline comparison. I've
+             * made one pass at this but it causes problems for TestIterators so
+             * there is clearly something wrong. Alternatively, raise this into
+             * the IAbstractNodeData interface.
              */
             if (true) {
-                final byte[] key = leaf.getKey(index);
+                final byte[] key = leaf.getKeys().get(index);
                 if (BytesUtil.compareBytes(key, fromKey) < 0) {
                     // key is LT then the optional inclusive lower bound.
                     return false;
@@ -1590,7 +1589,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                 if (tbuf == null) {
                     tbuf = new DataOutputBuffer(0);
                 }
-                leafCursor.leaf().copyKey(index, tbuf);
+                leafCursor.leaf().getKeys().copy(index, tbuf);
                 final int tlen = tbuf.limit();
                 final byte[] a = tbuf.array();
 
@@ -1674,12 +1673,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          
             // copy the current key.
             kbuf.reset();
-            try {
-                leafCursor.leaf().getKeys().copyKey(index, kbuf);
-            } catch(IOException ex) {
-                // note: IOException never get thrown.
-                throw new RuntimeException(ex);
-            }
+            leafCursor.leaf().getKeys().copy(index, kbuf);
 
         }
         

@@ -27,13 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.compression.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.ImmutableKeyBuffer;
+import com.bigdata.btree.raba.MutableKeyBuffer;
 
 /**
  * Interface for operations on an ordered set of keys. Each key is a variable
- * length unsigned byte[]. Keys are considered to be <em>immutable</em>,
- * though this is NOT enforced. Several aspects of the code assume that a byte[]
- * key is NOT modified once it has been created. This makes it possible to copy
+ * length unsigned byte[]. Keys are considered to be <em>immutable</em>, though
+ * this is NOT enforced. Several aspects of the code assume that a byte[] key is
+ * NOT modified once it has been created. This makes it possible to copy
  * references to keys rather than allocating new byte[]s and copying the data.
  * There are mutable and immutable implementations of this interface.
  * 
@@ -72,64 +74,16 @@ import com.bigdata.btree.compression.IRandomAccessByteArray;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated by any {@link IRandomAccessByteArray} instance which is
+ *             searchable and does not allow <code>null</code>s.
  */
 public interface IKeyBuffer extends IRandomAccessByteArray {
-    
-    /**
-     * Return a mutable instance. If the instance is mutable, returns
-     * <code>this</code>.
-     * 
-     * @exception IllegalArgumentException
-     *                if the capacity is less than the #of defined keys.
-     */
-    public MutableKeyBuffer toMutableKeyBuffer();
     
     /**
      * A human readable representation of the keys.
      */
     public String toString();
-
-    /**
-     * <p>
-     * Search for the given <i>searchKey</i> in the key buffer.
-     * </p>
-     * <p>
-     * Each time it is invoked, this method either returns the index of the
-     * child (for a node) or the entry (for a leaf) with that search key, or the
-     * insert position for that search key. When invoked by a node, the insert
-     * position is translated to identify the child that spans the search key.
-     * When invoked by a leaf, the insert position is interpreted as either a
-     * key not found or a key found. You can translate an insert position into a
-     * tuple index using
-     * </p>
-     * 
-     * <pre>
-     * entryIndex = -entryIndex - 1
-     * </pre>
-     * 
-     * <p>
-     * or just
-     * </p>
-     * 
-     * <pre>
-     * entryIndex = -entryIndex
-     * </pre>
-     * 
-     * if you are looking for the first key after the searchKey.
-     * 
-     * @param searchKey
-     *            The search key.
-     * 
-     * @return index of the search key, if it is found; otherwise,
-     *         <code>(-(insertion point) - 1)</code>. The insertion point is
-     *         defined as the point at which the key would be inserted. Note
-     *         that this guarantees that the return value will be >= 0 if and
-     *         only if the key is found.
-     * 
-     * @exception IllegalArgumentException
-     *                if the searchKey is null.
-     */
-    public int search(byte[] searchKey);
 
     /**
      * Return the largest leading prefix shared by all keys.
@@ -140,23 +94,5 @@ public interface IKeyBuffer extends IRandomAccessByteArray {
      * The length of the leading prefix shared by all keys.
      */
     public int getPrefixLength();
-
-    /**
-     * True iff the key buffer can not contain another key.
-     */
-    public boolean isFull();
-
-//    /**
-//     * @todo methods are being added to this API as the btree implementation
-//     *       becomes decoupled from the {@link MutableKeyBuffer} so that we can
-//     *       also try out a CompactingKeyBuffer implementation.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public interface IMutableKeyBuffer {
-//        
-//        
-//    }
     
 }

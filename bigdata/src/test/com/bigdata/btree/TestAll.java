@@ -59,21 +59,18 @@ public class TestAll extends TestCase {
                 .getName());
 
         // test low level variable length byte[] operations.
-        suite.addTestSuite( TestBytesUtil.class );
-        
+        suite.addTestSuite(TestBytesUtil.class);
+
         // unsigned byte[] key encoding and decoding.
         suite.addTest(com.bigdata.btree.keys.TestAll.suite());
 
+        // test random access byte[][] implementations, including key search
+        // and implementations which access coded (compressed) data in place.
+        suite.addTest(com.bigdata.btree.raba.TestAll.suite());
+        
         // key[] and value[] compression.
         suite.addTest(com.bigdata.btree.compression.TestAll.suite());
         
-        // test mutable key buffer.
-        suite.addTestSuite(TestMutableKeyBuffer.class);
-        // test immutable key buffer.
-        suite.addTestSuite(TestImmutableKeyBuffer.class);
-        // test key search routines on the key buffer implementations.
-        suite.addTestSuite(TestKeyBufferSearch.class);
-
         // test suite for the B+Tree node and leaf data records.
         suite.addTest(com.bigdata.btree.data.TestAll.suite());
         
@@ -82,8 +79,6 @@ public class TestAll extends TestCase {
          */
         // test static and instance utility methods on AbstractNode and ArrayType.
         suite.addTestSuite( TestUtilMethods.class );
-        // test assertions that test for node/leaf invariants.
-        suite.addTestSuite( TestInvariants.class );
         // test finding a child of a node by its key.
         suite.addTestSuite( TestFindChild.class );
         // test insert, lookup, and remove for root leaf w/o splitting it.
@@ -121,14 +116,14 @@ public class TestAll extends TestCase {
         suite.addTestSuite( TestIncrementalWrite.class );
         // test copy-on-write scenarios.
         suite.addTestSuite( TestCopyOnWrite.class );
-        
+
         /*
          * test with delete markers.
          * 
          * Note: tests with timestamps and delete markers are done in the
          * isolation package.
          */
-        suite.addTestSuite( TestDeleteMarkers.class );
+        suite.addTestSuite(TestDeleteMarkers.class);
 
         /*
          * test persistence protocols. 
@@ -139,7 +134,9 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestDirtyListener.class);
         // test the close/reopen protocol for releasing index buffers.
         suite.addTestSuite(TestReopen.class);
-        
+        // test of storing null values under a key with persistence.
+        suite.addTestSuite(TestNullValues.class);
+
         /*
          * test of transient BTree's (no backing store).
          */
@@ -154,11 +151,6 @@ public class TestAll extends TestCase {
 
         // pick up the index segment test suites.
         suite.addTest(TestAll_IndexSegment.suite());
-
-        /*
-         * test of storing null values under a key with persistence.
-         */
-        suite.addTestSuite(TestNullValues.class);
 
         /*
          * test fused views, including iterators for the fused view.

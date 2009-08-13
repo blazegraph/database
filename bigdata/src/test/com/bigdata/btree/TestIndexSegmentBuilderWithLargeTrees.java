@@ -199,7 +199,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     
     /**
      * A stress test for building {@link IndexSegment}s. A variety of
-     * {@link BTree}s are built from spase random keys using a variety of
+     * {@link BTree}s are built from sparse random keys using a variety of
      * branching factors. For each {@link BTree}, a variety of
      * {@link IndexSegment}s are built using a variety of output branching
      * factors. For each {@link IndexSegment}, we then compare it against its

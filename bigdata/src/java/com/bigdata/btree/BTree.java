@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.Leaf.ILeafListener;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
@@ -1376,14 +1377,14 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         private NodeFactory() {
         }
 
-        public ILeafData allocLeaf(IIndex btree, long addr,
-                int branchingFactor, IKeyBuffer keys, byte[][] values,
-                long[] versionTimestamp, boolean[] deleteMarkers,
-                long priorAddr, long nextAddr) {
+        public ILeafData allocLeaf(AbstractBTree btree, long addr,
+                int branchingFactor, IRandomAccessByteArray keys,
+                IRandomAccessByteArray values, long[] versionTimestamp,
+                boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
-            Leaf leaf = new Leaf((BTree) btree, addr, branchingFactor, keys, values,
+            Leaf leaf = new Leaf(btree, addr, branchingFactor, keys, values,
                     versionTimestamp, deleteMarkers);
-            
+
             /*
              * Note: The prior/next leaf addr information is not available for
              * mutable BTree so it is not being preserved here when a leaf is
@@ -1394,12 +1395,12 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
 
         }
 
-        public INodeData allocNode(IIndex btree, long addr,
-                int branchingFactor, int nentries, IKeyBuffer keys,
+        public INodeData allocNode(AbstractBTree btree, long addr,
+                int branchingFactor, int nentries, IRandomAccessByteArray keys,
                 long[] childAddr, int[] childEntryCounts) {
 
-            return new Node((BTree) btree, addr, branchingFactor, nentries,
-                    keys, childAddr, childEntryCounts);
+            return new Node(btree, addr, branchingFactor, nentries, keys,
+                    childAddr, childEntryCounts);
 
         }
 

@@ -31,11 +31,20 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.data.codec.HuffmanCodedValues;
+import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.codec.IDataCoder;
+import com.bigdata.btree.raba.codec.IRabaDecoder;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * A read-only view of the data for a B+Tree leaf.
+ * A read-only view of the data for a B+Tree leaf based on a compact record
+ * format. While some fields are cached, for the most part the various data
+ * fields, including the keys and values, are accessed in place in the data
+ * record in order to minimize the memory footprint of the leaf. The keys and
+ * values are coded using a caller specified {@link IDataCoder}. The specific
+ * coding scheme is specified by the {@link IndexMetadata} for the B+Tree
+ * instance and is not stored within the leaf data record.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -50,6 +59,8 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
     private final boolean doubleLinked;
     private final int nkeys;
     private final short flags;
+    private final IRandomAccessByteArray keys;
+    private final IRandomAccessByteArray vals; 
 
     /**
      * Offset of the encoded timestamp[] in the buffer -or- <code>-1</code> if
@@ -58,8 +69,8 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
     private final int O_versionTimestamps;
 
     /**
-     * Offset of the encoded delete markers in the buffer -or- <code>-1</code>
-     * if the leaf does not report those data.
+     * Offset of the bit flags in the buffer encoding the presence of deleted
+     * tuples -or- <code>-1</code> if the leaf does not report those data.
      */
     private final int O_deleteMarkers;
 
@@ -85,7 +96,8 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      * @param b
      *            A buffer containing the leaf data.
      */
-    protected ReadOnlyLeafData(final ByteBuffer b) {
+    protected ReadOnlyLeafData(final ByteBuffer b, final IDataCoder keysCoder,
+            final IDataCoder valuesCoder) {
 
         final byte type = b.get();
 
@@ -161,11 +173,15 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
         // keys
         O_keys = b.position();
-        b.position(b.position() + keysSize);
+        b.limit(b.position() + keysSize);
+        this.keys = keysCoder.decode(nkeys, b.slice());
+        assert b.position() == O_keys + keysSize;
 
         // values
         O_values = b.position();
-        b.position(b.position() + valuesSize);
+        b.limit(b.position() + valuesSize);
+        this.vals = valuesCoder.decode(nkeys, b.slice());
+        assert b.position() == O_values + valuesSize;
 
         assert b.position() == b.limit();
         
@@ -182,26 +198,31 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      * 
      * @param leaf
      *            The leaf data.
+     * @param keysCoder
+     *            The object which will be used to code the keys into the
+     *            record.
+     * @param valuesCoder
+     *            The object which will be used to code the values into the
+     *            record.
      * @param doubleLinked
      *            <code>true</code> to generate a data record with room for the
      *            priorAddr and nextAddr fields.
      */
-    public ReadOnlyLeafData(final ILeafData leaf, final boolean doubleLinked) {
+    public ReadOnlyLeafData(final ILeafData leaf, final IDataCoder keysCoder,
+            final IDataCoder valuesCoder, final boolean doubleLinked) {
 
         // cache some fields.
         this.doubleLinked = doubleLinked;
         this.nkeys = leaf.getKeyCount();
 
         // encode the keys.
-        final byte[] encodedKeys = encodeKeys(leaf);
+        this.keys = keysCoder.encode(leaf.getKeys());
+        final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
 
-//        // encode the values.
-//        this.values = new HuffmanCodedValues(leaf);
-//
-//        // serialize the coded values onto a byte[].
-//        final byte[] encodedValues = values.toByteArray();
-        final byte[] encodedValues = null; // FIXME encode values!
-        
+        // encode the values.
+        this.vals = valuesCoder.encode(leaf.getValues());
+        final ByteBuffer encodedValues = ((IRabaDecoder) vals).data();
+
         // figure out how the size of the buffer (exact fit).
         final int capacity = //
                 SIZEOF_TYPE + //
@@ -211,10 +232,11 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
                 SIZEOF_NKEYS + // nkeys
                 Bytes.SIZEOF_INT + // keysSize
                 Bytes.SIZEOF_INT + // valuesSize
+                bitFlagByteLength(nkeys)+// nulls
                 (leaf.hasVersionTimestamps() ? SIZEOF_TIMESTAMP * nkeys : 0) + //
-                (leaf.hasDeleteMarkers() ? bitFlagByteLength(nkeys) : 0) + // 
-                encodedKeys.length + // keys
-                encodedValues.length // values
+                (leaf.hasDeleteMarkers() ? bitFlagByteLength(nkeys) : 0) + // deleted
+                encodedKeys.capacity() + // keys
+                encodedValues.capacity() // values
         ;
         
         final ByteBuffer b = ByteBuffer.allocate(capacity);
@@ -250,11 +272,11 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         
         b.putInt(nkeys);
 
-        b.putInt(encodedKeys.length); // keysSize
+        b.putInt(encodedKeys.capacity()); // keysSize
         
-        b.putInt(encodedValues.length); // valuesSize
+        b.putInt(encodedValues.capacity()); // valuesSize
         
-        // timestamps
+        // version timestamps
         if (leaf.hasVersionTimestamps()) {
 
             O_versionTimestamps = b.position();
@@ -302,10 +324,14 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         
         // write the encoded keys on the buffer.
         O_keys = b.position();
+        encodedKeys.limit(encodedKeys.capacity());
+        encodedKeys.rewind();
         b.put(encodedKeys);
 
         // write the encoded values on the buffer.
         O_values = b.position();
+        encodedValues.limit(encodedKeys.capacity());
+        encodedValues.rewind();
         b.put(encodedValues);
 
         // prepare buffer for writing on the store [limit := pos; pos : =0] 
@@ -345,14 +371,17 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
     }
 
     /**
-     * For a leaf the #of entries is always the #of keys.
+     * For a leaf the #of tuples is always the #of keys.
      */
-    final public int getEntryCount() {
+    final public int getSpannedTupleCount() {
         
         return nkeys;
         
     }
 
+    /**
+     * For a leaf, the #of values is always the #of keys.
+     */
     final public int getValueCount() {
         
         return nkeys;
@@ -380,7 +409,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
     }
 
-    public boolean getDeleteMarker(final int index) {
+    final public boolean getDeleteMarker(final int index) {
 
         if (!hasDeleteMarkers())
             throw new UnsupportedOperationException();
@@ -388,65 +417,29 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         return getBit(O_deleteMarkers, index);
         
     }
-
-    final public void copyValue(int index, OutputStream os) {
-
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
-        
-    }
-
-    final public byte[] getValue(int index) {
-
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
-
-    }
-
-//    /**
-//     * Return the object for accessing the coded values. This is lazily decoded.
-//     */
-//    protected HuffmanCodedValues decodeValues() {
-//
-//        // double-checked locking (values must be volatile).
-//        if (values == null) {
-//            
-//            synchronized (this) {
-//
-//                if (values == null) {
-//
-//                    // setup slice on the coded values.
-//                    final ByteBuffer slice = this.b.slice();
-//                    slice.position(O_values);
-//                    slice.limit(this.b.limit() - O_values);
-//                    values = new HuffmanCodedValues(nkeys, slice);
-//
-//                }
-//
-//            }
-//            
-//        }
-//        
-//        return values;
-//
-//    }
-//    private volatile HuffmanCodedValues values;
     
-    /**
-     * @deprecated by {@link #getValue(int)} and
-     *             {@link #copyValue(int, OutputStream)}
-     */
-    final public byte[][] getValues() {
-
-        throw new UnsupportedOperationException();
+    final public IRandomAccessByteArray getKeys() {
+        
+        return keys;
         
     }
 
-    final public boolean isNull(int index) {
+    final public IRandomAccessByteArray getValues() {
 
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException();
+        return vals;
         
+    }
+
+    final public void copyValue(final int index, final OutputStream os) {
+
+        vals.copy(index, os);
+        
+    }
+
+    final public boolean isNull(final int index) {
+
+        return vals.isNull(index);
+
     }
 
 }

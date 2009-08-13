@@ -27,15 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.IAbstractNodeData;
-import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
-import com.bigdata.btree.data.codec.HuffmanCodedValues;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -186,7 +183,7 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
      */
     final protected boolean getBit(final int offset, final int bitIndex) {
         
-        return (buf().get(offset + byteIndexForBit(bitIndex)) & (1 << withinByteIndexForBit(bitIndex))) == 1;
+        return (buf().get(offset + byteIndexForBit(bitIndex)) & (1 << withinByteIndexForBit(bitIndex))) != 0;
 
     }
 
@@ -201,41 +198,4 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
         
     }
 
-    /**
-     * Encode the keys into a byte[].
-     * 
-     * @return The encoded keys.
-     * 
-     * @see HuffmanCodedValues
-     * 
-     *      FIXME implement at least hu-tucker encoding for the keys.
-     */
-    protected byte[] encodeKeys(final IAbstractNodeData data) {
-
-        throw new UnsupportedOperationException();
-        
-    }
-    
-    /**
-     * @todo consider writing an IKeyBuffer for each supported key encoding
-     *       (Hu-Tucker principally). That would let us plug in different key
-     *       encoding schemes. However, the binary image of the keys in the
-     *       buffer still needs to obey the general constraints for the data
-     *       recorded as encoded in the buffer (byte aligned, random access).
-     */
-    public IKeyBuffer getKeys() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    public void copyKey(final int index, final OutputStream os) {
-        // TODO Auto-generated method stub
-        
-    }
-
-    public byte[] getKey(final int index) {
-        // TODO Auto-generated method stub
-        return null;
-    }
-    
 }

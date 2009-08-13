@@ -43,7 +43,9 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.compression.RandomAccessByteArray;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.btree.raba.MutableRaba;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.compression.IRecordCompressor;
@@ -534,17 +536,17 @@ public class NodeSerializer {
 
     }
 
-    private ByteBuffer putNode2(INodeData node) throws IOException {
+    private ByteBuffer putNode2(final INodeData node) throws IOException {
 
         assert _writeBuffer != null;
         assert _writeBuffer.pos() == 0;
         assert node != null;
 
 //        assert branchingFactor == node.getBranchingFactor();
-        final int nentries = node.getEntryCount();
-        final int[] childEntryCounts = node.getChildEntryCounts();
+        final int nentries = node.getSpannedTupleCount();
+//        final int[] childEntryCounts = node.getChildEntryCounts();
         final int nkeys = node.getKeyCount();
-        final IKeyBuffer keys = node.getKeys();
+//        final IRandomAccessByteArray keys = node.getKeys();
         final long[] childAddr = node.getChildAddr();
 
         /*
@@ -563,13 +565,13 @@ public class NodeSerializer {
             _writeBuffer.packLong(nentries);
 
             // keys
-            nodeKeySerializer.write(_writeBuffer, keys);
+            nodeKeySerializer.write(_writeBuffer, node.getKeys());
 
             // addresses.
             addrSerializer.putChildAddresses(addressManager,_writeBuffer, childAddr, nkeys + 1);
 
             // #of entries spanned per child.
-            putChildEntryCounts(_writeBuffer, childEntryCounts, nkeys + 1);
+            putChildEntryCounts(_writeBuffer, node);
 
         } catch (EOFException ex) {
 
@@ -674,7 +676,7 @@ public class NodeSerializer {
                 keys = tmp;
             }
 
-            final int nkeys = keys.getKeyCount();
+            final int nkeys = keys.size();
             
             // Child addresses (nchildren == nkeys+1).
             addrSerializer.getChildAddresses(addressManager,is, childAddr, nkeys+1);
@@ -854,19 +856,19 @@ public class NodeSerializer {
     private int putLeafBody(DataOutputBuffer _writeBuffer, final ILeafData leaf)
             throws IOException {
         
-        final int nkeys = leaf.getKeyCount();
-        final IKeyBuffer keys = leaf.getKeys();
-        final byte[][] vals = leaf.getValues();
+//        final int nkeys = leaf.getKeyCount();
+//        final IRandomAccessByteArray keys = leaf.getKeys();
+//        final byte[][] vals = leaf.getValues();
         
         final int pos0 = _writeBuffer.pos();
         
         try {
             
             // keys.
-            leafKeySerializer.write(_writeBuffer, keys);
+            leafKeySerializer.write(_writeBuffer, leaf.getKeys());
             
             // values.
-            valueSerializer.write(_writeBuffer, new RandomAccessByteArray(0, nkeys, vals));
+            valueSerializer.write(_writeBuffer, leaf.getValues());
 
             if(leaf.hasDeleteMarkers()) {
                 
@@ -963,7 +965,7 @@ public class NodeSerializer {
 //            assert nkeys >= 0 && nkeys <= branchingFactor;
 
             // keys.
-            final IKeyBuffer keys;
+            final IRandomAccessByteArray keys;
             { 
                 /*
                  * FIXME currently de-serializes to an ImmutableKeyBuffer for
@@ -975,16 +977,13 @@ public class NodeSerializer {
                 keys = tmp;
             }
 
-            final int nkeys = keys.getKeyCount();
+            final int nkeys = keys.size();
 //            assert nkeys == keys.getKeyCount();
             
             // values.
-            final byte[][] values = new byte[branchingFactor + 1][];
-            {
-                RandomAccessByteArray raba = new RandomAccessByteArray(0, 0,
-                        values);
-                valueSerializer.read(is, raba);
-            }
+            final MutableRaba values = new MutableRaba(0, 0,
+                    new byte[branchingFactor + 1][]);
+            valueSerializer.read(is, values);
             
             // delete markers.
             final boolean[] deleteMarkers;
@@ -1053,12 +1052,14 @@ public class NodeSerializer {
      * 
      * @todo customizable serializer interface configured in {@link IndexMetadata}.
      */
-    static protected void putChildEntryCounts(DataOutput os,
-            int[] childEntryCounts, int nchildren) throws IOException {
+    static protected void putChildEntryCounts(final DataOutput os,
+            final INodeData node) throws IOException {
 
+        final int nchildren = node.getChildCount();
+        
         for (int i = 0; i < nchildren; i++) {
 
-            final long nentries = childEntryCounts[i];
+            final long nentries = node.getChildEntryCount(i);
 
             /*
              * Children MUST span some entries.

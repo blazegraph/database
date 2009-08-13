@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jan 22, 2007
  */
 
-package com.bigdata.btree;
+package com.bigdata.btree.raba;
 
 
 /**
@@ -55,7 +55,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
         MutableKeyBuffer kbuf = new MutableKeyBuffer(3);
         System.err.println(kbuf.toString());
         assertEquals("keys.length",3,kbuf.keys.length);
-        assertEquals("maxKeys",3,kbuf.getMaxKeys());
+        assertEquals("maxKeys",3,kbuf.capacity());
         assertEquals("nkeys",0,kbuf.nkeys);
         assertNull(kbuf.keys[0]);
         assertEquals("prefixLength",0,kbuf.getPrefixLength());

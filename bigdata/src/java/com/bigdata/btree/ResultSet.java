@@ -39,9 +39,9 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.compression.IRandomAccessByteArray;
-import com.bigdata.btree.compression.RandomAccessByteArray;
 import com.bigdata.btree.filter.ITupleFilter;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.MutableRaba;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
@@ -78,9 +78,9 @@ public class ResultSet implements Externalizable {
 
     private byte[] lastKey;
 
-    private RandomAccessByteArray keys;
+    private MutableRaba keys;
 
-    private RandomAccessByteArray vals;
+    private MutableRaba vals;
 
     private long[] versionTimestamps;
     
@@ -222,7 +222,7 @@ public class ResultSet implements Externalizable {
         if (keys == null)
             throw new IllegalStateException();
         
-        return keys.getKey(index);
+        return keys.get(index);
         
     }
 
@@ -242,7 +242,7 @@ public class ResultSet implements Externalizable {
         if (vals == null)
             throw new IllegalStateException();
         
-        return vals.getKey(index);
+        return vals.get(index);
         
     }
 
@@ -370,9 +370,9 @@ public class ResultSet implements Externalizable {
             
         }
         
-        this.keys = (sendKeys ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
+        this.keys = (sendKeys ? new MutableRaba(0,0,new byte[limit][]) : null);
 
-        this.vals = (sendVals ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
+        this.vals = (sendVals ? new MutableRaba(0,0,new byte[limit][]) : null);
         
         if(indexMetadata.getDeleteMarkers()) {
             
@@ -670,7 +670,7 @@ public class ResultSet implements Externalizable {
         
         if (haveKeys) {
             
-            keys = new RandomAccessByteArray( 0, 0, new byte[ntuples][] );
+            keys = new MutableRaba( 0, 0, new byte[ntuples][] );
             
             if (ntuples > 0) {
              
@@ -690,7 +690,7 @@ public class ResultSet implements Externalizable {
 
         if (haveVals) {
             
-            vals = new RandomAccessByteArray(0, 0, new byte[ntuples][]);
+            vals = new MutableRaba(0, 0, new byte[ntuples][]);
             
             if (ntuples > 0) {
 
@@ -770,7 +770,7 @@ public class ResultSet implements Externalizable {
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         ShortPacker.packShort(out, VERSION0);
 

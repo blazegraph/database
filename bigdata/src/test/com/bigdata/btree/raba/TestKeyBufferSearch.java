@@ -25,12 +25,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 12, 2006
  */
 
-package com.bigdata.btree;
+package com.bigdata.btree.raba;
+
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.IKeyBuffer;
 
 import junit.framework.TestCase2;
 
 /**
- * Unit tests for {@link IKeyBuffer#search(int offset, byte[] searchKey)}.
+ * Unit tests for {@link IKeyBuffer#search(byte[] searchKey)}.
  * 
  * @todo write performance test?  the existing code can no longer be used since
  * both linear and binary searches first test the shared prefix for the keys and
@@ -42,8 +45,6 @@ import junit.framework.TestCase2;
  * @todo do version of test with negative and positive integer keys so that the
  *       search on the encoded keys detects whether signed bytes or unsigned
  *       bytes are being compared.
- * 
- * @todo write stress test with offset != 0.
  * 
  * @todo do tests with JNI code linked in. note that we only use
  *       {@link BytesUtil#compareBytesWithLenAndOffset(int, int, byte[], int, int, byte[])} for
@@ -78,12 +79,12 @@ public class TestKeyBufferSearch extends TestCase2 {
 //     * linear vs binary search code.
 //     */
     
-    public int search(AbstractKeyBuffer kbuf,byte[]key) {
-     
+    public int search(AbstractKeyBuffer kbuf, byte[] key) {
+
         return kbuf.search(key);
-        
+
     }
-    
+
     /**
      * Test search for keys using both a mutable and an immutable key buffer and
      * a known set of keys.
@@ -102,8 +103,8 @@ public class TestKeyBufferSearch extends TestCase2 {
                                     //              insert  after := -6
         int nkeys = 5;
 
-        MutableKeyBuffer kbuf = new MutableKeyBuffer(nkeys,keys);
-        
+        final MutableKeyBuffer kbuf = new MutableKeyBuffer(nkeys, keys);
+
         doSearchTest01(kbuf);
         
         ImmutableKeyBuffer kbuf2 = new ImmutableKeyBuffer( kbuf );

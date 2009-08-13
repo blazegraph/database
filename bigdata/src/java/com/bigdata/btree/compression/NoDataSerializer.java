@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+
 
 /**
  * Useful when no data will be written.

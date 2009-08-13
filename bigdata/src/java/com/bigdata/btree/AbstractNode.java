@@ -38,6 +38,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.filter.EmptyTupleIterator;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.ImmutableKeyBuffer;
+import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.Expander;
@@ -112,26 +115,27 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
     final transient protected int maxKeys;
 
     /**
-     * The #of valid keys for this node or leaf.  For a {@link Node}, the #of
-     * children is always <code>nkeys+1</code>.  For a {@link Leaf}, the #of
+     * The #of valid keys for this node or leaf. For a {@link Node}, the #of
+     * children is always <code>nkeys+1</code>. For a {@link Leaf}, the #of
      * values is always the same as the #of keys.
-     * 
-     * FIXME deprecate since also maintained by {@link IKeyBuffer}.
+     * <p>
+     * Note: The code maintains this field but also the corresponding fields on
+     * {@link #keys} and on {@link Leaf#values} under mutation.
      */
     protected int nkeys = 0;
-    
+
     /**
      * A representation of each key in the node or leaf. Each key is as a
      * variable length unsigned byte[]. There are various implementations of
      * {@link IKeyBuffer} that are optimized for mutable and immutable nodes.
-     * 
+     * <p>
      * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
      * A leaf has one key per value - that is, the maximum #of keys for a leaf
      * is specified by the branching factor. In contrast a node has m-1 keys
      * where m is the maximum #of children (aka the branching factor). Therefore
      * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
      * the {@link AbstractNode}.
-     * 
+     * <p>
      * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
      * accept one more key than the maximum capacity so that the key that causes
      * overflow and forces the split may be inserted. This greatly simplifies
@@ -142,7 +146,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
      * @see IKeyBuffer#search(int searchKeyOffset, byte[] searchKey)
      */
-    protected IKeyBuffer keys;
+    protected IRandomAccessByteArray keys;
     
     /**
      * The parent of this node. This is null for the root node. The parent is
@@ -419,7 +423,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
 
             } else {
 
-                keys = new MutableKeyBuffer((ImmutableKeyBuffer) src.keys);
+                keys = new MutableKeyBuffer(src.keys);
 
             }
 
@@ -452,7 +456,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * 
      * @return Either this leaf or a copy of this leaf.
      */
-    protected IAbstractNode copyOnWrite() {
+    protected AbstractNode<T> copyOnWrite() {
         
         // Always invoked first for a leaf and thereafter in its other form.
         assert isLeaf();
@@ -487,7 +491,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * 
      * @return Either this node or a copy of this node.
      */
-    protected AbstractNode copyOnWrite(long triggeredByChildId) {
+    protected AbstractNode<T> copyOnWrite(final long triggeredByChildId) {
 
         if (isPersistent()) {
 
@@ -801,15 +805,15 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      */
     protected final void assertKeysMonotonic() {
 
-        if(keys instanceof MutableKeyBuffer) {
+        if (keys instanceof MutableKeyBuffer) {
 
             /*
              * iff mutable keys - immutable keys should be checked during
              * de-serialization or construction.
              */
-            
-            ((MutableKeyBuffer)keys).assertKeysMonotonic();
-            
+
+            ((MutableKeyBuffer) keys).assertKeysMonotonic();
+
         }
 
     }
@@ -844,14 +848,13 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            The source keys.
      * @param srcpos
      *            The index position from which the key will be copied.
-     * 
-     * @todo move to {@link MutableKeyBuffer}
      */
-    final protected void copyKey(int dstpos, IKeyBuffer srckeys, int srcpos) {
+    final protected void copyKey(final int dstpos,
+            final IRandomAccessByteArray srckeys, final int srcpos) {
 
         assert dirty;
         
-        ((MutableKeyBuffer)keys).keys[dstpos] = srckeys.getKey(srcpos);
+        ((MutableKeyBuffer) keys).keys[dstpos] = srckeys.get(srcpos);
         
     }
 
@@ -869,7 +872,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
     }
     
-    final public IKeyBuffer getKeys() {
+    final public IRandomAccessByteArray getKeys() {
         
         return keys;
         
@@ -879,7 +882,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
         try {
             
-            os.write(keys.getKey(index));
+            os.write(keys.get(index));
             
         } catch(IOException ex) {
             
@@ -891,7 +894,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
     
     final public byte[] getKey(final int index) {
 
-        return keys.getKey(index);
+        return keys.get(index);
         
     }
     

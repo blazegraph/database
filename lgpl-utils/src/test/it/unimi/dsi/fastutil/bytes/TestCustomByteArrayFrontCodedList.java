@@ -47,10 +47,12 @@ Modifications:
 
 package it.unimi.dsi.fastutil.bytes;
 
+import it.unimi.dsi.fastutil.objects.ObjectListIterator;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 
-import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import junit.framework.TestCase;
 
 /**
@@ -112,7 +114,7 @@ public class TestCustomByteArrayFrontCodedList extends TestCase {
     private byte[][] a; 
 
 
-    private void _test( int n ) {
+    private void _test( final int n) {
         int c;
 
         l = new int[ n ];
@@ -216,7 +218,21 @@ public class TestCustomByteArrayFrontCodedList extends TestCase {
          */
         try {
             CustomByteArrayFrontCodedList m2 = new CustomByteArrayFrontCodedList(
-                    m.size(),m.ratio(),m.getArray().clone());
+                    m.size(),m.ratio(),m.getBackingBuffer().toArray());
+            contentEquals(m, m2);
+        }
+        catch(Exception e) {
+            throw new AssertionError(e);
+        }
+
+        ensure( contentEquals( m, t ), "Error (" + seed + "): m does not equal t after save/read" );
+
+        /*
+         * Direct ByteBuffer (de-)serialization.
+         */
+        try {
+            CustomByteArrayFrontCodedList m2 = new CustomByteArrayFrontCodedList(
+                    m.size(),m.ratio(),ByteBuffer.wrap(m.getBackingBuffer().toArray()));
             contentEquals(m, m2);
         }
         catch(Exception e) {

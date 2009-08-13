@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.OutputStream;
+import com.bigdata.btree.raba.IRandomAccessByteArray;
 
 /**
  * Interface for low-level data access.
@@ -42,6 +42,9 @@ public interface IAbstractNodeData {
      */
     public boolean isLeaf();
 
+    // The branching factor is stored on the AbstractBTree object rather than 
+    // on each node or leaf.  Therefore it does not appear as part of this
+    // interface.
 //    /**
 //     * The branching factor is maximum the #of children for a node or maximum
 //     * the #of values for a leaf.
@@ -59,12 +62,13 @@ public interface IAbstractNodeData {
      * 
      * @see INodeData#getChildEntryCounts()
      */
-    public int getEntryCount();
+    public int getSpannedTupleCount();
 
     /**
-     * The #of keys defined keys for the node or leaf. The maximum #of keys for
-     * a node is one less than the {@link #getBranchingFactor()}. The maximum
-     * #of keys for a leaf is the {@link #getBranchingFactor()}.
+     * Return the #of keys in the node or leaf. A node has <code>nkeys+1</code>
+     * children. A leaf has <code>nkeys</code> keys and values. The maximum #of
+     * keys for a node is one less than the branching factor of the B+Tree. The
+     * maximum #of keys for a leaf is the branching factor of the B+Tree.
      * 
      * @return The #of defined keys.
      */
@@ -72,33 +76,7 @@ public interface IAbstractNodeData {
 
     /**
      * The object used to contain and manage the keys.
-     * 
-     * @deprecated in favor of {@link #copyKey(int, OutputStream)} or even
-     *             {@link #getKey(int)} if you must.
      */
-    public IKeyBuffer getKeys();
-
-    /**
-     * Copy the indicated key onto the callers stream. This can be more
-     * efficient than {@link #getKey(int)} when the caller is single threaded
-     * and a buffer can be reused for each request.
-     * 
-     * @param index
-     *            The index of the key in the node or leaf.
-     * 
-     * @param os
-     *            The stream onto which to copy the key.
-     */
-    public void copyKey(int index, OutputStream os);
-
-    /**
-     * Return the key at the indicated index.
-     * 
-     * @param index
-     *            The index of the key in the node or leaf.
-     * 
-     * @return The key at that index.
-     */
-    public byte[] getKey(int index);
+    public IRandomAccessByteArray getKeys();
 
 }

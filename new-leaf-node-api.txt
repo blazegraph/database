@@ -1,7 +1,77 @@
-new leaf API:
+Issues to be resolved in this branch.
 
-Re-design of the node/leaf API to support processing of serialized
-nodes and leaves without materializing their contents as java objects.
+1. Re-design of the node/leaf API to support processing of serialized
+   nodes and leaves without materializing their contents as java
+   objects.  Nodes and leaves are now expanded into Java objects iff a
+   mutation needs to be performed on the node or leaf. 
+
+   Note: Since search may have more overhead, operations per second
+   (lookup, insert, etc) may actually be slower until caching effects
+   trump IO Wait.
+
+2. Global record or B+Tree node/leaf record buffering for a DS.  This
+   allows us to efficiently use all available RAM to buffer the
+   indices.
+
+3. Store level record compression.
+
+4. Dependency refactor (fastutil, dsiutils, lgpl-utils).
+
+--------------------
+
+Query optimization
+
+x. B+Tree optimization (at least with respect to performance tuning
+   for the B+Tree refactor change set).
+
+x. Parallel range iterator flag.
+
+x. Resolve RDF Values using JOINs.
+
+x. Distributed join optimization (performance tuning, hot spot
+   elimination, configuration parameter tuning, etc).
+
+--------------------
+
+Index partition splits.
+
+   - Proactive scheduling
+
+   - Faster (possible dependency on deleted tuple count, but actually
+     I think that is a dead end).
+
+   - More robust (transactional)
+
+   - Based on #of bytes in post-merge file (no need to tweak).
+
+------------------------------------------------------------
+-------------- Store level record compression --------------
+------------------------------------------------------------
+
+- Support gzip, zip, bmz and other compression protocols in the store
+  at the record level.
+
+       - bmz implementation in C available from hypertable at
+         http://www.hypertable.org/doxygen/dir_636d9f0bc773a215f705e2de9f182c4e.html
+         (GPL).  The author was Luke Lu.  I don't know if there is a
+         JNI wrapper for it or not.  Luke Lu <hypertable@vicaya.com>
+         and probably Luke (vicaya@gmail.com).
+
+	 There is a open source implementation of bmdiff/zippy like
+         library in Hypertable, called bmz. It’s written in pure ANSI
+         C, and can be easily embedded in any project (that was a goal
+         I had in mind, so it’s written in C instead of C++ like the
+         rest of the Hypertable). The performance is similar to
+         google’s published numbers for small blocks (the size of
+         sstable block from 64KB-128KB. The speed to will go down
+         dramatically (to about 40MB/s), when the block size is big
+         enough to thrash the processor cache, as the algorithm uses a
+         hashtable.)  I wrote it (the bmdiff part, lzo is used for the
+         optional final pass) mostly for experiments without much
+         optimization (so there are rooms for improvement). The
+         Rabin-Karp like hash functions can be easily plugged in for
+         experiments. Feel free to give it try and ping me on how to
+         use the library (documentation is in bmz.h.)
 
 Goals:
 
@@ -134,8 +204,10 @@ Goals:
           type(byte) // 0=node
 	  -- body (compressed) --
 	  version(short)
-          nkeys(int)
+	  flags(short) // unused.
+    	  nkeys(int)
 	  nentries(int)
+	  keysSize(int)
 	  childAddr[]:long[]
 	  childEntryCounts:int[]
 	  keys:byte[][] // encoded as dictionary plus byte aligned code strings.
@@ -160,7 +232,10 @@ Goals:
 	  ]
 	  -- body (compressed) --
 	  version(short)
+	  flags(short) // VERSION_TIMESTAMPS | DELETE_MARKERS
     	  nkeys(int)
+	  keysSize(int)
+	  valuesSize(int)
 	  timestamp:long[] // optional, based on B+Tree provisioning.
 	  deleteMarker:bit[] // optional, based on B+Tree provisioning.
 	  keys:byte[][] // encoded as dictionary plus byte aligned code strings.
@@ -194,27 +269,60 @@ Goals:
        - The key compression and value compression methods are stored
          on the BTree.  So is the branching factor.
 
+	 Serialize the HuTucker coder, decoder and the codewords,
+	 which is a bit string.  Do search by projecting the probe key
+	 using the coder and then do use linear scan of the code words
+	 stopping at the first code work GTE the key.
+	 
+	 The HuTucker decoder (TreeDecoder) can be built from the
+	 codeWords:BitVector and the symbol:int[].  So we only need to
+	 store those two things.  We can then rewind the bit stream to
+	 decode the code words.
+	 
+	 The HuTucker coder (CodeWordCoder) can be built from the
+	 codeWords:BitVector.
+
+	 - Could bit flag nulls explicitly rather than mussing with
+           the huffman encoding.  When scanning the code words to
+           decode a value we would have to skip an imaginary code word
+           if the corresponding tuple index was null or deleted.
+
+	 ? Why not a ctor for TreeDecoder which accepts a BIS?
+
        - Done. IAbstractNodeData#getBranchingFactor() is deprecated
          (the field is not stored in node/leaf data record and the
          branchingFactor field is on the AbstractBTree and should be
          accessed there).
 
        - The priorAddr and nextAddr fields need to be exposed by the
-         ILeafData API.  The getter methods should throw an exception
-         if the fields are not present in the data record (e.g., for a
-         BTree vs an IndexSegment).
+         ILeafData API.
 
-       - I just need to replace the INodeData and ILeafData
-         implementations, but to do that I need to remove the use of
-         the IKeyBuffer interface and factor the INodeData and
-         ILeafData interfaces off of the INode and ILeaf
-         implementations.  This will allow me to direct the operations
-         to the appropriate node/leaf implementation object.
+	 The getter methods should throw an exception if the fields
+         are not present in the data record (e.g., for a BTree vs an
+         IndexSegment).
+
+	 On write, these fields are set in the buffer _after_ the
+         record is serialized and we have the address of the _next_
+         record from the store.
+
+       - Done. Create mutable INodeData and ILeafData implementations
+         based on the existing code in AbstractNode, Node, Leaf, and
+         MutableKeys.
+
+       - Refactor Node and Leaf to delegate to the INodeData or
+         ILeafData implementation.
+	 
+	 (***) ILeafData#getValue(int) and possibly some other methods
+	       must also test whether or not the tuple has been
+	       deleted.
 
        - Persistence of a mutable node should always produce the same
 	 binary image as an immutable node.  If the immutable node
 	 needs to be modified, then explode it into java objects.
 
+       - Add global read retention queue and weak value hash map based
+         lookup per store of the retained nodes.
+         
        - INodeFactory must be replaced or modified such that it
          creates a Node or Leaf from a ByteBuffer or allocates and
          writes the representation of a Node or Leaf on a ByteBuffer,
@@ -227,16 +335,59 @@ Goals:
          immutable (various methods are overriden to throw
          exceptions for unsupported operations).
 
-    x. prefix or hu-tucker coding for keys.
+       - I may need to converge on a common interface for RMI and
+         B+Tree nodes and leaves which is different from IKeyBuffer or
+         IRandomAccessByteArray.  If so, then IndexMetadata will need
+         to be updated to reflect the codec interface change.
 
-       For hu-tucker, store the dictionary in the node/leaf and
-       project the probe key into the hu-tucker coding each time we
-       enter a node/leaf.
+       - Done. Converge on the standard fastutil and dsi dependencies,
+         removing their variants from the lgpl-utils module and move
+         the lgpl-utils module into the bigdata project.
 
-       For prefix coding, we do a similar projection by chopping off
-       the part of the probe key which is held in common.
+	 - added dsiutils-1.0.10 (369k), replacing lgpl-utils.
 
-       Those "projections" should be invisible to the caller.
+	 - updated fastutils-5.1.4 to fastutils-5.1.5.
+
+	 - colt-1.2.0 is unchanged.
+
+	 - Package change for InputBitStream and OutputBitStream from
+	   it.unimi.dsi.mg4j.io to it.unimi.dsi.io.
+
+	 - Package change for Coder, Decoder, and HuffmanCodec from
+           it.unimi.dsi.mg4j.compression to it.unimi.dsi.compression.
+
+	 - Method change for Codec.getDecoder() to Codec.decoder().
+
+	 - Method change for PrefixCodec.getCoder() to
+           PrefixCodec.coder().
+
+	 - (*) Verify use of the correct (new) ctor for
+           OutputBitStream.
+
+	   Verify new uses of FastByteArrayOutputStream in compression
+	   code and of the OutputBitStream.  Make sure that we are not
+	   allocating huge buffers when compared to the actual
+	   requirements.
+
+	 - (*) Verify requirement for additional dsiutil dependencies.
+
+	 - Feedback to dsiutils on changes introduced in the
+           CustomByteArrayFrontCodedList.  These changes are probably
+           too far reaching to expect that they will make it back into
+           dsiutils.
+
+	 - (*) Replace it.unimi.dsi.mg4j.util.BloomFilter2 with
+	   it.unimi.dsi.util.BloomFilter?
+
+	   Request changes in dsi-utils so we can use that BloomFilter
+	   class directly.
+
+	 - Delete FastRDFKeyCompression (broken and Huffman or
+           Hu-Tucker key compression should be just as good).
+
+         - (*) Use autojar to extract only the necessary classes from
+           fastutils.  Possibly do this as part of the lgpl-utils
+           build.
 
     x. huffman (or extensible?) coding for the values.
 
@@ -340,8 +491,6 @@ Questions:
     Do we need to code "null" as well as variable length byte[] and
     allow values[] itself to be null?
 
-
-
 B+Tree node buffering.
 
        - set of large native buffers.
@@ -422,30 +571,230 @@ B+Tree node buffering.
 	 We could also install records into the cache when building an
 	 index segment, but again that might not be a benefit.
 
-       - Use Hu-Tucker or prefix coding for keys, Huffman for values.
-         But compare costs (space and time) when using gzip w/o
-         Huffman compression for the values.
+ * <pre>
 
-       - An alternative to variable length records and managing the
-         buffer space is to choose both a branchingFactor (m) and a
-         pageSize (in bytes).  There are several complications here,
-         but several advantages.  
+   version:uint6     The version identifier for this record format (6 bits,
+		     which allows for 64 format revisions).
 
-	     - Mutable nodes would be in-memory and might be in the
-               exploded format.  Once persisted, they would use the
-               same binary format as the index segment.
+   bitCodedSymbols:1 A bit flag whose value is 1 iff the symbols are given as
+		     a packed symbol[] and 0 if they are given as a 256 bit
+		     vector (32 bytes).
 
-	     - The index segment build would not be solely top-down
-               since a node could underflow or overflow based on its
-               bytes used.
+   nsymbols:uint9    There are at most 256 distinct symbols, which are the
+                     distinct possible byte values (9 bits, which allows
+                     for an empty leaf or node with no byte values used as
+		     well as a leaf or node with all 256 byte values used).
 
-	     - I can not see any way to dynamically maintain the
-               huffman encoding on the page, so there is really no way
-               to predict the encoded (but not compressed) page size.
+   -- note: at this point the record is byte aligned --
 
-	     - Pages would be compressed on the disk, so the on disk
-               storage would not be fixed length - only the in memory
-               image.
+   symbol:byte[]     The packed symbol array -or- an alternative coding which
+   symbol:bit[256]   is used if there are GT 32 distinct symbols to be coded
+                     since it a more compact representation.
+
+		     O_symbols := 16 bits.
+
+   -- note: at this point the record is byte aligned --
+
+   bitLengthBits:uint8
+		     The width in bits of the integers used to code the 
+		     bitLength[].
+
+		     The bit offset to this field is either ((2+nsymbols)*8) (if
+		     the symbols are coded as a packed byte[]) or ((2+32)*8) (if
+		     the symbols are coded as a 256 bit vector).
+
+   codeOffsetBits:uint8
+	             The width in bits of the integers used to code the
+	             codeOffset[].  If this is ZERO (0), then the codeOffset[]
+		     was not stored and the coded values must be decoded with
+		     a sequential scan of the codeWord[].
+
+		     O_codeOffsetBits := O_bitLengths + 8;
+
+   sumCodedValueBitLengths:uint32
+		     The sum of the bit lengths of the coded values.  This is
+		     a 32bit unsigned integer, which is sufficient to code up
+		     bit lengths of up to 512MB.  This field IS NOT present 
+		     if the codeOffsetBits is ZERO (0) since the field is only
+		     used to compute the bit offset of the codeOffset[].
+
+		     O_sumCodedValueBitLengths := O_bitLengths + 16;
+
+   -- note: at this point the record is byte aligned --
+   
+   nulls[]	     A vector of [nvalues] bit flags.  A flag is a ONE (1) iff
+		     the corresponding byte[] in the logical byte[][] was a 
+		     null.  A null is coded as a sequence of ZERO (0) code 
+		     words.  However, empty byte[]s are also permitted for
+		     B+Tree values (but not for B+Tree keys).  Therefore you
+		     MUST test the nulls[] to distinguish between a null byte[]
+		     and an empty byte[].
+
+		     O_nulls :=  O_bitLengthBits + 8 + 8 + (codeOffsetBits==0?0:32);
+  
+   bitLength[]	     The delta in the bit length of each code word from the
+		     previous code word.  There is one code word pre symbol.  
+		     The code words MUST be a canonical huffman code, which
+		     implies that the code words are arranged in a
+		     non-decreasing order.  This is used to reconstruct the
+		     decoder when processing the record.  The combination of
+		     a canonical huffman code and the bitLength[] allows us 
+		     to generate the decoder without any additional information.
+
+		     O_bitLength[] := O_nulls + nvalues
+
+   codedValue:bit[]  The coded values given as a sequence of code words.  The
+		     offsets of each coded value in this array are given
+		     directly by the codeOffset[].
+
+		     O_codedValue[] := O_bitLength[] + (nsymbols*bitLengthBits)
+
+   codeOffset[]      Offset to the start of each code from the start of the
+                     codedValue[].  While the delta in the offsets could be
+		     represented more efficiently, the offsets are represented
+		     directly so that we may avoid reading the entire codeOffset[]
+		     into memory.  This array is present iff codeOffsetBits is GT 
+		     ZERO.
+
+		     O_codeOffset[] := O_codedValue[] + sumCodedValueBitLengths
+
+ </pre>
+
+codeWord[]=[1101, 000, 001, 010, 1110, 1111, 011, 100, 101, 1100]
+longCodeWord[]=[13, 0, 1, 2, 14, 15, 3, 4, 5, 12] (base10 version of the codeWords)
+
+length[]=[3, 3, 3, 3, 3, 3, 4, 4, 4, 4]
+symbol[]=[1, 2, 3, 6, 7, 8, 9, 0, 4, 5]
+
+Reordering of the symbol2byte[] to match the code book:
+      0    1    2    3    4    5    6    7    8    9
+in: [99, 101, 105, 107, 109, 110, 111, 112, 114, 115]
+out:[101, 105, 107, 111, 112, 114, 115, 99, 109, 110]
+
+codeWord: 000, symbol=0, value=99 (c)
+codeWord: 001, symbol=1, value=101 (e)
+codeWord: 010, symbol=2, value=105 (i)
+codeWord: 011, symbol=3, value=107 (k)
+codeWord: 100, symbol=4, value=109 (m)
+codeWord: 101, symbol=5, value=110 (n)
+codeWord: 1101, symbol=6, value=111 (o)
+codeWord: 1110, symbol=7, value=112 (p)
+codeWord: 1111, symbol=8, value=114 (r)
+codeWord: 1100, symbol=9, value=115 (s)
+
+
+Note: When sending this record format, you must also transmit both the
+#of values in the logical byte[][] coded by the record and the #of
+bits in the record itself.
+
+- The Huffman decoder ctor requires the code words arranged into a
+  non-decreasing order by code length paired with the symbols arranged
+  in a correlated order.  This can be done either in the serialized
+  format or when read build the decoder from the record.  We do this
+  when we build the decoder because that allows us to use a more
+  compact representation of the symbols in the serialized record and
+  because the code word lengths are implicit in the code words due to
+  the prefix property.
+
+  - The codeWordLength[] might be more compact with run length
+    encoding.  The article suggests [min, max, #of codes having each
+    length between min and max].  E.g., a variant of runLength
+    encoding.
+
+    Try fibonacci codes for the dictionary entries when N LT 64?
+
+  - dsiutils
+
+    1. Modified HuffmanCodec to expose the symbol[].
+    
+    2. HuffmanCodec will fail if it is given a zero length
+       frequency[].  The exception is thrown out of the
+       CanonicalFast64CodeWordDecoder ctor.
+
+    3. Done. The ByteArrayFrontCodedList can not directly use the data
+       in place in a ByteBuffer or IBS.  Its serialization will have
+       to be modified to support that application.
+
+    4. Build lgpl-utils as a separate JAR and link it as a dependency.
+
+  - Implement at least:
+
+    None w/ search.  The byte[][] is written out w/o coding.
+
+       Write and test.  We should be able to do search() on this as
+       well as random lookup.  [This could be implemented using
+       FrontCodedCoder if it were modified such that the ratio is
+       dynamically set to the #of items in the record.]
+
+    Prefix coding w/ search
+
+       Done.  Continue the refactor so we can use search() on a raba
+       and test it in this context.  See if I can make some progress.
+
+       Still need to reconcile PrefixSerializer (IDataSerializer,
+       streams) with FrontCodedDataCoder (IDataCoder, records).
+
+    Canonical huffman coding w/ search.
+
+       This requires us to code zero frequency count byte values are
+       used so any byte[] may be coded.
+
+    Canonical huffman coding w/o search.
+
+       Only the byte values having non-zero frequency counts are
+       coded.
+    
+	Note: I am still having troubles with the canonical huffman
+	code.  It is possible to rebuild the Decoder from the
+	frequency[].  While that is quite a hack, it might be better
+	than banging my head on the wall further.  One problem with
+	that approach (at least as taken by MikeP) is it is NOT a
+	canonical code which results.  Another is that different data
+	are written onto the persistent record so the serialized
+	formats would not be compatible after a fix.
+
+    Hu-Tucker w/ search.
+
+        I am disincluded to implement this coding since the algorithm
+	implemented to find the code is quadratic in the size of the
+	code space and we would need to code all 256 byte values each
+	time in order to use this for search.
+
+    FastRDFValueCompression
+
+	Modify implement IDataCoder so as to permit in place access to
+	the coded values.
+
+  - Try patch to HuffmanSerializer in the trunk w/o StringBuilder and
+    w/o freq[].  Instead, send the code word bit lengths and either
+    use canonical huffman codes or also send the symbols/symbol
+    indices.
+
+- extend IRandomAccessByteArray interface for keys, adding a search()
+  method.  
+
+  Refactor to declare optional operations which throw an
+  UnsupportedOperationException and then clean up the interface
+  hierarchy.
+
+- Both Leaf and Node should provide access methods to wrap their keys
+  as a Raba and their values as a Raba.  We may want caching for those
+  wrapped views.
+
+  - Implement MutableLeafData by refactoring Leaf.
+
+  - Implement MutableNodeData by refactoring Node.
+
+- Align IDataSerializer with IRabaEncoder and IRabaDecoder.  Modify
+  various things to take advantage of random access to the coded
+  byte[]s rather than decoding everything first.
+
+- IBS over ByteBufferInputStream might be slow.  Look into that.
+
+------------------------------------------------------------
+-- Global B+Tree node/leaf buffering, or maybe record ------
+-- buffer across all stores for a DS instance --------------
+------------------------------------------------------------
 
 Paul,
 

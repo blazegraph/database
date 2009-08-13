@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on May 24, 2007
  */
 
-package com.bigdata.util;
+package com.bigdata.btree.raba.codec;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -44,82 +44,16 @@ import junit.framework.TestCase2;
 
 /**
  * 
- * @todo explore adaptive vs non-adaptive huffman encoding.
- * 
- * @todo Explore huffman (Optimal alphabetic binary trees (Hu-Tucker coding and
- *       the canonical Huffman code) encoding variants that preserve the lexical
- *       ordering of the symbols. This is extremely interesting since, if the
- *       search key and the keys in the index are both encoded by the same
- *       algorithm and dictionary then it should be possible to search using the
- *       lexical order preserving huffman codes directly. In order to be
- *       compact, the scope of the dictionary needs to be limited, e.g., to a
- *       node or leaf or possibly to an index partition (or to a btree or index
- *       segment). The basic requirements are that the mapping is static based
- *       on the frequency data found in the keys. This may require an initial
- *       pass over the keys in the node. An ordered preserving code can then be
- *       built, the dictionary serialized, and the keys serialized using that
- *       code. Search would require encoding the probe key using the dictionary.
- *       If the dictionary is per-node, then the key gets encoded for each node
- *       that is searched. It may or may not be worth while to strip off common
- *       prefixes before computing the code.
- *       <p>
- *       Hu-Tucker links:
- *       <ul>
- *       <li></li>
- *       <li>http://www.google.com/search?hl=en&q=Hu-Tucker - google search</li>
- *       <li>http://www.cs.rit.edu/~std3246/thesis/node10.html - detailed
- *       online description</li>
- *       <li>T. C. Hu. Combinatorial Algorithms. Addison-Wesley Publishing Co.,
- *       1982.</li>
- *       <li>Donald E. Knuth. The Art of Computer Programming, volume 3.
- *       Addison-Wesley Publishing Co., 1973. Sorting and Searching. </li>
- *       <li>http://portal.acm.org/citation.cfm?doid=355602.361319 - published
- *       algorithm</li>
- *       <li>http://www.cs.rit.edu/~std3246/thesis/thesis.html - thesis
- *       studying the Hu-Tucker algorithm, implementation strategies, and their
- *       performance.</li>
- *       <li>http://www.cse.ucsd.edu/classes/sp07/cse202/lec9.pdf - from a
- *       lecture.</li>
- *       <li>http://www.cs.utexas.edu/users/plaxton/c/337/projects/1/desc.pdf -
- *       a class project that describes phase I of the Hu-Tucker algorithm.</li>
- *       <li>Towards a Dynamic Optimal Binary Alphabetic Tree -
- *       ftp://dimacs.rutgers.edu/pub/dimacs/TechnicalReports/TechReports/1999/99-22.ps.gz</li>
- *       <li>Describes an approach to fast sorting (word RAM) using a linear
- *       time algorithm as an alternative to Hu-Tucker.</li>
- *       </ul>
- * 
- * @see http://en.wikipedia.org/wiki/Huffman_coding
- * 
- * @see http://www.zlib.net/ (BSD style license; the Java classes are JNI
- *      wrappers that expose part of this functionality. The JNI interface could
- *      doubtless be extended to gain greater access to the underlying library.
- *      madler@alumni.caltech.edu is the remaining active author.)
- * 
- * @see http://www.jcraft.com/jzlib/ (BSD style license; this is a pure Java
- *      port of the zlib library and might provide access to the dictionary).
- * 
- * @see http://www.oberhumer.com/opensource/lzo/ (GPL license; there is a java
- *      binding and it provides faster compression and extremely fast
- *      decompression. There is a pure Java decompression package, but the
- *      compression package is only available in C. The Java code is also GPL.
- *      The author offers the possiblity of alternative licensing on request.)
- * 
- * @see http://www.faqs.org/faqs/compression-faq/ (FAQs on the compression news
- *      group).
- * 
- * @see http://www.compressconsult.com/huffman/ (Practical Huffman coding by a
- *      data compression consultant : michael@compressconsult.com).
- * 
- * @see http://www.cs.helsinki.fi/u/jikorhon/ngp/compression.html
- * 
- * @see http://coding.derkeiler.com/Archive/Java/comp.lang.java.programmer/2003-10/1545.html
- * 
- * @see http://java.sun.com/j2se/1.4.2/docs/api/java/util/zip/package-summary.html#package_description
- * 
- * @see http://www.isi.edu/in-notes/rfc1951.txt (RFC)
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated The {@link Deflater} does not provide access to the dictionary.
+ *             For the B+Tree, what we generally want is to use a canonical
+ *             huffman code since it is both more space efficient and preserves
+ *             the alphabetic ordering of the coded values.
+ *             <p>
+ *             This test suite might be refactored for store level record
+ *             compression.
  */
 public class TestHuffmanEncoder extends TestCase2 {
 

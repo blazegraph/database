@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util;
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -74,7 +75,7 @@ public class TestAll extends TestCase {
         // test checksum computations (used by serialization).
         suite.addTestSuite( TestChecksumUtility.class );
 
-        suite.addTestSuite( TestHuffmanEncoder.class );
+        suite.addTestSuite(TestByteBufferBitVector.class);
 
         suite.addTestSuite( TestCSVReader.class );
 

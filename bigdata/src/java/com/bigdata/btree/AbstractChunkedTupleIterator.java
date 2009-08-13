@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -553,7 +552,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
             if (keyBuffer == null) {
 
-                final int initialCapacity = rset.getKeys().getLength(lastVisited);
+                final int initialCapacity = rset.getKeys().length(lastVisited);
                 
                 keyBuffer = new DataOutputBuffer(initialCapacity);
                 
@@ -561,17 +560,9 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             
             keyBuffer.reset();
             
-            try {
-            
-                rset.getKeys().copyKey(lastVisited, keyBuffer);
+            rset.getKeys().copy(lastVisited, keyBuffer);
 
-                keyBuffer.flip();
-
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+            keyBuffer.flip();
             
             return keyBuffer;
             
@@ -609,7 +600,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             
             if (valueBuffer == null) {
                 
-                final int initialCapacity = rset.getValues().getLength(lastVisited);
+                final int initialCapacity = rset.getValues().length(lastVisited);
 
                 valueBuffer = new DataOutputBuffer(initialCapacity);
                 
@@ -617,17 +608,9 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             
             valueBuffer.reset();
             
-            try {
+            rset.getValues().copy(lastVisited, valueBuffer);
             
-                rset.getValues().copyKey(lastVisited, valueBuffer);
-                
-                valueBuffer.flip();
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+            valueBuffer.flip();
             
             return valueBuffer;
             

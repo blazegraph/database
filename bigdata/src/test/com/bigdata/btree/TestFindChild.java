@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.raba.MutableKeyBuffer;
+
 
 /**
  * Test code that chooses the child to search during recursive traversal of the

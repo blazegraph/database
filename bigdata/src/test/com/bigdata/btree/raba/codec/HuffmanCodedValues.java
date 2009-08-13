@@ -25,24 +25,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 6, 2009
  */
 
-package com.bigdata.btree.data.codec;
+package com.bigdata.btree.raba.codec;
+
+import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
+
+import java.nio.ByteBuffer;
+
+import com.bigdata.btree.ILeafData;
+import com.bigdata.util.ByteBufferBitVector;
 
 /**
- * A codec for the keys of B+Tree node or leaf.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public interface IKeysCodec {
+public class HuffmanCodedValues {
 
-    /*
-     * @todo the main point of this interface is to allow pluggable codecs which
-     * know how to access the keys using IAbstractNodeData or IKeyBuffer.
-     * 
-     * @todo a parallel interface would know how to access the values and
-     * understand how to (de-)code a null value for a tuple regardless of
-     * whether the tuple was deleted or a null was associated with the key for
-     * an undeleted tuple.
-     */
-    
 }

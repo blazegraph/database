@@ -1680,7 +1680,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Remove the tuple under that key (will write a delete marker if delete
      * markers are enabled).
      */
-    final public byte[] remove(byte[] key) {
+    final public byte[] remove(final byte[] key) {
 
         final Tuple tuple;
         
@@ -1736,7 +1736,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @throws UnsupportedOperationException
      *             if the index is read-only.
      */
-    final public Tuple remove(byte[] key, Tuple tuple) {
+    final public Tuple remove(final byte[] key, final Tuple tuple) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1785,7 +1785,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
-    public byte[] lookup(byte[] key) {
+    public byte[] lookup(final byte[] key) {
 
         final Tuple tuple = lookup(key, getLookupTuple());
 

@@ -210,15 +210,15 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 
         final int branchingFactor = 20;
         
-        BTree btree = getBTree(branchingFactor);
+        final BTree btree = getBTree(branchingFactor);
 
-        Leaf root = (Leaf) btree.getRoot();
+        final Leaf root = (Leaf) btree.getRoot();
 
         // array of keys to insert.
-        byte[][] expectedKeys = new byte[branchingFactor][];
+        final byte[][] expectedKeys = new byte[branchingFactor][];
 
         // the value to insert for each key.
-        SimpleEntry[] expectedValues = new SimpleEntry[branchingFactor];
+        final SimpleEntry[] expectedValues = new SimpleEntry[branchingFactor];
         
         /*
          * Generate keys and values. The keys are a monotonic progression with
@@ -227,9 +227,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         
         int lastKey = 1;
         
-        for( int i=0; i<branchingFactor; i++ ) {
-            
-            int key = lastKey + r.nextInt(100) + 1;
+        for (int i = 0; i < branchingFactor; i++) {
+
+            final int key = lastKey + r.nextInt(100) + 1;
             
             expectedKeys[ i ] = keyBuilder.reset().append(key).getKey();
             
@@ -241,9 +241,9 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         
         for( int i=0; i<branchingFactor; i++ ) {
 
-            byte[] key = expectedKeys[i];
+            final byte[] key = expectedKeys[i];
             
-            SimpleEntry value = expectedValues[i];
+            final SimpleEntry value = expectedValues[i];
             
             assertEquals(i, root.nkeys );
             
@@ -264,10 +264,11 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             
             // verify the values iterator
             byte[][] tmp = new byte[root.nkeys][];
-            for( int j=0; j<root.nkeys; j++ ) {
-                tmp[j] = root.values[j];
+            for (int j = 0; j < root.nkeys; j++) {
+                tmp[j] = root.getValues().get(j);
             }
-            assertSameIterator( "values", tmp, new Striterator(root.entryIterator()).addFilter(new Resolver(){
+            assertSameIterator("values", tmp, new Striterator(root
+                    .entryIterator()).addFilter(new Resolver() {
 
                 @Override
                 protected Object resolve(Object arg0) {
@@ -281,14 +282,14 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
         assertTrue(root.dump(Level.DEBUG,System.err));
 
         // verify that the leaf has the same keys in the same order.
-        assertKeys( expectedKeys, root);
+        assertKeys(expectedKeys, root);
 
         // verify that the leaf has the same values in the same order.
-        assertValues( expectedValues, root );
-        
+        assertValues(expectedValues, root);
+
         // verify the expected behavior of the iterator.
-        assertSameIterator( "values", expectedValues, root.entryIterator() );
-        
+        assertSameIterator("values", expectedValues, root.entryIterator());
+
     }
 
     /**

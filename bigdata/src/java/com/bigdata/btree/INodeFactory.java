@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import com.bigdata.btree.raba.IRandomAccessByteArray;
+
 /**
  * Interface for creating mutable nodes or leaves.
  * 
@@ -56,9 +58,9 @@ public interface INodeFactory {
      * 
      * @return A node initialized from those data.
      */
-    public INodeData allocNode(IIndex btree, long addr, int branchingFactor,
-            int nentries, IKeyBuffer keys, long[] childAddr,
-            int[] childEntryCount);
+    public INodeData allocNode(AbstractBTree btree, long addr,
+            int branchingFactor, int nentries, IRandomAccessByteArray keys,
+            long[] childAddr, int[] childEntryCount);
 
     /**
      * Create a leaf. The implementation is encouraged to steal the <i>keys</i>
@@ -83,20 +85,21 @@ public interface INodeFactory {
      * @param priorAddr
      *            The address of the previous leaf in key order, <code>0L</code>
      *            if it is known that there is no previous leaf, and
-     *            <code>-1L</code> if either: (a) it was not known whether
-     *            there is a previous leaf; or (b) it was known that there was a
+     *            <code>-1L</code> if either: (a) it was not known whether there
+     *            is a previous leaf; or (b) it was known that there was a
      *            previous leaf but the address of that leaf was not known.
      * @param nextAddr
-     *            The address of the next leaf in key order, <code>0L</code>
-     *            if it is known that there is no next leaf, and
-     *            <code>-1L</code> if either: (a) it was not known whether
-     *            there is a next leaf; or (b) it was known that there was a
-     *            next leaf but the address of that leaf was not known.
+     *            The address of the next leaf in key order, <code>0L</code> if
+     *            it is known that there is no next leaf, and <code>-1L</code>
+     *            if either: (a) it was not known whether there is a next leaf;
+     *            or (b) it was known that there was a next leaf but the address
+     *            of that leaf was not known.
      * 
      * @return A leaf initialized from those data.
      */
-    public ILeafData allocLeaf(IIndex btree, long addr, int branchingFactor,
-            IKeyBuffer keys, byte[][] values, long[] versionTimestamps,
+    public ILeafData allocLeaf(AbstractBTree btree, long addr,
+            int branchingFactor, IRandomAccessByteArray keys,
+            IRandomAccessByteArray values, long[] versionTimestamps,
             boolean[] deleteMarkers, long priorAddr, long nextAddr);
 
 }

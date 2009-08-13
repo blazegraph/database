@@ -65,7 +65,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      * @param initialCapacity
      *            The initial capacity of the internal byte[].
      */
-    public DataOutputBuffer(int initialCapacity) {
+    public DataOutputBuffer(final int initialCapacity) {
         
         super(initialCapacity);
         
@@ -90,7 +90,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      * available in {@link #buf} from position 0 (inclusive) through position
      * {@link #pos} (exclusive).
      */
-    public DataOutputBuffer(InputStream in) throws IOException {
+    public DataOutputBuffer(final InputStream in) throws IOException {
 
         super();
         
@@ -114,7 +114,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      * available in {@link #buf} from position 0 (inclusive) through position
      * {@link #pos} (exclusive).
      */
-    public DataOutputBuffer(ObjectInput in) throws IOException {
+    public DataOutputBuffer(final ObjectInput in) throws IOException {
 
         super();
 
@@ -137,11 +137,11 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      * Conforms the return type to an instance of this class.
      */
     public DataOutputBuffer reset() {
-        
-        return (DataOutputBuffer)super.reset();
-        
+
+        return (DataOutputBuffer) super.reset();
+
     }
-    
+
     /**
      * Read <i>len</i> bytes into the buffer.
      * 
@@ -149,17 +149,17 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      *            The input source.
      * @param len
      *            The #of bytes to read.
-     *            
+     * 
      * @throws EOFException
-     *             if the EOF is reached before <i>len</i> bytes have been
-     *             read.
+     *             if the EOF is reached before <i>len</i> bytes have been read.
      * @throws IOException
      *             if an I/O error occurs.
      * 
      * @todo read many bytes at a time.
      * @todo write test.
      */
-    final public void write(DataInput in, final int len) throws IOException {
+    final public void write(final DataInput in, final int len)
+            throws IOException {
 
         ensureCapacity(len);
         

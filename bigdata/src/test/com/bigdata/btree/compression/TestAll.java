@@ -33,9 +33,9 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import com.bigdata.btree.TestBytesUtil;
-import com.bigdata.btree.TestImmutableKeyBuffer;
-import com.bigdata.btree.TestKeyBufferSearch;
-import com.bigdata.btree.TestMutableKeyBuffer;
+import com.bigdata.btree.raba.TestImmutableKeyBuffer;
+import com.bigdata.btree.raba.TestKeyBufferSearch;
+import com.bigdata.btree.raba.TestMutableKeyBuffer;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -59,9 +59,11 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("Compression");
+        final TestSuite suite = new TestSuite("Compression");
 
         suite.addTestSuite(TestPrefixSerializer.class);
+        suite.addTestSuite(TestHuffmanSerializer.class);
+        suite.addTestSuite(TestWrapSerializer.class);
 
         return suite;
         
