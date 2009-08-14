@@ -31,18 +31,23 @@ package com.bigdata.btree.raba;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 
 /**
- * Flyweight implementation for wrapping a <code>byte[][]</code> with
- * fromIndex and toIndex.
- * <p>
- * Note: This implementation is used when we split an
- * {@link IKeyArrayIndexProcedure} based on a key-range partitioned index. The
- * {@link MutableKeyBuffer} will not work for this case since it is not aware of
- * a fromIndex and a toIndex.
+ * Flyweight implementation for wrapping a <code>byte[][]</code> with fromIndex
+ * and toIndex.
+ * 
+ * @todo This implementation is used when we split an
+ *       {@link IKeyArrayIndexProcedure} based on a key-range partitioned index.
+ *       The {@link MutableKeyBuffer} will not work for this case since it is
+ *       not aware of a fromIndex and a toIndex.  However, {@link ReadOnlyValuesRaba}
+ *       and {@link ReadOnlyKeysRaba} would work better for those use cases.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated ? Is this version required? Do we want a mutable searchable? In
+ *             fact, {@link MutableKeyBuffer} is a mutable searchable
+ *             implementation.
  */
-public class MutableRaba extends AbstractRaba implements IRandomAccessByteArray {
+public class MutableRaba extends AbstractRaba implements IRaba {
 
     /**
      * This view is mutable.
@@ -53,19 +58,7 @@ public class MutableRaba extends AbstractRaba implements IRandomAccessByteArray 
 
     }
 
-    /**
-     * This view allows <code>null</code>s.
-     */
-    public boolean isNullAllowed() {
-        
-        return true;
-        
-    }
-
-    /**
-     * This view does not support search.
-     */
-    public boolean isSearchable() {
+    public boolean isKeys() {
     
         return false;
         
@@ -123,39 +116,12 @@ public class MutableRaba extends AbstractRaba implements IRandomAccessByteArray 
             final int capacity, final byte[][] a) {
 
         super(fromIndex, toIndex, capacity, a);
-        
+
     }
-        
-    /**
-     * Resize the buffer, copying the references to the existing data into a new
-     * view backed by a new byte[][]. fromIndex will be zero in the new view.
-     * 
-     * @param n
-     *            The size of the new buffer.
-     * 
-     * @return The new view, backed by a new byte[][].
-     */
+
     public MutableRaba resize(final int n) {
 
-        assertNotReadOnly();
-        
-        if (n < 0)
-            throw new IllegalArgumentException();
-
-        // #of entries in the source.
-        final int m = size();
-
-        // #of entries to be copied into the new buffer.
-        final int p = Math.min(m, n);
-
-        // new backing array sized to [n].
-        final byte[][] b = new byte[n][];
-
-        // copy references to the new buffer.
-        System.arraycopy(a, fromIndex, b, 0, p);
-
-        return new MutableRaba(0/* fromIndex */,
-                p/* toIndex */, a.length/* capacity */, a);
+        return (MutableRaba) super.resize(n);
 
     }
 

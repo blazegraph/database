@@ -3,7 +3,7 @@ package com.bigdata.btree.data;
 import java.io.OutputStream;
 
 import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Mock object for {@link ILeafData} used for unit tests.
@@ -13,13 +13,13 @@ import com.bigdata.btree.raba.IRandomAccessByteArray;
  */
 class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
-    final private IRandomAccessByteArray vals;
+    final private IRaba vals;
 
     final private boolean[] deleteMarkers;
 
     final private long[] versionTimestamps;
 
-    final public IRandomAccessByteArray getValues() {
+    final public IRaba getValues() {
 
         return vals;
 
@@ -91,21 +91,21 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
     }
 
-    public MockLeafData(final IRandomAccessByteArray keys,
-            final IRandomAccessByteArray vals) {
+    public MockLeafData(final IRaba keys,
+            final IRaba vals) {
 
         this(keys, vals, null/* deleteMarkers */, null/* versionTimestamps */);
 
     }
 
-    public MockLeafData(final IRandomAccessByteArray keys,
-            final IRandomAccessByteArray vals, final boolean[] deleteMarkers,
+    public MockLeafData(final IRaba keys,
+            final IRaba vals, final boolean[] deleteMarkers,
             final long[] versionTimestamps) {
 
         super(keys);
 
         assert vals != null;
-        assert vals.isNullAllowed();
+        assert !vals.isKeys();
         assert vals.size() == keys.size();
         assert vals.capacity() == keys.capacity();
 

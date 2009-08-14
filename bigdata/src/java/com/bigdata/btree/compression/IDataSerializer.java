@@ -42,8 +42,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.btree.NodeSerializer;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
-import com.bigdata.btree.raba.IMutableRandomAccessByteArray;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 
 /**
@@ -134,7 +133,7 @@ public interface IDataSerializer extends Serializable {
      * 
      * @throws IOException
      */
-    void write(DataOutput out, IRandomAccessByteArray raba) throws IOException;
+    void write(DataOutput out, IRaba raba) throws IOException;
 
 //    void write(DataOutput out, int fromIndex, int toIndex, byte[][] keys) throws IOException;
 
@@ -154,7 +153,7 @@ public interface IDataSerializer extends Serializable {
      *       append a key to the {@link IKeyBuffer} so that we can avoid
      *       allocation of byte[]s during de-serialization.
      */
-    public void read(DataInput in, IRandomAccessByteArray raba) throws IOException;
+    public void read(DataInput in, IRaba raba) throws IOException;
     
 //    /**
 //     * Return an interface that may be used to read the data. When efficient

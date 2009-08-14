@@ -30,10 +30,11 @@ package com.bigdata.btree.data;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ILeafData;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
-import com.bigdata.btree.raba.codec.IDataCoder;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.raba.codec.IRabaDecoder;
 import com.bigdata.rawstore.Bytes;
 
@@ -42,7 +43,7 @@ import com.bigdata.rawstore.Bytes;
  * format. While some fields are cached, for the most part the various data
  * fields, including the keys and values, are accessed in place in the data
  * record in order to minimize the memory footprint of the leaf. The keys and
- * values are coded using a caller specified {@link IDataCoder}. The specific
+ * values are coded using a caller specified {@link IRabaCoder}. The specific
  * coding scheme is specified by the {@link IndexMetadata} for the B+Tree
  * instance and is not stored within the leaf data record.
  * 
@@ -59,8 +60,8 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
     private final boolean doubleLinked;
     private final int nkeys;
     private final short flags;
-    private final IRandomAccessByteArray keys;
-    private final IRandomAccessByteArray vals; 
+    private final IRaba keys;
+    private final IRaba vals; 
 
     /**
      * Offset of the encoded timestamp[] in the buffer -or- <code>-1</code> if
@@ -96,8 +97,8 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      * @param b
      *            A buffer containing the leaf data.
      */
-    protected ReadOnlyLeafData(final ByteBuffer b, final IDataCoder keysCoder,
-            final IDataCoder valuesCoder) {
+    protected ReadOnlyLeafData(final ByteBuffer b, final IRabaCoder keysCoder,
+            final IRabaCoder valuesCoder) {
 
         final byte type = b.get();
 
@@ -163,7 +164,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
             O_deleteMarkers = b.position();
 
             // advance past the bit flags.
-            b.position(b.position() + bitFlagByteLength(nkeys));// bit coded.
+            b.position(b.position() + BytesUtil.bitFlagByteLength(nkeys));// bit coded.
             
         } else {
             
@@ -174,13 +175,13 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         // keys
         O_keys = b.position();
         b.limit(b.position() + keysSize);
-        this.keys = keysCoder.decode(nkeys, b.slice());
+        this.keys = keysCoder.decode(b.slice());
         assert b.position() == O_keys + keysSize;
 
         // values
         O_values = b.position();
         b.limit(b.position() + valuesSize);
-        this.vals = valuesCoder.decode(nkeys, b.slice());
+        this.vals = valuesCoder.decode(b.slice());
         assert b.position() == O_values + valuesSize;
 
         assert b.position() == b.limit();
@@ -208,8 +209,8 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      *            <code>true</code> to generate a data record with room for the
      *            priorAddr and nextAddr fields.
      */
-    public ReadOnlyLeafData(final ILeafData leaf, final IDataCoder keysCoder,
-            final IDataCoder valuesCoder, final boolean doubleLinked) {
+    public ReadOnlyLeafData(final ILeafData leaf, final IRabaCoder keysCoder,
+            final IRabaCoder valuesCoder, final boolean doubleLinked) {
 
         // cache some fields.
         this.doubleLinked = doubleLinked;
@@ -232,9 +233,9 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
                 SIZEOF_NKEYS + // nkeys
                 Bytes.SIZEOF_INT + // keysSize
                 Bytes.SIZEOF_INT + // valuesSize
-                bitFlagByteLength(nkeys)+// nulls
+                BytesUtil.bitFlagByteLength(nkeys)+// nulls
                 (leaf.hasVersionTimestamps() ? SIZEOF_TIMESTAMP * nkeys : 0) + //
-                (leaf.hasDeleteMarkers() ? bitFlagByteLength(nkeys) : 0) + // deleted
+                (leaf.hasDeleteMarkers() ? BytesUtil.bitFlagByteLength(nkeys) : 0) + // deleted
                 encodedKeys.capacity() + // keys
                 encodedValues.capacity() // values
         ;
@@ -306,7 +307,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
                     if(leaf.getDeleteMarker(i)) {
 
-                        bits |= 1;
+                        bits |= 1 << j;
                             
                     }
                     
@@ -414,17 +415,17 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         if (!hasDeleteMarkers())
             throw new UnsupportedOperationException();
 
-        return getBit(O_deleteMarkers, index);
-        
+        return BytesUtil.getBit(buf(), O_deleteMarkers, index);
+
     }
     
-    final public IRandomAccessByteArray getKeys() {
+    final public IRaba getKeys() {
         
         return keys;
         
     }
 
-    final public IRandomAccessByteArray getValues() {
+    final public IRaba getValues() {
 
         return vals;
         

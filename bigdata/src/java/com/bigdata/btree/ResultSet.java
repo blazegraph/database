@@ -40,7 +40,7 @@ import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.filter.ITupleFilter;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableRaba;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
@@ -182,7 +182,7 @@ public class ResultSet implements Externalizable {
      * @throws IllegalStateException
      *             if the keys were not retrieved.
      */
-    final public IRandomAccessByteArray getKeys() {
+    final public IRaba getKeys() {
         
         if (keys == null)
             throw new IllegalStateException();
@@ -197,7 +197,7 @@ public class ResultSet implements Externalizable {
      * @throws IllegalStateException
      *             if the values were not retrieved.
      */
-    final public IRandomAccessByteArray getValues() {
+    final public IRaba getValues() {
         
         if (vals == null)
             throw new IllegalStateException();
@@ -554,7 +554,7 @@ public class ResultSet implements Externalizable {
      * @param tuple
      *            The tuple.
      */
-    protected void copyTuple(ITuple tuple) {
+    protected void copyTuple(final ITuple tuple) {
 
         if (tuple == null)
             throw new IllegalArgumentException();

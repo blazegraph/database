@@ -35,6 +35,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import com.bigdata.btree.BytesUtil;
+
 /**
  * Compact storage of lists of arrays using front coding.
  * 
@@ -1081,9 +1083,11 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             // #of matching bytes.
             mlen = i;
 
-            // must be at least one matching byte.
-            assert mlen > 0;
-            
+//            // must be at least one matching byte.
+//            assert mlen > 0 : "mlen=" + mlen + ", poffset=" + poffset
+//                    + ", pos=" + pos + ", probe=" + BytesUtil.toString(a)
+//                    + ", this=" + this;
+
             // skip over the remainder of the full length coded entry.
             pos += (blen - mlen);
             
@@ -1140,7 +1144,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      * Binary search against the entries in the backing buffer that are coded as
      * their full length values.
      * 
-     * @param a
+     * @param key
      *            The key for the search.
      * 
      * @return index of the search key into the pointer array, if it is an exact
@@ -1152,7 +1156,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      *         0 if and only if the key is matched by any of the full length
      *         coded entries.
      */
-    private int binarySearch(final byte[] a) {
+    private int binarySearch(final byte[] key) {
 
         final int base = 0;
         
@@ -1182,9 +1186,6 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             final int tmp;
             {
 
-//                // The #of bytes in the probe.
-//                final int alen = a.length;
-
                 // The index into the backing buffer of index [mid].
                 int pos = p[mid];
                 
@@ -1194,31 +1195,19 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
                 // Skip the #of bytes required to code that length.
                 pos += count(blen);
 
-                tmp = compareBytes(a, 0, a.length, bb, pos, blen);
-//                // Compare bytes(probe,entry) (negative iff probe < entry)
-//                for (int i = 0; i < alen && i < blen; i++, pos++) {
-//                
-//                    // promotes to signed integers in [0:255] for comparison.
-//                    final int ret = (a[i] & 0xff) - (bb.get(pos) & 0xff);
-//                    
-//                    if (ret != 0)
-//                        return mid;
-//                
-//                }
-//                
-//                tmp = alen - blen;
+                // Compare key vs actual (in buffer).
+                tmp = compareBytes(key, 0, key.length, bb, pos, blen);
 
             }
-//            final byte[] midVal = keys[offset];
-//
-//            final int tmp = BytesUtil.compareBytes(midVal, key);
 
             if (tmp > 0) {
 
+                // Actual GT probe, restrict lower bound and try again.
                 low = mid + 1;
 
             } else if (tmp < 0) {
 
+                // Actual LT probe, restrict upper bound and try again.
                 high = mid - 1;
 
             } else {

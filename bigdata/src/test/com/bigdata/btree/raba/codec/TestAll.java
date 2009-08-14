@@ -59,8 +59,15 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("B+Tree key and value codecs");
 
-        suite.addTestSuite(TestFrontCodedDataCoder.class);
+        // no compression.
+        suite.addTestSuite(TestSimpleDataCoder.class);
+        
+        // front-compression for ordered unsigned byte[]s.
+        suite.addTestSuite(TestFrontCodedDataCoderRatio2.class);
+        suite.addTestSuite(TestFrontCodedDataCoderRatio8.class);
+        suite.addTestSuite(TestFrontCodedDataCoderRatio32.class);
 
+        // canonical huffman coding.
         suite.addTestSuite(TestCanonicalHuffmanDataCoder.class);
 
         suite.addTestSuite(TestHuffmanEncoder.class);

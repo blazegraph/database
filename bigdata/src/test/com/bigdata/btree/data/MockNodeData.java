@@ -1,7 +1,7 @@
 package com.bigdata.btree.data;
 
 import com.bigdata.btree.INodeData;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Mock object for {@link INodeData}.
@@ -71,7 +71,7 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
 
     }
 
-    public MockNodeData(final IRandomAccessByteArray keys,
+    public MockNodeData(final IRaba keys,
             final int spannedTupleCount, final long[] childAddr,
             final int[] childEntryCount) {
 

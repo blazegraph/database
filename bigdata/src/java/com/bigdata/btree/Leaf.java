@@ -35,7 +35,7 @@ import java.util.WeakHashMap;
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.filter.EmptyTupleIterator;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
 
@@ -77,7 +77,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      * everywhere that we update {@link AbstractNode#nkeys} or
      * {@link MutableKeyBuffer#nkeys}!!!
      * */
-    protected IRandomAccessByteArray values;
+    protected IRaba values;
     
     /**
      * The deletion markers IFF isolation is supported by the {@link BTree}.
@@ -107,7 +107,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
     }
 
-    public IRandomAccessByteArray getValues() {
+    public IRaba getValues() {
         
         return values;
         
@@ -137,8 +137,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      *            corresponding to the insert key that forces a split.
      */
     protected Leaf(final AbstractBTree btree, final long addr,
-            final int branchingFactor, final IRandomAccessByteArray keys,
-            final IRandomAccessByteArray values,
+            final int branchingFactor, final IRaba keys,
+            final IRaba values,
             final long[] versionTimestamps, final boolean[] deleteMarkers) {
 
         super(btree, branchingFactor, false /* The leaf is NOT dirty. */);
@@ -1515,7 +1515,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      * @param data
      *            An array of <em>signed</em> byte arrays.
      */
-    static private String toString(int n, IRandomAccessByteArray data) {
+    static private String toString(int n, IRaba data) {
        
         final StringBuilder sb = new StringBuilder();
 

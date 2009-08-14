@@ -32,9 +32,9 @@ import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 
-
-import com.bigdata.btree.raba.IRandomAccessByteArray;
-import com.bigdata.btree.raba.ReadOnlyRaba;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 
 /**
  * Test suite for the {@link FrontCodedDataCoder}.
@@ -49,26 +49,19 @@ import com.bigdata.btree.raba.ReadOnlyRaba;
  * 
  * @todo also test for probe keys that are not found.
  */
-public class TestFrontCodedDataCoder extends AbstractDataCoderTestCase {
+public class AbstractFrontCodedDataCoderTestCase extends AbstractDataCoderTestCase {
 
     /**
      * 
      */
-    public TestFrontCodedDataCoder() {
+    public AbstractFrontCodedDataCoderTestCase() {
     }
 
     /**
      * @param name
      */
-    public TestFrontCodedDataCoder(String name) {
+    public AbstractFrontCodedDataCoderTestCase(String name) {
         super(name);
-    }
-
-    protected void setUp() throws Exception {
-        
-        // @todo test with different ratios.
-        dataCoder = new FrontCodedDataCoder(8/* ratio */);
-        
     }
 
     /**
@@ -84,7 +77,8 @@ public class TestFrontCodedDataCoder extends AbstractDataCoderTestCase {
         a[1] = "foobar".getBytes("US-ASCII");
         a[2] = "fool".getBytes("US-ASCII");
         a[3] = "football".getBytes("US-ASCII");
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
+        
+        final IRaba expected = new ReadOnlyKeysRaba(a);
        
         // front-code the list.
         final int ratio = 4;
@@ -127,7 +121,8 @@ public class TestFrontCodedDataCoder extends AbstractDataCoderTestCase {
         a[1] = "foobar".getBytes("US-ASCII");
         a[2] = "fool".getBytes("US-ASCII");
         a[3] = "football".getBytes("US-ASCII");
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
+        
+        final IRaba expected = new ReadOnlyKeysRaba(a);
        
         // front-code the list.
         final int ratio = 3;
@@ -172,7 +167,8 @@ public class TestFrontCodedDataCoder extends AbstractDataCoderTestCase {
         a[1] = "foobar".getBytes("US-ASCII");
         a[2] = "fool".getBytes("US-ASCII");
         a[3] = "football".getBytes("US-ASCII");
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
+        
+        final IRaba expected = new ReadOnlyKeysRaba(a);
        
         // front-code the list.
         final int ratio = 2;
@@ -215,7 +211,8 @@ public class TestFrontCodedDataCoder extends AbstractDataCoderTestCase {
         a[1] = "foobar".getBytes("US-ASCII");
         a[2] = "fool".getBytes("US-ASCII");
         a[3] = "football".getBytes("US-ASCII");
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
+        
+        final IRaba expected = new ReadOnlyKeysRaba(a);
        
         // front-code the list.
         final int ratio = 1;

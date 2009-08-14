@@ -29,12 +29,9 @@ package com.bigdata.btree.raba.codec;
 
 import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.Random;
 
 import junit.framework.TestCase2;
@@ -42,16 +39,19 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
-import com.bigdata.btree.raba.ReadOnlyRaba;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 
 /**
- * Abstract test suite for {@link IDataCoder} implementations.
+ * Abstract test suite for {@link IRabaCoder} implementations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
  * @todo performance tuning on stress test and on real data.
+ * 
+ * @todo also test for probe keys that are not found.
  */
 abstract public class AbstractDataCoderTestCase extends TestCase2 {
 
@@ -72,7 +72,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      * The fixture under test. This will be <code>null</code> unless you
      * explicitly set it in {@link #setUp()}.
      */
-    protected IDataCoder dataCoder = null;
+    protected IRabaCoder dataCoder = null;
 
     /**
      * @todo test decode w/ nulls and delete markers and verify this. deleted
@@ -103,9 +103,18 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         final byte[][] a = new byte[2][];
         a[0] = "mike".getBytes("US-ASCII");
         a[1] = "personick".getBytes("US-ASCII");
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
 
-        doRoundTripTest(dataCoder, expected);
+        if(dataCoder.isKeyCoder()) {
+
+            doRoundTripTest(dataCoder, new ReadOnlyKeysRaba(a));
+            
+        }
+
+        if(dataCoder.isValueCoder()) {
+
+            doRoundTripTest(dataCoder, new ReadOnlyValuesRaba(a));
+            
+        }
 
     }
 
@@ -119,11 +128,46 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
 
         a[0] = new byte[] { 64, -64 };
 
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
+        if (dataCoder.isKeyCoder()) {
 
-        doRoundTripTest(dataCoder, expected);
+            doRoundTripTest(dataCoder, new ReadOnlyKeysRaba(a));
+
+        }
+
+        if (dataCoder.isValueCoder()) {
+
+            doRoundTripTest(dataCoder, new ReadOnlyValuesRaba(a));
+
+        }
 
     }
+
+    /**
+     * Test with an empty byte[] element.
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    public void test_withEmptyElement() throws UnsupportedEncodingException {
+
+        final byte[][] a = new byte[3][];
+        a[0] = new byte[0];
+        a[1] = "mike".getBytes("US-ASCII");
+        a[2] = "personick".getBytes("US-ASCII");
+        
+        if (dataCoder.isKeyCoder()) {
+
+            doRoundTripTest(dataCoder, new ReadOnlyKeysRaba(a));
+
+        }
+
+        if (dataCoder.isValueCoder()) {
+
+            doRoundTripTest(dataCoder, new ReadOnlyValuesRaba(a));
+
+        }
+
+    }
+
 
     /**
      * Test with a null value.
@@ -132,7 +176,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      */
     public void test_withNulls() throws UnsupportedEncodingException {
 
-        if (!dataCoder.isNullAllowed()) {
+        if (!dataCoder.isValueCoder()) {
 
             // coded does not allow nulls.
             return;
@@ -144,7 +188,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         a[1] = "personick".getBytes("US-ASCII");
         a[2] = null;
         
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
+        final IRaba expected = new ReadOnlyValuesRaba(a);
 
         doRoundTripTest(dataCoder, expected);
 
@@ -156,13 +200,13 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      * FIXME Due to a bug in the {@link CanonicalFast64CodeWordDecoder} ctor
      * there is a problem handling a logical byte[][] consisting solely of
      * <code>null</code>s. We handle this for the case of an empty logical
-     * byte[][] using an {@link EmptyRabaDecoder}. I suppose that could be
+     * byte[][] using an {@link EmptyRabaValueDecoder}. I suppose that could be
      * parameterized to identify the <code>null</code>s or else just fix the
      * ctor.
      */
     public void test_withNulls2() {
         
-        if (!dataCoder.isNullAllowed()) {
+        if (!dataCoder.isValueCoder()) {
 
             // coded does not allow nulls.
             return;
@@ -173,7 +217,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
 
         a[0] = null;
         
-        final IRandomAccessByteArray expected = new ReadOnlyRaba(a);
+        final IRaba expected = new ReadOnlyValuesRaba(a);
 
         doRoundTripTest(dataCoder, expected);
 
@@ -301,6 +345,11 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
 
     }
     
+    /**
+     * Test using a sequence of random URIs (formed with successive prefixes).
+     * 
+     * @throws Exception
+     */
     public void test_randomURIs() throws Exception {
         
         // generate 100 random URIs
@@ -309,20 +358,38 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         
         final String ns = "http://www.bigdata.com/rdf#";
         
+        long lastCounter = r.nextInt();
+        
         for (int i = 0; i < 100; i++) {
             
-            data[i] = makeKey(ns + String.valueOf(r.nextInt())); 
+            data[i] = makeKey(ns + String.valueOf(lastCounter)); 
                 
+            lastCounter = lastCounter + r.nextInt(100) + 1;
+            
         }
         
-        // put into sorted order.
-        Arrays.sort(data, 0, data.length, UnsignedByteArrayComparator.INSTANCE);
-        
-        // layer on interface.
-        final IRandomAccessByteArray raba = new ReadOnlyRaba(0/* fromIndex */,
-                data.length/* toIndex */, data.length/* capacity */, data);
+//        // put into sorted order.
+//        Arrays.sort(data, 0, data.length, UnsignedByteArrayComparator.INSTANCE);
 
-        doRoundTripTest(dataCoder, raba);
+        if (dataCoder.isValueCoder()) {
+
+            // layer on interface.
+            final IRaba raba = new ReadOnlyValuesRaba(0/* fromIndex */,
+                    data.length/* toIndex */, data.length/* capacity */, data);
+
+            doRoundTripTest(dataCoder, raba);
+
+        }
+
+        if (dataCoder.isKeyCoder()) {
+
+            // layer on interface.
+            final IRaba raba = new ReadOnlyKeysRaba(0/* fromIndex */,
+                    data.length/* toIndex */, data.length/* capacity */, data);
+
+            doRoundTripTest(dataCoder, raba);
+
+        }
         
     }
 
@@ -343,48 +410,114 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      *            The capacity of the byte[][].
      * @throws IOException
      */
-    protected void doRandomRoundTripTest(final IDataCoder dataCoder,
+    protected void doRandomRoundTripTest(final IRabaCoder dataCoder,
             final int size, final int capacity) throws IOException {
 
         assert capacity >= size;
 
-        final byte[][] data = new byte[capacity][];
+        if (dataCoder.isValueCoder()) {
 
-        for (int i = 0; i < size; i++) {
+            /*
+             * Note: random values are not ordered and may contain nulls.
+             */
+ 
+            final byte[][] data = new byte[capacity][];
 
-            final int len = r.nextInt(512);
+            for (int i = 0; i < size; i++) {
 
-            final byte[] a = new byte[len];
+                final boolean isNull = r.nextFloat()<.03;
+                
+                if(isNull) {
+                    
+                    data[i] = null;
 
-            r.nextBytes(a);
+                } else {
+
+                    final int len = r.nextInt(512);
+
+                    final byte[] a = new byte[len];
+
+                    r.nextBytes(a);
+
+                    data[i] = a;
+
+                }
+
+            }
+
+            // layer on interface.
+            final IRaba raba = new ReadOnlyValuesRaba(0/* fromIndex */,
+                    size/* toIndex */, capacity, data);
+
+            doRoundTripTest(dataCoder, raba);
             
-            data[i] = a;
+        }
+
+        if (dataCoder.isKeyCoder()) {
+
+            /*
+             * Note: B+Tree keys based on random values. The keys must be
+             * ordered, may not contain duplicates, and may not contain nulls.
+             */
+ 
+            final byte[][] data = new byte[capacity][];
+
+            /*
+             * The nominal maximum possible increment between successive keys.
+             * The actual increment will be a random number in [1:nominal].
+             */
+            final int nominalIncRange = 5000;
+            
+            // any integer value.
+            long lastKey = r.nextLong();
+
+            // The #of keys that we actually generated.
+            int nactual = 0;
+
+            for (int i = 0; i < size; i++, nactual++) {
+
+                data[i] = KeyBuilder.asSortKey(lastKey);
+
+                final long remainder = Long.MAX_VALUE - lastKey;
+
+                if (remainder == 1) {
+
+                    // out of room in the long value space.
+                    break;
+
+                }
+
+                final int incRange = (int) Math.max(nominalIncRange, Math
+                        .min(nominalIncRange, remainder));
+                
+                // increment is always at least by one to avoid duplicate keys.
+                final int inc = r.nextInt(incRange) + 1;
+
+                lastKey += inc;
+
+            }
+
+            // layer on interface.
+            final IRaba raba = new ReadOnlyKeysRaba(0/* fromIndex */,
+                    nactual/* toIndex */, capacity, data);
+
+            doRoundTripTest(dataCoder, raba);
 
         }
 
-        // put into sorted order.
-        Arrays.sort(data, 0, size, UnsignedByteArrayComparator.INSTANCE);
-
-        // layer on interface.
-        final IRandomAccessByteArray raba = new ReadOnlyRaba(0/* fromIndex */,
-                size/* toIndex */, capacity, data);
-
-        doRoundTripTest(dataCoder, raba);
-
     }
 
-    public void doRoundTripTest(final IDataCoder dataCoder,
-            final IRandomAccessByteArray expected) {
+    public void doRoundTripTest(final IRabaCoder dataCoder, final IRaba expected) {
 
         // encode the logical byte[][].
         final IRabaDecoder actual0 = dataCoder.encode(expected);
-        
+
         // Verify encode() results in object which can decode the byte[]s.
         AbstractBTreeTestCase.assertSameRaba(expected, actual0);
 
         // Verify decode when we build the decoder from the serialized format.
-        AbstractBTreeTestCase.assertSameRaba(expected, dataCoder.decode(
-                expected.size(), actual0.data()));
+        AbstractBTreeTestCase.assertSameRaba(expected, dataCoder.decode(actual0
+                .data()));
 
     }
 

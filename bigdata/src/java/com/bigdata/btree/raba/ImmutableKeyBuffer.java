@@ -134,14 +134,11 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
         
     }
 
-    final public boolean isNullAllowed() {
+    /**
+     * Instances are searchable and do not allow <code>null</code>s.
+     */
+    final public boolean isKeys() {
 
-        return false;
-        
-    }
-
-    final public boolean isSearchable() {
-        
         return true;
         
     }
@@ -149,7 +146,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
     /**
      * Creates an immutable key buffer from a mutable one.
      */
-    public ImmutableKeyBuffer(MutableKeyBuffer kbuf) {
+    public ImmutableKeyBuffer(final MutableKeyBuffer kbuf) {
         
         this(kbuf.nkeys, kbuf.keys.length, kbuf.keys);
         
@@ -747,7 +744,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
 
         public final transient static SimplePrefixSerializer INSTANCE = new SimplePrefixSerializer();
 
-        public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+        public void read(DataInput in, IRaba raba) throws IOException {
             
             // #of keys in the node or leaf.
             final int nkeys = (int) LongPacker.unpackLong(in);
@@ -814,7 +811,7 @@ public class ImmutableKeyBuffer extends AbstractKeyBuffer {
             
         }
 
-        public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
+        public void write(DataOutput out, IRaba raba) throws IOException {
 
             final int nkeys = raba.size();
                 

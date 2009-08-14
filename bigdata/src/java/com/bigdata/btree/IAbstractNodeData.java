@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Interface for low-level data access.
@@ -77,6 +77,6 @@ public interface IAbstractNodeData {
     /**
      * The object used to contain and manage the keys.
      */
-    public IRandomAccessByteArray getKeys();
+    public IRaba getKeys();
 
 }

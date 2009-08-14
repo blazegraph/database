@@ -40,9 +40,10 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
-import com.bigdata.btree.raba.ReadOnlyRaba;
+import com.bigdata.btree.raba.MutableValueBuffer;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.TemporaryRawStore;
@@ -2071,7 +2072,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final int m;
 
         // mutable.
-        IKeyBuffer keys;
+        IRaba keys;
 
         /**
          * We precompute the #of children to be assigned to each node and the
@@ -2106,7 +2107,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        final public IKeyBuffer getKeys() {
+        final public IRaba getKeys() {
 
             return keys;
             
@@ -2149,15 +2150,18 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 //         * The ordinal position of this leaf in the {@link IndexSegment}.
 //         */
 //        int leafIndex;
-        
+
         /**
          * The values stored in the leaf.
+         * 
+         * @todo use {@link MutableValueBuffer} instead so {@link #getValues()}
+         *       does not need to wrap the byte[][].
          */
         final byte[][] vals;
         
-        final public IRandomAccessByteArray getValues() {
+        final public IRaba getValues() {
             
-            return new ReadOnlyRaba(vals);
+            return new ReadOnlyValuesRaba(vals);
             
         }
         
@@ -2439,8 +2443,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         }
 
         public ILeafData allocLeaf(AbstractBTree btree, long addr,
-                int branchingFactor, IRandomAccessByteArray keys,
-                IRandomAccessByteArray values, long[] versionTimestamps,
+                int branchingFactor, IRaba keys,
+                IRaba values, long[] versionTimestamps,
                 boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
             throw new UnsupportedOperationException();
@@ -2448,7 +2452,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         }
 
         public INodeData allocNode(AbstractBTree btree, long addr,
-                int branchingFactor, int nentries, IRandomAccessByteArray keys,
+                int branchingFactor, int nentries, IRaba keys,
                 long[] childAddr, int[] childEntryCount) {
 
             throw new UnsupportedOperationException();

@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ImmutableKeyBuffer;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 
@@ -75,10 +75,10 @@ import com.bigdata.btree.raba.MutableKeyBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @deprecated by any {@link IRandomAccessByteArray} instance which is
+ * @deprecated by any {@link IRaba} instance which is
  *             searchable and does not allow <code>null</code>s.
  */
-public interface IKeyBuffer extends IRandomAccessByteArray {
+public interface IKeyBuffer extends IRaba {
     
     /**
      * A human readable representation of the keys.

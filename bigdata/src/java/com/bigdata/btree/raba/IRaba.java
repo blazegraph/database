@@ -32,14 +32,19 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
 
+import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.io.ByteArrayBuffer;
 
 /**
  * Interface for random access to a logical byte[][]s. This is primarily used
- * for B+Tree keys and values. There are optional operations for mutation. If
- * mutation is supported, then {@link #isReadOnly()} will return
+ * for B+Tree keys and values, but is also used when serializing keys and values
+ * for {@link IIndexProcedure}s. The interface defines optional operations for
+ * mutation. If mutation is supported, then {@link #isReadOnly()} will return
  * <code>false</code>. Support for storing <code>null</code>s and search are
- * also optional as described below.
+ * mutually exclusive. Searchable {@link IRaba}s are always interpreted as
+ * <code>unsigned byte[]</code>s and are used for B+Tree <em>keys</em>.
+ * Non-searchable {@link IRaba}s allow <code>null</code>s, are interpreted as
+ * <code>signed byte[]</code>, and are used for B+Tree <em>values</em>.
  * 
  * <h3>B+Tree keys</h3>
  * 
@@ -59,31 +64,47 @@ import com.bigdata.io.ByteArrayBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRandomAccessByteArray extends Iterable<byte[]> {
+public interface IRaba extends Iterable<byte[]> {
 
     /**
      * Return <code>true</code> if this implementation is read-only.
      */
     public boolean isReadOnly();
 
-    /**
-     * Return <code>true</code> if the implementation supports the optional
-     * {@link #search(byte[])} method. In order for search to function
-     * correctly, the application MUST ensure that the byte[] values are
-     * maintained in an <code>unsigned byte[]</code> order and that duplicate
-     * <code>byte[]</code>s are not stored. Such implementation are used to
-     * store the keys of a B+Tree index node.
-     */
-    boolean isSearchable();
+    // /**
+    // * Return <code>true</code> if the implementation supports the optional
+    // * {@link #search(byte[])} method. In order for search to function
+    // * correctly, the application MUST ensure that the byte[] values are
+    // * maintained in an <code>unsigned byte[]</code> order and that duplicate
+    // * <code>byte[]</code>s are not stored. Such implementation are used to
+    // * store the keys of a B+Tree index node.
+    // */
+    // boolean isSearchable();
+    //
+    // /**
+    // * Return <code>true</code> if the implementation allows <code>null</code>
+    // * <code>byte[]</code> values to be stored. Implementations used for the
+    // * keys of a B+Tree index node DO NOT allow <code>null</code>s. However,
+    // * implementations used to store the values of a B+Tree leaf MUST allow
+    // * <code>null</code>s.
+    // */
+    // boolean isNullAllowed();
 
     /**
-     * Return <code>true</code> if the implementation allows <code>null</code>
-     * <code>byte[]</code> values to be stored. Implementations used for the
-     * keys of a B+Tree index node DO NOT allow <code>null</code>s. However,
-     * implementations used to store the values of a B+Tree leaf MUST allow
-     * <code>null</code>s.
+     * When <code>true</code> the {@link IRaba} supports search and elements are
+     * interpreted as <code>unsigned byte[]</code>s (B+Tree keys). For this case
+     * the application MUST ensure that the elements are maintained in
+     * <code>unsigned byte[]</code> order and that duplicates byte[]s are not
+     * stored.
+     * <p>
+     * When <code>false</code>, the {@link IRaba} allows <code>null</code>s and
+     * the elements are interpreted as <code>signed byte[]</code> (B+Tree
+     * values).
+     * 
+     * @return <code>true</code> if the {@link IRaba} represents B+Tree keys and
+     *         <code>false</code> if it represents B+Tree values.
      */
-    boolean isNullAllowed();
+    boolean isKeys();
 
     /**
      * The capacity of the logical byte[][].
@@ -171,11 +192,10 @@ public interface IRandomAccessByteArray extends Iterable<byte[]> {
      * that element.
      */
     public Iterator<byte[]> iterator();
-    
+
     /*
      * Mutation operations (optional).
      */
-    
 
     /**
      * Set the byte[] value at the specified index (optional operation).
@@ -192,7 +212,8 @@ public interface IRandomAccessByteArray extends Iterable<byte[]> {
     public void set(int index, byte[] a);
 
     /**
-     * Append a byte[] value to the end of the logical byte[][] (optional operation).
+     * Append a byte[] value to the end of the logical byte[][] (optional
+     * operation).
      * 
      * @param a
      *            A value.
@@ -206,7 +227,8 @@ public interface IRandomAccessByteArray extends Iterable<byte[]> {
     public int add(byte[] a);
 
     /**
-     * Append a byte[] value to the end of the logical byte[][] (optional operation).
+     * Append a byte[] value to the end of the logical byte[][] (optional
+     * operation).
      * 
      * @param value
      *            A value
@@ -223,7 +245,8 @@ public interface IRandomAccessByteArray extends Iterable<byte[]> {
     public int add(byte[] value, int off, int len);
 
     /**
-     * Append a byte[] value to the end of the logical byte[][] (optional operation).
+     * Append a byte[] value to the end of the logical byte[][] (optional
+     * operation).
      * 
      * @param in
      *            The input stream from which the byte[] will be read.
@@ -243,7 +266,7 @@ public interface IRandomAccessByteArray extends Iterable<byte[]> {
     /*
      * Search (optional).
      */
-    
+
     /**
      * Search for the given <i>searchKey</i> in the key buffer (optional
      * operation). Whether or not search is supported depends on whether the

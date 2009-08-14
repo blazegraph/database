@@ -117,7 +117,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * @param src
      *            The source data.
      */
-    public MutableKeyBuffer(final IRandomAccessByteArray src) {
+    public MutableKeyBuffer(final IRaba src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -233,19 +233,10 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     }
     
     /**
-     * <code>null</code>s are not allowed.
+     * Instances are searchable and do not allow <code>null</code>s.
      */
-    final public boolean isNullAllowed() {
+    final public boolean isKeys() {
 
-        return false;
-        
-    }
-
-    /**
-     * Searchable.
-     */
-    final public boolean isSearchable() {
-        
         return true;
         
     }

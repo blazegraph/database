@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.nio.ByteBuffer;
 import java.util.Comparator;
 
 import org.apache.log4j.Logger;
@@ -228,6 +229,35 @@ public class BytesUtil {
             // promotes to signed integers in [0:255] for comparison.
             int ret = (a[i] & 0xff) - (b[i] & 0xff);
             //                int ret = a[i] - b[i];
+            if (ret != 0)
+                return ret;
+        }
+        return alen - blen;
+    }
+
+    /**
+     * Byte-wise comparison of a {@link ByteBuffer} and a byte[]. The data are
+     * treated as arrays of unsigned bytes. The {@link ByteBuffer} position,
+     * limit and mark are unchanged by this procedure.
+     * 
+     * @param a
+     *            A {@link ByteBuffer}.
+     * @param aoff
+     *            The offset of the starting byte in the buffer.
+     * @param blen
+     *            The number of bytes to be compared.
+     * @param b
+     *            A byte[].
+     * 
+     * @return a negative integer, zero, or a positive integer if the first
+     *         argument is less than, equal to, or greater than the second.
+     */
+    final public static int compareBytes(final ByteBuffer a, final int aoff,
+            final int alen, final byte[] b) {
+        final int blen = b.length;
+        for (int i = 0; i < alen && i < blen; i++) {
+            // promotes to signed integers in [0:255] for comparison.
+            final int ret = (a.get(aoff + i) & 0xff) - (b[i] & 0xff);
             if (ret != 0)
                 return ret;
         }
@@ -635,19 +665,22 @@ public class BytesUtil {
 
             final byte[] midVal = keys[offset];
 
-            int tmp = BytesUtil.compareBytes(midVal, key);
+            // compare actual vs probe
+            final int tmp = BytesUtil.compareBytes(midVal, key);
 
             if (tmp < 0) {
 
+                // Actual LT probe, restrict lower bound and try again.
                 low = mid + 1;
 
             } else if (tmp > 0) {
 
+                // Actual GT probe, restrict upper bound and try again.
                 high = mid - 1;
 
             } else {
 
-                // Found: return offset.
+                // Actual EQ probe. Found : return offset.
 
                 return offset;
 
@@ -729,5 +762,114 @@ public class BytesUtil {
         System.err.println("JNI library routines Ok.");
         
     }
-    
+
+    /**
+     * Return the #of bytes required to bit code the specified #of bits.
+     * 
+     * @param nbits
+     *            The #of bit flags.
+     * 
+     * @return The #of bytes required. This will be zero iff <i>nbits</i> is
+     *         zero.
+     */
+    final public static int bitFlagByteLength(final int nbits) {
+
+        return nbits / 8 + (nbits % 8 == 0 ? 0 : 1);
+        
+//        return nbits>>>3;
+        
+//        if (nbits == 0)
+//            return 0;
+//        
+//        return ((int) ((nbits / 8) + 1));
+        
+    }
+    /**
+     * Return the index of the byte in which the bit with the given index is
+     * encoded.
+     * 
+     * @param bitIndex
+     *            The bit index.
+     *            
+     * @return The byte index.
+     */
+    final public static int byteIndexForBit(final int bitIndex) {
+        
+        return ((int) (bitIndex / 8));
+        
+    }
+    /**
+     * Return the offset within the byte in which the bit is coded of the bit
+     * (this is just the remainder <code>bitIndex % 8</code>).
+     * 
+     * @param bitIndex
+     *            The bit index into the byte[].
+     * 
+     * @return The offset of the bit in the appropriate byte.
+     */
+    final public static int withinByteIndexForBit(final int bitIndex) {
+        
+        return bitIndex % 8;
+        
+    }
+
+    /**
+     * Get the value of a bit.
+     * 
+     * @param byteOffset
+     *            The offset in the buffer of the start of the byte[] sequence
+     *            in which the bit coded flags are stored.
+     * @param bitIndex
+     *            The index of the bit.
+     * 
+     * @return The value of the bit.
+     */
+    final public static boolean getBit(final ByteBuffer buf, final int byteOffset,
+            final int bitIndex) {
+
+        final int mask = (1 << withinByteIndexForBit(bitIndex));
+
+        final int off = byteOffset + byteIndexForBit(bitIndex);
+
+        final byte b = buf.get(off);
+
+        return (b & mask) != 0;
+
+    }
+
+    /**
+     * Set the value of a bit - this is NOT thread-safe (contention for the byte
+     * in the backing buffer can cause lost updates).
+     * 
+     * @param byteOffset
+     *            The offset in the buffer of the start of the byte[] sequence
+     *            in which the bit coded flags are stored.
+     * @param bitIndex
+     *            The index of the bit.
+     * 
+     * @return The old value of the bit.
+     */
+    final public static boolean setBit(final ByteBuffer buf, final int byteOffset,
+            final int bitIndex, final boolean value) {
+
+        final int mask = (1 << withinByteIndexForBit(bitIndex));
+
+        final int off = byteOffset + byteIndexForBit(bitIndex);
+
+        // current byte at that index.
+        byte b = buf.get(off);
+
+        final boolean oldValue = (b & mask) != 0;
+
+        if (value)
+            b |= mask;
+        else
+            b &= ~mask;
+
+        buf.put(off, b);
+        
+        return oldValue;
+
+    }
+
 }

@@ -30,7 +30,6 @@ package com.bigdata.btree.raba.codec;
 import it.unimi.dsi.bits.BitVector;
 import it.unimi.dsi.bits.Fast;
 import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
-import it.unimi.dsi.compression.Coder;
 import it.unimi.dsi.compression.Decoder;
 import it.unimi.dsi.compression.HuffmanCodec;
 import it.unimi.dsi.compression.PrefixCoder;
@@ -52,7 +51,8 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.AbstractRaba;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * This class provices (de-)compression for logical byte[][]s based on canonical
@@ -68,6 +68,15 @@ import com.bigdata.btree.raba.IRandomAccessByteArray;
  * <pre>
  * version:uint6    The version identifier for this record format (6 bits,
  *                  which allows for 64 format revisions).
+ * 
+ * size:int31       The #of elements in the logical byte[][].
+ * 
+ * isKeys:1         Bit flag indicates whether the record is coding B+Tree keys
+ *                  or B+Tree values.  When coding values only the non-zero
+ *                  byte frequency counts are used to compute the dictionary
+ *                  and nulls are permitted.  When coding keys, the dictionary
+ *                  includes codes for all 256 possible byte values so we may
+ *                  code search keys and nulls are not permitted.
  * 
  * bitCodedSymbols:1
  *                  A bit flag whose value is 1 iff the symbols are given as
@@ -222,7 +231,7 @@ import com.bigdata.btree.raba.IRandomAccessByteArray;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class CanonicalHuffmanDataCoder implements IDataCoder {
+public class CanonicalHuffmanDataCoder implements IRabaCoder {
 
     /**
      * If there are GT this many symbols then we write a bit coded symbol table,
@@ -240,7 +249,7 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
      *       index IS the byte value and NOT encode the symbol table into the
      *       record.
      * 
-     * @todo make this a parameter to {@link #encode(IRandomAccessByteArray)}
+     * @todo make this a parameter to {@link #encode(IRaba)}
      */
     final static int PACKED_SYMBOL_TABLE_THRESHOLD = 256; // @todo 32.
 
@@ -252,18 +261,23 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
     protected static final Logger log = Logger
             .getLogger(CanonicalHuffmanDataCoder.class);
 
-    public boolean isNullAllowed() {
+    /**
+     * FIXME When the {@link IRaba#isKeys()} then code with the unpacked
+     * frequency[], do not allow nulls, and support search. Otherwise code with
+     * only the packed frequency[], allow nulls, and do not support search.
+     */
+    final public boolean isKeyCoder() {
+
+        return false;
+
+    }
+
+    final public boolean isValueCoder() {
 
         return true;
 
     }
 
-    /**
-     * FIXME parameterize for implementations which allow <code>null</code>s, do
-     * code only the byte values used in the data, does not support coding of
-     * the caller's byte[]s and DOES NOT support search vs implementations which
-     * support search and code all byte values.
-     */
     public CanonicalHuffmanDataCoder() {
 
     }
@@ -397,7 +411,7 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
      *             effort.
      */
     protected long getSumCodedValueBitLengths(final BitVector[] codeWords,
-            final IRandomAccessByteArray raba, final Byte2Symbol byte2symbol) {
+            final IRaba raba, final Byte2Symbol byte2symbol) {
 
         final int nvalues = raba.size();
 
@@ -452,7 +466,7 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
     // @todo verify Ok to pass coder in here rather than codeWord[].
     protected long writeCodedValues(final PrefixCoder coder,
             // final BitVector[] codeWords,
-            final IRandomAccessByteArray raba, final Byte2Symbol byte2symbol,
+            final IRaba raba, final Byte2Symbol byte2symbol,
             final long[] codedValueOffset, final OutputBitStream obs)
             throws IOException {
 
@@ -577,7 +591,7 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
 
         abstract public BitVector[] codeWords();
 
-        abstract Coder coder();
+        abstract PrefixCoder coder();
 
         /**
          * Format the code book as a multi-line string.
@@ -716,7 +730,7 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
          * @return An 256 element array giving the frequency of each byte value.
          *         Values not observed will have a zero frequency count.
          */
-        protected int[] getFrequencyCount(final IRandomAccessByteArray raba) {
+        protected int[] getFrequencyCount(final IRaba raba) {
 
             final int[] frequency = new int[Byte.MAX_VALUE - Byte.MIN_VALUE + 1];
 
@@ -917,7 +931,7 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
         //        
         // }
 
-        public PackedCodingSetup(final IRandomAccessByteArray raba) {
+        public PackedCodingSetup(final IRaba raba) {
 
             // The #of byte[] values to be coded.
             final int size = raba.size();
@@ -1166,6 +1180,12 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
      */
     private static class SearchCodingSetup extends AbstractCodingSetup {
 
+        public SearchCodingSetup(final IRaba raba) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+        
         @Override
         public int getSymbolCount() {
             // TODO Auto-generated method stub
@@ -1203,21 +1223,58 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
     }
 
     /**
-     * Encode the data.
+     * Setup for an empty {@link IRaba}.
      * 
-     * @param raba
-     *            The data.
-     * 
-     * @return The encoded data paired with the state and logic to decode the
-     *         data.
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
      */
-    public IRabaDecoder encode(final IRandomAccessByteArray raba) {
+    private static class EmptyRabaSetup extends AbstractCodingSetup {
 
-        if (raba.isEmpty())
-            return EmptyRabaDecoder.INSTANCE;
+        private final BitVector[] codeWords = new BitVector[0];
+        
+        public EmptyRabaSetup() {
+            
+        }
+        
+        @Override
+        public BitVector[] codeWords() {
+            return codeWords;
+        }
 
-        // @todo parameterize for distinct byte values vs all byte values.
-        final PackedCodingSetup setup = new PackedCodingSetup(raba);
+        @Override
+        PrefixCoder coder() {
+            return null;
+        }
+
+        @Override
+        public int getSymbolCount() {
+            return 0;
+        }
+
+        public int byte2symbol(byte b) {
+            throw new UnsupportedOperationException();
+        }
+
+        public byte symbol2byte(int symbol) {
+            throw new UnsupportedOperationException();
+        }
+
+    }
+
+    public IRabaDecoder encode(final IRaba raba) {
+
+        final AbstractCodingSetup setup;
+        
+        if (raba.isEmpty()) {
+            setup = new EmptyRabaSetup();
+        } else {
+            if (raba.isKeys()) {
+                setup = new SearchCodingSetup(raba);
+            } else {
+                setup = new PackedCodingSetup(raba);
+            }
+        }
 
         // The #of byte[] values to be coded.
         final int nvalues = raba.size();
@@ -1366,6 +1423,14 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
             // The record version identifier.
             obs.writeInt(version, 6/* nbits */);
 
+            // The #of elements in the logical byte[][].
+            obs.writeInt(nvalues, 31);
+            
+            // Indicates if we are coding keys vs values.
+            obs.writeBit(raba.isKeys());
+
+            if(nvalues>0) {
+            
             // Write out the #of symbols and the symbol table.
             final boolean bitCodedSymbols = writeSymbolTable(
                     setup/* Symbol2Byte */, obs);
@@ -1380,11 +1445,10 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
             // #of bits per element in the codedValueOffset[] : @todo iff
             // nvalues>16
             // and SEQUENTIAL flag was not specified by called.
+            //
+            // FIXME why plus 1?!?
             final int codedValueOffsetBits = Fast
-                    .mostSignificantBit(sumCodedValueBitLengths) + 1; // FIXME
-            // why
-            // plus
-            // 1?!?
+                    .mostSignificantBit(sumCodedValueBitLengths) + 1;
 
             final long O_bitLengthBits = obs.writtenBits();
             assert O_bitLengthBits == (bitCodedSymbols ? (2 + 32L)
@@ -1442,6 +1506,8 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
                 O_codedValueOffsets = 0L;
             }
 
+            }
+            
             // done writing (will byte align the OBS).
             obs.flush();
 
@@ -1449,7 +1515,7 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
             baos.trim();
 
             // done.
-            return new HuffmanRabaDecoder(nvalues, ByteBuffer.wrap(baos.array)
+            return new HuffmanRabaDecoder(ByteBuffer.wrap(baos.array)
             // ,
             // codec.decoder()
             );
@@ -1462,21 +1528,9 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
 
     }
 
-    /**
-     * 
-     * @param size
-     *            The #of coded values.
-     * @param data
-     *            The record containing the coded data.
-     * 
-     * @return The decoder.
-     */
-    public IRabaDecoder decode(final int size, final ByteBuffer data) {
+    public IRabaDecoder decode(final ByteBuffer data) {
 
-        if (size == 0)
-            return EmptyRabaDecoder.INSTANCE;
-
-        return new HuffmanRabaDecoder(size, data);
+        return new HuffmanRabaDecoder(data);
 
     }
 
@@ -1497,6 +1551,11 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
          */
         private final int size;
 
+        /**
+         * If the logical byte[][] contains B+Tree keys vs B+Tree values.
+         */
+        private final boolean isKeys;
+        
         private final ByteBuffer data;
 
         private final Decoder decoder;
@@ -1530,21 +1589,17 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
 
         /**
          * 
-         * @param size
-         *            The #of entries in the coded logical byte[][].
          * @param data
          *            The record containing the coded data.
          */
-        public HuffmanRabaDecoder(final int size, final ByteBuffer data) {
+        public HuffmanRabaDecoder(final ByteBuffer data) {
 
-            this(size, data, null/* decoder */);
+            this(data, null/* decoder */);
 
         }
 
         /**
          * 
-         * @param size
-         *            The #of entries in the coded logical byte[][].
          * @param data
          *            The record containing the coded data.
          * @param decoder
@@ -1555,17 +1610,14 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
          *       right now due to API problems with the underlying
          *       {@link HuffmanCodec}.
          */
-        public HuffmanRabaDecoder(final int size, final ByteBuffer data,
+        public HuffmanRabaDecoder(final ByteBuffer data,
                 final Decoder decoder) {
 
             final boolean debug = log.isDebugEnabled() || true;
 
-            if (size < 0)
-                throw new IllegalArgumentException();
             if (data == null)
                 throw new IllegalArgumentException();
 
-            this.size = size;
             this.data = data;
 
             final StringBuilder sb = debug ? new StringBuilder() : null;
@@ -1578,6 +1630,14 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
                 }
                 if (debug)
                     sb.append("version=" + version + "\n");
+                
+                this.size = ibs.readInt(31/*nbits*/);
+                
+                if (size < 0)
+                    throw new RuntimeException();
+
+                isKeys = ibs.readBit() != 0;
+            
                 final boolean bitCodedSymbols = ibs.readBit() != 0;
                 if (debug)
                     sb.append("bitCodedSymbols=" + bitCodedSymbols + "\n");
@@ -1732,6 +1792,23 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
 
         }
 
+        /**
+         * @todo Canonical huffman codes support efficient search IFF (a) all
+         *       byte values can be coded (including those with a zero frequency
+         *       in the coded data) and (b) the codedValueOffset[] was included
+         *       in the record. If we can not code each byte value, then we need
+         *       to search against the decoded values. If the offset[] was not
+         *       stored, then we need to do a linear scan.
+         * 
+         * @todo search must be disabled if <code>null</code>s are allowed. That
+         *       should probably be a constraint realized by subclassing.
+         */
+        final public boolean isKeys() {
+
+            return isKeys;
+
+        }
+
         public ByteBuffer data() {
 
             return data;
@@ -1784,15 +1861,6 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
         // throw new UnsupportedOperationException();
         //
         // }
-
-        /**
-         * <code>null</code>s are allowed.
-         */
-        public boolean isNullAllowed() {
-
-            return true;
-
-        }
 
         public boolean isNull(final int index) {
 
@@ -2199,24 +2267,11 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
          */
         public int search(final byte[] probe) {
 
+            if(!isKeys())
+                throw new UnsupportedOperationException();
+
+            // Search is not implemented yet.
             throw new UnsupportedOperationException();
-
-        }
-
-        /**
-         * @todo Canonical huffman codes support efficient search IFF (a) all
-         *       byte values can be coded (including those with a zero frequency
-         *       in the coded data) and (b) the codedValueOffset[] was included
-         *       in the record. If we can not code each byte value, then we need
-         *       to search against the decoded values. If the offset[] was not
-         *       stored, then we need to do a linear scan.
-         * 
-         * @todo search must be disabled if <code>null</code>s are allowed. That
-         *       should probably be a constraint realized by subclassing.
-         */
-        public boolean isSearchable() {
-
-            return true;
 
         }
 
@@ -2264,6 +2319,12 @@ public class CanonicalHuffmanDataCoder implements IDataCoder {
         //
         // private volatile PrefixCoder coder;
 
+        public String toString() {
+            
+            return AbstractRaba.toString(this);
+            
+        }
+        
     }
 
 }

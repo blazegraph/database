@@ -27,15 +27,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba.codec;
 
-import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
-
-import java.nio.ByteBuffer;
-
-import com.bigdata.btree.ILeafData;
-import com.bigdata.util.ByteBufferBitVector;
 
 /**
+ * Test suite for the {@link FrontCodedDataCoder}.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
  */
-public class HuffmanCodedValues {
+public class TestFrontCodedDataCoderRatio8 extends AbstractFrontCodedDataCoderTestCase {
+
+    /**
+     * 
+     */
+    public TestFrontCodedDataCoderRatio8() {
+    }
+
+    /**
+     * @param name
+     */
+    public TestFrontCodedDataCoderRatio8(String name) {
+        super(name);
+    }
+
+    protected void setUp() throws Exception {
+        
+        super.setUp();
+        
+        dataCoder = new FrontCodedDataCoder(8/* ratio */);
+        
+    }
 
 }
