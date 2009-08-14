@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.filter.EmptyTupleIterator;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ImmutableKeyBuffer;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.cache.HardReferenceQueue;
@@ -146,7 +146,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
      * @see IKeyBuffer#search(int searchKeyOffset, byte[] searchKey)
      */
-    protected IRandomAccessByteArray keys;
+    protected IRaba keys;
     
     /**
      * The parent of this node. This is null for the root node. The parent is
@@ -850,7 +850,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            The index position from which the key will be copied.
      */
     final protected void copyKey(final int dstpos,
-            final IRandomAccessByteArray srckeys, final int srcpos) {
+            final IRaba srckeys, final int srcpos) {
 
         assert dirty;
         
@@ -872,7 +872,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
     }
     
-    final public IRandomAccessByteArray getKeys() {
+    final public IRaba getKeys() {
         
         return keys;
         

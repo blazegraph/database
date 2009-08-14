@@ -41,7 +41,7 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.PrefixSerializer;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableRaba;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 
@@ -233,7 +233,7 @@ public class TestKeyCompression extends TestCase2 {
 
             final DataOutputStream os = new DataOutputStream(baos);
 
-            final IRandomAccessByteArray raba = new MutableRaba(keys);
+            final IRaba raba = new MutableRaba(keys);
 
             ser.write(os, raba);
 
@@ -253,7 +253,7 @@ public class TestKeyCompression extends TestCase2 {
         /*
          * De-compress the keys and compare to the keys generated above.
          */
-        final IRandomAccessByteArray raba2;
+        final IRaba raba2;
         {
             
             final ByteArrayInputStream bais = new ByteArrayInputStream(data);

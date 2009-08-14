@@ -13,7 +13,7 @@ import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Prefix compression.
@@ -52,7 +52,7 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
      * as much compression as possible and since access during decompression is
      * serial.
      */
-    public void write(final DataOutput out, final IRandomAccessByteArray raba)
+    public void write(final DataOutput out, final IRaba raba)
             throws IOException {
 
         /*
@@ -114,7 +114,7 @@ public class PrefixSerializer implements IDataSerializer, Externalizable {
 
     }
 
-    public void read(final DataInput in, final IRandomAccessByteArray raba)
+    public void read(final DataInput in, final IRaba raba)
             throws IOException {
 
         final int nkeys = in.readInt();

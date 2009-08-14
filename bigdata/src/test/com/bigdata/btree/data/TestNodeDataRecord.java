@@ -29,9 +29,9 @@ package com.bigdata.btree.data;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.INodeData;
-import com.bigdata.btree.raba.ReadOnlySearchRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.codec.FrontCodedDataCoder;
-import com.bigdata.btree.raba.codec.IDataCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Test suite for the B+Tree {@link INodeData} records (accessing coded data in
@@ -40,7 +40,7 @@ import com.bigdata.btree.raba.codec.IDataCoder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo test round trip for each {@link IDataCoder} implementation suitable for
+ * @todo test round trip for each {@link IRabaCoder} implementation suitable for
  *       the keys of a node.
  * 
  *       FIXME Lot's more tests of various {@link INodeData} states.
@@ -60,7 +60,7 @@ public class TestNodeDataRecord extends AbstractBTreeTestCase {
         super(name);
     }
 
-    protected IDataCoder keysCoder = null;
+    protected IRabaCoder keysCoder = null;
     
     protected void setUp() throws Exception {
         
@@ -86,7 +86,7 @@ public class TestNodeDataRecord extends AbstractBTreeTestCase {
         final long[] childAddr = new long[m + 1];
         final int[] childEntryCount = new int[m + 1];
 
-        final INodeData expected = new MockNodeData(new ReadOnlySearchRaba(
+        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(
                 nkeys, keys), spannedTupleCount, childAddr, childEntryCount);
 
         final INodeData actual = new ReadOnlyNodeData(expected, keysCoder);

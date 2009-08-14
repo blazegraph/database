@@ -17,7 +17,9 @@ import java.util.Iterator;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.compression.PrefixSerializer;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.AbstractRaba;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Class provides (de-)compression for logical byte[][]s based on front coding.
@@ -33,7 +35,7 @@ import com.bigdata.btree.raba.IRandomAccessByteArray;
  *       current includes the #of bytes in the front-coded representation as
  *       part of its record format.
  */
-public class FrontCodedDataCoder implements IDataCoder, Externalizable {
+public class FrontCodedDataCoder implements IRabaCoder, Externalizable {
 
     /**
      * 
@@ -79,7 +81,13 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
 
     }
 
-    public boolean isNullAllowed() {
+    final public boolean isKeyCoder() {
+
+        return true;
+
+    }
+
+    final public boolean isValueCoder() {
 
         return false;
 
@@ -98,9 +106,31 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
 
     }
 
-    public IRabaDecoder encode(final IRandomAccessByteArray raba) {
+    private static final byte VERSION0 = 0x00;
 
-        // final int size = raba.size();
+    private static final int SIZEOF_VERSION = Bytes.SIZEOF_BYTE;
+
+    private static final int SIZEOF_SIZE = Bytes.SIZEOF_INT;
+
+    private static final int SIZEOF_RATIO = Bytes.SIZEOF_INT;
+
+    private static final int O_VERSION = 0;
+
+    private static final int O_SIZE = O_VERSION + SIZEOF_VERSION;
+
+    private static final int O_RATIO = O_SIZE + SIZEOF_SIZE;
+
+    private static final int O_DATA = O_RATIO + SIZEOF_RATIO;
+    
+    public IRabaDecoder encode(final IRaba raba) {
+
+        if (raba == null)
+            throw new IllegalArgumentException();
+
+        if (!raba.isKeys())
+            throw new UnsupportedOperationException("Must be keys.");
+        
+        final int size = raba.size();
 
         if (log.isInfoEnabled())
             log.info("n=" + raba.size() + ", capacity=" + raba.capacity()
@@ -111,17 +141,24 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
 
             final DataOutputStream dos = new DataOutputStream(baos);
 
-            // // #of entries (zero length indicates NO data)
-            // dos.writeInt(size);
+            // The record version identifier.
+            dos.write(VERSION0);
 
-            // // the ratio used to front code the data.
-            // dos.writeInt(ratio);
+            // #of entries (zero length indicates NO data)
+            dos.writeInt(size);
 
-            // more than one key.
-            final CustomByteArrayFrontCodedList c = new CustomByteArrayFrontCodedList(
-                    raba.iterator(), ratio);
+//            if (size > 0) {
 
-            c.getBackingBuffer().writeOn(dos);
+                // The ratio used to front code the data.
+                dos.writeInt(ratio);
+
+                // more than one key.
+                final CustomByteArrayFrontCodedList c = new CustomByteArrayFrontCodedList(
+                        raba.iterator(), ratio);
+
+                c.getBackingBuffer().writeOn(dos);
+
+//            }
 
             dos.flush();
 
@@ -133,33 +170,13 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
 
         final byte[] a = baos.toByteArray();
 
-        // final int headerSize = Bytes.SIZEOF_INT * 1;
-
-        // final ByteBuffer view = ByteBuffer.wrap(a, headerSize, a.length
-        // - headerSize).slice();
-
-        return decode(raba.size(), ByteBuffer.wrap(a));
+        return decode(ByteBuffer.wrap(a));
 
     }
 
-    public IRabaDecoder decode(final int size, final ByteBuffer data) {
+    public IRabaDecoder decode(final ByteBuffer data) {
 
-        // // The first int32 value in the buffer is the ratio.
-        // final int ratio = data.getInt(0);
-
-        // /*
-        // * Setup the view using a copy to avoid side effects on the limit
-        // * and position of the callers buffer.
-        // */
-        // final ByteBuffer tmp = data.asReadOnlyBuffer();
-        // tmp.limit(data.capacity());
-        // tmp.position(Bytes.SIZEOF_INT); // skip ratio.
-        //            
-        // // Create the view.
-        // final ByteBuffer view = tmp.slice();
-
-        // Decode.
-        return new FrontCodedDecoder(size, ratio, data);
+        return new FrontCodedDecoder(data);
 
     }
 
@@ -178,17 +195,43 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
 
         /**
          * 
-         * @param size
-         *            The #of entries in the coded logical byte[][].
-         * @param ratio
-         *            The ratio used to front-code the data.
          * @param data
          *            The record containing the coded data.
          */
-        public FrontCodedDecoder(final int size, final int ratio,
-                final ByteBuffer data) {
+        public FrontCodedDecoder(final ByteBuffer data) {
 
-            this.decoder = new CustomByteArrayFrontCodedList(size, ratio, data);
+
+            final byte version = data.get(O_VERSION);
+
+            if (version != VERSION0) {
+
+                throw new RuntimeException("Unknown version: " + version);
+
+            }
+            
+            // The #of entries in the logical byte[][].
+            final int size = data.getInt(O_SIZE);
+
+//            if (size == 0) {
+//
+//                // Nothing else in the record.
+//                return new EmptyRabaKeyDecoder(data);
+//
+//            }
+            
+            // The ratio.
+            final int ratio = data.getInt(O_RATIO);
+
+            /*
+             * Setup the view using a copy to avoid side effects on the limit and
+             * position of the callers buffer.
+             */
+            final ByteBuffer tmp = data.asReadOnlyBuffer();
+            tmp.limit(data.capacity());
+            tmp.position(O_DATA);
+            final ByteBuffer view = tmp.slice();
+
+            this.decoder = new CustomByteArrayFrontCodedList(size, ratio, view);
 
             this.data = data;
 
@@ -219,20 +262,11 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
         }
 
         /**
-         * Search is supported.
+         * Represents B+Tree keys.
          */
-        public boolean isSearchable() {
+        final public boolean isKeys() {
 
             return true;
-
-        }
-
-        /**
-         * <code>null</code>s are not allowed.
-         */
-        final public boolean isNullAllowed() {
-
-            return false;
 
         }
 
@@ -314,7 +348,13 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
 
         public int search(final byte[] searchKey) {
 
-            return decoder.search(searchKey);
+            if(isKeys()) {
+            
+                return decoder.search(searchKey);
+                
+            }
+            
+            throw new UnsupportedOperationException();
 
         }
 
@@ -334,6 +374,12 @@ public class FrontCodedDataCoder implements IDataCoder, Externalizable {
             throw new UnsupportedOperationException();
         }
 
+        public String toString() {
+            
+            return AbstractRaba.toString(this);
+            
+        }
+        
     }
 
 }

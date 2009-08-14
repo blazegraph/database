@@ -30,8 +30,8 @@ package com.bigdata.btree.data;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.INodeData;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
-import com.bigdata.btree.raba.codec.IDataCoder;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.raba.codec.IRabaDecoder;
 import com.bigdata.rawstore.Bytes;
 
@@ -66,7 +66,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
      */
     private final int O_keys;
 
-    private final IRandomAccessByteArray keys;
+    private final IRaba keys;
 
     public final ByteBuffer buf() {
 
@@ -80,7 +80,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
      * @param b
      *            The buffer containing the data for the node.
      */
-    public ReadOnlyNodeData(final ByteBuffer b, final IDataCoder keysCoder) {
+    public ReadOnlyNodeData(final ByteBuffer b, final IRabaCoder keysCoder) {
 
         if (b == null)
             throw new IllegalArgumentException();
@@ -122,7 +122,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         O_keys = O_childEntryCount + (nkeys + 1) * SIZEOF_ENTRY_COUNT;
         b.position(O_keys);
         b.limit(b.position() + keysSize);
-        this.keys = keysCoder.decode(nkeys, b.slice());
+        this.keys = keysCoder.decode(b.slice());
         assert b.position() == O_keys + keysSize;
         
         // save reference to buffer
@@ -136,7 +136,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
      * @param data
      *            The data to be encoded.
      */
-    public ReadOnlyNodeData(final INodeData node, final IDataCoder keysCoder) {
+    public ReadOnlyNodeData(final INodeData node, final IRabaCoder keysCoder) {
 
         // cache some fields.
         this.nkeys = node.getKeyCount();
@@ -271,7 +271,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
 
     }
 
-    final public IRandomAccessByteArray getKeys() {
+    final public IRaba getKeys() {
 
         return keys;
         

@@ -28,13 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.raba;
 
 /**
- * Immutable implementation does not allow <code>null</code>s but supports
+ * Immutable implementation allows <code>null</code>s but does not support
  * search.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlySearchRaba extends AbstractRaba {
+public class ReadOnlyValuesRaba extends AbstractRaba {
 
     /**
      * This view is read-only.
@@ -46,23 +46,14 @@ public class ReadOnlySearchRaba extends AbstractRaba {
     }
 
     /**
-     * The view does not allow <code>null</code>s.
+     * For B+Tree values (allows <code>null</code>s, not searchable).
      */
-    public boolean isNullAllowed() {
-        
+    final public boolean isKeys() {
+    
         return false;
         
     }
-
-    /**
-     * The view supports search.
-     */
-    public boolean isSearchable() {
     
-        return true;
-        
-    }
-
     /**
      * Create a view of a byte[][]. All elements in the array are visible in the
      * view.
@@ -70,7 +61,7 @@ public class ReadOnlySearchRaba extends AbstractRaba {
      * @param a
      *            The backing byte[][].
      */
-    public ReadOnlySearchRaba(final byte[][] a) {
+    public ReadOnlyValuesRaba(final byte[][] a) {
 
         this(0/* fromIndex */, a.length/* toIndex */, a.length/* capacity */, a);
 
@@ -86,12 +77,12 @@ public class ReadOnlySearchRaba extends AbstractRaba {
      * @param a
      *            The backing byte[][].
      */
-    public ReadOnlySearchRaba(final int size, final byte[][] a) {
+    public ReadOnlyValuesRaba(final int size, final byte[][] a) {
 
         this(0/* fromIndex */, size/* toIndex */, a.length/* capacity */, a);
 
     }
-
+    
     /**
      * Create a view from a slice of a byte[][].
      * 
@@ -106,7 +97,7 @@ public class ReadOnlySearchRaba extends AbstractRaba {
      * @param a
      *            The backing byte[][].
      */
-    public ReadOnlySearchRaba(final int fromIndex, final int toIndex,
+    public ReadOnlyValuesRaba(final int fromIndex, final int toIndex,
             final int capacity, final byte[][] a) {
 
         super(fromIndex, toIndex, capacity, a);

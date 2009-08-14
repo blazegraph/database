@@ -9,7 +9,7 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 
 /**
@@ -53,7 +53,7 @@ public class WrapSerializer implements IDataSerializer, Externalizable {
         
     }
     
-    public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+    public void read(DataInput in, IRaba raba) throws IOException {
 
         // true if the small serializer was used
         if (in.readBoolean()) {
@@ -71,7 +71,7 @@ public class WrapSerializer implements IDataSerializer, Externalizable {
         }
     }
 
-    public void write(DataOutput out, IRandomAccessByteArray raba)
+    public void write(DataOutput out, IRaba raba)
             throws IOException {
         
         final int n = raba.size();

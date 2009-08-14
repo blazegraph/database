@@ -31,7 +31,7 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.io.Serializable;
 
-import com.bigdata.btree.raba.codec.IDataCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
@@ -54,7 +54,7 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @see NodeSerializer
  * 
- * @deprecated Along with {@link NodeSerializer} by the {@link IDataCoder}
+ * @deprecated Along with {@link NodeSerializer} by the {@link IRabaCoder}
  */
 public interface IAddressSerializer extends Serializable {
 

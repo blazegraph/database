@@ -127,67 +127,6 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
     abstract public ByteBuffer buf();
 
     /**
-     * Return the #of bytes required to bit code the specified #of bits.
-     * 
-     * @param nbits
-     *            The #of bit flags.
-     *            
-     * @return The #of bytes required.
-     */
-    final protected static int bitFlagByteLength(final int nbits) {
-        
-        return ((int) ((nbits / 8) + 1));
-        
-    }
-
-    /**
-     * Return the index of the byte in which the bit with the given index is
-     * encoded.
-     * 
-     * @param bitIndex
-     *            The bit index.
-     *            
-     * @return The byte index.
-     */
-    final protected static int byteIndexForBit(final int bitIndex) {
-        
-        return ((int) (bitIndex / 8));
-        
-    }
-
-    /**
-     * Return the offset within the byte in which the bit is coded of the bit
-     * (this is just the remainder <code>bitIndex % 8</code>).
-     * 
-     * @param bitIndex
-     *            The bit index into the byte[].
-     * 
-     * @return The offset of the bit in the appropriate byte.
-     */
-    final protected static int withinByteIndexForBit(final int bitIndex) {
-        
-        return bitIndex % 8;
-        
-    }
-
-    /**
-     * Extract and return a bit coded flag.
-     * 
-     * @param offset
-     *            The offset in the buffer of the start of the byte[] sequence
-     *            in which the bit coded flags are stored.
-     * @param bitIndex
-     *            The index of the bit.
-     * 
-     * @return The value of the bit.
-     */
-    final protected boolean getBit(final int offset, final int bitIndex) {
-        
-        return (buf().get(offset + byteIndexForBit(bitIndex)) & (1 << withinByteIndexForBit(bitIndex))) != 0;
-
-    }
-
-    /**
      * Core ctor. There are two basic use cases. One when you already have the
      * {@link ByteBuffer} with the encoded node or leaf data and one when you
      * have a mutable {@link Node} or {@link Leaf} and you want to persist it.

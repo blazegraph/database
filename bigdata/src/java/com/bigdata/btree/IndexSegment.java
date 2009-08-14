@@ -29,7 +29,7 @@ import java.util.Iterator;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
@@ -664,8 +664,8 @@ public class IndexSegment extends AbstractBTree {
         }
 
         public ILeafData allocLeaf(AbstractBTree btree, long addr,
-                int branchingFactor, IRandomAccessByteArray keys,
-                IRandomAccessByteArray values, long[] versionTimestamps,
+                int branchingFactor, IRaba keys,
+                IRaba values, long[] versionTimestamps,
                 boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
             return new ImmutableLeaf(btree, addr, branchingFactor, keys,
@@ -675,7 +675,7 @@ public class IndexSegment extends AbstractBTree {
         }
 
         public INodeData allocNode(AbstractBTree btree, long addr,
-                int branchingFactor, int nentries, IRandomAccessByteArray keys,
+                int branchingFactor, int nentries, IRaba keys,
                 long[] childAddr, int[] childEntryCount) {
 
             return new ImmutableNode(btree, addr, branchingFactor, nentries,
@@ -703,7 +703,7 @@ public class IndexSegment extends AbstractBTree {
              * @param childKeys
              */
             protected ImmutableNode(AbstractBTree btree, long addr,
-                    int branchingFactor, int nentries, IRandomAccessByteArray keys,
+                    int branchingFactor, int nentries, IRaba keys,
                     long[] childKeys, int[] childEntryCount) {
 
                 super(btree, addr, branchingFactor, nentries, keys, childKeys,
@@ -777,8 +777,8 @@ public class IndexSegment extends AbstractBTree {
              * @param values
              */
             protected ImmutableLeaf(AbstractBTree btree, long addr,
-                    int branchingFactor, IRandomAccessByteArray keys,
-                    IRandomAccessByteArray values, long[] versionTimestamps,
+                    int branchingFactor, IRaba keys,
+                    IRaba values, long[] versionTimestamps,
                     boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
                 super(btree, addr, branchingFactor, keys, values,

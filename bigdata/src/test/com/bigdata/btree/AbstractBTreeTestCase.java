@@ -46,7 +46,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
@@ -108,8 +108,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      *            The actual node.
      */
-    static public void assertKeys(final IRandomAccessByteArray expected,
-            final IRandomAccessByteArray actual) {
+    static public void assertKeys(final IRaba expected,
+            final IRaba actual) {
 
         assertSameRaba(expected, actual);
         
@@ -459,17 +459,19 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
     }
 
     /**
-     * Compares the data in two {@link IRandomAccessByteArray}s but not their
+     * Compares the data in two {@link IRaba}s but not their
      * <code>capacity</code> or things which depend on their capacity, such as
-     * {@link IRandomAccessByteArray#isFull()}. Also does not compare
-     * {@link IRandomAccessByteArray#isReadOnly()}, whether they are searchable
-     * and whether they allow <code>null</code>s.
+     * {@link IRaba#isFull()} and whether or not they are
+     * {@link IRaba#isReadOnly()}. If the expected {@link IRaba#isKeys()}, then
+     * both must represent keys and the search API will also be tested.
      * 
      * @param expected
      * @param actual
      */
-    static public void assertSameRaba(final IRandomAccessByteArray expected,
-            final IRandomAccessByteArray actual) {
+    static public void assertSameRaba(final IRaba expected,
+            final IRaba actual) {
+
+        assertEquals("isKeys", expected.isKeys(), actual.isKeys());
 
         assertEquals("isEmpty", expected.isEmpty(), actual.isEmpty());
 
@@ -478,7 +480,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         // test using random access.
         for (int i = 0; i < expected.size(); i++) {
 
-            assertEquals("isNull", expected.isNull(i), actual.isNull(i));
+            assertEquals("isNull(" + i + ")", expected.isNull(i), actual
+                    .isNull(i));
 
             if (!expected.isNull(i)) {
 
@@ -540,6 +543,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         // test using iterator access.
         {
+            
             final Iterator<byte[]> eitr = expected.iterator();
             final Iterator<byte[]> aitr = actual.iterator();
             int i = 0;
@@ -555,6 +559,35 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             }
             
             assertFalse("hasNext", aitr.hasNext());
+            
+        }
+
+        // test search API?
+        if (expected.isKeys()) {
+
+//            final int[] order = getRandomOrder(expected.size());
+
+            for (int i = 0; i < expected.size(); i++) {
+
+//                final int index = order[i];
+                final int expectedIndex = i;
+                
+                final byte[] key = expected.get(expectedIndex);
+
+                final int actualIndex = actual.search(key);
+
+                if (actualIndex != expectedIndex) {
+
+                    fail("search(" + BytesUtil.toString(key) + ")"+//
+                            ": expectedIndex=" + expectedIndex+ //
+                            ", actualIndex=" + actualIndex + //
+                            ",\nexpected=" + expected + //
+                            ",\nactual=" + actual//
+                            );
+
+                }
+
+            }
             
         }
 

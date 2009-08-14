@@ -13,7 +13,7 @@ import java.io.ObjectOutput;
 import java.io.OutputStream;
 
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -53,7 +53,7 @@ public class FastRDFValueCompression implements IDataSerializer, Externalizable 
 
     }
 
-    public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+    public void read(DataInput in, IRaba raba) throws IOException {
 
         final InputBitStream ibs = new InputBitStream((InputStream) in,
                 0/* unbuffered! */, false/* reflectionTest */);
@@ -84,7 +84,7 @@ public class FastRDFValueCompression implements IDataSerializer, Externalizable 
         
     }
 
-    public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
+    public void write(DataOutput out, IRaba raba) throws IOException {
 
         final OutputBitStream obs = new OutputBitStream((OutputStream) out,
                 0 /* unbuffered! */, false/* reflectionTest */);

@@ -47,7 +47,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Errors;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableRaba;
 import com.bigdata.service.Split;
 
@@ -129,12 +129,12 @@ abstract public class AbstractKeyArrayIndexProcedure extends
     /**
      * The keys.
      */
-    private IRandomAccessByteArray keys;
+    private IRaba keys;
 
     /**
      * The values.
      */
-    private IRandomAccessByteArray vals;
+    private IRaba vals;
 
     /**
      * Index of the first element to be used in {@link #keys} and {@link #vals}
@@ -295,7 +295,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      * 
      * @return
      */
-    protected String toString(IRandomAccessByteArray keys) {
+    protected String toString(IRaba keys) {
        
         StringBuilder sb = new StringBuilder();
         

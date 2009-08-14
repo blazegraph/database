@@ -29,7 +29,7 @@ package com.bigdata.btree;
 
 import java.io.OutputStream;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Interface for low-level data access for the leaves of a B+-Tree.
@@ -51,7 +51,7 @@ public interface ILeafData extends IAbstractNodeData {
      * Return the object storing the logical byte[][] containing the values for
      * the leaf.
      */
-    public IRandomAccessByteArray getValues();
+    public IRaba getValues();
 
     /**
      * Return <code>true</code> iff the value stored at the specified index is
@@ -62,7 +62,7 @@ public interface ILeafData extends IAbstractNodeData {
      * @param index
      *            The index into the leaf.
      * 
-     * @deprecated by {@link IRandomAccessByteArray#isNull(int)}
+     * @deprecated by {@link IRaba#isNull(int)}
      */
     public boolean isNull(int index);
 
@@ -91,7 +91,7 @@ public interface ILeafData extends IAbstractNodeData {
      *      copy() by throwing a NullPointerException).
      * 
      * @deprecated by
-     *             {@link IRandomAccessByteArray#copy(int, java.io.DataOutput)}.
+     *             {@link IRaba#copy(int, java.io.DataOutput)}.
      */
     public void copyValue(int index, OutputStream os);
 

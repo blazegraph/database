@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.Leaf.ILeafListener;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
@@ -1378,8 +1378,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         }
 
         public ILeafData allocLeaf(AbstractBTree btree, long addr,
-                int branchingFactor, IRandomAccessByteArray keys,
-                IRandomAccessByteArray values, long[] versionTimestamp,
+                int branchingFactor, IRaba keys,
+                IRaba values, long[] versionTimestamp,
                 boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
             Leaf leaf = new Leaf(btree, addr, branchingFactor, keys, values,
@@ -1396,7 +1396,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         }
 
         public INodeData allocNode(AbstractBTree btree, long addr,
-                int branchingFactor, int nentries, IRandomAccessByteArray keys,
+                int branchingFactor, int nentries, IRaba keys,
                 long[] childAddr, int[] childEntryCounts) {
 
             return new Node(btree, addr, branchingFactor, nentries, keys,

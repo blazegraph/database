@@ -27,11 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.ImmutableKeyBuffer;
+import java.nio.ByteBuffer;
 
 import junit.framework.TestCase2;
+
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 
 /**
  * Test suite for low-level operations on variable length byte[]s.
@@ -39,6 +40,8 @@ import junit.framework.TestCase2;
  * @see BytesUtil
  * 
  * @todo test with JNI integration.
+ * 
+ * @todo test {@link BytesUtil#compareBytes(java.nio.ByteBuffer, int, int, byte[])}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -127,10 +130,7 @@ public class TestBytesUtil extends TestCase2 {
 
     /**
      * Test of unsigned byte[] comparison with explicit offset into each array
-     * and #of bytes to consider from that offset for each array. This version
-     * is used for comparison of keys in {@link IKeyBuffer} implementations
-     * since it allows a proven shared prefix to be skipped and also supports
-     * search on the compact representation used by {@link ImmutableKeyBuffer}.
+     * and #of bytes to consider from that offset for each array.
      */
     public void test_compareBytesWithOffsetAndLength() {
 
@@ -750,6 +750,61 @@ public class TestBytesUtil extends TestCase2 {
         )
           );
 
+    }
+
+    /*
+     * Bit operations
+     */
+    
+    public void test_bitFlagByteLength() {
+        
+        assertEquals(0,BytesUtil.bitFlagByteLength(0));
+        assertEquals(1,BytesUtil.bitFlagByteLength(1));
+        assertEquals(1,BytesUtil.bitFlagByteLength(2));
+        assertEquals(1,BytesUtil.bitFlagByteLength(3));
+        assertEquals(1,BytesUtil.bitFlagByteLength(4));
+        assertEquals(1,BytesUtil.bitFlagByteLength(5));
+        assertEquals(1,BytesUtil.bitFlagByteLength(6));
+        assertEquals(1,BytesUtil.bitFlagByteLength(7));
+        assertEquals(1,BytesUtil.bitFlagByteLength(8));
+        assertEquals(2,BytesUtil.bitFlagByteLength(9));
+        
+    }
+    
+    public void test_bitSetTest() {
+        
+        final int nbits = 12;
+
+        for (int bitIndex = 0; bitIndex < nbits; bitIndex++) {
+
+            // starting at the first byte.
+            final int offset = 0;
+
+            final ByteBuffer buf = ByteBuffer.allocate(BytesUtil
+                    .bitFlagByteLength(nbits));
+
+            // should be clear
+            assertEquals("get(" + offset + "," + bitIndex + ")", false, BytesUtil
+                    .getBit(buf, offset, bitIndex));
+
+            // set
+            assertEquals("set(" + offset + "," + bitIndex + ")", false, BytesUtil
+                    .setBit(buf, offset, bitIndex, true));
+
+            // should be set.
+            assertEquals("get(" + offset + "," + bitIndex + ")", true, BytesUtil
+                    .getBit(buf, offset, bitIndex));
+
+            // clear
+            assertEquals("set(" + offset + "," + bitIndex + ")", true, BytesUtil
+                    .setBit(buf, offset, bitIndex, false));
+
+            // should be clear
+            assertEquals("get(" + offset + "," + bitIndex + ")", false, BytesUtil
+                    .getBit(buf, offset, bitIndex));
+
+        }
+        
     }
 
 }

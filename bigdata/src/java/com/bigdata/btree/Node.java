@@ -36,7 +36,7 @@ import java.util.Set;
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.IndexMetadata.Options;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
@@ -250,7 +250,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
     @SuppressWarnings("unchecked")
     protected Node(final AbstractBTree btree, final long addr,
             final int branchingFactor, final int nentries,
-            final IRandomAccessByteArray keys, final long[] childAddr,
+            final IRaba keys, final long[] childAddr,
             final int[] childEntryCounts) {
 
         super( btree, branchingFactor, false /* The node is NOT dirty */ );

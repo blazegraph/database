@@ -30,11 +30,11 @@ package com.bigdata.btree.data;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.raba.ReadOnlyRaba;
-import com.bigdata.btree.raba.ReadOnlySearchRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanDataCoder;
 import com.bigdata.btree.raba.codec.FrontCodedDataCoder;
-import com.bigdata.btree.raba.codec.IDataCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Test suite for the B+Tree {@link ILeafData} records (accessing coded data in
@@ -44,7 +44,7 @@ import com.bigdata.btree.raba.codec.IDataCoder;
  * @version $Id$
  * 
  * @todo test round trip for node, leaf, and linked-leaf with each of the
- *       {@link IDataCoder} implementations.
+ *       {@link IRabaCoder} implementations.
  * 
  *       FIXME Lot's more tests of various {@link ILeafData} states.
  */
@@ -63,8 +63,8 @@ public class TestLeafDataRecord extends AbstractBTreeTestCase {
         super(name);
     }
 
-    protected IDataCoder keysCoder = null;
-    protected IDataCoder valuesCoder = null;
+    protected IRabaCoder keysCoder = null;
+    protected IRabaCoder valuesCoder = null;
     
     protected void setUp() throws Exception {
         
@@ -96,8 +96,8 @@ public class TestLeafDataRecord extends AbstractBTreeTestCase {
         final byte[][] keys = new byte[m + 1][];
         final byte[][] vals = new byte[m + 1][];
 
-        final ILeafData expected = new MockLeafData(new ReadOnlySearchRaba(
-                nkeys, keys), new ReadOnlyRaba(nkeys, vals));
+        final ILeafData expected = new MockLeafData(new ReadOnlyKeysRaba(
+                nkeys, keys), new ReadOnlyValuesRaba(nkeys, vals));
 
         final ILeafData actual = new ReadOnlyLeafData(expected, keysCoder,
                 valuesCoder, false/* doubleLinked */);

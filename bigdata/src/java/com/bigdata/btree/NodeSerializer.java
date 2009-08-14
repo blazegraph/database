@@ -43,7 +43,7 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableRaba;
 import com.bigdata.io.ByteBufferInputStream;
@@ -547,7 +547,7 @@ public class NodeSerializer {
 //        final int[] childEntryCounts = node.getChildEntryCounts();
         final int nkeys = node.getKeyCount();
 //        final IRandomAccessByteArray keys = node.getKeys();
-        final long[] childAddr = node.getChildAddr();
+//        final long[] childAddr = node.getChildAddr();
 
         /*
          * fixed length node header.
@@ -568,7 +568,8 @@ public class NodeSerializer {
             nodeKeySerializer.write(_writeBuffer, node.getKeys());
 
             // addresses.
-            addrSerializer.putChildAddresses(addressManager,_writeBuffer, childAddr, nkeys + 1);
+//            addrSerializer.putChildAddresses(addressManager,_writeBuffer, childAddr, nkeys + 1);
+            putChildAddresses(addressManager, _writeBuffer, node);
 
             // #of entries spanned per child.
             putChildEntryCounts(_writeBuffer, node);
@@ -618,7 +619,8 @@ public class NodeSerializer {
      *            
      * @return The deserialized node.
      */
-    public INodeData getNode(final AbstractBTree btree, final long addr, final ByteBuffer buf) {
+    public INodeData getNode(final AbstractBTree btree, final long addr,
+            final ByteBuffer buf) {
 
         //        assert btree != null;
         //        assert addr != 0L;
@@ -663,12 +665,11 @@ public class NodeSerializer {
             final int[] childEntryCounts = new int[branchingFactor + 1];
 
             // Keys.
-            final IKeyBuffer keys;
+            final IRaba keys;
             {
                 /*
-                 * FIXME This de-serializes and then converts to an
-                 * ImmutableKeyBuffer for compatibility with current assumptions
-                 * in the BTree code.
+                 * FIXME This "explodes" newly read keys so that they are
+                 * mutable.
                  */
                 MutableKeyBuffer tmp = new MutableKeyBuffer(branchingFactor);
                 nodeKeySerializer.read(is, tmp);
@@ -679,7 +680,8 @@ public class NodeSerializer {
             final int nkeys = keys.size();
             
             // Child addresses (nchildren == nkeys+1).
-            addrSerializer.getChildAddresses(addressManager,is, childAddr, nkeys+1);
+//            addrSerializer.getChildAddresses(addressManager,is, childAddr, nkeys+1);
+            getChildAddresses(addressManager, is, childAddr, nkeys + 1);
 
             // #of entries spanned by each child.
             getChildEntryCounts(is,childEntryCounts,nkeys+1);
@@ -965,7 +967,7 @@ public class NodeSerializer {
 //            assert nkeys >= 0 && nkeys <= branchingFactor;
 
             // keys.
-            final IRandomAccessByteArray keys;
+            final IRaba keys;
             { 
                 /*
                  * FIXME currently de-serializes to an ImmutableKeyBuffer for
@@ -1037,6 +1039,52 @@ public class NodeSerializer {
 
     }
     
+    private void putChildAddresses(IAddressManager addressManager,
+            DataOutputBuffer os, INodeData node)
+            throws IOException {
+
+        final int nchildren = node.getChildCount();
+        
+        for (int i = 0; i < nchildren; i++) {
+
+            final long addr = node.getChildAddr(i);
+
+            /*
+             * Children MUST have assigned persistent identity.
+             */
+            if (addr == 0L) {
+
+                throw new RuntimeException("Child is not persistent: index="
+                        + i);
+
+            }
+
+            os.writeLong(addr);
+
+        }
+
+    }
+
+    private void getChildAddresses(IAddressManager addressManager, DataInput is,
+            long[] childAddr, int nchildren) throws IOException {
+
+        for (int i = 0; i < nchildren; i++) {
+
+            final long addr = is.readLong();
+
+            if (addr == 0L) {
+
+                throw new RuntimeException(
+                        "Child does not have persistent address: index=" + i);
+
+            }
+
+            childAddr[i] = addr;
+
+        }
+
+    }
+
     /**
      * Write out a packed array of the #of entries spanned by each child of some
      * node.

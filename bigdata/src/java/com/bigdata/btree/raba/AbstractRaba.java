@@ -30,6 +30,8 @@ package com.bigdata.btree.raba;
 import java.io.DataInput;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Constructor;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -38,12 +40,12 @@ import com.bigdata.btree.BytesUtil;
 /**
  * Abstract base class implements mutation operators and search. A concrete
  * subclass need only indicate if it is mutable, searchable, or allows nulls
- * by overriding the appropriate methods.
+ * by overriding the appropriate methods.  
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRaba implements IRandomAccessByteArray {
+abstract public class AbstractRaba implements IRaba {
 
     /**
      * The inclusive lower bound of the view.
@@ -272,15 +274,19 @@ abstract public class AbstractRaba implements IRandomAccessByteArray {
         }
 
     }
-    
+
     /**
+     * @param a
+     *            A byte[] to be inserted or set on the {@link IRaba}.
+     * 
      * @throws IllegalArgumentException
-     *             if the <i>key</i> is <code>null</code> and the implementation
-     *             does not permit <code>null</code>s to be stored.
+     *             if the <code>byte[]</code> is <code>null</code> and the
+     *             implementation does not permit <code>null</code>s to be
+     *             stored.
      */
-    protected void assertNullAllowed(final byte[] key) {
+    protected void assertNullAllowed(final byte[] a) {
         
-        if (key == null && !isNullAllowed()) {
+        if (a == null && !isKeys()) {
 
             throw new IllegalArgumentException();
             
@@ -358,13 +364,9 @@ abstract public class AbstractRaba implements IRandomAccessByteArray {
 
     public int search(final byte[] searchKey) {
 
-        if (!isSearchable())
-            throw new UnsupportedOperationException();
+        if (!isKeys()) {
 
-        if (isNullAllowed()) {
-         
-            // implementations that allow search must not allow nulls.
-            throw new AssertionError();
+            throw new UnsupportedOperationException();
             
         }
 
@@ -375,9 +377,121 @@ abstract public class AbstractRaba implements IRandomAccessByteArray {
     
     public String toString() {
 
-        return getClass() + "{size=" + size() + ",capacity=" + capacity
-                + ",readOnly=" + isReadOnly() + "}";
+        return toString(this);
         
+    }
+    
+    /**
+     * If {@link IRaba#isKeys()} is <code>true</code> then represents the
+     * elements as <code>unsigned byte[]</code>s.  Otherwise represents the
+     * elements as <code>signed byte[]</code>s.
+     */
+    static public String toString(final IRaba raba) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        final boolean isKeys = raba.isKeys();
+        
+        sb.append(raba.getClass().getName());
+        sb.append("{ capacity=" + raba.capacity());
+        sb.append(", size=" + raba.size());
+        sb.append(", isKeys=" + isKeys);
+        sb.append(", isReadOnly=" + raba.isReadOnly());
+        sb.append(", [\n");
+
+        int i = 0;
+        for(byte[] a : raba) {
+
+            if (i > 0)
+                sb.append(",\n");
+
+            if (a == null) {
+
+                sb.append("null");
+
+            } else {
+
+                if(isKeys) {
+                    
+                    // representation as unsigned byte[].
+                    sb.append(BytesUtil.toString(a));
+                    
+                } else {
+                    
+                    // representation as signed byte[].
+                    sb.append(Arrays.toString(a));
+                    
+                }
+
+            }
+            
+            i++;
+
+        }
+
+        sb.append("]}");
+        
+        return sb.toString();
+
+    }
+
+    /**
+     * Resize the buffer, copying up to <i>n</i> references to the existing data
+     * into a new view backed by a new byte[][]. <code>fromIndex</code> will be
+     * zero in the new view.
+     * <p>
+     * This method requires a public constructor with the following signature:
+     * 
+     * <pre>
+     * ctor(byte[][])
+     * </pre>
+     * 
+     * @param n
+     *            The size of the new buffer.
+     * 
+     * @return The new view, backed by a new byte[][].
+     * 
+     * @throws IllegalArgumentException
+     *             if <i>n</i> is negative.
+     * 
+     * @throws RuntimeException
+     *             if the {@link AbstractRaba} instance does not declare an
+     *             appropriate ctor.
+     * 
+     * @todo redefine as slice() (view onto the same data) and copy(int n)?
+     */
+    public AbstractRaba resize(final int n) {
+
+        assertNotReadOnly();
+        
+        if (n < 0)
+            throw new IllegalArgumentException();
+
+        // #of entries in the source.
+        final int m = size();
+
+        // #of entries to be copied into the new buffer.
+        final int p = Math.min(m, n);
+
+        // new backing array sized to [n].
+        final byte[][] b = new byte[n][];
+
+        // copy references to the new buffer.
+        System.arraycopy(a, fromIndex, b, 0, p);
+
+        try {
+            
+            final Constructor<? extends AbstractRaba> ctor = getClass()
+                    .getConstructor(new Class[] { byte[].class });
+
+            return ctor.newInstance(new Object[] { a });
+
+        } catch (Exception ex) {
+
+            throw new RuntimeException(ex);
+
+        }
+
     }
 
 }

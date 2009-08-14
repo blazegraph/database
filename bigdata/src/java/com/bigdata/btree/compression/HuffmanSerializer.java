@@ -19,7 +19,7 @@ import java.io.ObjectOutput;
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Huffman compression.
@@ -47,7 +47,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
     /**
      * Use a Huffman compression algorithm to write keys to a byte stream. 
      */
-    public void write(final DataOutput out, final IRandomAccessByteArray raba)
+    public void write(final DataOutput out, final IRaba raba)
             throws IOException {
 
         // write number of keys
@@ -240,7 +240,7 @@ public class HuffmanSerializer implements IDataSerializer, Externalizable {
     /**
      * Use a Huffman compression algorithm to read keys from a byte stream. 
      */
-    public void read(final DataInput in, final IRandomAccessByteArray raba)
+    public void read(final DataInput in, final IRaba raba)
             throws IOException {
 
         // read the # of keys

@@ -3,7 +3,7 @@ package com.bigdata.btree.data;
 import java.io.OutputStream;
 
 import com.bigdata.btree.IAbstractNodeData;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Abstract base class for mock node and leaf data implementations for unit
@@ -15,7 +15,7 @@ import com.bigdata.btree.raba.IRandomAccessByteArray;
 abstract class AbstractMockNodeData implements IAbstractNodeData {
 
     // mutable.
-    final private IRandomAccessByteArray keys;
+    final private IRaba keys;
 
     final public int getKeyCount() {
 
@@ -23,7 +23,7 @@ abstract class AbstractMockNodeData implements IAbstractNodeData {
 
     }
 
-    final public IRandomAccessByteArray getKeys() {
+    final public IRaba getKeys() {
 
         return keys;
 
@@ -41,15 +41,12 @@ abstract class AbstractMockNodeData implements IAbstractNodeData {
 
     }
 
-    protected AbstractMockNodeData(final IRandomAccessByteArray keys) {
+    protected AbstractMockNodeData(final IRaba keys) {
 
         if (keys == null)
             throw new IllegalArgumentException();
 
-        if (!keys.isSearchable())
-            throw new IllegalArgumentException();
-
-        if (keys.isNullAllowed())
+        if (!keys.isKeys())
             throw new IllegalArgumentException();
 
         this.keys = keys;

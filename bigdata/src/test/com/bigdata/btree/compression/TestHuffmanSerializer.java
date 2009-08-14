@@ -40,7 +40,7 @@ import java.util.Random;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableRaba;
 
 /**
@@ -175,7 +175,7 @@ public class TestHuffmanSerializer extends TestCase2 {
         Arrays.sort(data, 0, data.length, UnsignedByteArrayComparator.INSTANCE);
         
         // layer on interface.
-        final IRandomAccessByteArray raba = new MutableRaba(
+        final IRaba raba = new MutableRaba(
                 0/* fromIndex */, data.length/* toIndex */, data);
         
         doRoundTripTest(raba);
@@ -201,7 +201,7 @@ public class TestHuffmanSerializer extends TestCase2 {
         Arrays.sort(data, 0, n, UnsignedByteArrayComparator.INSTANCE);
         
         // layer on interface.
-        final IRandomAccessByteArray raba = new MutableRaba(
+        final IRaba raba = new MutableRaba(
                 0/* fromIndex */, n/* toIndex */, data);
         
         doRoundTripTest(raba);
@@ -209,7 +209,7 @@ public class TestHuffmanSerializer extends TestCase2 {
 
     }
     
-    public void doRoundTripTest(IRandomAccessByteArray raba) throws IOException {
+    public void doRoundTripTest(IRaba raba) throws IOException {
 
         final byte[] data;
         {
@@ -225,7 +225,7 @@ public class TestHuffmanSerializer extends TestCase2 {
 
         }
 
-        final IRandomAccessByteArray raba2;
+        final IRaba raba2;
         {
 
 //            final int n = raba.getKeyCount();
@@ -281,8 +281,8 @@ public class TestHuffmanSerializer extends TestCase2 {
         
     }
 
-    protected void assertEquals(IRandomAccessByteArray expected,
-            IRandomAccessByteArray actual) {
+    protected void assertEquals(IRaba expected,
+            IRaba actual) {
 
         assertEquals("n", expected.size(), actual.size());
 

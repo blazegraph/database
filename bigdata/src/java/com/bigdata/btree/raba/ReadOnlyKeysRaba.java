@@ -28,13 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.raba;
 
 /**
- * Immutable implementation allows <code>null</code>s but does not support
+ * Immutable implementation does not allow <code>null</code>s but supports
  * search.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReadOnlyRaba extends AbstractRaba {
+public class ReadOnlyKeysRaba extends AbstractRaba {
 
     /**
      * This view is read-only.
@@ -46,23 +46,14 @@ public class ReadOnlyRaba extends AbstractRaba {
     }
 
     /**
-     * The view allows <code>null</code>s.
+     * For B+Tree keys (does not allow <code>null</code>s, is searchable).
      */
-    public boolean isNullAllowed() {
-        
+    final public boolean isKeys() {
+    
         return true;
         
     }
 
-    /**
-     * The view does not support search.
-     */
-    public boolean isSearchable() {
-    
-        return false;
-        
-    }
-    
     /**
      * Create a view of a byte[][]. All elements in the array are visible in the
      * view.
@@ -70,7 +61,7 @@ public class ReadOnlyRaba extends AbstractRaba {
      * @param a
      *            The backing byte[][].
      */
-    public ReadOnlyRaba(final byte[][] a) {
+    public ReadOnlyKeysRaba(final byte[][] a) {
 
         this(0/* fromIndex */, a.length/* toIndex */, a.length/* capacity */, a);
 
@@ -86,12 +77,12 @@ public class ReadOnlyRaba extends AbstractRaba {
      * @param a
      *            The backing byte[][].
      */
-    public ReadOnlyRaba(final int size, final byte[][] a) {
+    public ReadOnlyKeysRaba(final int size, final byte[][] a) {
 
         this(0/* fromIndex */, size/* toIndex */, a.length/* capacity */, a);
 
     }
-    
+
     /**
      * Create a view from a slice of a byte[][].
      * 
@@ -106,7 +97,7 @@ public class ReadOnlyRaba extends AbstractRaba {
      * @param a
      *            The backing byte[][].
      */
-    public ReadOnlyRaba(final int fromIndex, final int toIndex,
+    public ReadOnlyKeysRaba(final int fromIndex, final int toIndex,
             final int capacity, final byte[][] a) {
 
         super(fromIndex, toIndex, capacity, a);

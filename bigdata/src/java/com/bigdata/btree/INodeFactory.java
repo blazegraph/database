@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 /**
  * Interface for creating mutable nodes or leaves.
@@ -59,7 +59,7 @@ public interface INodeFactory {
      * @return A node initialized from those data.
      */
     public INodeData allocNode(AbstractBTree btree, long addr,
-            int branchingFactor, int nentries, IRandomAccessByteArray keys,
+            int branchingFactor, int nentries, IRaba keys,
             long[] childAddr, int[] childEntryCount);
 
     /**
@@ -98,8 +98,8 @@ public interface INodeFactory {
      * @return A leaf initialized from those data.
      */
     public ILeafData allocLeaf(AbstractBTree btree, long addr,
-            int branchingFactor, IRandomAccessByteArray keys,
-            IRandomAccessByteArray values, long[] versionTimestamps,
+            int branchingFactor, IRaba keys,
+            IRaba values, long[] versionTimestamps,
             boolean[] deleteMarkers, long priorAddr, long nextAddr);
 
 }

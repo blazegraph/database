@@ -39,7 +39,7 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class MutableValueBuffer implements IRandomAccessByteArray {
+public class MutableValueBuffer implements IRaba {
 
     /**
      * The #of entries with valid data.
@@ -55,21 +55,18 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
      * Mutable.
      */
     final public boolean isReadOnly() {
+
         return false;
+        
     }
 
     /**
-     * <code>null</code>s are allowed.
+     * For B+Tree values.
      */
-    public boolean isNullAllowed() {
-        return true;
-    }
-
-    /**
-     * Not searchable.
-     */
-    final public boolean isSearchable() {
+    final public boolean isKeys() {
+     
         return false;
+        
     }
 
     /**
@@ -101,7 +98,7 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
      * @param src
      *            The source data.
      */
-    public MutableValueBuffer(final IRandomAccessByteArray src) {
+    public MutableValueBuffer(final IRaba src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -247,17 +244,6 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
     }
     
     /**
-     * @throws UnsupportedOperationException
-     *             if the view is read-only.
-     */
-    protected void assertNotReadOnly() {
-        
-        if(isReadOnly())
-            throw new UnsupportedOperationException();
-        
-    }
-
-    /**
      * @throws IllegalStateException
      *             unless there is room to store another value.
      */
@@ -271,28 +257,9 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
 
     }
     
-    /**
-     * @throws IllegalArgumentException
-     *             if the <i>key</i> is <code>null</code> and the implementation
-     *             does not permit <code>null</code>s to be stored.
-     */
-    protected void assertNullAllowed(final byte[] key) {
-        
-        if (key == null && !isNullAllowed()) {
-
-            throw new IllegalArgumentException();
-            
-        }
-        
-    }
-    
     public void set(final int index, final byte[] key) {
         
-        assertNotReadOnly();
-        
         assert rangeCheck(index);
-
-        assertNullAllowed(key);
 
         values[index] = key;
         
@@ -300,11 +267,7 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
 
     public int add(final byte[] key) {
 
-        assertNotReadOnly();
-
         assertNotFull();
-
-        assertNullAllowed(key);
         
         values[nvalues++] = key;
         
@@ -314,11 +277,7 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
     
     public int add(final byte[] key, final int off, final int len) {
 
-        assertNotReadOnly();        
-
         assertNotFull();
-
-        assertNullAllowed(key);
 
         final byte[] b = new byte[len];
 
@@ -331,8 +290,6 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
     }
     
     public int add(final DataInput in, final int len) throws IOException {
-
-        assertNotReadOnly();
         
         assertNotFull();
 
@@ -354,8 +311,7 @@ public class MutableValueBuffer implements IRandomAccessByteArray {
     
     public String toString() {
 
-        return getClass() + "{size=" + nvalues + ",capacity=" + values.length
-                + "}";
+        return AbstractRaba.toString(this);
 
     }
  

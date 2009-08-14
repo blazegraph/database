@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 
 /**
@@ -21,13 +21,13 @@ public class NoDataSerializer implements IDataSerializer {
 
     public transient static NoDataSerializer INSTANCE = new NoDataSerializer();
 
-    public void write(DataOutput out, IRandomAccessByteArray raba) throws IOException {
+    public void write(DataOutput out, IRaba raba) throws IOException {
 
         // NOP
         
     }
 
-    public void read(DataInput in, IRandomAccessByteArray raba) throws IOException {
+    public void read(DataInput in, IRaba raba) throws IOException {
 
         // NOP
         

@@ -10,7 +10,7 @@ import java.io.OutputStream;
 
 import org.CognitiveWeb.extser.LongPacker;
 
-import com.bigdata.btree.raba.IRandomAccessByteArray;
+import com.bigdata.btree.raba.IRaba;
 
 
 /**
@@ -36,7 +36,7 @@ public class DefaultDataSerializer implements IDataSerializer, Externalizable {
     }
     
     public void read(final DataInput in,
-            final IRandomAccessByteArray raba) throws IOException {
+            final IRaba raba) throws IOException {
 //            final boolean notNull = in.readBoolean();
 //            if (!notNull) {
 //                return null;
@@ -55,7 +55,7 @@ public class DefaultDataSerializer implements IDataSerializer, Externalizable {
 //            return new RandomAccessByteArray(0/*fromIndex*/,n/*toIndex*/,a);
     }
 
-    public void write(final DataOutput out, final IRandomAccessByteArray raba)
+    public void write(final DataOutput out, final IRaba raba)
             throws IOException {
         final int n = raba.size();
 //            if (a == null && n != 0)
