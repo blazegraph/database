@@ -10,23 +10,19 @@ import java.util.UUID;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.TemporaryStore;
 
 /**
- * Sample for for using the {@link BTree} with a {@link Journal}. The
- * {@link Journal} is the right choice when you want a standalone persistence
- * store. Both the {@link TemporaryStore} and the {@link Journal} are
- * thread-safe for concurrent readers and writers. However, the {@link Journal}
- * has a commit protocol and has support for concurrency control. This example
- * shows you how to use the {@link BTree} on the {@link Journal} without any
- * concurrency controls.
+ * This example show how to create a {@link Journal}, register a {@link BTree}
+ * and perform basic operations on the {@link BTree}. The {@link Journal} is the
+ * right choice when you want a standalone persistence store. When using the
+ * {@link Journal} in this manner, you must remember to {@link Journal#commit()}
+ * your write sets.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BTreeJournalExample {
+public class JournalExample {
 
     public static void main(String[] args) {
 
@@ -34,7 +30,7 @@ public class BTreeJournalExample {
 
         properties.setProperty(Journal.Options.FILE, "testJournal.jnl");
         
-        final Journal store = new Journal(properties);
+        Journal store = new Journal(properties);
 
         try {
 
@@ -50,7 +46,7 @@ public class BTreeJournalExample {
 
                 store.registerIndex(indexMetadata);
                 
-                // commit the store so the index is on record.
+                // commit the store so the B+Tree can be found on restart.
                 store.commit();
                 
             }
@@ -111,8 +107,50 @@ public class BTreeJournalExample {
 
             }
 
-            // @todo show writes visible after a commit.
+            // Show writes visible after a commit.
+            {
+                
+                final BTree mutableBTree = store.getIndex("testIndex");
 
+                // lookup the tuple (not found).
+                System.err.println("tuple: " + mutableBTree.lookup("hello"));
+
+                // add a tuple
+                mutableBTree.insert("hello", "world2");
+
+                // lookup the tuple
+                System.err.println("tuple: " + mutableBTree.lookup("hello"));
+
+                // update the tuple
+                mutableBTree.insert("hello", "again2");
+
+                // lookup the new value
+                System.err.println("tuple: " + mutableBTree.lookup("hello"));
+                
+                // commit the changes.
+                store.commit();
+                
+            }
+
+            // Show that the changes were restart safe.
+            {
+                
+                // close the journal.
+                store.close();
+                System.out.println("Store closed.");
+                
+                // re-open the journal.
+                store = new Journal(properties);
+                System.out.println("Store re-opened.");
+
+                // lookup the B+Tree.
+                final BTree mutableBTree = store.getIndex("testIndex");
+                
+                // lookup the tuple
+                System.err.println("tuple: " + mutableBTree.lookup("hello"));
+    
+            }
+            
         } finally {
 
             // destroy the backing store.

@@ -1,12 +1,29 @@
 <html>
 <head>
-<title>bigdata&#174; sample code for the B+Tree package</title>
+<title>bigdata&#174; : Sample code for the B+Tree package</title>
 </head>
 <body>
 
 <p>
 
 This package contains some sample code for using the B+Tree package.
+
+<dl>
+
+<dt>TempStoreExample</dt><dd>Shows how to create a temporary store, register
+a B+Tree on the temporary store, and do basic CRUD operations on the B+Tree.</dd>
+
+<dt>JournalExample</dt><dd>Shows how to create a Journal, how to register a
+B+Tree on the journal, how to do basic CRUD operations on the B+Tree.  This
+example also covers committing or aborting the write set on the journal and
+re-opening an existing journal.</dd>
+
+<dt>ReadWriteIndexExample</dt><dd>Shows how to impose concurrency control on
+a B+Tree using a wrapper class.  The B+Tree is thread-safe for readers, but
+not for writers.  This example show how you can wrap the B+Tree with a skin
+backed by a ReadWriteLock.</dd>
+
+</dl>
 
 </p>
 
