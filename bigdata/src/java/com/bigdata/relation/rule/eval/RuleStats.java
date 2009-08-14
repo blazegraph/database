@@ -498,9 +498,11 @@ public class RuleStats {
         final DateFormat dateFormat = DateFormat.getDateTimeInstance(
                 DateFormat.MEDIUM/* date */, DateFormat.MEDIUM/* time */);
 
+        final String dateStr = dateFormat.format(startTime).replace(",", ""); 
+        
 //        final String sep = titles ? ", " : this.sep;
         
-        sb.append((titles?"startTime=":"") + dateFormat.format(startTime).replace(",", ""));
+        sb.append((titles?"startTime=":"") + dateStr);
         sb.append(sep + (titles ? "rule=" : "") + ruleNameStr);
         sb.append(sep + (titles ? "elapsed=" : "") + elapsed);
         sb.append(sep + (titles ? "solutionCount=" : "") + solutionCountStr);
@@ -529,7 +531,7 @@ public class RuleStats {
                 for (int tailIndex = 0; tailIndex < tailCount; tailIndex++) {
                     
                     if (tailIndex > 0)
-                        sb.append("\n"+ruleNameStr+(sep+sep+sep+sep+sep+sep));//",,,,,");
+                        sb.append("\n"+dateStr+sep+ruleNameStr+(sep+sep+sep+sep+sep));//",,,,,");
                     
                     final int i = showInEvalOrder?evalOrder[tailIndex]:tailIndex;
                     final int orderIndex = showInEvalOrder?tailIndex:permutation[i];
