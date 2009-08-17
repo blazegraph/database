@@ -100,6 +100,15 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
     protected ReadOnlyLeafData(final ByteBuffer b, final IRabaCoder keysCoder,
             final IRabaCoder valuesCoder) {
 
+        if (b == null)
+            throw new IllegalArgumentException();
+
+        if (keysCoder == null)
+            throw new IllegalArgumentException();
+        
+        if (valuesCoder == null)
+            throw new IllegalArgumentException();
+
         final byte type = b.get();
 
         switch (type) {
@@ -211,6 +220,15 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      */
     public ReadOnlyLeafData(final ILeafData leaf, final IRabaCoder keysCoder,
             final IRabaCoder valuesCoder, final boolean doubleLinked) {
+
+        if (leaf == null)
+            throw new IllegalArgumentException();
+
+        if (keysCoder == null)
+            throw new IllegalArgumentException();
+        
+        if (valuesCoder == null)
+            throw new IllegalArgumentException();
 
         // cache some fields.
         this.doubleLinked = doubleLinked;
@@ -331,7 +349,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
         // write the encoded values on the buffer.
         O_values = b.position();
-        encodedValues.limit(encodedKeys.capacity());
+        encodedValues.limit(encodedValues.capacity());
         encodedValues.rewind();
         b.put(encodedValues);
 

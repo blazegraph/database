@@ -22,39 +22,42 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 6, 2009
+ * Created on Aug 5, 2009
  */
 
-package com.bigdata.btree.raba.codec;
+package com.bigdata.btree.data;
 
+import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 
 /**
- * Test suite for the {@link FrontCodedDataCoder}.
+ * Test with simple coding for keys and values (no compression).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFrontCodedDataCoderRatio8 extends AbstractFrontCodedDataCoderTestCase {
+public class TestLeafDataRecord_Simple_Simple extends AbstractLeafDataRecordTestCase {
 
     /**
      * 
      */
-    public TestFrontCodedDataCoderRatio8() {
+    public TestLeafDataRecord_Simple_Simple() {
     }
 
     /**
      * @param name
      */
-    public TestFrontCodedDataCoderRatio8(String name) {
+    public TestLeafDataRecord_Simple_Simple(String name) {
         super(name);
     }
-
+    
     protected void setUp() throws Exception {
         
         super.setUp();
-        
-        dataCoder = new FrontCodedDataCoder(8/* ratio */);
+
+        keysCoder = SimpleRabaCoder.INSTANCE;
+
+        valuesCoder = SimpleRabaCoder.INSTANCE;
         
     }
-
 }

@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba;
 
+import com.bigdata.btree.BytesUtil;
+
 /**
  * Immutable implementation does not allow <code>null</code>s but supports
  * search.
@@ -102,6 +104,44 @@ public class ReadOnlyKeysRaba extends AbstractRaba {
 
         super(fromIndex, toIndex, capacity, a);
 
+        // FIXME This is too much overhead for normal runtime.
+        assert assertTotalOrder(fromIndex, toIndex, a);
+        
+    }
+
+    /**
+     * Asserts that the <code>unsigned byte[]</code>s in the logical byte[][]
+     * are in a total order.
+     * 
+     * @param fromIndex
+     *            The first index in the view (inclusive lower bound).
+     * @param toIndex
+     *            The first index outside the view (exclusive upper bound).
+     * @param a
+     *            The backing byte[][].
+     *            
+     * @return true if the total ordering constraint is respected by the data.
+     */
+    protected boolean assertTotalOrder(final int fromIndex, final int toIndex,
+            final byte[][] a) {
+
+        for (int i = fromIndex; i < toIndex; i++) {
+
+            if (i > fromIndex) {
+
+                final int ret = BytesUtil.compareBytes(a[i - 1], a[i]);
+                
+                assert ret < 0 : "unsigned byte[]s are out of order at index="
+                        + i +", ret="+ret //
+                        + "\na[" + (i - 1) + "]=" + BytesUtil.toString(a[i-1]) //
+                        + "\na[" + (i) + "]=" + BytesUtil.toString(a[i]);
+
+            }
+            
+        }
+        
+        return true;
+        
     }
 
 }

@@ -82,10 +82,13 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
         assert childAddr != null;
         
         assert childEntryCount != null;
+
+        assert keys.capacity() + 1 == childAddr.length : "keys.capacity="
+                + keys.capacity() + ", childAddr.length=" + childAddr.length;
         
-        assert keys.capacity() == childAddr.length;
-        
-        assert keys.capacity() == childEntryCount.length;
+        assert keys.capacity() + 1 == childEntryCount.length : "keys.capacity="
+                + keys.capacity() + ", childEntryCount.length="
+                + childEntryCount.length;
 
         this.spannedTupleCount = spannedTupleCount;
 

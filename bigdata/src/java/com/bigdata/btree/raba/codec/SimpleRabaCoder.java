@@ -27,17 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba.codec;
 
-import java.io.DataInput;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.raba.AbstractRaba;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.rawstore.Bytes;
 
@@ -50,11 +46,11 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleDataCoder implements IRabaCoder {
+public class SimpleRabaCoder implements IRabaCoder {
 
     private static final byte VERSION0 = 0x00;
 
-    public static transient final SimpleDataCoder INSTANCE = new SimpleDataCoder();
+    public static transient final SimpleRabaCoder INSTANCE = new SimpleRabaCoder();
     
     /**
      * Yes.
@@ -74,7 +70,7 @@ public class SimpleDataCoder implements IRabaCoder {
         
     }
     
-    private SimpleDataCoder() {
+    private SimpleRabaCoder() {
         
     }
     
@@ -229,7 +225,7 @@ public class SimpleDataCoder implements IRabaCoder {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private static class SimpleDataDecoder implements IRabaDecoder {
+    private static class SimpleDataDecoder extends AbstractRabaDecoder {
 
         /**
          * The #of entries (cached).
@@ -289,10 +285,6 @@ public class SimpleDataCoder implements IRabaCoder {
         
         final public ByteBuffer data() {
             return data;
-        }
-
-        final public boolean isReadOnly() {
-            return true;
         }
 
         public boolean isKeys() {
@@ -397,56 +389,6 @@ public class SimpleDataCoder implements IRabaCoder {
             
         }
 
-        final public Iterator<byte[]> iterator() {
-
-            return new Iterator<byte[]>() {
-
-                int i = 0;
-
-                public boolean hasNext() {
-
-                    return i < size;
-
-                }
-
-                public byte[] next() {
-
-                    if (!hasNext())
-                        throw new NoSuchElementException();
-
-                    return get(i++);
-
-                }
-
-                public void remove() {
-
-                    throw new UnsupportedOperationException();
-                    
-                }
-
-            };
-
-        }
-
-        /*
-         * Mutation.
-         */
-        
-        public void set(int index, byte[] a) {
-            throw new UnsupportedOperationException();   
-        }
-
-        public int add(byte[] a) {
-            throw new UnsupportedOperationException();
-        }
-
-        public int add(byte[] value, int off, int len) {
-            throw new UnsupportedOperationException();
-        }
-
-        public int add(DataInput in, int len) throws IOException {
-            throw new UnsupportedOperationException();        }
-
         /*
          * Search
          */
@@ -515,12 +457,6 @@ public class SimpleDataCoder implements IRabaCoder {
 
             return -(offset + 1);
 
-        }
-
-        public String toString() {
-            
-            return AbstractRaba.toString(this);
-            
         }
         
     }

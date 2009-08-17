@@ -29,29 +29,31 @@ package com.bigdata.btree.raba.codec;
 
 
 /**
- * Test suite for the {@link SimpleDataCoder}.
+ * Test suite for the {@link FrontCodedRabaCoder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSimpleDataCoder extends AbstractDataCoderTestCase {
+public class TestFrontCodedRabaCoderRatio2 extends AbstractFrontCodedRabaCoderTestCase {
 
     /**
      * 
      */
-    public TestSimpleDataCoder() {
+    public TestFrontCodedRabaCoderRatio2() {
     }
 
     /**
      * @param name
      */
-    public TestSimpleDataCoder(String name) {
+    public TestFrontCodedRabaCoderRatio2(String name) {
         super(name);
     }
 
     protected void setUp() throws Exception {
-
-        dataCoder = SimpleDataCoder.INSTANCE;
+        
+        super.setUp();
+        
+        rabaCoder = new FrontCodedRabaCoder(2/* ratio */);
         
     }
 

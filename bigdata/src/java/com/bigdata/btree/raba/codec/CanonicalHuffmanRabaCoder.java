@@ -39,27 +39,26 @@ import it.unimi.dsi.io.ByteBufferInputStream;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
-import java.io.DataInput;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.raba.AbstractRaba;
 import com.bigdata.btree.raba.IRaba;
 
 /**
- * This class provices (de-)compression for logical byte[][]s based on canonical
+ * This class provides (de-)compression for logical byte[][]s based on canonical
  * Huffman codes. Canonical huffman codes preserve the alphabetic order of the
  * original values. However, they are often used because it is possible to
  * transmit the dictionary using fewer bits by sending only the bitLength[] for
- * the code words.
+ * the code words. The {@link CanonicalHuffmanRabaCoder}can be used for keys or
+ * values. When used for keys it codes all byte values so we can search in the
+ * coded space. When used for values, it codes only the byte values which
+ * actually appear in the byte[][] values.
  * 
  * <h3>Record format</h3>
  * 
@@ -211,11 +210,11 @@ import com.bigdata.btree.raba.IRaba;
  * 
  * @see http://www.cs.helsinki.fi/u/jikorhon/ngp/compression.html
  * 
- * @see http
+ * @see http 
  *      ://coding.derkeiler.com/Archive/Java/comp.lang.java.programmer/2003-10
  *      /1545.html
  * 
- * @see http
+ * @see http 
  *      ://java.sun.com/j2se/1.4.2/docs/api/java/util/zip/package-summary.html
  *      #package_description
  * 
@@ -231,7 +230,7 @@ import com.bigdata.btree.raba.IRaba;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class CanonicalHuffmanDataCoder implements IRabaCoder {
+public class CanonicalHuffmanRabaCoder implements IRabaCoder {
 
     /**
      * If there are GT this many symbols then we write a bit coded symbol table,
@@ -259,7 +258,7 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
     final static byte VERSION0 = 0x00;
 
     protected static final Logger log = Logger
-            .getLogger(CanonicalHuffmanDataCoder.class);
+            .getLogger(CanonicalHuffmanRabaCoder.class);
 
     /**
      * FIXME When the {@link IRaba#isKeys()} then code with the unpacked
@@ -278,7 +277,7 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
 
     }
 
-    public CanonicalHuffmanDataCoder() {
+    public CanonicalHuffmanRabaCoder() {
 
     }
 
@@ -1535,13 +1534,19 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
     }
 
     /**
-     * Implementation for huffman encoded byte[][].
+     * Decoder.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
+     * 
+     *          FIXME The methods which interact with the buffer must not change
+     *          its position or limit. If they do then ALL methods which touch
+     *          the buffer need to be synchronized so NONE of them can have a
+     *          concurrent read during which the position/limit has been
+     *          transiently modified.
      */
-    public static class HuffmanRabaDecoder implements IRabaDecoder {
+    public static class HuffmanRabaDecoder extends AbstractRabaDecoder {
 
         protected static final Logger log = Logger
                 .getLogger(HuffmanRabaDecoder.class);
@@ -1612,7 +1617,7 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
          */
         public HuffmanRabaDecoder(final ByteBuffer data,
                 final Decoder decoder) {
-
+            
             final boolean debug = log.isDebugEnabled() || true;
 
             if (data == null)
@@ -1778,15 +1783,6 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
          * {@link #capacity()} by definition for this class.
          */
         final public boolean isFull() {
-
-            return true;
-
-        }
-
-        /**
-         * Return <code>true</code>.
-         */
-        final public boolean isReadOnly() {
 
             return true;
 
@@ -2189,37 +2185,6 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
 
         }
 
-        final public Iterator<byte[]> iterator() {
-
-            return new Iterator<byte[]>() {
-
-                int i = 0;
-
-                public boolean hasNext() {
-
-                    return i < size;
-
-                }
-
-                public byte[] next() {
-
-                    if (!hasNext())
-                        throw new NoSuchElementException();
-
-                    return get(i++);
-
-                }
-
-                public void remove() {
-
-                    throw new UnsupportedOperationException();
-
-                }
-
-            };
-
-        }
-
         /**
          * FIXME write method based on mixture of linear scan and binary search
          * depending on the #of values in the logical array. Make sure that the
@@ -2264,6 +2229,12 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
          * 
          * @param probe
          * @return
+         * 
+         *         FIXME Change the coding of the bitLength[] per the
+         *         recommendations of the article on efficient decoding of
+         *         prefix codes: min, max, #of code words of each length.
+         *         This will be significantly fewer bits when we are coding
+         *         all bytes for search.
          */
         public int search(final byte[] probe) {
 
@@ -2273,26 +2244,6 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
             // Search is not implemented yet.
             throw new UnsupportedOperationException();
 
-        }
-
-        /*
-         * Mutation API is not supported.
-         */
-
-        public int add(byte[] a) {
-            throw new UnsupportedOperationException();
-        }
-
-        public int add(byte[] value, int off, int len) {
-            throw new UnsupportedOperationException();
-        }
-
-        public int add(DataInput in, int len) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void set(int index, byte[] a) {
-            throw new UnsupportedOperationException();
         }
 
         // /**
@@ -2318,12 +2269,6 @@ public class CanonicalHuffmanDataCoder implements IRabaCoder {
         // }
         //
         // private volatile PrefixCoder coder;
-
-        public String toString() {
-            
-            return AbstractRaba.toString(this);
-            
-        }
         
     }
 

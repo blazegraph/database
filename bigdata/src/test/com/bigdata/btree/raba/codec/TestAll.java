@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree.raba.codec;
 
-import com.bigdata.btree.raba.codec.TestCanonicalHuffmanDataCoder;
+import com.bigdata.btree.raba.codec.TestCanonicalHuffmanRabaCoder;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -60,15 +60,15 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("B+Tree key and value codecs");
 
         // no compression.
-        suite.addTestSuite(TestSimpleDataCoder.class);
+        suite.addTestSuite(TestSimpleRabaCoder.class);
         
         // front-compression for ordered unsigned byte[]s.
-        suite.addTestSuite(TestFrontCodedDataCoderRatio2.class);
-        suite.addTestSuite(TestFrontCodedDataCoderRatio8.class);
-        suite.addTestSuite(TestFrontCodedDataCoderRatio32.class);
+        suite.addTestSuite(TestFrontCodedRabaCoderRatio2.class);
+        suite.addTestSuite(TestFrontCodedRabaCoderRatio8.class);
+        suite.addTestSuite(TestFrontCodedRabaCoderRatio32.class);
 
         // canonical huffman coding.
-        suite.addTestSuite(TestCanonicalHuffmanDataCoder.class);
+        suite.addTestSuite(TestCanonicalHuffmanRabaCoder.class);
 
         suite.addTestSuite(TestHuffmanEncoder.class);
 
