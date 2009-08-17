@@ -4,9 +4,9 @@ import com.bigdata.relation.accesspath.IElementFilter;
 
 public abstract class SPOFilter implements IElementFilter<ISPO> {
     
-    public boolean canAccept(final Class c) {
+    public boolean canAccept(final Object o) {
         
-        return ISPO.class.isAssignableFrom(c);
+        return o instanceof ISPO;
         
     }
     
