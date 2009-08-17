@@ -26,6 +26,7 @@ package com.bigdata.rdf.rules;
 
 import java.io.Serializable;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
@@ -52,6 +53,14 @@ import com.bigdata.relation.accesspath.IElementFilter;
  */
 public class DoNotAddFilter extends SPOFilter {
 
+    protected static final Logger log = Logger.getLogger(DoNotAddFilter.class);
+    
+    protected static final boolean INFO = log.isInfoEnabled();
+    
+    protected static final boolean DEBUG = log.isDebugEnabled();
+    
+    
+    
     /**
      * 
      */

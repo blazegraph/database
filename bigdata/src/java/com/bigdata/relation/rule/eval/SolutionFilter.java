@@ -34,9 +34,15 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
         return delegate.accept( e );
     }
     
-    public boolean canAccept(Class c) {
+    public boolean canAccept(Object o) {
 
-        return delegate.canAccept( c );
+        if (o instanceof ISolution == false) {
+            return false;
+        }
+        
+        final Object o2 = ((ISolution)o).get();
+        
+        return delegate.canAccept( o2 );
         
     }
  
