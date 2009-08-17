@@ -27,11 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
-import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.INodeData;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
-import com.bigdata.btree.raba.codec.FrontCodedDataCoder;
-import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 
 /**
  * Test suite for the B+Tree {@link INodeData} records (accessing coded data in
@@ -39,45 +37,38 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo test round trip for each {@link IRabaCoder} implementation suitable for
- *       the keys of a node.
- * 
- *       FIXME Lot's more tests of various {@link INodeData} states.
  */
-public class TestNodeDataRecord extends AbstractBTreeTestCase {
+abstract public class AbstractNodeDataRecordTestCase extends
+        AbstractNodeOrLeafDataRecordTestCase {
 
     /**
      * 
      */
-    public TestNodeDataRecord() {
+    public AbstractNodeDataRecordTestCase() {
     }
 
     /**
      * @param name
      */
-    public TestNodeDataRecord(String name) {
+    public AbstractNodeDataRecordTestCase(String name) {
         super(name);
     }
 
-    protected IRabaCoder keysCoder = null;
-    
-    protected void setUp() throws Exception {
-        
-        super.setUp();
-
-        /*
-         * The implementation for the keys must not permit nulls and must
-         * support search.
-         */
-        keysCoder = new FrontCodedDataCoder(8/*ratio*/);
-
+    @Override
+    protected boolean mayGenerateLeaves() {
+        return false;
     }
 
-    /**
-     * Unit test for an empty leaf.
+    @Override
+    protected boolean mayGenerateNodes() {
+        return true;
+    }
+
+   /**
+     * Unit test for an empty node (this is not a legal instance since only the
+     * root leaf may ever be empty).
      */
-    public void test_emptyLeaf() {
+    public void test_emptyNode() {
 
         final int m = 3;
         final int nkeys = 0;
@@ -95,10 +86,32 @@ public class TestNodeDataRecord extends AbstractBTreeTestCase {
 
     }
 
-    public void test_withData() {
+    /**
+     * This the minimum legal node for a branching factor of 3. It has one key
+     * and two children.
+     */
+    public void test_tupleCount1() {
         
-        fail("test lots of cases");
-        
-    }
+        final int m = 3;
+        final int nkeys = 1;
+        final byte[][] keys = new byte[m + 1][];
+        final long[] childAddr = new long[m + 1];
+        final int childEntryCount[] = new int[m + 1];
 
+        keys[0] = new byte[]{1,2,3};
+        
+        int entryCount = 0;
+        for (int i = 0; i < nkeys; i++) {
+            entryCount += childEntryCount[i];
+        }
+        
+        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(
+                nkeys, keys),entryCount,childAddr,childEntryCount);
+
+        final INodeData actual = new ReadOnlyNodeData(expected, keysCoder);
+
+        assertSameNodeData(expected, actual);
+
+    }
+    
 }

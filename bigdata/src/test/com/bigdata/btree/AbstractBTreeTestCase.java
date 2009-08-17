@@ -34,7 +34,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import junit.framework.AssertionFailedError;
@@ -2354,6 +2356,75 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assertFalse("Not expecting more tuples", actualItr.hasNext());
         
+    }
+
+    /**
+     * Generate a set of N random distinct byte[] keys in sorted order using an
+     * unsigned byte[] comparison function.
+     * 
+     * @param maxKeys
+     *            The capacity of the array.
+     * 
+     * @param nkeys
+     *            The #of keys to generate.
+     * 
+     * @return A byte[][] with nkeys non-null byte[] entries and a capacity of
+     *         maxKeys.
+     */
+    public static byte[][] getRandomKeys(final int maxKeys, final int nkeys) {
+
+        final Random r = new Random();
+
+        assert nkeys >= 0;
+        assert maxKeys >= nkeys;
+        
+        final int maxKeyLen = 20;
+
+        /*
+         * generate maxKeys distinct keys (sort requires that the keys are
+         * non-null).
+         */
+        
+        // used to ensure distinct keys.
+        final Set<byte[]> set = new TreeSet<byte[]>(
+                BytesUtil.UnsignedByteArrayComparator.INSTANCE);
+
+        final byte[][] keys = new byte[maxKeys][];
+
+        int n = 0;
+
+        while (n < maxKeys) {
+
+            // random key length in [1:maxKeyLen].
+            final byte[] key = new byte[r.nextInt(maxKeyLen) + 1];
+
+            // random data in the key.
+            r.nextBytes(key);
+
+            if( set.add(key)) {
+
+                keys[n++] = key;
+
+            }
+            
+        }
+
+        /*
+         * place keys into sorted order.
+         */
+        Arrays.sort(keys, BytesUtil.UnsignedByteArrayComparator.INSTANCE);
+
+        /*
+         * clear out keys from keys[nkeys] through keys[maxKeys-1].
+         */
+        for (int i = nkeys; i < maxKeys; i++) {
+
+            keys[i] = null;
+
+        }
+
+        return keys;
+
     }
 
     /**

@@ -85,6 +85,9 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         if (b == null)
             throw new IllegalArgumentException();
 
+        if (keysCoder == null)
+            throw new IllegalArgumentException();
+
         final byte type = b.get();
 
         switch (type) {
@@ -137,6 +140,12 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
      *            The data to be encoded.
      */
     public ReadOnlyNodeData(final INodeData node, final IRabaCoder keysCoder) {
+
+        if (node == null)
+            throw new IllegalArgumentException();
+
+        if (keysCoder == null)
+            throw new IllegalArgumentException();
 
         // cache some fields.
         this.nkeys = node.getKeyCount();

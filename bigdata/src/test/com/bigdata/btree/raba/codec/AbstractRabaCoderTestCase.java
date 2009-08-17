@@ -53,18 +53,18 @@ import com.bigdata.btree.raba.ReadOnlyValuesRaba;
  * 
  * @todo also test for probe keys that are not found.
  */
-abstract public class AbstractDataCoderTestCase extends TestCase2 {
+abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
     /**
      * 
      */
-    public AbstractDataCoderTestCase() {
+    public AbstractRabaCoderTestCase() {
     }
 
     /**
      * @param name
      */
-    public AbstractDataCoderTestCase(String name) {
+    public AbstractRabaCoderTestCase(String name) {
         super(name);
     }
 
@@ -72,7 +72,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      * The fixture under test. This will be <code>null</code> unless you
      * explicitly set it in {@link #setUp()}.
      */
-    protected IRabaCoder dataCoder = null;
+    protected IRabaCoder rabaCoder = null;
 
     /**
      * @todo test decode w/ nulls and delete markers and verify this. deleted
@@ -104,15 +104,15 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         a[0] = "mike".getBytes("US-ASCII");
         a[1] = "personick".getBytes("US-ASCII");
 
-        if(dataCoder.isKeyCoder()) {
+        if(rabaCoder.isKeyCoder()) {
 
-            doRoundTripTest(dataCoder, new ReadOnlyKeysRaba(a));
+            doRoundTripTest(rabaCoder, new ReadOnlyKeysRaba(a));
             
         }
 
-        if(dataCoder.isValueCoder()) {
+        if(rabaCoder.isValueCoder()) {
 
-            doRoundTripTest(dataCoder, new ReadOnlyValuesRaba(a));
+            doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
             
         }
 
@@ -128,15 +128,15 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
 
         a[0] = new byte[] { 64, -64 };
 
-        if (dataCoder.isKeyCoder()) {
+        if (rabaCoder.isKeyCoder()) {
 
-            doRoundTripTest(dataCoder, new ReadOnlyKeysRaba(a));
+            doRoundTripTest(rabaCoder, new ReadOnlyKeysRaba(a));
 
         }
 
-        if (dataCoder.isValueCoder()) {
+        if (rabaCoder.isValueCoder()) {
 
-            doRoundTripTest(dataCoder, new ReadOnlyValuesRaba(a));
+            doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
 
         }
 
@@ -154,15 +154,15 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         a[1] = "mike".getBytes("US-ASCII");
         a[2] = "personick".getBytes("US-ASCII");
         
-        if (dataCoder.isKeyCoder()) {
+        if (rabaCoder.isKeyCoder()) {
 
-            doRoundTripTest(dataCoder, new ReadOnlyKeysRaba(a));
+            doRoundTripTest(rabaCoder, new ReadOnlyKeysRaba(a));
 
         }
 
-        if (dataCoder.isValueCoder()) {
+        if (rabaCoder.isValueCoder()) {
 
-            doRoundTripTest(dataCoder, new ReadOnlyValuesRaba(a));
+            doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
 
         }
 
@@ -176,7 +176,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      */
     public void test_withNulls() throws UnsupportedEncodingException {
 
-        if (!dataCoder.isValueCoder()) {
+        if (!rabaCoder.isValueCoder()) {
 
             // coded does not allow nulls.
             return;
@@ -190,7 +190,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         
         final IRaba expected = new ReadOnlyValuesRaba(a);
 
-        doRoundTripTest(dataCoder, expected);
+        doRoundTripTest(rabaCoder, expected);
 
     }
 
@@ -206,7 +206,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      */
     public void test_withNulls2() {
         
-        if (!dataCoder.isValueCoder()) {
+        if (!rabaCoder.isValueCoder()) {
 
             // coded does not allow nulls.
             return;
@@ -219,7 +219,7 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         
         final IRaba expected = new ReadOnlyValuesRaba(a);
 
-        doRoundTripTest(dataCoder, expected);
+        doRoundTripTest(rabaCoder, expected);
 
     }
 
@@ -227,13 +227,13 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
 
     public void test_empty() throws IOException {
 
-        doRandomRoundTripTest(dataCoder, 0/* size */, 0/*capacity*/);
+        doRandomRoundTripTest(rabaCoder, 0/* size */, 0/*capacity*/);
 
-        doRandomRoundTripTest(dataCoder, 0/* size */, 1/*capacity*/);
+        doRandomRoundTripTest(rabaCoder, 0/* size */, 1/*capacity*/);
         
-        doRandomRoundTripTest(dataCoder, 0/* size */, 2/*capacity*/);
+        doRandomRoundTripTest(rabaCoder, 0/* size */, 2/*capacity*/);
         
-        doRandomRoundTripTest(dataCoder, 0/* size */, 10/*capacity*/);
+        doRandomRoundTripTest(rabaCoder, 0/* size */, 10/*capacity*/);
         
     }
 
@@ -252,21 +252,62 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
      */
     public void test_entryCount1() throws IOException {
 
-        doRandomRoundTripTest(dataCoder, 1/* n */, 1/* capacity */);
+        doRandomRoundTripTest(rabaCoder, 1/* n */, 1/* capacity */);
 
-        doRandomRoundTripTest(dataCoder, 1/* n */, 2/* capacity */);
+        doRandomRoundTripTest(rabaCoder, 1/* n */, 2/* capacity */);
 
-        doRandomRoundTripTest(dataCoder, 1/* n */, 10/* capacity */);
+        doRandomRoundTripTest(rabaCoder, 1/* n */, 10/* capacity */);
 
     }
 
     public void test_entryCount2() throws IOException {
 
-        doRandomRoundTripTest(dataCoder, 2/* n */, 2/* capacity */);
+        doRandomRoundTripTest(rabaCoder, 2/* n */, 2/* capacity */);
 
-        doRandomRoundTripTest(dataCoder, 2/* n */, 3/* capacity */);
+        doRandomRoundTripTest(rabaCoder, 2/* n */, 3/* capacity */);
 
-        doRandomRoundTripTest(dataCoder, 2/* n */, 10/* capacity */);
+        doRandomRoundTripTest(rabaCoder, 2/* n */, 10/* capacity */);
+
+    }
+    
+    public void test_error1() throws IOException {
+
+        final byte b187 = KeyBuilder.encodeByte(187);
+        final byte b146 = KeyBuilder.encodeByte(146);
+        final byte b207 = KeyBuilder.encodeByte(207);
+        
+        final byte[][] a = new byte[][] {//
+        new byte[]{121, b187, b146, b207, 99, 112, 24, 116},//
+        new byte[]{121, b187, b146, b207, 99, 112, 43, 68},//
+        new byte[]{121, b187, b146, b207, 99, 112, 46, 78},//
+        new byte[]{121, b187, b146, b207, 99, 112, 54, KeyBuilder.encodeByte(176)},//
+        new byte[]{121, b187, b146, b207, 99, 112, 54, KeyBuilder.encodeByte(236)},//
+        new byte[]{121, b187, b146, b207, 99, 112, 55, KeyBuilder.encodeByte(209)},//
+        new byte[]{121, b187, b146, b207, 99, 112, 62, 85},//
+        new byte[]{121, b187, b146, b207, 99, 112, 63, KeyBuilder.encodeByte(238)},//
+        new byte[]{121, b187, b146, b207, 99, 112, 71, 124},//
+        new byte[]{121, b187, b146, b207, 99, 112, 73, 49}//
+        };
+        
+        if(rabaCoder.isKeyCoder()) {
+            final IRaba expected = new ReadOnlyKeysRaba(a);
+            final IRaba actual = rabaCoder.encode(expected);
+            System.err.println(actual.toString());
+            // this is the one whose rlen/clen appear to be incorrect.
+            assertEquals(expected.get(4),actual.get(4));
+            assertEquals(0, actual.search(expected.get(0)));
+            assertEquals(1, actual.search(expected.get(1)));
+            assertEquals(2, actual.search(expected.get(2)));
+            assertEquals(3, actual.search(expected.get(3)));
+            assertEquals(8, actual.search(expected.get(8)));
+            assertEquals(4, actual.search(expected.get(4)));
+            assertEquals(5, actual.search(expected.get(5)));//broken
+            doRoundTripTest(rabaCoder, expected);
+        }
+
+        if(rabaCoder.isValueCoder()) {
+            doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
+        }
 
     }
     
@@ -276,9 +317,9 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         final int n = r.nextInt(100);
 
         // capacity of the array.
-        final int capacity = n + r.nextInt(n); 
-        
-        doRandomRoundTripTest(dataCoder, n, capacity);
+        final int capacity = n + r.nextInt(n + 1);
+
+        doRandomRoundTripTest(rabaCoder, n, capacity);
         
     }
 
@@ -287,72 +328,30 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         for (int i = 0; i < 1000; i++) {
 
             // #of elements.
-            final int n = r.nextInt(100) + 0;
+            final int n = r.nextInt(100);
 
             // capacity of the array.
             final int capacity = n + r.nextInt(n + 1);
 
-            doRandomRoundTripTest(dataCoder, n, capacity);
+            doRandomRoundTripTest(rabaCoder, n, capacity);
 
         }
 
     }
 
-    /**
-     * Interpret the string as a sequence of ASCII characters and encode it as
-     * an unsigned byte[].
-     * 
-     * @param s
-     *            The string
-     * 
-     * @return The unsigned byte[].
-     * 
-     * @todo why not use the real {@link KeyBuilder}?
-     */
-    protected byte[] makeKey(final String s) {
-    
-        final int len = s.length();
-        
-        //ensureFree(len);
-        
-        final byte[] buf = new byte[len];
-
-        for (int j = 0; j < len; j++) {
-
-            final char ch = s.charAt(j);
-            
-    //        append((byte)(ch & 0xff));
-    
-            // lexiographic ordering as unsigned byte.
-            
-            int v = (byte)ch;
-            
-            if (v < 0) {
-    
-                v = v - 0x80;
-    
-            } else {
-                
-                v = v + 0x80;
-                
-            }
-            
-            buf[j] = (byte)(v & 0xff);
-    
-        }
-        
-        return buf;
-
-    }
-    
     /**
      * Test using a sequence of random URIs (formed with successive prefixes).
      * 
      * @throws Exception
      */
     public void test_randomURIs() throws Exception {
-        
-        // generate 100 random URIs
+
+        /*
+         * Generate 100 random and distinct URIs.
+         * 
+         * Note: These data are distinct but ARE NOT fully ordered. We sort them
+         * before we use them as keys.
+         */
 
         final byte[][] data = new byte[100][];
         
@@ -361,33 +360,37 @@ abstract public class AbstractDataCoderTestCase extends TestCase2 {
         long lastCounter = r.nextInt();
         
         for (int i = 0; i < 100; i++) {
-            
-            data[i] = makeKey(ns + String.valueOf(lastCounter)); 
-                
-            lastCounter = lastCounter + r.nextInt(100) + 1;
+
+            data[i] = KeyBuilder.asSortKey(ns + String.valueOf(lastCounter));
+
+            final int inc = r.nextInt(100) + 1;
+
+            assert inc > 0 : "inc="+inc;
+
+            lastCounter += inc;
             
         }
         
-//        // put into sorted order.
-//        Arrays.sort(data, 0, data.length, UnsignedByteArrayComparator.INSTANCE);
-
-        if (dataCoder.isValueCoder()) {
+        if (rabaCoder.isValueCoder()) {
 
             // layer on interface.
             final IRaba raba = new ReadOnlyValuesRaba(0/* fromIndex */,
                     data.length/* toIndex */, data.length/* capacity */, data);
 
-            doRoundTripTest(dataCoder, raba);
+            doRoundTripTest(rabaCoder, raba);
 
         }
 
-        if (dataCoder.isKeyCoder()) {
+        if (rabaCoder.isKeyCoder()) {
+
+            // put into sorted order.
+            Arrays.sort(data, 0, data.length, UnsignedByteArrayComparator.INSTANCE);
 
             // layer on interface.
             final IRaba raba = new ReadOnlyKeysRaba(0/* fromIndex */,
                     data.length/* toIndex */, data.length/* capacity */, data);
 
-            doRoundTripTest(dataCoder, raba);
+            doRoundTripTest(rabaCoder, raba);
 
         }
         

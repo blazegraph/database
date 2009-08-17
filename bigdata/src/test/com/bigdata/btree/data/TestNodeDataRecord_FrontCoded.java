@@ -22,37 +22,50 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 6, 2009
+ * Created on Aug 5, 2009
  */
 
-package com.bigdata.btree.raba.codec;
+package com.bigdata.btree.data;
 
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 
 /**
- * Test suite for the {@link CanonicalHuffmanDataCoder}.
+ * Test suite using the {@link FrontCodedRabaCoder} to provide key compression.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestCanonicalHuffmanDataCoder extends AbstractDataCoderTestCase {
+public class TestNodeDataRecord_FrontCoded extends AbstractNodeOrLeafDataRecordTestCase {
 
     /**
      * 
      */
-    public TestCanonicalHuffmanDataCoder() {
+    public TestNodeDataRecord_FrontCoded() {
     }
 
     /**
      * @param name
      */
-    public TestCanonicalHuffmanDataCoder(String name) {
+    public TestNodeDataRecord_FrontCoded(String name) {
         super(name);
+    }
+
+    @Override
+    protected boolean mayGenerateLeaves() {
+        return false;
+    }
+
+    @Override
+    protected boolean mayGenerateNodes() {
+        return true;
     }
 
     protected void setUp() throws Exception {
         
-        dataCoder = new CanonicalHuffmanDataCoder();
-        
-    }
+        super.setUp();
 
+        keysCoder = new FrontCodedRabaCoder(8/*ratio*/);
+
+    }
+    
 }

@@ -29,8 +29,6 @@ package com.bigdata.btree;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 
 import org.apache.log4j.Level;
@@ -83,7 +81,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
             
             metadata.setBranchingFactor(branchingFactor);
             
-            metadata.setIsolatable(r.nextBoolean());
+//            metadata.setIsolatable(r.nextBoolean());
             
             metadata.setDeleteMarkers(r.nextBoolean());
 
@@ -432,71 +430,6 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         
     }
     
-    /**
-     * Generate a set of N random distinct byte[] keys in sorted order using an
-     * unsigned byte[] comparison function.
-     * 
-     * @param maxKeys
-     *            The capacity of the array.
-     * 
-     * @param nkeys
-     *            The #of keys to generate.
-     * 
-     * @return A byte[][] with nkeys non-null byte[] entries and a capacity of
-     *         maxKeys.
-     */
-    public byte[][] getRandomKeys(int maxKeys, int nkeys) {
-        
-        assert maxKeys >= nkeys;
-        
-        final int maxKeyLen = 20;
-
-        /*
-         * generate maxKeys distinct keys (sort requires that the keys are
-         * non-null).
-         */
-        
-        // used to ensure distinct keys.
-        Set<byte[]> set = new TreeSet<byte[]>(BytesUtil.UnsignedByteArrayComparator.INSTANCE);
-        
-        byte[][] keys = new byte[maxKeys][];
-
-        int n = 0;
-        
-        while( n < maxKeys) {
-
-            // random key length in [1:maxKeyLen].
-            byte[] key = new byte[r.nextInt(maxKeyLen)+1]; 
-
-            // random data in the key.
-            r.nextBytes(key);
-
-            if( set.add(key)) {
-
-                keys[n++] = key;
-
-            }
-            
-        }
-    
-        /* 
-         * place keys into sorted order.
-         */
-        Arrays.sort(keys,BytesUtil.UnsignedByteArrayComparator.INSTANCE);
-
-        /*
-         * clear out keys from keys[nkeys] through keys[maxKeys-1].
-         */
-        for( int i=nkeys; i<maxKeys; i++ ) {
-            
-            keys[i] = null;
-            
-        }
-        
-        return keys;
-
-    }
-
     /**
      * Generates a non-leaf node with random data.
      */

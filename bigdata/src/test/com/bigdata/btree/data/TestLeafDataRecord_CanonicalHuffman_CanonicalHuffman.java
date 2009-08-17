@@ -22,38 +22,43 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 6, 2009
+ * Created on Aug 5, 2009
  */
 
-package com.bigdata.btree.raba.codec;
+package com.bigdata.btree.data;
 
+import com.bigdata.btree.ILeafData;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
 
 /**
- * Test suite for the {@link FrontCodedDataCoder}.
+ * Test suite for the B+Tree {@link ILeafData} records (accessing coded data in
+ * place).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestFrontCodedDataCoderRatio32 extends AbstractFrontCodedDataCoderTestCase {
+public class TestLeafDataRecord_CanonicalHuffman_CanonicalHuffman extends AbstractLeafDataRecordTestCase {
 
     /**
      * 
      */
-    public TestFrontCodedDataCoderRatio32() {
+    public TestLeafDataRecord_CanonicalHuffman_CanonicalHuffman() {
     }
 
     /**
      * @param name
      */
-    public TestFrontCodedDataCoderRatio32(String name) {
+    public TestLeafDataRecord_CanonicalHuffman_CanonicalHuffman(String name) {
         super(name);
     }
 
     protected void setUp() throws Exception {
         
         super.setUp();
-        
-        dataCoder = new FrontCodedDataCoder(32/* ratio */);
+
+        keysCoder = new CanonicalHuffmanRabaCoder();
+
+        valuesCoder = new CanonicalHuffmanRabaCoder();
         
     }
 

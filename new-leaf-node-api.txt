@@ -17,12 +17,13 @@ Issues to be resolved in this branch.
 
 4. Dependency refactor (fastutil, dsiutils, lgpl-utils).
 
+5. Performance optimizations for the B+Tree refactor change set,
+   including the performance tuning for the rabas, the LRU buffer,
+   configurations, etc.
+
 --------------------
 
 Query optimization
-
-x. B+Tree optimization (at least with respect to performance tuning
-   for the B+Tree refactor change set).
 
 x. Parallel range iterator flag.
 
@@ -37,12 +38,26 @@ Index partition splits.
 
    - Proactive scheduling
 
-   - Faster (possible dependency on deleted tuple count, but actually
-     I think that is a dead end).
+   - Faster.  The best solution is to split after a compacting merge
+     since we have exact knowledge of the tuple counts and exact
+     knowledge of the on disk storage requirements at that time.
 
    - More robust (transactional)
 
    - Based on #of bytes in post-merge file (no need to tweak).
+
+-------------------- 
+Examples:
+
+ - Example showing use of the {@link KeyBuilder} (and DDL?)
+  
+ - Example showing how to use the scale-out indices efficiently with
+   {@link IIndexProcedure}s. this approach is necessary when you need
+   to do complex logic which would otherwise result in a large volume
+   of point tests against the scale-out index. Instead you map a
+   procedure against the index and it is executed locally on each
+   index partition within some key-range.
+
 
 ------------------------------------------------------------
 -------------- Store level record compression --------------
@@ -265,36 +280,10 @@ Goals:
        node or leaf will always use IRawStore#write(int,ByteBuffer).
 
        The keys and values 
-
-       - The key compression and value compression methods are stored
-         on the BTree.  So is the branching factor.
-
-	 Serialize the HuTucker coder, decoder and the codewords,
-	 which is a bit string.  Do search by projecting the probe key
-	 using the coder and then do use linear scan of the code words
-	 stopping at the first code work GTE the key.
 	 
-	 The HuTucker decoder (TreeDecoder) can be built from the
-	 codeWords:BitVector and the symbol:int[].  So we only need to
-	 store those two things.  We can then rewind the bit stream to
-	 decode the code words.
-	 
-	 The HuTucker coder (CodeWordCoder) can be built from the
-	 codeWords:BitVector.
+       - LinkedLeaf:
 
-	 - Could bit flag nulls explicitly rather than mussing with
-           the huffman encoding.  When scanning the code words to
-           decode a value we would have to skip an imaginary code word
-           if the corresponding tuple index was null or deleted.
-
-	 ? Why not a ctor for TreeDecoder which accepts a BIS?
-
-       - Done. IAbstractNodeData#getBranchingFactor() is deprecated
-         (the field is not stored in node/leaf data record and the
-         branchingFactor field is on the AbstractBTree and should be
-         accessed there).
-
-       - The priorAddr and nextAddr fields need to be exposed by the
+         The priorAddr and nextAddr fields need to be exposed by the
          ILeafData API.
 
 	 The getter methods should throw an exception if the fields
@@ -305,40 +294,117 @@ Goals:
          record is serialized and we have the address of the _next_
          record from the store.
 
-       - Done. Create mutable INodeData and ILeafData implementations
-         based on the existing code in AbstractNode, Node, Leaf, and
+       - Create mutable INodeData and ILeafData implementations based
+         on the existing code in AbstractNode, Node, Leaf, and
          MutableKeys.
 
-       - Refactor Node and Leaf to delegate to the INodeData or
-         ILeafData implementation.
-	 
-	 (***) ILeafData#getValue(int) and possibly some other methods
-	       must also test whether or not the tuple has been
-	       deleted.
+	 - (***) ILeafData#getValue(int) and possibly some other
+	   methods must also test whether or not the tuple has been
+	   deleted.  That information is NOT available on the IRaba.
 
-       - Persistence of a mutable node should always produce the same
-	 binary image as an immutable node.  If the immutable node
-	 needs to be modified, then explode it into java objects.
+         - Refactor Node and Leaf to delegate to the INodeData or
+	   ILeafData implementation.  Define a MutableNodeData and a
+	   MutableLeafData.
+
+	   Should copyOnWrite clone the "data" or the "node"?
+
+         - IndexMetadata will need to be updated to reflect the codec
+	   interface change and the reconcilation of the
+	   IDataSerializer with the IRabaCoder.
+       
+         - NodeSerializer, IAddressSerializer, and INodeFactory are
+           deprecated and will be deleted.
+
+	 - Examine ResultSet uses and try to use in-place access to
+           the compressed keys and values.
+
+       - Done. FrontCoded.
+
+       - Canonical Huffman (****)
+
+	  - The canonical huffman raba still has problems with
+            reconstructing the decoder efficiently from just the code
+            word run length data.
+
+	  - If the InputBitStream backed by a ByteBuffer is buffered,
+	    then make sure that the buffer is a reasonable size.  We
+	    could do this ourselves with a BufferedInputStream
+	    wrapping the ByteBufferInputStream.
+
+	  - (***) Do a version of the canonical huffman raba for keys
+	    (code words for all byte values so we can project a key
+	    into the coded value space and perform search on the coded
+	    keys).
+
+       - Done. Refactor the FastRDFValueSerializer (no test suite yet).
+
+       - RDF Keys coder?
+
+	  If we allowed a different IRabaCoder for the B+Tree leaf
+          keys and the B+Tree node keys then we could write a custom
+          canonical huffman coder for the RDF keys.
+
+	  Prefix coding might do just as well for space, but the
+          canonical huffman coding should be better for search for two
+          reasons: (1) it has random access to each coded value, not
+          just to every [ratio] coded values; (2) it is comparing
+          shorter values. (Actually, prefix search is pretty
+          efficient.)
+
+       - ByteBuffer is too slow.
+	   
+	     There are two very frequent batch operations which we use
+	     where we are forced to use byte-at-a-time processing with
+	     ByteBuffer.  These are (1) compareBytes(), which is an
+	     unsigned byte[] compare; and (2) writeOn(OS), which is
+	     used to copy byte[]s out of a raba.
+
+	     DO NOT use ByteBuffer#asReadOnlyBuffer() since it hides
+	     the backing byte[].
+
+	     DO tunnel through to the backing {byte[], off, len} for a
+	     heap ByteBuffer and use that data in place of the
+	     ByteBuffer within IRabaCoder#decode()
+	     implementations. Possibly extend the BackingBuffer
+	     interface and implementations for this purpose.
+
+	     Note: Test suites will have to exercise both with and w/o
+	     the byte[] tunnel.  The easy way to do that is to use
+	     ByteBuffer#asReadOnlyBuffer() since that will hide the
+	     array().
+
+	     Note: (*****) Methods which interact with a ByteBuffer
+	     MUST NOT change its position or limit. If they do then
+	     ALL methods which touch the buffer need to be
+	     synchronized so NONE of them can have a concurrent read
+	     during which the position/limit has been transiently
+	     modified.  The culprits here are the bulk byte transfer
+	     methods ByteBuffer#get() and ByteBuffer#put().  This is
+	     really a huge limitation on the use of a ByteBuffer for
+	     concurrent access to a read-only data structure!!!!
+
+	     Note: We will still have a C heap ByteBuffer for the
+             IndexSegment nodes region, but that might be the only
+             place they show up.
+
+	     Note: If we are doing record level compression then be
+             sure to decompress to an expandable per-worker task
+             byte[].  Once decompressed, create an exact fit byte[]
+             and wrap it as a ByteBuffer.
+
+	     This could be part of how we reconcile the DataSerializer
+	     and the IRabaCoder APIs.
 
        - Add global read retention queue and weak value hash map based
          lookup per store of the retained nodes.
-         
-       - INodeFactory must be replaced or modified such that it
-         creates a Node or Leaf from a ByteBuffer or allocates and
-         writes the representation of a Node or Leaf on a ByteBuffer,
-         which is more or less the role of the NodeSerializer.  The
-         INodeFactory passes all of the arguments, including the
-         byte[][]s, int[]s, and long[]s which will not work when we
-         have a AbstractBTree and a ByteBuffer.
 
-       - The IndexSegment's Node and Leaf instances must remain
-         immutable (various methods are overriden to throw
-         exceptions for unsupported operations).
+       - Examine GC problems with lots of B+Tree nodes buffered.  Try
+         parallel old GC and the G1 collector.
 
-       - I may need to converge on a common interface for RMI and
-         B+Tree nodes and leaves which is different from IKeyBuffer or
-         IRandomAccessByteArray.  If so, then IndexMetadata will need
-         to be updated to reflect the codec interface change.
+	 Tony Printezis [Antonios.Printezis@sun.com] 10G+ heaps will
+	 most likely create unpleasant Full GC pauses!  :-) But, yes,
+	 evaluate Parallel Old to first see how it works. And we can
+	 take it from there...
 
        - Done. Converge on the standard fastutil and dsi dependencies,
          removing their variants from the lgpl-utils module and move
@@ -382,38 +448,14 @@ Goals:
 	   Request changes in dsi-utils so we can use that BloomFilter
 	   class directly.
 
-	 - Delete FastRDFKeyCompression (broken and Huffman or
-           Hu-Tucker key compression should be just as good).
-
          - (*) Use autojar to extract only the necessary classes from
            fastutils.  Possibly do this as part of the lgpl-utils
            build.
 
-    x. huffman (or extensible?) coding for the values.
-
-    x. The spanned entry counts, the child addresses, and the
-       timestamps are all fixed length int32 or int64 fields.  These
-       can be compressed by a huffman coding on their byte values if
-       we want to keep the in-memory representation down more or they
-       could be stored "as is" in serialized record and deflate could
-       then compress them for the disk.
-
-    x. Bit flags for the delete markers.  Set aside (nentries/8)+1
-       bytes for this.
-
-  - Fixed or variable sized "page?"
-
-     - Unless record size is variable we need to control the #of
-       tuples in a "page" which would require new logic in Node, Leaf
-       and IndexSegmentBuilder/Plan.
-
-     - However, if record size is variable, then we need to manage the
-       "heap" on a native direct buffer or use byte[]s (or a
-       ByteBuffer backed by a byte[]).
-
 Access:
 
-  - Efficient search on compressed keys (prefix or hu-tucker).
+  - Efficient search on compressed keys (prefix, canonical huffman, or
+    hu-tucker).
 
   - Random access to tuples in a leaf (for keyAt(), etc).  This does
     not have to be as efficient as the key search which is much more
@@ -428,26 +470,6 @@ Access:
   - Efficient merged iterator on two or more leaves with optional
     filter (used for storing asynchronous writes in a compressed
     form).
-
-  - Fast index partition splits.  Record #of spanned tuples (already
-    done) and the #of spanned undeleted tuples.  The latter will be
-    used for fast index partition splits, fast exact range counts,
-    etc.  (I wonder if I really need to know the total #of tuples
-    spanned or just the #of undeleted tuples spanned.) 
-
-    The split can be identified by a search for keys whose undeleted
-    tuple count equally partitions the view.  For a split into two
-    index partitions, the search identifies a key such that the
-    undeleted tuple range counts are for the left and right sibling
-    are approximately equal.  [In fact, I am not sure if this is
-    possible since whether a tuple is deleted or not is only decidable
-    in two cases: (a) when the view is compact; and (b) when an
-    undeleted tuple scan reports the tuple.  So the fast split might
-    only be possible as part of a compacting merge when we have a view
-    without deleted tuples.  It is probably Ok if there are deleted
-    tuples on the mutable B+Tree if we track the deleted tuple count
-    there and know that the sole index segment in the view does not
-    have any deleted tuples.]
 
   - Parallel iterator scan at the ClientIndexView level (process the
     index partitions in parallel).  This should be implemented using a
@@ -477,7 +499,6 @@ Access:
 
   - Strongly type the AbstractBTree's IAutoBox interface for the
     key/value types and link that with the ITupleSerializer types.
-    
 
 API: 
 

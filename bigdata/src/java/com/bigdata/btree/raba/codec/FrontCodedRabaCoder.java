@@ -4,7 +4,6 @@ import it.unimi.dsi.fastutil.bytes.ByteArrayFrontCodedList;
 import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
 
 import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
 import java.io.DataOutputStream;
 import java.io.Externalizable;
 import java.io.IOException;
@@ -17,7 +16,6 @@ import java.util.Iterator;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.compression.PrefixSerializer;
-import com.bigdata.btree.raba.AbstractRaba;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.rawstore.Bytes;
 
@@ -35,7 +33,7 @@ import com.bigdata.rawstore.Bytes;
  *       current includes the #of bytes in the front-coded representation as
  *       part of its record format.
  */
-public class FrontCodedDataCoder implements IRabaCoder, Externalizable {
+public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
     /**
      * 
@@ -43,7 +41,7 @@ public class FrontCodedDataCoder implements IRabaCoder, Externalizable {
     private static final long serialVersionUID = -8195482077263147785L;
 
     protected static final Logger log = Logger
-            .getLogger(FrontCodedDataCoder.class);
+            .getLogger(FrontCodedRabaCoder.class);
 
     private int ratio;
 
@@ -75,7 +73,7 @@ public class FrontCodedDataCoder implements IRabaCoder, Externalizable {
      * m = n(64)/ratio(4) = 16
      * </pre>
      */
-    public FrontCodedDataCoder(final int ratio) {
+    public FrontCodedRabaCoder(final int ratio) {
 
         this.ratio = ratio;
 
@@ -187,7 +185,7 @@ public class FrontCodedDataCoder implements IRabaCoder, Externalizable {
      *         Thompson</a>
      * @version $Id$
      */
-    static class FrontCodedDecoder implements IRabaDecoder {
+    static class FrontCodedDecoder extends AbstractRabaDecoder {
 
         final ByteBuffer data;
 
@@ -249,15 +247,6 @@ public class FrontCodedDataCoder implements IRabaCoder, Externalizable {
         public ByteBuffer data() {
 
             return data;
-
-        }
-
-        /**
-         * Implementation is read-only.
-         */
-        final public boolean isReadOnly() {
-
-            return true;
 
         }
 
@@ -358,28 +347,6 @@ public class FrontCodedDataCoder implements IRabaCoder, Externalizable {
 
         }
 
-        public int add(byte[] a) {
-            throw new UnsupportedOperationException();
-        }
-
-        public int add(byte[] value, int off, int len) {
-            throw new UnsupportedOperationException();
-        }
-
-        public int add(DataInput in, int len) throws IOException {
-            throw new UnsupportedOperationException();
-        }
-
-        public void set(int index, byte[] a) {
-            throw new UnsupportedOperationException();
-        }
-
-        public String toString() {
-            
-            return AbstractRaba.toString(this);
-            
-        }
-        
     }
 
 }

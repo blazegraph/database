@@ -300,6 +300,14 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
 
     /**
      * Implementation with a backing {@link ByteBuffer}.
+     * <p>
+     * Note: Methods which interact with a ByteBuffer MUST NOT change its
+     * position or limit. If they do then ALL methods which touch the buffer
+     * need to be synchronized so NONE of them can have a concurrent read during
+     * which the position/limit has been transiently modified. The culprits here
+     * are the bulk byte transfer methods ByteBuffer#get() and ByteBuffer#put().
+     * This is really a huge limitation on the use of a ByteBuffer for
+     * concurrent access to a read-only data structure.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -327,11 +335,14 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
         }
         
         public byte get(final int i) {
-            return b.get(i);
+            synchronized(b) {
+                return b.get(i);
+            }
         }
 
         // @todo tweak by extracting values that are reused into tmp vars.
         public int readInt(final int pos) {
+            synchronized(b) {
             if (get(pos) >= 0)
                 return get(pos);
             if (get(pos + 1) >= 0)
@@ -343,25 +354,37 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
                         | (-get(pos + 2) - 1) << 7 | get(pos + 3);
             return (-get(pos) - 1) << 28 | (-get(pos + 1) - 1) << 21
                     | (-get(pos + 2) - 1) << 14 | (-get(pos + 3) - 1) << 7 | get(pos + 4);
+            }
         }
 
         public byte[] toArray() {
-            // prevent concurrent modification to the pos/limit.
-            final ByteBuffer b = this.b.asReadOnlyBuffer();
-            final byte[] a = new byte[b.capacity()];
-            b.limit(b.capacity());
-            b.rewind();
-            b.get(a);
-            return a;
+            /*
+             * Note: synchronized to prevent concurrent modification to the
+             * pos/limit. The pos/limit are restored as a postcondition using
+             * clear().
+             */
+            synchronized (b) {
+                final byte[] a = new byte[b.capacity()];
+                b.clear();
+                b.get(a);
+                b.clear();
+                return a;
+            }
         }
         
         public void arraycopy(final int pos, final byte[] dest,
                 final int destPos, final int len) {
-            // prevent concurrent modification to the pos/limit.
-            final ByteBuffer b = this.b.asReadOnlyBuffer();
-            b.limit(pos + len);
-            b.position(pos);
-            b.get(dest,destPos,len);
+            /*
+             * Note: synchronized to prevent concurrent modification to the
+             * pos/limit. The pos/limit are restored as a postcondition using
+             * clear().
+             */
+            synchronized (b) {
+                b.limit(pos + len);
+                b.position(pos);
+                b.get(dest, destPos, len);
+                b.clear();
+            }
         }
 
         public int writeOn(final DataOutput dos) throws IOException {
@@ -878,15 +901,43 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
         return c;
     }
 
+    /**
+     * Modified to dump internal record metadata and to show the byte[]s as
+     * unsigned values.
+     */
     public String toString() {
         final StringBuffer s = new StringBuffer();
-        s.append("[ ");
-        for (int i = 0; i < n; i++) {
-            if (i != 0)
-                s.append(", ");
-            s.append(ByteArrayList.wrap(getArray(i)).toString());
+        s.append("{ratio=" + ratio + ", size=" + n + ", p[]="
+                + java.util.Arrays.toString(p));
+        s.append("[\n");
+        for (int i = 0; i < n;) {
+            int pos = p[i/ratio];
+            for (int j = 0; j < ratio && i < n; j++, i++) {
+                final int delta = i % ratio;
+                final int pos0 = pos; // pos @ rlen.
+                final int rlen = bb.readInt(pos);
+                pos += count(rlen);
+                final int clen;
+                if (delta == 0) {
+                    clen = 0;
+                } else {
+                    clen = bb.readInt(pos);
+                    pos += count(clen);
+                }
+                final byte[] a = get(i);
+                s.append("index=" + i + ", delta=" + delta + ", p["
+                        + (i / ratio) + "]=" + p[i / ratio] + ", pos@rlen="
+                        + pos0 + ", rlen=" + rlen + ", clen=" + clen
+                        + ", pos@remainder=" + pos + " :: "
+                        + BytesUtil.toString(a) + "\n");
+                pos += rlen;
+            }
+//        for(int i=0; i<n; i++) {
+//            if (i != 0)
+//                s.append(", ");
+//            s.append(ByteArrayList.wrap(getArray(i)).toString());
         }
-        s.append(" ]");
+        s.append("]}");
         return s.toString();
     }
 
@@ -1005,9 +1056,51 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      * small. However, the compression is highest when the ratio is equal to the
      * #of entries in the list. Therefore, search performance is traded off
      * against compression.
+     * <p>
+     * Note: The full length entry is coded every [i/ratio] entries. However,
+     * the subsequent entries code their common length with respect to the
+     * previous front-coded entry NOT to the full length entry. This means that
+     * the length of the common prefix can increase or decrease as we scan a
+     * bucket and the #of already matched bytes can increase or decrease as
+     * well. Consider the following example, when coded with a ratio of 8.
+     * 
+     * <pre>
+     * [121, 59, 18, 79, 99, 112, 24, 116], // #0 rlen=8, clen=0 (new bucket)
+     * [121, 59, 18, 79, 99, 112, 43, 68],  // #1 rlen=2, clen=6
+     * [121, 59, 18, 79, 99, 112, 46, 78],  // #2 rlen=2, clen=6
+     * [121, 59, 18, 79, 99, 112, 54, 48],  // #3 rlen=2, clen=6
+     * [121, 59, 18, 79, 99, 112, 54, 108], // #4 rlen=1, clen=7 (***)
+     * [121, 59, 18, 79, 99, 112, 55, 81],  // #5 rlen=2, clen=6
+     * [121, 59, 18, 79, 99, 112, 62, 85],  // #6 rlen=2, clen=6
+     * [121, 59, 18, 79, 99, 112, 63, 110], // #7 rlen=8, clen=0 (new bucket)
+     * [121, 59, 18, 79, 99, 112, 71, 124], // #8 ...
+     * [121, 59, 18, 79, 99, 112, 73, 49]   // #9 ...
+     * </pre>
+     * 
+     * The common length grows for entry #4 because the [54] in the next to last
+     * byte in the array already appears in the same position in the previous
+     * front-coded entry. However, the common length decreases again for the
+     * next entry (#5).
+     * <p>
+     * The following rules guide the linear search of the bucket identified by
+     * the binary search.
+     * <ol>
+     * <li>If <code>clen GT mlen</code>, then skip to the next entry in the
+     * bucket as no match is possible (the common prefix was demonstrated to be
+     * longer than the matched prefix on a previous entry).</li>
+     * <li>Compare the remaining bytes in the search probe with the remainder
+     * for the current entry.</li>
+     * <li>If the search probe is EQ to the bucket entry, then halt. The probe
+     * key was found.</li>
+     * <li>If the search probe is LT the bucket entry, then halt. The probe key
+     * was not found.</li>
+     * <li>Otherwise, <code>mlen += prefixLength</code>, where prefixLength is
+     * the length of the matched prefix from step 2.
+     * </ol>
      * 
      * @param a
-     *            The search probe, which is interpreted as an <em>unsigned byte[]</code>
+     *            The search probe, which is interpreted as an
+     *            <em>unsigned byte[]</code>
      * 
      * @return index of the search key, if it is found; otherwise,
      *         <code>(-(insertion point) - 1)</code>. The insertion point is
@@ -1057,8 +1150,14 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
          */
         int pos = p[poffset];
 
-        // The #of bytes in the full length entry which match the probe key.
-        final int mlen;
+        /*
+         * The #of bytes in the full length entry which match the probe key.
+         * Note: This is NOT a fixed value. When we scan the front-coded entries
+         * in the same bucket, the common length with respect to the previous
+         * entry can actually increase -or- decrease, in which case the matched
+         * length may change as well.
+         */
+        int mlen;
         {
 
             // The #of bytes in the full length byte[] at the insertion point.
@@ -1071,7 +1170,6 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             int i;
             for (i = 0; i < a.length && i < blen; i++, pos++) {
 
-                // promotes to signed integers in [0:255] for comparison.
                 if (a[i] != bb.get(pos)) {
                     
                     break;
@@ -1083,11 +1181,6 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             // #of matching bytes.
             mlen = i;
 
-//            // must be at least one matching byte.
-//            assert mlen > 0 : "mlen=" + mlen + ", poffset=" + poffset
-//                    + ", pos=" + pos + ", probe=" + BytesUtil.toString(a)
-//                    + ", this=" + this;
-
             // skip over the remainder of the full length coded entry.
             pos += (blen - mlen);
             
@@ -1096,23 +1189,38 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
         /*
          * Scan up to ratio-1 entries or the last entry, whichever comes first.
          */
-        final int limit = Math.min(n - offset, ratio - 1);
+        final int limit = Math.min(n - (offset + 1), ratio - 1);
 
         int delta;
         for (delta = 0; delta < limit; delta++) {
 
-            // length of the remainder
+            // length of the remainder for this entry.
             final int rlen = bb.readInt(pos);
 
-            // skip past rlen.
+            // skip past rlen field.
             pos += count(rlen);
 
-            // length of the common prefix
+            // length of the common prefix (shared with the entry @ the ptr).
             final int clen = bb.readInt(pos);
 
-            // skip past clen.
+            // skip past clen field.
             pos += count(clen);
 
+            if (clen > mlen) {
+                /*
+                 * No match is possible while the common prefix length with the
+                 * prior entry is GT the matched length with the probe key.
+                 */
+                pos += rlen;
+                continue;
+            }
+
+            /*
+             * Compare the remaining bytes in the search probe to the remainder
+             * of the current entry.
+             */
+            assert mlen == clen : 
+                "mlen=" + mlen + ", clen=" + clen+", delta="+delta;
             final int ret = compareBytes(a, mlen, a.length - mlen, bb, pos,
                     rlen);
 
@@ -1125,10 +1233,17 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             
             if (ret < 0) {
 
-                // The current entry is GT the probe key.
+                // The current entry is GT the probe key. Halt (not found).
                 break;
                 
             }
+
+            /*
+             * Update the matched length by the length of the matched pefix from
+             * the last comparison test.
+             */
+            final int prefixLength = Math.abs(ret) - 1;
+            mlen += prefixLength;
             
             // skip past the remainder and keep looking.
             pos += rlen;
@@ -1243,26 +1358,32 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      * @param blen
      *            The length of the byte[] at that offset in the
      *            {@link BackingBuffer}.
-     *            
-     * @return a negative integer, zero, or a positive integer if the first
-     *         argument is less than, equal to, or greater than the byte[] in
-     *         the {@link BackingBuffer} at the specified offset.
+     * 
+     * @return The return is a negative integer, zero, or a positive integer if
+     *         the first argument is less than, equal to, or greater than the
+     *         byte[] in the {@link BackingBuffer} at the specified offset. The
+     *         return value also codes the length of the shared prefix, which
+     *         may be computed as <code>Math.abs(ret)-1</code>.
      */
     private int compareBytes(final byte[] a, final int aoff, final int alen,
             final BackingBuffer bb, final int boff, final int blen) {
 
+        int mlen = 0;
         // Compare bytes(probe,entry) (negative iff probe < entry)
-        for (int i = aoff, j = boff; i < aoff + alen && j < boff + blen; i++, j++) {
+        for (int i = aoff, j = boff; i < aoff + alen && j < boff + blen; i++, j++, mlen++) {
 
             // promotes to signed integers in [0:255] for comparison.
             final int ret = (a[i] & 0xff) - (bb.get(j) & 0xff);
 
-            if (ret != 0)
-                return ret;
+            if (ret != 0) {
+
+                return ret < 0 ? -(mlen + 1) : (mlen + 1);
+                
+            }
 
         }
 
-        return alen - blen;
+        return alen == blen ? 0 : (alen - blen) < 0 ? -(mlen + 1) : (mlen + 1);
 
     }
 

@@ -37,7 +37,7 @@ import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 
 /**
- * Test suite for the {@link FrontCodedDataCoder}.
+ * Test suite for the {@link FrontCodedRabaCoder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -49,18 +49,18 @@ import com.bigdata.btree.raba.ReadOnlyValuesRaba;
  * 
  * @todo also test for probe keys that are not found.
  */
-public class AbstractFrontCodedDataCoderTestCase extends AbstractDataCoderTestCase {
+public class AbstractFrontCodedRabaCoderTestCase extends AbstractRabaCoderTestCase {
 
     /**
      * 
      */
-    public AbstractFrontCodedDataCoderTestCase() {
+    public AbstractFrontCodedRabaCoderTestCase() {
     }
 
     /**
      * @param name
      */
-    public AbstractFrontCodedDataCoderTestCase(String name) {
+    public AbstractFrontCodedRabaCoderTestCase(String name) {
         super(name);
     }
 

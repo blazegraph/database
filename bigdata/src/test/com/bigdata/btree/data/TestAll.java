@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree.data;
 
-import com.bigdata.util.TestByteBufferBitVector;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -59,9 +57,21 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("B+Tree data records");
 
-        suite.addTestSuite(TestNodeDataRecord.class);
+        /*
+         * Test w/ all key and value coders suitable for nodes.
+         */
+        suite.addTestSuite(TestNodeDataRecord_Simple.class);
+        suite.addTestSuite(TestNodeDataRecord_FrontCoded.class);
+        suite.addTestSuite(TestNodeDataRecord_CanonicalHuffman.class);
 
-        suite.addTestSuite(TestLeafDataRecord.class);
+        /*
+         * Test w/ all key and value coders suitable for leaves.
+         * 
+         * @todo test w/ linked-leaf (IndexSegment only).
+         */
+        suite.addTestSuite(TestLeafDataRecord_Simple_Simple.class);
+        suite.addTestSuite(TestLeafDataRecord_FrontCoded_CanonicalHuffman.class);
+        suite.addTestSuite(TestLeafDataRecord_CanonicalHuffman_CanonicalHuffman.class);
 
         return suite;
         

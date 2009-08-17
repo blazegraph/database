@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
+
 import java.nio.ByteBuffer;
 import java.util.Comparator;
 
@@ -132,7 +134,8 @@ public class BytesUtil {
 
                 System.loadLibrary("BytesUtil");
 
-                if(log.isInfoEnabled()) log.info("BytesUtil JNI linked");
+                if (log.isInfoEnabled())
+                    log.info("BytesUtil JNI linked");
 
                 linked = true;
 
@@ -148,7 +151,7 @@ public class BytesUtil {
         return linked;
 
     }
-    
+
     /**
      * True iff the two arrays compare as equal. This is somewhat optimized in
      * that it tests the array lengths first, assumes that it is being used on
@@ -165,23 +168,25 @@ public class BytesUtil {
      */
     final public static boolean bytesEqual(final byte[] a, final byte[] b) {
 
-        if(a == b ) return true;
-        
+        if (a == b)
+            return true;
+
         final int alen = a.length;
 
         final int blen = b.length;
 
         if (alen != blen)
             return false;
-        
-        int i = alen-1;
 
-        while(i>=0) {
-        
-            if( a[i] != b[i] ) return false;
-            
+        int i = alen - 1;
+
+        while (i >= 0) {
+
+            if (a[i] != b[i])
+                return false;
+
             i--;
-            
+    
         }
 
 //        for (int i = 0; i < alen; i++) {
@@ -193,7 +198,7 @@ public class BytesUtil {
         return true;
         
     }
-    
+
     /**
      * Byte-wise comparison of byte[]s (the arrays are treated as arrays of
      * unsigned bytes).
@@ -207,10 +212,17 @@ public class BytesUtil {
      * @return a negative integer, zero, or a positive integer if the first
      *         argument is less than, equal to, or greater than the second.
      * 
-     * @todo consider returning the index of the byte at which the difference
-     *       was detected rather than the difference of the bytes at that index.
-     *       the index would be negative or positive depending on which way the
-     *       comparison went.
+     * @todo Return the index of the byte at which the difference with the sign
+     *       adjusted to indicate the relative order of the data rather than the
+     *       difference of the bytes at that index. The index would be negative
+     *       or positive depending on which way the comparison went. See
+     *       {@link CustomByteArrayFrontCodedList} for an implementation
+     *       guideline.
+     *       <p>
+     *       Change all implementations in this class and also BytesUtil.c,
+     *       which needs to be recompiled for Windows. Also makes sure that it
+     *       gets compiled and linked for Un*x. That should be tested from the
+     *       ant installer and the result reported. Do the same for ICU4JNI.
      */
     final public static int compareBytes(final byte[] a, final byte[] b) {
         if(a==b) return 0;
@@ -364,7 +376,7 @@ public class BytesUtil {
      *         in which the two arrays differ, although that index could lie
      *         beyond the end of one of the arrays).
      */
-    public final static int getPrefixLength(byte[] a, byte[] b) {
+    public final static int getPrefixLength(final byte[] a, final byte[] b) {
 
         final int alen = a.length;
 
@@ -395,11 +407,11 @@ public class BytesUtil {
      * @return A new byte[] containing the leading bytes in common between the
      *         two arrays.
      */
-    public final static byte[] getPrefix(byte[] a, byte[] b) {
+    public final static byte[] getPrefix(final byte[] a, final byte[] b) {
 
         final int len = getPrefixLength(a, b);
 
-        byte[] prefix = new byte[len];
+        final byte[] prefix = new byte[len];
         
         System.arraycopy(a, 0, prefix, 0, len);
         
@@ -416,11 +428,11 @@ public class BytesUtil {
      * 
      * @return A new unsigned byte[] that is the successor of the key.
      */
-    public final static byte[] successor(byte[] key) {
+    public final static byte[] successor(final byte[] key) {
 
         final int keylen = key.length;
 
-        byte[] tmp = new byte[keylen + 1];
+        final byte[] tmp = new byte[keylen + 1];
 
         System.arraycopy(key, 0, tmp, 0, keylen);
 
@@ -489,7 +501,8 @@ public class BytesUtil {
 //    *             if the keys are equal.
 //    * @throws IllegalArgumentException
 //    *             if the keys are out of order.
-    final public static byte[] getSeparatorKey(byte[] givenKey, byte[] priorKey) {
+    final public static byte[] getSeparatorKey(final byte[] givenKey,
+            final byte[] priorKey) {
 
         if (givenKey == null)
             throw new IllegalArgumentException();
@@ -531,7 +544,7 @@ public class BytesUtil {
          */
 
         // allocate to right size.
-        byte[] tmp = new byte[prefixLen+1];
+        final byte[] tmp = new byte[prefixLen+1];
         
         // copy shared prefix plus the following byte.
         System.arraycopy(givenKey, 0, tmp, 0, prefixLen+1);
@@ -601,9 +614,9 @@ public class BytesUtil {
      * @param data
      *            An array of unsigned byte arrays.
      */
-    static public String toString(byte[][] data) {
+    static public String toString(final byte[][] data) {
        
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         final int n = data.length;
         
@@ -705,11 +718,11 @@ public class BytesUtil {
     public static class UnsignedByteArrayComparator implements Comparator<byte[]> {
 
         public static transient final Comparator<byte[]> INSTANCE = new UnsignedByteArrayComparator();
-        
-        public int compare(byte[] o1, byte[] o2) {
-            
+
+        public int compare(final byte[] o1, final byte[] o2) {
+
             return BytesUtil.compareBytes(o1, o2);
-            
+
         }
         
     }
@@ -742,7 +755,7 @@ public class BytesUtil {
      * @exception AssertionError
      *                if the JNI methods do not produce the expected answers.
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
  
         // Force load of the JNI library.
         loadJNILibrary();
