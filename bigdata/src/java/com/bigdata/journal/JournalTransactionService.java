@@ -290,9 +290,14 @@ public class JournalTransactionService extends AbstractTransactionService {
                 localState);
 
         try {
-            
-            // submit and wait for the result.
-            concurrencyManager.getWriteService().submit(task).get();
+
+            /*
+             * Submit the task and wait for the result.
+             * 
+             * Note: This task MUST go through the ConcurrencyManager to obtain
+             * its locks.
+             */
+            concurrencyManager./*getWriteService().*/submit(task).get();
 
             /*
              * FIXME The state changes for the local tx should be atomic across

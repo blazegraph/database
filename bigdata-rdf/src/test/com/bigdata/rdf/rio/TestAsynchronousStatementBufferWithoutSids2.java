@@ -167,6 +167,12 @@ public class TestAsynchronousStatementBufferWithoutSids2 extends
 
         final AbstractTripleStore store = getStore();
         try {
+            
+            if(!(store instanceof ScaleOutTripleStore)) {
+                
+                fail("Test requires scale-out index views.");
+                
+            }
 
             // only do load since we expect an error to be reported.
             final AsynchronousStatementBufferFactory<BigdataStatement, File> factory = doLoad2(
