@@ -20,8 +20,6 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.journal.Journal;
 
 /**
