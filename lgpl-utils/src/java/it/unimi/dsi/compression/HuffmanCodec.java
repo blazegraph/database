@@ -71,12 +71,24 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 	
 	// Modified BBT 8/11/2009
 	private transient int symbol[];
+    private transient int length[];
+
     /**
      * Return the symbol[] in the permuted order used to construct the
-     * {@link CanonicalFast64CodeWordDecoder}.
+     * {@link CanonicalFast64CodeWordDecoder}. This information is
+     * <em>transient</em>.
      */
 	public int[] getSymbols() {
 	    return symbol;
+	}
+
+    /**
+     * Return the codeWord bit lengths in the non-decreasing order used to
+     * construct the {@link CanonicalFast64CodeWordDecoder}. This information is
+     * <em>transient</em>.
+     */
+	public int[] getLengths() {
+	    return length;
 	}
 
 	/** Creates a new Huffman codec using the given vector of frequencies.
@@ -92,7 +104,7 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 			coder = new Fast64CodeWordCoder( codeWord, new long[ size ] );
 			// Modified BBT 8/11/2009
 //            decoder = new CanonicalFast64CodeWordDecoder( new int[ size ], new int[ size ] );
-			decoder = new CanonicalFast64CodeWordDecoder( new int[ size ], (symbol=new int[ size ]) );
+			decoder = new CanonicalFast64CodeWordDecoder( (length=new int[ size ]), (symbol=new int[ size ]) );
 			return;
         }
         
@@ -185,7 +197,7 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 		coder = new Fast64CodeWordCoder( codeWord, longCodeWord );
 		// Modified BBT 8/11/2009
 //        decoder = new CanonicalFast64CodeWordDecoder( length, symbol );
-        decoder = new CanonicalFast64CodeWordDecoder( length, this.symbol = symbol );
+        decoder = new CanonicalFast64CodeWordDecoder( (this.length=length), (this.symbol = symbol) );
 		
 		if ( DEBUG ) {
 			final BitVector[] codeWord = codeWords();
