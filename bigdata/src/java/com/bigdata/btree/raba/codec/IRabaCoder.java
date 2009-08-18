@@ -7,6 +7,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.ByteArrayBuffer;
 
 /**
  * Interface for coding a logical byte[][] onto a {@link ByteBuffer}.
@@ -17,6 +18,19 @@ import com.bigdata.btree.raba.IRaba;
  * @todo reconcile with {@link IDataSerializer}, which does the same thing for a
  *       {@link DataOutput} stream. Attend use of the coded data in
  *       {@link ResultSet} and {@link IIndexProcedure}s.
+ * 
+ *       FIXME Refactor the API to use a RawRecord class which wraps a {byte[],
+ *       off, len} tuple and replace the use of ByteBuffer in the
+ *       {@link IRabaCoder} with this interface.
+ *       <p>
+ *       There are a number of problems with {@link ByteBuffer}. First, you have
+ *       to be very careful to protect it from changes to its internal state
+ *       (pos, limit), which leads to the use of {@link ByteBuffer#duplicate()}.
+ *       Second, and far more important, the bulk byte[] operations are not
+ *       extensible.
+ *       <p>
+ *       The implementation can be drawn from the {@link ByteArrayBuffer}, or
+ *       perhaps we can just use that class or a subset of its functionality.
  */
 public interface IRabaCoder {
 

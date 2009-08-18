@@ -55,7 +55,7 @@ import com.bigdata.btree.raba.IRaba;
  * Huffman codes. Canonical huffman codes preserve the alphabetic order of the
  * original values. However, they are often used because it is possible to
  * transmit the dictionary using fewer bits by sending only the bitLength[] for
- * the code words. The {@link CanonicalHuffmanRabaCoder}can be used for keys or
+ * the code words. The {@link CanonicalHuffmanRabaCoder} can be used for keys or
  * values. When used for keys it codes all byte values so we can search in the
  * coded space. When used for values, it codes only the byte values which
  * actually appear in the byte[][] values.
@@ -186,7 +186,10 @@ import com.bigdata.btree.raba.IRaba;
  * algorithm as an alternative to Hu-Tucker.</li>
  * </ul>
  * 
+ * @see HuffmanCodec
+ * 
  * @see http://en.wikipedia.org/wiki/Huffman_coding
+ * @see http://en.wikipedia.org/wiki/Canonical_Huffman_code
  * 
  * @see http://www.zlib.net/ (BSD style license; the Java classes are JNI
  *      wrappers that expose part of this functionality. The JNI interface could
