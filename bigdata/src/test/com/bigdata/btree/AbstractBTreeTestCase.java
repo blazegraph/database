@@ -522,8 +522,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                     actual.length(i);
                     fail("Expecting: " + NullPointerException.class);
                 } catch (NullPointerException ex) {
-                    if (log.isInfoEnabled())
-                        log.info("Ignoring expected exception: " + ex);
+                    if (log.isDebugEnabled())
+                        log.debug("Ignoring expected exception: " + ex);
                 }
 
                 // verify actual throws the expected exception.
@@ -533,8 +533,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                     actual.copy(i, dos);
                     fail("Expecting: " + NullPointerException.class);
                 } catch (NullPointerException ex) {
-                    if (log.isInfoEnabled())
-                        log.info("Ignoring expected exception: " + ex);
+                    if (log.isDebugEnabled())
+                        log.debug("Ignoring expected exception: " + ex);
                 } catch (RuntimeException ex) {
                     fail("Not expecting exception: "+ex, ex);
                 }

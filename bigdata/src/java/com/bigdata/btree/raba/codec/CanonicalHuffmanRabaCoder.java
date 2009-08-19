@@ -1205,6 +1205,37 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         // The #of distinct symbols (distinct byte values) actually used.
         final int nsymbols = setup.getSymbolCount();
 
+        // Total #of bits in the coded values.
+        final long sumCodedValueBitLengths = nsymbols == 0 ? 0
+                : getSumCodedValueBitLengths(setup.codec().codeWords(),
+                        raba, (Byte2Symbol) setup);
+
+        /*
+         * The #of bits per element in the codedValueOffset[]
+         * 
+         * @todo iff nvalues>16 and SEQUENTIAL flag was not specified by
+         * called.
+         * 
+         * @todo support isByteAlignedOffsets
+         * 
+         * FIXME why plus 1?!?
+         */
+        final int codedValueOffsetBits = nsymbols == 0 ? 0 : Fast
+                .mostSignificantBit(sumCodedValueBitLengths) + 1;
+
+        /*
+         * Note: The fbaos default is a 16kb buffer!
+         * 
+         * FIXME The backing buffer should be reused since compression is
+         * generally performed for a mutable B+Tree. Each such B+Tree should use
+         * a single backing buffer instance (NodeSerializer did it this way.)
+         * 
+         * @todo this initialCapacity estimate appears to be more than we need.
+         * Either reduce it or reuse the caller's buffer.
+         */
+        final int initialCapacity = (int) (512 + sumCodedValueBitLengths + (size + 1)
+                * codedValueOffsetBits);
+        
         /*
          * Write out the record on a bit stream backed by a byte[] buffer.
          */
@@ -1213,13 +1244,11 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             // The serialization version for the record.
             final int version = VERSION0;
 
-            /*
-             * FIXME The fbaos default is a 16kb buffer! Plus the BOS allocates
-             * ANOTHER 16kb buffer to buffer the buffer!
-             */
-            final FastByteArrayOutputStream baos = new FastByteArrayOutputStream();
+            final FastByteArrayOutputStream baos = new FastByteArrayOutputStream(
+                    initialCapacity);
 
-            final OutputBitStream obs = new OutputBitStream(baos);
+            final OutputBitStream obs = new OutputBitStream(baos,
+                    0/* bufSize */, false/* reflectionTest */);
 
             // The record version identifier.
             obs.writeInt(version, 8/* nbits */);
@@ -1254,24 +1283,6 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             assert obs.writtenBits() % 8 == 0;
             assert obs.writtenBits() == RabaDecoder.O_symbols
                     + (isSymbolTable ? nsymbols * 8 : 0);
-
-            // Total #of bits in the coded values.
-            final long sumCodedValueBitLengths = nsymbols == 0 ? 0
-                    : getSumCodedValueBitLengths(setup.codec().codeWords(),
-                            raba, (Byte2Symbol) setup);
-
-            /*
-             * The #of bits per element in the codedValueOffset[]
-             * 
-             * @todo iff nvalues>16 and SEQUENTIAL flag was not specified by
-             * called.
-             * 
-             * @todo support isByteAlignedOffsets
-             * 
-             * FIXME why plus 1?!?
-             */
-            final int codedValueOffsetBits = nsymbols == 0 ? 0 : Fast
-                    .mostSignificantBit(sumCodedValueBitLengths) + 1;
 
             final long O_codedValueOffsetBits = obs.writtenBits();
             obs.writeInt(codedValueOffsetBits, 8/* nbits */);
@@ -1335,9 +1346,14 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             // done writing (will byte align the OBS).
             obs.flush();
 
-            // trim backing array to an exact fit.
+            // trim backing array to an exact fit 
             baos.trim();
 
+            if (baos.length > initialCapacity) {
+                log.warn("initialCapacity=" + initialCapacity + ", actual="
+                        + baos.length);
+            }
+            
             // done.
             return new RabaDecoder(ByteBuffer.wrap(baos.array)
             // ,
