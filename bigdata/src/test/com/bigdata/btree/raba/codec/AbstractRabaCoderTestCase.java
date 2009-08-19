@@ -84,15 +84,35 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         a[0] = "mike".getBytes("US-ASCII");
         a[1] = "personick".getBytes("US-ASCII");
 
-        if(rabaCoder.isValueCoder()) {
+        if (rabaCoder.isValueCoder()) {
 
             doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
-            
+
         }
 
-        if(rabaCoder.isKeyCoder()) {
+        if (rabaCoder.isKeyCoder()) {
 
-            doRoundTripTest(rabaCoder, new ReadOnlyKeysRaba(a));
+            final IRaba expected = new ReadOnlyKeysRaba(a);
+
+            doRoundTripTest(rabaCoder, expected);
+
+            final IRabaDecoder actual = rabaCoder.encode(expected);
+
+            /*
+             * Spot check the correct computation of the insertion point for a
+             * variety of search keys.
+             */
+            
+            // verify correct insertion point for an empty byte[].
+            assertEquals(-1, actual.search(new byte[] {}));
+
+            assertEquals(-1, actual.search(new byte[] { 'm', 'i', 'k' }));
+
+            assertEquals(-2, actual.search(new byte[] { 'm', 'i', 'k', 'e', 's'}));
+
+            assertEquals(-2, actual.search("personic".getBytes("US-ASCII")));
+
+            assertEquals(-3, actual.search("personicks".getBytes("US-ASCII")));
             
         }
 
@@ -587,19 +607,19 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
     }
 
-    public void doRoundTripTest(final IRabaCoder dataCoder, final IRaba expected) {
+    public void doRoundTripTest(final IRabaCoder rabaCoder, final IRaba expected) {
 
         try {
 
             // encode the logical byte[][].
-            final IRabaDecoder actual0 = dataCoder.encode(expected);
+            final IRabaDecoder actual0 = rabaCoder.encode(expected);
 
             // Verify encode() results in object which can decode the byte[]s.
             AbstractBTreeTestCase.assertSameRaba(expected, actual0);
 
             // Verify decode when we build the decoder from the serialized
             // format.
-            AbstractBTreeTestCase.assertSameRaba(expected, dataCoder
+            AbstractBTreeTestCase.assertSameRaba(expected, rabaCoder
                     .decode(actual0.data()));
             
         } catch (Throwable t) {
