@@ -239,7 +239,7 @@ public class BytesUtil {
         }
         for (int i = 0; i < alen && i < blen; i++) {
             // promotes to signed integers in [0:255] for comparison.
-            int ret = (a[i] & 0xff) - (b[i] & 0xff);
+            final int ret = (a[i] & 0xff) - (b[i] & 0xff);
             //                int ret = a[i] - b[i];
             if (ret != 0)
                 return ret;

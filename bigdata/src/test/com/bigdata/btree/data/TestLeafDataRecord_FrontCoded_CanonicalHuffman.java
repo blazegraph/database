@@ -59,7 +59,7 @@ public class TestLeafDataRecord_FrontCoded_CanonicalHuffman extends AbstractLeaf
 
         keysCoder = new FrontCodedRabaCoder(8/*ratio*/);
 
-        valuesCoder = new CanonicalHuffmanRabaCoder();
+        valuesCoder = CanonicalHuffmanRabaCoder.INSTANCE;
         
     }
 

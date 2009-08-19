@@ -31,11 +31,23 @@ import it.unimi.dsi.bits.BitVector;
 import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
 import it.unimi.dsi.compression.Fast64CodeWordCoder;
 import it.unimi.dsi.compression.HuffmanCodec;
+import it.unimi.dsi.compression.PrefixCoder;
+import it.unimi.dsi.compression.HuffmanCodec.DecoderInputs;
 import it.unimi.dsi.fastutil.booleans.BooleanIterator;
+import it.unimi.dsi.fastutil.io.FastByteArrayOutputStream;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder.AbstractCodingSetup;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder.RabaCodingSetup;
 
 /**
  * Test suite for the {@link CanonicalHuffmanRabaCoder}.
@@ -60,7 +72,7 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
 
     protected void setUp() throws Exception {
         
-        rabaCoder = new CanonicalHuffmanRabaCoder();
+        rabaCoder = CanonicalHuffmanRabaCoder.INSTANCE;
         
     }
 
@@ -78,8 +90,15 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
 
         for (BitVector v : codeWords) {
 
+            final long long1 = v.getLong(0, v.size());
+            
+            final long long2 = Long.reverse(long1 << (64-v.size()));
+
+//            System.err.println("codeWord=" + v + ", v.size=" + v.size()
+//                    + " : long2=" + long2);
+
             sb.append("codeWord: " + v + ", bitLength=" + v.size()
-                    + ", longValue=" + v.getLong(0, v.size()) + "\n");
+                    + ", longValue=" + long2 + "\n");
 
         }
 
@@ -183,24 +202,20 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
      */
     public void doRoundTripTest(final int[] frequency) {
         
-        final HuffmanCodec codec = new HuffmanCodec(frequency);
-
-        final int[] length = codec.getLengths();
-
-        final int[] symbol = codec.getSymbols().clone();
+        final DecoderInputs decoderInputs = new DecoderInputs();
+        
+        final HuffmanCodec codec = new HuffmanCodec(frequency, decoderInputs);
 
         if (log.isDebugEnabled()) {
             log.debug(printCodeBook(codec.codeWords()) + "\nlength[]="
-                    + Arrays.toString(length) + "\nsymbol[]="
-                    + Arrays.toString(symbol));
+                    + Arrays.toString(decoderInputs.getLengths()) + "\nsymbol[]="
+                    + Arrays.toString(decoderInputs.getSymbols()));
         }
-
-//        final Decoder expectedDecoder = codec.decoder();
         
         final CanonicalFast64CodeWordDecoder actualDecoder = new CanonicalFast64CodeWordDecoder(
-                length, symbol);
+                decoderInputs.getLengths(), decoderInputs.getSymbols());
 
-        for (int i = 0; i < symbol.length; i++) {
+        for (int i = 0; i < frequency.length; i++) {
 
             final BooleanIterator coded = codec.coder().encode(i/*symbol*/);
             
@@ -214,8 +229,10 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
      * Stress test with 256 distinct symbols (corresponding to byte values in
      * the application). A large percentage of all symbols have a zero frequency
      * code, which models the expected patterns of B+Tree keys.
+     * 
+     * @throws IOException
      */
-    public void test_huffmanRecoderStress() {
+    public void test_huffmanRecoderStress() throws IOException {
 
         final int ntrials = 10000;
         
@@ -243,17 +260,25 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
 
     }
 
-    public void test_huffmanRecoder01() {
+    /**
+     * Simple test with a known symbol frequency distribution.
+     * 
+     * @throws IOException
+     */
+    public void test_huffmanRecoder01() throws IOException {
         
         final int[] frequency = new int[]{1,0,3,5,0,0,9};
 
         doRecoderRoundTripTest(frequency);
 
     }
-    
+
     /**
      * Verify we can regenerate the {@link Fast64CodeWordCoder} from the code
      * word[]. This is tested by coding and decoding random symbol sequences.
+     * For this test we need to reconstruct the {@link Fast64CodeWordCoder}. To
+     * do that, we need to use the codeWord[] and create a long[] having the
+     * same values as the codeWords, but expressed as 64-bit integers.
      * 
      * @param frequency
      *            The frequency[] should include a reasonable proportion of
@@ -261,41 +286,257 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
      *            expected conditions when coding non-random data such as are
      *            found in the keys of a B+Tree.
      * 
-     * @todo For this we need to reconstruct the {@link Fast64CodeWordCoder}. To
-     *       do that, we need to persist the codeWord[] and create a long[]
-     *       having the same values as the codeWords, but expressed as 64-bit
-     *       integers.
+     * @throws IOException
      */
-    public void doRecoderRoundTripTest(final int frequency[]) {
+    public void doRecoderRoundTripTest(final int frequency[]) throws IOException {
         
-        final HuffmanCodec codec = new HuffmanCodec(frequency);
+        final DecoderInputs decoderInputs = new DecoderInputs();
+        
+        final HuffmanCodec codec = new HuffmanCodec(frequency, decoderInputs);
 
-        System.err.println(printCodeBook(codec.codeWords()));
+        final PrefixCoder expected = codec.coder();
+        
+        final PrefixCoder actual = new Fast64CodeWordCoder(codec.codeWords());
+        
+        if (log.isDebugEnabled())
+            log.debug(printCodeBook(codec.codeWords()));
 
-        throw new UnsupportedOperationException();
-//        final int[] length = codec.getLengths();
-//
-//        final int[] symbol = codec.getSymbols().clone();
-//
-//        if (false && log.isInfoEnabled()) {
-//            log.info(printCodeBook(codec.codeWords()) + "\nlength[]="
-//                    + Arrays.toString(length) + "\nsymbol[]="
-//                    + Arrays.toString(symbol));
-//        }
-//
-////        final Decoder expectedDecoder = codec.decoder();
-//        
-//        final CanonicalFast64CodeWordDecoder actualDecoder = new CanonicalFast64CodeWordDecoder(
-//                length, symbol);
-//
-//        for (int i = 0; i < symbol.length; i++) {
-//
-//            final BooleanIterator coded = codec.coder().encode(i/*symbol*/);
-//            
-//            assertEquals(i, actualDecoder.decode(coded));
-//            
-//        }
+        /*
+         * First verify that both coders produce the same coded values for a
+         * symbol sequence of random length drawn from the full set of symbols
+         * of random length [1:nsymbols].
+         */
+        final int[] value = new int[r.nextInt(frequency.length) + 1];
+        for(int i=0; i<value.length; i++) {
+            // any of the symbols in [0:nsymbols-1].
+            value[i] = r.nextInt(frequency.length);
+        }
+
+        /*
+         * Now code the symbol sequence using both coders and then compare the
+         * coded values. They should be the same.
+         */
+        final byte[] codedValue;
+        {
+            final FastByteArrayOutputStream ebaos = new FastByteArrayOutputStream();
+            final FastByteArrayOutputStream abaos = new FastByteArrayOutputStream();
+            final OutputBitStream eobs = new OutputBitStream(ebaos);
+            final OutputBitStream aobs = new OutputBitStream(abaos);
+            for (int i = 0; i < value.length; i++) {
+                final int symbol = value[i];
+                expected.encode(symbol, eobs);
+                actual.encode(symbol, aobs);
+            }
+            eobs.flush();
+            aobs.flush();
+            assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0/* aoff */,
+                    ebaos.length, ebaos.array, 0/* boff */, abaos.length,
+                    abaos.array));
+            codedValue = new byte[abaos.length];
+            System.arraycopy(abaos.array/*src*/, 0/*srcPos*/, codedValue/*dest*/, 0/*destPos*/, abaos.length/*len*/);
+        }
+
+        /*
+         * Now verify that the coded sequence decodes to the original symbol
+         * sequence using a Decoder which is reconstructed from the bit length
+         * and symbol arrays of the codec.
+         */
+        final CanonicalFast64CodeWordDecoder actualDecoder = new CanonicalFast64CodeWordDecoder(
+                decoderInputs.getLengths(), decoderInputs.getSymbols());
+
+        {
+
+            final InputBitStream ibs = new InputBitStream(codedValue);
+            
+            for (int i = 0; i < value.length; i++) {
+
+                assertEquals(value[i]/* symbol */, actualDecoder.decode(ibs));
+
+            }
+            
+        }
 
     }
-    
+
+    /**
+     * Unit test for processing an empty {@link IRaba} representing B+Tree keys.
+     * 
+     * @throws IOException
+     */
+    public void test_emptyKeyRabaSetup() throws IOException {
+        
+        final int n = 0;
+        final byte[][] a = new byte[n][];
+        
+        final IRaba raba = new ReadOnlyKeysRaba(a);
+
+        final AbstractCodingSetup setup = new RabaCodingSetup(raba);
+
+        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
+                .decoderInputs());
+
+        // verify that we can re-create the coder.
+        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
+                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
+                setup.decoderInputs().getSymbols());
+
+    }
+
+    /**
+     * Unit test for processing an {@link IRaba} representing B+Tree keys
+     * suitable to setup the data for compression.
+     * 
+     * @throws IOException 
+     */
+    public void test_keyRabaSetup() throws IOException {
+
+        final int n = 8;
+        final byte[][] a = new byte[n][];
+        a[0] = new byte[]{1,2};
+        a[1] = new byte[]{1,2,3};
+        a[2] = new byte[]{1,3};
+        a[3] = new byte[]{1,3,1};
+        a[4] = new byte[]{1,3,3};
+        a[5] = new byte[]{1,3,7};
+        a[6] = new byte[]{1,5};
+        a[7] = new byte[]{1,6,0};
+        
+        final IRaba raba = new ReadOnlyKeysRaba(a);
+
+        final AbstractCodingSetup setup = new RabaCodingSetup(raba);
+
+        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
+                .decoderInputs());
+
+        // verify that we can re-create the coder.
+        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
+                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
+                setup.decoderInputs().getSymbols());
+
+    }
+
+    /**
+     * Unit test for processing an {@link IRaba} representing B+Tree values
+     * suitable to setup the data for compression.
+     * 
+     * @throws IOException 
+     * 
+     * @todo test w/ nulls.
+     */
+    public void test_valueRabaSetup() throws IOException {
+
+        final int n = 3;
+        final byte[][] a = new byte[n][];
+        a[0] = new byte[]{2,3};
+        a[1] = new byte[]{3,5};
+        a[2] = new byte[]{'m','i','k','e'};
+        
+        final IRaba raba = new ReadOnlyValuesRaba(a);
+
+        final RabaCodingSetup setup = new RabaCodingSetup(raba);
+        
+        // verify that we can re-create the decoder.
+        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
+                .decoderInputs());
+
+        // verify that we can re-create the coder.
+        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
+                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
+                setup.decoderInputs().getSymbols());
+
+    }
+
+    /**
+     * Unit test for processing an empty {@link IRaba} representing B+Tree
+     * values.
+     * 
+     * @throws IOException
+     */
+    public void test_emptyValueRabaSetup() throws IOException {
+
+        final int n = 0;
+        final byte[][] a = new byte[n][];
+
+        final IRaba raba = new ReadOnlyValuesRaba(a);
+
+        final RabaCodingSetup setup = new RabaCodingSetup(raba);
+
+        // verify that we can re-create the decoder.
+        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
+                .decoderInputs());
+
+        // verify that we can re-create the coder.
+        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
+                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
+                setup.decoderInputs().getSymbols());
+
+    }
+
+    /**
+     * Verify that we can round-trip the data required to reconstruct the
+     * decoder.
+     * 
+     * @param decoderInputs
+     * 
+     * @throws IOException
+     */
+    private void doDecoderInputRoundTripTest(final int nsymbols,
+            final DecoderInputs decoderInputs) throws IOException {
+
+        final byte[] in;
+        {
+            final FastByteArrayOutputStream baos = new FastByteArrayOutputStream();
+            final OutputBitStream obs = new OutputBitStream(baos);
+
+            CanonicalHuffmanRabaCoder.writeDecoderInputs(decoderInputs, obs);
+
+            obs.flush();
+            obs.close();
+
+            // just the bytes written.
+            in = new byte[baos.length];
+            System.arraycopy(baos.array, 0, in, 0, baos.length);
+        }
+
+        final InputBitStream ibs = new InputBitStream(in);
+
+        final DecoderInputs actualInputs = CanonicalHuffmanRabaCoder
+                .readDecoderInputs(nsymbols, ibs);
+
+        assertEquals("shortestCodeWord", decoderInputs.getShortestCodeWord(),
+                actualInputs.getShortestCodeWord());
+
+        assertEquals("length[]", decoderInputs.getLengths(), actualInputs
+                .getLengths());
+
+        assertEquals("symbol[]", decoderInputs.getSymbols(), actualInputs
+                .getSymbols());
+
+    }
+
+    /**
+     * @param shortestCodeWord
+     * @param lengths
+     * @param
+     */
+    private void doCoderRoundTripTest(final BitVector[] expected,
+            final BitVector shortestCodeWord, final int[] length,
+            final int[] symbol) {
+
+        final PrefixCoder newCoder = HuffmanCodec.newCoder(shortestCodeWord,
+                length, symbol);
+
+        final BitVector[] actual = newCoder.codeWords();
+
+        assertEquals("codeWord[]", expected, actual);
+
+        if (log.isDebugEnabled()) {
+         
+            log.debug("\nexpected: " + Arrays.toString(expected)
+                    + "\nactual  : " + Arrays.toString(actual));
+            
+        }
+        
+    }
+
 }

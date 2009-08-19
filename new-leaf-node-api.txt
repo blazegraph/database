@@ -58,6 +58,22 @@ Examples:
    procedure against the index and it is executed locally on each
    index partition within some key-range.
 
+------------------------------------------------------------
+
+-- merge to branch -- 
+
+from: https://bigdata.svn.sourceforge.net/svnroot/bigdata/trunk
+
+Revision: 2004 (this is the first revision of the branch - the one
+	        where it was created)
+
+to: https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BTREE_BUFFER_BRANCH
+
+Revision: Head
+
+Commit message: Merging trunk into branch BTREE_BUFFER_BRANCH [2004]:[2022].
+
+See http://openmrs.org/wiki/Subversion_Branching_and_Merging_Techniques
 
 ------------------------------------------------------------
 -------------- Store level record compression --------------
@@ -320,36 +336,30 @@ Goals:
 
        - Done. FrontCoded.
 
-       - Canonical Huffman (****)
+       - (***) Canonical Huffman.
 
-	  - The canonical huffman raba still has problems with
-            reconstructing the decoder efficiently from just the code
-            word run length data.
+          - Add unit tests for keys NOT present in the raba.
+
+	  - Special case when nsymbols==1 (dsiutils bug).
 
 	  - If the InputBitStream backed by a ByteBuffer is buffered,
 	    then make sure that the buffer is a reasonable size.  We
 	    could do this ourselves with a BufferedInputStream
 	    wrapping the ByteBufferInputStream.
 
-	  - (***) Do a version of the canonical huffman raba for keys
-	    (code words for all byte values so we can project a key
-	    into the coded value space and perform search on the coded
-	    keys).
-
        - Done. Refactor the FastRDFValueSerializer (no test suite yet).
 
-       - RDF Keys coder?
+       - Canonical huffman coder for RDF Keys?
 
-	  If we allowed a different IRabaCoder for the B+Tree leaf
-          keys and the B+Tree node keys then we could write a custom
-          canonical huffman coder for the RDF keys.
+	  If we generalize the CanonicalHuffmanRabaCoder to allow for
+          non-byte values and also allow a different IRabaCoder for
+          the keys of the B+Tree leaf and the B+Tree node keys then we
+          could use the long[] based canonical huffman coder and save
+          more space in the record, and probably have faster search.
 
-	  Prefix coding might do just as well for space, but the
-          canonical huffman coding should be better for search for two
-          reasons: (1) it has random access to each coded value, not
-          just to every [ratio] coded values; (2) it is comparing
-          shorter values. (Actually, prefix search is pretty
-          efficient.)
+	  Note that front-coding should already be pretty efficient in
+          space and time and we can always use the byte[] based
+          huffman coder for RDF keys.
 
        - ByteBuffer is too slow.
 	   

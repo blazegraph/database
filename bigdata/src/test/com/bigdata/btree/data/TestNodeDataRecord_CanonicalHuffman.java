@@ -65,7 +65,7 @@ public class TestNodeDataRecord_CanonicalHuffman extends AbstractNodeOrLeafDataR
         
         super.setUp();
 
-        keysCoder = new CanonicalHuffmanRabaCoder();
+        keysCoder = CanonicalHuffmanRabaCoder.INSTANCE;
 
     }
 
