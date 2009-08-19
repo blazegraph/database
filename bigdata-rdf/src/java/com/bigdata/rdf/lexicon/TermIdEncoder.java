@@ -88,6 +88,11 @@ public class TermIdEncoder {
 
     }
 
+    /**
+     * @param N
+     *            The #of low bits from the local counter that will be reversed
+     *            and written into the high-bits of the encoded long value.
+     */
     public TermIdEncoder(final int N) {
 
         if (N < 0)

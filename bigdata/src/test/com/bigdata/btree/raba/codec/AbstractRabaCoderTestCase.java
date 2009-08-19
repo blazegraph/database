@@ -31,6 +31,7 @@ import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -49,9 +50,8 @@ import com.bigdata.btree.raba.ReadOnlyValuesRaba;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @todo performance tuning on stress test and on real data.
- * 
- * @todo also test for probe keys that are not found.
+ * @todo performance tuning on stress test and on real data. be sure to factor
+ *       out the {@link ByteBuffer} first.
  */
 abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
@@ -75,44 +75,24 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
     protected IRabaCoder rabaCoder = null;
 
     /**
-     * @todo test decode w/ nulls and delete markers and verify this. deleted
-     *       values should appear as it they have nulls. nulls should be
-     *       represented as zero length coded values but also have the "null"
-     *       bit set for that value. On decode, we need to check the "null" bit
-     *       and return null if the value was null.
-     * 
-     * @todo test search.
+     * FIXME Test search using select keys which should be located before or
+     * after the coded keys. Do this for more than just this one test case.
      */
     public void test_mike_personick() throws UnsupportedEncodingException {
         
-        // example: [ mike ], [ personick ]
-
-        // nvalues=2 // not used!
-        
-        // keyLength[] = {4 9} // not used!
-        
-        // nsymbols=10
-        
-        // symbols (the distinct byte values observed, written in lexical order).
-        // c e i k m n o p r s
-
-        // packedFrequency[]
-        // 1 2 2 2 1 1 1 1 1 1
-        
-        // <num compressed bytes> <compressed bytes> 
         final byte[][] a = new byte[2][];
         a[0] = "mike".getBytes("US-ASCII");
         a[1] = "personick".getBytes("US-ASCII");
 
-        if(rabaCoder.isKeyCoder()) {
-
-            doRoundTripTest(rabaCoder, new ReadOnlyKeysRaba(a));
-            
-        }
-
         if(rabaCoder.isValueCoder()) {
 
             doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
+            
+        }
+
+        if(rabaCoder.isKeyCoder()) {
+
+            doRoundTripTest(rabaCoder, new ReadOnlyKeysRaba(a));
             
         }
 
@@ -147,7 +127,7 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      * 
      * @throws UnsupportedEncodingException
      */
-    public void test_withEmptyElement() throws UnsupportedEncodingException {
+    public void test_emptyElement() throws UnsupportedEncodingException {
 
         final byte[][] a = new byte[3][];
         a[0] = new byte[0];
@@ -168,6 +148,49 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
     }
 
+    /**
+     * Test with a single byte value (nsymbols=1).
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    public void test_nsymbolsOne() throws UnsupportedEncodingException {
+
+        final byte[][] a = new byte[1][];
+        a[0] = new byte[]{1};
+        
+        if (rabaCoder.isKeyCoder()) {
+
+            doRoundTripTest(rabaCoder, new ReadOnlyKeysRaba(a));
+
+        }
+
+        if (rabaCoder.isValueCoder()) {
+
+            doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
+
+        }
+
+    }
+
+    /**
+     * Test with a single byte value (nsymbols=1) and some nulls.
+     * 
+     * @throws UnsupportedEncodingException
+     */
+    public void test_nsymbolsOne_nulls() throws UnsupportedEncodingException {
+
+        final byte[][] a = new byte[3][];
+        a[0] = new byte[]{1};
+        a[1] = null;
+        a[2] = null;
+        
+        if (rabaCoder.isValueCoder()) {
+
+            doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
+
+        }
+
+    }
 
     /**
      * Test with a null value.
@@ -270,6 +293,9 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
     }
     
+    /**
+     * This test case was developed for the {@link FrontCodedRabaCoder}.
+     */
     public void test_error1() throws IOException {
 
         final byte b187 = KeyBuilder.encodeByte(187);
@@ -291,17 +317,17 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         
         if(rabaCoder.isKeyCoder()) {
             final IRaba expected = new ReadOnlyKeysRaba(a);
-            final IRaba actual = rabaCoder.encode(expected);
-            System.err.println(actual.toString());
-            // this is the one whose rlen/clen appear to be incorrect.
-            assertEquals(expected.get(4),actual.get(4));
-            assertEquals(0, actual.search(expected.get(0)));
-            assertEquals(1, actual.search(expected.get(1)));
-            assertEquals(2, actual.search(expected.get(2)));
-            assertEquals(3, actual.search(expected.get(3)));
-            assertEquals(8, actual.search(expected.get(8)));
-            assertEquals(4, actual.search(expected.get(4)));
-            assertEquals(5, actual.search(expected.get(5)));//broken
+//            final IRaba actual = rabaCoder.encode(expected);
+//            System.err.println(actual.toString());
+//            // this is the one whose rlen/clen appear to be incorrect.
+//            assertEquals(expected.get(4),actual.get(4));
+//            assertEquals(0, actual.search(expected.get(0)));
+//            assertEquals(1, actual.search(expected.get(1)));
+//            assertEquals(2, actual.search(expected.get(2)));
+//            assertEquals(3, actual.search(expected.get(3)));
+//            assertEquals(8, actual.search(expected.get(8)));
+//            assertEquals(4, actual.search(expected.get(4)));
+//            assertEquals(5, actual.search(expected.get(5)));//broken
             doRoundTripTest(rabaCoder, expected);
         }
 
@@ -309,6 +335,57 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
             doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
         }
 
+    }
+
+    /**
+     * This test case was developed for the {@link CanonicalHuffmanRabaCoder}.
+     * 
+     * <pre>
+     * junit.framework.AssertionFailedError: search([44, 186, 169, 175, 191, 31, 36, 227]): expectedIndex=1, actualIndex=-1,
+     * expected=com.bigdata.btree.raba.ReadOnlyKeysRaba{ capacity=3, size=2, isKeys=true, isReadOnly=true, [
+     * [44, 186, 169, 175, 191, 31, 36, 12],
+     * [44, 186, 169, 175, 191, 31, 36, 227]]},
+     * actual=com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder$RabaDecoder{ capacity=2, size=2, isKeys=true, isReadOnly=true, [
+     * [44, 186, 169, 175, 191, 31, 36, 12],
+     * [44, 186, 169, 175, 191, 31, 36, 227]]}
+     *     at junit.framework.Assert.fail(Assert.java:47)
+     *     at com.bigdata.btree.AbstractBTreeTestCase.assertSameRaba(AbstractBTreeTestCase.java:583)
+     *     at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.doRoundTripTest(AbstractRabaCoderTestCase.java:499)
+     *     at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.doRandomRoundTripTest(AbstractRabaCoderTestCase.java:487)
+     *     at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.test_entryCount2(AbstractRabaCoderTestCase.java:247)
+     * </pre>
+     * 
+     * <pre>
+     * junit.framework.AssertionFailedError: search([44, 197, 214, 208, 192, 31, 36, 156]): expectedIndex=1, actualIndex=-1,
+     * expected=com.bigdata.btree.raba.ReadOnlyKeysRaba{ capacity=2, size=2, isKeys=true, isReadOnly=true, [
+     * [44, 197, 214, 208, 192, 31, 36, 12],
+     * [44, 197, 214, 208, 192, 31, 36, 156]]},
+     * actual=com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder$RabaDecoder{ capacity=2, size=2, isKeys=true, isReadOnly=true, [
+     * [44, 197, 214, 208, 192, 31, 36, 12],
+     * [44, 197, 214, 208, 192, 31, 36, 156]]}
+     *     at junit.framework.Assert.fail(Assert.java:47)
+     *     at com.bigdata.btree.AbstractBTreeTestCase.assertSameRaba(AbstractBTreeTestCase.java:583)
+     *     at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.doRoundTripTest(AbstractRabaCoderTestCase.java:538)
+     *     at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.test_error2(AbstractRabaCoderTestCase.java:325)
+     * </pre>
+     */
+    public void test_error2() {
+
+        final int n = 2;
+        final byte[][] a = new byte[n][];
+        a[0] = new byte[]{44, 127-186, 127-169, 127-175, 127-191, 31, 36, 12};
+        a[1] = new byte[]{44, 127-186, 127-169, 127-175, 127-191, 31, 36, 127-227};
+//        a[0] = new byte[]{44, 186-127, 169-127, 175-127, 191-127, 31, 36, 12};
+//        a[1] = new byte[]{44, 186-127, 169-127, 175-127, 191-127, 31, 36, 227-127};
+
+        if(rabaCoder.isKeyCoder()) {
+            final IRaba expected = new ReadOnlyKeysRaba(a);
+            doRoundTripTest(rabaCoder, expected);
+        }
+
+        if(rabaCoder.isValueCoder()) {
+            doRoundTripTest(rabaCoder, new ReadOnlyValuesRaba(a));
+        }
     }
     
     public void test_randomOnce() throws IOException {
@@ -512,15 +589,24 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
     public void doRoundTripTest(final IRabaCoder dataCoder, final IRaba expected) {
 
-        // encode the logical byte[][].
-        final IRabaDecoder actual0 = dataCoder.encode(expected);
+        try {
 
-        // Verify encode() results in object which can decode the byte[]s.
-        AbstractBTreeTestCase.assertSameRaba(expected, actual0);
+            // encode the logical byte[][].
+            final IRabaDecoder actual0 = dataCoder.encode(expected);
 
-        // Verify decode when we build the decoder from the serialized format.
-        AbstractBTreeTestCase.assertSameRaba(expected, dataCoder.decode(actual0
-                .data()));
+            // Verify encode() results in object which can decode the byte[]s.
+            AbstractBTreeTestCase.assertSameRaba(expected, actual0);
+
+            // Verify decode when we build the decoder from the serialized
+            // format.
+            AbstractBTreeTestCase.assertSameRaba(expected, dataCoder
+                    .decode(actual0.data()));
+            
+        } catch (Throwable t) {
+
+            fail("Cause=" + t + ", expectedRaba=" + expected, t);
+
+        }
 
     }
 

@@ -48,10 +48,15 @@ import cern.colt.function.IntComparator;
  * no codeword longer than the base-[(5<sup>1/2</sup> + 1)/2] logarithm of 5<sup>1/2</sup> &#x00B7; 2<sup>31</sup> (less than 47) will ever be generated. 
  * <p>
  * <h3>Modifications</h3>
- * This class has been modified to expose the symbol[] in correlated order with
- * the codeWord bitLength[].  This information is only available when the ctor
- * is invoked directly. It is not serialized and therefore not available if an
- * instance of this class is deserialized.
+ * <ol><li>
+ * This class has been modified to define an alternative ctor which exposes the
+ * symbol[] in correlated order with the codeWord bitLength[] and the shortest
+ * code word in the generated canonical.</li>
+ * <li>
+ * A method has been added to recreate the {@link PrefixCoder} from the 
+ * shortest code word, the code word length[], and the symbol[].
+ * </li>
+ * </ol>
  * */
 
 public class HuffmanCodec implements PrefixCodec, Serializable {
@@ -68,34 +73,100 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 	private final Fast64CodeWordCoder coder;
 	/** A cached singleton instance of the decoder of this codec. */
 	private final CanonicalFast64CodeWordDecoder decoder;
+
+    /**
+     * Class encapsulates the data necessary to reconstruct a
+     * {@link CanonicalFast64CodeWordDecoder} or recreate the code.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+	public static class DecoderInputs {
+	    
+	    private BitVector shortestCodeWord;
+	    private int symbol[];
+	    private int length[];
+
+        /**
+         * Ctor may be passed to {@link HuffmanCodec} to obtain the assigned
+         * length[] and symbol[] data and the shortest code word.  
+         */
+        public DecoderInputs() {
+            
+        }
+
+        /**
+         * Ctor may be used to explicitly populate an instance with the caller's
+         * data.
+         * 
+         * @param shortestCodeWord
+         * @param length
+         * @param symbol
+         */
+        public DecoderInputs(final BitVector shortestCodeWord,
+                final int[] length, final int[] symbol) {
+            assert shortestCodeWord!=null;
+            assert length!=null;
+            assert symbol!=null;
+            assert length.length==symbol.length;
+            assert shortestCodeWord.size()==length[0];
+            this.shortestCodeWord = shortestCodeWord;
+            this.length = length;
+            this.symbol = symbol;
+	    }
+
+        /**
+         * The shortest code word. Note that canonical huffman codes can be
+         * recreated from just length[0] and the shortest code word.
+         */
+        public BitVector getShortestCodeWord() {
+            return shortestCodeWord;
+        }
+        
+	    /**
+	     * Return the symbol[] in the permuted order used to construct the
+	     * {@link CanonicalFast64CodeWordDecoder}. This information is
+	     * <em>transient</em>.
+	     */
+	    public int[] getSymbols() {
+	        return symbol;
+	    }
+
+	    /**
+	     * Return the codeWord bit lengths in the non-decreasing order used to
+	     * construct the {@link CanonicalFast64CodeWordDecoder}. This information is
+	     * <em>transient</em>.
+	     */
+	    public int[] getLengths() {
+	        return length;
+	    }
+
+	}
 	
-	// Modified BBT 8/11/2009
-	private transient int symbol[];
-    private transient int length[];
+    /** Creates a new Huffman codec using the given vector of frequencies.
+     * 
+     * @param frequency a vector of nonnnegative frequencies.
+     */
+    public HuffmanCodec( final int[] frequency ) {
+    
+        this(frequency, new DecoderInputs());
+        
+    }
 
     /**
-     * Return the symbol[] in the permuted order used to construct the
-     * {@link CanonicalFast64CodeWordDecoder}. This information is
-     * <em>transient</em>.
+     * Creates a new Huffman codec using the given vector of frequencies.
+     * 
+     * @param frequency
+     *            a vector of nonnnegative frequencies.
+     * @param decoderInputs
+     *            The inputs necessary to reconstruct a
+     *            {@link CanonicalFast64CodeWordDecoder} will be set on this
+     *            object.
      */
-	public int[] getSymbols() {
-	    return symbol;
-	}
-
-    /**
-     * Return the codeWord bit lengths in the non-decreasing order used to
-     * construct the {@link CanonicalFast64CodeWordDecoder}. This information is
-     * <em>transient</em>.
-     */
-	public int[] getLengths() {
-	    return length;
-	}
-
-	/** Creates a new Huffman codec using the given vector of frequencies.
-	 * 
-	 * @param frequency a vector of nonnnegative frequencies.
-	 */
-	public HuffmanCodec( final int[] frequency ) {
+	public HuffmanCodec( final int[] frequency, final DecoderInputs decoderInputs ) {
+	    if(decoderInputs==null)
+	        throw new IllegalArgumentException();
 		size = frequency.length;
 		
 		if ( size == 0 || size == 1 ) {
@@ -104,7 +175,10 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 			coder = new Fast64CodeWordCoder( codeWord, new long[ size ] );
 			// Modified BBT 8/11/2009
 //            decoder = new CanonicalFast64CodeWordDecoder( new int[ size ], new int[ size ] );
-			decoder = new CanonicalFast64CodeWordDecoder( (length=new int[ size ]), (symbol=new int[ size ]) );
+			decoderInputs.shortestCodeWord = codeWord[0];
+			decoderInputs.length = new int[size];
+			decoderInputs.symbol = new int[size];
+			decoder = new CanonicalFast64CodeWordDecoder( decoderInputs.length, decoderInputs.symbol );
 			return;
         }
         
@@ -197,7 +271,14 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 		coder = new Fast64CodeWordCoder( codeWord, longCodeWord );
 		// Modified BBT 8/11/2009
 //        decoder = new CanonicalFast64CodeWordDecoder( length, symbol );
-        decoder = new CanonicalFast64CodeWordDecoder( (this.length=length), (this.symbol = symbol) );
+        decoderInputs.shortestCodeWord = codeWord[symbol[0]];
+		decoderInputs.length = length;
+        decoderInputs.symbol = symbol;
+        assert decoderInputs.shortestCodeWord.size() == length[0] : "shortestCodeWord="
+                + decoderInputs.shortestCodeWord
+                + ", but length[0]="
+                + length[0]; 
+        decoder = new CanonicalFast64CodeWordDecoder( decoderInputs.length, decoderInputs.symbol);
 		
 		if ( DEBUG ) {
 			final BitVector[] codeWord = codeWords();
@@ -228,4 +309,91 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 	public BitVector[] codeWords() {
 		return coder.codeWords();
 	}
+
+    /**
+     * (Re-)constructs the canonical huffman code from the shortest code word,
+     * the non-decreasing bit lengths of each code word, and the permutation of
+     * the symbols corresponding to those bit lengths. This information is
+     * necessary and sufficient to reconstruct a canonical huffman code.
+     * 
+     * @param decoderInputs
+     *            This contains the necessary and sufficient information to
+     *            recreate the {@link PrefixCoder}.
+     * 
+     * @return A new {@link PrefixCoder} instance for the corresponding
+     *         canonical huffman code.
+     */
+    static public PrefixCoder newCoder(final DecoderInputs decoderInputs) {
+
+        return newCoder(decoderInputs.getShortestCodeWord(), decoderInputs
+                .getLengths(), decoderInputs.getSymbols());
+
+	}
+
+    /**
+     * (Re-)constructs the canonical huffman code from the shortest code word,
+     * the non-decreasing bit lengths of each code word, and the permutation of
+     * the symbols corresponding to those bit lengths. This information is
+     * necessary and sufficient to reconstruct a canonical huffman code.
+     * 
+     * @param shortestCodeWord
+     *            The code word with the shortest bit length.
+     * @param length
+     *            The bit length of each code word in the non-decreasing order
+     *            assigned when the code was generated. The length of this array
+     *            is the #of symbols in the code.
+     * @param symbol
+     *            The permutation of the symbols in the assigned when the
+     *            canonical huffman code was generated. The length of this array
+     *            is the #of symbols in the code.
+     * 
+     * @return A new {@link PrefixCoder} instance for the corresponding
+     *         canonical huffman code.
+     * 
+     * @see DecoderInputs
+     */
+    static public PrefixCoder newCoder(final BitVector shortestCodeWord,
+            final int[] length, final int[] symbol) {
+
+        if (shortestCodeWord == null)
+            throw new IllegalArgumentException();
+        if (shortestCodeWord.size() == 0)
+            throw new IllegalArgumentException();
+        if (length == null)
+            throw new IllegalArgumentException();
+        if (length.length == 0)
+            throw new IllegalArgumentException();
+        if (symbol == null)
+            throw new IllegalArgumentException();
+        if (symbol.length == 0)
+            throw new IllegalArgumentException();
+
+        final int size = length.length;
+        int s = symbol[ 0 ];
+        int l = length[ 0 ];
+        long value = 0;
+        BitVector v;
+        final BitVector[] codeWord = new BitVector[ size ];
+        final long[] longCodeWord = new long[ size ];
+        codeWord[ s ] = LongArrayBitVector.getInstance().length( l );
+        
+        for( int i = 1; i < size; i++ ) {
+            s = symbol[ i ];
+            if ( length[ i ] == l ) value++;
+            else {
+                value++;
+                value <<= length[ i ] - l;
+                if ( ASSERTS ) assert length[ i ] > l;
+                l = length[ i ];
+            }
+            v = LongArrayBitVector.getInstance().length( l );
+            for( int j = l; j-- != 0; ) if ( ( 1L << j & value ) != 0 ) v.set( l - 1 - j );
+            codeWord[ s ] = v;
+            longCodeWord[ s ] = value;
+        }
+
+        return new Fast64CodeWordCoder(codeWord, longCodeWord);
+
+    }
+    
 }

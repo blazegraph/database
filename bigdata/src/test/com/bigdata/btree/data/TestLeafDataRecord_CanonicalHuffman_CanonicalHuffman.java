@@ -56,9 +56,9 @@ public class TestLeafDataRecord_CanonicalHuffman_CanonicalHuffman extends Abstra
         
         super.setUp();
 
-        keysCoder = new CanonicalHuffmanRabaCoder();
+        keysCoder = CanonicalHuffmanRabaCoder.INSTANCE;
 
-        valuesCoder = new CanonicalHuffmanRabaCoder();
+        valuesCoder = CanonicalHuffmanRabaCoder.INSTANCE;
         
     }
 
