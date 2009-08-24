@@ -40,6 +40,9 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
@@ -2230,36 +2233,36 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        final public boolean isNull(final int index) {
-
-            if (vals[index] == null) {
-
-                return true;
-                
-            }
-            
-            return false;
-            
-        }
+//        final public boolean isNull(final int index) {
+//
+//            if (vals[index] == null) {
+//
+//                return true;
+//                
+//            }
+//            
+//            return false;
+//            
+//        }
         
-        final public void copyValue(int index, OutputStream os) {
-
-            final byte[] val = vals[index];
-
-            if (val == null)
-                throw new UnsupportedOperationException();
-            
-            try {
-                
-                os.write(val);
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
-
-        }
+//        final public void copyValue(int index, OutputStream os) {
+//
+//            final byte[] val = vals[index];
+//
+//            if (val == null)
+//                throw new UnsupportedOperationException();
+//            
+//            try {
+//                
+//                os.write(val);
+//                
+//            } catch (IOException e) {
+//                
+//                throw new RuntimeException(e);
+//                
+//            }
+//
+//        }
 
         final public boolean getDeleteMarker(final int index) {
 
@@ -2412,11 +2415,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        final public long[] getChildAddr() {
-            
-            return childAddr;
-            
-        }
+//        final public long[] getChildAddr() {
+//            
+//            return childAddr;
+//            
+//        }
 
         final public int getChildCount() {
 
@@ -2431,7 +2434,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         }
         
     }
-    
+
     /**
      * Factory does not support node or leaf creation.
      */
@@ -2442,8 +2445,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         private NOPNodeFactory() {
         }
 
-        public ILeafData allocLeaf(AbstractBTree btree, long addr,
-                int branchingFactor, IRaba keys,
+        public ILeafData allocLeaf(AbstractBTree btree, long addr, IRaba keys,
                 IRaba values, long[] versionTimestamps,
                 boolean[] deleteMarkers, long priorAddr, long nextAddr) {
 
@@ -2452,8 +2454,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         }
 
         public INodeData allocNode(AbstractBTree btree, long addr,
-                int branchingFactor, int nentries, IRaba keys,
-                long[] childAddr, int[] childEntryCount) {
+                int nentries, IRaba keys, long[] childAddr,
+                int[] childEntryCount) {
 
             throw new UnsupportedOperationException();
 

@@ -43,9 +43,12 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
-import com.bigdata.btree.raba.MutableRaba;
+import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.compression.IRecordCompressor;
@@ -690,8 +693,8 @@ public class NodeSerializer {
             buf.position(0);
             
             // Done.
-            return nodeFactory.allocNode(btree, addr, branchingFactor,
-                    nentries, keys, childAddr, childEntryCounts);
+            return nodeFactory.allocNode(btree, addr, nentries, keys,
+                    childAddr, childEntryCounts);
 
         } catch (EOFException ex) {
 
@@ -970,20 +973,20 @@ public class NodeSerializer {
             final IRaba keys;
             { 
                 /*
-                 * FIXME currently de-serializes to an ImmutableKeyBuffer for
-                 * compatibility with assumptions in the BTree code.
+                 * FIXME de-serializes rather than using the coded data directly.
                  */
-                MutableKeyBuffer tmp = new MutableKeyBuffer(branchingFactor+1);
-                leafKeySerializer.read(is, tmp);
+                keys = new MutableKeyBuffer(branchingFactor+1);
+                leafKeySerializer.read(is, keys);
 //                keys = new ImmutableKeyBuffer(tmp);
-                keys = tmp;
+//                keys = tmp;
             }
 
             final int nkeys = keys.size();
 //            assert nkeys == keys.getKeyCount();
             
             // values.
-            final MutableRaba values = new MutableRaba(0, 0,
+            // FIXME de-serializes rather than using the coded data directly.
+            final IRaba values = new MutableValueBuffer(0, 
                     new byte[branchingFactor + 1][]);
             valueSerializer.read(is, values);
             
@@ -1009,9 +1012,8 @@ public class NodeSerializer {
             buf.position(0);
             
             // Done.
-            return nodeFactory.allocLeaf(btree, addr, branchingFactor, keys,
-                    values, versionTimestamps, deleteMarkers, priorAddr,
-                    nextAddr);
+            return nodeFactory.allocLeaf(btree, addr, keys, values,
+                    versionTimestamps, deleteMarkers, priorAddr, nextAddr);
 
         } catch (EOFException ex) {
 

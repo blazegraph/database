@@ -286,7 +286,7 @@ abstract public class AbstractRaba implements IRaba {
      */
     protected void assertNullAllowed(final byte[] a) {
         
-        if (a == null && !isKeys()) {
+        if (a == null && isKeys()) {
 
             throw new IllegalArgumentException();
             

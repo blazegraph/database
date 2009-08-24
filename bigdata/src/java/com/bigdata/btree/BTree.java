@@ -31,6 +31,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.Leaf.ILeafListener;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
@@ -1377,13 +1379,10 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         private NodeFactory() {
         }
 
-        public ILeafData allocLeaf(AbstractBTree btree, long addr,
-                int branchingFactor, IRaba keys,
-                IRaba values, long[] versionTimestamp,
-                boolean[] deleteMarkers, long priorAddr, long nextAddr) {
-
-            Leaf leaf = new Leaf(btree, addr, branchingFactor, keys, values,
-                    versionTimestamp, deleteMarkers);
+        public ILeafData allocLeaf(final AbstractBTree btree, final long addr,
+                final IRaba keys, final IRaba values,
+                final long[] versionTimestamp, final boolean[] deleteMarkers,
+                final long priorAddr, final long nextAddr) {
 
             /*
              * Note: The prior/next leaf addr information is not available for
@@ -1391,16 +1390,17 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
              * de-serialized.
              */
             
-            return leaf;
+            return new Leaf(btree, addr, keys, values, versionTimestamp,
+                    deleteMarkers);
 
         }
 
-        public INodeData allocNode(AbstractBTree btree, long addr,
-                int branchingFactor, int nentries, IRaba keys,
-                long[] childAddr, int[] childEntryCounts) {
+        public INodeData allocNode(final AbstractBTree btree, final long addr,
+                final int nentries, final IRaba keys, final long[] childAddr,
+                final int[] childEntryCounts) {
 
-            return new Node(btree, addr, branchingFactor, nentries, keys,
-                    childAddr, childEntryCounts);
+            return new Node(btree, addr, nentries, keys, childAddr,
+                    childEntryCounts);
 
         }
 

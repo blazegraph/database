@@ -25,9 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Dec 15, 2006
  */
 
-package com.bigdata.btree;
-
-import java.io.OutputStream;
+package com.bigdata.btree.data;
 
 import com.bigdata.btree.raba.IRaba;
 
@@ -49,59 +47,23 @@ public interface ILeafData extends IAbstractNodeData {
 
     /**
      * Return the object storing the logical byte[][] containing the values for
-     * the leaf.
+     * the leaf. When the leaf maintains delete markers you MUST check whether
+     * or not the tuple is deleted before requesting its value.
+     * 
+     * @see #hasDeleteMarkers()
+     * @see #getDeleteMarker(int)
      */
     public IRaba getValues();
 
     /**
-     * Return <code>true</code> iff the value stored at the specified index is
-     * <code>null</code>. If you are visiting deleted tuples, then check to see
-     * if the tuple is deleted and only invoke this method on the non-deleted
-     * tuples.
+     * The version timestamp for the entry at the specified index.
      * 
-     * @param index
-     *            The index into the leaf.
-     * 
-     * @deprecated by {@link IRaba#isNull(int)}
-     */
-    public boolean isNull(int index);
-
-    /**
-     * Copy the indicated value onto the callers stream unless the tuple is
-     * flagged as deleted or the value associated with the tuple is
-     * <code>null</code>.
-     * 
-     * @param index
-     *            The index of the tuple in the leaf.
-     * 
-     * @param os
-     *            The stream onto which to copy the value.
+     * @return The version timestamp for the index entry.
      * 
      * @throws UnsupportedOperationException
-     *             if the value stored at that index is <code>null</code> -or-
-     *             the tuple is flagged as deleted.
-     * 
-     * @see #isNull(int)
-     * 
-     *      FIXME Do we need to defined and use getValue(int), copy(int,OS),
-     *      etc. are on the ILeafData interface because they must also test the
-     *      deleted flag? Or does that happen at the Tuple and AbstractBTree API
-     *      level? The danger is that we could permit unintended access to a
-     *      delete value, which would be reported as a <code>null</code> (or for
-     *      copy() by throwing a NullPointerException).
-     * 
-     * @deprecated by
-     *             {@link IRaba#copy(int, java.io.DataOutput)}.
-     */
-    public void copyValue(int index, OutputStream os);
-
-    /**
-     * The timestamp for the entry at the specified index.
-     * 
-     * @return The timestamp for the index entry.
-     * 
-     * @throws UnsupportedOperationException
-     *             if timestamps are not being maintained.
+     *             if version timestamps are not being maintained (they are only
+     *             required for indices on which transaction processing will be
+     *             used).
      */
     public long getVersionTimestamp(int index);
     

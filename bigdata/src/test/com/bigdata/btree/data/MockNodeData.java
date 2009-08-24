@@ -1,6 +1,5 @@
 package com.bigdata.btree.data;
 
-import com.bigdata.btree.INodeData;
 import com.bigdata.btree.raba.IRaba;
 
 /**
@@ -29,22 +28,32 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
 
     }
 
-//    final public int[] getChildEntryCounts() {
+//    final public long[] getChildAddr() {
 //
-//        return childEntryCount;
+//        return childAddr;
 //
 //    }
-
-    final public long[] getChildAddr() {
-
-        return childAddr;
-
-    }
     
+    /**
+     * Bounds check.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if <i>index</i> is LT ZERO (0)
+     * @throws IndexOutOfBoundsException
+     *             if <i>index</i> is GE <i>nkeys</i>
+     */
+    protected boolean assertChildIndex(final int index) {
+        
+        if (index < 0 || index > getKeys().size())
+            throw new IndexOutOfBoundsException();
+        
+        return true;
+        
+    }
+
     final public long getChildAddr(final int index) {
 
-        if (index < 0 || index > getKeys().size() + 1)
-            throw new IndexOutOfBoundsException();
+        assertChildIndex(index);
         
         return childAddr[index];
         
@@ -52,8 +61,7 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
 
     final public int getChildEntryCount(final int index) {
 
-        if (index < 0 || index > getKeys().size() + 1)
-            throw new IndexOutOfBoundsException();
+        assertChildIndex(index);
         
         return childEntryCount[index];
         

@@ -2,7 +2,6 @@ package com.bigdata.btree.data;
 
 import java.io.OutputStream;
 
-import com.bigdata.btree.IAbstractNodeData;
 import com.bigdata.btree.raba.IRaba;
 
 /**

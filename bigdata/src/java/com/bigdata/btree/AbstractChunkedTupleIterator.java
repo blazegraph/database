@@ -538,10 +538,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (lastVisited == -1)
                 throw new IllegalStateException();
 
-            if (!getKeysRequested())
-                throw new UnsupportedOperationException();
-
-            return rset.getKey(lastVisited);
+            return rset.getKeys().get(lastVisited);
 
         }
 
@@ -583,7 +580,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (!getValuesRequested())
                 throw new UnsupportedOperationException();
 
-            return rset.getValue(lastVisited);
+            return rset.getValues().get(lastVisited);
 
         }
 
@@ -637,7 +634,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (lastVisited == -1)
                 throw new IllegalStateException();
 
-            if (rset.getVersionTimestamps() == null) {
+            if (!rset.hasVersionTimestamps()) {
 
                 // Version timestamps not maintained by the index.
 
@@ -645,7 +642,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
             }
 
-            return rset.getVersionTimestamps()[lastVisited];
+            return rset.getVersionTimestamp(lastVisited);
 
         }
 
@@ -654,7 +651,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (lastVisited == -1)
                 throw new IllegalStateException();
 
-            if (rset.getDeleteMarkers() == null) {
+            if (!rset.hasDeleteMarkers()) {
 
                 // Delete markers not maintained by the index.
                 
@@ -662,7 +659,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
                 
             }
 
-            return rset.getDeleteMarkers()[lastVisited] == 0 ? false : true;
+            return rset.getDeleteMarker(lastVisited);
 
         }
 

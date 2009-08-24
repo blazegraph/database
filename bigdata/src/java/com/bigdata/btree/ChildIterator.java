@@ -131,7 +131,7 @@ class ChildIterator implements INodeIterator {
             } else {
 
                 // Note: nchildren == nkeys+1 for a Node.
-                toIndex = node.nkeys + 1;
+                toIndex = node.getKeyCount() + 1;
 
             }
 

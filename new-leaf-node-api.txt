@@ -332,6 +332,33 @@ Goals:
 	   methods must also test whether or not the tuple has been
 	   deleted.  That information is NOT available on the IRaba.
 
+	 - Clean up (de-)serialization to avoid decoding keys and
+           values.
+
+	 - Done. nkeys refactor has broken the code.
+
+	 - Done. toString() for Leaf, Node, LeafData impls and NodeData impls.
+
+	 - Finish isolation @ ILeafData and INodeData.
+
+	   - childAddr[] and childEntryCount[] must not be assumed.
+             Move them onto a MutableNodeData object.
+
+	   - deleteMarkers[] and versionTimestamps[] must not be
+             assumed.  Move them onto a MutableLeafData object.
+
+	   - verify clearing (in delete()) and stealing (in ctors).
+
+	   - verify copyOnWrite().
+
+	 - Review cases where we explicitly tunnel through and obtain
+           the mutable version of the keys or values for a node or
+           leaf.  I believe that in all cases we are about to discard
+           the values in a sibling during a merge, in which case it is
+           Ok to decode them first and we do not lose any efficiency
+           since we will be storing the keys/values in a mutable
+           node/leaf.
+	   
 	 - Code the version timestamp[].
 
 	   A good coding scheme might be the minimum timestamp plus a
@@ -365,13 +392,14 @@ Goals:
        
          - NodeSerializer, IAddressSerializer, and INodeFactory are
            deprecated and will be deleted.
+	   
+	 - IKeyBuffer is deprecated and should be deleted.  it is only
+           used by the test suites.
 
-	 - ResultSet must use a shared Tuple to minimize (de-)coding.
+	   The ImmutableKeyBuffer is deprecated and should be deleted.
 
-	   Decode from the B+Tree into a Tuple with a backing
-           ByteArrayBuffer for its key and value. Encode the target
-           IRaba before RMI.  On the receiver, use the coded IRabas,
-           decoding into a shared Tuple dynamically.
+	 - ResultSet must operate on the coded representation rather
+           than de-serializing the data.
 
          - Each mutable B+Tree should use a single backing buffer
            instance for key and value compression (NodeSerializer did
@@ -398,10 +426,8 @@ Goals:
 
        - Done. Refactor the FastRDFValueSerializer (no test suite yet).
 
-       - Canonical huffman coder for RDF Keys?
-
-	  - Generalize the CanonicalHuffmanRabaCoder to allow for
-            non-byte values.
+       - Generalize the CanonicalHuffmanRabaCoder to allow for
+         non-byte values (char[], int[], long[]).
 
 	  - Allow a different IRabaCoder for the keys of the B+Tree
             leaf and the B+Tree node keys then we could use the long[]

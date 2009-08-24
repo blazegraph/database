@@ -29,6 +29,8 @@ import java.util.Iterator;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.service.Event;
@@ -621,15 +623,15 @@ public class IndexSegment extends AbstractBTree {
 
         final IndexSegmentAddressManager am = getStore().getAddressManager();
         
-        AbstractNode node = getRootOrFinger(key);
+        AbstractNode<?> node = getRootOrFinger(key);
         
         int i = 0;
         
         while(true) {
             
-            final int childIndex = ((Node)node).findChild(key);
+            final int childIndex = ((Node) node).findChild(key);
 
-            final long childAddr = ((Node)node).childAddr[childIndex];
+            final long childAddr = ((Node) node).getChildAddr(childIndex);
             
             if(am.isLeafAddr(childAddr)) {
         
@@ -638,7 +640,7 @@ public class IndexSegment extends AbstractBTree {
                 
             }
 
-            // desend the node hierarchy.
+            // descend the node hierarchy.
             node = (Node)((Node)node).getChild(childIndex);
             
             i++;
@@ -663,23 +665,22 @@ public class IndexSegment extends AbstractBTree {
         private ImmutableNodeFactory() {
         }
 
-        public ILeafData allocLeaf(AbstractBTree btree, long addr,
-                int branchingFactor, IRaba keys,
-                IRaba values, long[] versionTimestamps,
-                boolean[] deleteMarkers, long priorAddr, long nextAddr) {
+        public ILeafData allocLeaf(final AbstractBTree btree, final long addr,
+                final IRaba keys, final IRaba values,
+                final long[] versionTimestamps, final boolean[] deleteMarkers,
+                final long priorAddr, final long nextAddr) {
 
-            return new ImmutableLeaf(btree, addr, branchingFactor, keys,
-                    values, versionTimestamps, deleteMarkers, priorAddr,
-                    nextAddr);
+            return new ImmutableLeaf(btree, addr, keys, values,
+                    versionTimestamps, deleteMarkers, priorAddr, nextAddr);
 
         }
 
-        public INodeData allocNode(AbstractBTree btree, long addr,
-                int branchingFactor, int nentries, IRaba keys,
-                long[] childAddr, int[] childEntryCount) {
+        public INodeData allocNode(final AbstractBTree btree, final long addr,
+                final int nentries, final IRaba keys, final long[] childAddr,
+                final int[] childEntryCount) {
 
-            return new ImmutableNode(btree, addr, branchingFactor, nentries,
-                    keys, childAddr, childEntryCount);
+            return new ImmutableNode(btree, addr, nentries, keys, childAddr,
+                    childEntryCount);
 
         }
 
@@ -702,12 +703,11 @@ public class IndexSegment extends AbstractBTree {
              * @param keys
              * @param childKeys
              */
-            protected ImmutableNode(AbstractBTree btree, long addr,
-                    int branchingFactor, int nentries, IRaba keys,
-                    long[] childKeys, int[] childEntryCount) {
+            protected ImmutableNode(final AbstractBTree btree, final long addr,
+                    final int nentries, final IRaba keys,
+                    final long[] childKeys, final int[] childEntryCount) {
 
-                super(btree, addr, branchingFactor, nentries, keys, childKeys,
-                        childEntryCount);
+                super(btree, addr, nentries, keys, childKeys, childEntryCount);
 
             }
 
@@ -772,17 +772,17 @@ public class IndexSegment extends AbstractBTree {
             /**
              * @param btree
              * @param addr
-             * @param branchingFactor
              * @param keys
              * @param values
              */
-            protected ImmutableLeaf(AbstractBTree btree, long addr,
-                    int branchingFactor, IRaba keys,
-                    IRaba values, long[] versionTimestamps,
-                    boolean[] deleteMarkers, long priorAddr, long nextAddr) {
+            protected ImmutableLeaf(final AbstractBTree btree, final long addr,
+                    final IRaba keys, final IRaba values,
+                    final long[] versionTimestamps,
+                    final boolean[] deleteMarkers, final long priorAddr,
+                    final long nextAddr) {
 
-                super(btree, addr, branchingFactor, keys, values,
-                        versionTimestamps, deleteMarkers);
+                super(btree, addr, keys, values, versionTimestamps,
+                        deleteMarkers);
 
                 // prior/next addrs must be known.
                 assert priorAddr != -1L;

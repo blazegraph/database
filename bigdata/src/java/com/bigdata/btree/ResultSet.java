@@ -39,24 +39,45 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.ReadOnlyLeafData;
 import com.bigdata.btree.filter.ITupleFilter;
+import com.bigdata.btree.raba.AbstractRaba;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableRaba;
+import com.bigdata.btree.raba.MutableKeysRaba;
+import com.bigdata.btree.raba.MutableValuesRaba;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
 
 /**
  * An object used to stream key scan results back to the client.
+ * <p>
+ * Note: The {@link IRangeQuery} bit flags may be used to indicate which data
+ * and metadata are returned. If the corresponding data was not requested then
+ * the access methods for that data will throw an
+ * {@link UnsupportedOperationException}. You can test this using
+ * {@link #hasDeleteMarkers()}, {@link #hasVersionTimestamps()} and related
+ * methods.
  * 
- * @todo harmonize this with {@link ILeafData}? We could reuse the same
- *       serialization logic with extensions for the additional metadata
- *       conveyed by the {@link ResultSet}.
+ * FIXME Harmonize this with {@link ILeafData}. Since information is only
+ * optionally present in the {@link ResultSet} we can not reuse the
+ * {@link ReadOnlyLeafData} directly. However, we can reuse the same objects for
+ * coding the keys, values, and timestamps. Note that this class does code
+ * additional metadata beyond that available for a leaf, notably the source
+ * information, tuple counter, and metadata for paging through {@link ResultSet}
+ * s.
+ * 
+ * FIXME Do not decode the keys or values in {@link #readExternal(ObjectInput)}.
+ * Use the coded representations in place.
+ * 
+ * FIXME Do not decode the delete flags or version timestamps. Code per
+ * {@link ReadOnlyLeafData} and then use the coded representations in place.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResultSet implements Externalizable {
+public class ResultSet implements ILeafData, Externalizable {
 
     private static final long serialVersionUID = -390738836663476282L;
 
@@ -72,16 +93,25 @@ public class ResultSet implements Externalizable {
     /** true iff values were requested. */
     private boolean sendVals;
     
+    /**
+     * The #of tuples in the buffer.
+     */
     private int ntuples;
 
     private boolean exhausted;
 
     private byte[] lastKey;
 
-    private MutableRaba keys;
+    /** The keys -or- <code>null</code> iff keys were not requested. */
+    private IRaba keys;
 
-    private MutableRaba vals;
+    /** The values -or- <code>null</code> iff values were not requested. */
+    private IRaba vals;
 
+    /**
+     * The version timestamps -or- <code>null</code> if not requested -or- not
+     * maintained.
+     */
     private long[] versionTimestamps;
     
     /**
@@ -100,7 +130,7 @@ public class ResultSet implements Externalizable {
     
     /**
      * Set automatically based on the first visited {@link ITuple}. By setting
-     * this value lazily, the {@link ITupleSerializer} can be overriden by an
+     * this value lazily, the {@link ITupleSerializer} can be overridden by an
      * {@link ITupleFilter} chain. For example, the logical row scan for the
      * SparseRowStore does this when it converts between the sparse row format
      * that is actually stored in the index and the timestamped property sets
@@ -179,13 +209,13 @@ public class ResultSet implements Externalizable {
     /**
      * Return the keys.
      * 
-     * @throws IllegalStateException
+     * @throws UnsupportedOperationException
      *             if the keys were not retrieved.
      */
     final public IRaba getKeys() {
         
         if (keys == null)
-            throw new IllegalStateException();
+            throw new UnsupportedOperationException();
         
         return keys;
         
@@ -194,89 +224,23 @@ public class ResultSet implements Externalizable {
     /**
      * Return the values.
      * 
-     * @throws IllegalStateException
+     * @throws UnsupportedOperationException
      *             if the values were not retrieved.
      */
     final public IRaba getValues() {
         
         if (vals == null)
-            throw new IllegalStateException();
+            throw new UnsupportedOperationException();
         
         return vals;
         
     }
     
     /**
-     * Return the key at the specified index.
-     * 
-     * @param index
-     *            The index of the key to be returned.
-     * 
-     * @see #getKeys()
-     * 
-     * @throws IllegalStateException
-     *             if the keys were not retrieved.
-     */
-    final public byte[] getKey(int index) {
-        
-        if (keys == null)
-            throw new IllegalStateException();
-        
-        return keys.get(index);
-        
-    }
-
-    /**
-     * Return the value at the specified index.
-     * 
-     * @param index
-     *            The index of the value to be returned.
-     * 
-     * @see #getValues()
-     * 
-     * @throws IllegalStateException
-     *             if the values were not retrieved.
-     */
-    final public byte[] getValue(int index) {
-        
-        if (vals == null)
-            throw new IllegalStateException();
-        
-        return vals.get(index);
-        
-    }
-
-    /**
-     * The visited version timestamps iff the index maintains version
-     * timestamps.
-     * 
-     * @return The version timestamps -or- <code>null</code> iff the index
-     *         does not maintain version timestamps.
-     */
-    final public long[] getVersionTimestamps() {
-        
-        return versionTimestamps;
-        
-    }
-    
-    /**
-     * The visited delete markers iff the the index maintains delete markers.
-     * The bytes are coded as ONE (1) is true and ZERO (0) is false.
-     * 
-     * @return The delete markers -or- <code>null</code> iff the index does
-     *         not maintain delete markers.
-     */
-    final public byte[] getDeleteMarkers() {
-        
-        return deleteMarkers;
-        
-    }
-
-    /**
      * The values returned by {@link ITuple#getSourceIndex()} for each visited
      * index entry.
      */
-    final public int getSourceIndex(int index) {
+    final public int getSourceIndex(final int index) {
         
         if (sources.length == 1) {
 
@@ -369,11 +333,13 @@ public class ResultSet implements Externalizable {
             limit = -limit;
             
         }
-        
-        this.keys = (sendKeys ? new MutableRaba(0,0,new byte[limit][]) : null);
 
-        this.vals = (sendVals ? new MutableRaba(0,0,new byte[limit][]) : null);
-        
+        this.keys = (sendKeys ? new MutableKeysRaba(0, 0, limit,
+                new byte[limit][]) : null);
+
+        this.vals = (sendVals ? new MutableValuesRaba(0, 0, limit,
+                new byte[limit][]) : null);
+
         if(indexMetadata.getDeleteMarkers()) {
             
             // index has delete markers so we send them along.
@@ -427,13 +393,13 @@ public class ResultSet implements Externalizable {
 
         if (this.keys != null) {
 
-            this.keys = this.keys.resize(limit);
+            this.keys = ((AbstractRaba) this.keys).resize(limit);
 
         }
 
         if (this.vals != null) {
 
-            this.vals = this.vals.resize(limit);
+            this.vals = ((AbstractRaba) this.vals).resize(limit);
 
         }
 
@@ -503,7 +469,7 @@ public class ResultSet implements Externalizable {
      *            that there is no data for the query in the key range on this
      *            index partition and hence that it is <i>exhausted</i>).
      */
-    protected void done(boolean exhausted, byte[] lastKey) {
+    protected void done(final boolean exhausted, final byte[] lastKey) {
 
         if (!exhausted && lastKey == null) {
 
@@ -670,7 +636,8 @@ public class ResultSet implements Externalizable {
         
         if (haveKeys) {
             
-            keys = new MutableRaba( 0, 0, new byte[ntuples][] );
+            // FIXME wrap the record using the coded keys in place.
+            keys = new MutableValuesRaba( 0, 0, new byte[ntuples][] );
             
             if (ntuples > 0) {
              
@@ -690,7 +657,8 @@ public class ResultSet implements Externalizable {
 
         if (haveVals) {
             
-            vals = new MutableRaba(0, 0, new byte[ntuples][]);
+            // FIXME wrap the record using the coded values in place.
+            vals = new MutableValuesRaba(0, 0, new byte[ntuples][]);
             
             if (ntuples > 0) {
 
@@ -720,10 +688,10 @@ public class ResultSet implements Externalizable {
 //                
 //              ibs.read(deleteMarkers, ntuples/* len */);
 
-                for(int i=0; i<ntuples; i++) {
+                for (int i = 0; i < ntuples; i++) {
 
-                    deleteMarkers[i] = (byte)(ibs.readBit() == 0 ? 0 : 1);
-                    
+                    deleteMarkers[i] = (byte) (ibs.readBit() == 0 ? 0 : 1);
+
                 }
                 
                 // ibs.close();
@@ -1023,6 +991,95 @@ public class ResultSet implements Externalizable {
         // Signal completion.
         done(exhausted, lastKey);
 
+    }
+
+    /*
+     * ILeafData
+     */
+    
+    private boolean rangeCheckIndex(final int index) {
+        if (index < 0 || index >= ntuples)
+            throw new IndexOutOfBoundsException();
+        return true;
+    }
+    
+//    final public void copyValue(final int index, final OutputStream os) {
+//        
+//        getKeys().copy(index, os);
+//        
+//    }
+//
+//    final public boolean isNull(final int index) {
+//
+//        return getValues().isNull(index);
+//
+//    }
+
+    final public boolean hasDeleteMarkers() {
+
+        return deleteMarkers != null;
+
+    }
+
+    final public boolean hasVersionTimestamps() {
+
+        return versionTimestamps != null;
+
+    }
+
+    final public long getVersionTimestamp(final int index) {
+        
+        if(versionTimestamps == null)
+            throw new UnsupportedOperationException();
+        
+        assert rangeCheckIndex(index);
+        
+        return versionTimestamps[index];
+        
+    }
+
+    final public boolean getDeleteMarker(final int index) {
+        
+        if (deleteMarkers == null)
+            throw new UnsupportedOperationException();
+
+        assert rangeCheckIndex(index);
+
+        return deleteMarkers[index] == 0 ? false : true;
+
+    }
+
+    final public int getKeyCount() {
+
+        return ntuples;
+        
+    }
+
+    final public int getValueCount() {
+        
+        return ntuples;
+        
+    }
+
+    /**
+     * Operation is not supported.
+     * 
+     * @todo we could also send this back.  It is just the #of tuples scanned.
+     */
+    public int getSpannedTupleCount() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * Yes (this data structure logically corresponds to a leaf since it
+     * implements the {@link ILeafData} API).
+     */
+    final public boolean isLeaf() {
+
+        return true;
+        
     }
     
 //    /**

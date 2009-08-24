@@ -29,7 +29,6 @@ package com.bigdata.btree.data;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.raba.codec.IRabaDecoder;
@@ -286,6 +285,79 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
     final public IRaba getKeys() {
 
         return keys;
+
+    }
+
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append(getClass().getName() + "{");
+
+        ReadOnlyNodeData.toString(this, sb);
+
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+
+    /**
+     * Utility method formats the {@link INodeData}.
+     * 
+     * @param node
+     *            A node data record.
+     * @param sb
+     *            The representation will be written onto this object.
+     * 
+     * @return The <i>sb</i> parameter.
+     */
+    static public StringBuilder toString(final INodeData node,
+            final StringBuilder sb) {
+
+        final int nchildren = node.getChildCount();
+
+        sb.append(", nchildren=" + nchildren);
+
+        sb.append(", spannedTupleCount=" + node.getSpannedTupleCount());
+
+        sb.append(", keys=" + node.getKeys());
+
+        {
+
+            sb.append(", childAddr=[");
+
+            for (int i = 0; i < nchildren; i++) {
+
+                if (i > 0)
+                    sb.append(", ");
+
+                sb.append(node.getChildAddr(i));
+
+            }
+
+            sb.append("]");
+
+        }
+
+        {
+
+            sb.append(", childEntryCount=[");
+
+            for (int i = 0; i < nchildren; i++) {
+
+                if (i > 0)
+                    sb.append(", ");
+
+                sb.append(node.getChildEntryCount(i));
+
+            }
+
+            sb.append("]");
+
+        }
+
+        return sb;
 
     }
 

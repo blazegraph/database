@@ -71,7 +71,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * @param keys
      *            The array of keys.
      */
-    public MutableKeyBuffer(int nkeys, byte[][] keys ) {
+    public MutableKeyBuffer(final int nkeys, final byte[][] keys ) {
         
         assert nkeys >= 0; // allow deficient root.
         
@@ -92,7 +92,7 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      * @param src
      *            An existing instance.
      */
-    public MutableKeyBuffer(MutableKeyBuffer src) {
+    public MutableKeyBuffer(final MutableKeyBuffer src) {
         
         assert src != null;
         
@@ -435,35 +435,38 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
     
     public String toString() {
 
-        final StringBuilder sb = new StringBuilder();
-
-        sb.append("nkeys=" + nkeys);
-        sb.append(", maxKeys=" + keys.length);
-        sb.append(", prefix=" + BytesUtil.toString(getPrefix()));
-        sb.append(", [\n");
-
-        for (int i = 0; i < nkeys/*keys.length*/; i++) {
-
-            if (i > 0)
-                sb.append(",\n");
-
-            byte[] key = keys[i];
-
-            if (key == null) {
-
-                sb.append("null");
-
-            } else {
-
-                sb.append(BytesUtil.toString(key));
-
-            }
-
-        }
-
-        sb.append("]");
-
-        return sb.toString();
+        return AbstractRaba.toString(this);
+        
+//        final StringBuilder sb = new StringBuilder();
+//
+//        sb.append(getClass().getName());
+//        sb.append("{ nkeys=" + nkeys);
+//        sb.append(", maxKeys=" + keys.length);
+//        sb.append(", prefix=" + BytesUtil.toString(getPrefix()));
+//        sb.append(", [\n");
+//
+//        for (int i = 0; i < nkeys/*keys.length*/; i++) {
+//
+//            if (i > 0)
+//                sb.append(",\n");
+//
+//            final byte[] key = keys[i];
+//
+//            if (key == null) {
+//
+//                sb.append("null");
+//
+//            } else {
+//
+//                sb.append(BytesUtil.toString(key));
+//
+//            }
+//
+//        }
+//
+//        sb.append("]}");
+//
+//        return sb.toString();
 
     }
    

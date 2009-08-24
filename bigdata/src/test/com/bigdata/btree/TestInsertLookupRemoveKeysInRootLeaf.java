@@ -115,7 +115,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             
             nkeys++;
             
-            assertEquals( nkeys, root.nkeys );
+            assertEquals( nkeys, root.getKeyCount() );
             
         }
 
@@ -143,29 +143,29 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 
         final int branchingFactor = 20;
         
-        BTree btree = getBTree(branchingFactor);
+        final BTree btree = getBTree(branchingFactor);
 
-        Leaf root = (Leaf) btree.root;
+        final Leaf root = (Leaf) btree.root;
 
         // array of inserted keys.
-        byte[][] expectedKeys = new byte[branchingFactor][];
+        final byte[][] expectedKeys = new byte[branchingFactor][];
         
         int nkeys = 0;
         
         while( nkeys < branchingFactor ) {
             
             // Valid random key.
-            byte[] key = new byte[3];
+            final byte[] key = new byte[3];
             r.nextBytes(key);
 
-            int nkeysBefore = root.nkeys;
+            final int nkeysBefore = root.getKeyCount();
             
-            boolean exists = btree.lookup(key) != null;
+            final boolean exists = btree.lookup(key) != null;
             
             btree.insert(key, new SimpleEntry() );
 
-            if( nkeysBefore == root.nkeys ) {
-                
+            if (nkeysBefore == root.getKeyCount()) {
+
                 // key already exists.
                 assertTrue(exists);
                 
@@ -180,8 +180,8 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             
             nkeys++;
             
-            assertEquals( nkeys, root.nkeys );
-            
+            assertEquals(nkeys, root.getKeyCount());
+
         }
 
         // sort the keys that we inserted.
@@ -245,7 +245,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             
             final SimpleEntry value = expectedValues[i];
             
-            assertEquals(i, root.nkeys );
+            assertEquals(i, root.getKeyCount() );
             
             assertNull("Not expecting to find key=" + BytesUtil.toString(key),
                     btree.lookup(key));
@@ -257,14 +257,14 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
 //            root.dump(System.err);
 
             assertEquals("nkeys(i=" + i + " of " + branchingFactor + ")", i + 1,
-                    root.nkeys);
+                    root.getKeyCount());
             
             assertEquals("value(i=" + i + " of " + branchingFactor + ")",
                     value, btree.lookup(key));
             
             // verify the values iterator
-            byte[][] tmp = new byte[root.nkeys][];
-            for (int j = 0; j < root.nkeys; j++) {
+            final byte[][] tmp = new byte[root.getKeyCount()][];
+            for (int j = 0; j < root.getKeyCount(); j++) {
                 tmp[j] = root.getValues().get(j);
             }
             assertSameIterator("values", tmp, new Striterator(root

@@ -29,7 +29,6 @@ package com.bigdata.btree.data;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.IAbstractNodeData;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
