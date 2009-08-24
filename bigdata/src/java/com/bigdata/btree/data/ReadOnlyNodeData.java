@@ -251,30 +251,33 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
     }
 
     /**
-     * @deprecated by #getChildAddr(int)
+     * Bounds check.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if <i>index</i> is LT ZERO (0)
+     * @throws IndexOutOfBoundsException
+     *             if <i>index</i> is GE <i>nkeys</i>
      */
-    final public long[] getChildAddr() {
-
-        throw new UnsupportedOperationException();
+    protected boolean assertChildIndex(final int index) {
+        
+        if (index < 0 || index > nkeys)
+            throw new IndexOutOfBoundsException();
+        
+        return true;
         
     }
 
     final public long getChildAddr(final int index) {
-        
+
+        assert assertChildIndex(index);
+
         return b.getLong(O_childAddr + index * SIZEOF_ADDR);
-        
+
     }
 
-//    /**
-//     * @deprecated by {@link #getChildEntryCount(int)}
-//     */
-//    final public int[] getChildEntryCounts() {
-//        
-//        throw new UnsupportedOperationException();
-//        
-//    }
-
     final public int getChildEntryCount(final int index) {
+
+        assert assertChildIndex(index);
 
         return b.getInt(O_childEntryCount + index * SIZEOF_ENTRY_COUNT);
 
@@ -283,7 +286,7 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
     final public IRaba getKeys() {
 
         return keys;
-        
+
     }
-    
+
 }

@@ -85,13 +85,19 @@ import com.bigdata.btree.raba.IRaba;
  *                  used since that does not degrade the code by much and it
  *                  allows us to eliminate a &tilde;256 bytes from the data record.
  * 
+ * isOffsetArray:1  A bit flag whose value is 1 iff the codedValueOffset[] is
+ *                  stored.  At this time, this array is always stored.  Either
+ *                  the offset[] or the #of symbols in each coded value MUST be
+ *                  stored in order for us to compute the end of each sequence
+ *                  of codeWord[]s for a given coded value. 
+ * 
  * isByteAlignedOffset:1
  *                  A bit flag whose value is 1 iff the codedValueOffset[] is
  *                  byte aligned.  When true, the start of the array will fall
  *                  on a byte boundary and each array element will be a multiple
  *                  of 8 bits.
  *                  
- * unused:5         unused bit flags.
+ * unused:4         unused bit flags.
  * 
  * size:int31       The #of elements in the logical byte[][].
  * 
@@ -115,10 +121,7 @@ import com.bigdata.btree.raba.IRaba;
  * 
  * codedValueOffsetBits:uint8
  *                  The width in bits of the integers used to code the
- *                  codedValueOffset[].  If this is ZERO (0), then the
- *                  codeValueOffset[] was not stored and the coded values must
- *                  be decoded with a sequential scan of the codeWord[]. Note
- *                  that this field will be zero if nsymbols==0.
+ *                  codedValueOffset[].
  * 
  *                  O_codedValueOffsetBits := [ibs.readBits];
  * 
@@ -141,9 +144,9 @@ import com.bigdata.btree.raba.IRaba;
  *                  are coded.
  * 
  *                  O_nulls :=  O_codedValueOffsetBits + 8 + (codedValueOffsetBits==0?0:32);
- *
+ * 
  * -- note: if nsymbols==0 then this is the end of the record --
- *
+ * 
  * decoderInputs:=
  * length[],        The bit length of each code word in the assigned order.
  * symbol[],        The correlated symbol indices.
@@ -174,7 +177,7 @@ import com.bigdata.btree.raba.IRaba;
  *                  While the delta in the offsets could be represented more
  *                  efficiently, the offsets are represented directly so that
  *                  we may avoid reading the entire codeOffset[] into memory.
- *                  This array is present iff codeOffsetBits is GT ZERO.
+ *                  This array is present iff isOffsetArray is true.
  * 
  *                  O_codedValueOffset[] := O_codedValue[] + sumCodedValueBitLengths
  * </pre>
@@ -192,7 +195,12 @@ import com.bigdata.btree.raba.IRaba;
  *       keys since we will always store all symbols for keys.
  * 
  *       FIXME Generalize to allow alphabets of size GT 256 so we can reuse this
- *       to directly encode the long[] keys of the leaves in the RDF DB.
+ *       to directly encode the long[] keys of the leaves in the RDF DB. This
+ *       will still be an {@link IRaba} (a random access byte[]). The difference
+ *       is that each symbol will correspond to a sequence of 8 bytes. So what
+ *       we need is a means to decouple the generation of the frequency[], the
+ *       assumption that alphabets of 256 are "complete", and the application of
+ *       the codec and the decoder, which must process 8 bytes at a time.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -1260,12 +1268,16 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             final boolean isSymbolTable = setup.getSymbolCount()!=256;
             obs.writeBit(isSymbolTable);
 
+            // Indicates whether the codedValueOffset[] is stored.
+            final boolean isOffsetArray = true;
+            obs.writeBit(isOffsetArray);
+            
             // Indicates if we will write the codedValueOffset[] with byte alignment.
             final boolean isByteAlignedOffsets = false;
             obs.writeBit(isByteAlignedOffsets);
             
-            // five unused bit flags.
-            obs.writeInt(0, 5);
+            // unused bit flags.
+            obs.writeInt(0, 4);
             
             // The #of elements in the logical byte[][].
             obs.writeInt(size, 31);
@@ -1517,14 +1529,17 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             
                 isSymbolTable = ibs.readBit() != 0;
 
+                final boolean isOffsetArray = ibs.readBit() != 0;
+
                 final boolean isByteAlignedOffsets = ibs.readBit() != 0;
 
                 // skip unused bit flags.
-                ibs.readInt(5/*nbits*/);
+                ibs.readInt(4/*nbits*/);
                 
                 if (debug) {
                     sb.append("isKeys=" + isKeys + "\n");
                     sb.append("isSymbolTable=" + isSymbolTable + "\n");
+                    sb.append("isOffsetArray=" + isOffsetArray + "\n");
                     sb.append("isByteAlignedOffsets=" + isByteAlignedOffsets + "\n");
                 }
 

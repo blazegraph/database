@@ -175,7 +175,7 @@ public class HuffmanCodec implements PrefixCodec, Serializable {
 			coder = new Fast64CodeWordCoder( codeWord, new long[ size ] );
 			// Modified BBT 8/11/2009
 //            decoder = new CanonicalFast64CodeWordDecoder( new int[ size ], new int[ size ] );
-			decoderInputs.shortestCodeWord = codeWord[0];
+			decoderInputs.shortestCodeWord = LongArrayBitVector.getInstance().length( 0 );
 			decoderInputs.length = new int[size];
 			decoderInputs.symbol = new int[size];
 			decoder = new CanonicalFast64CodeWordDecoder( decoderInputs.length, decoderInputs.symbol );

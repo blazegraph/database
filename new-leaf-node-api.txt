@@ -59,6 +59,10 @@ Examples:
    index partition within some key-range.
 
 ------------------------------------------------------------
+Other:
+
+- Examine opportunities for "rack aware" selection of the CS or DS
+  when integrating with HDFS.
 
 -- merge to branch -- 
 
@@ -296,6 +300,16 @@ Goals:
        node or leaf will always use IRawStore#write(int,ByteBuffer).
 
        The keys and values 
+
+       - Node: 
+
+         - Use minimum bit length coding for childEntryCount[] and
+           childAddr[]?  Pluggable or Versioned?
+
+       - Leaf:
+
+	 - Use minimum bit length coding for timestamp[]?  Possibly a
+           delta or prefix coding?  Pluggable or Versioned?
 	 
        - LinkedLeaf:
 
@@ -318,6 +332,27 @@ Goals:
 	   methods must also test whether or not the tuple has been
 	   deleted.  That information is NOT available on the IRaba.
 
+	 - Code the version timestamp[].
+
+	   A good coding scheme might be the minimum timestamp plus a
+           minimum width coding for the remainder for each timestamp.
+
+	 - Code the childAddr[].
+
+	   A good scheme might be identical to the version timestamp
+	   scheme since the childAddr[] will tend to have a shared
+	   prefix.
+
+	   For an index segment, the childAddr[] values will also be
+	   strictly increasing.
+
+	 - Code the childEntryCount[].
+
+	   A similar scheme might apply here.  Since the B+Tree is
+	   balanced the #of spanned tuples for each child will be
+	   roughly comparable, hence substracting out the minimum
+	   could save space.
+
          - Refactor Node and Leaf to delegate to the INodeData or
 	   ILeafData implementation.  Define a MutableNodeData and a
 	   MutableLeafData.
@@ -331,35 +366,51 @@ Goals:
          - NodeSerializer, IAddressSerializer, and INodeFactory are
            deprecated and will be deleted.
 
-	 - Examine ResultSet uses and try to use in-place access to
-           the compressed keys and values.
+	 - ResultSet must use a shared Tuple to minimize (de-)coding.
+
+	   Decode from the B+Tree into a Tuple with a backing
+           ByteArrayBuffer for its key and value. Encode the target
+           IRaba before RMI.  On the receiver, use the coded IRabas,
+           decoding into a shared Tuple dynamically.
+
+         - Each mutable B+Tree should use a single backing buffer
+           instance for key and value compression (NodeSerializer did
+           it this way, so there might be a reason to keep an object
+           around which has those buffers)
+
+	 - Support separate IRabaCodec for B+Tree node keys and B+Tree
+           leaf keys.  This will allow application specific key coding
+           for the leaves where we have full-length keys.  Canonical
+           huffman or front-coding can both be used for the B+Tree
+           nodes, which only store the "separator keys".
+
+	 - The persistence tests should use the default codec for keys
+           and values.  Either front-coded or canonical huffman for
+           keys and canonical huffman for values.
 
        - Done. FrontCoded.
 
-       - (***) Canonical Huffman.
+       - Canonical Huffman.
 
           - Add unit tests for keys NOT present in the raba.
 
-	  - Special case when nsymbols==1 (dsiutils bug).
-
-	  - If the InputBitStream backed by a ByteBuffer is buffered,
-	    then make sure that the buffer is a reasonable size.  We
-	    could do this ourselves with a BufferedInputStream
-	    wrapping the ByteBufferInputStream.
+	  - (***) Special case when nsymbols==1 (dsiutils bug).
 
        - Done. Refactor the FastRDFValueSerializer (no test suite yet).
 
        - Canonical huffman coder for RDF Keys?
 
-	  If we generalize the CanonicalHuffmanRabaCoder to allow for
-          non-byte values and also allow a different IRabaCoder for
-          the keys of the B+Tree leaf and the B+Tree node keys then we
-          could use the long[] based canonical huffman coder and save
-          more space in the record, and probably have faster search.
+	  - Generalize the CanonicalHuffmanRabaCoder to allow for
+            non-byte values.
 
-	  Note that front-coding should already be pretty efficient in
-          space and time and we can always use the byte[] based
-          huffman coder for RDF keys.
+	  - Allow a different IRabaCoder for the keys of the B+Tree
+            leaf and the B+Tree node keys then we could use the long[]
+            based canonical huffman coder and save more space in the
+            record, and probably have faster search.
+
+	  - Front-coding should already be pretty efficient in space
+            and time and we can always use the byte[] based huffman
+            coder for RDF keys.
 
        - ByteBuffer is too slow.
 	   
@@ -401,6 +452,11 @@ Goals:
              sure to decompress to an expandable per-worker task
              byte[].  Once decompressed, create an exact fit byte[]
              and wrap it as a ByteBuffer.
+
+	     Note: If the InputBitStream backed by a ByteBuffer is
+	     buffered, then make sure that the buffer is a reasonable
+	     size.  We could do this ourselves with a
+	     BufferedInputStream wrapping the ByteBufferInputStream.
 
 	     This could be part of how we reconcile the DataSerializer
 	     and the IRabaCoder APIs.
@@ -462,6 +518,10 @@ Goals:
            fastutils.  Possibly do this as part of the lgpl-utils
            build.
 
+	 - (*) Make sure that the ant script builds the lgpl-utils jar
+           first and then links with it to reference the classes
+           inside of that jar.
+
 Access:
 
   - Efficient search on compressed keys (prefix, canonical huffman, or
@@ -509,18 +569,6 @@ Access:
 
   - Strongly type the AbstractBTree's IAutoBox interface for the
     key/value types and link that with the ITupleSerializer types.
-
-API: 
-
-    Use the same API for mutable nodes and leaves and immutable nodes
-    and leaves, but the latter use a de-compressed record.
-
-Questions:
-
-    Will the data rest in a direct ByteBuffer or a byte[]?
-
-    Do we need to code "null" as well as variable length byte[] and
-    allow values[] itself to be null?
 
 B+Tree node buffering.
 
