@@ -192,7 +192,7 @@ public class DumpIndexSegment {
 
     }
 
-    static void dumpHeaders(IndexSegmentStore store) throws IOException {
+    static void dumpHeaders(final IndexSegmentStore store) throws IOException {
 
         System.out.println("file        : " + store.getFile());
 
@@ -213,14 +213,17 @@ public class DumpIndexSegment {
      * 
      * @param node
      */
-    static void dumpNodes(IndexSegmentStore store, Node node, boolean dumpNodeState) {
+    static void dumpNodes(final IndexSegmentStore store, final Node node,
+            final boolean dumpNodeState) {
 
         if(dumpNodeState)
             node.dump(System.out);
         
-        for (int i = 0; i <= node.nkeys; i++) {
+        final int nkeys = node.getKeyCount();
+        
+        for (int i = 0; i <= nkeys; i++) {
 
-            long addr = node.childAddr[i];
+            final long addr = node.getChildAddr(i);
 
             if (store.getAddressManager().isNodeAddr(addr)) {
 
@@ -233,7 +236,7 @@ public class DumpIndexSegment {
                 } else {
 
                     // lower level read 
-                    ByteBuffer data = store.read(addr);
+                    final ByteBuffer data = store.read(addr);
 
                     // note: does NOT set the parent reference on the Node!
                     child = (Node) node.btree.nodeSer.getNode(node.btree, addr,
@@ -271,7 +274,7 @@ public class DumpIndexSegment {
             Node child = (Node) btree.nodeSer.getNode(btree, addr, data);
             
             // left most child
-            return getFirstLeafAddr(store, child.childAddr[0]);
+            return getFirstLeafAddr(store, child.getChildAddr(0));
             
         }
 
@@ -288,20 +291,20 @@ public class DumpIndexSegment {
      * @param addr
      * @return
      */
-    static long getLastLeafAddr(IndexSegmentStore store, long addr) {
-        
+    static long getLastLeafAddr(final IndexSegmentStore store, final long addr) {
+
         if(store.getAddressManager().isNodeAddr(addr)) {
          
             // lower level read 
-            ByteBuffer data = store.read(addr);
+            final ByteBuffer data = store.read(addr);
 
             final AbstractBTree btree = store.loadIndexSegment(); 
             
             // note: does NOT set the parent reference on the read Node!
-            Node child = (Node) btree.nodeSer.getNode(btree, addr, data);
+            final Node child = (Node) btree.nodeSer.getNode(btree, addr, data);
             
             // right most child
-            return getLastLeafAddr(store, child.childAddr[child.nkeys]);
+            return getLastLeafAddr(store, child.getChildAddr(child.getKeyCount()));
             
         }
 

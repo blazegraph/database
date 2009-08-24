@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 
 /**
@@ -44,8 +46,6 @@ public interface INodeFactory {
      *            The owning btree.
      * @param addr
      *            The address from which the node was read.
-     * @param branchingFactor
-     *            The branching factor for the node.
      * @param nentries
      *            The #of entries spanned by this node.
      * @param keys
@@ -58,9 +58,8 @@ public interface INodeFactory {
      * 
      * @return A node initialized from those data.
      */
-    public INodeData allocNode(AbstractBTree btree, long addr,
-            int branchingFactor, int nentries, IRaba keys,
-            long[] childAddr, int[] childEntryCount);
+    public INodeData allocNode(AbstractBTree btree, long addr, int nentries,
+            IRaba keys, long[] childAddr, int[] childEntryCount);
 
     /**
      * Create a leaf. The implementation is encouraged to steal the <i>keys</i>
@@ -70,8 +69,6 @@ public interface INodeFactory {
      *            The owning btree.
      * @param addr
      *            The address from which the leaf was read.
-     * @param branchingFactor
-     *            The branching factor for the leaf.
      * @param keys
      *            A representation of the defined keys in the node.
      * @param values
@@ -97,9 +94,8 @@ public interface INodeFactory {
      * 
      * @return A leaf initialized from those data.
      */
-    public ILeafData allocLeaf(AbstractBTree btree, long addr,
-            int branchingFactor, IRaba keys,
-            IRaba values, long[] versionTimestamps,
-            boolean[] deleteMarkers, long priorAddr, long nextAddr);
+    public ILeafData allocLeaf(AbstractBTree btree, long addr, IRaba keys,
+            IRaba values, long[] versionTimestamps, boolean[] deleteMarkers,
+            long priorAddr, long nextAddr);
 
 }

@@ -237,7 +237,7 @@ public class TestBTreeLeafCursors extends TestCase2 {
         final BTree btree;
         {
             
-            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
 
             md.setBranchingFactor(3);
             

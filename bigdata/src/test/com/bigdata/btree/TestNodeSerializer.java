@@ -473,7 +473,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
          * create the node and set it as the root to fake out the btree.
          */
         
-        Node node = new Node(btree, addr, branchingFactor, nentries,
+        final Node node = new Node(btree, addr, nentries,
 //                new ImmutableKeyBuffer(nkeys, branchingFactor, keys),
                 new MutableKeyBuffer(nkeys, keys),
                 children, childEntryCounts);
@@ -533,7 +533,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
          * create the leaf and set it as the root to fake out the btree.
          */
 
-        Leaf leaf = new Leaf(btree, addr, branchingFactor,
+        final Leaf leaf = new Leaf(btree, addr, 
 //                new ImmutableKeyBuffer(nkeys, branchingFactor + 1, keys),
                 new MutableKeyBuffer(nkeys, keys),
                 new MutableValueBuffer(nkeys, values),//

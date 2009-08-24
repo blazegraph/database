@@ -45,6 +45,7 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.Reverserator;
 import com.bigdata.btree.filter.TupleRemover;
@@ -1280,7 +1281,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @return Either the root node of the tree or a recently touched leaf that
      *         is known to span the key.
      * 
-     * @todo This is a placeholder for finger(s) for hot spots in the B+Tree,
+     * @todo This is a place holder for finger(s) for hot spots in the B+Tree,
      *       but the finger(s) are currently disabled.
      */
     protected AbstractNode getRootOrFinger(final byte[] key) {
@@ -1584,8 +1585,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @throws UnsupportedOperationException
      *             if the index is read-only.
      */
-    final public Tuple insert(byte[] key, byte[] value, boolean delete,
-            long timestamp, Tuple tuple) {
+    final public Tuple insert(final byte[] key, final byte[] value,
+            final boolean delete, final long timestamp, final Tuple tuple) {
 
         assert delete == false || getIndexMetadata().getDeleteMarkers();
 
@@ -3073,7 +3074,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @return The persistent identity assigned by the store.
      */
-    protected long writeNodeOrLeaf(AbstractNode node) {
+    protected long writeNodeOrLeaf(final AbstractNode node) {
 
         assert root != null; // i.e., isOpen().
         assert node != null;
@@ -3200,7 +3201,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @return The node or leaf.
      */
-    protected AbstractNode readNodeOrLeaf(long addr) {
+    protected AbstractNode readNodeOrLeaf(final long addr) {
 
         final ByteBuffer tmp;
         {

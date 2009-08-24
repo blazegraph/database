@@ -28,9 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.data;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.IAbstractNodeData;
-import com.bigdata.btree.ILeafData;
-import com.bigdata.btree.INodeData;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;

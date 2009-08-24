@@ -2,7 +2,6 @@ package com.bigdata.btree.data;
 
 import java.io.OutputStream;
 
-import com.bigdata.btree.ILeafData;
 import com.bigdata.btree.raba.IRaba;
 
 /**
@@ -49,17 +48,17 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
     }
 
-    final public boolean isNull(final int index) {
-
-        return vals.isNull(index);
-
-    }
-
-    final public void copyValue(int index, OutputStream os) {
-
-        vals.copy(index, os);
-
-    }
+//    final public boolean isNull(final int index) {
+//
+//        return vals.isNull(index);
+//
+//    }
+//
+//    final public void copyValue(int index, OutputStream os) {
+//
+//        vals.copy(index, os);
+//
+//    }
 
     final public boolean getDeleteMarker(final int index) {
 

@@ -80,7 +80,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * @throws IllegalStateException
      *             If the identity is already defined.
      */
-    void setIdentity(long key) throws IllegalStateException {
+    void setIdentity(final long key) throws IllegalStateException {
 
         if (key == NULL) {
 
@@ -117,7 +117,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
 
     }
 
-    public void setDirty(boolean dirty) {
+    public void setDirty(final boolean dirty) {
 
         this.dirty = dirty;
 

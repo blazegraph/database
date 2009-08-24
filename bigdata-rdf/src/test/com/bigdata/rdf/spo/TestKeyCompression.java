@@ -42,7 +42,7 @@ import com.bigdata.btree.ICounter;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableRaba;
+import com.bigdata.btree.raba.MutableValuesRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 
@@ -261,7 +261,7 @@ public class TestKeyCompression extends TestCase2 {
             
             final DataInputStream in = new DataInputStream(bais);
             
-            raba2 = new MutableRaba(0/* fromIndex */, 0/* toIndex */,
+            raba2 = new MutableValuesRaba(0/* fromIndex */, 0/* toIndex */,
                     a.length/* capacity */, new byte[a.length][]);
 
             ser.read(in, raba2);

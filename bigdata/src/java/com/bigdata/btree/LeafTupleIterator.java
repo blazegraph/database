@@ -142,7 +142,7 @@ public class LeafTupleIterator implements ITupleIterator {
 
             } else {
 
-                toIndex = leaf.nkeys;
+                toIndex = leaf.getKeyCount();
 
             }
 
@@ -182,7 +182,7 @@ public class LeafTupleIterator implements ITupleIterator {
              */
             if (leaf.hasDeleteMarkers()
                     && ((tuple.flags() & IRangeQuery.DELETED) == 0)
-                    && leaf.deleteMarkers[index]) {
+                    && leaf.getDeleteMarker(index)) {
                 
                 // skipping a deleted version.
                 

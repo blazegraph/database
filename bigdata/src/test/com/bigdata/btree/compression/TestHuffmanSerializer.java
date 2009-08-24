@@ -41,7 +41,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableRaba;
+import com.bigdata.btree.raba.MutableValuesRaba;
 
 /**
  * Test suite for {@link HuffmanSerializer}.
@@ -175,7 +175,7 @@ public class TestHuffmanSerializer extends TestCase2 {
         Arrays.sort(data, 0, data.length, UnsignedByteArrayComparator.INSTANCE);
         
         // layer on interface.
-        final IRaba raba = new MutableRaba(
+        final IRaba raba = new MutableValuesRaba(
                 0/* fromIndex */, data.length/* toIndex */, data);
         
         doRoundTripTest(raba);
@@ -201,7 +201,7 @@ public class TestHuffmanSerializer extends TestCase2 {
         Arrays.sort(data, 0, n, UnsignedByteArrayComparator.INSTANCE);
         
         // layer on interface.
-        final IRaba raba = new MutableRaba(
+        final IRaba raba = new MutableValuesRaba(
                 0/* fromIndex */, n/* toIndex */, data);
         
         doRoundTripTest(raba);
@@ -232,7 +232,7 @@ public class TestHuffmanSerializer extends TestCase2 {
             
             final int capacity = raba.capacity();
             
-            raba2 = new MutableRaba(0/* fromIndex */,
+            raba2 = new MutableValuesRaba(0/* fromIndex */,
                     0/* toIndex */, new byte[capacity][]);
 
             final DataInput in = new DataInputStream(new ByteArrayInputStream(

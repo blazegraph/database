@@ -30,6 +30,7 @@ package com.bigdata.btree;
 
 import java.util.Arrays;
 
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;

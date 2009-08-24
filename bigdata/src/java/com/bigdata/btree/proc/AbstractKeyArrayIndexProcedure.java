@@ -48,7 +48,7 @@ import com.bigdata.btree.Errors;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableRaba;
+import com.bigdata.btree.raba.MutableValuesRaba;
 import com.bigdata.service.Split;
 
 /**
@@ -261,9 +261,9 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         
         this.toIndex = toIndex;
 
-        this.keys = new MutableRaba(fromIndex,toIndex,keys);
+        this.keys = new MutableValuesRaba(fromIndex,toIndex,keys);
 
-        this.vals = (vals == null ? null : new MutableRaba(fromIndex,
+        this.vals = (vals == null ? null : new MutableValuesRaba(fromIndex,
                 toIndex, vals));
 
     }
@@ -333,13 +333,13 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         
         final int n = toIndex - fromIndex;
         
-        keys = new MutableRaba( 0, 0, new byte[n][] );
+        keys = new MutableValuesRaba( 0, 0, new byte[n][] );
         
         getKeySerializer().read(in, keys );
 
         if(haveVals) {
         
-            vals = new MutableRaba( 0, 0, new byte[n][] );
+            vals = new MutableValuesRaba( 0, 0, new byte[n][] );
         
             getValSerializer().read(in, vals);
             
@@ -427,7 +427,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
          */
         private static final long serialVersionUID = -5705501700787163863L;
 
-        private MutableRaba a;
+        private MutableValuesRaba a;
 
         private IDataSerializer valSer;
         
@@ -456,7 +456,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             assert a != null;
             assert valSer != null;
                         
-            this.a = new MutableRaba(0/*fromIndex*/,n/*toIndex*/,a);
+            this.a = new MutableValuesRaba(0/*fromIndex*/,n/*toIndex*/,a);
             
             this.valSer = valSer;
             
@@ -481,7 +481,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
             valSer = (IDataSerializer) in.readObject();
             
-            a = new MutableRaba(0, 0, new byte[n][]);
+            a = new MutableValuesRaba(0, 0, new byte[n][]);
 
             valSer.read(in, a);
             

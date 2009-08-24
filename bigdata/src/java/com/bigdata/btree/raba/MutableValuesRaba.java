@@ -37,20 +37,17 @@ import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
  * @todo This implementation is used when we split an
  *       {@link IKeyArrayIndexProcedure} based on a key-range partitioned index.
  *       The {@link MutableKeyBuffer} will not work for this case since it is
- *       not aware of a fromIndex and a toIndex.  However, {@link ReadOnlyValuesRaba}
- *       and {@link ReadOnlyKeysRaba} would work better for those use cases.
+ *       not aware of a fromIndex and a toIndex. However,
+ *       {@link ReadOnlyValuesRaba} and {@link ReadOnlyKeysRaba} would work
+ *       better for those use cases.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @deprecated ? Is this version required? Do we want a mutable searchable? In
- *             fact, {@link MutableKeyBuffer} is a mutable searchable
- *             implementation.
  */
-public class MutableRaba extends AbstractRaba implements IRaba {
+public class MutableValuesRaba extends AbstractRaba implements IRaba {
 
     /**
-     * This view is mutable.
+     * No - This view is mutable.
      */
     public boolean isReadOnly() {
 
@@ -58,7 +55,10 @@ public class MutableRaba extends AbstractRaba implements IRaba {
 
     }
 
-    public boolean isKeys() {
+    /**
+     * No.
+     */
+    final public boolean isKeys() {
     
         return false;
         
@@ -71,7 +71,7 @@ public class MutableRaba extends AbstractRaba implements IRaba {
      * @param a
      *            The backing byte[][].
      */
-    public MutableRaba(final byte[][] a) {
+    public MutableValuesRaba(final byte[][] a) {
 
         this(0/* fromIndex */, a.length/* toIndex */, a.length/* capacity */, a);
 
@@ -92,7 +92,7 @@ public class MutableRaba extends AbstractRaba implements IRaba {
      * @deprecated This ctor assumes
      *             <code>capacity == a.length - fromIndex</code>.
      */
-    public MutableRaba(final int fromIndex, final int toIndex, final byte[][] a) {
+    public MutableValuesRaba(final int fromIndex, final int toIndex, final byte[][] a) {
 
         this(fromIndex, toIndex, a.length - fromIndex, a);
 
@@ -112,16 +112,16 @@ public class MutableRaba extends AbstractRaba implements IRaba {
      * @param a
      *            The backing byte[][].
      */
-    public MutableRaba(final int fromIndex, final int toIndex,
+    public MutableValuesRaba(final int fromIndex, final int toIndex,
             final int capacity, final byte[][] a) {
 
         super(fromIndex, toIndex, capacity, a);
 
     }
 
-    public MutableRaba resize(final int n) {
+    public MutableValuesRaba resize(final int n) {
 
-        return (MutableRaba) super.resize(n);
+        return (MutableValuesRaba) super.resize(n);
 
     }
 

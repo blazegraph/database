@@ -26,7 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -34,6 +33,8 @@ import java.util.WeakHashMap;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.ReadOnlyLeafData;
 import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
@@ -72,24 +73,50 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      * split may be inserted. This greatly simplifies the logic for computing
      * the split point and performing the split.
      * </p>
-     * 
-     * FIXME Verify that we always update {@link MutableValueBuffer#nvalues}
-     * everywhere that we update {@link AbstractNode#nkeys} or
-     * {@link MutableKeyBuffer#nkeys}!!!
-     * */
-    protected IRaba values;
+     */
+    private IRaba values;
     
     /**
      * The deletion markers IFF isolation is supported by the {@link BTree}.
      */
-    protected boolean[] deleteMarkers;
+    private boolean[] deleteMarkers;
     
     /**
      * The version timestamps IFF isolation is supported by the {@link BTree}.
      */
-    protected long[] versionTimestamps;
+    private long[] versionTimestamps;
+
+    /**
+     * Return <code>(branchingFactor + 1) &lt;&lt; 1</code>
+     */
+    protected final int minKeys() {
+
+        /*
+         * Compute the minimum #of children/values. This is the same whether
+         * this is a Node or a Leaf.
+         */
+        final int minChildren = (btree.branchingFactor + 1) >> 1;
+
+        // this.minKeys = isLeaf() ? minChildren : minChildren - 1;
+
+        return minChildren;
+        
+    }
     
-    public final long getVersionTimestamp(int index) {
+    /**
+     * Return <code>branchingFactor</code>, which is the maximum #of keys for a
+     * {@link Leaf}.
+     */
+    protected final int maxKeys() {
+        
+//        // The maximum #of keys is easy to compute.
+//        this.maxKeys = isLeaf() ? branchingFactor : branchingFactor - 1;
+
+        return btree.branchingFactor;
+        
+    }
+
+    public final long getVersionTimestamp(final int index) {
 
         if (versionTimestamps == null)
             throw new UnsupportedOperationException();
@@ -107,7 +134,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
     }
 
-    public IRaba getValues() {
+    final public IRaba getValues() {
         
         return values;
         
@@ -124,8 +151,6 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      *            The tree to which the leaf belongs.
      * @param addr
      *            The address of this leaf.
-     * @param branchingFactor
-     *            The branching factor for the leaf.
      * @param keys
      *            The defined keys. The allowable #of keys for a mutable leaf
      *            MUST be dimensioned to <code>branchingFactor+1</code> to
@@ -137,21 +162,24 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      *            corresponding to the insert key that forces a split.
      */
     protected Leaf(final AbstractBTree btree, final long addr,
-            final int branchingFactor, final IRaba keys,
-            final IRaba values,
+            final IRaba keys, final IRaba values,
             final long[] versionTimestamps, final boolean[] deleteMarkers) {
 
-        super(btree, branchingFactor, false /* The leaf is NOT dirty. */);
+        super(btree, false /* The leaf is NOT dirty. */);
 
-        assert nkeys >=0 && nkeys<= branchingFactor;
+//        assert nkeys >=0 && nkeys<= branchingFactor;
+        
+        assert keys != null;
+        
+        assert keys.capacity() == btree.branchingFactor + 1;
         
         assert values != null;
 
-        assert values.capacity() == branchingFactor + 1;
+        assert values.capacity() == btree.branchingFactor + 1;
 
         setIdentity(addr);
 
-        this.nkeys = keys.size();
+//        this.nkeys = keys.size();
         
         this.keys = keys; // steal reference.
         
@@ -177,8 +205,10 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      */
     protected Leaf(final AbstractBTree btree) {
 
-        super(btree, btree.branchingFactor, true /*dirty*/ );
+        super(btree, true /*dirty*/ );
 
+        final int branchingFactor = btree.branchingFactor;
+        
         keys = new MutableKeyBuffer(branchingFactor + 1);
 
         values = new MutableValueBuffer(0/* size */,
@@ -299,35 +329,35 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      */
     final public int getSpannedTupleCount() {
         
-        return nkeys;
+        return keys.size();
         
     }
     
     final public int getValueCount() {
         
-        return nkeys;
+        return values.size();
         
     }
     
-    final public boolean isNull(final int index) {
-        
-        return values.isNull(index);
-        
-    }
+//    final public boolean isNull(final int index) {
+//        
+//        return values.isNull(index);
+//        
+//    }
     
-    final public void copyValue(final int index, final OutputStream os) {
-
-        if (deleteMarkers != null && deleteMarkers[index]) {
-
-            // deleted.
-
-            throw new UnsupportedOperationException();
-
-        }
-
-        values.copy(index, os);
-        
-    }
+//    final public void copyValue(final int index, final OutputStream os) {
+//
+//        if (deleteMarkers != null && deleteMarkers[index]) {
+//
+//            // deleted.
+//
+//            throw new UnsupportedOperationException();
+//
+//        }
+//
+//        values.copy(index, os);
+//        
+//    }
     
     final public boolean hasDeleteMarkers() {
         
@@ -477,6 +507,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         // insert an entry under that key.
         {
 
+            final int nkeys = getKeyCount();
+            
             if (entryIndex < nkeys) {
 
                 /* index = 2;
@@ -518,7 +550,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 versionTimestamps[entryIndex] = timestamp;
             }
 
-            nkeys++; keys.nkeys++; vals.nvalues++;
+            /*nkeys++;*/keys.nkeys++; vals.nvalues++;
 
         }
 
@@ -538,15 +570,15 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 //            }
 //        }
 
-        if (nkeys == maxKeys + 1) {
+        if (getKeyCount() == maxKeys() + 1) {
 
             /*
              * The insert caused the leaf to overflow, so now we split the leaf.
              */
 
-            Leaf rightSibling = (Leaf) split();
+            final Leaf rightSibling = (Leaf) split();
 
-            // assert additional invarients post-split.
+            // assert additional invariants post-split.
             if(btree.debug) {
                 rightSibling.assertInvariants();
                 getParent().assertInvariants();
@@ -554,7 +586,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         }
 
-        // assert invarients post-split.
+        // assert invariants post-split.
         if(btree.debug) assertInvariants();
         
         /*
@@ -569,7 +601,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
 
-    public Tuple lookup(byte[] searchKey, Tuple tuple) {
+    public Tuple lookup(final byte[] searchKey, final Tuple tuple) {
 
         btree.touch(this);
 
@@ -598,26 +630,41 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         return keys.search(key);
 
     }
-    
-    public byte[] keyAt(int entryIndex) {
-        
-        if (entryIndex < 0)
-            throw new IndexOutOfBoundsException("negative: "+entryIndex);
 
-        if (entryIndex >= nkeys)
-            throw new IndexOutOfBoundsException("too large: "+entryIndex);
+    /**
+     * Range check an index into the leaf.
+     * 
+     * @param entryIndex
+     *            The index into the leaf.
+     * 
+     * @return <code>true</code>
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if the index is negative or GTE the #of keys.
+     */
+    final protected boolean rangeCheckIndex(final int entryIndex) {
+
+        if (entryIndex < 0)
+            throw new IndexOutOfBoundsException("negative: " + entryIndex);
+
+        if (entryIndex >= getKeyCount())
+            throw new IndexOutOfBoundsException("too large: " + entryIndex);
+
+        return true;
+        
+    }
+    
+    public byte[] keyAt(final int entryIndex) {
+
+        assert rangeCheckIndex(entryIndex);
         
         return keys.get(entryIndex);
         
     }
 
-    public void valueAt(int entryIndex, Tuple tuple) {
+    public void valueAt(final int entryIndex, final Tuple tuple) {
         
-        if (entryIndex < 0)
-            throw new IndexOutOfBoundsException("negative: "+entryIndex);
-
-        if (entryIndex >= nkeys)
-            throw new IndexOutOfBoundsException("too large: "+entryIndex);
+        assert rangeCheckIndex(entryIndex);
         
         tuple.copy(entryIndex, this);
         
@@ -640,23 +687,25 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      */
     protected IAbstractNode split() {
 
+        final int maxKeys = this.maxKeys();
+
         // MUST be mutable.
         assert isDirty();
         // MUST be an overflow.
-        assert nkeys == maxKeys+1;
+        assert getKeyCount() == maxKeys + 1;
 
-        final BTree btree = (BTree)this.btree;
-        
+        final BTree btree = (BTree) this.btree;
+
         btree.getBtreeCounters().leavesSplit++;
 
         // #of entries in the leaf before it is split.
-        final int nentriesBeforeSplit = nkeys;
+        final int nentriesBeforeSplit = getKeyCount();
         
         /*
          * The splitIndex is the index of the first key/value to move to the new
          * rightSibling.
          */
-        final int splitIndex = (maxKeys+1)/2;
+        final int splitIndex = (maxKeys + 1) / 2;
 
         /*
          * The separatorKey is the shortest key that is less than or equal to
@@ -687,7 +736,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         btree.nleaves++;
 
         if (INFO) {
-            log.info("this=" + this + ", nkeys=" + nkeys + ", splitIndex="
+            log.info("this=" + this + ", nkeys=" + getKeyCount() + ", splitIndex="
                     + splitIndex + ", separatorKey="
                     + keyAsString(separatorKey)
                     );
@@ -717,8 +766,14 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             if(deleteMarkers!=null) deleteMarkers[i] = false;
             if(versionTimestamps!=null) versionTimestamps[i] = 0L;
 
-            nkeys--; keys.nkeys--; vals.nvalues--; // one less key here.
-            rightSibling.nkeys++; skeys.nkeys++; svals.nvalues++; // more more key there.
+            // one less key here.
+            /* nkeys--; */
+            keys.nkeys--;
+            vals.nvalues--;
+            // more more key there.
+            /*rightSibling.nkeys++;*/
+            skeys.nkeys++;
+            svals.nvalues++;
 
         }
 
@@ -733,15 +788,16 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
              * on this leaf _before_ the split.
              */
 
-            p = new Node((BTree)btree, this, nentriesBeforeSplit);
+            p = new Node((BTree) btree, this, nentriesBeforeSplit);
 
         } else {
             
             // this leaf now has fewer entries
-            p.childEntryCounts[p.getIndexOf(this)] -= rightSibling.nkeys;
+            p.childEntryCounts[p.getIndexOf(this)] -= rightSibling
+                    .getKeyCount();
 
             if (p != btree.root && p.isRightMostNode()) {
-                
+
                 /*
                  * If the leaf that is split is a child of the right most node
                  * in the tree then that is counted as a "tail split".
@@ -757,9 +813,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                  */
 
                 btree.getBtreeCounters().tailSplit++;
-                
+
             } else if (p != btree.root && p.isLeftMostNode()) {
-                
+
                 /*
                  * If the leaf that is split is a child of the left-most node in
                  * the tree then that is counted as a "head split".
@@ -805,10 +861,15 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      * 
      * FIXME modify to always choose the shortest separator key.
      */
-    protected void redistributeKeys(AbstractNode sibling,boolean isRightSibling) {
+    protected void redistributeKeys(final AbstractNode sibling,
+            final boolean isRightSibling) {
 
         // the sibling of a leaf must be a leaf.
         final Leaf s = (Leaf) sibling;
+        
+        final int nkeys = this.getKeyCount();
+        final int snkeys = s.getKeyCount();
+        final int minKeys = this.minKeys();
         
         assert dirty;
         assert !deleted;
@@ -820,7 +881,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
         assert s != null;
         // the sibling MUST be _OVER_ the minimum #of keys/values.
-        assert s.nkeys > minKeys;
+        assert snkeys > minKeys;
         assert s.dirty;
         assert !s.deleted;
         assert !s.isPersistent();
@@ -848,8 +909,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         /*
          * Tunnel through to the mutable keys object.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
-        final MutableKeyBuffer skeys = (MutableKeyBuffer)s.keys;
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
+        final MutableKeyBuffer skeys = (MutableKeyBuffer) s.keys;
         final MutableValueBuffer vals = (MutableValueBuffer) this.values;
         final MutableValueBuffer svals = (MutableValueBuffer) s.values;
 
@@ -875,21 +936,21 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             if(versionTimestamps!=null) versionTimestamps[nkeys] = s.versionTimestamps[0];
             
             // copy down the keys on the right sibling to cover up the hole.
-            System.arraycopy(skeys.keys, 1, skeys.keys, 0, s.nkeys-1);
-            System.arraycopy(svals.values, 1, svals.values, 0, s.nkeys-1);
+            System.arraycopy(skeys.keys, 1, skeys.keys, 0, snkeys-1);
+            System.arraycopy(svals.values, 1, svals.values, 0, snkeys-1);
             if(deleteMarkers!=null)
-                System.arraycopy(s.deleteMarkers, 1, s.deleteMarkers, 0, s.nkeys-1);
+                System.arraycopy(s.deleteMarkers, 1, s.deleteMarkers, 0, snkeys-1);
             if(versionTimestamps!=null)
-                System.arraycopy(s.versionTimestamps, 1, s.versionTimestamps, 0, s.nkeys-1);
+                System.arraycopy(s.versionTimestamps, 1, s.versionTimestamps, 0, snkeys-1);
 
             // erase exposed key/value on rightSibling that is no longer defined.
-            skeys.keys[s.nkeys-1] = null;
-            svals.values[s.nkeys-1] = null;
-            if(deleteMarkers!=null) s.deleteMarkers[s.nkeys-1] = false;
-            if(versionTimestamps!=null) s.versionTimestamps[s.nkeys-1] = 0L;
+            skeys.keys[snkeys-1] = null;
+            svals.values[snkeys-1] = null;
+            if(deleteMarkers!=null) s.deleteMarkers[snkeys-1] = false;
+            if(versionTimestamps!=null) s.versionTimestamps[snkeys-1] = 0L;
 
-            s.nkeys--; skeys.nkeys--; svals.nvalues--;
-            this.nkeys++; keys.nkeys++; vals.nvalues++;
+            /*s.nkeys--;*/ skeys.nkeys--; svals.nvalues--;
+            /*this.nkeys++;*/keys.nkeys++; vals.nvalues++;
             
             // update the separator key for the rightSibling.
 //            p.setKey(index, s.getKey(0));
@@ -926,17 +987,17 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             // move the last key/value from the leftSibling to this leaf (copy, then clear).
             // copy.
 //            setKey(0, s.getKey(s.nkeys-1));
-            copyKey(0,s.keys,s.nkeys-1);
-            vals.values[0] = svals.values[s.nkeys-1];
-            if(deleteMarkers!=null) deleteMarkers[0] = s.deleteMarkers[s.nkeys-1];
-            if(versionTimestamps!=null) versionTimestamps[0] = s.versionTimestamps[s.nkeys-1];
+            copyKey(0,s.keys,snkeys-1);
+            vals.values[0] = svals.values[snkeys-1];
+            if(deleteMarkers!=null) deleteMarkers[0] = s.deleteMarkers[snkeys-1];
+            if(versionTimestamps!=null) versionTimestamps[0] = s.versionTimestamps[snkeys-1];
             // clear
-            skeys.keys[s.nkeys-1] = null;
-            svals.values[s.nkeys-1] = null;
-            if(deleteMarkers!=null) s.deleteMarkers[s.nkeys-1] = false;
-            if(versionTimestamps!=null) s.versionTimestamps[s.nkeys-1] = 0L;
-            s.nkeys--; skeys.nkeys--; svals.nvalues--;
-            this.nkeys++; keys.nkeys++; vals.nvalues++;
+            skeys.keys[snkeys-1] = null;
+            svals.values[snkeys-1] = null;
+            if(deleteMarkers!=null) s.deleteMarkers[snkeys-1] = false;
+            if(versionTimestamps!=null) s.versionTimestamps[snkeys-1] = 0L;
+            /*s.nkeys--;*/ skeys.nkeys--; svals.nvalues--;
+            /*this.nkeys++;*/ keys.nkeys++; vals.nvalues++;
             
             // update the separator key for this leaf.
 //            p.setKey(index-1,getKey(0));
@@ -967,19 +1028,23 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      *            A direct sibling of this leaf (does NOT need to be mutable).
      *            The sibling MUST have exactly the minimum #of keys.
      */
-    protected void merge(AbstractNode sibling, boolean isRightSibling) {
+    protected void merge(final AbstractNode sibling,
+            final boolean isRightSibling) {
         
         // the sibling of a leaf must be a leaf.
         final Leaf s = (Leaf)sibling;
         
+        final int nkeys = this.getKeyCount();
+        final int snkeys = s.getKeyCount();
+
         assert s != null;
         assert !s.deleted;
         // verify that this leaf is deficient.
-        assert nkeys < minKeys;
+        assert nkeys < minKeys();
         // verify that this leaf is under minimum capacity by one key.
-        assert nkeys == minKeys - 1;
+        assert nkeys == minKeys() - 1;
         // the sibling MUST at the minimum #of keys/values.
-        assert s.nkeys == s.minKeys;
+        assert snkeys == s.minKeys();
 
         final Node p = getParent();
         
@@ -1036,24 +1101,24 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
              * Copy in the keys and values from the sibling.
              */
             
-            System.arraycopy(skeys.keys, 0, keys.keys, nkeys, s.nkeys);
+            System.arraycopy(skeys.keys, 0, keys.keys, nkeys, snkeys);
 
-            System.arraycopy(svals.values, 0, vals.values, nkeys, s.nkeys);
+            System.arraycopy(svals.values, 0, vals.values, nkeys, snkeys);
 
             if(deleteMarkers!=null) {
-                System.arraycopy(s.deleteMarkers, 0, this.deleteMarkers, nkeys, s.nkeys);
+                System.arraycopy(s.deleteMarkers, 0, this.deleteMarkers, nkeys, snkeys);
             }
 
             if(versionTimestamps!=null) {
-                System.arraycopy(s.versionTimestamps, 0, this.versionTimestamps, nkeys, s.nkeys);
+                System.arraycopy(s.versionTimestamps, 0, this.versionTimestamps, nkeys, snkeys);
             }
             
             /* 
              * Adjust the #of keys in this leaf.
              */
-            this.nkeys += s.nkeys;
-            keys.nkeys += s.nkeys;
-            vals.nvalues += s.nkeys;
+//            this.nkeys += s.nkeys;
+            keys.nkeys += snkeys;
+            vals.nvalues += snkeys;
 
             /*
              * Note: in this case we have to replace the separator key for this
@@ -1087,28 +1152,28 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
              */
             
             // move keys and values down by sibling.nkeys positions.
-            System.arraycopy(keys.keys, 0, keys.keys, s.nkeys, this.nkeys);
-            System.arraycopy(vals.values, 0, vals.values, s.nkeys, this.nkeys);
+            System.arraycopy(keys.keys, 0, keys.keys, snkeys, nkeys);
+            System.arraycopy(vals.values, 0, vals.values, snkeys, nkeys);
             if(deleteMarkers!=null) {
-                System.arraycopy(this.deleteMarkers, 0, this.deleteMarkers, s.nkeys, this.nkeys);
+                System.arraycopy(this.deleteMarkers, 0, this.deleteMarkers, snkeys, nkeys);
             }
             if(versionTimestamps!=null) {
-                System.arraycopy(this.versionTimestamps, 0, this.versionTimestamps, s.nkeys, this.nkeys);
+                System.arraycopy(this.versionTimestamps, 0, this.versionTimestamps, snkeys, nkeys);
             }
             
             // copy keys and values from the sibling to index 0 of this leaf.
-            System.arraycopy(skeys.keys, 0, keys.keys, 0, s.nkeys);
-            System.arraycopy(svals.values, 0, vals.values, 0, s.nkeys);
+            System.arraycopy(skeys.keys, 0, keys.keys, 0, snkeys);
+            System.arraycopy(svals.values, 0, vals.values, 0, snkeys);
             if(deleteMarkers!=null) {
-                System.arraycopy(s.deleteMarkers, 0, this.deleteMarkers, 0, s.nkeys);
+                System.arraycopy(s.deleteMarkers, 0, this.deleteMarkers, 0, snkeys);
             }
             if(versionTimestamps!=null) {
-                System.arraycopy(s.versionTimestamps, 0, this.versionTimestamps, 0, s.nkeys);
+                System.arraycopy(s.versionTimestamps, 0, this.versionTimestamps, 0, snkeys);
             }
             
-            this.nkeys += s.nkeys;
-            keys.nkeys += s.nkeys;
-            vals.nvalues += s.nkeys;
+//            this.nkeys += s.nkeys;
+            keys.nkeys += snkeys;
+            vals.nvalues += snkeys;
 
             // reallocate spanned entries from the sibling to this node.
             p.childEntryCounts[index] += s.getSpannedTupleCount();
@@ -1288,51 +1353,57 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
          * length = nkeys(1) - index(0) - 1 = 0;
          */
 
-        /*
-         * Copy down to cover up the hole.
-         */
-        final int length = nkeys - entryIndex - 1;
+        {
 
-        // Tunnel through to the mutable keys object.
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
-        final MutableValueBuffer vals = (MutableValueBuffer) this.values;
-
-        if (length > 0) {
-
-            System.arraycopy(keys.keys, entryIndex + 1, keys.keys, entryIndex,
-                    length);
-
-            System.arraycopy(vals.values, entryIndex + 1, vals.values,
-                    entryIndex, length);
-
-            if (versionTimestamps != null) {
-
-                System.arraycopy(this.versionTimestamps, entryIndex + 1,
-                        this.versionTimestamps, entryIndex, length);
-
+            /*
+             * Copy down to cover up the hole.
+             */
+            
+            final int nkeys = getKeyCount();
+            final int length = nkeys - entryIndex - 1;
+    
+            // Tunnel through to the mutable keys object.
+            final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
+            final MutableValueBuffer vals = (MutableValueBuffer) this.values;
+    
+            if (length > 0) {
+    
+                System.arraycopy(keys.keys, entryIndex + 1, keys.keys, entryIndex,
+                        length);
+    
+                System.arraycopy(vals.values, entryIndex + 1, vals.values,
+                        entryIndex, length);
+    
+                if (versionTimestamps != null) {
+    
+                    System.arraycopy(this.versionTimestamps, entryIndex + 1,
+                            this.versionTimestamps, entryIndex, length);
+    
+                }
+    
             }
-
-        }
-
-        /* 
-         * Erase the key/value that was exposed by this operation.
-         */
-        keys.keys[nkeys - 1] = null;
-        vals.values[nkeys - 1] = null;
-        if(versionTimestamps!=null) {
-            this.versionTimestamps[nkeys - 1] = 0L;
-        }
-
-        // One less entry in the tree.
-        ((BTree)btree).nentries--;
-        assert ((BTree)btree).nentries >= 0;
+    
+            /* 
+             * Erase the key/value that was exposed by this operation.
+             */
+            keys.keys[nkeys - 1] = null;
+            vals.values[nkeys - 1] = null;
+            if(versionTimestamps!=null) {
+                this.versionTimestamps[nkeys - 1] = 0L;
+            }
+    
+            // One less key in the leaf.
+            /*nkeys--;*/ keys.nkeys--; vals.nvalues--;
+            
+            // One less entry in the tree.
+            ((BTree)btree).nentries--;
+            assert ((BTree)btree).nentries >= 0;
+            
+            // One more deleted tuple.
+            btree.getBtreeCounters().ntupleRemove++;
         
-        // One more deleted tuple.
-        btree.getBtreeCounters().ntupleRemove++;
-
-        // One less key in the leaf.
-        nkeys--; keys.nkeys--; vals.nvalues--;
-                
+    }
+        
         if( btree.root != this ) {
 
             /*
@@ -1341,9 +1412,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
             // update entry count on ancestors.
             
-            parent.get().updateEntryCount(this,-1);
+            parent.get().updateEntryCount(this, -1);
             
-            if( nkeys < minKeys ) {
+            if( getKeyCount() < minKeys() ) {
                 
                 /*
                  * The leaf is deficient. Join it with a sibling, causing their
@@ -1358,8 +1429,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                  * has any siblings and never experiences underflow so it may be
                  * legally reduced to zero values.
                  * 
-                 * Note that the minmum branching factor (3) and the invariants
-                 * together guarentee that there is at least one sibling. Also
+                 * Note that the minimum branching factor (3) and the invariants
+                 * together guarantee that there is at least one sibling. Also
                  * note that the minimum #of children for a node with the
                  * minimum branching factor is two (2) so a valid tree never has
                  * a node with a single sibling.
@@ -1423,7 +1494,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      */
     public ITupleIterator entryIterator() {
 
-        if (nkeys == 0) {
+        if (keys.isEmpty()) {
 
             return EmptyTupleIterator.INSTANCE;
 
@@ -1441,6 +1512,11 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         // Set to false iff an inconsistency is detected.
         boolean ok = true;
 
+        final int branchingFactor = this.getBranchingFactor();
+        final int nkeys = this.getKeyCount();
+        final int minKeys = this.minKeys();
+        final int maxKeys = this.maxKeys();
+        
         if ((btree.root != this) && (nkeys < minKeys)) {
             // min keys failure (the root may have fewer keys).
             out.println(indent(height) + "ERROR: too few keys: m="
@@ -1489,7 +1565,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             out.println(indent(height) + "  keys=" + keys);
         
             // Note: signed byte[]s.
-            out.println(indent(height) + "  vals=" + toString(nkeys,values));
+            out.println(indent(height) + "  vals=" + values);
             
             if(deleteMarkers!=null) {
                 
@@ -1509,39 +1585,73 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
     }
 
+//    /**
+//     * Formats the data into a {@link String}.
+//     * 
+//     * @param data
+//     *            An array of <em>signed</em> byte arrays.
+//     */
+//    static private String toString(final int n, final IRaba data) {
+//       
+//        final StringBuilder sb = new StringBuilder();
+//
+//        sb.append("data(n=" + n + ")={");
+//
+//        for (int i = 0; i < n; i++) {
+//
+//            final byte[] a = data.get(i);
+//
+//            sb.append("\n");
+//
+//            sb.append("data[" + i + "]=");
+//
+//            sb.append(Arrays.toString(a));
+//
+//            if (i + 1 < n)
+//                sb.append(",");
+//
+//        }
+//
+//        sb.append("}");
+//
+//        return sb.toString();
+//        
+//    }
+
     /**
-     * Formats the data into a {@link String}.
-     * 
-     * @param data
-     *            An array of <em>signed</em> byte arrays.
+     * Human readable representation of the {@link ILeafData} plus transient
+     * information associated with the {@link Leaf}.
      */
-    static private String toString(int n, IRaba data) {
-       
+    public String toString() {
+
         final StringBuilder sb = new StringBuilder();
 
-        sb.append("data(n=" + n + ")={");
+        sb.append(getClass().getName());
 
-        for (int i = 0; i < n; i++) {
+        sb.append("{ isDirty="+isDirty());
 
-            final byte[] a = data.get(i);
+        sb.append(", isDeleted="+isDeleted());
+        
+        sb.append(", addr=" + identity);
 
-            sb.append("\n");
+        final Node p = (parent == null ? null : parent.get());
 
-            sb.append("data[" + i + "]=");
+        sb.append(", parent=" + (p == null ? "N/A" : p.identity));
+        
+        sb.append(", nkeys=" + getKeyCount());
+        
+        sb.append(", minKeys=" + minKeys());
 
-            sb.append(Arrays.toString(a));
+        sb.append(", maxKeys=" + maxKeys());
 
-            if (i + 1 < n)
-                sb.append(",");
-
-        }
+        ReadOnlyLeafData.toString(this, sb);
 
         sb.append("}");
 
         return sb.toString();
         
     }
-
+    
     /**
      * An interface that may be used to register for and receive events when the
      * state of a {@link Leaf} is changed. This includes (a) adding a new tuple

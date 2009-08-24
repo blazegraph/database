@@ -73,81 +73,9 @@ public class TestAll extends TestCase {
         
         // test suite for the B+Tree node and leaf data records.
         suite.addTest(com.bigdata.btree.data.TestAll.suite());
-        
-        /*
-         * test btree fundamentals.
-         */
-        // test static and instance utility methods on AbstractNode and ArrayType.
-        suite.addTestSuite( TestUtilMethods.class );
-        // test finding a child of a node by its key.
-        suite.addTestSuite( TestFindChild.class );
-        // test insert, lookup, and remove for root leaf w/o splitting it.
-        suite.addTestSuite( TestInsertLookupRemoveKeysInRootLeaf.class );
-        // test splitting the root leaf.
-        suite.addTestSuite( TestSplitRootLeaf.class );
-        // test splitting and joining the root leaf (no more than two levels).
-        suite.addTestSuite( TestSplitJoinRootLeaf.class );
-        // test splitting and joining with more than two levels.
-        suite.addTestSuite( TestSplitJoinThreeLevels.class );
-        // test indexOf, keyAt, valueAt.
-        suite.addTestSuite( TestLinearListMethods.class );
-        // test getCounter()
-        suite.addTestSuite( TestIndexCounter.class );
-        
-        // test iterator semantics.
-        suite.addTest(TestAll_Iterators.suite());
 
-        // test delete semantics (also see the isolation package).
-        suite.addTestSuite( TestRemoveAll.class );
-        // test contract for BTree#touch(node) w/o IO.
-        suite.addTestSuite( TestTouch.class );
-        // stress test basic tree operations w/o IO.
-        suite.addTestSuite( TestBTree.class );
-        // test child address serialization.
-        suite.addTestSuite( TestAddressSerializer.class );
-        suite.addTestSuite( TestPackedAddressSerializer.class );
-        // test node/leaf serialization.
-        suite.addTestSuite( TestNodeSerializer.class );
-        
-        // test iterator semantics for visiting only "dirty" nodes or leaves.
-        suite.addTestSuite( TestDirtyIterators.class );
-        
-        // test incremental write of leaves and nodes.
-        suite.addTestSuite( TestIncrementalWrite.class );
-        // test copy-on-write scenarios.
-        suite.addTestSuite( TestCopyOnWrite.class );
-
-        /*
-         * test with delete markers.
-         * 
-         * Note: tests with timestamps and delete markers are done in the
-         * isolation package.
-         */
-        suite.addTestSuite(TestDeleteMarkers.class);
-
-        /*
-         * test persistence protocols. 
-         */
-        // test the commit protocol.
-        suite.addTestSuite(TestCommit.class);
-        // test the dirty event protocol.
-        suite.addTestSuite(TestDirtyListener.class);
-        // test the close/reopen protocol for releasing index buffers.
-        suite.addTestSuite(TestReopen.class);
-        // test of storing null values under a key with persistence.
-        suite.addTestSuite(TestNullValues.class);
-
-        /*
-         * test of transient BTree's (no backing store).
-         */
-        suite.addTestSuite(TestTransientBTree.class);
-
-        /*
-         * Test bloom filters for a BTree (vs an IndexSegment, which is handled
-         * below).
-         */
-        suite.addTestSuite(TestBloomFilter.class);
-        suite.addTestSuite(TestBTreeWithBloomFilter.class);
+        // core B+Tree API tests, including w/ and w/o persistence.
+        suite.addTest(TestAll_BTreeBasics.suite());
 
         // pick up the index segment test suites.
         suite.addTest(TestAll_IndexSegment.suite());

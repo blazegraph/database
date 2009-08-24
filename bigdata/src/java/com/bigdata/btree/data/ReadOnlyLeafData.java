@@ -27,11 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Date;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.ILeafData;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
@@ -449,15 +448,89 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         
     }
 
-    final public void copyValue(final int index, final OutputStream os) {
+//    final public void copyValue(final int index, final OutputStream os) {
+//
+//        vals.copy(index, os);
+//        
+//    }
+//
+//    final public boolean isNull(final int index) {
+//
+//        return vals.isNull(index);
+//
+//    }
 
-        vals.copy(index, os);
+    public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append(getClass().getName() + "{");
+
+        ReadOnlyLeafData.toString(this, sb);
+
+        sb.append("}");
+        
+        return sb.toString();
         
     }
 
-    final public boolean isNull(final int index) {
+    /**
+     * Utility method formats the {@link ILeafData}.
+     * 
+     * @param leaf
+     *            A leaf data record.
+     * @param sb
+     *            The representation will be written onto this object.
+     * 
+     * @return The <i>sb</i> parameter.
+     * 
+     * @todo prior/next links (not in the API).
+     */
+    static public StringBuilder toString(final ILeafData leaf,
+            final StringBuilder sb) {
 
-        return vals.isNull(index);
+        final int nkeys = leaf.getKeyCount();
+
+        sb.append(", keys=" + leaf.getKeys());
+        
+        sb.append(", vals=" + leaf.getValues());
+
+        if (leaf.hasDeleteMarkers()) {
+
+            sb.append(", deleteMarkers=[");
+
+            for (int i = 0; i < nkeys; i++) {
+
+                if (i > 0)
+                    sb.append(", ");
+
+                sb.append(leaf.getDeleteMarker(i));
+
+            }
+
+            sb.append("]");
+
+        }
+
+        if (leaf.hasVersionTimestamps()) {
+
+            sb.append(", versionTimestamps=[");
+
+            for (int i = 0; i < nkeys; i++) {
+
+                if (i > 0)
+                    sb.append(", ");
+
+                // sb.append(new Date(leaf.getVersionTimestamp(i)).toString());
+                sb.append(leaf.getVersionTimestamp(i));
+
+            }
+
+            sb.append("]");
+
+        }
+
+        return sb;
 
     }
 

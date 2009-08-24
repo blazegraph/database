@@ -42,7 +42,8 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for {@link AbstractChunkedTupleIterator} and its concrete
- * {@link ChunkedLocalRangeIterator} implementation.
+ * {@link ChunkedLocalRangeIterator} implementation which depends on the
+ * {@link ResultSet}.
  * <p>
  * Note: There are other implementations derived from the same abstract base
  * class so they have a dependency on this test suite to get it right for the
