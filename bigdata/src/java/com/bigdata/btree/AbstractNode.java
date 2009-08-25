@@ -94,11 +94,6 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
      */
     final transient protected AbstractBTree btree;
 
-//    /**
-//     * The branching factor (#of slots for keys or values).
-//     */
-//    final transient protected int branchingFactor;
-    
     /**
      * The minimum #of keys. For a {@link Node}, the minimum #of children is
      * <code>minKeys + 1</code>. For a {@link Leaf}, the minimum #of values
@@ -115,30 +110,6 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
     abstract protected int maxKeys();
 
     /**
-     * A representation of each key in the node or leaf. Each key is a variable
-     * length unsigned byte[]. There are various implementations of
-     * {@link IRaba} that are optimized for mutable and immutable keys.
-     * <p>
-     * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
-     * A leaf has one key per value - that is, the maximum #of keys for a leaf
-     * is specified by the branching factor. In contrast a node has m-1 keys
-     * where m is the maximum #of children (aka the branching factor). Therefore
-     * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
-     * the {@link AbstractNode}.
-     * <p>
-     * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
-     * accept one more key than the maximum capacity so that the key that causes
-     * overflow and forces the split may be inserted. This greatly simplifies
-     * the logic for computing the split point and performing the split.
-     * Therefore you always allocate this object with a capacity <code>m</code>
-     * keys for a {@link Node} and <code>m+1</code> keys for a {@link Leaf}.
-     * 
-     * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
-     * @see IKeyBuffer#search(int searchKeyOffset, byte[] searchKey)
-     */
-    protected IRaba keys;
-
-    /**
      * The parent of this node. This is null for the root node. The parent is
      * required in order to set the persistent identity of a newly persisted
      * child node on its parent. The reference to the parent will remain
@@ -152,7 +123,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
      * since they are no longer linked back to their old parents via their
      * parent reference.
      */
-    protected Reference<Node> parent = null;
+    transient protected Reference<Node> parent = null;
 
     /**
      * <p>
@@ -163,7 +134,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
      * {@link Reference} object for any given {@link Node}.
      * </p>
      */
-    protected final Reference<? extends AbstractNode> self;
+    transient protected final Reference<? extends AbstractNode<T>> self;
     
     /**
      * The #of times that this node is present on the {@link HardReferenceQueue} .
@@ -187,7 +158,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
      * synchronization or an AtomicInteger for the {@link #referenceCount}
      * field.
      */
-    protected int referenceCount = 0;
+    transient protected int referenceCount = 0;
 
     public void delete() {
         
@@ -209,7 +180,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
         
         // release the key buffer.
         /*nkeys = 0; */
-        keys = null;
+//        keys = null;
 
         // Note: do NOT clear the referenceCount.
         
@@ -399,32 +370,33 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
         // copy the parent reference.
         this.parent = src.parent;
         
-        /*
-         * Steal/copy the keys.
-         * 
-         * Note: The copy constructor is invoked when we need to begin mutation
-         * operations on an immutable node or leaf, so make sure that the keys
-         * are mutable.
-         */
-        {
-
-//            nkeys = src.nkeys;
-
-            if (src.keys instanceof MutableKeyBuffer) {
-
-                keys = src.keys;
-
-            } else {
-
-                keys = new MutableKeyBuffer(src.keys);
-
-            }
-
-            // release reference on the source node.
-//            src.nkeys = 0;
-            src.keys = null;
-            
-        }
+//        /*
+//         * Steal/copy the keys.
+//         * 
+//         * Note: The copy constructor is invoked when we need to begin mutation
+//         * operations on an immutable node or leaf, so make sure that the keys
+//         * are mutable.
+//         */
+//        {
+//
+////            nkeys = src.nkeys;
+//
+//            if (src.getKeys() instanceof MutableKeyBuffer) {
+//
+//                keys = src.getKeys();
+//
+//            } else {
+//
+//                keys = new MutableKeyBuffer(src.getBranchingFactor(), src
+//                        .getKeys());
+//
+//            }
+//
+//            // release reference on the source node.
+////            src.nkeys = 0;
+//            src.keys = null;
+//            
+//        }
 
     }
 
@@ -798,14 +770,14 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
      */
     protected final void assertKeysMonotonic() {
 
-        if (keys instanceof MutableKeyBuffer) {
+        if (getKeys() instanceof MutableKeyBuffer) {
 
             /*
              * iff mutable keys - immutable keys should be checked during
              * de-serialization or construction.
              */
 
-            ((MutableKeyBuffer) keys).assertKeysMonotonic();
+            ((MutableKeyBuffer) getKeys()).assertKeysMonotonic();
 
         }
 
@@ -847,7 +819,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
 
         assert dirty;
         
-        ((MutableKeyBuffer) keys).keys[dstpos] = srckeys.get(srcpos);
+        ((MutableKeyBuffer) getKeys()).keys[dstpos] = srckeys.get(srcpos);
         
     }
 
@@ -861,13 +833,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
     
     final public int getKeyCount() {
         
-        return keys.size();
-        
-    }
-    
-    final public IRaba getKeys() {
-        
-        return keys;
+        return getKeys().size();
         
     }
     
@@ -875,7 +841,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
         
         try {
             
-            os.write(keys.get(index));
+            os.write(getKeys().get(index));
             
         } catch(IOException ex) {
             

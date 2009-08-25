@@ -244,7 +244,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * the application in a manner consistent with the single-threaded contract
      * for the {@link AbstractBTree}.
      * <p>
-     * Note: This field MUST be marked as [volatile] in order to guarentee
+     * Note: This field MUST be marked as [volatile] in order to guarantee
      * correct semantics for double-checked locking in {@link BTree#reopen()}
      * and {@link IndexSegment#reopen()}.
      * 
@@ -614,7 +614,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         if(branchingFactor < Options.MIN_BRANCHING_FACTOR)
             throw new IllegalArgumentException();
-        
+
+        /*
+         * Compute the minimum #of children/values. This is the same whether
+         * this is a Node or a Leaf.
+         */
+        minChildren = (branchingFactor + 1) >> 1;
+
         if (nodeFactory == null)
             throw new IllegalArgumentException();
 
@@ -1200,6 +1206,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         return branchingFactor;
 
     }
+
+    /**
+     * The minimum #of children (for a node) or the minimum #of values (for
+     * a leaf).  This is computed in the same manner for nodes and leaves.
+     * <pre>
+     * (branchingFactor + 1) &lt;&lt; 1
+     * </pre>
+     */
+    final int minChildren;
 
     /**
      * The height of the btree. The height is the #of levels minus one. A btree
@@ -3297,7 +3312,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @see SoftReference
      * @see WeakReference
      */
-    final Reference<AbstractNode> newRef(final AbstractNode child) {
+    final <T extends AbstractNode<T>> Reference<AbstractNode<T>> newRef(
+            final AbstractNode<T> child) {
         
         /*
          * Note: If the parent refers to its children using soft references the
@@ -3321,11 +3337,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
              * Note: Used for transient BTrees.
              */
             
-            return new HardReference<AbstractNode>(child);
+            return new HardReference<AbstractNode<T>>(child);
             
         } else {
         
-            return new WeakReference<AbstractNode>( child );
+            return new WeakReference<AbstractNode<T>>( child );
 //        return new SoftReference<AbstractNode>( child ); // causes significant GC "hesitations".
         }
         

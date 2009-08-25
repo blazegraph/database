@@ -27,10 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba.codec;
 
+import it.unimi.dsi.bits.BitVector;
 import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
@@ -43,6 +45,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.service.ndx.pipeline.TestMasterTaskWithSplits;
 
 /**
  * Abstract test suite for {@link IRabaCoder} implementations.
@@ -75,8 +78,7 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
     protected IRabaCoder rabaCoder = null;
 
     /**
-     * FIXME Test search using select keys which should be located before or
-     * after the coded keys. Do this for more than just this one test case.
+     * A simple unit test.
      */
     public void test_mike_personick() throws UnsupportedEncodingException {
         
@@ -628,6 +630,29 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
         }
 
+    }
+
+    /**
+     * 
+     * FIXME Write unit test for search with a focus on the correct response for
+     * known misses (search keys which are not present in the {@link IRaba}).
+     * This implementation is based on <code>long</code> keys which have the
+     * advantage that they can be easily decoded to Java <code>long</code>s and
+     * we can then perform math on those <code>long</code> values in order to
+     * compute a key before or after a given key.
+     * 
+     * @todo also do a variant for {@link BitVector} or {@link BigInteger}. For
+     *       these classes we can also encode and decode the key transparently
+     *       and do math on the decoded key. However, unlike <code>long</code>
+     *       keys, the key has variable length for these cases. See
+     *       {@link TestMasterTaskWithSplits} for some code relevant to
+     *       {@link BigInteger} which might get refactored into
+     *       {@link KeyBuilder} if I can work it all out.
+     */
+    public void test_searchLongKeys() {
+        
+        fail("write test");
+        
     }
 
 }

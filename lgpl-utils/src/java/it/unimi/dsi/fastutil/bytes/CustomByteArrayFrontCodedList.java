@@ -1125,6 +1125,16 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             return pret * ratio;
             
         }
+        
+        if (pret == -1) {
+
+            /*
+             * The key would be inserted before the first entry in the
+             * front-coded array.
+             */
+            return -1;
+            
+        }
 
         /*
          * Next we do a linear scan of up to [ratio-1] entries, returning the
@@ -1186,6 +1196,20 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             
         }
 
+//        if(mlen == 0) {
+//            
+//            /*
+//             * The search key does not match anything in the full-length entry
+//             * for this bucket.
+//             */
+//            
+//            assert pret < 0; // must have been a miss on the binary search.
+//            
+//            // return the insertion point.
+//            return pret;
+//            
+//        }
+        
         /*
          * Scan up to ratio-1 entries or the last entry, whichever comes first.
          */
@@ -1219,8 +1243,11 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
              * Compare the remaining bytes in the search probe to the remainder
              * of the current entry.
              */
-            assert mlen == clen : 
-                "mlen=" + mlen + ", clen=" + clen+", delta="+delta;
+            
+            assert mlen == clen : "mlen=" + mlen + ", clen=" + clen
+                    + ", delta=" + delta + ", pret=" + pret + ", poffset="
+                    + poffset;
+            
             final int ret = compareBytes(a, mlen, a.length - mlen, bb, pos,
                     rlen);
 

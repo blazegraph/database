@@ -64,6 +64,30 @@ import cutthecrap.utils.striterators.SingleValueIterator;
 public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
     /**
+     * A representation of each key in the node or leaf. Each key is a variable
+     * length unsigned byte[]. There are various implementations of
+     * {@link IRaba} that are optimized for mutable and immutable keys.
+     * <p>
+     * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
+     * A leaf has one key per value - that is, the maximum #of keys for a leaf
+     * is specified by the branching factor. In contrast a node has m-1 keys
+     * where m is the maximum #of children (aka the branching factor). Therefore
+     * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
+     * the {@link AbstractNode}.
+     * <p>
+     * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
+     * accept one more key than the maximum capacity so that the key that causes
+     * overflow and forces the split may be inserted. This greatly simplifies
+     * the logic for computing the split point and performing the split.
+     * Therefore you always allocate this object with a capacity <code>m</code>
+     * keys for a {@link Node} and <code>m+1</code> keys for a {@link Leaf}.
+     * 
+     * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
+     * @see IKeyBuffer#search(int searchKeyOffset, byte[] searchKey)
+     */
+    private IRaba keys;
+
+    /**
      * <p>
      * The values of the tree. There is one value per key for a leaf.
      * </p>
@@ -91,15 +115,17 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      */
     protected final int minKeys() {
 
-        /*
-         * Compute the minimum #of children/values. This is the same whether
-         * this is a Node or a Leaf.
-         */
-        final int minChildren = (btree.branchingFactor + 1) >> 1;
+//        /*
+//         * Compute the minimum #of children/values. This is the same whether
+//         * this is a Node or a Leaf.
+//         */
+//        final int minChildren = (btree.branchingFactor + 1) >> 1;
+//
+//        // this.minKeys = isLeaf() ? minChildren : minChildren - 1;
+//
+//        return minChildren;
 
-        // this.minKeys = isLeaf() ? minChildren : minChildren - 1;
-
-        return minChildren;
+        return btree.minChildren;
         
     }
     
@@ -116,6 +142,10 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
 
+    /*
+     * ILeafData
+     */
+    
     public final long getVersionTimestamp(final int index) {
 
         if (versionTimestamps == null)
@@ -140,6 +170,48 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
     
+    final public IRaba getKeys() {
+        
+        return keys;
+        
+    }
+    
+    /**
+     * Always returns <code>true</code>.
+     */
+    final public boolean isLeaf() {
+
+        return true;
+
+    }
+
+    /**
+     * For a leaf the #of entries is always the #of keys.
+     */
+    final public int getSpannedTupleCount() {
+        
+        return getKeys().size();
+        
+    }
+    
+    final public int getValueCount() {
+        
+        return values.size();
+        
+    }
+    
+    final public boolean hasDeleteMarkers() {
+        
+        return deleteMarkers != null; 
+        
+    }
+    
+    final public boolean hasVersionTimestamps() {
+        
+        return versionTimestamps != null; 
+        
+    }
+
     /**
      * De-serialization constructor.
      * <p>
@@ -209,12 +281,12 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         final int branchingFactor = btree.branchingFactor;
         
-        keys = new MutableKeyBuffer(branchingFactor + 1);
+        this.keys = new MutableKeyBuffer(branchingFactor + 1);
 
         values = new MutableValueBuffer(0/* size */,
                 new byte[branchingFactor + 1][]);
         
-        if(btree.getIndexMetadata().isIsolatable()) {
+        if(btree.getIndexMetadata().getVersionTimestamps()) {
 
             versionTimestamps = new long[branchingFactor + 1];
 
@@ -249,6 +321,34 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         assert !src.isDirty();
         assert src.isPersistent();
         
+        /*
+         * Steal/copy the keys.
+         * 
+         * Note: The copy constructor is invoked when we need to begin mutation
+         * operations on an immutable node or leaf, so make sure that the keys
+         * are mutable.
+         */
+        {
+
+//            nkeys = src.nkeys;
+
+            if (src.getKeys() instanceof MutableKeyBuffer) {
+
+                keys = src.getKeys();
+
+            } else {
+
+                keys = new MutableKeyBuffer(src.getBranchingFactor(), src
+                        .getKeys());
+
+            }
+
+            // release reference on the source node.
+//            src.nkeys = 0;
+            src.keys = null;
+            
+        }
+
 //        /*
 //         * Steal the values[].
 //         */
@@ -271,7 +371,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             } else {
 
-                values = new MutableValueBuffer(src.values);
+                values = new MutableValueBuffer(src.getBranchingFactor(),
+                        src.values);
 
             }
 
@@ -305,6 +406,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         // clear references.
         
+        keys = null;
+        
         values = null;
         
         versionTimestamps = null;
@@ -312,62 +415,6 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         deleteMarkers = null;
         
         leafListeners = null;
-        
-    }
-    
-    /**
-     * Always returns <code>true</code>.
-     */
-    final public boolean isLeaf() {
-
-        return true;
-
-    }
-
-    /**
-     * For a leaf the #of entries is always the #of keys.
-     */
-    final public int getSpannedTupleCount() {
-        
-        return keys.size();
-        
-    }
-    
-    final public int getValueCount() {
-        
-        return values.size();
-        
-    }
-    
-//    final public boolean isNull(final int index) {
-//        
-//        return values.isNull(index);
-//        
-//    }
-    
-//    final public void copyValue(final int index, final OutputStream os) {
-//
-//        if (deleteMarkers != null && deleteMarkers[index]) {
-//
-//            // deleted.
-//
-//            throw new UnsupportedOperationException();
-//
-//        }
-//
-//        values.copy(index, os);
-//        
-//    }
-    
-    final public boolean hasDeleteMarkers() {
-        
-        return deleteMarkers != null; 
-        
-    }
-    
-    final public boolean hasVersionTimestamps() {
-        
-        return versionTimestamps != null; 
         
     }
 
@@ -428,7 +475,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
          */
 
         // look for the search key in the leaf.
-        int entryIndex = this.keys.search(searchKey);
+        int entryIndex = this.getKeys().search(searchKey);
 
         if (entryIndex >= 0) {
 
@@ -528,7 +575,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             }
 
             // Insert at index.
-            final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
+            final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
             final MutableValueBuffer vals = (MutableValueBuffer) this.values;
 //            copyKey(entryIndex, searchKeys, tupleIndex);
             keys.keys[entryIndex] = searchKey; // note: presumes caller does not reuse the searchKeys!
@@ -605,7 +652,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         btree.touch(this);
 
-        final int entryIndex = keys.search(searchKey);
+        final int entryIndex = getKeys().search(searchKey);
 
         if (entryIndex < 0) {
 
@@ -627,7 +674,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         btree.touch(this);
         
-        return keys.search(key);
+        return getKeys().search(key);
 
     }
 
@@ -658,7 +705,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         assert rangeCheckIndex(entryIndex);
         
-        return keys.get(entryIndex);
+        return getKeys().get(entryIndex);
         
     }
 
@@ -714,8 +761,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
          * rightSibling ) into the parent.
          */
         final byte[] separatorKey = BytesUtil.getSeparatorKey(//
-                keys.get(splitIndex),//
-                keys.get(splitIndex - 1)//
+                getKeys().get(splitIndex),//
+                getKeys().get(splitIndex - 1)//
                 );
 //        final Object separatorKey = ArrayType.alloc(btree.keyType, 1, stride);
 //        System.arraycopy(keys,splitIndex*stride,separatorKey,0,stride);
@@ -727,8 +774,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         /*
          * Tunnel through to the mutable keys object.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
-        final MutableKeyBuffer skeys = (MutableKeyBuffer) rightSibling.keys;
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
+        final MutableKeyBuffer skeys = (MutableKeyBuffer) rightSibling.getKeys();
         final MutableValueBuffer vals = (MutableValueBuffer) this.values;
         final MutableValueBuffer svals = (MutableValueBuffer) rightSibling.values;
 
@@ -748,7 +795,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             // copy key and value to the new leaf.
 //            rightSibling.setKey(j, getKey(i));
-            rightSibling.copyKey(j, this.keys, i);
+            rightSibling.copyKey(j, this.getKeys(), i);
             
             svals.values[j] = vals.values[i];
 
@@ -909,8 +956,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         /*
          * Tunnel through to the mutable keys object.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
-        final MutableKeyBuffer skeys = (MutableKeyBuffer) s.keys;
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
+        final MutableKeyBuffer skeys = (MutableKeyBuffer) s.getKeys();
         final MutableValueBuffer vals = (MutableValueBuffer) this.values;
         final MutableValueBuffer svals = (MutableValueBuffer) s.values;
 
@@ -930,7 +977,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             // copy the first key from the rightSibling.
 //            setKey(nkeys, s.getKey(0));
-            copyKey(nkeys, s.keys, 0);
+            copyKey(nkeys, s.getKeys(), 0);
             vals.values[nkeys] = svals.values[0];
             if(deleteMarkers!=null) deleteMarkers[nkeys] = s.deleteMarkers[0];
             if(versionTimestamps!=null) versionTimestamps[nkeys] = s.versionTimestamps[0];
@@ -954,7 +1001,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             
             // update the separator key for the rightSibling.
 //            p.setKey(index, s.getKey(0));
-            p.copyKey(index, s.keys, 0);
+            p.copyKey(index, s.getKeys(), 0);
 
             // update parent : one more key on this child.
             p.childEntryCounts[index]++;
@@ -987,7 +1034,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             // move the last key/value from the leftSibling to this leaf (copy, then clear).
             // copy.
 //            setKey(0, s.getKey(s.nkeys-1));
-            copyKey(0,s.keys,snkeys-1);
+            copyKey(0,s.getKeys(),snkeys-1);
             vals.values[0] = svals.values[snkeys-1];
             if(deleteMarkers!=null) deleteMarkers[0] = s.deleteMarkers[snkeys-1];
             if(versionTimestamps!=null) versionTimestamps[0] = s.versionTimestamps[snkeys-1];
@@ -1001,7 +1048,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             
             // update the separator key for this leaf.
 //            p.setKey(index-1,getKey(0));
-            p.copyKey(index-1, this.keys, 0);
+            p.copyKey(index-1, this.getKeys(), 0);
 
             // update parent : one more key on this child.
             p.childEntryCounts[index]++;
@@ -1076,12 +1123,12 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
          * mutable key buffer to that when we have to convert the siblings keys
          * into mutable form in order to perform the merge operation.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
-        final MutableKeyBuffer skeys = (s.keys instanceof MutableKeyBuffer ? (MutableKeyBuffer) s.keys
-                : new MutableKeyBuffer(s.keys));
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
+        final MutableKeyBuffer skeys = (s.getKeys() instanceof MutableKeyBuffer ? (MutableKeyBuffer) s.getKeys()
+                : new MutableKeyBuffer(getBranchingFactor(), s.getKeys()));
         final MutableValueBuffer vals = (MutableValueBuffer) this.values;
         final MutableValueBuffer svals= (s.values instanceof MutableValueBuffer ? (MutableValueBuffer) s.values
-                : new MutableValueBuffer(s.values));
+                : new MutableValueBuffer(getBranchingFactor(), s.values));
 
         /*
          * determine which leaf is earlier in the key ordering so that we know
@@ -1130,7 +1177,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
              * below.
              */
 //            p.setKey(index, p.getKey(index+1));
-            p.copyKey(index, p.keys, index+1 );
+            p.copyKey(index, p.getKeys(), index+1 );
 
             // reallocate spanned entries from the sibling to this node.
             p.childEntryCounts[index] += s.getSpannedTupleCount();
@@ -1204,7 +1251,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
          */
 
         // Tunnel through to the mutable keys and values objects.
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
         final MutableValueBuffer vals = (MutableValueBuffer) this.values;
 
         System.arraycopy(keys.keys, entryIndex, keys.keys, entryIndex + 1,
@@ -1257,7 +1304,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
         btree.touch(this);
 
-        final int entryIndex = keys.search(key);
+        final int entryIndex = getKeys().search(key);
 
         if (entryIndex < 0) {
 
@@ -1363,7 +1410,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             final int length = nkeys - entryIndex - 1;
     
             // Tunnel through to the mutable keys object.
-            final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
+            final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
             final MutableValueBuffer vals = (MutableValueBuffer) this.values;
     
             if (length > 0) {
@@ -1494,7 +1541,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
      */
     public ITupleIterator entryIterator() {
 
-        if (keys.isEmpty()) {
+        if (getKeys().isEmpty()) {
 
             return EmptyTupleIterator.INSTANCE;
 
@@ -1562,7 +1609,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                     + ", branchingFactor=" + branchingFactor);
             
             // Note: key format is dumped by its object.
-            out.println(indent(height) + "  keys=" + keys);
+            out.println(indent(height) + "  keys=" + getKeys());
         
             // Note: signed byte[]s.
             out.println(indent(height) + "  vals=" + values);

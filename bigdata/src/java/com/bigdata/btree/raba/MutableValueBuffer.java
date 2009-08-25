@@ -93,21 +93,33 @@ public class MutableValueBuffer implements IRaba {
     }
 
     /**
-     * Builds a mutable values buffer.
+     * Builds a mutable value buffer.
      * 
+     * @param capacity
+     *            The capacity of the new instance (this is based on the
+     *            branching factor for the B+Tree).
      * @param src
      *            The source data.
+     * 
+     * @throws IllegalArgumentException
+     *             if the capacity is LT the {@link IRaba#size()} of the
+     *             <i>src</i>.
+     * @throws IllegalArgumentException
+     *             if the source is <code>null</code>.
      */
-    public MutableValueBuffer(final IRaba src) {
+    public MutableValueBuffer(final int capacity, final IRaba src) {
 
         if (src == null)
+            throw new IllegalArgumentException();
+        
+        if (capacity < src.capacity())
             throw new IllegalArgumentException();
         
         nvalues = src.size();
 
         assert nvalues >= 0; // allows deficient root.
 
-        values = new byte[src.capacity()][];
+        values = new byte[capacity][];
 
         int i = 0;
         for (byte[] a : src) {

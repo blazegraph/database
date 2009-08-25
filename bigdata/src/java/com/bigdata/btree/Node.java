@@ -68,7 +68,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * computing the split point and performing the split.
      * </p>
      */
-    private volatile Reference<AbstractNode<?>>[] childRefs;
+    transient private volatile Reference<AbstractNode<?>>[] childRefs;
 
     /**
      * An array of objects used to provide a per-child lock in order to allow
@@ -88,8 +88,36 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *       This might be viable if we had an AtomicBitVector class since we
      *       could typically get by with 1-2 longs of data in that case.
      */
-    private Object[] childLocks;
+    transient private Object[] childLocks;
     
+    /**
+     * A representation of each key in the node or leaf. Each key is a variable
+     * length unsigned byte[]. There are various implementations of
+     * {@link IRaba} that are optimized for mutable and immutable keys.
+     * <p>
+     * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
+     * A leaf has one key per value - that is, the maximum #of keys for a leaf
+     * is specified by the branching factor. In contrast a node has m-1 keys
+     * where m is the maximum #of children (aka the branching factor). Therefore
+     * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
+     * the {@link AbstractNode}.
+     * <p>
+     * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
+     * accept one more key than the maximum capacity so that the key that causes
+     * overflow and forces the split may be inserted. This greatly simplifies
+     * the logic for computing the split point and performing the split.
+     * Therefore you always allocate this object with a capacity <code>m</code>
+     * keys for a {@link Node} and <code>m+1</code> keys for a {@link Leaf}.
+     * 
+     * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
+     * @see IKeyBuffer#search(int searchKeyOffset, byte[] searchKey)
+     * 
+     * @todo could be private if the AbstractNode ctors were modified to steal
+     *       the source node keys and if we cleared the source keys reference
+     *       in an appropriate place.
+     */
+    private IRaba keys;
+
     /**
      * <p>
      * The persistent keys of the childAddr nodes (may be nodes or leaves). The
@@ -148,15 +176,16 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     protected final int minKeys() {
 
-        /*
-         * Compute the minimum #of children/values. This is the same whether
-         * this is a Node or a Leaf.
-         */
-        final int minChildren = (btree.branchingFactor + 1) >> 1;
-
-        // this.minKeys = isLeaf() ? minChildren : minChildren - 1;
-
-        return minChildren - 1;
+//        /*
+//         * Compute the minimum #of children/values. This is the same whether
+//         * this is a Node or a Leaf.
+//         */
+//        final int minChildren = (btree.branchingFactor + 1) >> 1;
+//
+//        // this.minKeys = isLeaf() ? minChildren : minChildren - 1;
+//
+//        return minChildren - 1;
+        return btree.minChildren - 1;
         
     }
     
@@ -173,12 +202,6 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
     }
     
-    public final int getSpannedTupleCount() {
-    
-        return nentries;
-        
-    }
-
     /**
      * Range check a child index.
      * 
@@ -216,6 +239,17 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
         return childRefs[index];
 
+    }
+
+    /*
+     * INodeData.
+     */
+//    private INodeData data;
+    
+    public final int getSpannedTupleCount() {
+        
+        return nentries;
+        
     }
 
     public final long getChildAddr(final int index) {
@@ -537,6 +571,34 @@ public class Node extends AbstractNode<Node> implements INodeData {
         nentries = src.nentries;
         
         /*
+         * Steal/copy the keys.
+         * 
+         * Note: The copy constructor is invoked when we need to begin mutation
+         * operations on an immutable node or leaf, so make sure that the keys
+         * are mutable.
+         */
+        {
+
+//            nkeys = src.nkeys;
+
+            if (src.getKeys() instanceof MutableKeyBuffer) {
+
+                keys = src.getKeys();
+
+            } else {
+
+                keys = new MutableKeyBuffer(src.getBranchingFactor(), src
+                        .getKeys());
+
+            }
+
+            // release reference on the source node.
+//            src.nkeys = 0;
+            src.keys = null;
+            
+        }
+        
+        /*
          * Steal the childAddr[] and childEntryCounts[] arrays.
          */
         {
@@ -603,10 +665,17 @@ public class Node extends AbstractNode<Node> implements INodeData {
         super.delete();
         
         // clear state.
+        keys = null;
         childRefs = null;
         childAddr = null;
         nentries = 0;
         childEntryCounts = null;
+        
+    }
+    
+    final public IRaba getKeys() {
+        
+        return keys;
         
     }
     
@@ -621,7 +690,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
     final public int getChildCount() {
         
-        return getKeyCount() + 1;
+        return getKeys().size() + 1;
         
     }
     
@@ -1005,7 +1074,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     final protected int findChild(final byte[] searchKey) {
 
-        int childIndex = this.keys.search(searchKey);
+        int childIndex = this.getKeys().search(searchKey);
 
         if (childIndex >= 0) {
 
@@ -1110,7 +1179,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * among the leaves of the tree. This issue is covered by Bayer's
          * article on prefix trees.
          */
-        final byte[] separatorKey = keys.get(splitIndex);
+        final byte[] separatorKey = getKeys().get(splitIndex);
 
         // create the new rightSibling node.
         final Node rightSibling = new Node(btree);
@@ -1118,8 +1187,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         /*
          * Tunnel through to the mutable keys object.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
-        final MutableKeyBuffer skeys = (MutableKeyBuffer) rightSibling.keys;
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
+        final MutableKeyBuffer skeys = (MutableKeyBuffer) rightSibling.getKeys();
 
         if (INFO) {
             log.info("this=" + this + ", nkeys=" + getKeyCount() + ", splitIndex="
@@ -1146,7 +1215,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                  * Note: keys[nchildren-1] is undefined.
                  */
 //                rightSibling.setKey(j, getKey(i));
-                rightSibling.copyKey(j, this.keys, i);
+                rightSibling.copyKey(j, this.getKeys(), i);
                 
             }
             
@@ -1316,8 +1385,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
         /*
          * Tunnel through to the mutable keys object.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
-        final MutableKeyBuffer skeys = (MutableKeyBuffer)s.keys;
+        final MutableKeyBuffer keys = (MutableKeyBuffer)this.getKeys();
+        final MutableKeyBuffer skeys = (MutableKeyBuffer)s.getKeys();
 
         /*
          * determine which leaf is earlier in the key ordering and get the
@@ -1335,9 +1404,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
             // Mopy the first key/child from the rightSibling.
 //            setKey(nkeys, p.getKey(index)); // copy the separatorKey from the parent.
-            copyKey(nkeys, p.keys, index); // copy the separatorKey from the parent.
+            copyKey(nkeys, p.getKeys(), index); // copy the separatorKey from the parent.
 //            p.setKey(index, s.getKey(0)); // update the separatorKey from the rightSibling.
-            p.copyKey(index, s.keys, 0); // update the separatorKey from the rightSibling.
+            p.copyKey(index, s.getKeys(), 0); // update the separatorKey from the rightSibling.
             childRefs[nkeys+1] = s.childRefs[0]; // copy the child from the rightSibling.
             childAddr[nkeys+1] = s.childAddr[0];
             final int siblingChildCount = s.childEntryCounts[0]; // #of spanned entries being moved.
@@ -1401,9 +1470,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
             
             // move the last key/child from the leftSibling to this node.
 //            setKey(0, p.getKey(index-1)); // copy the separatorKey from the parent.
-            copyKey(0, p.keys, index-1); // copy the separatorKey from the parent.
+            copyKey(0, p.getKeys(), index-1); // copy the separatorKey from the parent.
 //            p.setKey(index-1, s.getKey(s.nkeys-1)); // update the separatorKey
-            p.copyKey(index-1, s.keys, snkeys-1); // update the separatorKey
+            p.copyKey(index-1, s.getKeys(), snkeys-1); // update the separatorKey
             childRefs[0] = s.childRefs[snkeys];
             childAddr[0] = s.childAddr[snkeys];
             final int siblingChildCount = s.childEntryCounts[snkeys];
@@ -1506,9 +1575,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * mutable key buffer to that when we have to convert the siblings keys
          * into mutable form in order to perform the merge operation.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
-        final MutableKeyBuffer skeys = (s.keys instanceof MutableKeyBuffer ? (MutableKeyBuffer) s.keys
-                : new MutableKeyBuffer(s.keys));
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
+        final MutableKeyBuffer skeys = (s.getKeys() instanceof MutableKeyBuffer ? (MutableKeyBuffer) s.getKeys()
+                : new MutableKeyBuffer(getBranchingFactor(), s.getKeys()));
 
         /*
          * determine which node is earlier in the key ordering so that we know
@@ -1529,7 +1598,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * this node.
              */
 //            this.setKey(nkeys++, p.getKey(index));
-            this.copyKey(nkeys, p.keys, index);
+            this.copyKey(nkeys, p.getKeys(), index);
             nkeys++; // update local var!
             keys.nkeys++;
 
@@ -1573,7 +1642,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
              * below.
              */
 //            p.setKey(index, p.getKey(index+1));
-            p.copyKey(index, p.keys, index+1);
+            p.copyKey(index, p.getKeys(), index+1);
             
             // reallocate spanned entries from the sibling to this node.
             p.childEntryCounts[index] += siblingEntryCount;
@@ -1612,7 +1681,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
             // copy the separatorKey from the parent.
             //this.setKey(s.nkeys, p.getKey(index - 1));
-            this.copyKey(snkeys, p.keys, index - 1);
+            this.copyKey(snkeys, p.getKeys(), index - 1);
             
             // update parent on children.
             final Reference<Node> weakRef = (Reference<Node>)this.self;
@@ -1676,7 +1745,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * the key goes into keys[0] but we have to copyDown by one anyway
          * to avoid stepping on the existing child.
          */
-        int childIndex = this.keys.search(key);
+        int childIndex = this.getKeys().search(key);
 
         if (childIndex >= 0) {
 
@@ -1701,7 +1770,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         /*
          * copy down per-key data.
          */
-        final MutableKeyBuffer keys = (MutableKeyBuffer) this.keys;
+        final MutableKeyBuffer keys = (MutableKeyBuffer) this.getKeys();
 
         final int length = nkeys - childIndex;
 
@@ -2053,7 +2122,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
             final int lengthKeyCopy = lengthChildCopy - 1;
     
             // Tunnel through to the mutable keys object.
-            final MutableKeyBuffer keys = (MutableKeyBuffer)this.keys;
+            final MutableKeyBuffer keys = (MutableKeyBuffer)this.getKeys();
     
             if (lengthKeyCopy > 0) {
     
@@ -2832,7 +2901,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
                     + nkeys + ", nchildren=" + (nkeys + 1) + ", minKeys="
                     + minKeys + ", maxKeys=" + maxKeys + ", branchingFactor="
                     + branchingFactor+", #entries="+nentries);
-            out.println(indent(height) + "  keys=" + keys);
+            out.println(indent(height) + "  keys=" + getKeys());
         }
         // verify keys are monotonically increasing.
         try {
@@ -3131,8 +3200,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
                          * Note: All keys on the first child MUST be LT the
                          * first key on this node.
                          */
-                        final byte[] k0 = keys.get(0);
-                        final byte[] ck0 = child.keys.get(0);
+                        final byte[] k0 = getKeys().get(0);
+                        final byte[] ck0 = child.getKeys().get(0);
                         if( BytesUtil.compareBytes(ck0,k0) >= 0 ) {
 //                          if( child.compare(0,keys,0) >= 0 ) {
 
@@ -3148,7 +3217,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
                         if (child.getKeyCount() >= 1 ) {
                             
-                            final byte[] ckn = child.keys.get(child.getKeyCount()-1);
+                            final byte[] ckn = child.getKeys().get(child.getKeyCount()-1);
                             if (BytesUtil.compareBytes(ckn, k0) >= 0) {
 //                            if (child.compare(child.nkeys-1, keys, 0) >= 0) {
 

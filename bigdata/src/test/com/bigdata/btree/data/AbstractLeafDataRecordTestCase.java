@@ -84,8 +84,11 @@ public class AbstractLeafDataRecordTestCase extends
 
     }
 
+    /**
+     * A single empty key (byte[0]) paired with a <code>null</code> value.
+     */
     public void test_tupleCount1_emptyKey_nullVal() {
-        
+ 
         final int m = 3;
         final int nkeys = 1;
         final byte[][] keys = new byte[m + 1][];
@@ -100,9 +103,20 @@ public class AbstractLeafDataRecordTestCase extends
                 valuesCoder, false/* doubleLinked */);
 
         assertSameLeafData(expected, actual);
+        
+        // check some keys that are not in the leaf.
+        assertEquals(//
+                expected.getKeys().search(new byte[] { 1 }), //
+                actual.getKeys().search(new byte[] { 1 }));
+        assertEquals(//
+                expected.getKeys().search(new byte[] { 0, 1, 2 }), //
+                actual.getKeys().search(new byte[] { 0, 1, 2 }));
 
     }
 
+    /**
+     * A single, empty key (byte[0]) paired with a delete marker.
+     */
     public void test_tupleCount1_emptyKey_deleted() {
         
         final int m = 3;
@@ -113,13 +127,14 @@ public class AbstractLeafDataRecordTestCase extends
         final long[] versionTimestamps = new long[m + 1];
 
         keys[0] = new byte[0];
-        deleteMarkers[0]=true;
-        versionTimestamps[0]=System.currentTimeMillis();
-        
-        final ILeafData expected = new MockLeafData(new ReadOnlyKeysRaba(
-                nkeys, keys), new ReadOnlyValuesRaba(nkeys, vals),
-                deleteMarkers,
-                versionTimestamps
+        deleteMarkers[0] = true;
+        versionTimestamps[0] = System.currentTimeMillis();
+
+        final ILeafData expected = new MockLeafData(//
+                new ReadOnlyKeysRaba(nkeys, keys),//
+                new ReadOnlyValuesRaba(nkeys, vals),//
+                deleteMarkers,//
+                versionTimestamps//
         );
 
         // spot check mock object impl.
@@ -130,6 +145,14 @@ public class AbstractLeafDataRecordTestCase extends
                 valuesCoder, false/* doubleLinked */);
 
         assertSameLeafData(expected, actual);
+
+        // check some keys that are not in the leaf.
+        assertEquals(//
+                expected.getKeys().search(new byte[] { 1 }), //
+                actual.getKeys().search(new byte[] { 1 }));
+        assertEquals(//
+                expected.getKeys().search(new byte[] { 0, 1, 2 }), //
+                actual.getKeys().search(new byte[] { 0, 1, 2 }));
 
     }
     
