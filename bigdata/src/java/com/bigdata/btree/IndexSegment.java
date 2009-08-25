@@ -31,7 +31,6 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.raba.IRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
@@ -665,22 +664,17 @@ public class IndexSegment extends AbstractBTree {
         private ImmutableNodeFactory() {
         }
 
-        public ILeafData allocLeaf(final AbstractBTree btree, final long addr,
-                final IRaba keys, final IRaba values,
-                final long[] versionTimestamps, final boolean[] deleteMarkers,
-                final long priorAddr, final long nextAddr) {
+        public Leaf allocLeaf(final AbstractBTree btree, final long addr,
+                final ILeafData data, final long priorAddr, final long nextAddr) {
 
-            return new ImmutableLeaf(btree, addr, keys, values,
-                    versionTimestamps, deleteMarkers, priorAddr, nextAddr);
+            return new ImmutableLeaf(btree, addr, data, priorAddr, nextAddr);
 
         }
 
-        public INodeData allocNode(final AbstractBTree btree, final long addr,
-                final int nentries, final IRaba keys, final long[] childAddr,
-                final int[] childEntryCount) {
+        public Node allocNode(final AbstractBTree btree, final long addr,
+                final INodeData data) {
 
-            return new ImmutableNode(btree, addr, nentries, keys, childAddr,
-                    childEntryCount);
+            return new ImmutableNode(btree, addr, data);
 
         }
 
@@ -704,10 +698,9 @@ public class IndexSegment extends AbstractBTree {
              * @param childKeys
              */
             protected ImmutableNode(final AbstractBTree btree, final long addr,
-                    final int nentries, final IRaba keys,
-                    final long[] childKeys, final int[] childEntryCount) {
+                    final INodeData data) {
 
-                super(btree, addr, nentries, keys, childKeys, childEntryCount);
+                super(btree, addr, data);
 
             }
 
@@ -776,13 +769,10 @@ public class IndexSegment extends AbstractBTree {
              * @param values
              */
             protected ImmutableLeaf(final AbstractBTree btree, final long addr,
-                    final IRaba keys, final IRaba values,
-                    final long[] versionTimestamps,
-                    final boolean[] deleteMarkers, final long priorAddr,
+                    final ILeafData data, final long priorAddr,
                     final long nextAddr) {
 
-                super(btree, addr, keys, values, versionTimestamps,
-                        deleteMarkers);
+                super(btree, addr, data);
 
                 // prior/next addrs must be known.
                 assert priorAddr != -1L;

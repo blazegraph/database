@@ -33,7 +33,6 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.Leaf.ILeafListener;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.raba.IRaba;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
@@ -1379,10 +1378,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         private NodeFactory() {
         }
 
-        public ILeafData allocLeaf(final AbstractBTree btree, final long addr,
-                final IRaba keys, final IRaba values,
-                final long[] versionTimestamp, final boolean[] deleteMarkers,
-                final long priorAddr, final long nextAddr) {
+        public Leaf allocLeaf(final AbstractBTree btree, final long addr,
+                final ILeafData data, final long priorAddr, final long nextAddr) {
 
             /*
              * Note: The prior/next leaf addr information is not available for
@@ -1390,17 +1387,14 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
              * de-serialized.
              */
             
-            return new Leaf(btree, addr, keys, values, versionTimestamp,
-                    deleteMarkers);
+            return new Leaf(btree, addr, data);
 
         }
 
-        public INodeData allocNode(final AbstractBTree btree, final long addr,
-                final int nentries, final IRaba keys, final long[] childAddr,
-                final int[] childEntryCounts) {
+        public Node allocNode(final AbstractBTree btree, final long addr,
+                final INodeData data) {
 
-            return new Node(btree, addr, nentries, keys, childAddr,
-                    childEntryCounts);
+            return new Node(btree, addr, data);
 
         }
 

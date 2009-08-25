@@ -374,7 +374,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
          * Some branching factors to choose from.
          */
         final int[] branchingFactors = new int[] { 3, 4, 8, 16, 27, 32, 48, 64,
-                96, 99, 112, 128, 256, 512, 1024, 4096};
+                96, 99, 112, 128, 256, 512, 1024};//, 4096};
 //        int[] branchingFactors = new int[] {4096};
         
         for (int trial = 0; trial < ntrials; trial++) {
@@ -420,9 +420,9 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
      */
     protected long nextAddr() {
 
-        int offset = r.nextInt(Integer.MAX_VALUE/2);
+        final int offset = r.nextInt(Integer.MAX_VALUE/2);
 
-        int nbytes = r.nextInt(1024);
+        final int nbytes = r.nextInt(1024);
         
 //        return Addr.toLong(nbytes,offset);
         
@@ -433,7 +433,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
     /**
      * Generates a non-leaf node with random data.
      */
-    public Node getRandomNode(BTree btree) {
+    public Node getRandomNode(final BTree btree) {
 
         // #of keys per node.
         final int branchingFactor = btree.branchingFactor;
@@ -470,14 +470,12 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         }
                 
         /*
-         * create the node and set it as the root to fake out the btree.
+         * Create the node and set it as the root to fake out the btree.
          */
         
-        final Node node = new Node(btree, addr, nentries,
-//                new ImmutableKeyBuffer(nkeys, branchingFactor, keys),
-                new MutableKeyBuffer(nkeys, keys),
-                children, childEntryCounts);
-        
+        final Node node = new Node(btree, addr, new MutableNodeData(nentries,
+                new MutableKeyBuffer(nkeys, keys), children, childEntryCounts));
+
         btree.root = node;
 
         return node;
@@ -487,7 +485,7 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
     /**
      * Generates a leaf node with random data.
      */
-    public Leaf getRandomLeaf(BTree btree) {
+    public Leaf getRandomLeaf(final BTree btree) {
 
         // #of keys per node.
         final int branchingFactor = btree.branchingFactor;
@@ -530,16 +528,18 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
         }
 
         /*
-         * create the leaf and set it as the root to fake out the btree.
+         * Create the leaf and set it as the root to fake out the btree.
          */
 
-        final Leaf leaf = new Leaf(btree, addr, 
-//                new ImmutableKeyBuffer(nkeys, branchingFactor + 1, keys),
-                new MutableKeyBuffer(nkeys, keys),
-                new MutableValueBuffer(nkeys, values),//
-                versionTimestamps,//
-                deleteMarkers//
-                ); // ,previous,next);
+        final Leaf leaf = new Leaf(btree, addr,//
+                new MutableLeafData(
+                        //
+                        new MutableKeyBuffer(nkeys, keys),
+                        new MutableValueBuffer(nkeys, values),//
+                        versionTimestamps,//
+                        deleteMarkers//
+                        // ,previous,next);
+                ));
         
         btree.root = leaf;
         

@@ -25,11 +25,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 25, 2009
  */
 
-package com.bigdata.btree.data;
+package com.bigdata.btree;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
+import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.data.ReadOnlyNodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 
@@ -37,6 +36,9 @@ import com.bigdata.btree.raba.MutableKeyBuffer;
  * Implementation maintains Java objects corresponding to the persistent data
  * and defines methods for a variety of mutations on the {@link INodeData}
  * record which operate by direct manipulation of the Java objects.
+ * <p>
+ * Note: package private fields are used so that they may be directly accessed
+ * by the {@link Node} class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -64,7 +66,7 @@ public class MutableNodeData implements INodeData {
      * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
      * @see IRaba#search(byte[])
      */
-    private final MutableKeyBuffer keys;
+    final MutableKeyBuffer keys;
 
     /**
      * <p>
@@ -87,7 +89,7 @@ public class MutableNodeData implements INodeData {
      * computing the split point and performing the split.
      * </p>
      */
-    private long[] childAddr;
+    final long[] childAddr;
 
     /**
      * The #of entries spanned by this node. This value should always be equal
@@ -105,7 +107,7 @@ public class MutableNodeData implements INodeData {
      * <p>
      * This field is initialized by the various {@link Node} constructors.
      */
-    private int nentries;
+    int nentries;
 
     /**
      * The #of entries spanned by each direct child of this node.
@@ -117,7 +119,7 @@ public class MutableNodeData implements INodeData {
      * able to traverse the {@link AbstractNode#parent} reference in a straight
      * forward manner.
      */
-    private final int[] childEntryCounts;
+    final int[] childEntryCounts;
 
     /**
      * Create an empty mutable data record.
@@ -146,12 +148,6 @@ public class MutableNodeData implements INodeData {
      *            initialize the various arrays to the correct capacity.
      * @param src
      *            The source data record.
-     * 
-     * @todo do I need to define a ctor variant to "steal" the array references?
-     *       Probably yes if the source is a {@link MutableNodeData}, or I can
-     *       just reuse the {@link MutableNodeData} reference rather than
-     *       stealing anything and clear that reference on the source
-     *       {@link Node}.
      */
     public MutableNodeData(final int branchingFactor, final INodeData src) {
 
@@ -182,6 +178,45 @@ public class MutableNodeData implements INodeData {
         
         assert sum == nentries;
 
+    }
+
+    /**
+     * 
+     * @param nentries
+     * @param keys
+     * @param childAddr
+     * @param childEntryCounts
+     * 
+     * @deprecated This is a de-serialization ctor. It will be replaced by the
+     *             direct deserialization of a {@link ReadOnlyNodeData} wrapping
+     *             a coded data record.
+     */
+    public MutableNodeData(final int nentries, final IRaba keys,
+            final long[] childAddr, final int[] childEntryCounts) {
+
+        assert keys != null;
+        assert childAddr != null;
+        assert childEntryCounts != null;
+        assert keys.capacity() + 1 == childAddr.length;
+        assert childAddr.length == childEntryCounts.length;
+        
+        this.nentries = nentries;
+        
+        this.keys = (MutableKeyBuffer) keys;
+        
+        this.childAddr = childAddr;
+        
+        this.childEntryCounts = childEntryCounts;
+        
+    }
+    
+    /**
+     * No - this is a mutable data record.
+     */
+    final public boolean isReadOnly() {
+        
+        return false;
+        
     }
     
     public final int getSpannedTupleCount() {

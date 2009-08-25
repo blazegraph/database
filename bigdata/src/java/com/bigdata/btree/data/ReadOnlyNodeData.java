@@ -223,6 +223,15 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
     }
 
     /**
+     * Yes.
+     */
+    final public boolean isReadOnly() {
+        
+        return true;
+        
+    }
+    
+    /**
      * {@inheritDoc}. This field is cached.
      */
     final public int getKeyCount() {

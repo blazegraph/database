@@ -25,14 +25,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Aug 25, 2009
  */
 
-package com.bigdata.btree.data;
+package com.bigdata.btree;
 
 import it.unimi.dsi.bits.BitVector;
 
-import com.bigdata.btree.AbstractNode;
-import com.bigdata.btree.BTree;
-import com.bigdata.btree.Leaf;
-import com.bigdata.btree.Node;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
@@ -41,6 +38,9 @@ import com.bigdata.btree.raba.MutableValueBuffer;
  * Implementation maintains Java objects corresponding to the persistent data
  * and defines methods for a variety of mutations on the {@link ILeafData}
  * record which operate by direct manipulation of the Java objects.
+ * <p>
+ * Note: package private fields are used so that they may be directly accessed
+ * by the {@link Leaf} class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -68,7 +68,7 @@ public class MutableLeafData implements ILeafData {
      * 
      * @see IRaba#search(byte[])
      */
-    final private MutableKeyBuffer keys;
+    final MutableKeyBuffer keys;
 
     /**
      * <p>
@@ -81,19 +81,20 @@ public class MutableLeafData implements ILeafData {
      * the split point and performing the split.
      * </p>
      */
-    final private MutableValueBuffer values;
-    
+    final MutableValueBuffer values;
+
     /**
      * The deletion markers IFF isolation is supported by the {@link BTree}.
      * 
-     * @todo {@link BitVector}?
+     * @todo {@link BitVector}? The code in {@link Leaf} which makes changes to
+     *       this array would have to be updated.
      */
-    final private boolean[] deleteMarkers;
+    final boolean[] deleteMarkers;
     
     /**
      * The version timestamps IFF isolation is supported by the {@link BTree}.
      */
-    final private long[] versionTimestamps;
+    final long[] versionTimestamps;
 
     /**
      * Create an empty data record with internal arrays dimensioned for the
@@ -122,6 +123,14 @@ public class MutableLeafData implements ILeafData {
 
     }
 
+    /**
+     * Copy ctor.
+     * 
+     * @param branchingFactor
+     *            The branching factor for the owning B+Tree.
+     * @param src
+     *            The source leaf.
+     */
     public MutableLeafData(final int branchingFactor, final ILeafData src) {
 
         keys = new MutableKeyBuffer(branchingFactor, src.getKeys());
@@ -157,6 +166,39 @@ public class MutableLeafData implements ILeafData {
         }
 
     }
+
+    /**
+     * @param keys
+     *            A representation of the defined keys in the node.
+     * @param values
+     *            An array containing the values found in the leaf.
+     * @param versionTimestamps
+     *            An array of the version timestamps (iff the version metadata
+     *            is being maintained).
+     * @param deleteMarkers
+     *            An array of the delete markers (iff the version metadata is
+     *            being maintained).
+     */
+    public MutableLeafData(final MutableKeyBuffer keys,
+            final MutableValueBuffer values, final long[] versionTimestamps,
+            final boolean[] deleteMarkers) {
+        
+        assert keys != null;
+        assert values != null;
+        assert keys.capacity() == values.capacity();
+        if (versionTimestamps != null) {
+            assert versionTimestamps.length == keys.capacity();
+        }
+        if (deleteMarkers != null) {
+            assert deleteMarkers.length == keys.capacity();
+        }
+
+        this.keys = keys;
+        this.values = values;
+        this.versionTimestamps = versionTimestamps;
+        this.deleteMarkers = deleteMarkers;
+        
+    }
     
     /**
      * Range check a tuple index.
@@ -177,6 +219,15 @@ public class MutableLeafData implements ILeafData {
         
     }
     
+    /**
+     * No - this is a mutable data record.
+     */
+    final public boolean isReadOnly() {
+        
+        return false;
+        
+    }
+
     public final long getVersionTimestamp(final int index) {
 
         if (versionTimestamps == null)

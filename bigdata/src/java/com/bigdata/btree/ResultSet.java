@@ -1081,7 +1081,17 @@ public class ResultSet implements ILeafData, Externalizable {
         return true;
         
     }
-    
+
+    /**
+     * Yes (the data structure is populated during the ctor and is read-only
+     * thereafter).
+     */
+    final public boolean isReadOnly() {
+        
+        return true;
+        
+    }
+
 //    /**
 //     * FIXME Remove. This is for debugging.
 //     */

@@ -328,75 +328,129 @@ Goals:
          on the existing code in AbstractNode, Node, Leaf, and
          MutableKeys.
 
-	 - (***) ILeafData#getValue(int) and possibly some other
-	   methods must also test whether or not the tuple has been
-	   deleted.  That information is NOT available on the IRaba.
-
-	 - Clean up (de-)serialization to avoid decoding keys and
-           values.
+	 - Done (this is now checked by the various methods which copy
+	   data out of a leaf). ILeafData#getValue(int) and possibly
+	   some other methods must also test whether or not the tuple
+	   has been deleted.  That information is NOT available on the
+	   IRaba.
 
 	 - Done. nkeys refactor has broken the code.
 
 	 - Done. toString() for Leaf, Node, LeafData impls and NodeData impls.
 
-	 - Finish isolation @ ILeafData and INodeData.
+	 - Done. Finish isolation @ ILeafData and INodeData.
 
-	   - childAddr[] and childEntryCount[] must not be assumed.
-             Move them onto a MutableNodeData object.
+	   - PO:
 
-	   - deleteMarkers[] and versionTimestamps[] must not be
-             assumed.  Move them onto a MutableLeafData object.
+	     - identity, dirty, deleted
 
-	   - verify clearing (in delete()) and stealing (in ctors).
+	   - AbstractNode:
 
-	   - verify copyOnWrite().
+	     - self:Reference<AbstractNode<T>>
+	     - parent:Reference<Node>
+	     - keys:IRaba
+	     - referenceCount:int
 
-	 - Review cases where we explicitly tunnel through and obtain
-           the mutable version of the keys or values for a node or
-           leaf.  I believe that in all cases we are about to discard
-           the values in a sibling during a merge, in which case it is
-           Ok to decode them first and we do not lose any efficiency
-           since we will be storing the keys/values in a mutable
-           node/leaf.
+	   - Node:
+
+	     - childRefs[]
+	     - childLocks[]
+	     - data:INodeData (new!)
+
+	   - MutableNodeData:
+
+	     - keys:IRaba
+	     - nentries:int
+	     - childAddr:long[]
+	     - childEntryCount:int[]
+
+	   - Leaf
+
+	     - data:ILeafData (new!)
+
+	   - MutableLeafData
+
+	     - keys:IRaba
+	     - values:IRaba
+	     - deleteMarkers[] (BitVector w/ long[] impl?)
+	     - versionTimestamps:long[]
+
+	   - Done (passing in the branchingFactor). Either the
+             IRabaCoder must round-trip the capacity or we must have
+             appropriate ctors for MutableKeyBuffer and
+             MutableValueBuffer so that they are provisioned to the
+             correct capacity (rather than just the #of keys or values
+             currently in the node or leaf).
+
+	   - Done. verify clearing (in delete()) and stealing (in ctors).
+
+	   - Done. verify copyOnWrite().
+
+	   - verify use of Node:Node(final Node src, final long
+             triggeredByChildId).  The javadoc indicates that this is
+             a copy ctor and that the src is always an immutable Node.
+
+	     It is in fact invoked solely by copyOnWrite().	     
+
+             In that case, we can probably replace this with the
+             conversion of the INodeData:data field to a mutable
+             field, but the code which invokes copyOnWrite() no longer
+             needs to operate on a new Node reference [or does
+             something depend on that as well - for example, the dirty
+             flag is doubtless set?]
+
+	   - (*) Verify that transient B+Trees convert data records to
+             immutable data records when there is an eviction event.
+             This will help us bound their in-memory footprint.
+
+	   - (*) Should run all of the persistence tests against each
+             of the IRabaCoder combinations.
+
+	   - (*) Roll prior/next addr into ILeafData?
+
+	 - Done. Review cases where we explicitly tunnel through and
+           obtain the mutable version of the keys or values for a node
+           or leaf.  I believe that in all cases we are about to
+           discard the values in a sibling during a merge, in which
+           case it is Ok to decode them first and we do not lose any
+           efficiency since we will be storing the keys/values in a
+           mutable node/leaf.
+
+	 - (***) Clean up (de-)serialization to avoid decoding keys
+	         and values.
+
+	 - (*) ReadOnlyNode/Leaf
 	   
-	 - Code the version timestamp[].
+  	   - Code the version timestamp[].
 
-	   A good coding scheme might be the minimum timestamp plus a
-           minimum width coding for the remainder for each timestamp.
+	     A good coding scheme might be the minimum timestamp plus
+             a minimum width coding for the remainder for each
+             timestamp.
 
-	 - Code the childAddr[].
+	   - Code the childAddr[].
 
-	   A good scheme might be identical to the version timestamp
-	   scheme since the childAddr[] will tend to have a shared
-	   prefix.
+	     A good scheme might be identical to the version timestamp
+	     scheme since the childAddr[] will tend to have a shared
+	     prefix.
 
-	   For an index segment, the childAddr[] values will also be
-	   strictly increasing.
+	     For an index segment, the childAddr[] values will also be
+	     strictly increasing.
 
-	 - Code the childEntryCount[].
+	   - Code the childEntryCount[].
 
-	   A similar scheme might apply here.  Since the B+Tree is
-	   balanced the #of spanned tuples for each child will be
-	   roughly comparable, hence substracting out the minimum
-	   could save space.
-
-         - Refactor Node and Leaf to delegate to the INodeData or
-	   ILeafData implementation.  Define a MutableNodeData and a
-	   MutableLeafData.
-
-	   Should copyOnWrite clone the "data" or the "node"?
+	     A similar scheme might apply here.  Since the B+Tree is
+	     balanced the #of spanned tuples for each child will be
+	     roughly comparable, hence substracting out the minimum
+	     could save space.
 
          - IndexMetadata will need to be updated to reflect the codec
 	   interface change and the reconcilation of the
 	   IDataSerializer with the IRabaCoder.
        
          - NodeSerializer, IAddressSerializer, and INodeFactory are
-           deprecated and will be deleted.
-	   
-	 - IKeyBuffer is deprecated and should be deleted.  it is only
-           used by the test suites.
-
-	   The ImmutableKeyBuffer is deprecated and should be deleted.
+           deprecated and will be deleted. IKeyBuffer is deprecated
+           and should be deleted - it is only used by the test suites.
+           The ImmutableKeyBuffer is deprecated and should be deleted.
 
 	 - ResultSet must operate on the coded representation rather
            than de-serializing the data.
@@ -417,6 +471,19 @@ Goals:
            keys and canonical huffman for values.
 
        - Done. FrontCoded.
+
+	 This is a fence post on search where the insertion point is
+	 before anything in the front-coded byte[].  This shows up in
+	 TestFrontCodedRabaCoderRatio2.
+
+	 (****) Send bug fix to Sebastiano.  Problem when search probe
+	        is LT the first front-coded entry.
+
+java.lang.ArrayIndexOutOfBoundsException: -1
+	at it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList.search(CustomByteArrayFrontCodedList.java:1151)
+	at com.bigdata.btree.raba.codec.FrontCodedRabaCoder$FrontCodedDecoder.search(FrontCodedRabaCoder.java:342)
+	at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.test_mike_personick(AbstractRabaCoderTestCase.java:107)
+
 
        - Canonical Huffman.
 

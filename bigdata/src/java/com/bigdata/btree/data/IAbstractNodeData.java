@@ -43,6 +43,11 @@ public interface IAbstractNodeData {
     public boolean isLeaf();
 
     /**
+     * True iff this is an immutable data structure.
+     */
+    public boolean isReadOnly();
+    
+    /**
      * The #of tuples spanned by this node or leaf. For a leaf this is always
      * the #of keys.
      * 
