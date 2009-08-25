@@ -126,25 +126,27 @@ public class TestUtilMethods extends AbstractBTreeTestCase {
         final int nkeys = 3;
         final BTree btree = getBTree(m);
 
-        final Leaf leaf = new Leaf(btree, 1L, new MutableKeyBuffer(nkeys,
-                // keys
-                new byte[][] {//
-                new byte[] { 1 }, //
+        final Leaf leaf = new Leaf(btree, 1L, //
+                new MutableLeafData(//
+                    new MutableKeyBuffer(nkeys,
+                    // keys
+                        new byte[][] {//
+                        new byte[] { 1 }, //
                         new byte[] { 2 }, //
                         new byte[] { 3 },//
                         null }),//
-                // vals
-                new MutableValueBuffer(nkeys, //
+                    // vals
+                    new MutableValueBuffer(nkeys, //
                         // vals
                         new byte[][] { //
                         new byte[] { 1 },//
                         new byte[] { 2 },//
                         new byte[] { 3 },//
                         new byte[] { 0 }} //
-                ),
-                null,// timestamps
-                null// deleteMarkers
-                );
+                    ),
+                    null,// timestamps
+                    null// deleteMarkers
+                    ));
 
         leaf.assertKeysMonotonic();
 

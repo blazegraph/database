@@ -28,12 +28,6 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
 
     }
 
-//    final public long[] getChildAddr() {
-//
-//        return childAddr;
-//
-//    }
-    
     /**
      * Bounds check.
      * 
@@ -77,6 +71,12 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
 
         return false;
 
+    }
+
+    final public boolean isReadOnly() {
+        
+        return true;
+        
     }
 
     public MockNodeData(final IRaba keys,

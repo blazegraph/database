@@ -2221,49 +2221,18 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-//        final public Object[] getValues() {
-//            
-//            return vals;
-//            
-//        }
-
         final public boolean isLeaf() {
             
             return true;
             
         }
 
-//        final public boolean isNull(final int index) {
-//
-//            if (vals[index] == null) {
-//
-//                return true;
-//                
-//            }
-//            
-//            return false;
-//            
-//        }
+        final public boolean isReadOnly() {
+            
+            return true;
+            
+        }
         
-//        final public void copyValue(int index, OutputStream os) {
-//
-//            final byte[] val = vals[index];
-//
-//            if (val == null)
-//                throw new UnsupportedOperationException();
-//            
-//            try {
-//                
-//                os.write(val);
-//                
-//            } catch (IOException e) {
-//                
-//                throw new RuntimeException(e);
-//                
-//            }
-//
-//        }
-
         final public boolean getDeleteMarker(final int index) {
 
             if (deleteMarkers == null)
@@ -2355,19 +2324,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         /**
          * The #of entries spanned by each child of this node.
          */
-        int[] childEntryCount;
+        final int[] childEntryCount;
         
         final public int getSpannedTupleCount() {
             
             return nentries;
             
         }
-
-//        final public int[] getChildEntryCounts() {
-//            
-//            return childEntryCount;
-//            
-//        }
 
         final public long getChildAddr(final int index) {
 
@@ -2415,12 +2378,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-//        final public long[] getChildAddr() {
-//            
-//            return childAddr;
-//            
-//        }
-
         final public int getChildCount() {
 
             return keys.size() + 1;
@@ -2433,6 +2390,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
         
+        final public boolean isReadOnly() {
+            
+            return true;
+            
+        }
+
     }
 
     /**
@@ -2445,17 +2408,15 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         private NOPNodeFactory() {
         }
 
-        public ILeafData allocLeaf(AbstractBTree btree, long addr, IRaba keys,
-                IRaba values, long[] versionTimestamps,
-                boolean[] deleteMarkers, long priorAddr, long nextAddr) {
+        public Leaf allocLeaf(AbstractBTree btree, long addr,
+                final ILeafData data, long priorAddr, long nextAddr) {
 
             throw new UnsupportedOperationException();
 
         }
 
-        public INodeData allocNode(AbstractBTree btree, long addr,
-                int nentries, IRaba keys, long[] childAddr,
-                int[] childEntryCount) {
+        public Node allocNode(final AbstractBTree btree, final long addr,
+                final INodeData data) {
 
             throw new UnsupportedOperationException();
 

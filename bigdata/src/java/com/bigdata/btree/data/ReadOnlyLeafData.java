@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.data;
 
 import java.nio.ByteBuffer;
-import java.util.Date;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
@@ -367,6 +366,15 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
         return true;
 
+    }
+
+    /**
+     * Yes.
+     */
+    final public boolean isReadOnly() {
+        
+        return true;
+        
     }
 
     /**

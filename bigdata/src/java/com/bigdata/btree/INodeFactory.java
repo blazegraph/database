@@ -25,7 +25,6 @@ package com.bigdata.btree;
 
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.raba.IRaba;
 
 /**
  * Interface for creating mutable nodes or leaves.
@@ -43,42 +42,26 @@ public interface INodeFactory {
      * and <i>childAddr</i> references rather than cloning them.
      * 
      * @param btree
-     *            The owning btree.
+     *            The owning B+Tree.
      * @param addr
      *            The address from which the node was read.
-     * @param nentries
-     *            The #of entries spanned by this node.
-     * @param keys
-     *            A representation of the defined keys in the node.
-     * @param childAddr
-     *            An array of the persistent addresses for the children of this
-     *            node.
-     * @param childEntryCount
-     *            An of the #of entries spanned by each direct child.
-     * 
+     * @param data
+     *            The node data record.
+     *            
      * @return A node initialized from those data.
      */
-    public INodeData allocNode(AbstractBTree btree, long addr, int nentries,
-            IRaba keys, long[] childAddr, int[] childEntryCount);
+    public Node allocNode(AbstractBTree btree, long addr, INodeData data);
 
     /**
      * Create a leaf. The implementation is encouraged to steal the <i>keys</i>
      * and <i>values</i> references rather than cloning them.
      * 
      * @param btree
-     *            The owning btree.
+     *            The owning B+Tree.
      * @param addr
      *            The address from which the leaf was read.
-     * @param keys
-     *            A representation of the defined keys in the node.
-     * @param values
-     *            An array containing the values found in the leaf.
-     * @param versionTimestamps
-     *            An array of the version timestamps (iff the version metadata
-     *            is being maintained).
-     * @param deleteMarkers
-     *            An array of the delete markers (iff the version metadata is
-     *            being maintained).
+     * @param data
+     *            The leaf data record.
      * @param priorAddr
      *            The address of the previous leaf in key order, <code>0L</code>
      *            if it is known that there is no previous leaf, and
@@ -94,8 +77,7 @@ public interface INodeFactory {
      * 
      * @return A leaf initialized from those data.
      */
-    public ILeafData allocLeaf(AbstractBTree btree, long addr, IRaba keys,
-            IRaba values, long[] versionTimestamps, boolean[] deleteMarkers,
+    public Leaf allocLeaf(AbstractBTree btree, long addr, ILeafData data,
             long priorAddr, long nextAddr);
 
 }

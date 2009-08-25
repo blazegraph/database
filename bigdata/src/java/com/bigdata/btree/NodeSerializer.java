@@ -692,9 +692,9 @@ public class NodeSerializer {
             // reset the buffer position.
             buf.position(0);
             
-            // Done.
-            return nodeFactory.allocNode(btree, addr, nentries, keys,
-                    childAddr, childEntryCounts);
+            // Done : FIXME do not create mutable instances here!
+            return nodeFactory.allocNode(btree, addr, new MutableNodeData(
+                    nentries, keys, childAddr, childEntryCounts));
 
         } catch (EOFException ex) {
 
@@ -702,7 +702,7 @@ public class NodeSerializer {
              * Masquerade an EOF reading on the input stream as a buffer
              * underflow, which is what it really represents.
              */
-            RuntimeException ex2 = new BufferUnderflowException();
+            final RuntimeException ex2 = new BufferUnderflowException();
 
             ex2.initCause(ex);
 
@@ -1011,9 +1011,10 @@ public class NodeSerializer {
             // reset the buffer position.
             buf.position(0);
             
-            // Done.
-            return nodeFactory.allocLeaf(btree, addr, keys, values,
-                    versionTimestamps, deleteMarkers, priorAddr, nextAddr);
+            // Done : FIXME Do not convert to mutable keys/values.
+            return nodeFactory.allocLeaf(btree, addr, new MutableLeafData(
+                    (MutableKeyBuffer) keys, (MutableValueBuffer) values,
+                    versionTimestamps, deleteMarkers), priorAddr, nextAddr);
 
         } catch (EOFException ex) {
 
