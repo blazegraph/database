@@ -58,7 +58,7 @@ public class DefaultEvictionListener implements
 
     public void evicted(final HardReferenceQueue<PO> cache, final PO ref) {
 
-        final AbstractNode node = (AbstractNode) ref;
+        final AbstractNode<?> node = (AbstractNode<?>) ref;
 
         /*
          * Decrement the reference counter.  When it reaches zero (0) we will

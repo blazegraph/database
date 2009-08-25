@@ -59,7 +59,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("scale-out index write pipeline");
+        final TestSuite suite = new TestSuite("scale-out index write pipeline");
 
         suite.addTestSuite(TestDefaultDuplicateRemover.class);
         

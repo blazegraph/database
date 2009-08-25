@@ -89,7 +89,7 @@ public class TestInsertLookupRemoveKeysInRootLeaf extends AbstractBTreeTestCase 
             byte[] key = new byte[3];
             r.nextBytes(key);
             
-            int index = root.keys.search(key);
+            int index = root.getKeys().search(key);
             
             if( index >= 0 ) {
                 

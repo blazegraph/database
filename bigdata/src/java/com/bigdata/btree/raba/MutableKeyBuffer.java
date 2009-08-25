@@ -93,46 +93,60 @@ public class MutableKeyBuffer extends AbstractKeyBuffer {
      *            An existing instance.
      */
     public MutableKeyBuffer(final MutableKeyBuffer src) {
-        
+
         assert src != null;
-        
-//        assert capacity > src.nkeys;
-        
+
+        // assert capacity > src.nkeys;
+
         this.nkeys = src.nkeys;
-        
+
+        // note: dimension to the capacity of the source.
         this.keys = new byte[src.keys.length][];
-        
-        for( int i=0; i<nkeys; i++ ) {
-            
+
+        // copy the defined keys.
+        for (int i = 0; i < nkeys; i++) {
+
             // Note: copies the reference.
             this.keys[i] = src.keys[i];
-            
+
         }
-        
+
     }
 
     /**
      * Builds a mutable key buffer.
      * 
+     * @param capacity
+     *            The capacity of the new instance (this is based on the
+     *            branching factor for the B+Tree).
      * @param src
      *            The source data.
+     * 
+     * @throws IllegalArgumentException
+     *             if the capacity is LT the {@link IRaba#size()} of the
+     *             <i>src</i>.
+     * @throws IllegalArgumentException
+     *             if the source is <code>null</code>.
      */
-    public MutableKeyBuffer(final IRaba src) {
+    public MutableKeyBuffer(final int capacity, final IRaba src) {
 
         if (src == null)
+            throw new IllegalArgumentException();
+
+        if (capacity < src.capacity())
             throw new IllegalArgumentException();
         
         nkeys = src.size();
 
         assert nkeys >= 0; // allows deficient root.
-        
-        keys = new byte[src.capacity()][];
-        
+
+        keys = new byte[capacity][];
+
         int i = 0;
-        for(byte[] a : src) {
-            
+        for (byte[] a : src) {
+
             keys[i++] = a;
-            
+
         }
         
     }

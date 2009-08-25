@@ -56,10 +56,8 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
     protected IRabaCoder valuesCoder = null;
 
     /**
-     * Small (de-)serialization stress test conducted for a variety of slot
-     * sizes and branching factors.
-     * 
-     * @see #main(String[] args) for a large stress test.
+     * De-serialization stress test conducted for a variety of and branching
+     * factors.
      */
     public void testStress() {
      
@@ -90,7 +88,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
          * Some branching factors to choose from.
          */
         final int[] branchingFactors = new int[] { 3, 4, 8, 16, 27, 32, 48, 64,
-                96, 99, 112, 128, 256, 512, 1024, 4096};
+                96, 99, 112, 128, 256, 512, 1024};//, 4096};
 //        int[] branchingFactors = new int[] {4096};
         
         for (int trial = 0; trial < ntrials; trial++) {

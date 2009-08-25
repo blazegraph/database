@@ -149,7 +149,7 @@ public class TestUtilMethods extends AbstractBTreeTestCase {
         leaf.assertKeysMonotonic();
 
         // access the byte[][].
-        final byte[][] keys = ((MutableKeyBuffer)leaf.keys).keys;
+        final byte[][] keys = ((MutableKeyBuffer)leaf.getKeys()).keys;
 
         // swap around two keys so that they are out of order.
         final byte[] tmp = keys[0];

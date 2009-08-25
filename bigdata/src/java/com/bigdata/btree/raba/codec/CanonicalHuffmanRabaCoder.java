@@ -51,6 +51,7 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
 
@@ -1225,8 +1226,6 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * called.
          * 
          * @todo support isByteAlignedOffsets
-         * 
-         * FIXME why plus 1?!?
          */
         final int codedValueOffsetBits = nsymbols == 0 ? 0 : Fast
                 .mostSignificantBit(sumCodedValueBitLengths) + 1;
@@ -1840,6 +1839,20 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                     }
                     
                 }
+                
+                if (nsymbols == 0) {
+
+                    /*
+                     * The offset[] is not stored if there are no symbols. Since
+                     * we know that the value is not a null, this implies that
+                     * the coded value was an empty byte[]. We have to handle
+                     * this case explicitly.
+                     */
+                    
+                    return 0;
+                    
+                }
+                
                 /*
                  * Figure out the bit length of the coded byte[].
                  * 
@@ -1934,6 +1947,19 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                     
                 }
 
+                if (nsymbols == 0) {
+
+                    /*
+                     * The offset[] is not stored if there are no symbols. Since
+                     * we know that the value is not a null, this implies that
+                     * the coded value was an empty byte[]. We have to handle
+                     * this case explicitly.
+                     */
+                    
+                    return BytesUtil.EMPTY;
+                    
+                }
+                
                 /*
                  * Figure out the bit length of the coded byte[].
                  * 
@@ -2052,7 +2078,19 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
                 }
 
-                /*
+                if (nsymbols == 0) {
+
+                    /*
+                     * The offset[] is not stored if there are no symbols. Since
+                     * we know that the value is not a null, this implies that
+                     * the coded value was an empty byte[]. We have to handle
+                     * this case explicitly.
+                     */
+                    
+                    return 0;
+                    
+                }
+                                /*
                  * Figure out the bit length of the coded byte[].
                  * 
                  * Note: When we are allocating the byte[] for the caller we
@@ -2240,8 +2278,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          *            The search probe key.
          * 
          * @return a negative integer, zero, or a positive integer if the coded
-         *         value identified by the first argument is less than, equal
-         *         to, or greater than the second when they are compared in the
+         *         value identified by the <i>index</i> is less than, equal to,
+         *         or greater than the <i>key</i> when they are compared in the
          *         code space.
          * 
          * @throws IOException
@@ -2249,6 +2287,19 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         private int compare(final InputBitStream ibs, final int index,
                 final byte[] key) throws IOException {
 
+            if (nsymbols == 0) {
+
+                /*
+                 * The offset[] is not stored if there are no symbols. Since we
+                 * know that the value is not a null (keys do not permit nulls),
+                 * this implies that the coded value was an empty byte[]. We
+                 * have to handle this case explicitly.
+                 */
+
+                return BytesUtil.compareBytes(key, BytesUtil.EMPTY);
+
+            }
+            
             // get the bit offset of the start of this coded value.
             ibs.position(O_codedValueOffsets + ((long) index)
                     * codedValueOffsetBits);
