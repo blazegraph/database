@@ -53,7 +53,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
     public void test_mutation() {
         
         MutableKeyBuffer kbuf = new MutableKeyBuffer(3);
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("keys.length",3,kbuf.keys.length);
         assertEquals("maxKeys",3,kbuf.capacity());
         assertEquals("nkeys",0,kbuf.nkeys);
@@ -63,7 +63,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
         
         byte[] k1 = new byte[]{1,2,3};
         assertEquals("nkeys",1,kbuf.add(k1));
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("nkeys",1,kbuf.nkeys);
         assertFalse(kbuf.isFull());
         assertEquals(k1,kbuf.keys[0]);
@@ -72,7 +72,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
 
         byte[] k2 = new byte[]{1,2,4};
         assertEquals("nkeys",2,kbuf.add(k2));
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("nkeys",2,kbuf.nkeys);
         assertFalse(kbuf.isFull());
         assertEquals(k1,kbuf.keys[0]);
@@ -82,7 +82,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
 
         byte[] k3 = new byte[]{1,2,5};
         assertEquals("nkeys",3,kbuf.add(k3));
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("nkeys",3,kbuf.nkeys);
         assertTrue(kbuf.isFull());
         assertEquals(k1,kbuf.keys[0]);
@@ -93,7 +93,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
         
         // remove the 1st key, leaving two keys.
         assertEquals("nkeys",2,kbuf.remove(0));
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("nkeys",2,kbuf.nkeys);
         assertFalse(kbuf.isFull());
         assertEquals(k2,kbuf.keys[0]);
@@ -104,7 +104,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
         
         // remove the last key, leaving one key.
         assertEquals("nkeys",1,kbuf.remove(1));
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("nkeys",1,kbuf.nkeys);
         assertFalse(kbuf.isFull());
         assertEquals(k2,kbuf.keys[0]);
@@ -115,7 +115,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
         
         // insert a key in the 1st position (two keys in the buffer).
         assertEquals("nkeys",2,kbuf.insert(0,k1));
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("nkeys",2,kbuf.nkeys);
         assertFalse(kbuf.isFull());
         assertEquals(k1,kbuf.keys[0]);
@@ -127,7 +127,7 @@ public class TestMutableKeyBuffer extends AbstractKeyBufferTestCase {
         // insert a key in the 2nd position (three keys in the buffer).
         byte[] k4 = new byte[]{1,2,3,0};
         assertEquals("nkeys",3,kbuf.insert(1,k4));
-        System.err.println(kbuf.toString());
+        if(log.isInfoEnabled()) log.info(kbuf.toString());
         assertEquals("nkeys",3,kbuf.nkeys);
         assertTrue(kbuf.isFull());
         assertEquals(k1,kbuf.keys[0]);

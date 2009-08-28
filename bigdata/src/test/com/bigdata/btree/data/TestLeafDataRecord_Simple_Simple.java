@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
-import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 
 /**
@@ -55,9 +54,11 @@ public class TestLeafDataRecord_Simple_Simple extends AbstractLeafDataRecordTest
         
         super.setUp();
 
-        keysCoder = SimpleRabaCoder.INSTANCE;
-
-        valuesCoder = SimpleRabaCoder.INSTANCE;
+        coder = new DefaultLeafCoder(//
+                SimpleRabaCoder.INSTANCE,// keys
+                SimpleRabaCoder.INSTANCE // vals
+        );
         
     }
+
 }

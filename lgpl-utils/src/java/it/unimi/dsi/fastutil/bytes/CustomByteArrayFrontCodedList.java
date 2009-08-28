@@ -29,6 +29,7 @@ import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 
 import java.io.DataOutput;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -36,6 +37,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.io.ByteArrayBuffer;
 
 /**
  * Compact storage of lists of arrays using front coding.
@@ -196,7 +198,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
          * 
          * @return The #of bytes written.
          */
-        public int writeOn(DataOutput out) throws IOException;
+        public int writeOn(OutputStream out) throws IOException;
 
         /**
          * Write <i>len</i> bytes starting at <i>off</i> onto the caller's
@@ -211,7 +213,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
          * 
          * @return The #of bytes written.
          */
-        public int writeOn(DataOutput out, int off, int len) throws IOException;
+        public int writeOn(OutputStream out, int off, int len) throws IOException;
 
         /**
          * Clone the backing buffer.
@@ -231,46 +233,67 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
         private static final long serialVersionUID = 1L;
         
         private final byte[] a;
+        private final int off;
+        private final int len;
         
         public BackingByteArray(final byte[] a) {
+            this(a,0,a.length);
+        }
+
+        public BackingByteArray(final byte[] a, final int off, final int len) {
             this.a = a;
+            this.off = off;
+            this.len = len;
         }
     
         public int size() {
-            return a.length;
+            return len;
         }
         
         public byte get(final int i) {
          
-            return a[i];
+            return a[off + i];
             
         }
         
         public void arraycopy(final int pos, final byte[] dest,
                 final int destPos, final int len) {
-         
-            System.arraycopy(a/* src */, pos, dest, destPos, len);
-            
-        }
-        
-        public int writeOn(final DataOutput dos) throws IOException {
 
-            dos.write(a, 0/* off */, a.length/* len */);
+            if (pos < 0) // check starting pos.
+                throw new IllegalArgumentException();
             
-            return a.length;
+            if (pos + len > this.len) // check run length.
+                throw new IllegalArgumentException();
             
+            System.arraycopy(a/* src */, off + pos, dest, destPos, len);
+
         }
         
-        public int writeOn(final DataOutput dos, final int off, final int len)
-                throws IOException {
+        public int writeOn(final OutputStream dos) throws IOException {
 
             dos.write(a, off, len);
-
-            return a.length;
-
+            
+            return len;
+            
         }
         
-        public int readInt(final int pos) {
+        public int writeOn(final OutputStream dos, final int aoff,
+                final int alen) throws IOException {
+
+            if (aoff < 0) // check starting pos.
+                throw new IllegalArgumentException();
+            
+            if (aoff + alen > this.len) // check run length.
+                throw new IllegalArgumentException();
+
+            dos.write(a, off + aoff, alen);
+
+            return len;
+            
+        }
+        
+        public int readInt(int pos) {
+            pos += off;
             if (a[pos] >= 0)
                 return a[pos];
             if (a[pos + 1] >= 0)
@@ -285,9 +308,13 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
         }
 
         public byte[] toArray() {
-            
-            return a.clone();
-            
+
+            final byte[] b = new byte[len];
+
+            System.arraycopy(a, off, b, 0, len);
+
+            return b;
+
         }
         
         public BackingByteArray clone() {
@@ -312,6 +339,8 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
+     * 
+     * @deprecated The {@link ByteBuffer} is too slow.
      */
     private static class BackingByteBuffer implements BackingBuffer {
 
@@ -387,7 +416,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             }
         }
 
-        public int writeOn(final DataOutput dos) throws IOException {
+        public int writeOn(final OutputStream dos) throws IOException {
 
             final byte[] a = toArray();
             
@@ -397,7 +426,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             
         }
 
-        public int writeOn(final DataOutput dos, final int off, final int len)
+        public int writeOn(final OutputStream dos, final int off, final int len)
                 throws IOException {
 
             final byte[] a = new byte[len];
@@ -747,6 +776,35 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
     }
 
     /**
+     * Write the specified byte[] onto a stream.
+     * 
+     * @param os
+     *            The stream.
+     * @param index
+     *            The index of the byte[].
+     * 
+     * @return The #of bytes written on the stream.
+     * 
+     * @throws IOException
+     * 
+     * @todo Optimize this to avoid the byte[] allocation.
+     * 
+     * @todo An alternative optimization would be to specify a variant of
+     *       {@link #get(int)} which accepts a {@link ByteArrayBuffer} that is
+     *       automatically extended to have sufficient capacity.
+     */
+    public int writeOn(final OutputStream os, final int index)
+            throws IOException {
+
+        final byte[] a = get(index);
+        
+        os.write(a);
+
+        return a.length;
+
+    }
+
+    /**
      * Stores in the given array elements from an array stored in this
      * front-coded list.
      * 
@@ -968,6 +1026,23 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
     public CustomByteArrayFrontCodedList(final int n, final int ratio,
             final byte[] array) {
 
+        this(n, ratio, array, 0, array.length);
+    }
+
+    /**
+     * Reconsitute an instance from a slice byte[] containing the coded data,
+     * the #of elements in the array, and the ratio.
+     * 
+     * @param n
+     *            The #of elements in the array.
+     * @param ratio
+     *            The ratio of this front-coded list.
+     * @param array
+     *            The array containing the compressed arrays.
+     */
+    public CustomByteArrayFrontCodedList(final int n, final int ratio,
+            final byte[] array, final int off, final int len) {
+
         assertRatio(ratio);
 
         this.n = n;
@@ -975,7 +1050,7 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
         this.ratio = ratio;
 
 //        this.array = array;
-        this.bb = new BackingByteArray(array);
+        this.bb = new BackingByteArray(array, off, len);
 
         rebuildPointerArray();
 

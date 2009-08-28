@@ -15,6 +15,10 @@ Issues to be resolved in this branch.
 
 3. Store level record compression.
 
+   See com.bigdata.io.compression as well as
+   com.bigdata.btree.raba.codec.TestHuffmanEncoder, NodeSerializer,
+   and IndexSegmentBuilder.
+
 4. Dependency refactor (fastutil, dsiutils, lgpl-utils).
 
 5. Performance optimizations for the B+Tree refactor change set,
@@ -45,6 +49,118 @@ Index partition splits.
    - More robust (transactional)
 
    - Based on #of bytes in post-merge file (no need to tweak).
+
+--------------------
+Sync of disconnected clients:
+
+Offhand, I see three ways of approaching this.  One is to simply log
+the deltas and replay the log to the client.  Another is to store
+version timestamps on the tuples and use a scan to identify the change
+set, or alternatively to scan the two B+Tree revisions in parallel,
+reporting only the delta (tuples found in one index but not the
+other), where a tuple would correspond to an SPO(C).  If we go with
+the per-tuple revision timestamp, but also store the most current
+tuple revision timestamp on the ancestor nodes (these are always
+touched when we update a descendent), then we can prune the search on
+any node/leaf whose largest revision timestamp is LT then starting
+revision required to sync the client.
+
+The revision timestamp is LT the commit timestamp since revision
+timestamps are assigned at the start of the commit protocol, while the
+commit timestamp is assigned once the write sets have been reconciled,
+the indices have been checkpointed, and all is good for the commit,
+which just updates the root block.  Revision timestamps on a given
+B+Tree will be totally ordered for concurrent transactions since the
+commit protocol has an exclusive lock on the unisolated B+Tree view.
+Since we would be working with revision timestamps rather than commit
+timestamps, I could either extend the transaction service to allow
+reporting of the assigned revision timestamp, or it could be obtained
+by an after action read on the root of the B+Tree using the commit
+time of the transaction.  Tuple revision timestamps and delete markers
+are automatically maintained by the transaction commit protocol.
+
+This approach would do much less work since we would basically skip
+any node (and all dominated leaves) which had not been updated since
+the starting revision for the sync.  New statements would be
+associated with tuples having a revision timestamp GT the starting
+revision time for the sync.  Deleted statements would be identified by
+the presence of a tuple with a delete marker having a revision
+timestamp GT the starting revision for the sync.
+
+If it sounds like that would do what you want, I can think about how
+to raise that information up into a filter on the B+Tree iterators and
+from there to the KB layer.  If we did this for the SPO(C) index, then
+you could resolve those tuples to RDF Statements and push them to the
+client.  The application would need a log of the revision timestamps
+associated with the commit timestamps so it could use the former to
+sync clients and the latter to read from a historical commit point.
+Probably the transaction service could be extended to retain that
+information for a temporal store.
+
+Scale-out for a temporal store will require the ability to patch the
+MDI (or maybe just the logical to physical DS mapping) with the new
+locations of index partitions which are moved due to machine failure.
+
+--------------------
+
+Asynchronous notification of RDF change sets (deltas).
+
+There is some interest in a feature which would report on the change
+sets for the RDF database.  E.g., triples added or removed.  In the
+case of truth maintenance, this might also include the state change
+for triples between "explicit" and "inference".
+
+For the current SAIL, we could extract bit flags for each triple
+written on (or retracted from) the database indicating for that triple
+whether or not the database was modified (e.g., whether it was already
+present when added or whether it was not present when retracted).  We
+would do this for just one of the statement indices -- probably the
+SPO index.  This information could be reported via an asynchronous
+listener mechanism each time a chunk of RDF statements is flushed to
+the database.  This might be a few days effort.
+
+When performing truth maintenance, we fix point a temporary triple
+store until it contains the statements to be added to (or removed
+from) the database.  This can include explicit statements which become
+inferences, or inferences which are no longer supported and are fully
+retracted.  In this case, it would be possible to report statements
+which were added, removed, or whose status as inferences or explicit
+statements was changed by the operations.  This is a bit more work.
+
+Doing this for transactions would require an extension to the commit
+protocol since the events would occur during the "merge down" of the
+transaction write set onto the unisolated indices.  If the "statement
+change set" events are to be ACID, then we will have to log the events
+and play them back to the listener as an after action on the commit.
+That way the listener would have a guarantee that the persistent state
+change was in fact committed.  That log might be a restart safe queue,
+so a listener could ensure that they observed all state changes. If we
+mark the commit time associated with a set of logged changes, then a
+listener could survive restart and request a reply of the change sets
+since some historical commit time.  Those events would be in terms of
+the internal keys of the statement index, which are essentially
+long[3] and correspond to the Subject, Predicate, and Object positions
+of a triple.  Those keys could be resolved to an RDF Statement, and
+the application would set the change set as RDF Statements.  For truth
+maintenance, we would also log the change in the statement type
+(explicit, inference).  Handling change set notification for
+transactions is clearly more complex.
+
+By doing this at the database layer we should be able to report events
+even when concurrent operations insert the same triples without
+duplicate events.  Change set detection would also work for scale-out,
+but a proxy for the listener would have to be registered with each
+data service.
+
+The more complex approach would be if you were using native (bigdata)
+transactions, wanted the notifications to have the same ACID semantics
+as the transaction. E.g., the application would never see a change set
+unless the transaction was successfully committed to disk, and
+required a guarantee that you eventually saw all change sets.
+
+You could still do the "bit flag" route with the clustered backend,
+but you would need to register proxies for listeners at each bigdata
+node on the cluster.
 
 -------------------- 
 Examples:
@@ -299,33 +415,8 @@ Goals:
        in the header data as well.  This means that writing a B+Tree
        node or leaf will always use IRawStore#write(int,ByteBuffer).
 
-       The keys and values 
-
-       - Node: 
-
-         - Use minimum bit length coding for childEntryCount[] and
-           childAddr[]?  Pluggable or Versioned?
-
-       - Leaf:
-
-	 - Use minimum bit length coding for timestamp[]?  Possibly a
-           delta or prefix coding?  Pluggable or Versioned?
-	 
-       - LinkedLeaf:
-
-         The priorAddr and nextAddr fields need to be exposed by the
-         ILeafData API.
-
-	 The getter methods should throw an exception if the fields
-         are not present in the data record (e.g., for a BTree vs an
-         IndexSegment).
-
-	 On write, these fields are set in the buffer _after_ the
-         record is serialized and we have the address of the _next_
-         record from the store.
-
-       - Create mutable INodeData and ILeafData implementations based
-         on the existing code in AbstractNode, Node, Leaf, and
+       - Done. Create mutable INodeData and ILeafData implementations
+         based on the existing code in AbstractNode, Node, Leaf, and
          MutableKeys.
 
 	 - Done (this is now checked by the various methods which copy
@@ -386,27 +477,11 @@ Goals:
 
 	   - Done. verify copyOnWrite().
 
-	   - verify use of Node:Node(final Node src, final long
+	   - Done. Verify use of Node:Node(final Node src, final long
              triggeredByChildId).  The javadoc indicates that this is
              a copy ctor and that the src is always an immutable Node.
 
-	     It is in fact invoked solely by copyOnWrite().	     
-
-             In that case, we can probably replace this with the
-             conversion of the INodeData:data field to a mutable
-             field, but the code which invokes copyOnWrite() no longer
-             needs to operate on a new Node reference [or does
-             something depend on that as well - for example, the dirty
-             flag is doubtless set?]
-
-	   - (*) Verify that transient B+Trees convert data records to
-             immutable data records when there is an eviction event.
-             This will help us bound their in-memory footprint.
-
-	   - (*) Should run all of the persistence tests against each
-             of the IRabaCoder combinations.
-
-	   - (*) Roll prior/next addr into ILeafData?
+	   - Done. Roll prior/next addr into ILeafData?
 
 	 - Done. Review cases where we explicitly tunnel through and
            obtain the mutable version of the keys or values for a node
@@ -416,10 +491,165 @@ Goals:
            efficiency since we will be storing the keys/values in a
            mutable node/leaf.
 
+1. Done. encode(IRaba,ByteArrayBuffer):byte[]
+
+   This allows buffer reuse, but gives us the coded byte[].  We need
+   that to write the #of bytes followed by the coded data for RMI.
+
+2. Done. decode(IRawRecord):IRaba(Decoder)
+
+   This allows decoding a slice of a byte[], which we need for leaves
+   and nodes.  Make sure that we decode in place for those cases.
+
+3. Done. IRabaDecoder data():IRawRecord
+
+   probably the latter for now as data() might still be useful.
+
+x. Done. Verify all RabaCoder and leaf/node data records.  
+
+         - Done. Modify IRabaCoder to reduce byte[] allocation:
+	   
+	 - Done. Optimize the CustomFrontCodedByteArray for IRawRecord
+           and optimize the IRabaCoder for that case.
+
+	 - Done. Verify that O_xxx offsets are NOT presumed to be
+           absolute when coding.  E.g., that we do not presume that
+           the buffer was rewound before we begin to code the
+           data. However, they ARE absolute during decoding.
+
+	 - Done. Leaf and node should code seqeuentially and the patch
+           the byte length of the keys and values to avoid additional
+           byte[] allocations.
+
+	 - Done. Abstract the leaf and node coders into an interface
+           parallel in design to the IRabaCoder.
+           encode(ILeafData,flags):slice and decode(slice):ILeafData.
+           This will let me directly replace the coded representation
+           of the leaves.
+
+	 - Unit tests should verify that leaf data and node data are
+           correctly coded and decoded when there is a non-zero
+           offset.  The IRabaCoder unit tests already handle this.
+
+	 - Done. Unit tests should verify search for random prefix and
+           random suffix of known keys.  Again, the IRabaCoder unit
+           tests already handle this.
+
+	 - (***) Bug fix for search on front-coded raba.
+
+4. (***) Get rid of all uses of IDataSerializer, replacing them with
+   IRabaCoder.
+
+	   For RMI, we need to pass along the byte length of the coded
+	   rabas for that to work since we can not just read to the
+	   end of the input stream if there is more data following the
+	   coded raba.  This looks like:
+
+                 final ByteArrayBuffer buf = new ByteArrayBuffer();
+                 tupleSerializer.getLeafKeyCoder().encode(keys, buf);
+                 final int nbytes = buf.limit();
+                 out.writeInt(nbytes);
+                 out.write(buf.array(), 0/*off*/, nbytes);
+
+	   This also means that we will no longer have to worry about
+	   whether RMI output streams are buffered.
+		
+	   What we lose is the ability to stream coded data onto the
+	   network without first fully buffering it in memory.  What
+	   we gain is the ability to access the coded representation.
+	   However, for RMI we MUST buffer the coded representation
+	   when sending or receiving.
+
 	 - (***) Clean up (de-)serialization to avoid decoding keys
 	         and values.
 
-	 - (*) ReadOnlyNode/Leaf
+	   - IRabaDecoder should probably be discarded.  The caller
+	     can obtain the backing {byte[],off,len} tuple from their
+	     argument to IRabaCoder#encode(raba,out).
+
+ 	   - Harmonize IDataSerializer and IRabaCoder.
+
+	   - Examine use of rabas in index procedures.
+
+	   - Optimize out the use of the ByteBuffer.  This should be
+             easy to hack w/ record level compression if we use a
+             ByteArrayBuffer as the (de-)compression target.
+
+	   - Record level compression for the store.
+
+	   - (*) Verify that transient B+Trees convert data records to
+             immutable data records when there is an eviction event.
+             This will help us bound their in-memory footprint.
+
+	     In fact, they do not, not even for a B+Tree backed by a
+	     persistence store.  This needs to be changed.  The node
+	     or leaf data record should be coded, the reference to the
+	     data record on the owning node or leaf replaced, and the
+	     coded record then written onto the store.  [This last
+	     step can be skipped when the B+Tree is transient.]
+
+	   - (*) Should run all of the persistence tests against each
+             of the IRabaCoder combinations.
+
+         - IndexMetadata will need to be updated to reflect the codec
+	   interface change and the reconcilation of the
+	   IDataSerializer with the IRabaCoder.
+       
+         - NodeSerializer and IAddressSerializer are deprecated and
+           will be deleted. IKeyBuffer is deprecated and should be
+           deleted - it is only used by the test suites.  The
+           ImmutableKeyBuffer is deprecated and should be deleted.
+
+	 - ITupleSerializer - update (IDataSerializer).
+
+	 - (***) ResultSet must operate on the coded representation
+           rather than de-serializing the data.
+
+	 - (***) The IIndexProcedure implementations MUST NOT
+           deserialize the coded rabas.  Just wrap them.
+	   
+	   Make sure that we are reusing buffers for RMI. E.g., the
+	   index write pipeline code might have a small pool of those
+	   buffers.  The buffers could be linked to a "coding" task.
+
+	   getKeys():IRaba and getValues():IRaba SHOULD be raised into
+	   the IKeyArrayIndexProcedure API.  This will make it easier
+	   to use efficient access to the coded data.
+
+5. (***) Replace data record in AbstractBTree on eviction with coded
+   data record.
+
+         - Must replace the [data] with the read-only record.  This
+           will change the NodeSerializer API since we need the
+           ReadOnlyLeafData or ReadOnlyNodeData object back, not just
+           the ByteBuffer (this is available from those classes).
+
+	     AbstractBTree#writeNodeOrLeaf(final AbstractNode node)
+
+	 - Verify that we do this for transient B+Tree instances as
+           well.
+
+         - Each mutable B+Tree should use a single backing buffer
+           instance for key and value compression (NodeSerializer did
+           it this way, so there might be a reason to keep an object
+           around which has those buffers)
+
+	 - The persistence tests should use the default codec for keys
+           and values.  Either front-coded or canonical huffman for
+           keys and canonical huffman for values.
+
+6. Tighter coding, make sure all records and Externalizable interfaces
+   are versioned (Externalizable for DefaultLeafCoder and
+   DefaultNodeCoder are not).
+
+	 - (*) ReadOnlyNode/Leaf Coding.
+
+	     Note: Any of these coding schemes could wind up with a
+	     bit boundary which needs to be byte aligned.  See how
+	     this is done in the CanonicalHuffmanRabaCoder.
+
+	   - Code the min/max of the version timestamp (add to the
+             API).
 	   
   	   - Code the version timestamp[].
 
@@ -443,41 +673,10 @@ Goals:
 	     roughly comparable, hence substracting out the minimum
 	     could save space.
 
-         - IndexMetadata will need to be updated to reflect the codec
-	   interface change and the reconcilation of the
-	   IDataSerializer with the IRabaCoder.
-       
-         - NodeSerializer, IAddressSerializer, and INodeFactory are
-           deprecated and will be deleted. IKeyBuffer is deprecated
-           and should be deleted - it is only used by the test suites.
-           The ImmutableKeyBuffer is deprecated and should be deleted.
-
-	 - ResultSet must operate on the coded representation rather
-           than de-serializing the data.
-
-         - Each mutable B+Tree should use a single backing buffer
-           instance for key and value compression (NodeSerializer did
-           it this way, so there might be a reason to keep an object
-           around which has those buffers)
-
-	 - Support separate IRabaCodec for B+Tree node keys and B+Tree
-           leaf keys.  This will allow application specific key coding
-           for the leaves where we have full-length keys.  Canonical
-           huffman or front-coding can both be used for the B+Tree
-           nodes, which only store the "separator keys".
-
-	 - The persistence tests should use the default codec for keys
-           and values.  Either front-coded or canonical huffman for
-           keys and canonical huffman for values.
-
-       - Done. FrontCoded.
-
-	 This is a fence post on search where the insertion point is
-	 before anything in the front-coded byte[].  This shows up in
-	 TestFrontCodedRabaCoderRatio2.
-
-	 (****) Send bug fix to Sebastiano.  Problem when search probe
-	        is LT the first front-coded entry.
+  (****) There is a fence post on search where the insertion
+	 point is before anything in the front-coded byte[].  This
+	 shows up in TestFrontCodedRabaCoderRatio2.  [Send a bug fix to
+	 Sebastiano.]
 
 java.lang.ArrayIndexOutOfBoundsException: -1
 	at it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList.search(CustomByteArrayFrontCodedList.java:1151)
@@ -485,25 +684,52 @@ java.lang.ArrayIndexOutOfBoundsException: -1
 	at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.test_mike_personick(AbstractRabaCoderTestCase.java:107)
 
 
+       - Performance tuning:
+
+	 AbstractRabaCoderTestCase#main(String[])
+
+	     - There are definately optimizations which could be made
+	       in the front-coded byte[], mainly dealing with
+	       recomputing the length of a byte[] entry, but also with
+	       copying the data efficiently onto an OutputStream.
+
+	 (***) The canonical huffman raba coder appears to be VERY
+	       slow when compared to the other implementations.  Put a
+	       performance analyzer on this.
+
+nops=400000, size=256, ncoders=5
+com.bigdata.btree.raba.codec.SimpleRabaCoder@ee6ad6 : elapsed=17231, recordLength=3032
+com.bigdata.btree.raba.codec.FrontCodedRabaCoder@3ca56f{ratio=2} : elapsed=18219, recordLength=2061
+com.bigdata.btree.raba.codec.FrontCodedRabaCoder@ca2076{ratio=8} : elapsed=18583, recordLength=1910
+com.bigdata.btree.raba.codec.FrontCodedRabaCoder@1d451d2{ratio=32} : elapsed=24614, recordLength=1889
+com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder@19c4844 : elapsed=75892, recordLength=1886
+
+
        - Canonical Huffman.
 
           - Add unit tests for keys NOT present in the raba.
 
-	  - (***) Special case when nsymbols==1 (dsiutils bug).
+	  - Done. Special case when nsymbols==1 (dsiutils bug).
 
        - Done. Refactor the FastRDFValueSerializer (no test suite yet).
 
-       - Generalize the CanonicalHuffmanRabaCoder to allow for
-         non-byte values (char[], int[], long[]).
+	   (***) FastRDFValueCompression MAY be broken due to the
+		 changes to BytesUtil to use the same big endian
+		 format for bit flags as OutputBitStream.
 
-	  - Allow a different IRabaCoder for the keys of the B+Tree
-            leaf and the B+Tree node keys then we could use the long[]
-            based canonical huffman coder and save more space in the
-            record, and probably have faster search.
+       - RDF Front Coding or Canonical Huffman Leaf Key Coders.
 
-	  - Front-coding should already be pretty efficient in space
-            and time and we can always use the byte[] based huffman
-            coder for RDF keys.
+         This would apply only to the leaves, where we always have
+         full length keys.  Either front-coding or canonical huffman
+         coding would work as long as they operating on long[] rather
+         than byte[].
+
+         - Front-coding should already be pretty efficient in space
+           and time and we can always use the byte[] based huffman
+           coder for RDF keys.
+
+         - Generalize the CanonicalHuffmanRabaCoder to allow for
+           non-byte values (char[], int[], long[]).
 
        - ByteBuffer is too slow.
 	   
@@ -554,8 +780,8 @@ java.lang.ArrayIndexOutOfBoundsException: -1
 	     This could be part of how we reconcile the DataSerializer
 	     and the IRabaCoder APIs.
 
-       - Add global read retention queue and weak value hash map based
-         lookup per store of the retained nodes.
+       - (***) Add global read retention queue and weak value hash map
+         based lookup per store of the retained nodes.
 
        - Examine GC problems with lots of B+Tree nodes buffered.  Try
          parallel old GC and the G1 collector.

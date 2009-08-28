@@ -173,7 +173,7 @@ public interface ITxCommitProtocol extends Remote {
      *   |                     | [6]             |
      *   |                     | &lt;--committed(tx)+
      *   |                     | 
-     *   |       "comitted" barrier [7]
+     *   |       "committed" barrier [7]
      *   |                     | [8]
      *   |                     | ------ (success)+  
      *   |                     | [9]             |
@@ -190,7 +190,7 @@ public interface ITxCommitProtocol extends Remote {
      * 
      * <ul>
      * <li> [1] The client issues an {@link ITransactionService#commit(long)}
-     * request, in which it specifies the transaction identifer (tx). </li>
+     * request, in which it specifies the transaction identifier (tx). </li>
      * <li> [2,3] The transaction service issues concurrent
      * {@link #prepare(long, long)} requests to the participating
      * {@link IDataService}s, specifying the transaction identifier (tx) and
@@ -225,7 +225,7 @@ public interface ITxCommitProtocol extends Remote {
      * only halt processing on the {@link IDataService}s and discard any local
      * state associated with the transaction and throw an exception out of
      * {@link #prepare(long, long)}. Once the first barrier has been
-     * satisified, persistent side-effects MAY occur. Error handling in this
+     * satisfied, persistent side-effects MAY occur. Error handling in this
      * case must rollback the state of the live journal for each of the
      * participating {@link IDataService}s. If error handling was performed in
      * response to a local error, then the {@link IDataService} must throw that

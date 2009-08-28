@@ -3,20 +3,18 @@ package com.bigdata.btree.raba.codec;
 import it.unimi.dsi.fastutil.bytes.ByteArrayFrontCodedList;
 import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -25,13 +23,6 @@ import com.bigdata.rawstore.Bytes;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Reconcile with {@link PrefixSerializer} (stream-based). It would be
- *       best if they could use the same representation do we could just wrap
- *       the data with a {@link FrontCodedDecoder} without materializing the
- *       byte[][]. This may pose problems since the {@link PrefixSerializer}
- *       current includes the #of bytes in the front-coded representation as
- *       part of its record format.
  */
 public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
@@ -45,6 +36,12 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
     private int ratio;
 
+    public String toString() {
+
+        return super.toString() + "{ratio=" + ratio + "}";
+        
+    }
+    
     /**
      * @param ratio
      *            The ratio as defined by {@link ByteArrayFrontCodedList}. For
@@ -112,53 +109,60 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
     private static final int SIZEOF_RATIO = Bytes.SIZEOF_INT;
 
+    /** The byte offset of the version identifier. */
     private static final int O_VERSION = 0;
 
+    /**
+     * The byte offset of the field coding the #of entries in the logical
+     * byte[][].
+     */
     private static final int O_SIZE = O_VERSION + SIZEOF_VERSION;
 
+    /** The byte offset of the field coding the ratio. */
     private static final int O_RATIO = O_SIZE + SIZEOF_SIZE;
 
+    /** The byte offset of the start of the front-coded representation. */
     private static final int O_DATA = O_RATIO + SIZEOF_RATIO;
     
-    public IRabaDecoder encode(final IRaba raba) {
+    public AbstractFixedByteArrayBuffer encode(final IRaba raba,
+            final DataOutputBuffer buf) {
 
         if (raba == null)
             throw new IllegalArgumentException();
 
         if (!raba.isKeys())
             throw new UnsupportedOperationException("Must be keys.");
-        
+
+        if (buf == null)
+            throw new IllegalArgumentException();
+
         final int size = raba.size();
 
         if (log.isInfoEnabled())
             log.info("n=" + raba.size() + ", capacity=" + raba.capacity()
                     + ", ratio=" + ratio);
 
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        // The byte offset of the origin of the coded record into the buffer.
+        final int O_origin = buf.pos();
+//        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
 
-            final DataOutputStream dos = new DataOutputStream(baos);
-
             // The record version identifier.
-            dos.write(VERSION0);
+            buf.write(VERSION0);
 
             // #of entries (zero length indicates NO data)
-            dos.writeInt(size);
+            buf.writeInt(size);
 
-//            if (size > 0) {
+            // The ratio used to front code the data.
+            buf.writeInt(ratio);
 
-                // The ratio used to front code the data.
-                dos.writeInt(ratio);
+            // front-code the byte[][].
+            final CustomByteArrayFrontCodedList c = new CustomByteArrayFrontCodedList(
+                    raba.iterator(), ratio);
 
-                // more than one key.
-                final CustomByteArrayFrontCodedList c = new CustomByteArrayFrontCodedList(
-                        raba.iterator(), ratio);
+            c.getBackingBuffer().writeOn(buf);
 
-                c.getBackingBuffer().writeOn(dos);
-
-//            }
-
-            dos.flush();
+            buf.flush();
 
         } catch (IOException ex) {
 
@@ -166,13 +170,13 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
-        final byte[] a = baos.toByteArray();
+        return buf.slice(O_origin, buf.pos() - O_origin);
 
-        return decode(ByteBuffer.wrap(a));
+//        return decode(ByteBuffer.wrap(a));
 
     }
 
-    public IRabaDecoder decode(final ByteBuffer data) {
+    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
 
         return new FrontCodedDecoder(data);
 
@@ -187,7 +191,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
      */
     static class FrontCodedDecoder extends AbstractRabaDecoder {
 
-        final ByteBuffer data;
+        private final AbstractFixedByteArrayBuffer data;
 
         private final CustomByteArrayFrontCodedList decoder;
 
@@ -196,10 +200,9 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
          * @param data
          *            The record containing the coded data.
          */
-        public FrontCodedDecoder(final ByteBuffer data) {
+        public FrontCodedDecoder(final AbstractFixedByteArrayBuffer data) {
 
-
-            final byte version = data.get(O_VERSION);
+            final byte version = data.getByte(O_VERSION);
 
             if (version != VERSION0) {
 
@@ -210,41 +213,18 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
             // The #of entries in the logical byte[][].
             final int size = data.getInt(O_SIZE);
 
-//            if (size == 0) {
-//
-//                // Nothing else in the record.
-//                return new EmptyRabaKeyDecoder(data);
-//
-//            }
-            
             // The ratio.
             final int ratio = data.getInt(O_RATIO);
 
-            /*
-             * Setup the view using a copy to avoid side effects on the limit and
-             * position of the callers buffer.
-             */
-            final ByteBuffer tmp = data.asReadOnlyBuffer();
-            tmp.limit(data.capacity());
-            tmp.position(O_DATA);
-            final ByteBuffer view = tmp.slice();
-
-            this.decoder = new CustomByteArrayFrontCodedList(size, ratio, view);
+            // wrap slice with decoder.
+            this.decoder = new CustomByteArrayFrontCodedList(size, ratio, data
+                    .array(), data.off() + O_DATA, data.len());
 
             this.data = data;
 
         }
 
-        // /**
-        // * The ratio specified when the data were front-coded.
-        // */
-        // public int ratio() {
-        //                
-        // return decoder.ratio();
-        //                
-        // }
-
-        public ByteBuffer data() {
+        public AbstractFixedByteArrayBuffer data() {
 
             return data;
 
@@ -313,13 +293,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
             try {
 
-                // FIXME add writeOn(int, DO) to BackingBuffer for this (faster)
-                
-                final byte[] a = get(index);
-                
-                os.write(a);
-
-                return a.length;
+                return decoder.writeOn(os, index);
 
             } catch (IOException ex) {
                 

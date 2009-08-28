@@ -44,7 +44,6 @@ import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
-import com.bigdata.btree.raba.ImmutableKeyBuffer;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;

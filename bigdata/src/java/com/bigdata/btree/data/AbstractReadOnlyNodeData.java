@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -49,7 +50,7 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
      * A B+Tree node data record.
      */
     protected static final byte NODE = 0;
-    
+
     /**
      * A B+Tree leaf data record.
      */
@@ -60,6 +61,51 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
      * is used for the leaves in an {@link IndexSegment}.
      */
     protected static final byte LINKED_LEAF = 2;
+
+    /**
+     * Return <code>true</code> iff the byte indicates an {@link INodeData}
+     * record.
+     * 
+     * @param b
+     *            The byte value.
+     * @return
+     */
+    public static boolean isNode(final byte b) {
+
+        switch (b) {
+        case NODE:
+            return true;
+        case LEAF:
+        case LINKED_LEAF:
+            return false;
+        default:
+            throw new AssertionError();
+        }
+
+    }
+
+    /**
+     * Return <code>true</code> iff the byte indicates an {@link ILeafData}
+     * record. Note that this will return true for both {@link #LEAF} and
+     * {@link #LINKED_LEAF}.
+     * 
+     * @param b
+     *            The byte value.
+     * @return
+     */
+    public static boolean isLeaf(final byte b) {
+
+        switch (b) {
+        case NODE:
+            return false;
+        case LEAF:
+        case LINKED_LEAF:
+            return true;
+        default:
+            throw new AssertionError();
+        }
+
+    }
 
     /**
      * Version zero is the only version defined at this time.
@@ -85,7 +131,10 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
 
     /**
      * The size of the field in the data record which encodes the serialization
-     * version of the data record.
+     * version of the data record. The offset of this field depends on whether
+     * the record is a node or leaf versus a linked leaf. For a linked leaf, the
+     * version information starts after the prior/next addr fields.  Otherwise
+     * it starts immediately after the type field.
      */
     static protected final int SIZEOF_VERSION = Bytes.SIZEOF_SHORT;
 
@@ -101,6 +150,13 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
      * <code>nkeys+1</code>.
      */
     static protected final int SIZEOF_NKEYS = Bytes.SIZEOF_INT; // @todo short?
+
+    /**
+     * The size of the field in the data record which encodes the #of bytes in
+     * the coded keys (or the coded values). This is an int32 because it is
+     * possible that an int16 would limit the size of records for RMI.
+     */
+    static protected final int SIZEOF_KEYS_SIZE = Bytes.SIZEOF_INT;
 
     /**
      * The size of the field in the data record which encodes the #of tuples
@@ -121,9 +177,28 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
     static protected final int SIZEOF_TIMESTAMP = Bytes.SIZEOF_LONG;
 
     /**
-     * Return a read-only view of the backing {@link ByteBuffer}.
+     * The offset of the byte field which codes the type of the node or leaf.
      */
-    abstract public ByteBuffer buf();
+    static public final int O_TYPE = 0;
+
+    /**
+     * The offset of the long field which codes the address of the previous
+     * leaf. This field IS NOT present unless the record type is
+     * {@link AbstractReadOnlyNodeData#LINKED_LEAF}.
+     */
+    static public final int O_PRIOR = 0 + SIZEOF_TYPE;
+
+    /**
+     * The offset of the long field which codes the address of the next leaf.
+     * This field IS NOT present unless the record type is
+     * {@link AbstractReadOnlyNodeData#LINKED_LEAF}.
+     */
+    static public final int O_NEXT = 1 + SIZEOF_ADDR;
+
+    /**
+     * Return a read-only view of the backing buffer.
+     */
+    abstract public AbstractFixedByteArrayBuffer buf();
 
     /**
      * Core ctor. There are two basic use cases. One when you already have the

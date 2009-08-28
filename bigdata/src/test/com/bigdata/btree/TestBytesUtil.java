@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.nio.ByteBuffer;
-
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -40,8 +38,6 @@ import com.bigdata.btree.keys.KeyBuilder;
  * @see BytesUtil
  * 
  * @todo test with JNI integration.
- * 
- * @todo test {@link BytesUtil#compareBytes(java.nio.ByteBuffer, int, int, byte[])}
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -775,36 +771,32 @@ public class TestBytesUtil extends TestCase2 {
         
         final int nbits = 12;
 
-        for (int bitIndex = 0; bitIndex < nbits; bitIndex++) {
+        for (long bitIndex = 0; bitIndex < nbits; bitIndex++) {
 
-            // starting at the first byte.
-            final int offset = 0;
-
-            final ByteBuffer buf = ByteBuffer.allocate(BytesUtil
-                    .bitFlagByteLength(nbits));
+            final byte[] buf = new byte[BytesUtil.bitFlagByteLength(nbits)];
 
             // should be clear
-            assertEquals("get(" + offset + "," + bitIndex + ")", false, BytesUtil
-                    .getBit(buf, offset, bitIndex));
+            assertEquals("get(" + bitIndex + ")", false, BytesUtil.getBit(buf,
+                    bitIndex));
 
             // set
-            assertEquals("set(" + offset + "," + bitIndex + ")", false, BytesUtil
-                    .setBit(buf, offset, bitIndex, true));
+            assertEquals("set(" + bitIndex + ")", false, BytesUtil.setBit(buf,
+                    bitIndex, true));
 
             // should be set.
-            assertEquals("get(" + offset + "," + bitIndex + ")", true, BytesUtil
-                    .getBit(buf, offset, bitIndex));
+            assertEquals("get(" + bitIndex + ")", true, BytesUtil.getBit(buf,
+                    bitIndex));
 
             // clear
-            assertEquals("set(" + offset + "," + bitIndex + ")", true, BytesUtil
-                    .setBit(buf, offset, bitIndex, false));
+            assertEquals("set(" + bitIndex + ")", true, BytesUtil.setBit(buf,
+                    bitIndex, false));
 
             // should be clear
-            assertEquals("get(" + offset + "," + bitIndex + ")", false, BytesUtil
-                    .getBit(buf, offset, bitIndex));
+            assertEquals("get(" + bitIndex + ")", false, BytesUtil.getBit(buf,
+                    bitIndex));
 
         }
-        
+
     }
 
 }

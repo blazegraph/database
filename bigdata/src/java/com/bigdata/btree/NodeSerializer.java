@@ -30,7 +30,6 @@ import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.DataInput;
-import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.EOFException;
 import java.io.IOException;
@@ -43,13 +42,12 @@ import org.CognitiveWeb.extser.LongPacker;
 
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.data.AbstractReadOnlyNodeData;
+import com.bigdata.btree.data.DefaultLeafCoder;
+import com.bigdata.btree.data.DefaultNodeCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableKeyBuffer;
-import com.bigdata.btree.raba.MutableValueBuffer;
-import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.compression.IRecordCompressorFactory;
@@ -272,17 +270,17 @@ public class NodeSerializer {
      */
     private static short VERSION0 = (short) 0;
 
-    final private boolean isNode(final byte b) {
-
-        return (b & 0x1) == 0;
-
-    }
-
-    final private boolean isLeaf(final byte b) {
-
-        return (b & 0x1) == 1;
-
-    }
+//    final private boolean isNode(final byte b) {
+//
+//        return (b & 0x1) == 0;
+//
+//    }
+//
+//    final private boolean isLeaf(final byte b) {
+//
+//        return (b & 0x1) == 1;
+//
+//    }
 
     /**
      * Constructor is disallowed.
@@ -444,8 +442,8 @@ public class NodeSerializer {
      * 
      * @return The de-serialized node.
      */
-    public IAbstractNodeData getNodeOrLeaf(final AbstractBTree btree, final long addr,
-            final ByteBuffer buf) {
+    public IAbstractNodeData getNodeOrLeaf(final AbstractBTree btree,
+            final long addr, final ByteBuffer buf) {
 
         //        assert btree != null;
         //        assert addr != 0L;
@@ -455,17 +453,20 @@ public class NodeSerializer {
 
         final IAbstractNodeData ret;
 
-        final boolean isNode = isNode(buf.get(OFFSET_NODE_TYPE));
+        final boolean isNode = AbstractReadOnlyNodeData.isNode(buf
+                .get(OFFSET_NODE_TYPE));
 
         if(isNode) {
 
             // deserialize
             ret = getNode(btree, addr, buf);
-
+//            return new ReadOnlyNodeData(buf, nodeKeySerializer);
+            
         } else {
             
             // deserialize
             ret = getLeaf(btree, addr, buf);
+//            return new ReadOnlyLeafData(buf, leafKeySerializer, valueSerializer);
 
         }
 
@@ -487,15 +488,15 @@ public class NodeSerializer {
      *         same instance of this class. The position will be zero and the
      *         limit will be the #of bytes in the serialized representation.
      */
-    public ByteBuffer putNodeOrLeaf(IAbstractNodeData node) {
+    public ByteBuffer putNodeOrLeaf(final IAbstractNodeData node) {
 
-        if (node instanceof INodeData) {
+        if (node.isLeaf()) {
 
-            return putNode((INodeData) node);
+            return putLeaf((ILeafData) node);
 
         } else {
 
-            return putLeaf((ILeafData) node);
+            return putNode((INodeData) node);
 
         }
 
@@ -619,108 +620,137 @@ public class NodeSerializer {
      *            The address of the node.
      * @param buf
      *            The buffer containing the serialized node.
-     *            
+     * 
      * @return The deserialized node.
      */
-    public INodeData getNode(final AbstractBTree btree, final long addr,
+    public Node getNode(final AbstractBTree btree, final long addr,
             final ByteBuffer buf) {
 
-        //        assert btree != null;
-        //        assert addr != 0L;
+        // assert btree != null;
+        // assert addr != 0L;
         assert buf != null;
         assert buf.position() == 0;
 
-        /*
-         * Read fixed length node header.
-         */
+        // wrap the record.
+        final INodeData data = new DefaultNodeCoder(nodeKeySerializer)
+                .decode(buf);
 
-        if (isLeaf(buf.get()))
-            throw new RuntimeException("Not a Node: addr=" + addr);
-
-        // version
-        final short versionId = buf.getShort();
-
-        if (versionId != VERSION0)
-            throw new RuntimeException("Unknown serialization version: "
-                    + versionId);
-
-        /*
-         * Setup input stream reading from the buffer.
-         * 
-         * Note: The buffer is never backed by an array since it is read-only
-         * (per the IRawStore contract for read) and read-only buffers do not
-         * expose the backing array. This means that we would have to duplicate
-         * the data in order to use the DataInputBuffer rather than read from
-         * the Buffer.
-         */
-        final DataInput is = new DataInputStream(new ByteBufferInputStream(buf));
-
-        try {
-
-            // nentries
-            final int nentries = (int) LongPacker.unpackLong(is);
-
-            // Note: [nkeys] minimum is (m+1/2) unless this is the root node.
-            // assert nkeys >= 0 && nkeys < branchingFactor;
-
-            final long[] childAddr = new long[branchingFactor + 1];
-
-            final int[] childEntryCounts = new int[branchingFactor + 1];
-
-            // Keys.
-            final IRaba keys;
-            {
-                /*
-                 * FIXME This "explodes" newly read keys so that they are
-                 * mutable.
-                 */
-                MutableKeyBuffer tmp = new MutableKeyBuffer(branchingFactor);
-                nodeKeySerializer.read(is, tmp);
-//                keys = new ImmutableKeyBuffer(tmp);
-                keys = tmp;
-            }
-
-            final int nkeys = keys.size();
-            
-            // Child addresses (nchildren == nkeys+1).
-//            addrSerializer.getChildAddresses(addressManager,is, childAddr, nkeys+1);
-            getChildAddresses(addressManager, is, childAddr, nkeys + 1);
-
-            // #of entries spanned by each child.
-            getChildEntryCounts(is,childEntryCounts,nkeys+1);
-
-            // reset the buffer position.
-            buf.position(0);
-            
-            // Done : FIXME do not create mutable instances here!
-            return nodeFactory.allocNode(btree, addr, new MutableNodeData(
-                    nentries, keys, childAddr, childEntryCounts));
-
-        } catch (EOFException ex) {
-
-            /*
-             * Masquerade an EOF reading on the input stream as a buffer
-             * underflow, which is what it really represents.
-             */
-            final RuntimeException ex2 = new BufferUnderflowException();
-
-            ex2.initCause(ex);
-
-            throw ex2;
-
-        }
-
-        catch (IOException ex) {
-
-            /*
-             * This should not occur since we are reading from a ByteBuffer, but
-             * this is thrown by methods reading on the DataInputStream.
-             */
-            throw new RuntimeException(ex);
-
-        }
+        // wrap as Node.
+        return nodeFactory.allocNode(btree, addr, data);
 
     }
+
+//    /**
+//     * De-serialize a node.
+//     * 
+//     * @param btree
+//     *            The btree to which the node belongs.
+//     * @param addr
+//     *            The address of the node.
+//     * @param buf
+//     *            The buffer containing the serialized node.
+//     *            
+//     * @return The deserialized node.
+//     */
+//    public Node getNode(final AbstractBTree btree, final long addr,
+//            final ByteBuffer buf) {
+//
+//        //        assert btree != null;
+//        //        assert addr != 0L;
+//        assert buf != null;
+//        assert buf.position() == 0;
+//
+//        /*
+//         * Read fixed length node header.
+//         */
+//
+//        if (isLeaf(buf.get()))
+//            throw new RuntimeException("Not a Node: addr=" + addr);
+//
+//        // version
+//        final short versionId = buf.getShort();
+//
+//        if (versionId != VERSION0)
+//            throw new RuntimeException("Unknown serialization version: "
+//                    + versionId);
+//
+//        /*
+//         * Setup input stream reading from the buffer.
+//         * 
+//         * Note: The buffer is never backed by an array since it is read-only
+//         * (per the IRawStore contract for read) and read-only buffers do not
+//         * expose the backing array. This means that we would have to duplicate
+//         * the data in order to use the DataInputBuffer rather than read from
+//         * the Buffer.
+//         */
+//        final DataInput is = new DataInputStream(new ByteBufferInputStream(buf));
+//
+//        try {
+//
+//            // nentries
+//            final int nentries = (int) LongPacker.unpackLong(is);
+//
+//            // Note: [nkeys] minimum is (m+1/2) unless this is the root node.
+//            // assert nkeys >= 0 && nkeys < branchingFactor;
+//
+//            final long[] childAddr = new long[branchingFactor + 1];
+//
+//            final int[] childEntryCounts = new int[branchingFactor + 1];
+//
+//            // Keys.
+//            final IRaba keys;
+//            {
+//                /*
+//                 * FIXME This "explodes" newly read keys so that they are
+//                 * mutable.
+//                 */
+//                MutableKeyBuffer tmp = new MutableKeyBuffer(branchingFactor);
+//                nodeKeySerializer.read(is, tmp);
+////                keys = new ImmutableKeyBuffer(tmp);
+//                keys = tmp;
+//            }
+//
+//            final int nkeys = keys.size();
+//            
+//            // Child addresses (nchildren == nkeys+1).
+////            addrSerializer.getChildAddresses(addressManager,is, childAddr, nkeys+1);
+//            getChildAddresses(addressManager, is, childAddr, nkeys + 1);
+//
+//            // #of entries spanned by each child.
+//            getChildEntryCounts(is,childEntryCounts,nkeys+1);
+//
+//            // reset the buffer position.
+//            buf.position(0);
+//            
+//            // Done : FIXME do not create mutable instances here!
+//            return nodeFactory.allocNode(btree, addr, new MutableNodeData(
+//                    nentries, keys, childAddr, childEntryCounts));
+//
+//        } catch (EOFException ex) {
+//
+//            /*
+//             * Masquerade an EOF reading on the input stream as a buffer
+//             * underflow, which is what it really represents.
+//             */
+//            final RuntimeException ex2 = new BufferUnderflowException();
+//
+//            ex2.initCause(ex);
+//
+//            throw ex2;
+//
+//        }
+//
+//        catch (IOException ex) {
+//
+//            /*
+//             * This should not occur since we are reading from a ByteBuffer, but
+//             * this is thrown by methods reading on the DataInputStream.
+//             */
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//    }
     
     /**
      * Serialize a leaf onto an internal buffer and returns that buffer (NOT
@@ -794,16 +824,17 @@ public class NodeSerializer {
     public void updateLeaf(final ByteBuffer b, final long priorAddr,
             final long nextAddr) {
 
-        if (isNode(b.get(OFFSET_NODE_TYPE))) {
-            
-            throw new IllegalArgumentException("Not a leaf.");
-            
+        if (AbstractReadOnlyNodeData.isNode(b
+                .get(AbstractReadOnlyNodeData.O_TYPE))) {
+
+            throw new UnsupportedOperationException("Not a leaf.");
+
         }
 
-        b.putLong(OFFSET_PRIOR, priorAddr);
+        b.putLong(AbstractReadOnlyNodeData.O_PRIOR, priorAddr);
 
-        b.putLong(OFFSET_NEXT, nextAddr);
-        
+        b.putLong(AbstractReadOnlyNodeData.O_NEXT, nextAddr);
+
     }
 
     private ByteBuffer putLeaf2(final ILeafData leaf) throws IOException {
@@ -925,122 +956,151 @@ public class NodeSerializer {
      */
     public ILeafData getLeaf(final AbstractBTree btree, final long addr,
             final ByteBuffer buf) {
-        
-//        assert btree != null;
-//        assert addr != 0L;
+
+        // assert btree != null;
+        // assert addr != 0L;
         assert buf != null;
         assert buf.position() == 0;
 
-        /*
-         * common data.
-         */
+        // wrap buffer as data record.
+        final ILeafData data = new DefaultLeafCoder(leafKeySerializer,
+                valueSerializer).decode(buf);
 
-        // nodeType
-        final byte nodeType = buf.get();
-        
-        if (isNode(nodeType))
-            throw new RuntimeException("Not a leaf: addr=" + addr);
-        
-        // version
-        final short versionId = buf.getShort();
-        
-        if (versionId != VERSION0)
-            throw new RuntimeException("Unknown serialization version: "
-                    + versionId);
-
-        /*
-         * Setup input stream reading from the buffer.
-         * 
-         * @todo It would be faster to bulk copy the ByteBuffer into a shared
-         * DataInputBuffer and then read on that -- perhaps using a ThreadLocal
-         * since concurrent readers are allowed.
-         */
-        final DataInputStream is = new DataInputStream(
-                new ByteBufferInputStream(buf));
-
-        try {
-
-            final long priorAddr = is.readLong();
-
-            final long nextAddr = is.readLong();
-            
-//            // nkeys
-//            final int nkeys = (int) LongPacker.unpackLong(is);
-//               Note: minimum is (m+1)/2 unless root leaf.
-//            assert nkeys >= 0 && nkeys <= branchingFactor;
-
-            // keys.
-            final IRaba keys;
-            { 
-                /*
-                 * FIXME de-serializes rather than using the coded data directly.
-                 */
-                keys = new MutableKeyBuffer(branchingFactor+1);
-                leafKeySerializer.read(is, keys);
-//                keys = new ImmutableKeyBuffer(tmp);
-//                keys = tmp;
-            }
-
-            final int nkeys = keys.size();
-//            assert nkeys == keys.getKeyCount();
-            
-            // values.
-            // FIXME de-serializes rather than using the coded data directly.
-            final IRaba values = new MutableValueBuffer(0, 
-                    new byte[branchingFactor + 1][]);
-            valueSerializer.read(is, values);
-            
-            // delete markers.
-            final boolean[] deleteMarkers;
-            if(btree.getIndexMetadata().getDeleteMarkers()) {
-                deleteMarkers = new boolean[branchingFactor+1];
-                getDeleteMarkers(is, nkeys, deleteMarkers );
-            } else {
-                deleteMarkers = null;
-            }
-            
-            // version timestamps.
-            final long[] versionTimestamps;
-            if(btree.getIndexMetadata().getVersionTimestamps()) {
-                versionTimestamps = new long[branchingFactor+1];
-                getVersionTimestamps(is, nkeys, versionTimestamps );
-            } else {
-                versionTimestamps = null;
-            }
-
-            // reset the buffer position.
-            buf.position(0);
-            
-            // Done : FIXME Do not convert to mutable keys/values.
-            return nodeFactory.allocLeaf(btree, addr, new MutableLeafData(
-                    (MutableKeyBuffer) keys, (MutableValueBuffer) values,
-                    versionTimestamps, deleteMarkers), priorAddr, nextAddr);
-
-        } catch (EOFException ex) {
-
-            /*
-             * Masquerade an EOF reading on the input stream as a buffer
-             * underflow, which is what it really represents.
-             */
-            RuntimeException ex2 = new BufferUnderflowException();
-
-            ex2.initCause(ex);
-
-            throw ex2;
-
-        }
-
-        catch (IOException ex) {
-
-            /*
-             * This should not occur since we are reading from a ByteBuffer, but
-             * this is thrown by methods reading on the DataInputStream.
-             */
-            throw new RuntimeException(ex);
-
-        }
+        // wrap data record as Leaf.
+        return nodeFactory.allocLeaf(btree, addr, data);
 
     }
+
+//    /**
+//     * De-serialize a leaf.
+//     * 
+//     * @param btree
+//     *            The owning btree.
+//     * @param addr
+//     *            The address of the leaf.
+//     * @param buf
+//     *            The buffer containing the serialized leaf.
+//     * 
+//     * @return The deserialized leaf.
+//     */
+//    public ILeafData getLeaf(final AbstractBTree btree, final long addr,
+//            final ByteBuffer buf) {
+//        
+////        assert btree != null;
+////        assert addr != 0L;
+//        assert buf != null;
+//        assert buf.position() == 0;
+//
+//        /*
+//         * common data.
+//         */
+//
+//        // nodeType
+//        final byte nodeType = buf.get();
+//        
+//        if (isNode(nodeType))
+//            throw new RuntimeException("Not a leaf: addr=" + addr);
+//        
+//        // version
+//        final short versionId = buf.getShort();
+//        
+//        if (versionId != VERSION0)
+//            throw new RuntimeException("Unknown serialization version: "
+//                    + versionId);
+//
+//        /*
+//         * Setup input stream reading from the buffer.
+//         * 
+//         * @todo It would be faster to bulk copy the ByteBuffer into a shared
+//         * DataInputBuffer and then read on that -- perhaps using a ThreadLocal
+//         * since concurrent readers are allowed.
+//         */
+//        final DataInputStream is = new DataInputStream(
+//                new ByteBufferInputStream(buf));
+//
+//        try {
+//
+//            final long priorAddr = is.readLong();
+//
+//            final long nextAddr = is.readLong();
+//            
+////            // nkeys
+////            final int nkeys = (int) LongPacker.unpackLong(is);
+////               Note: minimum is (m+1)/2 unless root leaf.
+////            assert nkeys >= 0 && nkeys <= branchingFactor;
+//
+//            // keys.
+//            final IRaba keys;
+//            { 
+//                /*
+//                 * FIXME de-serializes rather than using the coded data directly.
+//                 */
+//                keys = new MutableKeyBuffer(branchingFactor+1);
+//                leafKeySerializer.read(is, keys);
+////                keys = new ImmutableKeyBuffer(tmp);
+////                keys = tmp;
+//            }
+//
+//            final int nkeys = keys.size();
+////            assert nkeys == keys.getKeyCount();
+//            
+//            // values.
+//            // FIXME de-serializes rather than using the coded data directly.
+//            final IRaba values = new MutableValueBuffer(0, 
+//                    new byte[branchingFactor + 1][]);
+//            valueSerializer.read(is, values);
+//            
+//            // delete markers.
+//            final boolean[] deleteMarkers;
+//            if(btree.getIndexMetadata().getDeleteMarkers()) {
+//                deleteMarkers = new boolean[branchingFactor+1];
+//                getDeleteMarkers(is, nkeys, deleteMarkers );
+//            } else {
+//                deleteMarkers = null;
+//            }
+//            
+//            // version timestamps.
+//            final long[] versionTimestamps;
+//            if(btree.getIndexMetadata().getVersionTimestamps()) {
+//                versionTimestamps = new long[branchingFactor+1];
+//                getVersionTimestamps(is, nkeys, versionTimestamps );
+//            } else {
+//                versionTimestamps = null;
+//            }
+//
+//            // reset the buffer position.
+//            buf.position(0);
+//            
+//            // Done : FIXME Do not convert to mutable keys/values.
+//            return nodeFactory.allocLeaf(btree, addr, new MutableLeafData(
+//                    (MutableKeyBuffer) keys, (MutableValueBuffer) values,
+//                    versionTimestamps, deleteMarkers), priorAddr, nextAddr);
+//
+//        } catch (EOFException ex) {
+//
+//            /*
+//             * Masquerade an EOF reading on the input stream as a buffer
+//             * underflow, which is what it really represents.
+//             */
+//            final RuntimeException ex2 = new BufferUnderflowException();
+//
+//            ex2.initCause(ex);
+//
+//            throw ex2;
+//
+//        }
+//
+//        catch (IOException ex) {
+//
+//            /*
+//             * This should not occur since we are reading from a ByteBuffer, but
+//             * this is thrown by methods reading on the DataInputStream.
+//             */
+//            throw new RuntimeException(ex);
+//
+//        }
+//
+//    }
     
     private void putChildAddresses(IAddressManager addressManager,
             DataOutputBuffer os, INodeData node)

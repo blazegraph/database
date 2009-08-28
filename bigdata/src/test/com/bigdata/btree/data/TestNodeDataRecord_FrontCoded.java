@@ -35,7 +35,7 @@ import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestNodeDataRecord_FrontCoded extends AbstractNodeOrLeafDataRecordTestCase {
+public class TestNodeDataRecord_FrontCoded extends AbstractNodeDataRecordTestCase {
 
     /**
      * 
@@ -64,7 +64,7 @@ public class TestNodeDataRecord_FrontCoded extends AbstractNodeOrLeafDataRecordT
         
         super.setUp();
 
-        keysCoder = new FrontCodedRabaCoder(8/*ratio*/);
+        coder = new DefaultNodeCoder(new FrontCodedRabaCoder(8/*ratio*/));
 
     }
     

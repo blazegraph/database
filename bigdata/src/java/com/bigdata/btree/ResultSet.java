@@ -46,6 +46,7 @@ import com.bigdata.btree.raba.AbstractRaba;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeysRaba;
 import com.bigdata.btree.raba.MutableValuesRaba;
+import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
@@ -637,6 +638,13 @@ public class ResultSet implements ILeafData, Externalizable {
         if (haveKeys) {
             
             // FIXME wrap the record using the coded keys in place.
+            
+//            final int nbytes = in.readInt();
+//            final byte[] a = new byte[nbytes];
+//            in.readFully(a);
+//            keys = tupleSerializer.getLeafKeyCoder().decode(
+//                    new ByteArrayBuffer(0/* off */, a.length/* len */, a));
+            
             keys = new MutableValuesRaba( 0, 0, new byte[ntuples][] );
             
             if (ntuples > 0) {
@@ -786,6 +794,13 @@ public class ResultSet implements ILeafData, Externalizable {
 //        }
             
         if (keys != null && ntuples > 0) {
+
+            // FIXME change over to IRabaCoder.
+//              final ByteArrayBuffer buf = new ByteArrayBuffer();
+//              tupleSerializer.getLeafKeyCoder().encode(keys, buf);
+//              final int nbytes = buf.limit();
+//              out.writeInt(nbytes);
+//              out.write(buf.array(), 0/*off*/, nbytes);
 
             tupleSerializer.getLeafKeySerializer().write(out, keys);
 
@@ -1090,6 +1105,21 @@ public class ResultSet implements ILeafData, Externalizable {
         
         return true;
         
+    }
+
+    /**
+     * No.
+     */
+    final public boolean isDoubleLinked() {
+        return false;
+    }
+
+    final public long getNextAddr() {
+        throw new UnsupportedOperationException();
+    }
+
+    final public long getPriorAddr() {
+        throw new UnsupportedOperationException();
     }
 
 //    /**

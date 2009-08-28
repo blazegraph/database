@@ -34,6 +34,7 @@ import java.util.Set;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.data.DefaultNodeCoder;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.data.ReadOnlyNodeData;
 import com.bigdata.btree.raba.IRaba;
@@ -577,14 +578,20 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            constructor. This should be the immutable child NOT the one
      *            that was already cloned. This information is used to avoid
      *            stealing the original child since we already made a copy of
-     *            it. It is {@link #NULL} when this information is not available, e.g.,
-     *            when the copyOnWrite action is triggered by a join() and we
-     *            are cloning the sibling before we redistribute a key to the
-     *            node/leaf on which the join was invoked.
+     *            it. It is {@link #NULL} when this information is not
+     *            available, e.g., when the copyOnWrite action is triggered by a
+     *            join() and we are cloning the sibling before we redistribute a
+     *            key to the node/leaf on which the join was invoked.
      * 
-     * FIXME Can't we just test to see if the child already has this node as its
-     * parent reference and then skip it? If so, then that would remove a
-     * toublesome parameter from the API.
+     * @todo We could perhaps replace this with the conversion of the
+     *       INodeData:data field to a mutable field since the code which
+     *       invokes copyOnWrite() no longer needs to operate on a new Node
+     *       reference. However, I need to verify that nothing else depends on
+     *       the new Node, e.g., the dirty flag, addr, etc.
+     * 
+     * @todo Can't we just test to see if the child already has this node as its
+     *       parent reference and then skip it? If so, then that would remove a
+     *       troublesome parameter from the API.
      */
     protected Node(final Node src, final long triggeredByChildId) {
 
@@ -3373,7 +3380,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         sb.append(", maxKeys=" + maxKeys());
 
-        ReadOnlyNodeData.toString(this, sb);
+        DefaultNodeCoder.toString(this, sb);
 
         // indicate if each child is loaded or unloaded.
         {

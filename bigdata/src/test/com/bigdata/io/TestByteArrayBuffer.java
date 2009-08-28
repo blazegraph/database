@@ -38,8 +38,6 @@ import com.bigdata.rawstore.Bytes;
 /**
  * Test suite for {@link ByteArrayBuffer}.
  * 
- * @todo test absolute get/put
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -68,23 +66,32 @@ public class TestByteArrayBuffer extends TestCase2 {
     public void test_ctor() {
 
         {
-            ByteArrayBuffer buf = new ByteArrayBuffer();
+            final ByteArrayBuffer buf = new ByteArrayBuffer();
             assertNotNull(buf.buf);
+            assertEquals(0, buf.pos());
+            assertEquals(0, buf.limit());
             assertEquals(ByteArrayBuffer.DEFAULT_INITIAL_CAPACITY,
                     buf.buf.length);
-
+            assertEquals(ByteArrayBuffer.DEFAULT_INITIAL_CAPACITY, buf
+                    .capacity());
         }
 
         {
-            ByteArrayBuffer buf = new ByteArrayBuffer(0);
+            final ByteArrayBuffer buf = new ByteArrayBuffer(0);
             assertNotNull(buf.buf);
+            assertEquals(0, buf.pos());
+            assertEquals(0, buf.limit());
             assertEquals(0, buf.buf.length);
+            assertEquals(0, buf.capacity());
         }
 
         {
-            ByteArrayBuffer buf = new ByteArrayBuffer(20);
+            final ByteArrayBuffer buf = new ByteArrayBuffer(20);
             assertNotNull(buf.buf);
+            assertEquals(0, buf.pos());
+            assertEquals(0, buf.limit());
             assertEquals(20, buf.buf.length);
+            assertEquals(20, buf.capacity());
         }
 
     }
@@ -98,7 +105,7 @@ public class TestByteArrayBuffer extends TestCase2 {
             new ByteArrayBuffer(-1);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: " + ex);
+            if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
         }
 
     }
@@ -109,7 +116,7 @@ public class TestByteArrayBuffer extends TestCase2 {
 
     public void test_ensureCapacity() {
 
-        ByteArrayBuffer buf = new ByteArrayBuffer(0);
+        final ByteArrayBuffer buf = new ByteArrayBuffer(0);
 
 //        assertEquals(0, buf.len);
         assertNotNull(buf.buf);
@@ -122,7 +129,7 @@ public class TestByteArrayBuffer extends TestCase2 {
             buf.ensureCapacity(-1);
             fail("Expecting: " + IllegalArgumentException.class);
         } catch (IllegalArgumentException ex) {
-            System.err.println("Ignoring expected exception: " + ex);
+            if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
         }
         assertTrue(originalBuffer == buf.buf); // same buffer.
 
@@ -157,11 +164,10 @@ public class TestByteArrayBuffer extends TestCase2 {
      */
     public void test_ensureCapacity03() {
 
-        Random r = new Random();
-        byte[] expected = new byte[20];
+        final byte[] expected = new byte[20];
         r.nextBytes(expected);
 
-        ByteArrayBuffer buf = new ByteArrayBuffer(20);
+        final ByteArrayBuffer buf = new ByteArrayBuffer(20);
 
         // copy in random data.
         buf.put(0, expected);
@@ -212,22 +218,22 @@ public class TestByteArrayBuffer extends TestCase2 {
 
         final int capacity = 20;
         
-        ByteArrayBuffer buf = new ByteArrayBuffer(capacity);
+        final ByteArrayBuffer buf = new ByteArrayBuffer(capacity);
 
         assertEquals((byte)0,buf.getByte(0));
 
         try {
             buf.getByte(-1);
-            fail("Expecting: "+ArrayIndexOutOfBoundsException.class);
-        } catch(ArrayIndexOutOfBoundsException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+            fail("Expecting: "+IndexOutOfBoundsException.class);
+        } catch(IndexOutOfBoundsException ex) {
+            if(log.isInfoEnabled()) log.info("Ignoring expected exception: "+ex);
         }
 
         try {
             buf.getByte(capacity);
-            fail("Expecting: "+ArrayIndexOutOfBoundsException.class);
-        } catch(ArrayIndexOutOfBoundsException ex) {
-            System.err.println("Ignoring expected exception: "+ex);
+            fail("Expecting: "+IndexOutOfBoundsException.class);
+        } catch(IndexOutOfBoundsException ex) {
+            if(log.isInfoEnabled()) log.info("Ignoring expected exception: "+ex);
         }
         
         buf.getByte(capacity-1);
@@ -235,14 +241,13 @@ public class TestByteArrayBuffer extends TestCase2 {
     }
     
     /**
-     * @todo no method has been defined yet to read a byte[] out of the buffer
-     *       so this merely verifies the data in the buffer.
+     * Test bulk get/put byte[] methods.
      */
     public void test_getPutByteArray() {
         
         final int capacity = 200;
         
-        ByteArrayBuffer buf = new ByteArrayBuffer(capacity);
+        final ByteArrayBuffer buf = new ByteArrayBuffer(capacity);
         
         assertEquals((byte)0,buf.getByte(0));
         assertEquals((byte)0,buf.getByte(capacity-1));
@@ -260,7 +265,13 @@ public class TestByteArrayBuffer extends TestCase2 {
             assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(0,
                     expected.length, expected, pos, expected.length,
                     buf.buf));
-            
+
+            final byte[] actual = new byte[expected.length];
+
+            buf.get(pos, actual);
+
+            assertTrue(BytesUtil.bytesEqual(expected, actual));
+
         }
 
         assertEquals((byte)0,buf.getByte(0));
@@ -270,38 +281,45 @@ public class TestByteArrayBuffer extends TestCase2 {
     }
     
     /**
-     * 
-     * @todo no method has been defined yet to read a byte[] out of the buffer
-     *       so this merely verifies the data in the buffer.
+     * Test bulk get/put byte[] methods with offset and length.
      */
     public void test_getPutByteArrayWithOffsetAndLength() {
         
         final int capacity = 200;
         
-        ByteArrayBuffer buf = new ByteArrayBuffer(capacity);
-        
-        assertEquals((byte)0,buf.getByte(0));
-        assertEquals((byte)0,buf.getByte(capacity-1));
+        final ByteArrayBuffer buf = new ByteArrayBuffer(capacity);
+
+        assertEquals((byte) 0, buf.getByte(0));
+        assertEquals((byte) 0, buf.getByte(capacity - 1));
 
         final int pos = 1;
-        
-        for(int i=0; i<LIMIT; i++) {
 
-            final byte[] expected = new byte[r.nextInt(capacity-2)];            
+        for (int i = 0; i < LIMIT; i++) {
+
+            final byte[] expected = new byte[r.nextInt(capacity - 2)];
 
             final int off = (expected.length / 2 == 0 ? 0 : r
                     .nextInt(expected.length / 2));
 
             final int len = (expected.length == 0 ? 0 : r
                     .nextInt(expected.length - off));
-            
+
             r.nextBytes(expected);
-            
+
             buf.put(pos, expected, off, len);
-            
+
             assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(off, len,
                     expected, pos, len, buf.buf));
-            
+
+            final int dstoff = r.nextInt(10);
+
+            final byte[] actual = new byte[expected.length + dstoff];
+
+            buf.get(pos, actual, dstoff, expected.length);
+
+            assertEquals(0, BytesUtil.compareBytesWithLenAndOffset(off, len,
+                    expected, dstoff, len, actual));
+
         }
 
         assertEquals((byte)0,buf.getByte(0));
@@ -497,7 +515,8 @@ public class TestByteArrayBuffer extends TestCase2 {
             buf.getByte( expected );
             fail("Expecting exception.");
         } catch(RuntimeException ex) {
-            log.info("Ignoring expected exception: "+ex);
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
         }
 
     }

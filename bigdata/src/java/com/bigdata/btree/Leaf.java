@@ -32,6 +32,7 @@ import java.util.WeakHashMap;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.ReadOnlyLeafData;
 import com.bigdata.btree.filter.EmptyTupleIterator;
@@ -218,6 +219,24 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         return data.hasVersionTimestamps();
         
     }
+    
+    final public boolean isDoubleLinked() {
+        
+        return data.isDoubleLinked();
+        
+    }
+    
+    final public long getPriorAddr() {
+        
+        return data.getPriorAddr();
+        
+    }
+
+    final public long getNextAddr() {
+        
+        return data.getNextAddr();
+        
+    }
 
 //    public final long getVersionTimestamp(final int index) {
 //
@@ -296,7 +315,16 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         super(btree, false /* The leaf is NOT dirty. */);
 
         assert data != null;
-        
+
+        /*
+         * Cross check flags against the B+Tree when we wrap the record in a
+         * Leaf.
+         */
+        assert data.hasDeleteMarkers() == btree.getIndexMetadata()
+                .getDeleteMarkers();
+        assert data.hasVersionTimestamps() == btree.getIndexMetadata()
+                .getVersionTimestamps();
+
 //        assert nkeys >=0 && nkeys<= branchingFactor;
         
 //        assert keys != null;
@@ -1824,7 +1852,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         sb.append(", maxKeys=" + maxKeys());
 
-        ReadOnlyLeafData.toString(this, sb);
+        DefaultLeafCoder.toString(this, sb);
 
         sb.append("}");
 

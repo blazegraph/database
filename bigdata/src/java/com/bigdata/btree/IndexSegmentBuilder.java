@@ -43,6 +43,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.data.ReadOnlyLeafData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
@@ -1564,8 +1565,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             if (nleavesWritten > 0) {
 
-                if(log.isDebugEnabled())
-                    log.info("Writing leaf: priorLeaf="+addrPriorLeaf+", nextLeaf="+addr);
+                if (log.isDebugEnabled())
+                    log.info("Writing leaf: priorLeaf=" + addrPriorLeaf
+                            + ", nextLeaf=" + addr);
                 else if (log.isInfoEnabled())
                     System.err.print("."); // wrote a leaf.
 
@@ -1612,16 +1614,17 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         nleavesWritten++;
 
         if (plan.nleaves == nleavesWritten) {
-            
+
             /*
              * Force out the last leaf.
              */
-    
-            if(log.isDebugEnabled())
-                log.debug("Writing leaf: priorLeaf="+addrPriorLeaf+", nextLeaf="+0L);
+
+            if (log.isDebugEnabled())
+                log.debug("Writing leaf: priorLeaf=" + addrPriorLeaf
+                        + ", nextLeaf=" + 0L);
             else if (log.isInfoEnabled())
                 System.err.print("."); // wrote a leaf.
-            
+
             // patch representation of the last leaf.
             nodeSer.updateLeaf(bufLastLeaf, addrPriorLeaf, 0L/*addrNextLeaf*/);
 
@@ -2145,7 +2148,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    protected static class SimpleLeafData extends AbstractSimpleNodeData implements ILeafData {
+    protected static class SimpleLeafData extends AbstractSimpleNodeData
+            implements ILeafData {
 
         // mutable.
         
@@ -2263,6 +2267,23 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         }
 
+        /**
+         * Yes - the caller maintains the necessary information and then updates
+         * the coded {@link ReadOnlyLeafData} record once we have the address of
+         * the next record.
+         */
+        final public boolean isDoubleLinked() {
+            return true;
+        }
+
+        final public long getNextAddr() {
+            throw new UnsupportedOperationException();
+        }
+
+        final public long getPriorAddr() {
+            throw new UnsupportedOperationException();
+        }
+        
     }
 
     /**
@@ -2408,8 +2429,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         private NOPNodeFactory() {
         }
 
-        public Leaf allocLeaf(AbstractBTree btree, long addr,
-                final ILeafData data, long priorAddr, long nextAddr) {
+        public Leaf allocLeaf(final AbstractBTree btree, final long addr,
+                final ILeafData data) {
 
             throw new UnsupportedOperationException();
 

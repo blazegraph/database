@@ -41,7 +41,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
 
     }
 
-    public byte[] handle(ITuple tuple, IRawStore target) {
+    public byte[] handle(final ITuple tuple, final IRawStore target) {
 
         if (buf == null) {
 

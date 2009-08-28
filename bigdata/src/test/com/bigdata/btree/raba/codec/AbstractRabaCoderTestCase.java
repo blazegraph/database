@@ -27,34 +27,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba.codec;
 
-import it.unimi.dsi.bits.BitVector;
 import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
+import it.unimi.dsi.compression.HuffmanCodec;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
+import junit.framework.AssertionFailedError;
+import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
-import com.bigdata.service.ndx.pipeline.TestMasterTaskWithSplits;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.FixedByteArrayBuffer;
 
 /**
  * Abstract test suite for {@link IRabaCoder} implementations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo performance tuning on stress test and on real data. be sure to factor
- *       out the {@link ByteBuffer} first.
  */
 abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
@@ -98,23 +100,31 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
             doRoundTripTest(rabaCoder, expected);
 
-            final IRabaDecoder actual = rabaCoder.encode(expected);
+            {
+                /*
+                 * Spot check the correct computation of the insertion point for
+                 * a variety of search keys.
+                 */
 
-            /*
-             * Spot check the correct computation of the insertion point for a
-             * variety of search keys.
-             */
+                final AbstractFixedByteArrayBuffer data = rabaCoder.encode(
+                        expected, new DataOutputBuffer());
+
+                final IRabaDecoder actual = rabaCoder.decode(data);
+
+                // verify correct insertion point for an empty byte[].
+                assertEquals(-1, actual.search(new byte[] {}));
+
+                assertEquals(-1, actual.search(new byte[] { 'm', 'i', 'k' }));
+
+                assertEquals(-2, actual.search(new byte[] { 'm', 'i', 'k', 'e',
+                        's' }));
+
+                assertEquals(-2, actual.search("personic".getBytes("US-ASCII")));
+
+                assertEquals(-3, actual.search("personicks"
+                        .getBytes("US-ASCII")));
             
-            // verify correct insertion point for an empty byte[].
-            assertEquals(-1, actual.search(new byte[] {}));
-
-            assertEquals(-1, actual.search(new byte[] { 'm', 'i', 'k' }));
-
-            assertEquals(-2, actual.search(new byte[] { 'm', 'i', 'k', 'e', 's'}));
-
-            assertEquals(-2, actual.search("personic".getBytes("US-ASCII")));
-
-            assertEquals(-3, actual.search("personicks".getBytes("US-ASCII")));
+            }
             
         }
 
@@ -171,11 +181,12 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
     }
 
     /**
-     * Test with a single byte value (nsymbols=1).
-     * 
-     * @throws UnsupportedEncodingException
+     * Test with a single byte value (nsymbols:=1). This test was written to a
+     * known bug in {@link HuffmanCodec} and
+     * {@link CanonicalFast64CodeWordDecoder}. A workaround for that bug has
+     * been implemented in the {@link CanonicalHuffmanRabaCoder}.
      */
-    public void test_nsymbolsOne() throws UnsupportedEncodingException {
+    public void test_nsymbolsOne() {
 
         final byte[][] a = new byte[1][];
         a[0] = new byte[]{1};
@@ -195,11 +206,12 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
     }
 
     /**
-     * Test with a single byte value (nsymbols=1) and some nulls.
-     * 
-     * @throws UnsupportedEncodingException
+     * Test with a single byte value (nsymbols=1) and some nulls. This test was
+     * written to a known bug in {@link HuffmanCodec} and
+     * {@link CanonicalFast64CodeWordDecoder}. A workaround for that bug has
+     * been implemented in the {@link CanonicalHuffmanRabaCoder}.
      */
-    public void test_nsymbolsOne_nulls() throws UnsupportedEncodingException {
+    public void test_nsymbolsOne_nulls() {
 
         final byte[][] a = new byte[3][];
         a[0] = new byte[]{1};
@@ -283,17 +295,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
     }
 
     /**
-     * Maybe the problem is a failure to maintain the code words and the symbols
-     * in the correct two-level ordering? However we encode the data twice and
-     * get a different answer the 2nd time, which is not very good!
-     * 
-     * <pre>
-     * java.lang.AssertionError: sumCodedValueBitLengths=3670 != sumCodedValueBitLengths2=3453
-     *     at com.bigdata.btree.data.codec.TestHuffmanCodedValues.encode(TestHuffmanCodedValues.java:2526)
-     *     at com.bigdata.btree.data.codec.TestHuffmanCodedValues.doRoundTripTest(TestHuffmanCodedValues.java:1292)
-     *     at com.bigdata.btree.data.codec.TestHuffmanCodedValues.doRandomRoundTripTest(TestHuffmanCodedValues.java:1285)
-     *     at com.bigdata.btree.data.codec.TestHuffmanCodedValues.test_huffmanCompression_1(TestHuffmanCodedValues.java:1137)
-     * </pre>
+     * Test with {@link IRaba} having a size of ONE (1) and a variety of
+     * capacities.
      */
     public void test_entryCount1() throws IOException {
 
@@ -305,6 +308,10 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
     }
 
+    /**
+     * Test with {@link IRaba} having a size of TWO (2) and a variety of
+     * capacities.
+     */
     public void test_entryCount2() throws IOException {
 
         doRandomRoundTripTest(rabaCoder, 2/* n */, 2/* capacity */);
@@ -445,31 +452,9 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
      */
     public void test_randomURIs() throws Exception {
 
-        /*
-         * Generate 100 random and distinct URIs.
-         * 
-         * Note: These data are distinct but ARE NOT fully ordered. We sort them
-         * before we use them as keys.
-         */
+        // random, distinct, unordered w/o nulls.
+        final byte[][] data = new RandomURIGenerator(r).generateValues(100);
 
-        final byte[][] data = new byte[100][];
-        
-        final String ns = "http://www.bigdata.com/rdf#";
-        
-        long lastCounter = r.nextInt();
-        
-        for (int i = 0; i < 100; i++) {
-
-            data[i] = KeyBuilder.asSortKey(ns + String.valueOf(lastCounter));
-
-            final int inc = r.nextInt(100) + 1;
-
-            assert inc > 0 : "inc="+inc;
-
-            lastCounter += inc;
-            
-        }
-        
         if (rabaCoder.isValueCoder()) {
 
             // layer on interface.
@@ -495,6 +480,7 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         
     }
 
+    
     /**
      * Generates a random byte[][] and verifies round-trip encoding and
      * decoding.
@@ -614,15 +600,86 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         try {
 
             // encode the logical byte[][].
-            final IRabaDecoder actual0 = rabaCoder.encode(expected);
+//            final IRabaDecoder actual0 = rabaCoder.encode(expected);
+            final AbstractFixedByteArrayBuffer originalData = rabaCoder.encode(
+                    expected, new DataOutputBuffer());
+            
+            {
 
-            // Verify encode() results in object which can decode the byte[]s.
-            AbstractBTreeTestCase.assertSameRaba(expected, actual0);
+                /*
+                 * Verify that we can read the byte[] out of [data]. This is
+                 * really a test of the data.getDataInput() and the returned
+                 * DataInputBuffer.
+                 */
 
-            // Verify decode when we build the decoder from the serialized
-            // format.
-            AbstractBTreeTestCase.assertSameRaba(expected, rabaCoder
-                    .decode(actual0.data()));
+                assertEquals(0, originalData.off());
+                
+                final byte[] tmp = new byte[originalData.len()];
+
+                originalData.getDataInput().read(tmp);
+
+                assertTrue(BytesUtil.compareBytesWithLenAndOffset(originalData.off(),
+                        originalData.len(), originalData.array(), 0, tmp.length, tmp) == 0);
+
+            }
+
+            // verify we can decode the encoded data.
+            {
+             
+                // decode.
+                final IRabaDecoder actual0 = rabaCoder.decode(originalData);
+
+                // Verify encode() results in object which can decode the
+                // byte[]s.
+                AbstractBTreeTestCase.assertSameRaba(expected, actual0);
+
+                // Verify decode when we build the decoder from the serialized
+                // format.
+                AbstractBTreeTestCase.assertSameRaba(expected, rabaCoder
+                        .decode(actual0.data()));
+            }
+
+            // Verify encode with a non-zero offset for the DataOutputBuffer
+            // returns a slice which has the same data.
+            {
+
+                // buffer w/ non-zero offset.
+                final int off = 10;
+                final DataOutputBuffer out = new DataOutputBuffer(off,
+                        new byte[100 + off]);
+
+                // encode onto that buffer.
+                final AbstractFixedByteArrayBuffer slice = rabaCoder.encode(
+                        expected, out);
+
+                // verify same encoded data for the slice.
+                assertEquals(originalData.toByteArray(), slice.toByteArray());
+                
+            }
+
+            // Verify decode when we build the decoder from a slice with a
+            // non-zero offset
+            {
+
+                final int off = 10;
+                final byte[] tmp = new byte[off + originalData.len()];
+                System.arraycopy(originalData.array(), originalData.off(), tmp,
+                        off, originalData.len());
+
+                // create slice
+                final FixedByteArrayBuffer slice = new FixedByteArrayBuffer(
+                        tmp, off, originalData.len());
+
+                // verify same slice.
+                assertEquals(originalData.toByteArray(), slice.toByteArray());
+
+                // decode the slice.
+                final IRaba actual = rabaCoder.decode(slice);
+                
+                // verify same raba.
+                AbstractBTreeTestCase.assertSameRaba(expected, actual);
+                
+            }
             
         } catch (Throwable t) {
 
@@ -633,26 +690,662 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
     }
 
     /**
+     * Performance stress test for keys. Performance tuning should give more
+     * weight to coded raba access times, including search and key retrieval or
+     * copy, than coding times since most use will be access on the coded data.
+     * Those costs are not factored apart in the stress test times. They are
+     * parameterized here by a normalized vector of the rates of the different
+     * operations (search(), get(), length(), etc).
      * 
-     * FIXME Write unit test for search with a focus on the correct response for
-     * known misses (search keys which are not present in the {@link IRaba}).
-     * This implementation is based on <code>long</code> keys which have the
-     * advantage that they can be easily decoded to Java <code>long</code>s and
-     * we can then perform math on those <code>long</code> values in order to
-     * compute a key before or after a given key.
+     * <dl>
+     * <dt>nops</dt>
+     * <dd>
+     * The #of random operations to be performed. Large values for <i>nops</i>
+     * need to be used to get beyond the initial JVM performance tuning so you
+     * can more accurately compare the performance of the different coders. For
+     * example, a value of 1M (1000000) will run for ~ 30-40s for the
+     * front-coded coders. For shorter run times, the order in which we test the
+     * coders will dominate their performance.</dd>
+     * <dt>size</dt>
+     * <dd>The #of entries in the raba to be tested (must be LTE the capacity)</dd>
+     * </dl>
      * 
-     * @todo also do a variant for {@link BitVector} or {@link BigInteger}. For
-     *       these classes we can also encode and decode the key transparently
-     *       and do math on the decoded key. However, unlike <code>long</code>
-     *       keys, the key has variable length for these cases. See
-     *       {@link TestMasterTaskWithSplits} for some code relevant to
-     *       {@link BigInteger} which might get refactored into
-     *       {@link KeyBuilder} if I can work it all out.
+     * @param args
+     *            [nops [generator [size]]]
+     * 
+     *            FIXME parameterize the generator choice.
      */
-    public void test_searchLongKeys() {
+    static public void main(final String[] args) {
+
+        final Random r = new Random();
+
+        // default nops.
+        int nops = 200000;
+//        int nops = 1000000; // ~30-40s per coder @ 1M.
+        if (args.length > 0)
+            nops = Integer.valueOf(args[0]);
+        if (nops <= 0)
+            throw new IllegalArgumentException();
         
-        fail("write test");
+//        // default capacity (branching factor).
+//        int capacity = 256;
+//        if (args.length > 1)
+//            capacity = Integer.valueOf(args[1]);
+//        if (capacity <= 0)
+//            throw new IllegalArgumentException();
+
+        // default size (#of keys).
+        int size = 256;
+        if (args.length > 2)
+            nops = Integer.valueOf(args[2]);
+        if (size <= 0)
+            throw new IllegalArgumentException();
+        
+        // The coders to be tested.
+        final IRabaCoder[] coders = new IRabaCoder[] {
+                SimpleRabaCoder.INSTANCE,
+                new FrontCodedRabaCoder(2/* ratio */),
+                new FrontCodedRabaCoder(8/* ratio */),
+                new FrontCodedRabaCoder(32/* ratio */),
+                CanonicalHuffmanRabaCoder.INSTANCE};
+
+        System.out.println("nops=" + nops + ", size=" + size + ", ncoders="
+                + coders.length);
+
+        /*
+         * Generate a raba.  The same data is used for each coder. 
+         */
+
+        // The raw data.
+        final byte[][] a;
+
+        // Random keys based on random variable length byte[]s.
+//        a = new RandomKeysGenerator(r, size + r.nextInt(size)/* maxKeys */, 20/* maxKeyLength */)
+//                .generateKeys(size);
+
+        // Random URIs in sorted order.
+//        a = new RandomURIGenerator(r).generateKeys(size);
+
+        // based on a tokenized source code file.
+        a = new TokenizeKeysGenerator(
+                "bigdata/src/test/com/bigdata/btree/raba/codec/AbstractRabaCoderTestCase.java")
+                .generateKeys(size);
+        
+        /*
+         * isNull, length, get, copy, search, iterator, recode.
+         * 
+         * Note: isNull is not used for keys!
+         */
+        final Op op = new Op(0.0f, .01f, .4f, .2f, .6f, .2f, .04f);
+
+        /*
+         * Test each IRabaCoder.
+         * 
+         * @todo should also test on coded B+Tree values, which would be a
+         * different [expected] instance.
+         */
+        for(IRabaCoder rabaCoder : coders) {
+
+            // the read-only raba.
+            final ReadOnlyKeysRaba expected = new ReadOnlyKeysRaba(size, a);
+
+            final long begin = System.nanoTime();
+
+            int recordLength = -1;
+            try {
+
+                recordLength = doRabaCoderPerformanceTest(expected, rabaCoder,
+                        size, nops, r, op);
+                
+            } catch (Throwable t) {
+
+                System.err.println("coder failed: " + rabaCoder);
+                
+                t.printStackTrace(System.err);
+                
+            }
+
+            final long elapsed = System.nanoTime() - begin;
+
+            System.out.println(rabaCoder.toString() + " : elapsed="
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed)
+                    + ", recordLength="
+                    + (recordLength == -1 ? "N/A" : recordLength));
+
+        }
+        
+    }
+    
+    /**
+     * A test designed to measure the performance of an {@link IRabaCoder} for
+     * operations on B+Tree keys, including search.
+     */
+    public void test_keyCoderPerformance() {
+        
+        // test is only for coders which can code keys.
+        if(!rabaCoder.isKeyCoder()) return;
+
+        /*
+         * Some branching factors to choose from.
+         */
+        final int[] branchingFactors = new int[] { 3, 4, 8, 16, 27, 32, 48,
+                64, 96, 99, 112, 128, 256, 512, 1024, 4096 };
+
+        final int capacity = branchingFactors[r
+                .nextInt(branchingFactors.length)];
+
+        final int size = r.nextInt(capacity) + 1;
+
+        // Generate a read-only raba.
+        final ReadOnlyKeysRaba expected = new ReadOnlyKeysRaba(size,
+                AbstractBTreeTestCase.getRandomKeys(capacity, size));
+
+        final int nops = 50000;
+        
+        /*
+         * isNull, length, get, copy, search, iterator, recode.
+         * 
+         * Note: isNull is not used for keys!
+         */
+        final Op op = new Op(0.0f, .01f, .4f, .2f, .6f, .2f, .04f);
+
+        doRabaCoderPerformanceTest(expected, rabaCoder, size, nops, r, op);
         
     }
 
+    /**
+     * Do a performance stress test consisting of random operations on a
+     * randomly generated B+Tree keys {@link IRaba}. The operations will be
+     * checked against ground truth.
+     * 
+     * @param rabaCoder
+     *            The coder to be tested.
+     * @param size
+     *            The #of keys.
+     * @param nops
+     *            The #of operations to perform.
+     * @param r
+     *            The random number generator.
+     * @param op
+     *            The distribution of the operations to be performed.
+     * 
+     * @return The size of the coded record.
+     */
+    static public int doRabaCoderPerformanceTest(final IRaba expected,
+            final IRabaCoder rabaCoder, final int size, final int nops,
+            final Random r, final Op op) {
+
+        // The raba under test.  This can be recoded by one of the ops.
+        IRabaDecoder actual;
+        final byte[] originalData;
+        {
+
+            // encode the record.
+            final AbstractFixedByteArrayBuffer data = rabaCoder.encode(
+                    expected, new DataOutputBuffer());
+
+            // save off a copy of the original coded record.
+            originalData = data.toByteArray();
+            
+            // decode the record.
+            actual = rabaCoder.decode(data);
+
+            // verify correct initial coding.
+            AbstractBTreeTestCase.assertSameRaba(expected, actual);
+
+        }
+
+        final DataOutputBuffer os = new DataOutputBuffer();
+
+        for (int i = 0; i < nops; i++) {
+
+            final int code;
+            switch (code = op.nextOp(r)) {
+            case Op.ISNULL: {
+                if (expected.isKeys()) {
+                    // method not defined for keys.
+                    continue;
+                }
+                final int index = r.nextInt(size);
+                if (log.isDebugEnabled())
+                    log.debug(op.getName(code) + "(" + index + ") : expected="
+                            + expected.isNull(index));
+                assertEquals(op.getName(code), expected.isNull(index), actual
+                        .isNull(index));
+                break;
+            }
+            case Op.LENGTH: {
+                final int index = r.nextInt(size);
+                if (log.isDebugEnabled())
+                    log.debug(op.getName(code) + "(" + index + ") : expected="
+                            + expected.length(index));
+                assertEquals(op.getName(code), expected.length(index), actual
+                        .length(index));
+                break;
+            }
+            case Op.GET: {
+                final int index = r.nextInt(size);
+                if (log.isDebugEnabled())
+                    log.debug(op.getName(code) + "(" + index + ") : expected="
+                            + BytesUtil.toString(expected.get(index)));
+                assertEquals(op.getName(code), expected.get(index), actual
+                        .get(index));
+                break;
+            }
+            case Op.COPY: {
+                /*
+                 * Note: We reuse the same output buffer all the time for this.
+                 * This is not a problem since we are not overwriting the data
+                 * backing the raba.
+                 */
+                final int index = r.nextInt(size);
+                final int len = expected.length(index);
+                if (log.isDebugEnabled())
+                    log.debug(op.getName(code) + "(" + index + ") : expected="
+                            + BytesUtil.toString(expected.get(index)));
+                // reset the buffer.
+                os.reset();
+                assertEquals(op.getName(code), len, actual.copy(index, os));
+                assertTrue(0 == BytesUtil.compareBytesWithLenAndOffset(0, len,
+                        os.array(), 0, len, expected.get(index)));
+                break;
+            }
+            case Op.SEARCH: {
+                /*
+                 * Search with a key chosen randomly from the original data.
+                 */
+                if (!expected.isKeys()) {
+                    // method not defined for values.
+                    continue;
+                }
+                final int index = r.nextInt(size);
+                final byte[] key = expected.get(index);
+                if (log.isDebugEnabled())
+                    log.debug(op.getName(code) + "(" + index + ") : key="
+                            + BytesUtil.toString(key));
+                { // search at the key.
+
+                    assertEquals(op.getName(code), index, actual.search(key));
+                    
+                }
+                { // search at key plus a random byte[] suffix.
+                    
+                    // random suffix length.
+                    final int suffixLength = r.nextInt(1 + (key.length / 2)) + 1;
+                    
+                    // random fill of entire key.
+                    final byte[] key2 = new byte[key.length + suffixLength];
+                    r.nextBytes(key2);
+                    
+                    // copy shared prefix (all of the original key).
+                    System.arraycopy(key, 0, key2, 0, key.length);
+                    
+                    // expected insert position (or index iff found).
+                    final int epos = expected.search(key2);
+                    
+                    // actual result from search on the coded raba.
+                    final int apos = actual.search(key2);
+                    
+                    assertEquals(op.getName(code), epos, apos);
+                    
+                }
+                { // search at random length prefix of the key.
+                    
+                    // random prefix length (may be zero).
+                    final int prefixLength = Math.max(0, r.nextInt(Math.max(1,
+                            key.length)) - 1);
+                    
+                    // copy shared prefix.
+                    final byte[] key2 = new byte[prefixLength];
+                    System.arraycopy(key, 0, key2, 0, prefixLength);
+
+                    // expected insert position (or index iff found).
+                    final int epos = expected.search(key2);
+                    
+                    // actual result from search on the coded raba.
+                    final int apos = actual.search(key2);
+                    
+                    assertEquals(op.getName(code), epos, apos);
+                    
+                }
+                break;
+            }
+            case Op.ITERATOR: {
+                if (log.isDebugEnabled())
+                    log.debug(op.getName(code) + "()");
+                assertSameIterator(expected.iterator(), actual.iterator());
+                break;
+            }
+            case Op.RECODE: {
+
+                /*
+                 * Note: this uses a new buffer instance so we do not stomp on
+                 * the existing coded representation backing the raba. The
+                 * backing array for the buffer is preallocated to a modest size
+                 * and filled with random data. When we setup the buffer, we
+                 * then advance it a random #of bytes into the buffer so the
+                 * raba will frequently be coded at a non-zero offset in the
+                 * buffer.
+                 */
+
+                // backing byte[]. sometimes empty. will be extended on demand.
+                final byte[] tmp = (r.nextFloat() < .1 ? new byte[0]
+                        : new byte[r.nextInt(100) * size]);
+
+                // fill it with random data.
+                r.nextBytes(tmp);
+
+                /*
+                 * Start at random (but small) offset into the buffer with a
+                 * bias to start at zero.
+                 * 
+                 * Note: A lot of re-coding errors are linked to a non-zero
+                 * starting offset. If you set [start] to zero explicitly and
+                 * the re-coding problem goes away, then the problem is a
+                 * non-zero offset. Likewise, you can explicitly choose a
+                 * non-zero start to debug a problem.
+                 */
+
+                // random start offset.
+                final int start = Math.min(tmp.length, (r.nextFloat() < .2 ? 0
+                        : r.nextInt(20)));
+//                final int start = 0;
+
+                if (log.isDebugEnabled())
+                    log.debug(op.getName(code) + "(): start=" + start
+                            + ", buf.len=" + tmp.length);
+
+                // output buffer wrapping that byte[].
+                final DataOutputBuffer buf = new DataOutputBuffer(start, tmp);
+
+                try {
+                    
+                    // recode onto the buffer.
+                    final AbstractFixedByteArrayBuffer data = rabaCoder.encode(
+                            actual, buf);
+
+                    // verify the same coding was produced.
+                    assertEquals(originalData, data.toByteArray());
+                    
+                    // new instance wrapping the buffer.
+                    actual = rabaCoder.decode(data);
+
+                    // verify recoded raba.
+                    AbstractBTreeTestCase.assertSameRaba(expected, actual);
+                    
+                } catch (AssertionFailedError ex) {
+                    fail(op.getName(code) + "(): start=" + start + ", buf.len="
+                            + tmp.length, ex);
+                }
+
+                break;
+            }
+            default:
+                throw new AssertionError();
+            }
+
+        }
+
+        // The size of the coded record.
+        return originalData.length;
+        
+    }
+
+    /**
+     * Verify same byte[] iterators.
+     * 
+     * @param eitr
+     *            The expected iterator.
+     * @param aitr
+     *            The actual iterator.
+     */
+    static protected void assertSameIterator(final Iterator<byte[]> eitr,
+            final Iterator<byte[]> aitr) {
+
+        int i = 0;
+        while (eitr.hasNext()) {
+
+            assertTrue("hasNext", aitr.hasNext());
+            
+            // verify same byte[] (compare data, may both be null).
+            assertEquals("byte[" + i + "]", eitr.next(), aitr.next());
+
+            i++;
+            
+        }
+        
+        assertFalse("hasNext", aitr.hasNext());
+        
+    }
+    
+    /**
+     * Helper class generates a random sequence of operation codes obeying the
+     * probability distribution described in the constructor call.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    static class Op {
+        
+        static public final int ISNULL = 0;
+        static public final int LENGTH = 1;
+        static public final int GET = 2;
+        static public final int COPY = 3;
+        static public final int SEARCH = 4;
+        static public final int ITERATOR = 5;
+        static public final int RECODE = 6;
+        
+        /**
+         * The last defined operator.
+         */
+        static final int lastOp = RECODE;
+        
+//        final private Random r = new Random();
+        
+        final private float[] _dist;
+
+        /*
+         * isNull, length, get, copy, search, iterator, recode.
+         */
+        public Op(float isNullRate, float lengthRate, float getRate,
+                float copyRate, float searchRate, float iteratorRate,
+                float recodeRate)
+        {
+            if (isNullRate < 0 || lengthRate < 0 || getRate < 0
+                    || copyRate < 0 || searchRate < 0 || iteratorRate < 0
+                    || recodeRate < 0) {
+                throw new IllegalArgumentException("negative rate");
+            }
+            float total = isNullRate + lengthRate + getRate + copyRate
+                    + searchRate + iteratorRate + recodeRate;
+            if( total == 0.0 ) {
+                throw new IllegalArgumentException("all rates are zero.");
+            }
+            /*
+             * Convert to normalized distribution in [0:1].
+             */
+            isNullRate /= total;
+            lengthRate /= total;
+            getRate /= total;
+            copyRate /= total;
+            searchRate /= total;
+            iteratorRate /= total;
+            recodeRate /= total;
+            /*
+             * Save distribution.
+             */
+            int i = 0;
+            _dist = new float[lastOp+1];
+            _dist[ i++ ] = isNullRate;
+            _dist[ i++ ] = lengthRate;
+            _dist[ i++ ] = getRate;
+            _dist[ i++ ] = copyRate;
+            _dist[ i++ ] = searchRate;
+            _dist[ i++ ] = iteratorRate;
+            _dist[ i++ ] = recodeRate;
+
+            /*
+             * Checksum.
+             */
+            float sum = 0f;
+            for( i = 0; i<_dist.length; i++ ) {
+                sum += _dist[ i ];
+            }
+            if( Math.abs( sum - 1f) > 0.01 ) {
+                throw new AssertionError("sum of distribution is: "+sum+", but expecting 1.0");
+            }
+            
+        }
+        
+        /**
+         * Return the name of the operator.
+         * 
+         * @param op
+         * @return
+         */
+        public String getName( final int op ) {
+            if( op < 0 || op > lastOp ) {
+                throw new IllegalArgumentException();
+            }
+            /*
+             * isNull, length, get, copy, search, iterator, recode.
+             */
+            switch( op ) {
+            case ISNULL:  return "isNull";
+            case LENGTH:  return "length";
+            case GET:    return "get";
+            case COPY:  return "copy";
+            case SEARCH:     return "search";
+            case ITERATOR:   return "iterator";
+            case RECODE: return "recode";
+            default:
+                throw new AssertionError();
+            }
+        }
+        
+        /**
+         * An array of normalized probabilities assigned to each operator. The
+         * array may be indexed by the operator, e.g., dist[{@link #fetch}]
+         * would be the probability of a fetch operation.
+         * 
+         * @return The probability distribution over the defined operators.
+         */
+        public float[] getDistribution() {
+            return _dist;
+        }
+
+        /**
+         * Generate a random operator according to the distribution described to
+         * to the constructor.
+         * 
+         * @return A declared operator selected according to a probability
+         *         distribution.
+         */
+        public int nextOp(final Random r) {
+            final float rand = r.nextFloat(); // [0:1)
+            float cumprob = 0f;
+            for( int i=0; i<_dist.length; i++ ) {
+                cumprob += _dist[ i ];
+                if( rand <= cumprob ) {
+                    return i;
+                }
+            }
+            throw new AssertionError();
+        }
+        
+    }
+
+    /**
+     * Tests of the {@link Op} test helper class.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public static class TestOp extends TestCase {
+
+        private final Random r = new Random();
+        
+        public void test_Op() {
+            /*
+             * isNull, length, get, copy, search, iterator, recode.
+             */
+            Op gen = new Op(.2f, .05f, .2f, 05f, .1f, .05f, .001f);
+            doOpTest(gen);
+        }
+
+        public void test_Op2() {
+            /*
+             * isNull, length, get, copy, search, iterator, recode.
+             */
+            Op gen = new Op(0f,0f,0f,1f,0f,0f,0f);
+            doOpTest(gen);
+        }
+
+        /**
+         * Correct rejection test when all rates are zero.
+         */
+        public void test_correctRejectionAllZero() {
+            /*
+             * isNull, length, get, copy, search, iterator, recode.
+             */
+            try {
+                new Op(0f,0f,0f,0f,0f,0f,0f);
+                fail("Expecting: "+IllegalArgumentException.class);
+            }
+            catch(IllegalArgumentException ex) {
+                log.info("Ignoring expected exception: "+ex);
+            }
+        }
+
+        /**
+         * Correct rejection test when one or more rates are negative.
+         */
+        public void test_correctRejectionNegativeRate() {
+            /*
+             * isNull, length, get, copy, search, iterator, recode.
+             */
+            try {
+                new Op(0f,0f,0f,-1f,0f,1f,0f);
+                fail("Expecting: "+IllegalArgumentException.class);
+            }
+            catch(IllegalArgumentException ex) {
+                log.info("Ignoring expected exception: "+ex);
+            }
+        }
+
+        /**
+         * Verifies the {@link Op} class given an instance with some probability
+         * distribution.
+         */
+        void doOpTest(final Op gen) {
+            final int limit = 10000;
+            int[] ops = new int[limit];
+            int[] sums = new int[Op.lastOp + 1];
+            for (int i = 0; i < limit; i++) {
+                int op = gen.nextOp(r);
+                assertTrue(op >= 0);
+                assertTrue(op <= Op.lastOp);
+                ops[i] = op;
+                sums[op]++;
+            }
+            float[] expectedProbDistribution = gen.getDistribution();
+            float[] actualProbDistribution = new float[Op.lastOp + 1];
+            float sum = 0f;
+            for (int i = 0; i <= Op.lastOp; i++) {
+                sum += expectedProbDistribution[i];
+                actualProbDistribution[i] = (float) ((double) sums[i] / (double) limit);
+                float diff = Math.abs(actualProbDistribution[i]
+                        - expectedProbDistribution[i]);
+                System.err.println("expected[i=" + i + "]="
+                        + expectedProbDistribution[i] + ", actual[i=" + i
+                        + "]=" + actualProbDistribution[i] + ", diff="
+                        + ((int) (diff * 1000)) / 10f + "%");
+                assertTrue(diff < 0.02); // difference is less than 2%
+                                            // percent.
+            }
+            assertTrue(Math.abs(sum - 1f) < 0.01); // essential 1.0
+        }
+
+    }
+    
 }

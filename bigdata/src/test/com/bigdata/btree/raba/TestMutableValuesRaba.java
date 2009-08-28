@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba;
 
-import com.bigdata.btree.raba.MutableValuesRaba;
-
 import junit.framework.TestCase2;
 
 /**
@@ -37,19 +35,19 @@ import junit.framework.TestCase2;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestMutableRaba extends TestCase2 {
+public class TestMutableValuesRaba extends TestCase2 {
 
     /**
      * 
      */
-    public TestMutableRaba() {
+    public TestMutableValuesRaba() {
 
     }
 
     /**
      * @param name
      */
-    public TestMutableRaba(String name) {
+    public TestMutableValuesRaba(String name) {
         super(name);
     }
     

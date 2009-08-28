@@ -40,26 +40,27 @@ import com.bigdata.io.ByteArrayBuffer;
  * for B+Tree keys and values, but is also used when serializing keys and values
  * for {@link IIndexProcedure}s. The interface defines optional operations for
  * mutation. If mutation is supported, then {@link #isReadOnly()} will return
- * <code>false</code>. Support for storing <code>null</code>s and search are
- * mutually exclusive. Searchable {@link IRaba}s are always interpreted as
- * <code>unsigned byte[]</code>s and are used for B+Tree <em>keys</em>.
- * Non-searchable {@link IRaba}s allow <code>null</code>s, are interpreted as
- * <code>signed byte[]</code>, and are used for B+Tree <em>values</em>.
+ * <code>false</code>. An {@link IRaba} instance either stores B+Tree keys and
+ * supports {@link #search(byte[])} -or- stores B+Tree values and allows
+ * <code>null</code>s but does not support search. for storing <code>null</code>
+ * s and search are mutually exclusive. Some {@link IRaba} implementations may
+ * be used for either purpose, but the {@link IRaba} instance is always either
+ * B+Tree keys or B+Tree values. In both cases, the {@link IRaba} stores
+ * variable length byte[]s. However, when an {@link IRaba} stores B+Tree keys,
+ * the byte[]s interpreted as <code>unsigned byte[]</code>s for the purpose of
+ * {@link #search(byte[])}.
  * 
  * <h3>B+Tree keys</h3>
  * 
  * When used for B+Tree keys, the interface provides operations on an ordered
- * set of variable length <code>unsigned byte[]</code> keys. For this use case,
- * the implementation MUST be searchable ({@link #isSearchable()}) and MUST NOT
- * allow nulls ({@link #isNullAllowed()}).
+ * set of variable length <code>unsigned byte[]</code> keys and
+ * <code>null</code>s ARE NOT permitted.
  * 
  * <h3>B+Tree values</h3>
  * 
  * When used for B+Tree values, the interface provides operations on an
- * unordered collection of variable length <code>byte[]</code>s. For this use
- * case the implementation MUST allow <code>null</code>s (
- * {@link #isNullAllowed()}) and MUST NOT permit search ({@link #isSearchable()}
- * ).
+ * unordered collection of variable length <code>byte[]</code>s, does NOT
+ * support {@link #search(byte[])} and <code>null</code>s are allowed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -70,25 +71,6 @@ public interface IRaba extends Iterable<byte[]> {
      * Return <code>true</code> if this implementation is read-only.
      */
     public boolean isReadOnly();
-
-    // /**
-    // * Return <code>true</code> if the implementation supports the optional
-    // * {@link #search(byte[])} method. In order for search to function
-    // * correctly, the application MUST ensure that the byte[] values are
-    // * maintained in an <code>unsigned byte[]</code> order and that duplicate
-    // * <code>byte[]</code>s are not stored. Such implementation are used to
-    // * store the keys of a B+Tree index node.
-    // */
-    // boolean isSearchable();
-    //
-    // /**
-    // * Return <code>true</code> if the implementation allows <code>null</code>
-    // * <code>byte[]</code> values to be stored. Implementations used for the
-    // * keys of a B+Tree index node DO NOT allow <code>null</code>s. However,
-    // * implementations used to store the values of a B+Tree leaf MUST allow
-    // * <code>null</code>s.
-    // */
-    // boolean isNullAllowed();
 
     /**
      * When <code>true</code> the {@link IRaba} supports search and elements are
@@ -128,7 +110,9 @@ public interface IRaba extends Iterable<byte[]> {
 
     /**
      * Return <code>true</code> iff the byte[] at that index is
-     * <code>null</code>.
+     * <code>null</code>. If {@link IRaba#isKeys()} would return
+     * <code>true</code> then this method MUST return <code>false</code> since
+     * <code>null</code>s are not permitted for B+Tree keys.
      * 
      * @param index
      *            The index in [0:{@link #size()}-1].

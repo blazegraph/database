@@ -44,6 +44,8 @@ import com.bigdata.btree.raba.MutableValueBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo consider mutable implementation based on a compacting record ala GOM.
  */
 public class MutableLeafData implements ILeafData {
 
@@ -302,6 +304,22 @@ public class MutableLeafData implements ILeafData {
         
         return keys.size();
         
+    }
+
+    /**
+     * No - this class does not support double-linked leaves (only the
+     * {@link IndexSegment} actually uses double-linked leaves).
+     */
+    final public boolean isDoubleLinked() {
+        return false;
+    }
+
+    final public long getNextAddr() {
+        throw new UnsupportedOperationException();
+    }
+
+    final public long getPriorAddr() {
+        throw new UnsupportedOperationException();
     }
 
 }

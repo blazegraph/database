@@ -1379,14 +1379,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         }
 
         public Leaf allocLeaf(final AbstractBTree btree, final long addr,
-                final ILeafData data, final long priorAddr, final long nextAddr) {
+                final ILeafData data) {
 
-            /*
-             * Note: The prior/next leaf addr information is not available for
-             * mutable BTree so it is not being preserved here when a leaf is
-             * de-serialized.
-             */
-            
             return new Leaf(btree, addr, data);
 
         }

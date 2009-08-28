@@ -86,4 +86,32 @@ public interface ILeafData extends IAbstractNodeData {
      */
     public boolean hasDeleteMarkers();
     
+    /**
+     * Return <code>true</code> if the leaf data record supports encoding of the
+     * address of the previous and next leaf in the B+Tree order.
+     */
+    public boolean isDoubleLinked();
+
+    /**
+     * The address of the previous leaf in key order, <code>0L</code> if it is
+     * known that there is no previous leaf, and <code>-1L</code> if either: (a)
+     * it is not known whether there is a previous leaf; or (b) it is known but
+     * the address of that leaf is not known to the caller.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the leaf data record is not double-linked.
+     */
+    public long getPriorAddr();
+
+    /**
+     * The address of the next leaf in key order, <code>0L</code> if it is known
+     * that there is no next leaf, and <code>-1L</code> if either: (a) it is not
+     * known whether there is a next leaf; or (b) it is known but the address of
+     * that leaf is not known to the caller.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the leaf data record is not double-linked.
+     */
+    public long getNextAddr();
+    
 }

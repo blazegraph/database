@@ -82,16 +82,14 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
     }
 
-    public MockLeafData(final IRaba keys,
-            final IRaba vals) {
+    public MockLeafData(final IRaba keys, final IRaba vals) {
 
         this(keys, vals, null/* deleteMarkers */, null/* versionTimestamps */);
 
     }
 
-    public MockLeafData(final IRaba keys,
-            final IRaba vals, final boolean[] deleteMarkers,
-            final long[] versionTimestamps) {
+    public MockLeafData(final IRaba keys, final IRaba vals,
+            final boolean[] deleteMarkers, final long[] versionTimestamps) {
 
         super(keys);
 
@@ -112,6 +110,18 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
         this.versionTimestamps = versionTimestamps;
 
+    }
+
+    public boolean isDoubleLinked() {
+        return false;
+    }
+
+    public long getNextAddr() {
+        throw new UnsupportedOperationException();
+    }
+
+    public long getPriorAddr() {
+        throw new UnsupportedOperationException();
     }
 
 }

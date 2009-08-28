@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
+import it.unimi.dsi.fastutil.io.RepositionableStream;
+
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.EOFException;
@@ -43,38 +45,45 @@ import java.io.InputStream;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DataInputBuffer extends InputStream implements DataInput {
+public class DataInputBuffer extends InputStream implements DataInput,
+        RepositionableStream {
 
     /**
      * The buffer whose contents are being read.
      */
-    protected byte[] buf;
+    private byte[] buf;
+    
+    /**
+     * The original value of {@link #off}.
+     */
+    private int origin;
     
     /**
      * The current offset in the buffer.  This is incremented each time
      * any data is read from the buffer.
      */
-    protected int off;
-    
+    private int off;
+
     /**
-     * The exclusive index of the last byte in the buffer having valid date (up
+     * The exclusive index of the last byte in the buffer having valid data (up
      * to limit-1 is valid).
      */
-    protected int limit;
-    
+    private int limit;
+
     /**
      * Prepare for reading from the byte[].
      * 
      * @param buf
      *            The source data.
      */
-    public DataInputBuffer(byte[] buf) {
-        
-        if(buf==null) throw new IllegalArgumentException();
-        
+    public DataInputBuffer(final byte[] buf) {
+
+        if (buf == null)
+            throw new IllegalArgumentException();
+
         this.buf = buf;
         
-        this.off = 0;
+        this.off = this.origin = 0;
         
         this.limit = buf.length;
         
@@ -90,8 +99,8 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @param len
      *            The #of bytes available.
      */
-    public DataInputBuffer(byte[] buf,int off, int len) {
-        
+    public DataInputBuffer(final byte[] buf, final int off, final int len) {
+
         if (buf == null)
             throw new IllegalArgumentException();
         
@@ -103,7 +112,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
         
         this.buf = buf;
         
-        this.off = off;
+        this.off = this.origin = off;
         
         this.limit = off + len;
         
@@ -117,14 +126,14 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @param buf
      *            The buffer.
      */
-    public DataInputBuffer(ByteArrayBuffer buf) {
+    public DataInputBuffer(final ByteArrayBuffer buf) {
         
         if (buf == null)
             throw new IllegalArgumentException();
         
         this.buf = buf.array();
         
-        this.off = buf.pos;
+        this.off = this.origin = buf.pos;
         
         this.limit = buf.limit;
         
@@ -136,13 +145,13 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @param buf
      *            The new buffer.
      */
-    public void setBuffer(byte[] buf) {
-        
+    public void setBuffer(final byte[] buf) {
+
         if (buf == null)
             throw new IllegalArgumentException();
 
-        setBuffer(buf,0,buf.length);
-        
+        setBuffer(buf, 0, buf.length);
+
     }
     
     /**
@@ -154,7 +163,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @param off
      * @param len
      */
-    public void setBuffer(byte[] buf, int off, int len) {
+    public void setBuffer(final byte[] buf, final int off, final int len) {
 
         if (buf == null)
             throw new IllegalArgumentException();
@@ -164,7 +173,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
         this.buf = buf;
 
-        this.off = off;
+        this.off = this.origin = off;
 
         this.limit = off + len;
         
@@ -178,7 +187,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
      * @param buf
      *            The buffer.
      */
-    public void setBuffer(ByteArrayBuffer buf) {
+    public void setBuffer(final ByteArrayBuffer buf) {
         
         if (buf == null)
             throw new IllegalArgumentException();
@@ -206,7 +215,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
         if (off >= limit)
             return -1; // EOF
         
-        return buf[off++];
+        return 0xff & buf[off++];
         
     }
     
@@ -224,9 +233,9 @@ public class DataInputBuffer extends InputStream implements DataInput {
         if (off + 2 > limit)
             throw new EOFException();
 
-        int ch1 = buf[off++];
+        final int ch1 = buf[off++];
 
-        int ch2 = buf[off++];
+        final int ch2 = buf[off++];
         
         return (char) ((ch1 << 8) + (ch2 << 0));
         
@@ -244,26 +253,63 @@ public class DataInputBuffer extends InputStream implements DataInput {
         
     }
 
-    final public void readFully(byte[] b) throws IOException {
+    final public void readFully(final byte[] b) throws IOException {
 
         readFully(b, 0, b.length);
         
     }
 
-    final public void readFully(byte[] b, final  int off, final int len) throws IOException {
+    final public void readFully(final byte[] a, final int aoff, final int alen)
+            throws IOException {
 
-        if (this.off + len > this.limit)
+        if (this.off + alen > this.limit)
             throw new EOFException();
         
-        System.arraycopy(buf, this.off, b, off, len);
+        System.arraycopy(buf/* src */, this.off/* srcPos */, a/* dest */,
+                aoff/* destPos */, alen/* len */);
         
-        this.off += len;
+        this.off += alen;
         
+    }
+
+    /**
+     * Overridden for more efficiency.
+     */
+    final public int read(final byte[] a, final int aoff, final int alen)
+            throws IOException {
+
+        if (alen == 0) {
+
+            // Read request length is zero, so return 0 (per API).
+            return 0;
+
+        }
+        
+        final int remaining = limit - off;
+
+        if (remaining == 0) {
+
+            // EOF (per API).
+            return -1;
+        
+        }
+
+        // #of bytes to read.
+        final int n = remaining < alen ? remaining : alen;
+
+        System.arraycopy(buf/* src */, this.off/* srcPos */, a/* dest */,
+                aoff/* destPos */, n/* len */);
+
+        this.off += n;
+
+        return n;
+
     }
 
     public int readInt() throws IOException {
 
-        if(off+4>limit) throw new EOFException();
+        if (off + 4 > limit)
+            throw new EOFException();
         
         int v = 0;
         
@@ -285,10 +331,11 @@ public class DataInputBuffer extends InputStream implements DataInput {
 
     public long readLong() throws IOException {
 
-        if(off+8>limit) throw new EOFException();
-        
+        if (off + 8 > limit)
+            throw new EOFException();
+
         long v = 0L;
-        
+
         // big-endian.
         v += (0xffL & buf[off++]) << 56;
         v += (0xffL & buf[off++]) << 48;
@@ -308,9 +355,9 @@ public class DataInputBuffer extends InputStream implements DataInput {
         if (off + 2 > limit)
             throw new EOFException();
 
-        int ch1 = buf[off++];
+        final int ch1 = buf[off++];
 
-        int ch2 = buf[off++];
+        final int ch2 = buf[off++];
         
         return (short) ((ch1 << 8) + (ch2 << 0));
         
@@ -346,12 +393,13 @@ public class DataInputBuffer extends InputStream implements DataInput {
         
     }
 
-    public int skipBytes(int n) throws IOException {
+    public int skipBytes(final int n) throws IOException {
 
         off += n;
-        
-        if(off>limit) throw new IOException();
-        
+
+        if (off > limit)
+            throw new IOException();
+
         return n;
         
     }
@@ -430,6 +478,40 @@ public class DataInputBuffer extends InputStream implements DataInput {
             v = b; // interpret the byte as a short value.
         }
         return (short) v;
+    }
+
+    /*
+     * RepositionableStream.
+     * 
+     * Note: This interface allows us to use InputBitStream and reset the
+     * position to zero (0L) so that we can reuse the buffer, e.g., to serialize
+     * nodes in the B+Tree.
+     */
+
+    /**
+     * Report the position of the stream within its slice (relative to the
+     * original offset for the backing buffer)
+     */
+    public long position() throws IOException {
+
+        return off - origin;
+
+    }
+
+    /**
+     * Reposition the stream within its slice (relative to the original offset
+     * for the backing buffer).
+     */
+    public void position(final long v) throws IOException {
+
+//        if (v < origin || v > limit) {
+//
+//            throw new IOException();
+//
+//        }
+
+        this.off = origin + (int) Math.min(v, limit);// origin + (int) v;
+
     }
 
 }

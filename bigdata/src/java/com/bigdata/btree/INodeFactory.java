@@ -27,19 +27,15 @@ import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 
 /**
- * Interface for creating mutable nodes or leaves.
+ * Interface for creating nodes or leaves.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @deprecated This will be replaced with a factory suitable for creating a node
- *             or leaf data object from a ByteBuffer.
  */
 public interface INodeFactory {
 
     /**
-     * Create a node. The implementation is encouraged to steal the <i>keys</i>
-     * and <i>childAddr</i> references rather than cloning them.
+     * Create a node.
      * 
      * @param btree
      *            The owning B+Tree.
@@ -53,8 +49,7 @@ public interface INodeFactory {
     public Node allocNode(AbstractBTree btree, long addr, INodeData data);
 
     /**
-     * Create a leaf. The implementation is encouraged to steal the <i>keys</i>
-     * and <i>values</i> references rather than cloning them.
+     * Create a leaf.
      * 
      * @param btree
      *            The owning B+Tree.
@@ -62,22 +57,9 @@ public interface INodeFactory {
      *            The address from which the leaf was read.
      * @param data
      *            The leaf data record.
-     * @param priorAddr
-     *            The address of the previous leaf in key order, <code>0L</code>
-     *            if it is known that there is no previous leaf, and
-     *            <code>-1L</code> if either: (a) it was not known whether there
-     *            is a previous leaf; or (b) it was known that there was a
-     *            previous leaf but the address of that leaf was not known.
-     * @param nextAddr
-     *            The address of the next leaf in key order, <code>0L</code> if
-     *            it is known that there is no next leaf, and <code>-1L</code>
-     *            if either: (a) it was not known whether there is a next leaf;
-     *            or (b) it was known that there was a next leaf but the address
-     *            of that leaf was not known.
      * 
      * @return A leaf initialized from those data.
      */
-    public Leaf allocLeaf(AbstractBTree btree, long addr, ILeafData data,
-            long priorAddr, long nextAddr);
+    public Leaf allocLeaf(AbstractBTree btree, long addr, ILeafData data);
 
 }

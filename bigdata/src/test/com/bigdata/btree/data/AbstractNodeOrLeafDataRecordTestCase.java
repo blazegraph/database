@@ -30,7 +30,9 @@ package com.bigdata.btree.data;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
-import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.FixedByteArrayBuffer;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -52,16 +54,21 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
         super(name);
     }
 
-    protected IRabaCoder keysCoder = null;
-    protected IRabaCoder valuesCoder = null;
+//    protected IRabaCoder keysCoder = null;
+//    protected IRabaCoder valuesCoder = null;
 
+    /**
+     * Set by concrete test suite classes to the coder under test.
+     */
+    protected IAbstractNodeCoder<?> coder = null;
+    
     /**
      * De-serialization stress test conducted for a variety of and branching
      * factors.
      */
     public void testStress() {
      
-        final int ntrials = 20;
+        final int ntrials = 10;
         
         final int nnodes = 500;
 
@@ -112,34 +119,168 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                     + (mayGenerateLeaves() ? ", deleteMarkers=" + deleteMarkers
                             + ", versionTimestamps=" + versionTimestamps : ""));
 
+            final DataOutputBuffer buf = new DataOutputBuffer();
+            
             for (int i = 0; i < nnodes; i++) {
 
                 final IAbstractNodeData expected = getRandomNodeOrLeaf(
                         branchingFactor, deleteMarkers, versionTimestamps);
 
-                if (expected.isLeaf()) {
-
-                    final ILeafData actual = new ReadOnlyLeafData(
-                            (ILeafData) expected, keysCoder, valuesCoder, false/* doubleLinked */);
-
-                    assertSameLeafData((ILeafData) expected, actual);
-
-                } else {
-
-                    final INodeData actual = new ReadOnlyNodeData(
-                            (INodeData) expected, keysCoder);
-
-                    assertSameNodeData((INodeData) expected, actual);
-
-                }
+                doRoundTripTest(expected,coder,buf);
                 
             }
    
         }
         
     }
+
+    /**
+     * 
+     * @param expected
+     * @param coder
+     * @param buf
+     */
+    protected void doRoundTripTest(final IAbstractNodeData expected,
+            final IAbstractNodeCoder<?> coder, final DataOutputBuffer buf) {
+
+        // clear the buffer before encoding data on it.
+        buf.reset();
+
+        if (expected.isLeaf()) {
+
+            /*
+             * A leaf data record.
+             */
+
+            // encode
+            final AbstractFixedByteArrayBuffer originalData = ((IAbstractNodeCoder<ILeafData>) coder)
+                    .encode((ILeafData) expected, buf);
+
+            // Verify we can decode the record.
+            {
+                
+                // decode.
+                final ILeafData actual = ((IAbstractNodeCoder<ILeafData>) coder)
+                        .decode(originalData);
+
+                // verify the decoded data.
+                assertSameLeafData((ILeafData) expected, actual);
+
+            }
+            
+            // Verify encode with a non-zero offset for the DataOutputBuffer
+            // returns a slice which has the same data.
+            {
+
+                // buffer w/ non-zero offset.
+                final int off = 10;
+                final DataOutputBuffer out = new DataOutputBuffer(off,
+                        new byte[1000 + off]);
+
+                // encode onto that buffer.
+                final AbstractFixedByteArrayBuffer slice = ((IAbstractNodeCoder<ILeafData>) coder)
+                        .encode((ILeafData) expected, out);
+
+                // verify same encoded data for the slice.
+                assertEquals(originalData.toByteArray(), slice.toByteArray());
+
+            }
+
+            // Verify decode when we build the decoder from a slice with a
+            // non-zero offset
+            {
+
+                final int off = 10;
+                final byte[] tmp = new byte[off + originalData.len()];
+                System.arraycopy(originalData.array(), originalData.off(), tmp,
+                        off, originalData.len());
+
+                // create slice
+                final FixedByteArrayBuffer slice = new FixedByteArrayBuffer(
+                        tmp, off, originalData.len());
+
+                // verify same slice.
+                assertEquals(originalData.toByteArray(), slice.toByteArray());
+
+                // decode the slice.
+                final ILeafData actual = ((IAbstractNodeCoder<ILeafData>) coder)
+                        .decode(slice);
+
+                // verify the decoded slice.
+                assertSameLeafData((ILeafData) expected, actual);
+                
+            }
+
+        } else {
+
+            /*
+             * A node data record.
+             */
+
+            // encode
+            final AbstractFixedByteArrayBuffer originalData = ((IAbstractNodeCoder<INodeData>) coder)
+                    .encode((INodeData) expected, buf);
+
+            // Verify we can decode the record.
+            {
+
+                // decode
+                final INodeData actual = ((IAbstractNodeCoder<INodeData>) coder)
+                        .decode(originalData);
+
+                // verify the decoded data.
+                assertSameNodeData((INodeData) expected, actual);
+
+            }
+
+            // Verify encode with a non-zero offset for the DataOutputBuffer
+            // returns a slice which has the same data.
+            {
+
+                // buffer w/ non-zero offset.
+                final int off = 10;
+                final DataOutputBuffer out = new DataOutputBuffer(off,
+                        new byte[1000 + off]);
+
+                // encode onto that buffer.
+                final AbstractFixedByteArrayBuffer slice = ((IAbstractNodeCoder<INodeData>) coder)
+                        .encode((INodeData) expected, out);
+
+                // verify same encoded data for the slice.
+                assertEquals(originalData.toByteArray(), slice.toByteArray());
+
+            }
+            
+            // Verify decode when we build the decoder from a slice with a
+            // non-zero offset
+            {
+
+                final int off = 10;
+                final byte[] tmp = new byte[off + originalData.len()];
+                System.arraycopy(originalData.array(), originalData.off(), tmp,
+                        off, originalData.len());
+
+                // create slice
+                final FixedByteArrayBuffer slice = new FixedByteArrayBuffer(
+                        tmp, off, originalData.len());
+
+                // verify same slice.
+                assertEquals(originalData.toByteArray(), slice.toByteArray());
+
+                // decode the slice.
+                final INodeData actual = ((IAbstractNodeCoder<INodeData>) coder)
+                        .decode(slice);
+
+                // verify the decoded slice.
+                assertSameNodeData((INodeData) expected, actual);
+                
+            }
+            
+        }
+
+    }
     
-//    /**
+    //    /**
 //     * Run a large stress test.
 //     * 
 //     * @param args
@@ -307,6 +448,34 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
     }
 
     abstract protected boolean mayGenerateNodes();
+
     abstract protected boolean mayGenerateLeaves();
+
+    /**
+     * Verify methods that recognize a node vs a leaf based on a byte.
+     */
+    public void test_nodeOrLeafFlag() {
+
+        // isLeaf()
+        assertTrue(AbstractReadOnlyNodeData
+                .isLeaf(AbstractReadOnlyNodeData.LEAF));
+        
+        assertTrue(AbstractReadOnlyNodeData
+                .isLeaf(AbstractReadOnlyNodeData.LINKED_LEAF));
+
+        assertFalse(AbstractReadOnlyNodeData
+                .isLeaf(AbstractReadOnlyNodeData.NODE));
+        
+        // isNode()
+        assertFalse(AbstractReadOnlyNodeData
+                .isNode(AbstractReadOnlyNodeData.LEAF));
+        
+        assertFalse(AbstractReadOnlyNodeData
+                .isNode(AbstractReadOnlyNodeData.LINKED_LEAF));
+
+        assertTrue(AbstractReadOnlyNodeData
+                .isNode(AbstractReadOnlyNodeData.NODE));
+
+    }
     
 }
