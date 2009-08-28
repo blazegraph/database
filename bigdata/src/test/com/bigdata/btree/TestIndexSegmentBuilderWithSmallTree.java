@@ -223,17 +223,21 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         assertEquals(1, seg.getNodeCount());
         assertEquals(10, seg.getEntryCount());
 
-        final ImmutableLeaf firstLeaf = seg.readLeaf(segStore.getCheckpoint().addrFirstLeaf);
+        final ImmutableLeaf firstLeaf = seg
+                .readLeaf(segStore.getCheckpoint().addrFirstLeaf);
 
-        assertEquals("priorAddr", 0L, firstLeaf.priorAddr);
+        assertEquals("priorAddr", 0L, firstLeaf.getPriorAddr());
 
-        assertEquals("nextAddr", segStore.getCheckpoint().addrLastLeaf, firstLeaf.nextAddr);
+        assertEquals("nextAddr", segStore.getCheckpoint().addrLastLeaf,
+                firstLeaf.getNextAddr());
 
-        final ImmutableLeaf lastLeaf = seg.readLeaf(segStore.getCheckpoint().addrLastLeaf);
+        final ImmutableLeaf lastLeaf = seg
+                .readLeaf(segStore.getCheckpoint().addrLastLeaf);
 
-        assertEquals("priorAddr", segStore.getCheckpoint().addrFirstLeaf,lastLeaf.priorAddr);
+        assertEquals("priorAddr", segStore.getCheckpoint().addrFirstLeaf,
+                lastLeaf.getPriorAddr());
 
-        assertEquals("nextAddr", 0L, lastLeaf.nextAddr);
+        assertEquals("nextAddr", 0L, lastLeaf.getNextAddr());
 
         // test forward scan
         {
@@ -336,9 +340,9 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         assertEquals(10,seg.getEntryCount());
 
         final ImmutableLeaf leaf = seg.readLeaf(segStore.getCheckpoint().addrRoot);
-        assertEquals("priorAddr",0L,leaf.priorAddr);
-        assertEquals("nextAddr",0L,leaf.nextAddr);
-        
+        assertEquals("priorAddr", 0L, leaf.getPriorAddr());
+        assertEquals("nextAddr", 0L, leaf.getNextAddr());
+
         final ImmutableLeafCursor itr = seg.newLeafCursor(SeekEnum.First);
         assertTrue(leaf == itr.leaf());
         assertNull(itr.prior());

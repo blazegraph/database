@@ -1,8 +1,7 @@
 package com.bigdata.btree.raba.codec;
 
-import java.nio.ByteBuffer;
-
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 /**
  * Interface for an coded logical byte[][]. Implementations of this interface
@@ -20,6 +19,6 @@ public interface IRabaDecoder extends IRaba {
     /**
      * The encoded data.
      */
-    ByteBuffer data();
+    AbstractFixedByteArrayBuffer data();
 
 }

@@ -35,7 +35,7 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestNodeDataRecord_Simple extends AbstractNodeOrLeafDataRecordTestCase {
+public class TestNodeDataRecord_Simple extends AbstractNodeDataRecordTestCase {
 
     /**
      * 
@@ -64,8 +64,8 @@ public class TestNodeDataRecord_Simple extends AbstractNodeOrLeafDataRecordTestC
         
         super.setUp();
 
-        keysCoder = SimpleRabaCoder.INSTANCE;
-
+        coder = new DefaultNodeCoder(SimpleRabaCoder.INSTANCE);
+        
     }
 
 }

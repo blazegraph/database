@@ -36,8 +36,6 @@ import it.unimi.dsi.compression.HuffmanCodec;
 import it.unimi.dsi.compression.PrefixCoder;
 import it.unimi.dsi.compression.HuffmanCodec.DecoderInputs;
 import it.unimi.dsi.fastutil.bytes.Byte2IntOpenHashMap;
-import it.unimi.dsi.fastutil.io.FastByteArrayOutputStream;
-import it.unimi.dsi.io.ByteBufferInputStream;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
@@ -46,7 +44,6 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.apache.log4j.Logger;
@@ -54,6 +51,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
  * This class provides (de-)compression for logical byte[][]s based on canonical
@@ -191,10 +190,6 @@ import com.bigdata.btree.raba.IRaba;
  * @todo it could be useful to byte align the codedValueOffset[] IF we also
  *       coded the offsets using nbits, where nbits was a multiple of 8.
  * 
- *       FIXME 3. Special case when nsymbols == 0 or nsymbols == 1 since the
- *       codec can not be constructed for those cases. This will never occur for
- *       keys since we will always store all symbols for keys.
- * 
  *       FIXME Generalize to allow alphabets of size GT 256 so we can reuse this
  *       to directly encode the long[] keys of the leaves in the RDF DB. This
  *       will still be an {@link IRaba} (a random access byte[]). The difference
@@ -211,7 +206,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
     protected static final Logger log = Logger
             .getLogger(CanonicalHuffmanRabaCoder.class);
 
-    private static final transient boolean debug = log.isDebugEnabled() || true;
+    private static final transient boolean debug = log.isDebugEnabled();
 
     /**
      * The original serialization version for the record.
@@ -298,13 +293,15 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      *            code and the symbols assigned to each code word.
      * @param obs
      *            The output bit stream.
+     * @param sb
+     *            Debugging information is added to this buffer (optional).
      * 
      * @throws IOException
      * 
      * @see {@link DecoderInputs}
      */
     static protected void writeDecoderInputs(final DecoderInputs decoderInputs,
-            final OutputBitStream obs) throws IOException {
+            final OutputBitStream obs, final StringBuilder sb) throws IOException {
 
         if (decoderInputs == null)
             throw new IllegalArgumentException();
@@ -335,11 +332,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
         assert nsizes >= 0;
 
-        final StringBuilder sb = log.isDebugEnabled() ? new StringBuilder()
-                : null;
-
-        if (sb != null)
-            sb.append("\nmin=" + min + ", max=" + max);
+       if (sb != null)
+            sb.append("min=" + min + ", max=" + max+"\n");
 
         // the minimum code word bit length.
         obs.writeNibble(min);
@@ -380,7 +374,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                         obs.writeNibble(symbol[j]);
                     }
                     if (sb != null)
-                        sb.append("]");
+                        sb.append("]\n");
                     sizeCount = (thisSize == lastSize + 1 ? 1 : 0);
                     nextSymbol = i;
                     lastSize++;
@@ -399,7 +393,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 obs.writeNibble(symbol[j]);
             }
             if (sb != null)
-                sb.append("]");
+                sb.append(" ]\n");
         }
         assert lastSize == max;
 
@@ -407,10 +401,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         obs.write(decoderInputs.getShortestCodeWord().iterator());
 
         if (sb != null) {
-            sb
-                    .append("shortestCodeWord="
-                            + decoderInputs.getShortestCodeWord());
-            log.debug(sb.toString());
+            sb.append("shortestCodeWord="
+                    + decoderInputs.getShortestCodeWord()+"\n");
         }
         
     }
@@ -419,8 +411,12 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      * Reconstruct the {@link DecoderInputs} from the data written by
      * {@link #writeDecoderInputs(BitVector[], OutputBitStream)}.
      * 
+     * @param nsymbols
+     *            The #of symbols.
      * @param ibs
-     *            Where to read the bit lengths.
+     *            The input bit stream.
+     * @param sb
+     *            Debugging information is added to this buffer (optional).
      * 
      * @return The decoded bit lengths and the corresponding symbol indices for
      *         the canonical huffman code.
@@ -428,17 +424,15 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      * @throws IOException
      */
     static protected DecoderInputs readDecoderInputs(final int nsymbols,
-            final InputBitStream ibs) throws IOException {
+            final InputBitStream ibs, final StringBuilder sb)
+            throws IOException {
 
         final int min = ibs.readNibble();
 
         final int max = ibs.readNibble();
 
-        final StringBuilder sb = log.isDebugEnabled() ? new StringBuilder()
-                : null;
-        
         if (sb != null)
-            sb.append("min=" + min + ", max=" + max);
+            sb.append("min=" + min + ", max=" + max+"\n");
 
         final BitVector shortestCodeWord;
         final int[] length = new int[nsymbols];
@@ -459,7 +453,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 symbol[lastSymbol] = tmp;
             }
             if (sb != null)
-                sb.append("]");
+                sb.append(" ]\n");
             codeSize++;
         }
 
@@ -475,8 +469,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         }
 
         if (sb != null) {
-            sb.append("shortestCodeWord=" + shortestCodeWord);
-            log.debug(sb.toString());
+            sb.append("shortestCodeWord=" + shortestCodeWord+"\n");
         }
 
         return new DecoderInputs(shortestCodeWord, length, symbol);
@@ -993,6 +986,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 final int[] frequency = new int[256];
 
                 int nsymbols = 0;
+                byte lastByte = 0;
 
                 for (int i = 0; i < size; i++) {
 
@@ -1004,6 +998,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
                             if (frequency[b - Byte.MIN_VALUE]++ == 0) {
 
+                                lastByte = b;
+                                
                                 nsymbols++;
 
                             }
@@ -1012,6 +1008,26 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
                     }
 
+                }
+
+                if (nsymbols == 1) {
+                    /*
+                     * FIXME This is a hack to workaround a ctor bug in the
+                     * HuffmanCodec/CanonicalFast64CodeWordDecoder when
+                     * nsymbols==1.
+                     * 
+                     * The workaround pretends that a 2nd symbol is present and
+                     * assigns it a non-zero frequency count to ensure that it
+                     * is preserved by the packedFrequency table. If that bug is
+                     * fixed, then this code block can simply be commented out.
+                     * 
+                     * The choice of that 2nd symbol is arbitrary. Since there
+                     * is only one symbol present, we use index #0 if the symbol
+                     * is non-zero and use index #1 if the symbol is zero.
+                     */
+                    final int fakeByteIndex = (lastByte == 0 ? 1 : 0);
+                    frequency[fakeByteIndex] = 1;
+                    nsymbols++;
                 }
 
                 this.nsymbols = nsymbols;
@@ -1191,7 +1207,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 //
 //    }
 
-    public IRabaDecoder encode(final IRaba raba) {
+    public AbstractFixedByteArrayBuffer encode(final IRaba raba,
+            final DataOutputBuffer buf) {
 
         final AbstractCodingSetup setup = new RabaCodingSetup(raba);
         
@@ -1207,6 +1224,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 //                setup = new ValueRabaCodingSetup(raba);
 //            }
 //        }
+
+        final StringBuilder sb = debug ? new StringBuilder("\n") : null;
 
         // The #of byte[] values to be coded.
         final int size = raba.size();
@@ -1231,34 +1250,36 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 .mostSignificantBit(sumCodedValueBitLengths) + 1;
 
         /*
-         * Note: The fbaos default is a 16kb buffer!
-         * 
-         * FIXME The backing buffer should be reused since compression is
-         * generally performed for a mutable B+Tree. Each such B+Tree should use
-         * a single backing buffer instance (NodeSerializer did it this way.)
-         * 
-         * @todo this initialCapacity estimate appears to be more than we need.
-         * Either reduce it or reuse the caller's buffer.
+         * Note: this initialCapacity estimate appears to be more than we need,
+         * however if the caller is reusing their buffer then there should be
+         * little waste associated with it over time.
          */
         final int initialCapacity = (int) (512 + sumCodedValueBitLengths + (size + 1)
                 * codedValueOffsetBits);
+
+        buf.ensureCapacity(initialCapacity);
         
         /*
          * Write out the record on a bit stream backed by a byte[] buffer.
          */
+        final int O_origin = buf.pos(); // byte offset of the origin.
+        if (debug)
+            sb.append("O_origin=" + O_origin + "\n");
         try {
 
             // The serialization version for the record.
             final int version = VERSION0;
 
-            final FastByteArrayOutputStream baos = new FastByteArrayOutputStream(
-                    initialCapacity);
+//            final FastByteArrayOutputStream baos = new FastByteArrayOutputStream(
+//                    initialCapacity);
 
-            final OutputBitStream obs = new OutputBitStream(baos,
+            final OutputBitStream obs = new OutputBitStream(buf,
                     0/* bufSize */, false/* reflectionTest */);
 
             // The record version identifier.
             obs.writeInt(version, 8/* nbits */);
+            if (debug)
+                sb.append("version=" + version + "\n");
 
             // Indicates if we are coding keys vs values.
             obs.writeBit(raba.isKeys());
@@ -1277,13 +1298,23 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             
             // unused bit flags.
             obs.writeInt(0, 4);
+            if (debug) {
+                sb.append("isKeys=" + raba.isKeys() + "\n");
+                sb.append("isSymbolTable=" + isSymbolTable + "\n");
+                sb.append("isOffsetArray=" + isOffsetArray + "\n");
+                sb.append("isByteAlignedOffsets=" + isByteAlignedOffsets + "\n");
+            }
             
             // The #of elements in the logical byte[][].
             obs.writeInt(size, 31);
-
+            if (debug)
+                sb.append("size=" + size+ "\n");
+            
             // The #of symbols in the code.
             obs.writeInt(nsymbols, 9/* nbits */);
             assert obs.writtenBits() == RabaDecoder.O_symbols;
+            if (debug)
+                sb.append("nsymbols=" + nsymbols + "\n");
             
             if(isSymbolTable) {
                 // Write out the optional symbol2byte[].
@@ -1297,11 +1328,18 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
             final long O_codedValueOffsetBits = obs.writtenBits();
             obs.writeInt(codedValueOffsetBits, 8/* nbits */);
+            if (debug) {
+                sb.append("O_codedValueOffsetBits="
+                        + O_codedValueOffsetBits + "\n");
+                sb.append("codedValueOffsetBits=" + codedValueOffsetBits
+                        + "\n");
+            }
 
             if (codedValueOffsetBits != 0) {
-
                 obs.writeLong(sumCodedValueBitLengths, 32/* nbits */);
-
+                if (debug)
+                    sb.append("sumCodedValueBitLengths="
+                            + sumCodedValueBitLengths + "\n");
             }
 
             // nulls[] : bit flags identifying null byte[]s.
@@ -1309,67 +1347,90 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             assert O_nulls == O_codedValueOffsetBits + 8
                     + (codedValueOffsetBits == 0 ? 0 : 32);
             if (!raba.isKeys()) {
+                if (debug)
+                    sb.append("O_nulls=" + O_nulls + "\n");
                 for (int i = 0; i < size; i++) {
-                    obs.writeBit(raba.isNull(i));
+                    final boolean isNull = raba.isNull(i);
+                    obs.writeBit(isNull);
+                    if (debug)
+                        sb.append("null[" + i + "]=" + isNull + "\n");
                 }
             }
 
             if (nsymbols > 0) {
+    
+                // write the code word length[], the correlated symbol[], and the
+                // shortest code word. 
+                final long O_decoderInputs = obs.writtenBits();
+                if (debug)
+                    sb.append("O_decoderInputs=" + O_decoderInputs+"\n");
+                writeDecoderInputs(setup.decoderInputs(), obs, sb);
 
-            // write the code word length[], the correlated symbol[], and the
-            // shortest code word. 
-            writeDecoderInputs(setup.decoderInputs(), obs);
-
-            // Write out the coded values.
-            final long O_codedValues = obs.writtenBits();
-//            assert O_codedValues == O_nulls + (raba.isKeys() ? 0 : size);
-            final long[] codedValueOffset = (codedValueOffsetBits == 0 ? null
-                    : new long[size + 1]);
-            final long sumCodedValueBitLengths2 = writeCodedValues(setup
-                    .codec().coder(), raba, (Byte2Symbol) setup,
-                    codedValueOffset, obs);
-            assert sumCodedValueBitLengths == sumCodedValueBitLengths2 : "sumCodedValueBitLengths="
-                    + sumCodedValueBitLengths
-                    + " != sumCodedValueBitLengths2="
-                    + sumCodedValueBitLengths2;
-            if (codedValueOffset != null)
-                assert codedValueOffset[size] == sumCodedValueBitLengths;
-
-            // Write out the codedValueOffset[].
-            final long O_codedValueOffsets;
-            if (codedValueOffsetBits != 0) {
-//                // force byte alignment.
-//                final long tmp = obs.writtenBits();
-//                obs.align();
-                O_codedValueOffsets = obs.writtenBits();
-                assert O_codedValueOffsets == O_codedValues
-                        + sumCodedValueBitLengths;
-                for (long offset : codedValueOffset) {
-                    obs.writeLong(offset, codedValueOffsetBits/* nbits */);
+                // Write out the coded values.
+                final long O_codedValues = obs.writtenBits();
+                if (debug)
+                    sb.append("O_codedValues=" + O_codedValues + "\n");
+                //            assert O_codedValues == O_nulls + (raba.isKeys() ? 0 : size);
+                final long[] codedValueOffset = (codedValueOffsetBits == 0 ? null
+                        : new long[size + 1]);
+                final long sumCodedValueBitLengths2 = writeCodedValues(setup
+                        .codec().coder(), raba, (Byte2Symbol) setup,
+                        codedValueOffset, obs);
+                assert sumCodedValueBitLengths == sumCodedValueBitLengths2 : "sumCodedValueBitLengths="
+                        + sumCodedValueBitLengths
+                        + " != sumCodedValueBitLengths2="
+                        + sumCodedValueBitLengths2;
+                if (codedValueOffset != null)
+                    assert codedValueOffset[size] == sumCodedValueBitLengths;
+    
+                // Write out the codedValueOffset[].
+                final long O_codedValueOffsets;
+                if (codedValueOffsetBits != 0) {
+    //                // force byte alignment.
+    //                final long tmp = obs.writtenBits();
+    //                obs.align();
+                    O_codedValueOffsets = obs.writtenBits();
+                    assert O_codedValueOffsets == O_codedValues
+                            + sumCodedValueBitLengths;
+                    if (debug)
+                        sb.append("O_codedValueOffsets=" + O_codedValueOffsets
+                                + "\n");
+                    for (int i = 0; i < codedValueOffset.length; i++) {
+                        final long offset = codedValueOffset[i];
+                        obs.writeLong(offset, codedValueOffsetBits/* nbits */);
+                        if (debug)
+                            sb.append("codedValueOffsets[" + i + "]=" + offset
+                                    + "\n");
+                    }
+                } else {
+                    // Not included in the record.
+                    O_codedValueOffsets = 0L;
                 }
-            } else {
-                // Not included in the record.
-                O_codedValueOffsets = 0L;
-            }
-            
-            }
+                
+            }// if(nsymbols>0)
             
             // done writing (will byte align the OBS).
             obs.flush();
 
-            // trim backing array to an exact fit 
-            baos.trim();
-
-            if (baos.length > initialCapacity) {
-                log.warn("initialCapacity=" + initialCapacity + ", actual="
-                        + baos.length);
+            if (debug) {
+                sb.append("bytesWritten=" + (buf.pos() - O_origin) + "\n");
+                log.debug(sb.toString());
             }
             
+//            // trim backing array to an exact fit 
+//            baos.trim();
+//
+//            if (baos.length > initialCapacity) {
+//                log.warn("initialCapacity=" + initialCapacity + ", actual="
+//                        + baos.length);
+//            }
+            
             // done.
-            return new RabaDecoder(ByteBuffer.wrap(baos.array)
+//            return new RabaDecoder(ByteBuffer.wrap(baos.array)
             // ,
             // codec.decoder()
-            );
+//            );
+            return buf.slice(O_origin, buf.pos() - O_origin);
 
         } catch (IOException ex) {
 
@@ -1379,7 +1440,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
-    public IRabaDecoder decode(final ByteBuffer data) {
+    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
 
         return new RabaDecoder(data);
 
@@ -1391,17 +1452,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
-     * 
-     *          FIXME The methods which interact with the buffer must not change
-     *          its position or limit. If they do then ALL methods which touch
-     *          the buffer need to be synchronized so NONE of them can have a
-     *          concurrent read during which the position/limit has been
-     *          transiently modified.
      */
     private static class RabaDecoder extends AbstractRabaDecoder {
-
-        protected static final Logger log = Logger
-                .getLogger(RabaDecoder.class);
 
         /**
          * The entries in the logical byte[][].
@@ -1421,7 +1473,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          */
         private final boolean isSymbolTable;
         
-        private final ByteBuffer data;
+        private final AbstractFixedByteArrayBuffer data;
 
 //        /**
 //         * The coder is generated iff the logical byte[][] contains B+Tree keys.
@@ -1486,7 +1538,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * @param data
          *            The record containing the coded data.
          */
-        public RabaDecoder(final ByteBuffer data) {
+        public RabaDecoder(final AbstractFixedByteArrayBuffer data) {
 
             this(data, null/* decoder */);
 
@@ -1500,13 +1552,11 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          *            The decoder (optional). When not given the decoder is
          *            reconstructed from the record.
          * 
-         * @todo the decoder parameter is not proving to be terribly useful
-         *       right now due to API problems with the underlying
-         *       {@link HuffmanCodec}.  If things are working properly, then
-         *       we can save effort by reusing the decoder instance here when
-         *       a mutable node is persisted.
+         * @todo We can save effort by reusing the decoder instance here when a
+         *       mutable node is persisted.
          */
-        public RabaDecoder(final ByteBuffer data, final Decoder decoder) {
+        public RabaDecoder(final AbstractFixedByteArrayBuffer data,
+                final Decoder decoder) {
 
             if (data == null)
                 throw new IllegalArgumentException();
@@ -1514,8 +1564,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             this.data = data;
 
             final StringBuilder sb = debug ? new StringBuilder("\n") : null;
-            final InputBitStream ibs = new InputBitStream(
-                    new ByteBufferInputStream(data));
+            final InputBitStream ibs = data.getInputBitStream();
             try {
                 final int version = ibs.readInt(8/* nbits */);
                 if (version != VERSION0) {
@@ -1543,9 +1592,10 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 }
 
                 this.size = ibs.readInt(31/*nbits*/);
-                
+                if (debug)
+                    sb.append("size=" + size + "\n");
                 if (size < 0)
-                    throw new RuntimeException();
+                    throw new IOException();
 
                 nsymbols = ibs.readInt(9/* nbits */);
                 if (debug)
@@ -1589,7 +1639,10 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                     if (debug) {
                         sb.append("O_nulls=" + O_nulls + "\n");
                         for (int i = 0; i < size; i++) {
-                            sb.append("null[" + i + "]=" + ibs.readBit()+ "\n");
+                            final boolean isNull = ibs.readBit() != 0;
+                            sb.append("null[" + i + "]=" + isNull + "\n");
+                            assert isNull == data.getBit(O_nulls + i) : "index="
+                                    + i;
                         }
                     } else {
                         // skip over the null bit flags.
@@ -1615,6 +1668,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                  * Setup the decoder.
                  */
                 final long O_decoderInputs = ibs.readBits();
+                if (debug)
+                    sb.append("O_decoderInputs=" + O_decoderInputs+"\n");
                 assert O_decoderInputs == O_nulls + (isKeys ? 0 : size);
 //                assert O_decoderInputs % 8 == 0; // verify byte aligned.
 //                assert O_decoderInputs == O_symbols
@@ -1622,7 +1677,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 
                 // read bit length[], symbol[], and shortest code word. 
                 final DecoderInputs decoderInputs = readDecoderInputs(nsymbols,
-                        ibs);
+                        ibs, sb);
 
                 if (decoder == null) {
                     /*
@@ -1733,7 +1788,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
-        public ByteBuffer data() {
+        public AbstractFixedByteArrayBuffer data() {
 
             return data;
 
@@ -1759,7 +1814,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             } else {
                 
                 // index into the buffer start after [nsymbols].
-                return data.get(BO_symbols + symbol);
+                return data.getByte(BO_symbols + symbol);
             
             }
 
@@ -1781,28 +1836,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 
             }
 
-            final InputBitStream ibs = new InputBitStream(
-                    new ByteBufferInputStream(data));
-
-            try {
-                
-                ibs.position(O_nulls + index);
-
-                return ibs.readBit() != 0;
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            } finally {
-
-                try {
-                    ibs.close();
-                } catch (IOException ex) {
-                    log.error(ex);
-                }
-
-            }
+            return data.getBit(O_nulls + index);
 
         }
 
@@ -1815,51 +1849,45 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             if (index < 0 || index >= size)
                 throw new IllegalArgumentException();
 
-            final InputBitStream ibs = new InputBitStream(
-                    new ByteBufferInputStream(data));
+            if (!isKeys) {
 
-            try {
-
-                if (!isKeys) {
-
-                    /*
-                     * Figure out whether or not this index is a null.
-                     * 
-                     * @todo bit test the buffer w/o creating the IBS.
-                     */
-                    ibs.position(O_nulls + index);
-
-                    final boolean isNull = ibs.readBit() != 0;
-
-                    if (isNull) {
-
-                        // per the API.
-                        throw new NullPointerException();
-
-                    }
-                    
-                }
-                
-                if (nsymbols == 0) {
-
-                    /*
-                     * The offset[] is not stored if there are no symbols. Since
-                     * we know that the value is not a null, this implies that
-                     * the coded value was an empty byte[]. We have to handle
-                     * this case explicitly.
-                     */
-                    
-                    return 0;
-                    
-                }
-                
                 /*
-                 * Figure out the bit length of the coded byte[].
-                 * 
-                 * Note: When we are allocating the byte[] for the caller we
-                 * will scan the coded byte[] once to get the length of the
-                 * decoded byte[] and then scan it again to decode the byte[].
+                 * Figure out whether or not this index is a null.
                  */
+                final boolean isNull = data.getBit(O_nulls + index);
+
+                if (isNull) {
+
+                    // per the API.
+                    throw new NullPointerException();
+
+                }
+
+            }
+
+            if (nsymbols == 0) {
+
+                /*
+                 * The offset[] is not stored if there are no symbols. Since we
+                 * know that the value is not a null, this implies that the
+                 * coded value was an empty byte[]. We have to handle this case
+                 * explicitly.
+                 */
+
+                return 0;
+
+            }
+
+            /*
+             * Figure out the bit length of the coded byte[].
+             * 
+             * Note: When we are allocating the byte[] for the caller we will
+             * scan the coded byte[] once to get the length of the decoded
+             * byte[] and then scan it again to decode the byte[].
+             */
+
+            final InputBitStream ibs = data.getInputBitStream();
+            try {
 
                 // get the bit offset of the start of this coded value.
                 ibs.position(O_codedValueOffsets + ((long) index)
@@ -1922,44 +1950,39 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             if (index < 0 || index >= size)
                 throw new IllegalArgumentException();
 
-            final InputBitStream ibs = new InputBitStream(
-                    new ByteBufferInputStream(data));
+            if (!isKeys) {
+
+                /*
+                 * Figure out whether or not this index is a null.
+                 */
+                final boolean isNull = data.getBit(O_nulls + index);
+
+                if (isNull) {
+
+                    // The value is a null.
+                    return null;
+
+                }
+                
+            }
+
+            if (nsymbols == 0) {
+
+                /*
+                 * The offset[] is not stored if there are no symbols. Since
+                 * we know that the value is not a null, this implies that
+                 * the coded value was an empty byte[]. We have to handle
+                 * this case explicitly.
+                 */
+                
+                return BytesUtil.EMPTY;
+                
+            }
+                
+            final InputBitStream ibs = data.getInputBitStream();
 
             try {
 
-                if (!isKeys) {
-
-                    /*
-                     * Figure out whether or not this index is a null.
-                     * 
-                     * @todo bit test the buffer w/o creating the IBS.
-                     */
-                    ibs.position(O_nulls + index);
-
-                    final boolean isNull = ibs.readBit() != 0;
-
-                    if (isNull) {
-
-                        // The value is a null.
-                        return null;
-
-                    }
-                    
-                }
-
-                if (nsymbols == 0) {
-
-                    /*
-                     * The offset[] is not stored if there are no symbols. Since
-                     * we know that the value is not a null, this implies that
-                     * the coded value was an empty byte[]. We have to handle
-                     * this case explicitly.
-                     */
-                    
-                    return BytesUtil.EMPTY;
-                    
-                }
-                
                 /*
                  * Figure out the bit length of the coded byte[].
                  * 
@@ -1983,7 +2006,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 // the total length of this code in bits.
                 final long codeLength = O_to - O_from;
                 
-                assert codeLength >= 0;
+                assert codeLength >= 0 : "index=" + index + ", codeLength="
+                        + codeLength;
 
                 /*
                  * Figure out how many symbols are in the coded byte[].
@@ -2053,44 +2077,40 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             if (index < 0 || index >= size)
                 throw new IllegalArgumentException();
 
-            final InputBitStream ibs = new InputBitStream(
-                    new ByteBufferInputStream(data));
+            if (!isKeys) {
+
+                /*
+                 * Figure out whether or not this index is a null.
+                 */
+                final boolean isNull = data.getBit(O_nulls + index);
+
+                if (isNull) {
+
+                    // per the API.
+                    throw new NullPointerException();
+
+                }
+
+            }
+
+            if (nsymbols == 0) {
+
+                /*
+                 * The offset[] is not stored if there are no symbols. Since we
+                 * know that the value is not a null, this implies that the
+                 * coded value was an empty byte[]. We have to handle this case
+                 * explicitly.
+                 */
+
+                return 0;
+
+            }
+
+            final InputBitStream ibs = data.getInputBitStream();
 
             try {
 
-                if (!isKeys) {
-
-                    /*
-                     * Figure out whether or not this index is a null.
-                     * 
-                     * @todo bit test the buffer w/o creating the IBS.
-                     */
-                    ibs.position(O_nulls + index);
-
-                    final boolean isNull = ibs.readBit() != 0;
-
-                    if (isNull) {
-
-                        // per the API.
-                        throw new NullPointerException();
-
-                    }
-
-                }
-
-                if (nsymbols == 0) {
-
-                    /*
-                     * The offset[] is not stored if there are no symbols. Since
-                     * we know that the value is not a null, this implies that
-                     * the coded value was an empty byte[]. We have to handle
-                     * this case explicitly.
-                     */
-                    
-                    return 0;
-                    
-                }
-                                /*
+                /*
                  * Figure out the bit length of the coded byte[].
                  * 
                  * Note: When we are allocating the byte[] for the caller we
@@ -2173,8 +2193,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
 //            assert coder != null;
             
-            final InputBitStream ibs = new InputBitStream(
-                    new ByteBufferInputStream(data));
+            final InputBitStream ibs = data.getInputBitStream();
 
             try {
 

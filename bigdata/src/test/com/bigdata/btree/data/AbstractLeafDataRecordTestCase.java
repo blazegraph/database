@@ -30,6 +30,7 @@ package com.bigdata.btree.data;
 
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
  * Test suite for the B+Tree {@link ILeafData} records (accessing coded data in
@@ -77,10 +78,12 @@ public class AbstractLeafDataRecordTestCase extends
         final ILeafData expected = new MockLeafData(new ReadOnlyKeysRaba(
                 nkeys, keys), new ReadOnlyValuesRaba(nkeys, vals));
 
-        final ILeafData actual = new ReadOnlyLeafData(expected, keysCoder,
-                valuesCoder, false/* doubleLinked */);
-
-        assertSameLeafData(expected, actual);
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
+        
+//        final ILeafData actual = new ReadOnlyLeafData(expected, keysCoder,
+//                valuesCoder, false/* doubleLinked */, new DataOutputBuffer());
+//
+//        assertSameLeafData(expected, actual);
 
     }
 
@@ -99,18 +102,20 @@ public class AbstractLeafDataRecordTestCase extends
         final ILeafData expected = new MockLeafData(new ReadOnlyKeysRaba(
                 nkeys, keys), new ReadOnlyValuesRaba(nkeys, vals));
 
-        final ILeafData actual = new ReadOnlyLeafData(expected, keysCoder,
-                valuesCoder, false/* doubleLinked */);
-
-        assertSameLeafData(expected, actual);
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
         
-        // check some keys that are not in the leaf.
-        assertEquals(//
-                expected.getKeys().search(new byte[] { 1 }), //
-                actual.getKeys().search(new byte[] { 1 }));
-        assertEquals(//
-                expected.getKeys().search(new byte[] { 0, 1, 2 }), //
-                actual.getKeys().search(new byte[] { 0, 1, 2 }));
+//        final ILeafData actual = new ReadOnlyLeafData(expected, keysCoder,
+//                valuesCoder, false/* doubleLinked */, new DataOutputBuffer());
+//
+//        assertSameLeafData(expected, actual);
+//        
+//        // check some keys that are not in the leaf.
+//        assertEquals(//
+//                expected.getKeys().search(new byte[] { 1 }), //
+//                actual.getKeys().search(new byte[] { 1 }));
+//        assertEquals(//
+//                expected.getKeys().search(new byte[] { 0, 1, 2 }), //
+//                actual.getKeys().search(new byte[] { 0, 1, 2 }));
 
     }
 
@@ -141,18 +146,20 @@ public class AbstractLeafDataRecordTestCase extends
         assertTrue(expected.getDeleteMarker(0));
         assertEquals(versionTimestamps[0], expected.getVersionTimestamp(0));
 
-        final ILeafData actual = new ReadOnlyLeafData(expected, keysCoder,
-                valuesCoder, false/* doubleLinked */);
-
-        assertSameLeafData(expected, actual);
-
-        // check some keys that are not in the leaf.
-        assertEquals(//
-                expected.getKeys().search(new byte[] { 1 }), //
-                actual.getKeys().search(new byte[] { 1 }));
-        assertEquals(//
-                expected.getKeys().search(new byte[] { 0, 1, 2 }), //
-                actual.getKeys().search(new byte[] { 0, 1, 2 }));
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
+        
+//        final ILeafData actual = new ReadOnlyLeafData(expected, keysCoder,
+//                valuesCoder, false/* doubleLinked */, new DataOutputBuffer());
+//
+//        assertSameLeafData(expected, actual);
+//
+//        // check some keys that are not in the leaf.
+//        assertEquals(//
+//                expected.getKeys().search(new byte[] { 1 }), //
+//                actual.getKeys().search(new byte[] { 1 }));
+//        assertEquals(//
+//                expected.getKeys().search(new byte[] { 0, 1, 2 }), //
+//                actual.getKeys().search(new byte[] { 0, 1, 2 }));
 
     }
     

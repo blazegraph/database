@@ -1,29 +1,23 @@
 package com.bigdata.rdf.spo;
 
 
-import it.unimi.dsi.fastutil.io.FastByteArrayOutputStream;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.Externalizable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.AbstractRabaDecoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.raba.codec.IRabaDecoder;
-import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -50,8 +44,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FastRDFValueCompression implements IDataSerializer,
-        Externalizable, IRabaCoder {
+public class FastRDFValueCompression implements Externalizable, IRabaCoder {
 
     protected static final Logger log = Logger
             .getLogger(FastRDFValueCompression.class);
@@ -84,57 +77,6 @@ public class FastRDFValueCompression implements IDataSerializer,
      * Sole constructor (handles de-serialization also).
      */
     public FastRDFValueCompression() {
-
-    }
-
-    public void read(final DataInput in, final IRaba raba) throws IOException {
-
-        final InputBitStream ibs = new InputBitStream((InputStream) in,
-                0/* unbuffered! */, false/* reflectionTest */);
-
-        /*
-         * read the values.
-         */
-
-        final byte version = (byte) ibs.readInt(8/* nbits */);
-
-        if (version != VERSION0)
-            throw new IOException();
-        
-        final int n = ibs.readNibble();
-
-        for (int i = 0; i < n; i++) {
-
-            final int b = ibs.readInt(3);
-            
-            if (b == 7) {
-             
-                // A null.
-                
-                raba.add(null);
-                
-            } else {
-            
-                raba.add(new byte[] { (byte) b });
-                
-            }
-
-        }
-        
-    }
-
-    public void write(final DataOutput out, final IRaba raba)
-            throws IOException {
-
-        final OutputBitStream obs = new OutputBitStream((OutputStream) out,
-                0 /* unbuffered! */, false/* reflectionTest */);
-
-        writeOn(raba, obs);
-        
-        /*
-         * Note: ALWAYS flush!
-         */
-        obs.flush();
 
     }
 
@@ -187,17 +129,42 @@ public class FastRDFValueCompression implements IDataSerializer,
         
     }
     
-    public IRabaDecoder encode(final IRaba raba) {
+    public AbstractFixedByteArrayBuffer encode(final IRaba raba,
+            final DataOutputBuffer b) {
+
+        if (raba == null)
+            throw new UnsupportedOperationException();
+
+        if (b == null)
+            throw new UnsupportedOperationException();
         
         final int n = raba.size();
         
         // This is sufficient capacity to code the data.
         final int initialCapacity = Bytes.SIZEOF_INT + (3 * n) / 8 + 1;
+
+        b.ensureCapacity(initialCapacity);
+
+//        final FastByteArrayOutputStream baos = new FastByteArrayOutputStream(
+//                initialCapacity);
+
+//        if (b == null) {
+//
+//            b = new ByteArrayBuffer(initialCapacity);
+//            
+//        } else {
+//
+//            b.ensureCapacity(initialCapacity);
+//            
+//            b.reset();
+//            
+//        }
+
+        // The byte offset of the start of the coded record in the buffer.
+        final int O_origin = b.pos();
         
-        final FastByteArrayOutputStream baos = new FastByteArrayOutputStream(initialCapacity);
-        
-        final OutputBitStream obs = new OutputBitStream((OutputStream) baos,
-                0 /* unbuffered! */, false/* reflectionTest */);
+        final OutputBitStream obs = new OutputBitStream(b, 0 /* unbuffered! */,
+                false/* reflectionTest */);
 
         try {
          
@@ -210,12 +177,14 @@ public class FastRDFValueCompression implements IDataSerializer,
             
         }
 
-        return decode(ByteBuffer
-                .wrap(baos.array, 0/* off */, baos.length/* len */));
+        return b.slice(O_origin, b.pos() - O_origin);
+//        return b.toByteArray();
+//        return decode(ByteBuffer
+//                .wrap(baos.array, 0/* off */, baos.length/* len */));
         
     }
 
-    public IRabaDecoder decode(final ByteBuffer data) {
+    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
 
         return new RabaDecoderImpl(data);
         
@@ -229,7 +198,7 @@ public class FastRDFValueCompression implements IDataSerializer,
      */
     private static class RabaDecoderImpl extends AbstractRabaDecoder {
 
-        private final ByteBuffer data;
+        private final AbstractFixedByteArrayBuffer data;
         
         /**
          * Cached.
@@ -241,7 +210,7 @@ public class FastRDFValueCompression implements IDataSerializer,
          */
         private final int O_values;
         
-        final public ByteBuffer data() {
+        final public AbstractFixedByteArrayBuffer data() {
 
             return data;
             
@@ -283,15 +252,14 @@ public class FastRDFValueCompression implements IDataSerializer,
             
         }
 
-        public RabaDecoderImpl(final ByteBuffer data) {
+        public RabaDecoderImpl(final AbstractFixedByteArrayBuffer data) {
 
             if (data == null)
                 throw new IllegalArgumentException();
 
             this.data = data;
-            
-            final InputBitStream ibs = new InputBitStream(
-                    new ByteBufferInputStream(data));
+
+            final InputBitStream ibs = data.getInputBitStream();
 
             try {
 
@@ -337,6 +305,9 @@ public class FastRDFValueCompression implements IDataSerializer,
          * 
          * @throws IndexOutOfBoundsException
          *             unless the index is in [0:size-1].
+         * 
+         * @todo this could be faster if we extracted a byte or two and did the
+         *       appropriate bit manipulations.
          */
         final protected byte getBits(final int index) {
 
@@ -344,11 +315,15 @@ public class FastRDFValueCompression implements IDataSerializer,
                 throw new IndexOutOfBoundsException();
 
             int value = 0;
-            int bitIndex = O_values;
+            long bitIndex = O_values;
             for (int i = 0; i < 3; i++, bitIndex++) {
 
-                final boolean bit = BytesUtil.getBit(data, 0/* byteOffset */,
-                        bitIndex);
+                /*
+                 * FIXME This is going to be broken due to the changes to
+                 * BytesUtil to use the same big endian format for bit flags as
+                 * OutputBitStream.
+                 */
+                final boolean bit = data.getBit(bitIndex);
 
                 value |= (bit ? 1 : 0) << i;
 

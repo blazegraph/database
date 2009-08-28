@@ -1,6 +1,6 @@
-/**
+/*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -21,31 +21,34 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.btree.raba;
+/*
+ * Created on Aug 26, 2009
+ */
 
+package com.bigdata.io;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates test suites into increasing dependency order.
- *
+ * Aggregates test suites in increasing dependency order.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class TestAll_Buffers extends TestCase {
 
     /**
      * 
      */
-    public TestAll() {
+    public TestAll_Buffers() {
     }
 
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public TestAll_Buffers(String arg0) {
         super(arg0);
     }
 
@@ -53,24 +56,31 @@ public class TestAll extends TestCase {
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
      */
-    public static Test suite()
-    {
+    public static Test suite() {
 
-        final TestSuite suite = new TestSuite("Random Access Byte Arrays (rabas)");
+        final TestSuite suite = new TestSuite(TestAll.class.getPackage()
+                .getName());
 
-        suite.addTestSuite(TestMutableValuesRaba.class);
-        
-        // test mutable key buffer.
-        suite.addTestSuite(TestMutableKeyBuffer.class);
+        /*
+         * test fast DataOutput and DataInput implementations.
+         */
 
-        // test key search routines on the key buffer implementations.
-        suite.addTestSuite(TestKeyBufferSearch.class);
-
-        // compressed data implementations.
-        suite.addTest(com.bigdata.btree.raba.codec.TestAll.suite());
+        // test use of ByteBuffer as an input/output stream.
+        suite.addTestSuite(TestByteBufferStreams.class);
+        // test fixed-length record w/ absolute access.
+        suite.addTestSuite(TestFixedByteArrayBuffer.class);
+        // test extensible record w/ absolute and relative and stream-based
+        // access.
+        suite.addTestSuite(TestByteArrayBuffer.class);
+        // test extensible record w/ DataOutput API.
+        suite.addTestSuite(TestDataOutputBuffer.class);
+        // test packed short support.
+        suite.addTestSuite(TestShortPacker.class);
+        // test packed long support.
+        suite.addTestSuite(TestLongPacker.class);
 
         return suite;
-        
+
     }
-    
+
 }

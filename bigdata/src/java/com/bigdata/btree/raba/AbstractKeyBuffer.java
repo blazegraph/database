@@ -25,8 +25,6 @@ package com.bigdata.btree.raba;
 
 import java.util.Iterator;
 
-import com.bigdata.btree.IKeyBuffer;
-
 /**
  * Class with implementations supporting mutable and immutable variable length
  * byte[] keys.
@@ -47,7 +45,7 @@ import com.bigdata.btree.IKeyBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractKeyBuffer implements IKeyBuffer {
+public abstract class AbstractKeyBuffer implements IRaba {
 
     /**
      * Test the search key against the leading prefix shared by all bytes in the
@@ -100,4 +98,14 @@ public abstract class AbstractKeyBuffer implements IKeyBuffer {
 
     }
 
+    /**
+     * Return the largest leading prefix shared by all keys.
+     */
+    abstract public byte[] getPrefix();
+    
+    /**
+     * The length of the leading prefix shared by all keys.
+     */
+    abstract public int getPrefixLength();
+    
 }

@@ -135,6 +135,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
     /**
      * Conforms the return type to an instance of this class.
+     * {@inheritDoc}
      */
     public DataOutputBuffer reset() {
 
@@ -294,7 +295,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
         limit = pos;
         
     }
-    
+
     /**
      * @todo This is not wildly efficient (it would be fine if
      *       DataOutputStream#writeUTF(String str, DataOutput out)} was public)
@@ -303,6 +304,9 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      *       application values are already being serialized as byte[]s - which
      *       is always true when there is a client-server divide). It is used by
      *       {@link Name2Addr} to store the index names.
+     * 
+     * @todo Consider changing the access modified on the desired method using
+     *       reflection.
      */
     public void writeUTF(final String str) throws IOException {
         

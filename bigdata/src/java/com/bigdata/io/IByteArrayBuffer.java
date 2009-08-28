@@ -31,35 +31,53 @@ package com.bigdata.io;
 import it.unimi.dsi.fastutil.io.RepositionableStream;
 
 /**
- * An interface for reading from and accessing a managed byte[].
+ * An interface for reading from and accessing a managed (extensible) byte[].
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo raise mark(), pos(int), etc into this interface?
  */
-public interface IByteArrayBuffer {
+public interface IByteArrayBuffer extends IRawRecord {
 
     /**
-     * The backing byte[] buffer. This is re-allocated whenever the capacity of
-     * the buffer is too small and reused otherwise.
+     * The backing byte[]. This reference is invalidated if the buffer is
+     * extended.
      */
-    public byte[] array();
+    byte[] array();
+    
+    /**
+     * The offset of the slice into the backing byte[] is always zero.
+     */
+    int off();
 
+    /**
+     * The length of the slice is always the capacity of the backing byte[].
+     */
+    int len();
+    
     /**
      * The capacity of the buffer.
      */
-    public int capacity();
+    int capacity();
 
     /**
      * The current position in the buffer.
      * <p>
-     * Note: The method name was choosen to avoid a collision with
+     * Note: The method name was choose to avoid a collision with
      * {@link RepositionableStream#position()}.
      */
-    public int pos();
+    int pos();
+
+    /**
+     * The read limit (there is no write limit on the buffer since the capacity
+     * will be automatically extended on overflow).
+     */
+    int limit();
 
     /**
      * The #of bytes remaining in the buffer before it would overflow.
      */
-    public int remaining();
+    int remaining();
 
 }

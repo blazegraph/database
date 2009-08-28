@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on May 24, 2007
  */
 
-package com.bigdata.btree.raba.codec;
+package com.bigdata.io.compression;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

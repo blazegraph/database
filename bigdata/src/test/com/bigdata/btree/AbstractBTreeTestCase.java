@@ -34,9 +34,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.UUID;
 
 import junit.framework.AssertionFailedError;
@@ -52,6 +50,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.codec.RandomKeysGenerator;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
@@ -470,8 +469,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param expected
      * @param actual
      */
-    static public void assertSameRaba(final IRaba expected,
-            final IRaba actual) {
+    static public void assertSameRaba(final IRaba expected, final IRaba actual     ) {
 
         assertEquals("isKeys", expected.isKeys(), actual.isKeys());
 
@@ -564,29 +562,72 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
-        // test search API?
+        // test search API (only for B+Tree keys).
         if (expected.isKeys()) {
 
-//            final int[] order = getRandomOrder(expected.size());
-
+            final Random r = new Random();
+            
             for (int i = 0; i < expected.size(); i++) {
 
-//                final int index = order[i];
                 final int expectedIndex = i;
                 
                 final byte[] key = expected.get(expectedIndex);
 
-                final int actualIndex = actual.search(key);
+                { // search at the key.
+                    
+                    final int actualIndex = actual.search(key);
 
-                if (actualIndex != expectedIndex) {
+                    if (actualIndex != expectedIndex) {
 
-                    fail("search(" + BytesUtil.toString(key) + ")"+//
-                            ": expectedIndex=" + expectedIndex+ //
-                            ", actualIndex=" + actualIndex + //
-                            ",\nexpected=" + expected + //
-                            ",\nactual=" + actual//
-                            );
+                        fail("search(" + BytesUtil.toString(key) + ")" + //
+                                ": expectedIndex=" + expectedIndex + //
+                                ", actualIndex=" + actualIndex + //
+                                ",\nexpected=" + expected + //
+                                ",\nactual=" + actual//
+                        );
 
+                    }
+                }
+                
+                { // search at key plus a random byte[] suffix.
+                    
+                    // random suffix length.
+                    final int suffixLength = r.nextInt(1 + (key.length / 2)) + 1;
+                    
+                    // random fill of entire key.
+                    final byte[] key2 = new byte[key.length + suffixLength];
+                    r.nextBytes(key2);
+                    
+                    // copy shared prefix (all of the original key).
+                    System.arraycopy(key, 0, key2, 0, key.length);
+                    
+                    // expected insert position (or index iff found).
+                    final int epos = expected.search(key2);
+                    
+                    // actual result from search on the coded raba.
+                    final int apos = actual.search(key2);
+                    
+                    assertEquals("search with random prefix", epos, apos);
+                    
+                }
+                { // search at random length prefix of the key.
+                    
+                    // random prefix length (may be zero).
+                    final int prefixLength = Math.max(0,
+                            r.nextInt(Math.max(1,key.length)) - 1);
+                    
+                    // copy shared prefix.
+                    final byte[] key2 = new byte[prefixLength];
+                    System.arraycopy(key, 0, key2, 0, prefixLength);
+
+                    // expected insert position (or index iff found).
+                    final int epos = expected.search(key2);
+                    
+                    // actual result from search on the coded raba.
+                    final int apos = actual.search(key2);
+                    
+                    assertEquals("search with random suffix", epos, apos);
+                    
                 }
 
             }
@@ -2377,57 +2418,61 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     public static byte[][] getRandomKeys(final int maxKeys, final int nkeys) {
 
+        final int maxKeyLength = 20;
+
         final Random r = new Random();
-
-        assert nkeys >= 0;
-        assert maxKeys >= nkeys;
         
-        final int maxKeyLen = 20;
+        return new RandomKeysGenerator(r, maxKeys, maxKeyLength)
+                .generateKeys(nkeys);
 
-        /*
-         * generate maxKeys distinct keys (sort requires that the keys are
-         * non-null).
-         */
-        
-        // used to ensure distinct keys.
-        final Set<byte[]> set = new TreeSet<byte[]>(
-                BytesUtil.UnsignedByteArrayComparator.INSTANCE);
-
-        final byte[][] keys = new byte[maxKeys][];
-
-        int n = 0;
-
-        while (n < maxKeys) {
-
-            // random key length in [1:maxKeyLen].
-            final byte[] key = new byte[r.nextInt(maxKeyLen) + 1];
-
-            // random data in the key.
-            r.nextBytes(key);
-
-            if( set.add(key)) {
-
-                keys[n++] = key;
-
-            }
-            
-        }
-
-        /*
-         * place keys into sorted order.
-         */
-        Arrays.sort(keys, BytesUtil.UnsignedByteArrayComparator.INSTANCE);
-
-        /*
-         * clear out keys from keys[nkeys] through keys[maxKeys-1].
-         */
-        for (int i = nkeys; i < maxKeys; i++) {
-
-            keys[i] = null;
-
-        }
-
-        return keys;
+//
+//        assert nkeys >= 0;
+//        assert maxKeys >= nkeys;
+//
+//        /*
+//         * generate maxKeys distinct keys (sort requires that the keys are
+//         * non-null).
+//         */
+//        
+//        // used to ensure distinct keys.
+//        final Set<byte[]> set = new TreeSet<byte[]>(
+//                BytesUtil.UnsignedByteArrayComparator.INSTANCE);
+//
+//        final byte[][] keys = new byte[maxKeys][];
+//
+//        int n = 0;
+//
+//        while (n < maxKeys) {
+//
+//            // random key length in [1:maxKeyLen].
+//            final byte[] key = new byte[r.nextInt(maxKeyLen) + 1];
+//
+//            // random data in the key.
+//            r.nextBytes(key);
+//
+//            if( set.add(key)) {
+//
+//                keys[n++] = key;
+//
+//            }
+//            
+//        }
+//
+//        /*
+//         * place keys into sorted order.
+//         */
+//        Arrays.sort(keys, BytesUtil.UnsignedByteArrayComparator.INSTANCE);
+//
+//        /*
+//         * clear out keys from keys[nkeys] through keys[maxKeys-1].
+//         */
+//        for (int i = nkeys; i < maxKeys; i++) {
+//
+//            keys[i] = null;
+//
+//        }
+//
+//        return keys;
 
     }
 

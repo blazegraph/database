@@ -36,7 +36,7 @@ import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestNodeDataRecord_CanonicalHuffman extends AbstractNodeOrLeafDataRecordTestCase {
+public class TestNodeDataRecord_CanonicalHuffman extends AbstractNodeDataRecordTestCase {
 
     /**
      * 
@@ -65,7 +65,7 @@ public class TestNodeDataRecord_CanonicalHuffman extends AbstractNodeOrLeafDataR
         
         super.setUp();
 
-        keysCoder = CanonicalHuffmanRabaCoder.INSTANCE;
+        coder = new DefaultNodeCoder(CanonicalHuffmanRabaCoder.INSTANCE);
 
     }
 

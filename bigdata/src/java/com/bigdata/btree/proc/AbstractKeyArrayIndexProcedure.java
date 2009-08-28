@@ -287,42 +287,6 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         return valSer;
         
     }
-
-    /**
-     * Formats the data into a {@link String}.
-     * 
-     * @param data An array of unsigned byte arrays.
-     * 
-     * @return
-     */
-    protected String toString(IRaba keys) {
-       
-        StringBuilder sb = new StringBuilder();
-        
-        final int n = keys.size();
-        
-        sb.append("data(n=" + n + ")={");
-
-        for (int i = 0; i < n; i++) {
-
-            final byte[] a = keys.get(i);
-            
-            sb.append("\n");
-
-            sb.append("data[" + i + "]=");
-
-            sb.append(BytesUtil.toString(a));
-
-            if (i + 1 < n)
-                sb.append(",");
-            
-        }
-        
-        sb.append("}");
-        
-        return sb.toString();
-        
-    }
     
     final public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
@@ -480,8 +444,10 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             final int n = in.readInt();
 
             valSer = (IDataSerializer) in.readObject();
-            
-            a = new MutableValuesRaba(0, 0, new byte[n][]);
+
+            // FIXME do not deserialize, just wrap the record!
+            a = new MutableValuesRaba(0/* fromIndex */, 0/* toIndex */,
+                    n/* capacity */, new byte[n][]);
 
             valSer.read(in, a);
             

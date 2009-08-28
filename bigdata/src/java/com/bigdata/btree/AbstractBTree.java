@@ -627,7 +627,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         this.store = store;
 
         if (store == null) {
-            
+
             /*
              * Transient BTree.
              * 
@@ -635,8 +635,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
              * a transient BTree and the read retention queue is positively
              * useless.
              * 
-             * Note: The [nodeSer] is used by a transient BTree - the nodes and
-             * leaves are NOT serialized since they are NOT persistent.
+             * FIXME The [nodeSer] is not used by a transient BTree - the nodes
+             * and leaves are NOT serialized since they are NOT persistent.
+             * [This should be changed. On eviction, the node/leaf should be
+             * coded so it is in a compact in-memory form, but the coded record
+             * will not be written onto a backing store]
              */
 
             this.writeRetentionQueue = new HardReferenceQueue<PO>(//
@@ -3098,7 +3101,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         assert !node.deleted;
         assert !node.isPersistent();
         assertNotReadOnly();
-
+        
         /*
          * Note we have to permit the reference counter to be positive and not
          * just zero here since during a commit there will typically still be
@@ -3136,6 +3139,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         /*
          * Serialize the node or leaf onto a shared buffer.
+         * 
+         * FIXME This should replace node.data with a ReadOnlyNodeData or a
+         * ReadOnlyLeafData wrapping the coded record.
          */
 
         if (debug)
@@ -3148,13 +3154,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
             if (node.isLeaf()) {
 
-                buf = nodeSer.putLeaf((Leaf) node);
+                buf = nodeSer.putLeaf(((Leaf) node).data);
 
                 btreeCounters.leavesWritten++;
 
             } else {
 
-                buf = nodeSer.putNode((Node) node);
+                buf = nodeSer.putNode(((Node) node).data);
 
                 btreeCounters.nodesWritten++;
 

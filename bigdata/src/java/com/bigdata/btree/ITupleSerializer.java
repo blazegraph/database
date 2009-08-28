@@ -47,10 +47,10 @@ import com.bigdata.service.IMetadataService;
  * <p>
  * The encoded key is always a variable length unsigned byte[]s. The purpose of
  * the encoded key is to determine the total order over the tuple in the B+Tree.
- * While some key encodings are reversable without less (e.g., int, long, float
+ * While some key encodings are reversible without less (e.g., int, long, float
  * or double), many key encodings are simply not decodable (including Unicode
  * keys). Applications that require the ability to decode complex keys may need
- * to resort to storing the unencoded key state redundently in the tuple value.
+ * to resort to storing the unencoded key state redundantly in the tuple value.
  * 
  * FIXME extSer integration. There are two broad setups. (1) Local: when running
  * without an {@link IMetadataService} and hence on a single
@@ -75,7 +75,7 @@ import com.bigdata.service.IMetadataService;
  * remote) extSer object from within both the {@link AbstractBTree} and the
  * various {@link ITupleIterator} implementations, including the
  * {@link AbstractChunkedTupleIterator}. Further, the recovered object must
- * cache the extSer state, must have a resonable life cycle so that it is
+ * cache the extSer state, must have a reasonable life cycle so that it is
  * efficient, and must be linked into the commit protocol such that assigned
  * class identifiers are always made persistent if a commit could have included
  * data written using those class identifiers.
@@ -102,7 +102,7 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
      * </p>
      * <p>
      * Note: If you change this value in a manner that is not backward
-     * compatable once entries have been written on the index then you may be
+     * compatible once entries have been written on the index then you may be
      * unable to any read data already written.
      * </p>
      * <p>
@@ -195,7 +195,7 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
      * <p>
      * Note: The B+Tree does NOT rely on this method. It is used to support the
      * materialization of the key required to allow {@link BigdataMap} and
-     * {@link BigdataSet} to fullfill their respective APIs.
+     * {@link BigdataSet} to fulfill their respective APIs.
      * 
      * @throws UnsupportedOperationException
      *             if this operation is not implemented.
@@ -212,7 +212,7 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
      * leaf.
      * <p>
      * Note: If you change this value in a manner that is not backward
-     * compatable once entries have been written on the index then you may be
+     * compatible once entries have been written on the index then you may be
      * unable to any read data already written.
      */
     IDataSerializer getLeafKeySerializer();
@@ -228,7 +228,7 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
      * the leaf.
      * <p>
      * Note: If you change this value in a manner that is not backward
-     * compatable once entries have been written on the index then you may be
+     * compatible once entries have been written on the index then you may be
      * unable to any read data already written.
      */
     IDataSerializer getLeafValueSerializer();

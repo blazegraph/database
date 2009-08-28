@@ -27,10 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.IKeyBuffer;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.btree.BytesUtil;
 
 /**
  * Unit tests for {@link IKeyBuffer#search(byte[] searchKey)}.
@@ -107,9 +106,9 @@ public class TestKeyBufferSearch extends TestCase2 {
 
         doSearchTest01(kbuf);
         
-        ImmutableKeyBuffer kbuf2 = new ImmutableKeyBuffer( kbuf );
-        
-        doSearchTest01(kbuf2);
+//        ImmutableKeyBuffer kbuf2 = new ImmutableKeyBuffer( kbuf );
+//        
+//        doSearchTest01(kbuf2);
         
     }
 
@@ -197,31 +196,31 @@ public class TestKeyBufferSearch extends TestCase2 {
                 kbuf.search(null);
                 fail("Expecting: " + IllegalArgumentException.class);
             } catch (IllegalArgumentException ex) {
-                System.err.println("Ignoring expected exception: " + ex);
+                if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
             }
         }
 
-        {
-            ImmutableKeyBuffer kbuf = new ImmutableKeyBuffer(nkeys, maxKeys, keys);
-
-            assertEquals(3,kbuf.getPrefixLength());
-
-            doSearchTest02(kbuf);
-            
-            try { // correct rejection when search key is null.
-                kbuf.search(null);
-                fail("Expecting: " + IllegalArgumentException.class);
-            } catch (IllegalArgumentException ex) {
-                System.err.println("Ignoring expected exception: " + ex);
-            }
-
-        }
+//        {
+//            ImmutableKeyBuffer kbuf = new ImmutableKeyBuffer(nkeys, maxKeys, keys);
+//
+//            assertEquals(3,kbuf.getPrefixLength());
+//
+//            doSearchTest02(kbuf);
+//            
+//            try { // correct rejection when search key is null.
+//                kbuf.search(null);
+//                fail("Expecting: " + IllegalArgumentException.class);
+//            } catch (IllegalArgumentException ex) {
+//                if(log.isInfoEnabled()) log.info("Ignoring expected exception: " + ex);
+//            }
+//
+//        }
         
     }
     
-    private void doSearchTest02(IKeyBuffer kbuf) {
+    private void doSearchTest02(final AbstractKeyBuffer kbuf) {
         
-        System.err.println("kbuf="+kbuf);
+        if(log.isInfoEnabled()) log.info("kbuf="+kbuf);
         
         assertEquals(0,kbuf.search(new byte[]{1,3,4}));
         assertEquals(1,kbuf.search(new byte[]{1,3,4,1,0}));
@@ -250,11 +249,11 @@ public class TestKeyBufferSearch extends TestCase2 {
         
         doSearchTest03( new MutableKeyBuffer(nkeys,keys));
 
-        doSearchTest03( new ImmutableKeyBuffer(nkeys,maxKeys,keys));
+//        doSearchTest03( new ImmutableKeyBuffer(nkeys,maxKeys,keys));
 
     }
 
-    private void doSearchTest03(IKeyBuffer kbuf) {
+    private void doSearchTest03(final AbstractKeyBuffer kbuf) {
         
         assert kbuf.getPrefixLength() == 0;
         
@@ -292,13 +291,13 @@ public class TestKeyBufferSearch extends TestCase2 {
         
         doSearchTest04( new MutableKeyBuffer(nkeys,keys));
 
-        doSearchTest04( new ImmutableKeyBuffer(nkeys,0,keys));
-                
-        doSearchTest04( new ImmutableKeyBuffer(nkeys,maxKeys,keys));
+//        doSearchTest04( new ImmutableKeyBuffer(nkeys,0,keys));
+//                
+//        doSearchTest04( new ImmutableKeyBuffer(nkeys,maxKeys,keys));
         
     }
     
-    private void doSearchTest04(IKeyBuffer kbuf) {
+    private void doSearchTest04(final AbstractKeyBuffer kbuf) {
 
         assertEquals(-1,kbuf.search(new byte[]{}));
         
@@ -326,13 +325,13 @@ public class TestKeyBufferSearch extends TestCase2 {
             
         }
         
-        {
-         
-            ImmutableKeyBuffer kbuf = new ImmutableKeyBuffer(nkeys,maxKeys,keys);
-            
-            doPrefixMatchLengthTest(kbuf);
-         
-        }
+//        {
+//         
+//            ImmutableKeyBuffer kbuf = new ImmutableKeyBuffer(nkeys,maxKeys,keys);
+//            
+//            doPrefixMatchLengthTest(kbuf);
+//         
+//        }
 
     }
     
@@ -344,7 +343,7 @@ public class TestKeyBufferSearch extends TestCase2 {
         // verify the prefix.
         assertEquals("prefix", new byte[]{1,3,4}, kbuf.getPrefix());
 
-        System.err.println("prefix="+BytesUtil.toString(kbuf.getPrefix()));
+        if(log.isInfoEnabled()) log.info("prefix="+BytesUtil.toString(kbuf.getPrefix()));
             
         /*
          * test on some keys that are in the buffer. all keys in the buffer must

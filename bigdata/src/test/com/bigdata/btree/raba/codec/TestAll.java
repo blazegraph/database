@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree.raba.codec;
 
-import com.bigdata.btree.raba.codec.TestCanonicalHuffmanRabaCoder;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -69,8 +67,6 @@ public class TestAll extends TestCase {
 
         // canonical huffman coding.
         suite.addTestSuite(TestCanonicalHuffmanRabaCoder.class);
-
-        suite.addTestSuite(TestHuffmanEncoder.class);
 
         return suite;
         

@@ -488,7 +488,15 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
             final FastByteArrayOutputStream baos = new FastByteArrayOutputStream();
             final OutputBitStream obs = new OutputBitStream(baos);
 
-            CanonicalHuffmanRabaCoder.writeDecoderInputs(decoderInputs, obs);
+            final StringBuilder sb = CanonicalHuffmanRabaCoder.log.isDebugEnabled()?new StringBuilder():null;
+            
+            CanonicalHuffmanRabaCoder.writeDecoderInputs(decoderInputs, obs, sb);
+
+            if (sb != null) {
+            
+                CanonicalHuffmanRabaCoder.log.debug(sb.toString());
+                
+            }
 
             obs.flush();
             obs.close();
@@ -496,21 +504,35 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
             // just the bytes written.
             in = new byte[baos.length];
             System.arraycopy(baos.array, 0, in, 0, baos.length);
+
         }
 
-        final InputBitStream ibs = new InputBitStream(in);
+        {
 
-        final DecoderInputs actualInputs = CanonicalHuffmanRabaCoder
-                .readDecoderInputs(nsymbols, ibs);
+            final InputBitStream ibs = new InputBitStream(in);
 
-        assertEquals("shortestCodeWord", decoderInputs.getShortestCodeWord(),
-                actualInputs.getShortestCodeWord());
+            final StringBuilder sb = CanonicalHuffmanRabaCoder.log
+                    .isDebugEnabled() ? new StringBuilder() : null;
 
-        assertEquals("length[]", decoderInputs.getLengths(), actualInputs
-                .getLengths());
+            final DecoderInputs actualInputs = CanonicalHuffmanRabaCoder
+                    .readDecoderInputs(nsymbols, ibs, sb);
 
-        assertEquals("symbol[]", decoderInputs.getSymbols(), actualInputs
-                .getSymbols());
+            if (sb != null) {
+
+                CanonicalHuffmanRabaCoder.log.debug(sb.toString());
+
+            }
+
+            assertEquals("shortestCodeWord", decoderInputs
+                    .getShortestCodeWord(), actualInputs.getShortestCodeWord());
+
+            assertEquals("length[]", decoderInputs.getLengths(), actualInputs
+                    .getLengths());
+
+            assertEquals("symbol[]", decoderInputs.getSymbols(), actualInputs
+                    .getSymbols());
+
+        }
 
     }
 

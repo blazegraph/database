@@ -56,9 +56,10 @@ public class TestLeafDataRecord_FrontCoded_CanonicalHuffman extends AbstractLeaf
         
         super.setUp();
 
-        keysCoder = new FrontCodedRabaCoder(8/* ratio */);
-
-        valuesCoder = CanonicalHuffmanRabaCoder.INSTANCE;
+        coder = new DefaultLeafCoder(//
+                new FrontCodedRabaCoder(8/* ratio */),// keys
+                CanonicalHuffmanRabaCoder.INSTANCE // vals
+        );
 
     }
 

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.data;
 
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
-import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
  * Test suite for the B+Tree {@link INodeData} records (accessing coded data in
@@ -71,7 +71,7 @@ abstract public class AbstractNodeDataRecordTestCase extends
 
         final int m = 3;
         final int nkeys = 0;
-        final byte[][] keys = new byte[m + 1][];
+        final byte[][] keys = new byte[m][];
         final int spannedTupleCount = 0;
         final long[] childAddr = new long[m + 1];
         final int[] childEntryCount = new int[m + 1];
@@ -79,9 +79,7 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(
                 nkeys, keys), spannedTupleCount, childAddr, childEntryCount);
 
-        final INodeData actual = new ReadOnlyNodeData(expected, keysCoder);
-
-        assertSameNodeData(expected, actual);
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
 
     }
 
@@ -92,25 +90,25 @@ abstract public class AbstractNodeDataRecordTestCase extends
     public void test_tupleCount1() {
         
         final int m = 3;
-        final int nkeys = 1;
-        final byte[][] keys = new byte[m + 1][];
-        final long[] childAddr = new long[m + 1];
-        final int childEntryCount[] = new int[m + 1];
+        final int nkeys = 1; // 1 key so 2 children.
+        final byte[][] keys = new byte[m][];
+        final long[] childAddr = new long[] { 10, 20, 0, 0 };
+        final int childEntryCount[] = new int[] { 4, 7, 0, 0 };
 
-        keys[0] = new byte[]{1,2,3};
-        
+        keys[0] = new byte[] { 1, 2, 3 };
+
         int entryCount = 0;
         for (int i = 0; i < nkeys; i++) {
+
             entryCount += childEntryCount[i];
+
         }
-        
-        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(
-                nkeys, keys),entryCount,childAddr,childEntryCount);
 
-        final INodeData actual = new ReadOnlyNodeData(expected, keysCoder);
+        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(nkeys,
+                keys), entryCount, childAddr, childEntryCount);
 
-        assertSameNodeData(expected, actual);
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
 
     }
-    
+
 }

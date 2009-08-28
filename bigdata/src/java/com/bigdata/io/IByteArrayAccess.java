@@ -22,33 +22,25 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Aug 14, 2009
+ * Created on Aug 27, 2009
  */
 
-package com.bigdata.btree.raba.codec;
-
-import java.nio.ByteBuffer;
-
-import com.bigdata.btree.raba.IRaba;
+package com.bigdata.io;
 
 /**
- * Variant used for an empty {@link IRaba} that represents B+Tree keys.
+ * Interface for access to a backing byte[].
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyRabaKeyDecoder extends EmptyRabaValueDecoder {
+public interface IByteArrayAccess {
 
-    public EmptyRabaKeyDecoder(final ByteBuffer data) {
-        
-        super(data);
-        
-    }
-
-    final public boolean isKeys() {
-        
-        return true;
-        
-    }
+    /**
+     * The backing byte[]. This method DOES NOT guarantee that the backing array
+     * reference will remain constant. Some implementations use an extensible
+     * backing byte[] and will replace the reference when the backing buffer is
+     * extended.
+     */
+    public byte[] array();
     
 }

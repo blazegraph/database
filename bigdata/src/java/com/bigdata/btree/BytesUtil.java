@@ -24,8 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
-import java.nio.ByteBuffer;
 import java.util.Comparator;
 
 import org.apache.log4j.Logger;
@@ -247,34 +248,34 @@ public class BytesUtil {
         return alen - blen;
     }
 
-    /**
-     * Byte-wise comparison of a {@link ByteBuffer} and a byte[]. The data are
-     * treated as arrays of unsigned bytes. The {@link ByteBuffer} position,
-     * limit and mark are unchanged by this procedure.
-     * 
-     * @param a
-     *            A {@link ByteBuffer}.
-     * @param aoff
-     *            The offset of the starting byte in the buffer.
-     * @param blen
-     *            The number of bytes to be compared.
-     * @param b
-     *            A byte[].
-     * 
-     * @return a negative integer, zero, or a positive integer if the first
-     *         argument is less than, equal to, or greater than the second.
-     */
-    final public static int compareBytes(final ByteBuffer a, final int aoff,
-            final int alen, final byte[] b) {
-        final int blen = b.length;
-        for (int i = 0; i < alen && i < blen; i++) {
-            // promotes to signed integers in [0:255] for comparison.
-            final int ret = (a.get(aoff + i) & 0xff) - (b[i] & 0xff);
-            if (ret != 0)
-                return ret;
-        }
-        return alen - blen;
-    }
+//    /**
+//     * Byte-wise comparison of a {@link ByteBuffer} and a byte[]. The data are
+//     * treated as arrays of unsigned bytes. The {@link ByteBuffer} position,
+//     * limit and mark are unchanged by this procedure.
+//     * 
+//     * @param a
+//     *            A {@link ByteBuffer}.
+//     * @param aoff
+//     *            The offset of the starting byte in the buffer.
+//     * @param blen
+//     *            The number of bytes to be compared.
+//     * @param b
+//     *            A byte[].
+//     * 
+//     * @return a negative integer, zero, or a positive integer if the first
+//     *         argument is less than, equal to, or greater than the second.
+//     */
+//    final public static int compareBytes(final ByteBuffer a, final int aoff,
+//            final int alen, final byte[] b) {
+//        final int blen = b.length;
+//        for (int i = 0; i < alen && i < blen; i++) {
+//            // promotes to signed integers in [0:255] for comparison.
+//            final int ret = (a.get(aoff + i) & 0xff) - (b[i] & 0xff);
+//            if (ret != 0)
+//                return ret;
+//        }
+//        return alen - blen;
+//    }
 
 //    /**
 //     * Byte-wise comparison of byte[]s (the arrays are treated as arrays of
@@ -772,7 +773,7 @@ public class BytesUtil {
             
         }
 
-        System.err.println("JNI library routines Ok.");
+        System.out.println("JNI library routines Ok.");
         
     }
 
@@ -797,6 +798,7 @@ public class BytesUtil {
 //        return ((int) ((nbits / 8) + 1));
         
     }
+    
     /**
      * Return the index of the byte in which the bit with the given index is
      * encoded.
@@ -806,45 +808,48 @@ public class BytesUtil {
      *            
      * @return The byte index.
      */
-    final public static int byteIndexForBit(final int bitIndex) {
+    final public static int byteIndexForBit(final long bitIndex) {
         
         return ((int) (bitIndex / 8));
         
     }
+
     /**
      * Return the offset within the byte in which the bit is coded of the bit
      * (this is just the remainder <code>bitIndex % 8</code>).
+     * <p>
+     * Note, the computation of the bit offset is intentionally aligned with
+     * {@link OutputBitStream} and {@link InputBitStream}.
      * 
      * @param bitIndex
      *            The bit index into the byte[].
      * 
      * @return The offset of the bit in the appropriate byte.
      */
-    final public static int withinByteIndexForBit(final int bitIndex) {
+    final public static int withinByteIndexForBit(final long bitIndex) {
         
-        return bitIndex % 8;
+        return 7 - ((int) bitIndex) % 8;
         
     }
 
     /**
      * Get the value of a bit.
+     * <p>
+     * Note, the computation of the bit offset is intentionally aligned with
+     * {@link OutputBitStream} and {@link InputBitStream}.
      * 
-     * @param byteOffset
-     *            The offset in the buffer of the start of the byte[] sequence
-     *            in which the bit coded flags are stored.
      * @param bitIndex
      *            The index of the bit.
      * 
      * @return The value of the bit.
      */
-    final public static boolean getBit(final ByteBuffer buf, final int byteOffset,
-            final int bitIndex) {
+    final public static boolean getBit(final byte[] buf, final long bitIndex) {
 
         final int mask = (1 << withinByteIndexForBit(bitIndex));
 
-        final int off = byteOffset + byteIndexForBit(bitIndex);
+        final int off = byteIndexForBit(bitIndex);
 
-        final byte b = buf.get(off);
+        final byte b = buf[off];
 
         return (b & mask) != 0;
 
@@ -853,24 +858,24 @@ public class BytesUtil {
     /**
      * Set the value of a bit - this is NOT thread-safe (contention for the byte
      * in the backing buffer can cause lost updates).
+     * <p>
+     * Note, the computation of the bit offset is intentionally aligned with
+     * {@link OutputBitStream} and {@link InputBitStream}.
      * 
-     * @param byteOffset
-     *            The offset in the buffer of the start of the byte[] sequence
-     *            in which the bit coded flags are stored.
      * @param bitIndex
      *            The index of the bit.
      * 
      * @return The old value of the bit.
      */
-    final public static boolean setBit(final ByteBuffer buf, final int byteOffset,
-            final int bitIndex, final boolean value) {
+    final public static boolean setBit(final byte[] buf, final long bitIndex,
+            final boolean value) {
 
         final int mask = (1 << withinByteIndexForBit(bitIndex));
 
-        final int off = byteOffset + byteIndexForBit(bitIndex);
+        final int off = byteIndexForBit(bitIndex);
 
         // current byte at that index.
-        byte b = buf.get(off);
+        byte b = buf[off];
 
         final boolean oldValue = (b & mask) != 0;
 
@@ -879,10 +884,10 @@ public class BytesUtil {
         else
             b &= ~mask;
 
-        buf.put(off, b);
+        buf[off] = b;
         
         return oldValue;
 
     }
-
+    
 }

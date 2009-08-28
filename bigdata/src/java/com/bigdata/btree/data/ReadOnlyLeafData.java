@@ -27,13 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
-import java.nio.ByteBuffer;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.btree.raba.codec.IRabaDecoder;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -44,6 +43,9 @@ import com.bigdata.rawstore.Bytes;
  * values are coded using a caller specified {@link IRabaCoder}. The specific
  * coding scheme is specified by the {@link IndexMetadata} for the B+Tree
  * instance and is not stored within the leaf data record.
+ * <p>
+ * Note: The leading byte of the record format codes for a leaf, a double-linked
+ * leaf or a node in a manner which is compatible with {@link ReadOnlyNodeData}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -51,11 +53,11 @@ import com.bigdata.rawstore.Bytes;
 public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         implements ILeafData {
 
-    /** A read-only view of the backing {@link ByteBuffer}. */
-    private final ByteBuffer b;
+    /** The backing buffer. */
+    private final AbstractFixedByteArrayBuffer b;
     
     // fields which are cached by the ctor.
-    private final boolean doubleLinked;
+//    private final boolean doubleLinked;
     private final int nkeys;
     private final short flags;
     private final IRaba keys;
@@ -73,32 +75,32 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      */
     private final int O_deleteMarkers;
 
-    /**
-     * Offset of the encoded keys in the buffer.
-     */
-    private final int O_keys;
-    
-    /**
-     * Offset of the encoded values in the buffer.
-     */
-    private final int O_values;
+//    /**
+//     * Offset of the encoded keys in the buffer.
+//     */
+//    private final int O_keys;
+//    
+//    /**
+//     * Offset of the encoded values in the buffer.
+//     */
+//    private final int O_values;
 
-    public final ByteBuffer buf() {
+    public final AbstractFixedByteArrayBuffer buf() {
 
         return b;
         
     }
 
     /**
-     * Wrap a record containing the encoded data for a leaf.
+     * Decode in place (wraps a record containing the encoded data for a leaf).
      * 
-     * @param b
+     * @param buf
      *            A buffer containing the leaf data.
      */
-    protected ReadOnlyLeafData(final ByteBuffer b, final IRabaCoder keysCoder,
-            final IRabaCoder valuesCoder) {
+    protected ReadOnlyLeafData(final AbstractFixedByteArrayBuffer buf,
+            final IRabaCoder keysCoder, final IRabaCoder valuesCoder) {
 
-        if (b == null)
+        if (buf == null)
             throw new IllegalArgumentException();
 
         if (keysCoder == null)
@@ -107,8 +109,11 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         if (valuesCoder == null)
             throw new IllegalArgumentException();
 
-        final byte type = b.get();
+        int pos = O_TYPE;
+        final byte type = buf.getByte(pos);
+        pos += SIZEOF_TYPE;
 
+        final boolean doubleLinked;
         switch (type) {
         case NODE:
             throw new AssertionError();
@@ -125,11 +130,12 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         if (doubleLinked) {
             
             // skip over the prior/next addr.
-            b.position(b.position() + SIZEOF_ADDR * 2);
+            pos += SIZEOF_ADDR * 2;
             
         }
         
-        final int version = b.getInt();
+        final int version = buf.getShort(pos);
+        pos += SIZEOF_VERSION;
         switch (version) {
         case VERSION0:
             break;
@@ -137,27 +143,27 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
             throw new AssertionError("version=" + version);
         }
 
-        /*
-         * @todo Cross check flags against the B+Tree when we wrap the record in
-         * a Leaf.
-         */
-        flags = b.getShort();
+        flags = buf.getShort(pos);
+        pos += SIZEOF_FLAGS;
         final boolean hasVersionTimestamps = ((flags & FLAG_VERSION_TIMESTAMPS) != 0);
         final boolean hasDeleteMarkers = ((flags & FLAG_DELETE_MARKERS) != 0);
 
-        this.nkeys = b.getInt();
+        this.nkeys = buf.getInt(pos);
+        pos += SIZEOF_NKEYS;
 
-        final int keysSize = b.getInt();
+        final int keysSize = buf.getInt(pos);
+        pos += SIZEOF_KEYS_SIZE;
         
-        final int valuesSize = b.getInt();
+        final int valuesSize = buf.getInt(pos);
+        pos += SIZEOF_KEYS_SIZE;
 
         // version timestamps
         if (hasVersionTimestamps) {
 
-            O_versionTimestamps = b.position();
+            O_versionTimestamps = pos;
             
             // advance past the timestamps.
-            b.position(b.position() + nkeys * SIZEOF_TIMESTAMP);
+            pos += nkeys * SIZEOF_TIMESTAMP;
             
         } else {
             
@@ -168,10 +174,10 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         // delete markers
         if (hasDeleteMarkers) {
             
-            O_deleteMarkers = b.position();
+            O_deleteMarkers = pos;
 
             // advance past the bit flags.
-            b.position(b.position() + BytesUtil.bitFlagByteLength(nkeys));// bit coded.
+            pos += BytesUtil.bitFlagByteLength(nkeys);// bit coded.
             
         } else {
             
@@ -180,29 +186,32 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         }
 
         // keys
-        O_keys = b.position();
-        b.limit(b.position() + keysSize);
-        this.keys = keysCoder.decode(b.slice());
-        assert b.position() == O_keys + keysSize;
+//        final int O_keys = pos;
+//        buf.limit(buf.pos() + keysSize);
+        this.keys = keysCoder.decode(buf.slice(pos, keysSize));
+//        assert buf.position() == O_keys + keysSize;
+        pos += keysSize;// skip over the keys.
 
         // values
-        O_values = b.position();
-        b.limit(b.position() + valuesSize);
-        this.vals = valuesCoder.decode(b.slice());
-        assert b.position() == O_values + valuesSize;
+//        final int O_values = pos;
+//        buf.limit(buf.position() + valuesSize);
+        this.vals = valuesCoder.decode(buf.slice(pos,valuesSize));
+//        assert buf.position() == O_values + valuesSize;
+        pos += valuesSize;// skip over the values.
 
-        assert b.position() == b.limit();
+//        assert buf.pos() == buf.limit();
         
         // flip [limit=pos; pos=0].
-        b.flip();
+//        buf.flip();
 
         // save reference to buffer
-        this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
+//        this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
+        this.b = buf;
 
     }
 
     /**
-     * Encode the leaf data onto a newly allocated buffer.
+     * Encode the leaf data.
      * 
      * @param leaf
      *            The leaf data.
@@ -215,9 +224,12 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      * @param doubleLinked
      *            <code>true</code> to generate a data record with room for the
      *            priorAddr and nextAddr fields.
+     * @param buf
+     *            The buffer on which the coded representation will be written.
      */
     public ReadOnlyLeafData(final ILeafData leaf, final IRabaCoder keysCoder,
-            final IRabaCoder valuesCoder, final boolean doubleLinked) {
+            final IRabaCoder valuesCoder, final boolean doubleLinked,
+            final DataOutputBuffer buf) {
 
         if (leaf == null)
             throw new IllegalArgumentException();
@@ -228,37 +240,36 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         if (valuesCoder == null)
             throw new IllegalArgumentException();
 
+        if (buf == null)
+            throw new IllegalArgumentException();
+
         // cache some fields.
-        this.doubleLinked = doubleLinked;
+//        this.doubleLinked = doubleLinked;
         this.nkeys = leaf.getKeyCount();
 
-        // encode the keys.
-        this.keys = keysCoder.encode(leaf.getKeys());
-        final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
+//        // figure out how the size of the buffer (exact fit).
+//        final int capacity = //
+//                SIZEOF_TYPE + //
+//                (doubleLinked ? SIZEOF_ADDR * 2 : 0) + // priorAddr, nextAddr.
+//                SIZEOF_VERSION + // version
+//                SIZEOF_FLAGS + // flags
+//                SIZEOF_NKEYS + // nkeys
+//                Bytes.SIZEOF_INT + // keysSize
+//                Bytes.SIZEOF_INT + // valuesSize
+//                BytesUtil.bitFlagByteLength(nkeys)+// nulls
+//                (leaf.hasVersionTimestamps() ? SIZEOF_TIMESTAMP * nkeys : 0) + //
+//                (leaf.hasDeleteMarkers() ? BytesUtil.bitFlagByteLength(nkeys) : 0) + // deleted
+//                encodedKeys.len() + // keys
+//                encodedValues.len() // values
+//        ;
 
-        // encode the values.
-        this.vals = valuesCoder.encode(leaf.getValues());
-        final ByteBuffer encodedValues = ((IRabaDecoder) vals).data();
-
-        // figure out how the size of the buffer (exact fit).
-        final int capacity = //
-                SIZEOF_TYPE + //
-                (doubleLinked ? SIZEOF_ADDR * 2 : 0) + // priorAddr, nextAddr.
-                SIZEOF_VERSION + // version
-                SIZEOF_FLAGS + // flags
-                SIZEOF_NKEYS + // nkeys
-                Bytes.SIZEOF_INT + // keysSize
-                Bytes.SIZEOF_INT + // valuesSize
-                BytesUtil.bitFlagByteLength(nkeys)+// nulls
-                (leaf.hasVersionTimestamps() ? SIZEOF_TIMESTAMP * nkeys : 0) + //
-                (leaf.hasDeleteMarkers() ? BytesUtil.bitFlagByteLength(nkeys) : 0) + // deleted
-                encodedKeys.capacity() + // keys
-                encodedValues.capacity() // values
-        ;
+        // The byte offset of the start of the coded record into the buffer.
+        final int O_origin = buf.pos();
         
-        final ByteBuffer b = ByteBuffer.allocate(capacity);
+//        final ByteBuffer b = ByteBuffer.allocate(capacity);
+//        buf.ensureCapacity(capacity);
 
-        b.put((byte) (doubleLinked ? LINKED_LEAF : LEAF));
+        buf.putByte((byte) (doubleLinked ? LINKED_LEAF : LEAF));
         
         if(doubleLinked) {
 
@@ -270,11 +281,11 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
              * disk requirements.
              */
 
-            b.position(b.position() + SIZEOF_ADDR * 2);
+            buf.skip(SIZEOF_ADDR * 2);
             
         }
 
-        b.putShort(VERSION0);
+        buf.putShort(VERSION0);
         
         short flags = 0;
         if (leaf.hasDeleteMarkers()) {
@@ -285,22 +296,27 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         }
         this.flags = flags;
 
-        b.putShort(flags);
+        buf.putShort(flags);
         
-        b.putInt(nkeys);
+        buf.putInt(nkeys); // pack?
 
-        b.putInt(encodedKeys.capacity()); // keysSize
+        final int O_keysSize = buf.pos();
         
-        b.putInt(encodedValues.capacity()); // valuesSize
+        // skip past the keysSize and valuesSize fields.
+        buf.skip(SIZEOF_KEYS_SIZE * 2);
+        
+//        buf.putInt(encodedKeys.length); // keysSize
+//        
+//        buf.putInt(encodedValues.length); // valuesSize
         
         // version timestamps
         if (leaf.hasVersionTimestamps()) {
 
-            O_versionTimestamps = b.position();
+            O_versionTimestamps = buf.pos();
             
             for (int i = 0; i < nkeys; i++) {
 
-                b.putLong(leaf.getVersionTimestamp(i));
+                buf.putLong(leaf.getVersionTimestamp(i));
 
             }
 
@@ -313,7 +329,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         // delete markers (bit coded).
         if (leaf.hasDeleteMarkers()) {
 
-            O_deleteMarkers = b.position();
+            O_deleteMarkers = buf.pos();
 
             for (int i = 0; i < nkeys;) {
 
@@ -323,13 +339,14 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
                     if(leaf.getDeleteMarker(i)) {
 
-                        bits |= 1 << j;
+                        // Note: bit order is per BitInputStream & BytesUtil!
+                        bits |= 1 << (7 - j);
                             
                     }
                     
                 }
 
-                b.put(bits);
+                buf.putByte(bits);
 
             }
 
@@ -338,25 +355,44 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
             O_deleteMarkers = -1;
             
         }
-        
+
+        // encode the keys into the buffer
+//      this.keys = keysCoder.encode(leaf.getKeys());
+//      final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
+      final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(leaf
+              .getKeys(), buf);
+      this.keys = keysCoder.decode(encodedKeys);
+
+      // encode the values.
+//      this.vals = valuesCoder.encode(leaf.getValues());
+//      final ByteBuffer encodedValues = ((IRabaDecoder) vals).data();
+      final AbstractFixedByteArrayBuffer encodedValues = valuesCoder.encode(
+              leaf.getValues(), buf);
+      this.vals = valuesCoder.decode(encodedValues);
+
+      // patch the buffer to indicate the byte length of the encoded keys and
+      // the encoded values.
+      buf.putInt(O_keysSize, encodedKeys.len());
+      buf.putInt(O_keysSize + Bytes.SIZEOF_INT, encodedValues.len());
+
         // write the encoded keys on the buffer.
-        O_keys = b.position();
-        encodedKeys.limit(encodedKeys.capacity());
-        encodedKeys.rewind();
-        b.put(encodedKeys);
+//        final int O_keys = b.pos();
+//        encodedKeys.limit(encodedKeys.capacity());
+//        encodedKeys.rewind();
 
         // write the encoded values on the buffer.
-        O_values = b.position();
-        encodedValues.limit(encodedValues.capacity());
-        encodedValues.rewind();
-        b.put(encodedValues);
+//        final int O_values = b.pos();
+//        encodedValues.limit(encodedValues.capacity());
+//        encodedValues.rewind();
 
-        // prepare buffer for writing on the store [limit := pos; pos : =0] 
-        b.flip();
+//        // prepare buffer for writing on the store [limit := pos; pos : =0] 
+//        b.flip();
+//        
+//        // save read-only reference to the buffer.
+//        this.b = b.asReadOnlyBuffer();
+
+        this.b = buf.slice(O_origin, buf.pos() - O_origin);
         
-        // save read-only reference to the buffer.
-        this.b = b.asReadOnlyBuffer();
-
     }
     
     /**
@@ -375,16 +411,6 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         
         return true;
         
-    }
-
-    /**
-     * Return <code>true</code> if the leaf encodes the address or the prior and
-     * next leaves.
-     */
-    public final boolean isDoubleLinked() {
-
-        return doubleLinked;
-
     }
 
     /**
@@ -440,7 +466,7 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         if (!hasDeleteMarkers())
             throw new UnsupportedOperationException();
 
-        return BytesUtil.getBit(buf(), O_deleteMarkers, index);
+        return b.getBit((O_deleteMarkers << 3) + index);
 
     }
     
@@ -455,18 +481,6 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
         return vals;
         
     }
-
-//    final public void copyValue(final int index, final OutputStream os) {
-//
-//        vals.copy(index, os);
-//        
-//    }
-//
-//    final public boolean isNull(final int index) {
-//
-//        return vals.isNull(index);
-//
-//    }
 
     public String toString() {
 
@@ -491,14 +505,20 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
      *            The representation will be written onto this object.
      * 
      * @return The <i>sb</i> parameter.
-     * 
-     * @todo prior/next links (not in the API).
      */
     static public StringBuilder toString(final ILeafData leaf,
             final StringBuilder sb) {
 
         final int nkeys = leaf.getKeyCount();
 
+        if(leaf.isDoubleLinked()) {
+            
+            sb.append(", priorAddr=" + leaf.getPriorAddr());
+
+            sb.append(", nextAddr=" + leaf.getNextAddr());
+
+        }
+        
         sb.append(", keys=" + leaf.getKeys());
         
         sb.append(", vals=" + leaf.getValues());
@@ -540,6 +560,99 @@ public class ReadOnlyLeafData extends AbstractReadOnlyNodeData<ILeafData>
 
         return sb;
 
+    }
+
+    /*
+     * Double-linked leaf support.
+     */
+    
+    /**
+     * The offset of the long field which codes the address of the previous
+     * leaf. This field IS NOT present unless the record type is
+     * {@link AbstractReadOnlyNodeData#LINKED_LEAF}.
+     */
+    static public final int O_PRIOR = 0 + SIZEOF_TYPE;
+
+    /**
+     * The offset of the long field which codes the address of the next leaf.
+     * This field IS NOT present unless the record type is
+     * {@link AbstractReadOnlyNodeData#LINKED_LEAF}.
+     */
+    static public final int O_NEXT = 1 + SIZEOF_ADDR;
+
+    /**
+     * Return <code>true</code> if the leaf encodes the address or the prior and
+     * next leaves.
+     */
+    public final boolean isDoubleLinked() {
+
+        return b.getByte(0) == LINKED_LEAF;
+
+    }
+
+//    /**
+//     * Update the data record to set the prior and next leaf address.
+//     * <p>
+//     * Note: In order to use this method to write linked leaves on the store you
+//     * have to either write behind at a pre-determined address on the store or
+//     * settle for writing only the prior or the next leaf address, but not both.
+//     * It is up to the caller to perform these tricks. All this method does is
+//     * to touch up the serialized record.
+//     * <p>
+//     * Note: This method has NO side-effects on the <i>position</i> or
+//     * <i>limit</i> of the internal {@link ByteBuffer}.
+//     * 
+//     * @param priorAddr
+//     *            The address of the previous leaf in key order, <code>0L</code>
+//     *            if it is known that there is no previous leaf, and
+//     *            <code>-1L</code> if either: (a) it is not known whether there
+//     *            is a previous leaf; or (b) it is known but the address of that
+//     *            leaf is not known to the caller.
+//     * @param nextAddr
+//     *            The address of the next leaf in key order, <code>0L</code> if
+//     *            it is known that there is no next leaf, and <code>-1L</code>
+//     *            if either: (a) it is not known whether there is a next leaf;
+//     *            or (b) it is known but the address of that leaf is not known
+//     *            to the caller.
+//     * 
+//     * @see IndexSegmentBuilder
+//     */
+//    public void updateLeaf(final long priorAddr, final long nextAddr) {
+//
+//        if (!isDoubleLinked()) {
+//
+//            // Not double-linked.
+//            throw new UnsupportedOperationException();
+//            
+//        }
+//
+//        /*
+//         * Note: these fields are written immediately after the byte indicating
+//         * whether this is a leaf, linked-leaf, or node.
+//         */
+//        
+//        b.putLong(O_PRIOR, priorAddr);
+//
+//        b.putLong(O_NEXT + SIZEOF_ADDR, nextAddr);
+//
+//    }
+
+    public final long getPriorAddr() {
+        
+        if(!isDoubleLinked())
+            throw new UnsupportedOperationException();
+
+        return b.getLong(O_PRIOR);
+        
+    }
+    
+    public final long getNextAddr() {
+        
+        if(!isDoubleLinked())
+            throw new UnsupportedOperationException();
+
+        return b.getLong(O_NEXT);
+        
     }
 
 }

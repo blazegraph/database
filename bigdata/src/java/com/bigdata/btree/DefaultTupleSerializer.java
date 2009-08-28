@@ -181,15 +181,15 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      *            The {@link IKeyBuilderFactory}, which will be automatically
      *            wrapped up by a {@link ThreadLocalKeyBuilderFactory}.
      */
-    public DefaultTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
+    public DefaultTupleSerializer(final IKeyBuilderFactory keyBuilderFactory) {
         
         this(keyBuilderFactory, getDefaultLeafKeySerializer(),
                 getDefaultValueKeySerializer());
         
     }
 
-    public DefaultTupleSerializer(IKeyBuilderFactory keyBuilderFactory,
-            IDataSerializer leafKeySer, IDataSerializer leafValSer) {
+    public DefaultTupleSerializer(final IKeyBuilderFactory keyBuilderFactory,
+            final IDataSerializer leafKeySer, final IDataSerializer leafValSer) {
 
         if (keyBuilderFactory == null)
             throw new IllegalArgumentException();
@@ -217,7 +217,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
     public String toString() {
 
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
 
         sb.append(getClass().getName()+"{");
         sb.append(", keyBuilderFactory="+delegateKeyBuilderFactory);

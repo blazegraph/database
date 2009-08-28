@@ -74,16 +74,7 @@ public class TestAll extends TestCase {
         // test suite for locating journal files.
         suite.addTestSuite(TestNameAndExtensionFilter.class);
 
-        // test classes that let us treat a ByteBuffer as an input/output stream.
-        suite.addTestSuite( TestByteBufferStreams.class );
-
-        /*
-         * test fast DataOutput and DataInput implementations.
-         */
-        suite.addTestSuite(TestByteArrayBuffer.class);
-        suite.addTestSuite(TestDataOutputBuffer.class);
-        suite.addTestSuite(TestShortPacker.class);
-        suite.addTestSuite(TestLongPacker.class);
+        suite.addTest(TestAll_Buffers.suite());
         
         suite.addTest(com.bigdata.io.compression.TestAll.suite());
         

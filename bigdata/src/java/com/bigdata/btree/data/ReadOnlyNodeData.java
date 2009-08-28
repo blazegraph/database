@@ -27,24 +27,33 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
-import java.nio.ByteBuffer;
-
+import com.bigdata.btree.MutableNodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.btree.raba.codec.IRabaDecoder;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
 
 /**
  * A read-only view of the data for a B+Tree node.
+ * <p>
+ * Note: The leading byte of the record format codes for a leaf, a double-linked
+ * leaf or a node in a manner which is compatible with {@link ReadOnlyNodeData}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo partly mutable coded records for {@link INodeData} are feasible. The
+ *       only reason to expand an {@link INodeData} into a fully
+ *       {@link MutableNodeData} is if we need to modify the keys. The rest of
+ *       the fields could be easily patched in place if they were not coded
+ *       (they are fixed length fields).  Of course, we have a more compact
+ *       representation when those fields ARE coded.
  */
 public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         implements INodeData {
     
-    /** A read-only view of the backing {@link ByteBuffer}. */
-    private final ByteBuffer b;
+    /** The backing buffer */
+    private final AbstractFixedByteArrayBuffer b;
     
     // fields which are cached by the ctor.
     private final int nkeys;
@@ -67,27 +76,30 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
 
     private final IRaba keys;
 
-    public final ByteBuffer buf() {
+    public final AbstractFixedByteArrayBuffer buf() {
 
         return b;
         
     }
     
     /**
-     * Constructor wraps a buffer containing an encoded node data record.
+     * Decode in place (wraps a buffer containing an encoded node data record).
      * 
      * @param b
      *            The buffer containing the data for the node.
      */
-    public ReadOnlyNodeData(final ByteBuffer b, final IRabaCoder keysCoder) {
+    public ReadOnlyNodeData(final AbstractFixedByteArrayBuffer buf,
+            final IRabaCoder keysCoder) {
 
-        if (b == null)
+        if (buf == null)
             throw new IllegalArgumentException();
 
         if (keysCoder == null)
             throw new IllegalArgumentException();
 
-        final byte type = b.get();
+        int pos = O_TYPE;
+        final byte type = buf.getByte(pos);
+        pos += SIZEOF_TYPE;
 
         switch (type) {
         case NODE:
@@ -100,7 +112,8 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
             throw new AssertionError("type=" + type);
         }
 
-        final int version = b.getInt();
+        final int version = buf.getShort(pos);
+        pos += SIZEOF_VERSION;
         switch (version) {
         case VERSION0:
             break;
@@ -108,37 +121,44 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
             throw new AssertionError("version=" + version);
         }
         
-        // skip over flags (they are unused for a node).
-        b.getShort();
+        // skip over flags (they are unused for a node) : @todo version timestamps flag.
+        pos += SIZEOF_FLAGS;
         
-        this.nkeys = b.getInt();
+        this.nkeys = buf.getInt(pos);
+        pos += SIZEOF_NKEYS;
         
-        this.nentries = b.getInt();
+        this.nentries = buf.getInt(pos);
+        pos += SIZEOF_ENTRY_COUNT;
         
-        final int keysSize = b.getInt();
-        
-        O_childAddr = b.position();
+        final int keysSize = buf.getInt(pos);
+        pos += SIZEOF_KEYS_SIZE;
+
+        O_childAddr = pos;
         
         O_childEntryCount = O_childAddr + (nkeys + 1) * SIZEOF_ADDR;
 
         O_keys = O_childEntryCount + (nkeys + 1) * SIZEOF_ENTRY_COUNT;
-        b.position(O_keys);
-        b.limit(b.position() + keysSize);
-        this.keys = keysCoder.decode(b.slice());
-        assert b.position() == O_keys + keysSize;
+//        b.position(O_keys);
+//        b.limit(b.position() + keysSize);
+        this.keys = keysCoder.decode(buf.slice(O_keys, keysSize));
+//        assert b.position() == O_keys + keysSize;
         
         // save reference to buffer
-        this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
+//        this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
+        this.b = buf;
 
     }
 
     /**
-     * Serialize the node onto a newly allocated buffer.
+     * Encode the node data.
      * 
      * @param data
      *            The data to be encoded.
+     * @param buf
+     *            The buffer on which the coded representation will be written.
      */
-    public ReadOnlyNodeData(final INodeData node, final IRabaCoder keysCoder) {
+    public ReadOnlyNodeData(final INodeData node, final IRabaCoder keysCoder,
+            DataOutputBuffer buf) {
 
         if (node == null)
             throw new IllegalArgumentException();
@@ -146,70 +166,92 @@ public class ReadOnlyNodeData extends AbstractReadOnlyNodeData<INodeData>
         if (keysCoder == null)
             throw new IllegalArgumentException();
 
+        if (buf == null)
+            throw new IllegalArgumentException();
+
         // cache some fields.
         this.nkeys = node.getKeyCount();
         this.nentries = node.getSpannedTupleCount();
 
         // encode the keys.
-        this.keys = keysCoder.encode(node.getKeys());
-        final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
+//        this.keys = keysCoder.encode(node.getKeys());
+//        final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
+//        final byte[] encodedKeys = keysCoder.encode(node.getKeys(), buf);
+//        this.keys = keysCoder.decode(FixedByteArrayBuffer.wrap(encodedKeys));
 
-        // figure out how the size of the buffer (exact fit).
-        final int capacity = //
-                SIZEOF_TYPE + //
-                SIZEOF_VERSION + //
-                SIZEOF_FLAGS + //
-                SIZEOF_NKEYS + //
-                SIZEOF_ENTRY_COUNT + //
-                Bytes.SIZEOF_INT + // keysSize
-                SIZEOF_ADDR * (nkeys + 1) + // childAddr[]
-                SIZEOF_ENTRY_COUNT * (nkeys + 1) + // childEntryCount[]
-                encodedKeys.capacity() // keys
-        ;
+//        // figure out how the size of the buffer (exact fit).
+//        final int capacity = //
+//                SIZEOF_TYPE + //
+//                SIZEOF_VERSION + //
+//                SIZEOF_FLAGS + //
+//                SIZEOF_NKEYS + //
+//                SIZEOF_ENTRY_COUNT + //
+//                Bytes.SIZEOF_INT + // keysSize
+//                SIZEOF_ADDR * (nkeys + 1) + // childAddr[]
+//                SIZEOF_ENTRY_COUNT * (nkeys + 1) + // childEntryCount[]
+//                encodedKeys.length // keys
+//        ;
         
-        final ByteBuffer b = ByteBuffer.allocate(capacity);
+//        final ByteBuffer b = ByteBuffer.allocate(capacity);
+//        final ByteArrayBuffer b = buf; // alias.
+//        b.ensureCapacity(capacity);
+//        b.reset();
 
-        b.put(NODE);
+        // The byte offset of the start of the coded data in the buffer.
+        final int O_origin = buf.pos();
+        
+        buf.putByte(NODE);
 
-        b.putShort(VERSION0);
+        buf.putShort(VERSION0);
         
-        b.putShort((short) 0/* flags */);
+        buf.putShort((short) 0/* flags */);
         
-        b.putInt(nkeys);
+        buf.putInt(nkeys); // @todo pack?
         
-        b.putInt(nentries);
+        buf.putInt(nentries); // @todo pack?
 
-        b.putInt(encodedKeys.capacity()); // keySize
+        final int O_keysSize = buf.pos();
+        buf.skip(SIZEOF_KEYS_SIZE);
+//        buf.putInt(encodedKeys.length); // keySize @todo pack?
         
-        // childAddr[]
-        O_childAddr = b.position();
+        // childAddr[] : @todo code childAddr[]
+        O_childAddr = buf.pos();
         for (int i = 0; i <= nkeys; i++) {
             
-            b.putLong(node.getChildAddr(i));
+            buf.putLong(node.getChildAddr(i));
             
         }
         
-        // childEntryCount[]
-        O_childEntryCount = b.position();
+        // childEntryCount[] : @todo code childEntryCount[]
+        O_childEntryCount = buf.pos();
         for (int i = 0; i <= nkeys; i++) {
             
-            b.putInt(node.getChildEntryCount(i));
+            buf.putInt(node.getChildEntryCount(i));
             
         }
         
         // write the encoded keys on the buffer.
-        O_keys = b.position();
-        encodedKeys.limit(encodedKeys.capacity());
-        encodedKeys.rewind();
-        b.put(encodedKeys);
+        O_keys = buf.pos();
+//        encodedKeys.limit(encodedKeys.capacity());
+//        encodedKeys.rewind();
+//      assert b.position() == b.limit();
+//        buf.put(encodedKeys);
 
-        assert b.position() == b.limit();
+        final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(node
+                .getKeys(), buf);
+
+        this.keys = keysCoder.decode(encodedKeys);
         
-        // prepare buffer for writing on the store [limit := pos; pos : =0] 
-        b.flip();
+        // Patch the byte length of the coded keys on the buffer.
+        buf.putInt(O_keysSize, encodedKeys.len());
+
+//        // prepare buffer for writing on the store [limit := pos; pos : =0] 
+//        b.flip();
         
         // save read-only reference to the buffer.
-        this.b = b.asReadOnlyBuffer();
+//        this.b = b.asReadOnlyBuffer();
+//        this.b = FixedByteArrayBuffer.wrap(buf.toByteArray());
+        this.b = buf.slice(O_origin, buf.pos() - O_origin);
         
     }
 

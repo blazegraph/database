@@ -35,6 +35,8 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -93,97 +95,127 @@ public class SimpleRabaCoder implements IRabaCoder {
     static private final int SIZEOF_FLAGS = 1;
     /** The size of the size field. */
     static private final int SIZEOF_SIZE = Bytes.SIZEOF_INT;
-    /** The size of the elements in the offset[]. */
+    /** The size of the field coding the #of elements in the offset[]. */
     static private final int SIZEOF_OFFSET = Bytes.SIZEOF_INT;
 
+    /** The byte offset to the version identifier. */
     static private final int O_VERSION = 0;
+    /** The byte offset of the bit flags. */
     static private final int O_FLAGS = O_VERSION + SIZEOF_VERSION;
+    /** The byte offset of the field coding the #of entries in the raba. */
     static private final int O_SIZE = O_FLAGS + SIZEOF_FLAGS;
+    /** The byte offset to the bit flags coding the nulls. */
     static private final int O_NULLS = O_SIZE + SIZEOF_SIZE;
-    
-    public IRabaDecoder encode(final IRaba raba) {
 
+    public AbstractFixedByteArrayBuffer encode(final IRaba raba,
+            final DataOutputBuffer buf) {
+
+        if (raba == null)
+            throw new IllegalArgumentException();
+        
+        if (buf == null)
+            throw new IllegalArgumentException();
+        
         // The #of entries.
         final int size = raba.size();
 
-        // The total byte length of the entries.
-        int totalByteLength = 0;
-        int nullCount = 0;
-        for (int i = 0; i < size; i++) {
-            
-            if (raba.isNull(i)) {
-                
-                nullCount++;
-                
-            } else {
-                
-                totalByteLength += raba.length(i);
-                
-            }
+        /*
+         * Note: this is only useful for pre-sizing the buffer, but that is
+         * not necessary if the caller is reusing their buffers (and they
+         * should be).
+         */
+//        // The total byte length of the entries.
+//        int totalByteLength = 0;
+//        int nullCount = 0;
+//        for (int i = 0; i < size; i++) {
+//            
+//            if (raba.isNull(i)) {
+//                
+//                nullCount++;
+//                
+//            } else {
+//                
+//                totalByteLength += raba.length(i);
+//                
+//            }
+//
+//        }
 
-        }
+        // iff the raba represents B+Tree keys.
+        final boolean isKeys = raba.isKeys();
 
-        // #of bytes required for the nulls bit flags.
-        final int bitFlagByteCount = BytesUtil.bitFlagByteLength(size);
+//        // #of bytes required for the nulls bit flags (zero iff keys).
+//        final int bitFlagByteCount = isKeys ? 0 : BytesUtil
+//                .bitFlagByteLength(size);
 
+        // #of bytes for the offset[].
         final int sizeOfOffsets = (size + 1) * SIZEOF_OFFSET;
         
-        final int capacity = //
-                SIZEOF_VERSION + // version
-                SIZEOF_FLAGS+ // bit flags
-                SIZEOF_SIZE+ // size
-                bitFlagByteCount + // nulls
-                sizeOfOffsets + // sizeof(offset[])
-                totalByteLength // byte[] values
-        ;
+//        final int capacity = //
+//                SIZEOF_VERSION + // version
+//                SIZEOF_FLAGS+ // bit flags
+//                SIZEOF_SIZE+ // size
+//                bitFlagByteCount + // nulls (iff B+Tree values)
+//                sizeOfOffsets + // sizeof(offset[])
+//                totalByteLength // byte[] values
+//        ;
+//        
+//        buf.ensureCapacity(capacity);
 
-        final ByteBuffer b = ByteBuffer.allocate(capacity);
-
+        // The byte offset of the origin of the coded data in the buffer.
+        final int O_origin = buf.pos();
+        
         // version
-        assert b.position() == O_VERSION;
-        b.put(VERSION0);
+        assert buf.pos() == O_VERSION + O_origin;
+        buf.putByte(VERSION0);
 
         // a byte containing a single bit flag.
-        assert b.position() == O_FLAGS;
-        b.put((byte) (raba.isKeys() ? 1 : 0));
+        assert buf.pos() == O_FLAGS + O_origin;
+        buf.putByte((byte) (isKeys ? 1 : 0));
         
         // #of entries.
-        assert b.position() == O_SIZE;
-        b.putInt(size);
+        assert buf.pos() == O_SIZE + O_origin;
+        buf.putInt(size);
 
-        // bit flag nulls : @todo not required for keys.
-        assert b.position() == O_NULLS;
-        for (int i = 0; i < size;) {
+        // bit flag nulls
+        if (!isKeys) {
+            
+            assert buf.pos() == O_NULLS + O_origin;
+            
+            for (int i = 0; i < size;) {
 
-            byte bits = 0;
+                byte bits = 0;
 
-            for (int j = 0; j < 8 && i < size; j++, i++) {
+                for (int j = 0; j < 8 && i < size; j++, i++) {
 
-                if (raba.isNull(i)) {
+                    if (raba.isNull(i)) {
 
-                    bits |= 1 << j;
+                        // Note: bit order is per BitInputStream & BytesUtil!
+                        bits |= 1 << (7 - j);
+
+                    }
 
                 }
 
-            }
+                buf.putByte(bits);
 
-            b.put(bits);
+            }
 
         }
 
         // offset[]
-        assert size > 0 && b.position() > O_NULLS || size == 0;
-        final int O_offsets = b.position() + sizeOfOffsets;
+        assert size > 0 && buf.pos() > O_NULLS + O_origin || size == 0 || isKeys;
+        final int O_offsets = buf.pos() + sizeOfOffsets - O_origin;
         int lastOffset = O_offsets;
         for (int i = 0; i < size; i++) {
 
             if (raba.isNull(i)) {
                 
-                b.putInt(lastOffset);
+                buf.putInt(lastOffset);
                 
             } else {
              
-                b.putInt(lastOffset);
+                buf.putInt(lastOffset);
                 
                 lastOffset += raba.length(i);
                 
@@ -191,29 +223,29 @@ public class SimpleRabaCoder implements IRabaCoder {
 
         }
         
-        b.putInt(lastOffset);
+        buf.putInt(lastOffset);
 
         // byte[]s
         for (int i = 0; i < size; i++) {
 
             if (!raba.isNull(i)) {
                 
-                b.put(raba.get(i));
+                buf.put(raba.get(i));
                 
             }
             
         }
 
-        assert b.position() == b.limit() : b.toString() + " : src=" + raba;
-        assert b.position() == b.capacity() : b.toString() + " : src=" + raba;
+        assert buf.pos() == buf.limit() : buf.toString() + " : src=" + raba;
+//        assert buf.pos() == buf.capacity() : buf.toString() + " : src=" + raba;
 
-        b.flip();
+//        b.flip();
         
-        return new SimpleDataDecoder(b.asReadOnlyBuffer());
+        return buf.slice(O_origin, buf.pos() - O_origin);
         
     }
 
-    public IRabaDecoder decode(final ByteBuffer data) {
+    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
 
         return new SimpleDataDecoder(data);
 
@@ -237,20 +269,20 @@ public class SimpleRabaCoder implements IRabaCoder {
          */
         private final boolean isKeys;
         
-        private final ByteBuffer data;
+        private final AbstractFixedByteArrayBuffer data;
 
         /**
          * 
          * @param data
          */
-        public SimpleDataDecoder(final ByteBuffer data) {
+        public SimpleDataDecoder(final AbstractFixedByteArrayBuffer data) {
 
             if (data == null)
                 throw new IllegalArgumentException();
             
             this.data = data;
             
-            final byte version = data.get(O_VERSION);
+            final byte version = data.getByte(O_VERSION);
 
             switch (version) {
             case VERSION0:
@@ -260,7 +292,7 @@ public class SimpleRabaCoder implements IRabaCoder {
             }
 
             // Note: Only one bit flag, so we do not need a mask.
-            this.isKeys = data.get(O_FLAGS) != 0;
+            this.isKeys = data.getByte(O_FLAGS) != 0;
             
             this.size = data.getInt(O_SIZE);
             
@@ -268,7 +300,8 @@ public class SimpleRabaCoder implements IRabaCoder {
                 throw new IllegalArgumentException();
             
             // #of bytes required for the nulls bit flags.
-            final int bitFlagByteCount = BytesUtil.bitFlagByteLength(size);
+            final int bitFlagByteCount = isKeys ? 0 : BytesUtil
+                    .bitFlagByteLength(size);
             
             // offset of the offset[].
             O_offsets = O_NULLS + bitFlagByteCount;
@@ -283,28 +316,40 @@ public class SimpleRabaCoder implements IRabaCoder {
          */
         private final int O_offsets;
         
-        final public ByteBuffer data() {
+        final public AbstractFixedByteArrayBuffer data() {
+            
             return data;
+            
         }
 
         public boolean isKeys() {
+
             return isKeys;
+            
         }
 
         final public int capacity() {
+            
             return size;
+            
         }
 
         final public int size() {
+            
             return size;
+            
         }
 
         final public boolean isEmpty() {
+            
             return size == 0;
+            
         }
 
         final public boolean isFull() {
+            
             return true;
+            
         }
 
         protected void rangeCheck(final int index) {
@@ -317,8 +362,11 @@ public class SimpleRabaCoder implements IRabaCoder {
         public boolean isNull(final int index) {
 
             rangeCheck(index);
+
+            if (isKeys)
+                return false;
             
-            return BytesUtil.getBit(data, O_NULLS, index);
+            return data.getBit((O_NULLS << 3) + index);
 
         }
 
@@ -353,39 +401,52 @@ public class SimpleRabaCoder implements IRabaCoder {
             final int length = offset2 - offset;
             
             assert length >= 0;
-            
+
             final byte[] a = new byte[length];
 
             /*
              * Copy the byte[] from the buffer.
-             * 
-             * Note: The buffer is duplicated first to avoid concurrent
-             * modification to the buffer's internal state.
              */
-            final ByteBuffer data = this.data.duplicate();
-            data.limit(offset2);
-            data.position(offset);
-            data.get(a);
+//             * 
+//             * Note: The buffer is duplicated first to avoid concurrent
+//             * modification to the buffer's internal state.
+//             */
+//            final ByteBuffer data = this.data.duplicate();
+//            data.limit(offset2);
+//            data.position(offset);
+//            data.get(a);
 
+            data.get(offset, a, 0/* dstoff */, length);
+            
             return a;
 
         }
 
         public int copy(final int index, final OutputStream os) {
+
+            if (isNull(index))
+                throw new NullPointerException();
             
-            final byte[] a = get(index);
+            final int offset = data.getInt(O_offsets + index * SIZEOF_OFFSET);
+
+            final int offset2 = data.getInt(O_offsets + (index + 1)
+                    * SIZEOF_OFFSET);
+
+            final int length = offset2 - offset;
             
+            assert length >= 0;
+
             try {
             
-                os.write(a);
-                
+                data.writeOn(os, offset, length);
+
             } catch (IOException ex) {
                 
                 throw new RuntimeException(ex);
                 
             }
 
-            return a.length;
+            return length;
             
         }
 
@@ -429,7 +490,9 @@ public class SimpleRabaCoder implements IRabaCoder {
                         - aoff;
 
                 // compare actual data vs probe key.
-                final int tmp = BytesUtil.compareBytes(data, aoff, alen, key);
+                final int tmp = BytesUtil.compareBytesWithLenAndOffset(//
+                        data.off() + aoff, alen, data.array(), //
+                        0, key.length, key);
 
                 if (tmp < 0) {
 

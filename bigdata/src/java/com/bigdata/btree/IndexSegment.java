@@ -665,9 +665,9 @@ public class IndexSegment extends AbstractBTree {
         }
 
         public Leaf allocLeaf(final AbstractBTree btree, final long addr,
-                final ILeafData data, final long priorAddr, final long nextAddr) {
+                final ILeafData data) {
 
-            return new ImmutableLeaf(btree, addr, data, priorAddr, nextAddr);
+            return new ImmutableLeaf(btree, addr, data);
 
         }
 
@@ -736,17 +736,29 @@ public class IndexSegment extends AbstractBTree {
          */
         public static class ImmutableLeaf extends Leaf {
 
-            /**
-             * The address of the previous leaf in key order if known, 0L if it
-             * known that this is the first leaf, and -1L otherwise.
-             */
-            public final long priorAddr;
-
-            /**
-             * The address of the next leaf in key order if known, 0L if it
-             * known that this is the first leaf, and -1L otherwise.
-             */
-            public final long nextAddr;
+//            /**
+//             * The address of the previous leaf in key order if known, 0L if it
+//             * known that this is the first leaf, and -1L otherwise.
+//             */
+//            private final long priorAddr;
+//
+//            /**
+//             * The address of the next leaf in key order if known, 0L if it
+//             * known that this is the first leaf, and -1L otherwise.
+//             */
+//            private final long nextAddr;
+            
+//            public final boolean isDoubleLinked() {
+//                return true;
+//            }
+            
+//            public final long getPriorAddr() {
+//                return priorAddr;
+//            }
+//            
+//            public final long getNextAddr() {
+//                return nextAddr;
+//            }
             
             /**
              * Ctor used when the {@link IndexSegment} is empty (no tuples) to
@@ -754,11 +766,11 @@ public class IndexSegment extends AbstractBTree {
              * 
              * @param btree
              */
-            protected ImmutableLeaf(AbstractBTree btree) {
+            protected ImmutableLeaf(final AbstractBTree btree) {
                 
                 super(btree);
                 
-                priorAddr = nextAddr = 0L;
+//                priorAddr = nextAddr = 0L;
                 
             }
             
@@ -769,18 +781,20 @@ public class IndexSegment extends AbstractBTree {
              * @param values
              */
             protected ImmutableLeaf(final AbstractBTree btree, final long addr,
-                    final ILeafData data, final long priorAddr,
-                    final long nextAddr) {
+                    final ILeafData data
+//                    , final long priorAddr,
+//                    final long nextAddr
+                    ) {
 
                 super(btree, addr, data);
 
-                // prior/next addrs must be known.
-                assert priorAddr != -1L;
-                assert nextAddr != -1L;
-
-                this.priorAddr = priorAddr;
-                
-                this.nextAddr = nextAddr;
+//                // prior/next addrs must be known.
+//                assert priorAddr != -1L;
+//                assert nextAddr != -1L;
+//
+//                this.priorAddr = priorAddr;
+//                
+//                this.nextAddr = nextAddr;
                 
             }
 
@@ -805,38 +819,42 @@ public class IndexSegment extends AbstractBTree {
 
             public ImmutableLeaf nextLeaf() {
 
+                final long nextAddr = getNextAddr();
+                
                 if (nextAddr == 0L) {
 
                     // no more leaves.
 
-                    if(INFO)
+                    if (INFO)
                         log.info("No more leaves");
-                    
+
                     return null;
-                    
+
                 }
-                
+
                 // return the next leaf in the key order.
-                return ((IndexSegment)btree).readLeaf(nextAddr);
-                
+                return ((IndexSegment) btree).readLeaf(nextAddr);
+
             }
-            
+
             public ImmutableLeaf priorLeaf() {
-                
-                if(priorAddr == 0L) {
+
+                final long priorAddr = getPriorAddr();
+
+                if (priorAddr == 0L) {
 
                     // no more leaves.
 
-                    if(INFO)
+                    if (INFO)
                         log.info("No more leaves");
-                    
+
                     return null;
-                    
+
                 }
-                
+
                 // return the previous leaf in the key order.
-                return ((IndexSegment)btree).readLeaf(priorAddr);
-                
+                return ((IndexSegment) btree).readLeaf(priorAddr);
+
             }
 
         }
