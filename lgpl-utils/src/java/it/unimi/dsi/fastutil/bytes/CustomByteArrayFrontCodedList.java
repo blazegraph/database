@@ -1302,6 +1302,17 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             // length of the common prefix (shared with the entry @ the ptr).
             final int clen = bb.readInt(pos);
 
+            if (clen < mlen) {
+
+                /*
+                 * No match is possible once the common length is LT the matched
+                 * length.
+                 */
+                
+                break;
+                
+            }
+            
             // skip past clen field.
             pos += count(clen);
 
@@ -1318,11 +1329,12 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
              * Compare the remaining bytes in the search probe to the remainder
              * of the current entry.
              */
-            
-            assert mlen == clen : "mlen=" + mlen + ", clen=" + clen
-                    + ", delta=" + delta + ", pret=" + pret + ", poffset="
-                    + poffset;
-            
+
+            assert mlen == clen : "mlen=" + mlen + ", clen=" + clen + ", rlen="
+                    + rlen + ", delta=" + delta + ", pret=" + pret
+                    + ", poffset=" + poffset + ", searchKey="
+                    + BytesUtil.toString(a) + ", this=" + this;
+
             final int ret = compareBytes(a, mlen, a.length - mlen, bb, pos,
                     rlen);
 
