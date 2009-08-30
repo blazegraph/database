@@ -318,11 +318,6 @@ public class FastRDFValueCompression implements Externalizable, IRabaCoder {
             long bitIndex = O_values;
             for (int i = 0; i < 3; i++, bitIndex++) {
 
-                /*
-                 * FIXME This is going to be broken due to the changes to
-                 * BytesUtil to use the same big endian format for bit flags as
-                 * OutputBitStream.
-                 */
                 final boolean bit = data.getBit(bitIndex);
 
                 value |= (bit ? 1 : 0) << i;

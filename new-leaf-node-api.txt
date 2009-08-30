@@ -527,15 +527,15 @@ x. Done. Verify all RabaCoder and leaf/node data records.
            This will let me directly replace the coded representation
            of the leaves.
 
-	 - Unit tests should verify that leaf data and node data are
-           correctly coded and decoded when there is a non-zero
+	 - Done. Unit tests should verify that leaf data and node data
+           are correctly coded and decoded when there is a non-zero
            offset.  The IRabaCoder unit tests already handle this.
 
 	 - Done. Unit tests should verify search for random prefix and
            random suffix of known keys.  Again, the IRabaCoder unit
            tests already handle this.
 
-	 - (***) Bug fix for search on front-coded raba.
+	 - Done. Bug fix for search on front-coded raba.
 
 4. (***) Get rid of all uses of IDataSerializer, replacing them with
    IRabaCoder.
@@ -638,9 +638,9 @@ x. Done. Verify all RabaCoder and leaf/node data records.
            and values.  Either front-coded or canonical huffman for
            keys and canonical huffman for values.
 
-6. Tighter coding, make sure all records and Externalizable interfaces
-   are versioned (Externalizable for DefaultLeafCoder and
-   DefaultNodeCoder are not).
+6. Tighter coding & versioning.
+
+   - Make sure all records and Externalizable interfaces are versioned.
 
 	 - (*) ReadOnlyNode/Leaf Coding.
 
@@ -673,18 +673,7 @@ x. Done. Verify all RabaCoder and leaf/node data records.
 	     roughly comparable, hence substracting out the minimum
 	     could save space.
 
-  (****) There is a fence post on search where the insertion
-	 point is before anything in the front-coded byte[].  This
-	 shows up in TestFrontCodedRabaCoderRatio2.  [Send a bug fix to
-	 Sebastiano.]
-
-java.lang.ArrayIndexOutOfBoundsException: -1
-	at it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList.search(CustomByteArrayFrontCodedList.java:1151)
-	at com.bigdata.btree.raba.codec.FrontCodedRabaCoder$FrontCodedDecoder.search(FrontCodedRabaCoder.java:342)
-	at com.bigdata.btree.raba.codec.AbstractRabaCoderTestCase.test_mike_personick(AbstractRabaCoderTestCase.java:107)
-
-
-       - Performance tuning:
+       - (***) Performance tuning:
 
 	 AbstractRabaCoderTestCase#main(String[])
 
@@ -693,9 +682,21 @@ java.lang.ArrayIndexOutOfBoundsException: -1
 	       recomputing the length of a byte[] entry, but also with
 	       copying the data efficiently onto an OutputStream.
 
+	     - Memory analyzer.  How is the in-memory representation
+               now as compared to the trunk?
+
 	 (***) The canonical huffman raba coder appears to be VERY
-	       slow when compared to the other implementations.  Put a
-	       performance analyzer on this.
+	       slow when compared to the other implementations.  The
+	       problem appears to be InputBitStream.
+
+	       Modify InputBitStream to natively use the backing
+	       (byte[], off, len), which should be much faster.
+
+	       This would be a new ctor.  position := 0.  pos := off.
+	       avail := len.
+
+	       AbstractFixedByteArrayBuffer would use that ctor for
+	       its getInputBitStream() method.
 
 nops=400000, size=256, ncoders=5
 com.bigdata.btree.raba.codec.SimpleRabaCoder@ee6ad6 : elapsed=17231, recordLength=3032
@@ -703,6 +704,48 @@ com.bigdata.btree.raba.codec.FrontCodedRabaCoder@3ca56f{ratio=2} : elapsed=18219
 com.bigdata.btree.raba.codec.FrontCodedRabaCoder@ca2076{ratio=8} : elapsed=18583, recordLength=1910
 com.bigdata.btree.raba.codec.FrontCodedRabaCoder@1d451d2{ratio=32} : elapsed=24614, recordLength=1889
 com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder@19c4844 : elapsed=75892, recordLength=1886
+
+nops=200000, size=256, ncoders=5
+op	count	nanos	%time	ops/ms
+length	1375	2514	0.19%	546,937.152
+get   	55160	1676	0.12%	32,911,694.511
+copy  	27425	1676	0.12%	16,363,365.155
+search	82880	2794	0.21%	29,663,564.782
+itr   	27556	124038	9.16%	222,157.726
+recode	5604	1221664	90.20%	4,587.186
+com.bigdata.btree.raba.codec.SimpleRabaCoder@1cc0a7f : elapsed=11796, recordLength=3053
+op	count	nanos	%time	ops/ms
+length	1396	2515	0.17%	555,069.583
+get   	55093	1676	0.12%	32,871,718.377
+copy  	27413	1676	0.12%	16,356,205.251
+search	82862	3073	0.21%	26,964,529.775
+itr   	27648	122641	8.43%	225,438.475
+recode	5587	1322793	90.95%	4,223.639
+com.bigdata.btree.raba.codec.FrontCodedRabaCoder@169df00{ratio=2} : elapsed=12925, recordLength=2101
+op	count	nanos	%time	ops/ms
+length	1453	2514	0.17%	577,963.405
+get   	55108	2514	0.17%	21,920,445.505
+copy  	27435	1676	0.11%	16,369,331.742
+search	83059	3073	0.21%	27,028,636.512
+itr   	27330	123759	8.31%	220,832.424
+recode	5615	1354921	91.03%	4,144.153
+com.bigdata.btree.raba.codec.FrontCodedRabaCoder@52744{ratio=8} : elapsed=12544, recordLength=1927
+op	count	nanos	%time	ops/ms
+length	1417	2794	0.14%	507,158.196
+get   	55557	3631	0.18%	15,300,743.597
+copy  	27557	3073	0.15%	8,967,458.51
+search	82257	3073	0.15%	26,767,653.759
+itr   	27801	122641	6.01%	226,686.019
+recode	5411	1903873	93.37%	2,842.101
+com.bigdata.btree.raba.codec.FrontCodedRabaCoder@773a1{ratio=32} : elapsed=15283, recordLength=1902
+op	count	nanos	%time	ops/ms
+length	1399	2235	0.03%	625,950.783
+get   	55129	2514	0.04%	21,928,798.727
+copy  	27774	1956	0.03%	14,199,386.503
+search	82998	10057	0.15%	8,252,759.272
+itr   	27091	503974	7.68%	53,754.757
+recode	5609	6044344	92.07%	927.975
+com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder@9b04ac : elapsed=50066, recordLength=1916
 
 
        - Canonical Huffman.
@@ -729,7 +772,9 @@ com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder@19c4844 : elapsed=75892, 
            coder for RDF keys.
 
          - Generalize the CanonicalHuffmanRabaCoder to allow for
-           non-byte values (char[], int[], long[]).
+           non-byte values (char[], int[], long[]).  This should be
+           very compact when the alphabet corresponds to the natural
+           data type size.  E.g., RDF long[3] or long[4] keys.
 
        - ByteBuffer is too slow.
 	   

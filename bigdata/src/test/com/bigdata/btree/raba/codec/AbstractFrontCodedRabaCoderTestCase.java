@@ -34,20 +34,12 @@ import java.util.Arrays;
 
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
-import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 
 /**
  * Test suite for the {@link FrontCodedRabaCoder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo unit tests where the successor in the byte[][] has fewer bytes in
- *       common when compared to its predecessor.
- * 
- * @todo performance tuning, including for the best ratio for an application.
- * 
- * @todo also test for probe keys that are not found.
  */
 public class AbstractFrontCodedRabaCoderTestCase extends AbstractRabaCoderTestCase {
 

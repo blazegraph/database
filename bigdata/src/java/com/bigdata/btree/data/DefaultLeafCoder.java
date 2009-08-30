@@ -46,20 +46,34 @@ import com.bigdata.io.DataOutputBuffer;
  */
 public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
 
+    protected static final byte VERSION0 = 0x00;
+    
     private IRabaCoder keysCoder;
     private IRabaCoder valsCoder;
 
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
+        final byte version = in.readByte();
+        switch(version) {
+        case VERSION0:
+            break;
+        default:
+            throw new IOException();
+        }
+
         keysCoder = (IRabaCoder) in.readObject();
+        
         valsCoder = (IRabaCoder) in.readObject();
         
     }
 
     public void writeExternal(final ObjectOutput out) throws IOException {
 
+        out.write(VERSION0);
+        
         out.writeObject(keysCoder);
+        
         out.writeObject(valsCoder);
         
     }

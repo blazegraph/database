@@ -79,7 +79,7 @@ abstract public class AbstractRabaDecoder implements IRabaDecoder {
     }
 
     /**
-     * Basic implementation may be overriden if a faster implementation is
+     * Basic implementation may be overridden if a faster implementation is
      * available.
      */
     public Iterator<byte[]> iterator() {
