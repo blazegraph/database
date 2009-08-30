@@ -379,8 +379,8 @@ abstract public class AbstractFixedByteArrayBuffer implements IFixedByteArrayBuf
     public InputBitStream getInputBitStream() {
 
         /*
-         * @todo We have to double-wrap the buffer to ensure that it reads from
-         * just the slice since InputBitStream does not have a constructor which
+         * We have to double-wrap the buffer to ensure that it reads from just
+         * the slice since InputBitStream does not have a constructor which
          * accepts a slice of the form (byte[], off, len). [It would be nice if
          * InputBitStream handled the slice natively since should be faster per
          * its own javadoc.]
@@ -390,8 +390,12 @@ abstract public class AbstractFixedByteArrayBuffer implements IFixedByteArrayBuf
          * RepositionableStream interface. Ideally, it would always do that but
          * skip the reflection on the getChannel() method when it was false.
          */
+//        return new InputBitStream(getDataInput(), 0/* unbuffered */, true/* reflectionTest */);
         
-        return new InputBitStream(getDataInput(), 0/* unbuffered */, true/* reflectionTest */);
+        /*
+         * This directly wraps the slice.  This is much faster.
+         */
+        return new InputBitStream(array(), off, len);
 
     }
 

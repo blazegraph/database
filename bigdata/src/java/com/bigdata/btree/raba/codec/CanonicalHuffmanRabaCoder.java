@@ -1475,13 +1475,20 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         
         private final AbstractFixedByteArrayBuffer data;
 
-//        /**
-//         * The coder is generated iff the logical byte[][] contains B+Tree keys.
-//         * The coder is used in this case to code new byte[]s given as search
-//         * probe so that we can search within the coded key space.
-//         */
-//        private final PrefixCoder coder;
-        
+        /**
+         * A reference to the backing byte array. Offsets into this array MUST
+         * be adjusted for the starting offset of the slice. Direct access to
+         * this byte[] is used to reduce the cost of operations such lookup in
+         * the packed symbol2byte table.
+         */
+        private final byte[] array;
+
+        /**
+         * The offset into the {@link #array} of the first byte of the slice for
+         * the data record.
+         */
+        private final int aoff;
+
         /**
          * The decoder, which is always available.
          */
@@ -1495,16 +1502,16 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         private final int nsymbols;
 
         /**
-         * The <em>byte</em> offset to the packed symbol2byte table. This is a
-         * constant. However the symbol2byte table IS NOT present when B+Tree
-         * keys are being coded.
+         * The <em>byte</em> offset to the packed symbol2byte table relative to
+         * the start of the slice.
          */
-        private static final int BO_symbols = 7;
+        private static final int BYTE_O_symbols = 7;
 
         /**
-         * The bit offset to the packed symbol2byte table.
+         * The bit offset to the packed symbol2byte table (relative to the start
+         * of the data record).
          */
-        private static final long O_symbols = BO_symbols * 8;
+        private static final long O_symbols = BYTE_O_symbols * 8;
         
         /**
          * The bit offset to the start of the nulls[], which is coded IFF the
@@ -1562,6 +1569,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 throw new IllegalArgumentException();
 
             this.data = data;
+            this.array = data.array();
+            this.aoff = data.off();
 
             final StringBuilder sb = debug ? new StringBuilder("\n") : null;
             final InputBitStream ibs = data.getInputBitStream();
@@ -1812,9 +1821,16 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
                 return (byte) KeyBuilder.encodeByte(symbol);
                 
             } else {
-                
-                // index into the buffer start after [nsymbols].
-                return data.getByte(BO_symbols + symbol);
+
+                /*
+                 * Index into the buffer start after [nsymbols].
+                 * 
+                 * Note: This uses direct indexing into the backing byte[] to
+                 * avoid method call and parameter check overhead associated
+                 * with data.getByte().
+                 */
+                return array[aoff + BYTE_O_symbols + symbol];
+//                return data.getByte(BYTE_O_symbols + symbol);
             
             }
 
@@ -2190,8 +2206,6 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             
             if(!isKeys())
                 throw new UnsupportedOperationException();
-
-//            assert coder != null;
             
             final InputBitStream ibs = data.getInputBitStream();
 
@@ -2364,14 +2378,19 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
             }
 
             if (nsymbols == key.length) {
+
                 /*
                  * Note: When the search key is [] we but the coded symbol is
                  * non-empty, we need to indicate that the coded symbol is
                  * longer.
                  */
+                
                 if (ibs.readBits() < codeLength) {
+                
                     return -1;
+                    
                 }
+                
             }
             
             return key.length - nsymbols;

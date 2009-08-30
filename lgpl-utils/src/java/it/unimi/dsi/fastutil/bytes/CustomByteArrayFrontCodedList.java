@@ -1271,20 +1271,6 @@ public class CustomByteArrayFrontCodedList extends AbstractObjectList<byte[]>
             
         }
 
-//        if(mlen == 0) {
-//            
-//            /*
-//             * The search key does not match anything in the full-length entry
-//             * for this bucket.
-//             */
-//            
-//            assert pret < 0; // must have been a miss on the binary search.
-//            
-//            // return the insertion point.
-//            return pret;
-//            
-//        }
-        
         /*
          * Scan up to ratio-1 entries or the last entry, whichever comes first.
          */

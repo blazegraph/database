@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package it.unimi.dsi;
 
 import it.unimi.dsi.fastutil.bytes.TestCustomByteArrayFrontCodedList;
+import it.unimi.dsi.io.InputBitStreamTest;
 import it.unimi.dsi.util.TestBloomFilter2;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -57,10 +58,12 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("modified dsiutils classes");
+        final TestSuite suite = new TestSuite("modified dsiutils/fastutil classes");
 
         suite.addTestSuite(TestBloomFilter2.class);
-        
+
+        suite.addTestSuite(InputBitStreamTest.class);
+
         suite.addTestSuite(TestCustomByteArrayFrontCodedList.class);
         
         return suite;

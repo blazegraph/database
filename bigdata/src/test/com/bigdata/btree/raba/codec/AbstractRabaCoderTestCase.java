@@ -32,6 +32,7 @@ import it.unimi.dsi.compression.HuffmanCodec;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Random;
@@ -46,6 +47,7 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
@@ -720,8 +722,8 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         final Random r = new Random();
 
         // default nops.
-        int nops = 200000;
-//        int nops = 1000000; // ~30-40s per coder @ 1M.
+//        int nops = 200000;
+        int nops = 1000000; // ~30-40s per coder @ 1M.
         if (args.length > 0)
             nops = Integer.valueOf(args[0]);
         if (nops <= 0)
@@ -743,10 +745,11 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         
         // The coders to be tested.
         final IRabaCoder[] coders = new IRabaCoder[] {
+//                MutableKeyCoder @todo define to measure against the MutableKeyBuffer.
                 SimpleRabaCoder.INSTANCE,
-                new FrontCodedRabaCoder(2/* ratio */),
+//                new FrontCodedRabaCoder(2/* ratio */),
                 new FrontCodedRabaCoder(8/* ratio */),
-                new FrontCodedRabaCoder(32/* ratio */),
+//                new FrontCodedRabaCoder(32/* ratio */),
                 CanonicalHuffmanRabaCoder.INSTANCE};
 
         System.out.println("nops=" + nops + ", size=" + size + ", ncoders="
@@ -895,10 +898,18 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
 
         }
 
+        // reused buffer.
         final DataOutputBuffer os = new DataOutputBuffer();
 
+        // #of operations per operation type.
+        final long[] count = new long[op._dist.length];
+
+        // elapsed ns per operation type.
+        final long[] elapsed = new long[op._dist.length];
+        
         for (int i = 0; i < nops; i++) {
 
+            final long begin = System.nanoTime();
             final int code;
             switch (code = op.nextOp(r)) {
             case Op.ISNULL: {
@@ -1083,9 +1094,40 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
             default:
                 throw new AssertionError();
             }
+            elapsed[code] = System.nanoTime() - begin;
+            count[code]++;
 
         }
 
+        double totalNS = 0;
+        for (long ns : elapsed)
+            totalNS += ns;
+        
+        final NumberFormat percentF = NumberFormat.getPercentInstance();
+        percentF.setMinimumFractionDigits(2);
+        final NumberFormat rateF = NumberFormat.getInstance();
+        rateF.setMinimumFractionDigits(0);
+        rateF.setMaximumFractionDigits(0);
+        System.out.println("op\tcount\tnanos\t%time\tops/ms");
+        for (int i = 0; i < count.length; i++) {
+
+            if (count[i] == 0)
+                continue;
+            
+            System.out.println(//
+                    op.getName(i) + "\t"
+                    + count[i]
+                    + "\t"
+                    + elapsed[i]
+                    + "\t"
+                    + percentF.format(elapsed[i] / totalNS)//
+                    + "\t"
+                    + (elapsed[i] == 0 ? "N/A" : rateF.format(count[i]
+                                    / (elapsed[i] * scalingFactor))) //
+                    );
+
+        }
+        
         // The size of the coded record.
         return originalData.length;
         
@@ -1118,6 +1160,12 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
         
     }
     
+    /**
+     * Scaling factor converts nanoseconds to milliseconds.
+     */
+    static protected final double scalingFactor = 1d / TimeUnit.NANOSECONDS
+            .convert(1, TimeUnit.MILLISECONDS);
+
     /**
      * Helper class generates a random sequence of operation codes obeying the
      * probability distribution described in the constructor call.
@@ -1213,11 +1261,11 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
             switch( op ) {
             case ISNULL:  return "isNull";
             case LENGTH:  return "length";
-            case GET:    return "get";
-            case COPY:  return "copy";
-            case SEARCH:     return "search";
-            case ITERATOR:   return "iterator";
-            case RECODE: return "recode";
+            case GET:     return "get   ";
+            case COPY:    return "copy  ";
+            case SEARCH:  return "search";
+            case ITERATOR:return "itr   ";
+            case RECODE:  return "recode";
             default:
                 throw new AssertionError();
             }
