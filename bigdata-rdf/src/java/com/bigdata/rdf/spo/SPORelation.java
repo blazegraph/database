@@ -41,7 +41,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
@@ -52,12 +51,12 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.BatchRemove;
 import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.journal.AbstractTask;
@@ -70,15 +69,11 @@ import com.bigdata.rdf.lexicon.ITermIdFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.load.AssignedSplits;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rio.AsynchronousStatementBufferWithoutSids.AsynchronousWriteBufferFactoryWithoutSids;
 import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
@@ -90,7 +85,6 @@ import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
 import com.bigdata.service.DataService;
-import com.bigdata.service.ndx.IAsynchronousWriteBufferFactory;
 import com.bigdata.service.ndx.IClientIndex;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -600,10 +594,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final IndexMetadata metadata = newIndexMetadata(getFQN(keyOrder));
 
         // leading key compression works great.
-        final IDataSerializer leafKeySer = DefaultTupleSerializer
-                .getDefaultLeafKeySerializer();
+        final IRabaCoder leafKeySer = DefaultTupleSerializer
+                .getDefaultLeafKeysCoder();
 
-        final IDataSerializer leafValSer;
+        final IRabaCoder leafValSer;
         if (!statementIdentifiers) {
 
             /*
@@ -617,7 +611,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         } else {
             
-            leafValSer = DefaultTupleSerializer.getDefaultValueKeySerializer();
+            leafValSer = DefaultTupleSerializer.getDefaultValuesCoder();
             
         }
         

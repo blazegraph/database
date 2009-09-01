@@ -145,6 +145,8 @@ public class AbstractLeafDataRecordTestCase extends
         // spot check mock object impl.
         assertTrue(expected.getDeleteMarker(0));
         assertEquals(versionTimestamps[0], expected.getVersionTimestamp(0));
+        assertEquals(versionTimestamps[0], expected.getMinimumVersionTimestamp());
+        assertEquals(versionTimestamps[0], expected.getMaximumVersionTimestamp());
 
         doRoundTripTest(expected, coder, new DataOutputBuffer());
         
@@ -161,6 +163,43 @@ public class AbstractLeafDataRecordTestCase extends
 //                expected.getKeys().search(new byte[] { 0, 1, 2 }), //
 //                actual.getKeys().search(new byte[] { 0, 1, 2 }));
 
+    }
+    
+    /**
+     * A leaf w/ two keys and version timestamps.
+     */
+    public void test_tupleCount2VersionTimestamps() {
+        
+        final int m = 3;
+        final int nkeys = 2;
+        final byte[][] keys = new byte[m + 1][];
+        final byte[][] vals = new byte[m + 1][];
+        final boolean[] deleteMarkers = new boolean[m + 1];
+        final long[] versionTimestamps = new long[m + 1];
+
+        keys[0] = new byte[]{1,2,3};
+        keys[1] = new byte[]{2,2,3};
+        deleteMarkers[0] = false;
+        deleteMarkers[1] = false;
+        versionTimestamps[0] = System.currentTimeMillis();
+        versionTimestamps[1] = System.currentTimeMillis()+20;
+
+        final ILeafData expected = new MockLeafData(//
+                new ReadOnlyKeysRaba(nkeys, keys),//
+                new ReadOnlyValuesRaba(nkeys, vals),//
+                deleteMarkers,//
+                versionTimestamps//
+        );
+
+        assertFalse(expected.getDeleteMarker(0));
+        assertFalse(expected.getDeleteMarker(1));
+        
+        assertEquals(versionTimestamps[0], expected.getVersionTimestamp(0));
+        assertEquals(versionTimestamps[0], expected.getMinimumVersionTimestamp());
+        assertEquals(versionTimestamps[1], expected.getMaximumVersionTimestamp());
+
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
+        
     }
     
 }

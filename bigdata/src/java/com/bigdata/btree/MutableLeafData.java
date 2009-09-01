@@ -99,6 +99,22 @@ public class MutableLeafData implements ILeafData {
     final long[] versionTimestamps;
 
     /**
+     * The minimum version timestamp (iff they are maintained) and otherwise
+     * ZERO(0). These fields are initialized to ZERO and will be non-zero iff
+     * version timestamps are inserted into the record.
+     * 
+     * FIXME These fields are not maintained yet. Since they default to ZERO the
+     * minimum MUST be updated if it is non-zero. Perhaps change the default to
+     * {@link Long#MIN_VALUE} and {@link Long#MAX_VALUE}?
+     * 
+     * @todo these fields at 16 bytes to each {@link MutableLeafData} object
+     *       even when we do not use them. It would be better to use a subclass
+     *       or tack them onto the end of the {@link #versionTimestamps} array.
+     */
+    long minimumVersionTimestamp;
+    long maximumVersionTimestamp;
+    
+    /**
      * Create an empty data record with internal arrays dimensioned for the
      * specified branching factor.
      * 
@@ -241,6 +257,24 @@ public class MutableLeafData implements ILeafData {
 
     }
     
+    final public long getMinimumVersionTimestamp() {
+
+        if (versionTimestamps == null)
+            throw new UnsupportedOperationException();
+
+        return minimumVersionTimestamp;
+
+    }
+    
+    final public long getMaximumVersionTimestamp() {
+
+        if (versionTimestamps == null)
+            throw new UnsupportedOperationException();
+
+        return maximumVersionTimestamp;
+
+    }
+
     public final boolean getDeleteMarker(final int index) {
 
         if (deleteMarkers == null)
@@ -311,15 +345,21 @@ public class MutableLeafData implements ILeafData {
      * {@link IndexSegment} actually uses double-linked leaves).
      */
     final public boolean isDoubleLinked() {
+     
         return false;
+
     }
 
     final public long getNextAddr() {
+    
         throw new UnsupportedOperationException();
+        
     }
 
     final public long getPriorAddr() {
+        
         throw new UnsupportedOperationException();
+        
     }
 
 }

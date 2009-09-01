@@ -35,6 +35,7 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.compression.NoDataSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -912,8 +913,8 @@ public class Justification implements Comparable<Justification> {
 
             // Note: keys are SPOs; no values stored for the tuples.
             tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO,
-                    DefaultTupleSerializer.getDefaultLeafKeySerializer(),
-                    NoDataSerializer.INSTANCE);
+                    DefaultTupleSerializer.getDefaultLeafKeysCoder(),
+                    EmptyRabaValueCoder.INSTANCE);
             
             metadata.setTupleSerializer(tupleSer);
             

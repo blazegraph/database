@@ -41,9 +41,10 @@ import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
@@ -195,7 +196,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         
     }
     
-    protected Term2IdWriteProc(IDataSerializer keySer, int fromIndex,
+    protected Term2IdWriteProc(IRabaCoder keySer, int fromIndex,
             int toIndex, byte[][] keys, boolean readOnly,
             boolean storeBlankNodes, int scaleOutTermIdBitsToReverse) {
 
@@ -236,8 +237,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        public Term2IdWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
+        public Term2IdWriteProc newInstance(IRabaCoder keySer,
+                IRabaCoder valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             assert vals == null;
@@ -293,6 +294,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         int nnew = 0;
         for (int i = 0; i < numTerms; i++) {
 
+            // @todo copy key into reused buffer to reduce allocation.
             final byte[] key = getKey(i);
 
             // this byte encodes the kind of term (URI, Literal, BNode, etc.)
@@ -332,6 +334,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 // Lookup in the forward index (URIs, Literals, and SIDs)
                 //
                 // Also BNodes iff storeBlankNodes is true
+                // @todo reuse Tuple for lookups to reduce allocation (will reuse an internal buffer).
                 final byte[] tmp = ndx.lookup(key);
     
                 if (tmp == null) {

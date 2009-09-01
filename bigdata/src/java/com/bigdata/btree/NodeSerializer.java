@@ -26,15 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import it.unimi.dsi.io.InputBitStream;
-import it.unimi.dsi.io.OutputBitStream;
-
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.BufferOverflowException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
@@ -45,9 +37,12 @@ import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.data.AbstractReadOnlyNodeData;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.DefaultNodeCoder;
+import com.bigdata.btree.data.IAbstractNodeCodedData;
+import com.bigdata.btree.data.IAbstractNodeCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.compression.IRecordCompressorFactory;
@@ -96,8 +91,12 @@ import com.bigdata.rawstore.IAddressManager;
  * @see IndexMetadata
  * @see INodeData
  * @see ILeafData
- * @see IDataSerializer
+ * @see IRabaCoder
+ * @see IAbstractNodeCoder
  * @see LongPacker
+ * 
+ * @todo isolate this class with an interface to allow pluggable
+ *       implementations?
  */
 public class NodeSerializer {
 
@@ -130,17 +129,17 @@ public class NodeSerializer {
     /**
      * An object that knows how to (de-)serialize keys in a {@link Node}.
      */
-    private final IDataSerializer nodeKeySerializer;
+    private final IRabaCoder nodeKeysCoder;
 
     /**
      * An object that knows how to (de-)serialize keys in a {@link Leaf}.
      */
-    private final IDataSerializer leafKeySerializer;
+    private final IRabaCoder leafKeyCoder;
 
     /**
      * An object that knows how to (de-)serialize the values on leaves.
      */
-    private final IDataSerializer valueSerializer;
+    private final IRabaCoder valueCoder;
     
     /**
      * Factory for record-level (de-)compression of nodes and leaves (optional).
@@ -353,11 +352,11 @@ public class NodeSerializer {
         
         this.addrSerializer = indexMetadata.getAddressSerializer();
 
-        this.nodeKeySerializer = indexMetadata.getNodeKeySerializer();
+        this.nodeKeysCoder = indexMetadata.getNodeKeySerializer();
 
-        this.leafKeySerializer = indexMetadata.getTupleSerializer().getLeafKeySerializer();
+        this.leafKeyCoder = indexMetadata.getTupleSerializer().getLeafKeysCoder();
 
-        this.valueSerializer = indexMetadata.getTupleSerializer().getLeafValueSerializer();
+        this.valueCoder = indexMetadata.getTupleSerializer().getLeafValuesCoder();
 
         // MAY be null
         this.recordCompressorFactory = recordCompressorFactory;
@@ -516,7 +515,13 @@ public class NodeSerializer {
      *         instance of this class. The position will be zero and the limit
      *         will be the #of bytes in the serialized representation.
      */
-    public ByteBuffer putNode(INodeData node) {
+    public ByteBuffer putNode(final INodeData node) {
+
+        if (node == null)
+            throw new IllegalArgumentException();
+
+        if (!(node instanceof IAbstractNodeCodedData))
+            throw new IllegalArgumentException();
 
         if (_writeBuffer == null) {
 
@@ -530,7 +535,33 @@ public class NodeSerializer {
             // prepare buffer for reuse.
             _writeBuffer.reset();
 
-            return putNode2(node);
+            /*
+             * FIXME IAbstractNodeDecoder should indicate that the node has been
+             * coded and give us access to the slice containing the coded data.
+             * At that point, NodeSerializer does not need to do anything except
+             * wrap the slice as a ByteBuffer and conditionally compress it.
+             * 
+             * The AbstractBTree's write queue eviction should reuse the _writeBuffer
+             * for all evicted nodes so they are coded using the same backing buffer.
+             * We don't need it in the NodeSerializer class any more.  We already
+             * have a coded slice on hand.
+             */
+            
+          // #of bytes actually written.
+          final int nbytes = _writeBuffer.pos();
+  
+          assert nbytes > SIZEOF_NODE_HEADER;
+  
+          final ByteBuffer buf2 = ByteBuffer
+                  .wrap(_writeBuffer.array(), 0, nbytes);
+  
+          /*
+           * Note: The position will be zero(0). The limit will be the #of bytes
+           * in the buffer.
+           */
+  
+          return buf2;
+//            return putNode2(node);
 
         } catch (IOException ex) {
 
@@ -540,76 +571,76 @@ public class NodeSerializer {
 
     }
 
-    private ByteBuffer putNode2(final INodeData node) throws IOException {
-
-        assert _writeBuffer != null;
-        assert _writeBuffer.pos() == 0;
-        assert node != null;
-
-//        assert branchingFactor == node.getBranchingFactor();
-        final int nentries = node.getSpannedTupleCount();
-//        final int[] childEntryCounts = node.getChildEntryCounts();
-        final int nkeys = node.getKeyCount();
-//        final IRandomAccessByteArray keys = node.getKeys();
-//        final long[] childAddr = node.getChildAddr();
-
-        /*
-         * fixed length node header.
-         */
-
-        // nodeType (Node)
-        _writeBuffer.writeByte(0);
-
-        // version
-        _writeBuffer.writeShort(VERSION0);
-
-        try {
-
-            // #of spanned entries.
-            _writeBuffer.packLong(nentries);
-
-            // keys
-            nodeKeySerializer.write(_writeBuffer, node.getKeys());
-
-            // addresses.
-//            addrSerializer.putChildAddresses(addressManager,_writeBuffer, childAddr, nkeys + 1);
-            putChildAddresses(addressManager, _writeBuffer, node);
-
-            // #of entries spanned per child.
-            putChildEntryCounts(_writeBuffer, node);
-
-        } catch (EOFException ex) {
-
-            /*
-             * Masquerade the EOFException as a buffer overflow since that is
-             * what it really represents (@todo since ByteBuffer is not used
-             * anymore we do not need to masquerade this and the javadoc should
-             * be updated).
-             */
-            RuntimeException ex2 = new BufferOverflowException();
-
-            ex2.initCause(ex);
-
-            throw ex2;
-
-        }
-
-        // #of bytes actually written.
-        final int nbytes = _writeBuffer.pos();
-
-        assert nbytes > SIZEOF_NODE_HEADER;
-
-        final ByteBuffer buf2 = ByteBuffer
-                .wrap(_writeBuffer.array(), 0, nbytes);
-
-        /*
-         * Note: The position will be zero(0). The limit will be the #of bytes
-         * in the buffer.
-         */
-
-        return buf2;
-
-    }
+//    private ByteBuffer putNode2(final INodeData node) throws IOException {
+//
+//        assert _writeBuffer != null;
+//        assert _writeBuffer.pos() == 0;
+//        assert node != null;
+//
+////        assert branchingFactor == node.getBranchingFactor();
+//        final int nentries = node.getSpannedTupleCount();
+////        final int[] childEntryCounts = node.getChildEntryCounts();
+//        final int nkeys = node.getKeyCount();
+////        final IRandomAccessByteArray keys = node.getKeys();
+////        final long[] childAddr = node.getChildAddr();
+//
+//        /*
+//         * fixed length node header.
+//         */
+//
+//        // nodeType (Node)
+//        _writeBuffer.writeByte(0);
+//
+//        // version
+//        _writeBuffer.writeShort(VERSION0);
+//
+//        try {
+//
+//            // #of spanned entries.
+//            _writeBuffer.packLong(nentries);
+//
+//            // keys
+//            nodeKeysCoder.write(_writeBuffer, node.getKeys());
+//
+//            // addresses.
+////            addrSerializer.putChildAddresses(addressManager,_writeBuffer, childAddr, nkeys + 1);
+//            putChildAddresses(addressManager, _writeBuffer, node);
+//
+//            // #of entries spanned per child.
+//            putChildEntryCounts(_writeBuffer, node);
+//
+//        } catch (EOFException ex) {
+//
+//            /*
+//             * Masquerade the EOFException as a buffer overflow since that is
+//             * what it really represents (@todo since ByteBuffer is not used
+//             * anymore we do not need to masquerade this and the javadoc should
+//             * be updated).
+//             */
+//            RuntimeException ex2 = new BufferOverflowException();
+//
+//            ex2.initCause(ex);
+//
+//            throw ex2;
+//
+//        }
+//
+//        // #of bytes actually written.
+//        final int nbytes = _writeBuffer.pos();
+//
+//        assert nbytes > SIZEOF_NODE_HEADER;
+//
+//        final ByteBuffer buf2 = ByteBuffer
+//                .wrap(_writeBuffer.array(), 0, nbytes);
+//
+//        /*
+//         * Note: The position will be zero(0). The limit will be the #of bytes
+//         * in the buffer.
+//         */
+//
+//        return buf2;
+//
+//    }
 
     /**
      * De-serialize a node.
@@ -632,7 +663,7 @@ public class NodeSerializer {
         assert buf.position() == 0;
 
         // wrap the record.
-        final INodeData data = new DefaultNodeCoder(nodeKeySerializer)
+        final INodeData data = new DefaultNodeCoder(nodeKeysCoder)
                 .decode(buf);
 
         // wrap as Node.
@@ -866,81 +897,81 @@ public class NodeSerializer {
 
     }
 
-    private void putLeafHeader(final ILeafData leaf) throws IOException {
-        
-        // nodeType
-        _writeBuffer.writeByte(1); // this is a leaf.
+//    private void putLeafHeader(final ILeafData leaf) throws IOException {
+//        
+//        // nodeType
+//        _writeBuffer.writeByte(1); // this is a leaf.
+//
+//        // version
+//        _writeBuffer.writeShort(VERSION0);
+//
+//        // previous leaf address. Note: -1L indicates UNKNOWN
+//        _writeBuffer.writeLong(-1L);
+//
+//        // next leaf address.  Note: -1L indicates UNKNOWN.
+//        _writeBuffer.writeLong(-1L);
+//
+//    }
 
-        // version
-        _writeBuffer.writeShort(VERSION0);
-
-        // previous leaf address. Note: -1L indicates UNKNOWN
-        _writeBuffer.writeLong(-1L);
-
-        // next leaf address.  Note: -1L indicates UNKNOWN.
-        _writeBuffer.writeLong(-1L);
-
-    }
-
-    /**
-     * 
-     * @param _writeBuffer
-     * @param leaf
-     * @return The #of bytes written in the leaf body.
-     * @throws IOException
-     */
-    private int putLeafBody(DataOutputBuffer _writeBuffer, final ILeafData leaf)
-            throws IOException {
-        
-//        final int nkeys = leaf.getKeyCount();
-//        final IRandomAccessByteArray keys = leaf.getKeys();
-//        final byte[][] vals = leaf.getValues();
-        
-        final int pos0 = _writeBuffer.pos();
-        
-        try {
-            
-            // keys.
-            leafKeySerializer.write(_writeBuffer, leaf.getKeys());
-            
-            // values.
-            valueSerializer.write(_writeBuffer, leaf.getValues());
-
-            if(leaf.hasDeleteMarkers()) {
-                
-                putDeleteMarkers(_writeBuffer, leaf);
-                
-            }
-            
-            if(leaf.hasVersionTimestamps()) {
-                
-                putVersionTimestamps(_writeBuffer, leaf);
-                
-            }
-            
-        } catch (EOFException ex) {
-
-            /*
-             * Masquerade the EOFException as a buffer overflow since that is
-             * what it really represents (@todo we do not need to masquerade
-             * this exception since we are not using ByteBuffer anymore).
-             */
-            RuntimeException ex2 = new BufferOverflowException();
-
-            ex2.initCause(ex);
-
-            throw ex2;
-
-        }
-
-        // #of bytes actually written.
-        final int nbytes = _writeBuffer.pos() - pos0;
-        
-//        assert nbytes > SIZEOF_LEAF_HEADER;
-        
-        return nbytes;
-
-    }
+//    /**
+//     * 
+//     * @param _writeBuffer
+//     * @param leaf
+//     * @return The #of bytes written in the leaf body.
+//     * @throws IOException
+//     */
+//    private int putLeafBody(DataOutputBuffer _writeBuffer, final ILeafData leaf)
+//            throws IOException {
+//        
+////        final int nkeys = leaf.getKeyCount();
+////        final IRandomAccessByteArray keys = leaf.getKeys();
+////        final byte[][] vals = leaf.getValues();
+//        
+//        final int pos0 = _writeBuffer.pos();
+//        
+//        try {
+//            
+//            // keys.
+//            leafKeyCoder.write(_writeBuffer, leaf.getKeys());
+//            
+//            // values.
+//            valueCoder.write(_writeBuffer, leaf.getValues());
+//
+//            if(leaf.hasDeleteMarkers()) {
+//                
+//                putDeleteMarkers(_writeBuffer, leaf);
+//                
+//            }
+//            
+//            if(leaf.hasVersionTimestamps()) {
+//                
+//                putVersionTimestamps(_writeBuffer, leaf);
+//                
+//            }
+//            
+//        } catch (EOFException ex) {
+//
+//            /*
+//             * Masquerade the EOFException as a buffer overflow since that is
+//             * what it really represents (@todo we do not need to masquerade
+//             * this exception since we are not using ByteBuffer anymore).
+//             */
+//            RuntimeException ex2 = new BufferOverflowException();
+//
+//            ex2.initCause(ex);
+//
+//            throw ex2;
+//
+//        }
+//
+//        // #of bytes actually written.
+//        final int nbytes = _writeBuffer.pos() - pos0;
+//        
+////        assert nbytes > SIZEOF_LEAF_HEADER;
+//        
+//        return nbytes;
+//
+//    }
 
     /**
      * De-serialize a leaf.
@@ -963,8 +994,8 @@ public class NodeSerializer {
         assert buf.position() == 0;
 
         // wrap buffer as data record.
-        final ILeafData data = new DefaultLeafCoder(leafKeySerializer,
-                valueSerializer).decode(buf);
+        final ILeafData data = new DefaultLeafCoder(leafKeyCoder,
+                valueCoder).decode(buf);
 
         // wrap data record as Leaf.
         return nodeFactory.allocLeaf(btree, addr, data);
@@ -1101,237 +1132,237 @@ public class NodeSerializer {
 //        }
 //
 //    }
-    
-    private void putChildAddresses(IAddressManager addressManager,
-            DataOutputBuffer os, INodeData node)
-            throws IOException {
-
-        final int nchildren = node.getChildCount();
-        
-        for (int i = 0; i < nchildren; i++) {
-
-            final long addr = node.getChildAddr(i);
-
-            /*
-             * Children MUST have assigned persistent identity.
-             */
-            if (addr == 0L) {
-
-                throw new RuntimeException("Child is not persistent: index="
-                        + i);
-
-            }
-
-            os.writeLong(addr);
-
-        }
-
-    }
-
-    private void getChildAddresses(IAddressManager addressManager, DataInput is,
-            long[] childAddr, int nchildren) throws IOException {
-
-        for (int i = 0; i < nchildren; i++) {
-
-            final long addr = is.readLong();
-
-            if (addr == 0L) {
-
-                throw new RuntimeException(
-                        "Child does not have persistent address: index=" + i);
-
-            }
-
-            childAddr[i] = addr;
-
-        }
-
-    }
-
-    /**
-     * Write out a packed array of the #of entries spanned by each child of some
-     * node.
-     * 
-     * @param os
-     *            The output stream.
-     * @param childEntryCounts
-     *            The #of entries spanned by each direct child.
-     * @param nchildren
-     *            The #of elements of that array that are defined.
-     *            
-     * @throws IOException
-     * 
-     * @todo customizable serializer interface configured in {@link IndexMetadata}.
-     */
-    static protected void putChildEntryCounts(final DataOutput os,
-            final INodeData node) throws IOException {
-
-        final int nchildren = node.getChildCount();
-        
-        for (int i = 0; i < nchildren; i++) {
-
-            final long nentries = node.getChildEntryCount(i);
-
-            /*
-             * Children MUST span some entries.
-             */
-            if (nentries == 0L) {
-
-                throw new RuntimeException(
-                        "Child does not span entries: index=" + i);
-
-            }
-
-            LongPacker.packLong(os, nentries);
-
-        }
-
-    }
-
-    /**
-     * Read in a packed array of the #of entries spanned by each child of some
-     * node.
-     * 
-     * @param is
-     * @param childEntryCounts
-     *            The #of entries spanned by each direct child.
-     * @param nchildren
-     *            The #of elements of that array that are defined.
-     * @throws IOException
-     * 
-     * @todo customizable serializer interface configured in {@link IndexMetadata}.
-     */
-    static protected void getChildEntryCounts(DataInput is,
-            int[] childEntryCounts, int nchildren) throws IOException {
-
-        for (int i = 0; i < nchildren; i++) {
-
-            final int nentries = (int) LongPacker.unpackLong(is);
-
-            if (nentries == 0L) {
-
-                throw new RuntimeException(
-                        "Child does not span entries: index=" + i);
-
-            }
-
-            childEntryCounts[i] = nentries;
-
-        }
-
-    }
-
-    
-    
-    /**
-     * Write out the delete markers.
-     * 
-     * @param os
-     * @param leaf
-     * 
-     * @throws IOException
-     * 
-     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
-     */
-    static protected void putDeleteMarkers(DataOutputBuffer os, ILeafData leaf)
-            throws IOException {
-
-        final int n = leaf.getKeyCount();
-
-        if (n == 0)
-            return;
-
-        final OutputBitStream obs = new OutputBitStream(os,
-                0/* unbuffered! */, false/* reflectionTest */);
-
-        for (int i = 0; i < n; i++) {
-
-            obs.writeBit(leaf.getDeleteMarker(i));
-
-        }
-
-        obs.flush();
-
-        obs.close();
-
-    }
-
-    /**
-     * Read in the delete markers.
-     * 
-     * @param is
-     * @param n
-     * @param deleteMarkers
-     * 
-     * @throws IOException
-     */
-    static protected void getDeleteMarkers(DataInput is, int n, boolean[] deleteMarkers)
-            throws IOException {
-
-        if (n == 0)
-            return;
-
-        final InputBitStream ibs = new InputBitStream((InputStream) is,
-                0/* unbuffered! */, false/* reflectionTest */);
-
-        for (int i = 0; i < n; i++) {
-
-            deleteMarkers[i] = ibs.readBit() == 0 ? false : true;
-            
-        }
-        
-//        ibs.close();
-        
-    }
-
-    /**
-     * Write out the version timestamps.
-     * 
-     * @param os
-     * @param nentries
-     * @param versionTimestamps
-     * 
-     * @throws IOException
-     * 
-     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
-     * 
-     * @todo Experiment with other serialization schemes. One of the more
-     *       obvious would be a huffman encoding of the timestamps since I
-     *       presume that they will tend to bunch together a lot. If timestamps
-     *       are non-negative then we can also pack them (or use the nibble
-     *       coding). this should be configured in the IndexMetadata. it will
-     *       need to have its own interface since the data are not byte[]s.
-     */
-    static protected void putVersionTimestamps(DataOutputBuffer os, ILeafData leaf)
-            throws IOException {
-
-        final int n = leaf.getKeyCount();
-
-        if (n == 0)
-            return;
-
-        for (int i = 0; i < n; i++) {
-
-            final long timestamp = leaf.getVersionTimestamp(i);
-
-            os.writeLong(timestamp);
-
-        }
-
-    }
-
-    static protected void getVersionTimestamps(DataInput is, int n,
-            long[] versionTimestamps) throws IOException {
-
-        if (n == 0)
-            return;
-
-        for (int i = 0; i < n; i++) {
-
-            versionTimestamps[i] = is.readLong();
-
-        }
-
-    }
+//    
+//    private void putChildAddresses(IAddressManager addressManager,
+//            DataOutputBuffer os, INodeData node)
+//            throws IOException {
+//
+//        final int nchildren = node.getChildCount();
+//        
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long addr = node.getChildAddr(i);
+//
+//            /*
+//             * Children MUST have assigned persistent identity.
+//             */
+//            if (addr == 0L) {
+//
+//                throw new RuntimeException("Child is not persistent: index="
+//                        + i);
+//
+//            }
+//
+//            os.writeLong(addr);
+//
+//        }
+//
+//    }
+//
+//    private void getChildAddresses(IAddressManager addressManager, DataInput is,
+//            long[] childAddr, int nchildren) throws IOException {
+//
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long addr = is.readLong();
+//
+//            if (addr == 0L) {
+//
+//                throw new RuntimeException(
+//                        "Child does not have persistent address: index=" + i);
+//
+//            }
+//
+//            childAddr[i] = addr;
+//
+//        }
+//
+//    }
+
+//    /**
+//     * Write out a packed array of the #of entries spanned by each child of some
+//     * node.
+//     * 
+//     * @param os
+//     *            The output stream.
+//     * @param childEntryCounts
+//     *            The #of entries spanned by each direct child.
+//     * @param nchildren
+//     *            The #of elements of that array that are defined.
+//     *            
+//     * @throws IOException
+//     * 
+//     * @todo customizable serializer interface configured in {@link IndexMetadata}.
+//     */
+//    static protected void putChildEntryCounts(final DataOutput os,
+//            final INodeData node) throws IOException {
+//
+//        final int nchildren = node.getChildCount();
+//        
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long nentries = node.getChildEntryCount(i);
+//
+//            /*
+//             * Children MUST span some entries.
+//             */
+//            if (nentries == 0L) {
+//
+//                throw new RuntimeException(
+//                        "Child does not span entries: index=" + i);
+//
+//            }
+//
+//            LongPacker.packLong(os, nentries);
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * Read in a packed array of the #of entries spanned by each child of some
+//     * node.
+//     * 
+//     * @param is
+//     * @param childEntryCounts
+//     *            The #of entries spanned by each direct child.
+//     * @param nchildren
+//     *            The #of elements of that array that are defined.
+//     * @throws IOException
+//     * 
+//     * @todo customizable serializer interface configured in {@link IndexMetadata}.
+//     */
+//    static protected void getChildEntryCounts(DataInput is,
+//            int[] childEntryCounts, int nchildren) throws IOException {
+//
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final int nentries = (int) LongPacker.unpackLong(is);
+//
+//            if (nentries == 0L) {
+//
+//                throw new RuntimeException(
+//                        "Child does not span entries: index=" + i);
+//
+//            }
+//
+//            childEntryCounts[i] = nentries;
+//
+//        }
+//
+//    }
+
+//    
+//    
+//    /**
+//     * Write out the delete markers.
+//     * 
+//     * @param os
+//     * @param leaf
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
+//     */
+//    static protected void putDeleteMarkers(DataOutputBuffer os, ILeafData leaf)
+//            throws IOException {
+//
+//        final int n = leaf.getKeyCount();
+//
+//        if (n == 0)
+//            return;
+//
+//        final OutputBitStream obs = new OutputBitStream(os,
+//                0/* unbuffered! */, false/* reflectionTest */);
+//
+//        for (int i = 0; i < n; i++) {
+//
+//            obs.writeBit(leaf.getDeleteMarker(i));
+//
+//        }
+//
+//        obs.flush();
+//
+//        obs.close();
+//
+//    }
+//
+//    /**
+//     * Read in the delete markers.
+//     * 
+//     * @param is
+//     * @param n
+//     * @param deleteMarkers
+//     * 
+//     * @throws IOException
+//     */
+//    static protected void getDeleteMarkers(DataInput is, int n, boolean[] deleteMarkers)
+//            throws IOException {
+//
+//        if (n == 0)
+//            return;
+//
+//        final InputBitStream ibs = new InputBitStream((InputStream) is,
+//                0/* unbuffered! */, false/* reflectionTest */);
+//
+//        for (int i = 0; i < n; i++) {
+//
+//            deleteMarkers[i] = ibs.readBit() == 0 ? false : true;
+//            
+//        }
+//        
+////        ibs.close();
+//        
+//    }
+//
+//    /**
+//     * Write out the version timestamps.
+//     * 
+//     * @param os
+//     * @param nentries
+//     * @param versionTimestamps
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
+//     * 
+//     * @todo Experiment with other serialization schemes. One of the more
+//     *       obvious would be a huffman encoding of the timestamps since I
+//     *       presume that they will tend to bunch together a lot. If timestamps
+//     *       are non-negative then we can also pack them (or use the nibble
+//     *       coding). this should be configured in the IndexMetadata. it will
+//     *       need to have its own interface since the data are not byte[]s.
+//     */
+//    static protected void putVersionTimestamps(DataOutputBuffer os, ILeafData leaf)
+//            throws IOException {
+//
+//        final int n = leaf.getKeyCount();
+//
+//        if (n == 0)
+//            return;
+//
+//        for (int i = 0; i < n; i++) {
+//
+//            final long timestamp = leaf.getVersionTimestamp(i);
+//
+//            os.writeLong(timestamp);
+//
+//        }
+//
+//    }
+//
+//    static protected void getVersionTimestamps(DataInput is, int n,
+//            long[] versionTimestamps) throws IOException {
+//
+//        if (n == 0)
+//            return;
+//
+//        for (int i = 0; i < n; i++) {
+//
+//            versionTimestamps[i] = is.readLong();
+//
+//        }
+//
+//    }
 
 }

@@ -361,7 +361,7 @@ public class OutputBitStream implements Flushable, Closeable {
 
 	public void close() throws IOException {
 		flush();
-		if ( os != System.out && os != System.err ) os.close();
+        if (os != null && os != System.out && os != System.err ) os.close();
 		buffer = null;
 	}
 

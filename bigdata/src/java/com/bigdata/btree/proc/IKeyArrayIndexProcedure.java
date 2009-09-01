@@ -1,5 +1,6 @@
 package com.bigdata.btree.proc;
 
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.service.ndx.ClientIndexView;
 
 /**
@@ -20,6 +21,8 @@ public interface IKeyArrayIndexProcedure extends IIndexProcedure {
 
     /**
      * The #of keys/tuples
+     * 
+     * @deprecated by {@link #getKeys()}
      */
     public int getKeyCount();
     
@@ -30,6 +33,8 @@ public interface IKeyArrayIndexProcedure extends IIndexProcedure {
      *            The index (origin zero).
      * 
      * @return The key at that index.
+     * 
+     * @deprecated by {@link #getKeys()}
      */
     public byte[] getKey(int i);
     
@@ -40,7 +45,24 @@ public interface IKeyArrayIndexProcedure extends IIndexProcedure {
      *            The index (origin zero).
      * 
      * @return The value at that index.
+     * 
+     * @deprecated by {@link #getValues()}
      */
     public byte[] getValue(int i);
-    
+
+    /**
+     * The keys.
+     * 
+     * @return The keys and never <code>null</code>.
+     */
+    public IRaba getKeys();
+
+    /**
+     * The values.
+     * 
+     * @return The values -or- <code>null</code> if no values were associated
+     *         with the {@link IIndexProcedure}.
+     */
+    public IRaba getValues();
+
 }

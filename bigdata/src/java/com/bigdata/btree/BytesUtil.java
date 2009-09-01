@@ -65,9 +65,14 @@ public class BytesUtil {
     protected static final Logger log = Logger.getLogger(BytesUtil.class);
 
     /**
-     * An empty byte array.
+     * An empty <code>byte[]</code>.
      */
-    public static final byte[] EMPTY = new byte[]{};
+    public static final byte[] EMPTY = new byte[0];
+
+    /**
+     * An empty <code>byte[][]</code>.
+     */
+    public static final byte[][] EMPTY2 = new byte[0][];
 
     /**
      * Flag set iff JNI linking succeeds.  When this flag is false we run with

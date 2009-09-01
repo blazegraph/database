@@ -22,6 +22,12 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
      */
     private final int[] childEntryCount;
 
+    private final boolean hasVersionTimestamps;
+
+    private final long minVersionTimestamp;
+
+    private final long maxVersionTimestamp;
+    
     final public int getSpannedTupleCount() {
 
         return spannedTupleCount;
@@ -79,9 +85,10 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
         
     }
 
-    public MockNodeData(final IRaba keys,
-            final int spannedTupleCount, final long[] childAddr,
-            final int[] childEntryCount) {
+    public MockNodeData(final IRaba keys, final int spannedTupleCount,
+            final long[] childAddr, final int[] childEntryCount,
+            boolean hasVersionTimestamps, long minVersionTimestamp,
+            long maxVersionTimestamp) {
 
         super(keys);
 
@@ -104,6 +111,36 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
 
         this.childEntryCount = childEntryCount;
 
+        this.hasVersionTimestamps = hasVersionTimestamps;
+        
+        this.minVersionTimestamp = minVersionTimestamp;
+        
+        this.maxVersionTimestamp = maxVersionTimestamp;
+
+    }
+
+    final public boolean hasVersionTimestamps() {
+        
+        return hasVersionTimestamps;
+        
+    }
+
+    final public long getMaximumVersionTimestamp() {
+        
+        if (!hasVersionTimestamps())
+            throw new UnsupportedOperationException();
+        
+        return maxVersionTimestamp;
+        
+    }
+
+    final public long getMinimumVersionTimestamp() {
+        
+        if (!hasVersionTimestamps())
+            throw new UnsupportedOperationException();
+        
+        return minVersionTimestamp;
+        
     }
 
 }

@@ -357,7 +357,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 .getBranchingFactor());
 
         assertSameLeafData(n1, n2);
-        
+
     }
 
     /**
@@ -368,11 +368,27 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         assertEquals("isLeaf", n1.isLeaf(), n2.isLeaf());
 
-        assertEquals("entryCount", n1.getSpannedTupleCount(), n2.getSpannedTupleCount());
+        assertEquals("entryCount", n1.getSpannedTupleCount(), n2
+                .getSpannedTupleCount());
 
         assertEquals("keyCount", n1.getKeyCount(), n2.getKeyCount());
 
         assertKeys(n1.getKeys(), n2.getKeys());
+
+        assertEquals("hasVersionTimestamps", n1.hasVersionTimestamps(), n2
+                .hasVersionTimestamps());
+        
+        if (n1.hasVersionTimestamps()) {
+
+            assertEquals("minimumVersionTimestamp", n1
+                    .getMinimumVersionTimestamp(), n2
+                    .getMinimumVersionTimestamp());
+
+            assertEquals("maximumVersionTimestamp", n1
+                    .getMaximumVersionTimestamp(), n2
+                    .getMaximumVersionTimestamp());
+
+        }
 
     }
     

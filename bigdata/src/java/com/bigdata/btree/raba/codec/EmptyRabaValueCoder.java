@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.raba.codec;
 
 import java.io.DataInput;
+import java.io.Externalizable;
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -45,8 +48,27 @@ import com.bigdata.io.FixedByteArrayBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class EmptyRabaValueCoder implements IRabaCoder {
+public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
 
+    public void readExternal(ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        // NOP
+        
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        // NOP
+        
+    }
+
+    public static transient final EmptyRabaValueCoder INSTANCE = new EmptyRabaValueCoder();
+    
+    public EmptyRabaValueCoder() {
+        
+    }
+    
     /**
      * No.  Keys can not be constrained to be empty.
      */

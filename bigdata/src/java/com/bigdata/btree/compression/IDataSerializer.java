@@ -55,9 +55,8 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
  * for the keys and values in the {@link AbstractBTree} and for the keys and
  * values in {@link IKeyArrayIndexProcedure}s, which are auto-split against the
  * index partitions and hence use a {fromIndex, toIndex}. This leads to the
- * requirement that the caller allocate the
- * {@link IMutableRandomAccessByteArray} into which the data will be
- * de-serialized so that they can specify the capacity of that object.
+ * requirement that the caller allocate the {@link IRaba} into which the data
+ * will be de-serialized so that they can specify the capacity of that object.
  * <p>
  * The standard practice is to write out <code>toIndex</code> as (toIndex -
  * fromIndex), which is the #of keys to be written. When the data are read back

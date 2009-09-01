@@ -67,8 +67,8 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
 
         super(new ASCIIKeyBuilderFactory(
                 keyOrder.getArity() * Bytes.SIZEOF_LONG), 
-                getDefaultLeafKeySerializer(),
-                getDefaultValueKeySerializer());
+                getDefaultLeafKeysCoder(),
+                getDefaultValuesCoder());
         
         if (keyOrder == null)
             throw new IllegalArgumentException();

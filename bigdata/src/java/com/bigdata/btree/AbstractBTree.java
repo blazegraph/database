@@ -2994,7 +2994,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            MUST be dirty. The node this does NOT have to be the root of
      *            the tree and it does NOT have to be a {@link Node}.
      */
-    protected void writeNodeRecursive(AbstractNode node) {
+    final protected void writeNodeRecursive(final AbstractNode<?> node) {
 
         final long begin = System.currentTimeMillis();
         
@@ -3027,11 +3027,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * 
          * Note: This iterator only visits dirty nodes.
          */
-        final Iterator itr = node.postOrderNodeIterator(true);
+        final Iterator<AbstractNode> itr = node.postOrderNodeIterator(true);
 
         while (itr.hasNext()) {
 
-            final AbstractNode t = (AbstractNode) itr.next();
+            final AbstractNode<?> t = itr.next();
 
             assert t.dirty;
 
@@ -3092,7 +3092,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @return The persistent identity assigned by the store.
      */
-    protected long writeNodeOrLeaf(final AbstractNode node) {
+    protected long writeNodeOrLeaf(final AbstractNode<?> node) {
 
         assert root != null; // i.e., isOpen().
         assert node != null;

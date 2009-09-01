@@ -82,8 +82,9 @@ public class TestFindChild extends AbstractBTreeTestCase {
                 null });
 
         final Node node = new Node(btree, 1, new MutableNodeData(nentries,
-                keys, childAddrs, childEntryCounts));
-        
+                keys, childAddrs, childEntryCounts,
+                false/* versionTimestamps */, 0L, 0L));
+
         assertEquals(0,node.findChild(new byte[]{1}));
         assertEquals(0,node.findChild(new byte[]{2}));
         assertEquals(0,node.findChild(new byte[]{3}));

@@ -15,6 +15,8 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
     final private boolean[] deleteMarkers;
 
     final private long[] versionTimestamps;
+    
+    final private long minVersionTimestamp, maxVersionTimestamp;
 
     final public IRaba getValues() {
 
@@ -110,6 +112,35 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
 
         this.versionTimestamps = versionTimestamps;
 
+        if (versionTimestamps != null) {
+
+            long min = Long.MAX_VALUE;
+            long max = Long.MIN_VALUE;
+            
+            final int nkeys = keys.size();
+            
+            for (int i = 0; i < nkeys; i++) {
+
+                final long t = versionTimestamps[i];
+
+                if (t < min)
+                    min = t;
+                
+                if (t > max)
+                    max = t;
+                
+            }
+            
+            this.minVersionTimestamp = min;
+            
+            this.maxVersionTimestamp = max;
+            
+        } else {
+
+            this.minVersionTimestamp = this.maxVersionTimestamp = 0L;
+
+        }
+        
     }
 
     public boolean isDoubleLinked() {
@@ -124,4 +155,38 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
         throw new UnsupportedOperationException();
     }
 
+    public long getMaximumVersionTimestamp() {
+        
+        if(!hasVersionTimestamps())
+            throw new UnsupportedOperationException();
+
+        return maxVersionTimestamp;
+        
+    }
+
+    public long getMinimumVersionTimestamp() {
+
+        if(!hasVersionTimestamps())
+            throw new UnsupportedOperationException();
+
+        return minVersionTimestamp;
+        
+    }
+
+    public String toString() {
+    
+        final StringBuilder sb = new StringBuilder();
+        
+        sb.append(super.toString());
+        
+        sb.append("{");
+        
+        DefaultLeafCoder.toString(this, sb);
+        
+        sb.append("}");
+        
+        return sb.toString();
+        
+    }
+    
 }

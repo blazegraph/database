@@ -1,5 +1,7 @@
 package com.bigdata.btree.raba.codec;
 
+import java.io.Serializable;
+
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
@@ -13,7 +15,7 @@ import com.bigdata.io.DataOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IRabaCoder {
+public interface IRabaCoder extends Serializable {
 
     /**
      * Return <code>true</code> if this implementation can code B+Tree keys
@@ -31,6 +33,12 @@ public interface IRabaCoder {
 
     /**
      * Encode the data.
+     * <p>
+     * Note: Implementations of this method are typically heavy. While it is
+     * always valid to {@link #encode(IRaba, DataOutputBuffer)} an {@link IRaba}
+     * , DO NOT invoke this <em>arbitrarily</em> on data which may already be
+     * coded. The {@link IRabaDecoder} interface will always be implemented for
+     * coded data.
      * 
      * @param raba
      *            The data.

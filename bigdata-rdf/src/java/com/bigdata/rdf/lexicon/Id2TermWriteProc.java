@@ -32,9 +32,10 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -83,10 +84,10 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
         
     }
     
-    protected Id2TermWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+    protected Id2TermWriteProc(final IRabaCoder keysCoder, final IRabaCoder valsCoder,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
-        super(keySer, valSer, fromIndex, toIndex, keys, vals);
+        super(keysCoder, valsCoder, fromIndex, toIndex, keys, vals);
         
         assert vals != null;
         
@@ -108,11 +109,12 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         private Id2TermWriteProcConstructor() {}
         
-        public Id2TermWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer,int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public Id2TermWriteProc newInstance(final IRabaCoder keysCoder,
+                final IRabaCoder valsCoder, final int fromIndex,
+                final int toIndex, final byte[][] keys, final byte[][] vals) {
 
-            return new Id2TermWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);
+            return new Id2TermWriteProc(keysCoder, valsCoder, fromIndex, toIndex,
+                    keys, vals);
 
         }
 
@@ -130,13 +132,14 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * @return <code>null</code>.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
         
         final int n = getKeyCount();
         
         for (int i = 0; i < n; i++) {
 
             // Note: the key is the term identifier.
+            // @todo copy key/val into reused buffers to reduce allocation.
             final byte[] key = getKey(i);
             
             // Note: the value is the serialized term (and never a BNode).

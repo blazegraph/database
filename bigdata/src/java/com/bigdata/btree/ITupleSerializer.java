@@ -31,10 +31,11 @@ package com.bigdata.btree;
 import java.io.Serializable;
 import java.util.Locale;
 
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.Journal;
@@ -201,36 +202,26 @@ public interface ITupleSerializer<K extends Object, V extends Object> extends
      *             if this operation is not implemented.
      */
     K deserializeKey(ITuple tuple);
-    
+
     /**
-     * The object used to (de-)serialize/(de-)compress an ordered array of keys
-     * such as found in a B+Tree leaf or in a {@link ResultSet}.
-     * <p>
-     * Note: This handles the "serialization" of the <code>byte[][]</code>
-     * containing all of the keys for some leaf of the index. As such it may be
-     * used to provide compression across the already serialized keys in the
-     * leaf.
+     * The object used to code (compress) an ordered array of keys such as found
+     * in a B+Tree {@link ILeafData} record or in a {@link ResultSet}.
      * <p>
      * Note: If you change this value in a manner that is not backward
      * compatible once entries have been written on the index then you may be
      * unable to any read data already written.
      */
-    IDataSerializer getLeafKeySerializer();
-    
+    IRabaCoder getLeafKeysCoder();
+
     /**
-     * The object used to (de-)serialize/(de-)compress an unordered array of
-     * values ordered array of keys such as found in a B+Tree leaf or in a
-     * {@link ResultSet}
-     * <p>
-     * Note: This handles the "serialization" of the <code>byte[][]</code>
-     * containing all of the values for some leaf of the index. As such it may
-     * be used to provide compression across the already serialized values in
-     * the leaf.
+     * The object used to code (compress) an unordered array of values ordered
+     * array of keys such as found in a B+Tree {@link ILeafData} record or in a
+     * {@link ResultSet}.
      * <p>
      * Note: If you change this value in a manner that is not backward
      * compatible once entries have been written on the index then you may be
      * unable to any read data already written.
      */
-    IDataSerializer getLeafValueSerializer();
+    IRabaCoder getLeafValuesCoder();
    
 }

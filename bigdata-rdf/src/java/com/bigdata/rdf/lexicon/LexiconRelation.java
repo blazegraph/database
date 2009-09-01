@@ -1446,7 +1446,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
                     toIndex, ndx.getIndexMetadata().getTupleSerializer()
-                            .getLeafValueSerializer());
+                            .getLeafValuesCoder());
 
             // batch lookup
             ndx.submit(fromIndex, toIndex/* toIndex */, keys, null/* vals */,

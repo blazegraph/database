@@ -17,7 +17,7 @@ import com.bigdata.io.AbstractFixedByteArrayBuffer;
 public interface IRabaDecoder extends IRaba {
 
     /**
-     * The encoded data.
+     * The coded (aka compressed) data.
      */
     AbstractFixedByteArrayBuffer data();
 

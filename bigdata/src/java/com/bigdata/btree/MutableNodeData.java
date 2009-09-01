@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.data.ReadOnlyNodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 
@@ -122,13 +121,35 @@ public class MutableNodeData implements INodeData {
     final int[] childEntryCounts;
 
     /**
+     * <code>true</code> iff the B+Tree is maintaining per tuple revision
+     * timestamps.
+     */
+    final boolean hasVersionTimestamps;
+    
+    /**
+     * The minimum tuple revision timestamp for any leaf spanned by this node
+     * IFF the B+Tree is maintaining tuple revision timestamps.
+     */
+    long minimumVersionTimestamp;
+
+    /**
+     * The maximum tuple revision timestamp for any leaf spanned by this node
+     * IFF the B+Tree is maintaining tuple revision timestamps.
+     */
+    long maximumVersionTimestamp;
+
+    /**
      * Create an empty mutable data record.
      * 
      * @param branchingFactor
      *            The branching factor for the owning B+Tree. This is used to
      *            initialize the various arrays to the correct capacity.
+     * @param hasVersionTimestamps
+     *            <code>true</code> iff the B+Tree is maintaining per tuple
+     *            version timestamps.
      */
-    public MutableNodeData(final int branchingFactor) {
+    public MutableNodeData(final int branchingFactor,
+            final boolean hasVersionTimestamps) {
 
         nentries = 0;
 
@@ -137,6 +158,10 @@ public class MutableNodeData implements INodeData {
         childAddr = new long[branchingFactor + 1];
 
         childEntryCounts = new int[branchingFactor + 1];
+
+        this.hasVersionTimestamps = hasVersionTimestamps;
+        
+        minimumVersionTimestamp = maximumVersionTimestamp = 0L;
 
     }
 
@@ -175,24 +200,34 @@ public class MutableNodeData implements INodeData {
             sum += tmp;
             
         }
+
+        this.hasVersionTimestamps = src.hasVersionTimestamps();
+        
+        if(src.hasVersionTimestamps()) {
+        
+            minimumVersionTimestamp = src.getMinimumVersionTimestamp();
+            
+            maximumVersionTimestamp = src.getMaximumVersionTimestamp();
+            
+        }
         
         assert sum == nentries;
 
     }
 
     /**
-     * 
+     * Ctor based on just the "data".  Mainly used by unit tests.
+     *  
      * @param nentries
      * @param keys
      * @param childAddr
      * @param childEntryCounts
-     * 
-     * @deprecated This is a de-serialization ctor. It will be replaced by the
-     *             direct deserialization of a {@link ReadOnlyNodeData} wrapping
-     *             a coded data record.
      */
     public MutableNodeData(final int nentries, final IRaba keys,
-            final long[] childAddr, final int[] childEntryCounts) {
+            final long[] childAddr, final int[] childEntryCounts,
+            final boolean hasVersionTimestamps,
+            final long minimumVersionTimestamp,
+            final long maximumVersionTimestamp) {
 
         assert keys != null;
         assert childAddr != null;
@@ -207,6 +242,12 @@ public class MutableNodeData implements INodeData {
         this.childAddr = childAddr;
         
         this.childEntryCounts = childEntryCounts;
+
+        this.hasVersionTimestamps = hasVersionTimestamps;
+        
+        this.minimumVersionTimestamp = minimumVersionTimestamp;
+        
+        this.maximumVersionTimestamp = maximumVersionTimestamp;
         
     }
     
@@ -282,6 +323,30 @@ public class MutableNodeData implements INodeData {
 
         return false;
 
+    }
+
+    final public boolean hasVersionTimestamps() {
+        
+        return hasVersionTimestamps;
+        
+    }
+
+    final public long getMaximumVersionTimestamp() {
+
+        if(!hasVersionTimestamps)
+            throw new UnsupportedOperationException();
+        
+        return maximumVersionTimestamp;
+        
+    }
+
+    final public long getMinimumVersionTimestamp() {
+        
+        if(!hasVersionTimestamps)
+            throw new UnsupportedOperationException();
+        
+        return minimumVersionTimestamp;
+        
     }
 
 }

@@ -126,7 +126,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                 final IAbstractNodeData expected = getRandomNodeOrLeaf(
                         branchingFactor, deleteMarkers, versionTimestamps);
 
-                doRoundTripTest(expected,coder,buf);
+                doRoundTripTest(expected, coder, buf);
                 
             }
    
@@ -336,6 +336,15 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
 
         final int[] childEntryCounts = new int[branchingFactor+1];
         
+        final boolean hasVersionTimestamp = r.nextBoolean();
+        
+        final long minimumVersionTimestamp = hasVersionTimestamp ? System
+                .currentTimeMillis() : 0L;
+
+        final long maximumVersionTimestamp = hasVersionTimestamp ? System
+                .currentTimeMillis()
+                + r.nextInt() : 0L;
+
         // node with some valid keys and corresponding child refs.
 
         int nentries = 0;
@@ -351,11 +360,12 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
         }
                 
         /*
-         * create the node and set it as the root to fake out the btree.
+         * Create the node.
          */
 
         return new MockNodeData(new ReadOnlyKeysRaba(nkeys, keys), nentries,
-                children, childEntryCounts);
+                children, childEntryCounts, hasVersionTimestamp,
+                minimumVersionTimestamp, maximumVersionTimestamp);
         
     }
 
