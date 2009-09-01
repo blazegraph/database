@@ -47,32 +47,32 @@ public interface IAbstractNodeData {
      */
     public boolean isReadOnly();
 
-//    /**
-//     * Return <code>true</code> iff the leaves maintain tuple revision
-//     * timestamps. When <code>true</code>, the minimum and maximum tuple
-//     * revision timestamp for a node or leaf are available from
-//     * {@link #getMinimumVersionTimestamp()} and
-//     * {@link #getMaximumVersionTimestamp()}.
-//     */
-//    public boolean hasVersionTimestamps();
-//
-//    /**
-//     * The earliest tuple revision timestamp associated with any tuple spanned
-//     * by this node or leaf.
-//     * 
-//     * @throws UnsupportedOperationException
-//     *             unless tuple revision timestamps are being maintained.
-//     */
-//    public long getMinimumVersionTimestamp();
-//
-//    /**
-//     * The most recent tuple revision timestamp associated with any tuple
-//     * spanned by this node or leaf.
-//     * 
-//     * @throws UnsupportedOperationException
-//     *             unless tuple revision timestamps are being maintained.
-//     */
-//    public long getMaximumVersionTimestamp();
+    /**
+     * Return <code>true</code> iff the leaves maintain tuple revision
+     * timestamps. When <code>true</code>, the minimum and maximum tuple
+     * revision timestamp for a node or leaf are available from
+     * {@link #getMinimumVersionTimestamp()} and
+     * {@link #getMaximumVersionTimestamp()}.
+     */
+    public boolean hasVersionTimestamps();
+
+    /**
+     * The earliest tuple revision timestamp associated with any tuple spanned
+     * by this node or leaf.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless tuple revision timestamps are being maintained.
+     */
+    public long getMinimumVersionTimestamp();
+
+    /**
+     * The most recent tuple revision timestamp associated with any tuple
+     * spanned by this node or leaf.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless tuple revision timestamps are being maintained.
+     */
+    public long getMaximumVersionTimestamp();
     
     /**
      * The #of tuples spanned by this node or leaf. For a leaf this is always

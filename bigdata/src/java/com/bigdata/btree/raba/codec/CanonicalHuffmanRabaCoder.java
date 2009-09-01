@@ -236,7 +236,10 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
     
     public static transient final CanonicalHuffmanRabaCoder INSTANCE = new CanonicalHuffmanRabaCoder();
 
-    private CanonicalHuffmanRabaCoder() {
+    /**
+     * 
+     */
+    public CanonicalHuffmanRabaCoder() {
 
     }
 

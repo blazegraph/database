@@ -28,18 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba;
 
-import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
-
 /**
  * Flyweight implementation for wrapping a <code>byte[][]</code> with fromIndex
  * and toIndex.
  * 
- * @todo This implementation is used when we split an
- *       {@link IKeyArrayIndexProcedure} based on a key-range partitioned index.
- *       The {@link MutableKeyBuffer} will not work for this case since it is
- *       not aware of a fromIndex and a toIndex. However,
- *       {@link ReadOnlyValuesRaba} and {@link ReadOnlyKeysRaba} would work
- *       better for those use cases.
+ * @see MutableKeyBuffer
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -74,6 +67,28 @@ public class MutableKeysRaba extends AbstractRaba implements IRaba {
     public MutableKeysRaba(final byte[][] a) {
 
         this(0/* fromIndex */, a.length/* toIndex */, a.length/* capacity */, a);
+
+    }
+
+    /**
+     * Create a view of a <code>byte[][]</code> slice. The slice will include
+     * only those elements between the fromIndex and the toIndex. The capacity
+     * will be the #of elements. {@link #isFull()} will report <code>true</code>
+     * .
+     * 
+     * @param fromIndex
+     *            The index of the first visible in the view (inclusive lower
+     *            bound).
+     * @param toIndex
+     *            The index of the first element beyond the view (exclusive
+     *            upper bound). If toIndex == fromIndex then the view is empty.
+     * @param a
+     *            The backing byte[][].
+     */
+    public MutableKeysRaba(final int fromIndex, final int toIndex,
+            final byte[][] a) {
+
+        this(fromIndex, toIndex, a.length - fromIndex, a);
 
     }
 

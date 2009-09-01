@@ -122,7 +122,7 @@ public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
                 new ResultBufferHandler(keys.length, ndx
                         .getIndexMetadata()
                         .getTupleSerializer()
-                        .getLeafValueSerializer());
+                        .getLeafValuesCoder());
         
         // submit the batch contains procedure to the SPO index
         ndx.submit(

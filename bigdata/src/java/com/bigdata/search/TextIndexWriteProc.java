@@ -5,10 +5,10 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -67,8 +67,8 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
             
         }
         
-        public TextIndexWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer,int fromIndex, int toIndex,
+        public TextIndexWriteProc newInstance(IRabaCoder keySer,
+                IRabaCoder valSer,int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             return new TextIndexWriteProc(keySer, valSer, fromIndex, toIndex, keys,
@@ -87,7 +87,7 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
     
     private boolean overwrite;
     
-    protected TextIndexWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+    protected TextIndexWriteProc(IRabaCoder keySer, IRabaCoder valSer,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
             boolean overwrite) {
 
@@ -141,7 +141,7 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("wrote " + n + " tuples of which " + updateCount
                     + " were updated rows");
         

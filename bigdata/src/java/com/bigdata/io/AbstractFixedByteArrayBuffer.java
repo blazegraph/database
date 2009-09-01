@@ -30,6 +30,7 @@ package com.bigdata.io;
 
 import it.unimi.dsi.io.InputBitStream;
 
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -84,7 +85,7 @@ abstract public class AbstractFixedByteArrayBuffer implements IFixedByteArrayBuf
      * @param array
      *            The array.
      */
-    public static IRawRecord wrap(final byte[] array) {
+    public static FixedByteArrayBuffer wrap(final byte[] array) {
 
         return new FixedByteArrayBuffer(array, 0/* off */, array.length/* len */);
 
@@ -413,19 +414,19 @@ abstract public class AbstractFixedByteArrayBuffer implements IFixedByteArrayBuf
         
     }
     
-//    /**
-//     * Write the slice on the output stream.
-//     * 
-//     * @param os
-//     *            The output stream.
-//     *            
-//     * @throws IOException
-//     */
-//    final public void writeOn(final DataOutput out) throws IOException {
-//        
-//        out.write(array(), off, len);
-//
-//    }
+    /**
+     * Write the slice on the output stream.
+     * 
+     * @param os
+     *            The output stream.
+     *            
+     * @throws IOException
+     */
+    final public void writeOn(final DataOutput out) throws IOException {
+        
+        out.write(array(), off, len);
+
+    }
 
     /**
      * Write part of the slice on the output stream.

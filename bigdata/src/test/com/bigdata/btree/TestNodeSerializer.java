@@ -455,6 +455,15 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
 
         final int[] childEntryCounts = new int[branchingFactor+1];
         
+        final boolean hasVersionTimestamp = r.nextBoolean();
+        
+        final long minimumVersionTimestamp = hasVersionTimestamp ? System
+                .currentTimeMillis() : 0L;
+
+        final long maximumVersionTimestamp = hasVersionTimestamp ? System
+                .currentTimeMillis()
+                + r.nextInt() : 0L;
+                
         // node with some valid keys and corresponding child refs.
 
         int nentries = 0;
@@ -474,7 +483,9 @@ public class TestNodeSerializer extends AbstractBTreeTestCase {
          */
         
         final Node node = new Node(btree, addr, new MutableNodeData(nentries,
-                new MutableKeyBuffer(nkeys, keys), children, childEntryCounts));
+                new MutableKeyBuffer(nkeys, keys), children, childEntryCounts,
+                hasVersionTimestamp, minimumVersionTimestamp,
+                maximumVersionTimestamp));
 
         btree.root = node;
 

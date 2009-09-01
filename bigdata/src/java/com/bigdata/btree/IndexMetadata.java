@@ -38,12 +38,14 @@ import java.util.concurrent.TimeUnit;
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.compression.DefaultDataSerializer;
 import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
@@ -400,29 +402,31 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         /**
          * Override the {@link IDataSerializer} used for the keys in the nodes
-         * of a B+Tree (the default is {@link PrefixSerializer}).
+         * of a B+Tree (the default is a {@link FrontCodedRabaCoder} instance).
          */
-        String NODE_KEY_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+        String NODE_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + "nodeKeySerializer";
+                + "nodeKeysCoder";
 
         /**
-         * Override the {@link IDataSerializer} used for the keys of leaves in
-         * B+Trees (the default is {@link PrefixSerializer}). This is set using
-         * {@link DefaultTupleSerializer#setLeafKeySerializer(IDataSerializer)}.
+         * Override the {@link IRabaCoder} used for the keys of leaves in
+         * B+Trees (the default is a {@link FrontCodedRabaCoder} instance). This
+         * is set using
+         * {@link DefaultTupleSerializer#setLeafKeysCoder(IDataSerializer)}.
          */
-        String LEAF_KEY_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+        String LEAF_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".leafKeySerializer";
+                + ".leafKeysCoder";
 
         /**
          * Override the {@link IDataSerializer} used for the values of leaves in
-         * B+Trees (default is {@link DefaultDataSerializer}). This is set using
-         * {@link DefaultTupleSerializer#setLeafValueSerializer(IDataSerializer)}.
+         * B+Trees (default is a {@link CanonicalHuffmanRabaCoder}). This is set
+         * using
+         * {@link DefaultTupleSerializer#setLeafValuesCoder(IDataSerializer)}.
          */
-        String LEAF_VALUE_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+        String LEAF_VALUES_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".leafValueSerializer";
+                + ".leafValuesCoder";
 
         /**
          * Option determines whether or not per-child locks are used by
@@ -1026,7 +1030,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private String btreeClassName;
     private String checkpointClassName;
     private IAddressSerializer addrSer;
-    private IDataSerializer nodeKeySer;
+    private IRabaCoder nodeKeysCoder;
     private ITupleSerializer tupleSer;
     private IRecordCompressorFactory btreeRecordCompressorFactory;
     private IRecordCompressorFactory indexSegmentRecordCompressorFactory;
@@ -1366,7 +1370,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * 
      * @see #getTupleSerializer()
      */
-    public final IDataSerializer getNodeKeySerializer() {return nodeKeySer;}
+    public final IRabaCoder getNodeKeySerializer() {return nodeKeysCoder;}
     
     /**
      * The object used to form unsigned byte[] keys from Java objects, to
@@ -1480,12 +1484,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setNodeKeySerializer(final IDataSerializer nodeKeySer) {
+    public void setNodeKeySerializer(final IRabaCoder nodeKeysCoder) {
         
-        if (nodeKeySer == null)
+        if (nodeKeysCoder == null)
             throw new IllegalArgumentException();
         
-        this.nodeKeySer = nodeKeySer;
+        this.nodeKeysCoder = nodeKeysCoder;
         
     }
 
@@ -1699,8 +1703,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
             if (!iface.isAssignableFrom(cls)) {
 
-                throw new IllegalArgumentException("Does not implement "
-                        + IDataSerializer.class + " : " + className);
+                throw new IllegalArgumentException("Does not implement " + cls
+                        + " : " + className);
 
             }
 
@@ -1946,9 +1950,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         this.addrSer = AddressSerializer.INSTANCE;
         
 //        this.nodeKeySer = PrefixSerializer.INSTANCE;
-        this.nodeKeySer = newInstance(getProperty(indexManager,
-                properties, namespace, Options.NODE_KEY_SERIALIZER,
-                PrefixSerializer.class.getName()), IDataSerializer.class);
+        this.nodeKeysCoder = newInstance(getProperty(indexManager, properties,
+                namespace, Options.NODE_KEYS_CODER,
+                DefaultFrontCodedRabaCoder.class.getName()), IRabaCoder.class);
 
         // this.tupleSer = DefaultTupleSerializer.newInstance();
         {
@@ -1964,18 +1968,18 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             final IKeyBuilderFactory keyBuilderFactory = DefaultTupleSerializer
                     .getDefaultKeyBuilderFactory();
 
-            final IDataSerializer leafKeySerializer = newInstance(getProperty(
+            final IRabaCoder leafKeysCoder = newInstance(getProperty(
                     indexManager, properties, namespace,
-                    Options.LEAF_KEY_SERIALIZER, PrefixSerializer.class
-                            .getName()), IDataSerializer.class);
+                    Options.LEAF_KEYS_CODER, DefaultFrontCodedRabaCoder.class
+                            .getName()), IRabaCoder.class);
 
-            final IDataSerializer valueSerializer = newInstance(getProperty(
+            final IRabaCoder valuesCoder = newInstance(getProperty(
                     indexManager, properties, namespace,
-                    Options.LEAF_VALUE_SERIALIZER, DefaultDataSerializer.class
-                            .getName()), IDataSerializer.class);
+                    Options.LEAF_VALUES_CODER, CanonicalHuffmanRabaCoder.class
+                            .getName()), IRabaCoder.class);
 
             this.tupleSer = new DefaultTupleSerializer(keyBuilderFactory,
-                    leafKeySerializer, valueSerializer);
+                    leafKeysCoder, valuesCoder);
             
         }
 
@@ -2216,7 +2220,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", class=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
         sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
-        sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
+        sb.append(", nodeKeysCoder=" + nodeKeysCoder.getClass().getName());
         sb.append(", btreeRecordCompressorFactory="
                 + (btreeRecordCompressorFactory == null ? "N/A"
                         : btreeRecordCompressorFactory));
@@ -2343,12 +2347,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         btreeClassName = in.readUTF();
         
         checkpointClassName = in.readUTF();
-        
-        addrSer = (IAddressSerializer)in.readObject();
-        
-        nodeKeySer = (IDataSerializer)in.readObject();
 
-        tupleSer = (ITupleSerializer)in.readObject();
+        addrSer = (IAddressSerializer) in.readObject();
+
+        nodeKeysCoder = (IRabaCoder) in.readObject();
+
+        tupleSer = (ITupleSerializer) in.readObject();
         
         if (version < VERSION4) {
 
@@ -2534,7 +2538,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         out.writeObject(addrSer);
         
-        out.writeObject(nodeKeySer);
+        out.writeObject(nodeKeysCoder);
         
         out.writeObject(tupleSer);
         

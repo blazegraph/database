@@ -4,7 +4,7 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.service.IDataService;
 
 /**
@@ -68,13 +68,13 @@ public abstract class AbstractKeyArrayIndexProcedureConstructor<T extends IKeyAr
 
         final ITupleSerializer tupleSer = indexMetadata.getTupleSerializer();
 
-        return newInstance(tupleSer.getLeafKeySerializer(), tupleSer
-                .getLeafValueSerializer(), fromIndex, toIndex, keys, vals);
+        return newInstance(tupleSer.getLeafKeysCoder(), tupleSer
+                .getLeafValuesCoder(), fromIndex, toIndex, keys, vals);
 
     }
 
     /**
-     * Uses default {@link IDataSerializer}s for (de-)compression.
+     * Uses the default {@link IRabaCoder}s for coding.
      * 
      * @param fromIndex
      * @param toIndex
@@ -89,25 +89,25 @@ public abstract class AbstractKeyArrayIndexProcedureConstructor<T extends IKeyAr
             final byte[][] keys, final byte[][] vals) {
 
         return newInstance(
-                DefaultTupleSerializer.getDefaultLeafKeySerializer(),
-                DefaultTupleSerializer.getDefaultValueKeySerializer(),
+                DefaultTupleSerializer.getDefaultLeafKeysCoder(),
+                DefaultTupleSerializer.getDefaultValuesCoder(),
                 fromIndex, toIndex, keys, vals);
         
     }
        
     /**
-     * Uses the specified {@link IDataSerializer}s.
+     * Uses the specified {@link IRabaCoder}s.
      * 
-     * @param keySer
-     * @param valSer
+     * @param keysCoder
+     * @param valsCoder
      * @param fromIndex
      * @param toIndex
      * @param keys
      * @param vals
      * @return
      */
-    abstract public T newInstance(IDataSerializer keySer,
-            IDataSerializer valSer, int fromIndex, int toIndex, byte[][] keys,
+    abstract public T newInstance(IRabaCoder keysCoder,
+            IRabaCoder valsCoder, int fromIndex, int toIndex, byte[][] keys,
             byte[][] vals);
         
 }

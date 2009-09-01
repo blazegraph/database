@@ -142,17 +142,42 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
         buf.putByte(ReadOnlyNodeData.NODE);
 
         buf.putShort(ReadOnlyNodeData.VERSION0);
-        
-        buf.putShort((short) 0/* flags */);
-        
-        buf.putInt(nkeys); // @todo pack?
-        
-        buf.putInt(nentries); // @todo pack?
 
+        final boolean hasVersionTimestamps =node.hasVersionTimestamps();
+        short flags = 0;
+        if (hasVersionTimestamps) {
+            flags |= AbstractReadOnlyNodeData.FLAG_VERSION_TIMESTAMPS;
+        }
+
+        buf.putShort(flags);
+
+//        @todo pack (must unpack in decode).
+        buf.putInt(nkeys);
+        buf.putInt(nentries);
+//        try {
+//
+//            buf.packLong(nkeys);
+//
+//            buf.packLong(nentries);
+//            
+//        } catch (IOException ex) {
+//         
+//            throw new RuntimeException(ex);
+//            
+//        }
+
+        // The offset at which the byte length of the keys will be recorded.
         final int O_keysSize = buf.pos();
         buf.skip(ReadOnlyNodeData.SIZEOF_KEYS_SIZE);
-//            buf.putInt(encodedKeys.length); // keySize @todo pack?
         
+        // Write the encoded keys on the buffer.
+        final int O_keys = buf.pos();
+        final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(node
+                .getKeys(), buf);
+
+        // Patch the byte length of the coded keys on the buffer.
+        buf.putInt(O_keysSize, encodedKeys.len());
+
         // childAddr[] : @todo code childAddr[]
         final int O_childAddr = buf.pos();
         for (int i = 0; i <= nkeys; i++) {
@@ -169,27 +194,13 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
             
         }
         
-        // write the encoded keys on the buffer.
-        final int O_keys = buf.pos();
-//            encodedKeys.limit(encodedKeys.capacity());
-//            encodedKeys.rewind();
-//          assert b.position() == b.limit();
-//            buf.put(encodedKeys);
+        if(hasVersionTimestamps) {
+            
+            buf.putLong(node.getMinimumVersionTimestamp());
 
-        final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(node
-                .getKeys(), buf);
-
-//            this.keys = keysCoder.decode(encodedKeys);
-        
-        // Patch the byte length of the coded keys on the buffer.
-        buf.putInt(O_keysSize, encodedKeys.len());
-
-//            // prepare buffer for writing on the store [limit := pos; pos : =0] 
-//            b.flip();
-        
-        // save read-only reference to the buffer.
-//            this.b = b.asReadOnlyBuffer();
-//            this.b = FixedByteArrayBuffer.wrap(buf.toByteArray());
+            buf.putLong(node.getMaximumVersionTimestamp());
+            
+        }
         
         return buf.slice(O_origin, buf.pos() - O_origin);
         
@@ -211,8 +222,16 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
         private final AbstractFixedByteArrayBuffer b;
         
         // fields which are cached by the ctor.
+        private final short flags;
         private final int nkeys;
         private final int nentries;
+
+        /**
+         * Offset of the encoded keys in the buffer.
+         */
+        private final int O_keys;
+
+        private final IRaba keys;
 
         /**
          * Offset of the encoded childAddr[] in the buffer.
@@ -223,16 +242,9 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
          * Offset of the encoded childEntryCount[] in the buffer.
          */
         private final int O_childEntryCount;
-
-        /**
-         * Offset of the encoded keys in the buffer.
-         */
-        private final int O_keys;
-
-        private final IRaba keys;
-
-        public final AbstractFixedByteArrayBuffer buf() {
-
+                
+        final public AbstractFixedByteArrayBuffer data() {
+            
             return b;
             
         }
@@ -276,9 +288,10 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
                 throw new AssertionError("version=" + version);
             }
             
-            // skip over flags (they are unused for a node) : @todo version timestamps flag.
+            // flags
+            flags = buf.getShort(pos);
             pos += SIZEOF_FLAGS;
-            
+
             this.nkeys = buf.getInt(pos);
             pos += SIZEOF_NKEYS;
             
@@ -288,127 +301,63 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
             final int keysSize = buf.getInt(pos);
             pos += SIZEOF_KEYS_SIZE;
 
+//          O_keys = O_childEntryCount + (nkeys + 1) * SIZEOF_ENTRY_COUNT;
+            O_keys = pos;
+            this.keys = keysCoder.decode(buf.slice(O_keys, keysSize));
+            pos += keysSize;
+//            assert b.position() == O_keys + keysSize;
+            
             O_childAddr = pos;
             
             O_childEntryCount = O_childAddr + (nkeys + 1) * SIZEOF_ADDR;
 
-            O_keys = O_childEntryCount + (nkeys + 1) * SIZEOF_ENTRY_COUNT;
-//            b.position(O_keys);
-//            b.limit(b.position() + keysSize);
-            this.keys = keysCoder.decode(buf.slice(O_keys, keysSize));
-//            assert b.position() == O_keys + keysSize;
-            
             // save reference to buffer
 //            this.b = (b.isReadOnly() ? b : b.asReadOnlyBuffer());
             this.b = buf;
 
         }
 
-//        /**
-//         * Encode the node data.
-//         * 
-//         * @param data
-//         *            The data to be encoded.
-//         * @param buf
-//         *            The buffer on which the coded representation will be written.
-//         */
-//        public ReadOnlyNodeData(final INodeData node, final IRabaCoder keysCoder,
-//                DataOutputBuffer buf) {
-//
-//            if (node == null)
-//                throw new IllegalArgumentException();
-//
-//            if (keysCoder == null)
-//                throw new IllegalArgumentException();
-//
-//            if (buf == null)
-//                throw new IllegalArgumentException();
-//
-//            // cache some fields.
-//            this.nkeys = node.getKeyCount();
-//            this.nentries = node.getSpannedTupleCount();
-//
-//            // encode the keys.
-////            this.keys = keysCoder.encode(node.getKeys());
-////            final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
-////            final byte[] encodedKeys = keysCoder.encode(node.getKeys(), buf);
-////            this.keys = keysCoder.decode(FixedByteArrayBuffer.wrap(encodedKeys));
-//
-////            // figure out how the size of the buffer (exact fit).
-////            final int capacity = //
-////                    SIZEOF_TYPE + //
-////                    SIZEOF_VERSION + //
-////                    SIZEOF_FLAGS + //
-////                    SIZEOF_NKEYS + //
-////                    SIZEOF_ENTRY_COUNT + //
-////                    Bytes.SIZEOF_INT + // keysSize
-////                    SIZEOF_ADDR * (nkeys + 1) + // childAddr[]
-////                    SIZEOF_ENTRY_COUNT * (nkeys + 1) + // childEntryCount[]
-////                    encodedKeys.length // keys
-////            ;
-//            
-////            final ByteBuffer b = ByteBuffer.allocate(capacity);
-////            final ByteArrayBuffer b = buf; // alias.
-////            b.ensureCapacity(capacity);
-////            b.reset();
-//
-//            // The byte offset of the start of the coded data in the buffer.
-//            final int O_origin = buf.pos();
-//            
-//            buf.putByte(NODE);
-//
-//            buf.putShort(VERSION0);
-//            
-//            buf.putShort((short) 0/* flags */);
-//            
-//            buf.putInt(nkeys); // @todo pack?
-//            
-//            buf.putInt(nentries); // @todo pack?
-//
-//            final int O_keysSize = buf.pos();
-//            buf.skip(SIZEOF_KEYS_SIZE);
-////            buf.putInt(encodedKeys.length); // keySize @todo pack?
-//            
-//            // childAddr[] : @todo code childAddr[]
-//            O_childAddr = buf.pos();
-//            for (int i = 0; i <= nkeys; i++) {
-//                
-//                buf.putLong(node.getChildAddr(i));
-//                
-//            }
-//            
-//            // childEntryCount[] : @todo code childEntryCount[]
-//            O_childEntryCount = buf.pos();
-//            for (int i = 0; i <= nkeys; i++) {
-//                
-//                buf.putInt(node.getChildEntryCount(i));
-//                
-//            }
-//            
-//            // write the encoded keys on the buffer.
-//            O_keys = buf.pos();
-////            encodedKeys.limit(encodedKeys.capacity());
-////            encodedKeys.rewind();
-////          assert b.position() == b.limit();
-////            buf.put(encodedKeys);
-//
-//            final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(node
-//                    .getKeys(), buf);
-//
-//            this.keys = keysCoder.decode(encodedKeys);
-//            
-//            // Patch the byte length of the coded keys on the buffer.
-//            buf.putInt(O_keysSize, encodedKeys.len());
-//
-////            // prepare buffer for writing on the store [limit := pos; pos : =0] 
-////            b.flip();
-//            
-//            // save read-only reference to the buffer.
-////            this.b = b.asReadOnlyBuffer();
-////            this.b = FixedByteArrayBuffer.wrap(buf.toByteArray());
-//            this.b = buf.slice(O_origin, buf.pos() - O_origin);
-//            
-//        }
+        /**
+         * The offset into the buffer of the minimum version timestamp, which is
+         * an int64 field. The maximum version timestamp is the next field. This
+         * offset is computed dynamically to keep down the size of the node
+         * object in memory.
+         */
+        private int getVersionTimestampOffset() {
+
+            return O_childEntryCount + ((nkeys + 1) * SIZEOF_ENTRY_COUNT);
+            
+        }
+
+        final public boolean hasVersionTimestamps() {
+            
+            return ((flags & FLAG_VERSION_TIMESTAMPS) != 0);
+            
+        }
+
+        final public long getMinimumVersionTimestamp() {
+            
+            if(!hasVersionTimestamps())
+                throw new UnsupportedOperationException();
+
+            final int off = getVersionTimestampOffset();
+            
+            // at the offset.
+            return b.getLong(off);
+            
+        }
+
+        final public long getMaximumVersionTimestamp() {
+            
+            if(!hasVersionTimestamps())
+                throw new UnsupportedOperationException();
+
+            final int off = getVersionTimestampOffset() + SIZEOF_TIMESTAMP;
+
+            // one long value beyond the offset.
+            return b.getLong(off);
+
+        }
 
         /**
          * Always returns <code>false</code>.
@@ -565,8 +514,140 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
 
         }
 
+        if(node.hasVersionTimestamps()) {
+            
+            sb.append(", versionTimestamps={min="
+                    + node.getMinimumVersionTimestamp() + ",max="
+                    + node.getMaximumVersionTimestamp() + "}");
+
+        }
+        
         return sb;
 
     }
 
 }
+
+    /*
+     * @todo old code from NodeSerializer.
+     */
+    
+//    private void putChildAddresses(IAddressManager addressManager,
+//            DataOutputBuffer os, INodeData node) throws IOException {
+//
+//        final int nchildren = node.getChildCount();
+//
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long addr = node.getChildAddr(i);
+//
+//            /*
+//             * Children MUST have assigned persistent identity.
+//             */
+//            if (addr == 0L) {
+//
+//                throw new RuntimeException("Child is not persistent: index="
+//                        + i);
+//
+//            }
+//
+//            os.writeLong(addr);
+//
+//        }
+//
+//    }
+//
+//    private void getChildAddresses(IAddressManager addressManager,
+//            DataInput is, long[] childAddr, int nchildren) throws IOException {
+//
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long addr = is.readLong();
+//
+//            if (addr == 0L) {
+//
+//                throw new RuntimeException(
+//                        "Child does not have persistent address: index=" + i);
+//
+//            }
+//
+//            childAddr[i] = addr;
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * Write out a packed array of the #of entries spanned by each child of some
+//     * node.
+//     * 
+//     * @param os
+//     *            The output stream.
+//     * @param childEntryCounts
+//     *            The #of entries spanned by each direct child.
+//     * @param nchildren
+//     *            The #of elements of that array that are defined.
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo customizable serializer interface configured in
+//     *       {@link IndexMetadata}.
+//     */
+//    static protected void putChildEntryCounts(final DataOutput os,
+//            final INodeData node) throws IOException {
+//
+//        final int nchildren = node.getChildCount();
+//
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long nentries = node.getChildEntryCount(i);
+//
+//            /*
+//             * Children MUST span some entries.
+//             */
+//            if (nentries == 0L) {
+//
+//                throw new RuntimeException(
+//                        "Child does not span entries: index=" + i);
+//
+//            }
+//
+//            LongPacker.packLong(os, nentries);
+//
+//        }
+//
+//    }
+//
+//    /**
+//     * Read in a packed array of the #of entries spanned by each child of some
+//     * node.
+//     * 
+//     * @param is
+//     * @param childEntryCounts
+//     *            The #of entries spanned by each direct child.
+//     * @param nchildren
+//     *            The #of elements of that array that are defined.
+//     * @throws IOException
+//     * 
+//     * @todo customizable serializer interface configured in
+//     *       {@link IndexMetadata}.
+//     */
+//    static protected void getChildEntryCounts(DataInput is,
+//            int[] childEntryCounts, int nchildren) throws IOException {
+//
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final int nentries = (int) LongPacker.unpackLong(is);
+//
+//            if (nentries == 0L) {
+//
+//                throw new RuntimeException(
+//                        "Child does not span entries: index=" + i);
+//
+//            }
+//
+//            childEntryCounts[i] = nentries;
+//
+//        }
+//
+//    }

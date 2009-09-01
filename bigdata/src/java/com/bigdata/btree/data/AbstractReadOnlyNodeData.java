@@ -32,7 +32,6 @@ import java.nio.ByteBuffer;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
-import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -44,7 +43,7 @@ import com.bigdata.rawstore.Bytes;
  * @version $Id$
  */
 abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
-        implements IAbstractNodeData {
+        implements IAbstractNodeCodedData {
 
     /**
      * A B+Tree node data record.
@@ -123,6 +122,15 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
     protected static final short FLAG_VERSION_TIMESTAMPS = 1 << 1;
 
     /**
+     * Bit flag indicating that the tuple revision timestamps have been written
+     * out using an array n-bit deltas computed as
+     * <code>maxTimestamp - minTimestamp</code>, where n is the number of bits
+     * required to code (maxTimestamp - minTimestamp). This is a relatively
+     * compact coding.
+     */
+    protected static final short DELTA_VERSION_TIMESTAMPS = 1 << 2;
+
+    /**
      * The size of the field in the data record which encodes whether the data
      * record represents a B+Tree {@link #NODE}, a {@link #LEAF}, or a
      * {@link #LINKED_LEAF}.
@@ -194,11 +202,6 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
      * {@link AbstractReadOnlyNodeData#LINKED_LEAF}.
      */
     static public final int O_NEXT = 1 + SIZEOF_ADDR;
-
-    /**
-     * Return a read-only view of the backing buffer.
-     */
-    abstract public AbstractFixedByteArrayBuffer buf();
 
     /**
      * Core ctor. There are two basic use cases. One when you already have the

@@ -43,7 +43,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.data.ReadOnlyLeafData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;

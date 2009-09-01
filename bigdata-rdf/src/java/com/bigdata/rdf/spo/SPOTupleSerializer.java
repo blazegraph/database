@@ -36,10 +36,10 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
@@ -111,8 +111,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      */
     public SPOTupleSerializer(SPOKeyOrder keyOrder) {
 
-        this(keyOrder, getDefaultLeafKeySerializer(),
-                getDefaultValueKeySerializer());
+        this(keyOrder, getDefaultLeafKeysCoder(), getDefaultValuesCoder());
 
     }
     
@@ -124,8 +123,8 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * @param leafKeySer
      * @param leafValSer
      */
-    public SPOTupleSerializer(SPOKeyOrder keyOrder, IDataSerializer leafKeySer,
-            IDataSerializer leafValSer) {
+    public SPOTupleSerializer(SPOKeyOrder keyOrder, IRabaCoder leafKeySer,
+            IRabaCoder leafValSer) {
 
         super(new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG), leafKeySer,
                 leafValSer);
@@ -338,7 +337,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
     /**
      * Encodes the {@link StatementEnum} and the optional statement identifier.
      */
-    public byte[] serializeVal(SPO spo) {
+    public byte[] serializeVal(final SPO spo) {
 
         if (spo == null)
             throw new IllegalArgumentException();

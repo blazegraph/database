@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.raba;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 
 /**
  * Immutable implementation does not allow <code>null</code>s but supports
@@ -37,6 +38,12 @@ import com.bigdata.btree.BytesUtil;
  * @version $Id$
  */
 public class ReadOnlyKeysRaba extends AbstractRaba {
+
+    /**
+     * A read-only empty keys raba.
+     */
+    public static final transient ReadOnlyKeysRaba EMPTY = new ReadOnlyKeysRaba(
+            BytesUtil.EMPTY2);
 
     /**
      * This view is read-only.
@@ -86,6 +93,31 @@ public class ReadOnlyKeysRaba extends AbstractRaba {
     }
 
     /**
+     * Create a view of a <code>byte[][]</code> slice. The slice will include
+     * only those elements between the fromIndex and the toIndex. The capacity
+     * will be the #of elements. {@link #isFull()} will report <code>true</code>
+     * .
+     * <p>
+     * Note: This constructor is used when we split an
+     * {@link IKeyArrayIndexProcedure} based on a key-range partitioned index.
+     * 
+     * @param fromIndex
+     *            The index of the first visible in the view (inclusive lower
+     *            bound).
+     * @param toIndex
+     *            The index of the first element beyond the view (exclusive
+     *            upper bound). If toIndex == fromIndex then the view is empty.
+     * @param a
+     *            The backing byte[][].
+     */
+    public ReadOnlyKeysRaba(final int fromIndex, final int toIndex,
+            final byte[][] a) {
+
+        this(fromIndex, toIndex, a.length - fromIndex, a);
+
+    }
+    
+    /**
      * Create a view from a slice of a byte[][].
      * 
      * @param fromIndex
@@ -105,7 +137,7 @@ public class ReadOnlyKeysRaba extends AbstractRaba {
         super(fromIndex, toIndex, capacity, a);
 
         // FIXME This is too much overhead for normal runtime.
-        assert assertTotalOrder(fromIndex, toIndex, a);
+//        assert assertTotalOrder(fromIndex, toIndex, a);
         
     }
 

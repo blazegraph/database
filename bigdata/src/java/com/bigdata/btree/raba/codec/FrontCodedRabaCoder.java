@@ -26,11 +26,6 @@ import com.bigdata.rawstore.Bytes;
  */
 public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = -8195482077263147785L;
-
     protected static final Logger log = Logger
             .getLogger(FrontCodedRabaCoder.class);
 
@@ -40,6 +35,38 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
         return super.toString() + "{ratio=" + ratio + "}";
         
+    }
+
+    /**
+     * A pre-parameterized version of the {@link FrontCodedRabaCoder} which is
+     * used as the default {@link IRabaCoder} for B+Tree keys for both nodes and
+     * leaves.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    public static class DefaultFrontCodedRabaCoder extends FrontCodedRabaCoder {
+
+        public static final transient DefaultFrontCodedRabaCoder INSTANCE = new DefaultFrontCodedRabaCoder();
+        
+        protected transient static final int DEFAULT_RATIO = 8;
+        
+        public DefaultFrontCodedRabaCoder() {
+
+            super(DEFAULT_RATIO);
+            
+        }
+        
+        public void readExternal(ObjectInput in) throws IOException,
+                ClassNotFoundException {
+            // NOP
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+            // NOP
+        }
+
     }
     
     /**

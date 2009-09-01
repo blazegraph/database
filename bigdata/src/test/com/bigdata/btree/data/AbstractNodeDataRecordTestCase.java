@@ -75,9 +75,39 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final int spannedTupleCount = 0;
         final long[] childAddr = new long[m + 1];
         final int[] childEntryCount = new int[m + 1];
+        final boolean hasVersionTimestamps = false;
+        final long minimumVersionTimestamp = 0L;
+        final long maximumVersionTimestamp = 0L;
 
-        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(
-                nkeys, keys), spannedTupleCount, childAddr, childEntryCount);
+        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(nkeys,
+                keys), spannedTupleCount, childAddr, childEntryCount,
+                hasVersionTimestamps, minimumVersionTimestamp,
+                maximumVersionTimestamp);
+
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
+
+    }
+
+    /**
+     * Empty node with version timestamps (this is not a legal instance since
+     * only the root leaf may ever be empty).
+     */
+    public void test_emptyNodeVersionTimestamps() {
+
+        final int m = 3;
+        final int nkeys = 0;
+        final byte[][] keys = new byte[m][];
+        final int spannedTupleCount = 0;
+        final long[] childAddr = new long[m + 1];
+        final int[] childEntryCount = new int[m + 1];
+        final boolean hasVersionTimestamps = true;
+        final long minimumVersionTimestamp = System.currentTimeMillis();
+        final long maximumVersionTimestamp = System.currentTimeMillis() + 20;
+
+        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(nkeys,
+                keys), spannedTupleCount, childAddr, childEntryCount,
+                hasVersionTimestamps, minimumVersionTimestamp,
+                maximumVersionTimestamp);
 
         doRoundTripTest(expected, coder, new DataOutputBuffer());
 
@@ -94,6 +124,9 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final byte[][] keys = new byte[m][];
         final long[] childAddr = new long[] { 10, 20, 0, 0 };
         final int childEntryCount[] = new int[] { 4, 7, 0, 0 };
+        final boolean hasVersionTimestamps = false;
+        final long minimumVersionTimestamp = 0L;
+        final long maximumVersionTimestamp = 0L;
 
         keys[0] = new byte[] { 1, 2, 3 };
 
@@ -105,7 +138,42 @@ abstract public class AbstractNodeDataRecordTestCase extends
         }
 
         final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(nkeys,
-                keys), entryCount, childAddr, childEntryCount);
+                keys), entryCount, childAddr, childEntryCount,
+                hasVersionTimestamps, minimumVersionTimestamp,
+                maximumVersionTimestamp);
+
+        doRoundTripTest(expected, coder, new DataOutputBuffer());
+
+    }
+
+    /**
+     * This the minimum legal node for a branching factor of 3. It has one key
+     * and two children.
+     */
+    public void test_tupleCount1WithVersionTimestamps() {
+        
+        final int m = 3;
+        final int nkeys = 1; // 1 key so 2 children.
+        final byte[][] keys = new byte[m][];
+        final long[] childAddr = new long[] { 10, 20, 0, 0 };
+        final int childEntryCount[] = new int[] { 4, 7, 0, 0 };
+        final boolean hasVersionTimestamps = true;
+        final long minimumVersionTimestamp = System.currentTimeMillis();
+        final long maximumVersionTimestamp = System.currentTimeMillis() + 20;
+
+        keys[0] = new byte[] { 1, 2, 3 };
+
+        int entryCount = 0;
+        for (int i = 0; i < nkeys; i++) {
+
+            entryCount += childEntryCount[i];
+
+        }
+
+        final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(nkeys,
+                keys), entryCount, childAddr, childEntryCount,
+                hasVersionTimestamps, minimumVersionTimestamp,
+                maximumVersionTimestamp);
 
         doRoundTripTest(expected, coder, new DataOutputBuffer());
 

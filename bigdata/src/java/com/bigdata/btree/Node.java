@@ -36,7 +36,6 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.data.DefaultNodeCoder;
 import com.bigdata.btree.data.INodeData;
-import com.bigdata.btree.data.ReadOnlyNodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 
@@ -307,13 +306,36 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
     }
 
+    final public long getMaximumVersionTimestamp() {
+     
+        return data.getMaximumVersionTimestamp();
+        
+    }
+
+    public long getMinimumVersionTimestamp() {
+
+        return data.getMinimumVersionTimestamp();
+        
+    }
+
+    final public boolean hasVersionTimestamps() {
+
+        return data.hasVersionTimestamps();
+        
+    }
+
     /**
      * Apply the delta to the per-child count for this node and then recursively
      * ascend up the tree applying the delta to all ancestors of this node. This
      * is invoked solely by the methods that add and remove entries from a leaf
      * as those are the only methods that change the #of entries spanned by a
-     * parent node.  Methods that split, merge, or redistribute keys have a net
+     * parent node. Methods that split, merge, or redistribute keys have a net
      * zero effect on the #of entries spanned by the parent.
+     * <p>
+     * This also updates {@link #getMinimumVersionTimestamp()} and
+     * {@link #getMaximumVersionTimestamp()} iff version timestamps are enabled
+     * and the child has a minimum (maximum) version timestamp GE the minimum
+     * (maximum) version timestamp of this node.
      * 
      * @param child
      *            The direct child.
@@ -337,6 +359,20 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         assert data.nentries > 0;
 
+        if (child.hasVersionTimestamps()) {
+            
+            final long cmin = child.getMinimumVersionTimestamp();
+            
+            final long cmax = child.getMaximumVersionTimestamp();
+            
+            if (cmin < data.minimumVersionTimestamp)
+                data.minimumVersionTimestamp = cmin;
+
+            if (cmax > data.maximumVersionTimestamp)
+                data.maximumVersionTimestamp = cmax;
+
+        }
+        
         if( parent != null ) {
             
             parent.get().updateEntryCount(this, delta);
@@ -410,8 +446,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         final int branchingFactor = btree.branchingFactor;
 
-        data = new MutableNodeData(branchingFactor);
-        
+        data = new MutableNodeData(branchingFactor, btree.getIndexMetadata()
+                .getVersionTimestamps());
+
         childRefs = new Reference[branchingFactor + 1];
 
         childLocks = newChildLocks(btree, 0/* nkeys */);
@@ -463,8 +500,9 @@ public class Node extends AbstractNode<Node> implements INodeData {
         childLocks = null; // newChildLocks(btree);
 
         final MutableNodeData data;
-        this.data = data = new MutableNodeData(branchingFactor);
-        
+        this.data = data = new MutableNodeData(branchingFactor, btree
+                .getIndexMetadata().getVersionTimestamps());
+
         // #of entries spanned by the old root _before_ this split.
         data.nentries = nentries;
         

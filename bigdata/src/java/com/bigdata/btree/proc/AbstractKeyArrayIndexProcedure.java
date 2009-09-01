@@ -28,6 +28,8 @@
 
 package com.bigdata.btree.proc;
 
+import it.unimi.dsi.bits.BitVector;
+import it.unimi.dsi.bits.LongArrayBitVector;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
@@ -39,16 +41,17 @@ import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.CognitiveWeb.extser.LongPacker;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Errors;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableValuesRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.service.Split;
 
 /**
@@ -84,47 +87,46 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
     protected static final Logger log = Logger.getLogger(AbstractKeyArrayIndexProcedure.class);
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
+//            .toInt();
+//
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
-     * The object used to (de-)serialize the keys when they are sent to the
-     * remote service.
+     * The object used to (de-)code the keys when they are sent to the remote
+     * service.
      */
-    private IDataSerializer keySer;
+    private IRabaCoder keysCoder;
 
     /**
-     * The object used to (de-)serialize the values when they are sent to the
-     * remote service.
+     * The object used to (de-)code the values when they are sent to the remote
+     * service.
      */
-    private IDataSerializer valSer;
+    private IRabaCoder valsCoder;
     
-    /**
-     * Index of the first element to be used in {@link #keys} and {@link #vals}
-     * and serialized as <code>0</code>. This makes it possible to reuse the
-     * original keys[] and vals[] when the procedure is mapped across a
-     * key-range partitioned index while only sending the minimum amount of data
-     * when the procedure is serialized.
-     */
-    private int fromIndex;
-    
-    /**
-     * Index of the first element to NOT be used in {@link #keys} and
-     * {@link #vals} and serialized as <code>(toIndex - fromIndex)</code>.
-     * This makes it possible to reuse the original keys[] and vals[] when the
-     * procedure is mapped across a key-range partitioned index while only
-     * sending the minimum amount of data when the procedure is serialized.
-     */
-    private int toIndex;
+//    /**
+//     * Index of the first element to be used in {@link #keys} and {@link #vals}
+//     * and serialized as <code>0</code>. This makes it possible to reuse the
+//     * original keys[] and vals[] when the procedure is mapped across a
+//     * key-range partitioned index while only sending the minimum amount of data
+//     * when the procedure is serialized.
+//     */
+//    private int fromIndex;
+//    
+//    /**
+//     * Index of the first element to NOT be used in {@link #keys} and
+//     * {@link #vals} and serialized as <code>(toIndex - fromIndex)</code>.
+//     * This makes it possible to reuse the original keys[] and vals[] when the
+//     * procedure is mapped across a key-range partitioned index while only
+//     * sending the minimum amount of data when the procedure is serialized.
+//     */
+//    private int toIndex;
 
     /**
      * The keys.
@@ -136,67 +138,61 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      */
     private IRaba vals;
 
-    /**
-     * Index of the first element to be used in {@link #keys} and {@link #vals}
-     * and serialized as <code>0</code>. This makes it possible to reuse the
-     * original keys[] and vals[] when the procedure is mapped across a
-     * key-range partitioned index while only sending the minimum amount of data
-     * when the procedure is serialized.
-     */
-    final public int getFromIndex() {
-
-        return fromIndex;
-
-    }
-
-    /**
-     * Index of the first element to NOT be used in {@link #keys} and
-     * {@link #vals} and serialized as <code>(toIndex - fromIndex)</code>.
-     * This makes it possible to reuse the original keys[] and vals[] when the
-     * procedure is mapped across a key-range partitioned index while only
-     * sending the minimum amount of data when the procedure is serialized.
-     */
-    final public int getToIndex() {
-
-        return toIndex;
+//    /**
+//     * Index of the first element to be used in {@link #keys} and {@link #vals}
+//     * and serialized as <code>0</code>. This makes it possible to reuse the
+//     * original keys[] and vals[] when the procedure is mapped across a
+//     * key-range partitioned index while only sending the minimum amount of data
+//     * when the procedure is serialized.
+//     */
+//    final public int getFromIndex() {
+//
+//        return fromIndex;
+//
+//    }
+//
+//    /**
+//     * Index of the first element to NOT be used in {@link #keys} and
+//     * {@link #vals} and serialized as <code>(toIndex - fromIndex)</code>.
+//     * This makes it possible to reuse the original keys[] and vals[] when the
+//     * procedure is mapped across a key-range partitioned index while only
+//     * sending the minimum amount of data when the procedure is serialized.
+//     */
+//    final public int getToIndex() {
+//
+//        return toIndex;
+//        
+//    }
+    
+    final public IRaba getKeys() {
+        
+        return keys;
         
     }
     
-    /**
-     * The #of keys/tuples
-     */
+    final public IRaba getValues() {
+        
+        return vals;
+        
+    }
+    
     final public int getKeyCount() {
 
-        return toIndex - fromIndex;
+        return keys.size();
 
     }
 
-    /**
-     * Return the key at the given index (after adjusting for the
-     * {@link #fromIndex}).
-     * 
-     * @param i
-     *            The index (origin zero).
-     * 
-     * @return The key at that index.
-     */
-    public byte[] getKey(int i) {
+    final public byte[] getKey(final int i) {
 
         return keys.get(i);
 
     }
 
-    /**
-     * Return the value at the given index (after adjusting for the
-     * {@link #fromIndex}).
-     * 
-     * @param i
-     *            The index (origin zero).
-     * 
-     * @return The value at that index.
-     */
-    public byte[] getValue(int i) {
+    final public byte[] getValue(final int i) {
 
+        if (vals == null)
+            throw new UnsupportedOperationException();
+        
         return vals.get( i );
 
     }
@@ -228,14 +224,14 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      *            The values (optional, must be co-indexed with <i>keys</i>
      *            when non-<code>null</code>).
      */
-    protected AbstractKeyArrayIndexProcedure(IDataSerializer keySer,
-            IDataSerializer valSer, int fromIndex, int toIndex, byte[][] keys,
-            byte[][] vals) {
+    protected AbstractKeyArrayIndexProcedure(final IRabaCoder keysCoder,
+            final IRabaCoder valsCoder, final int fromIndex, final int toIndex,
+            final byte[][] keys, final byte[][] vals) {
 
-        if (keySer == null)
+        if (keysCoder == null)
             throw new IllegalArgumentException();
         
-        if (valSer == null && vals != null)
+        if (valsCoder == null && vals != null)
             throw new IllegalArgumentException();
         
         if (keys == null)
@@ -253,59 +249,89 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         if (vals != null && toIndex > vals.length)
             throw new IllegalArgumentException(Errors.ERR_TO_INDEX);
 
-        this.keySer = keySer;
+        this.keysCoder = keysCoder;
         
-        this.valSer = valSer;
+        this.valsCoder = valsCoder;
         
-        this.fromIndex = fromIndex;
-        
-        this.toIndex = toIndex;
+//        this.fromIndex = fromIndex;
+//        
+//        this.toIndex = toIndex;
 
-        this.keys = new MutableValuesRaba(fromIndex,toIndex,keys);
+        this.keys = new ReadOnlyKeysRaba(fromIndex, toIndex, keys);
 
-        this.vals = (vals == null ? null : new MutableValuesRaba(fromIndex,
+        this.vals = (vals == null ? null : new ReadOnlyValuesRaba(fromIndex,
                 toIndex, vals));
 
     }
 
-    /**
-     * Return the object used to (de-)serialize the keys when they are sent to
-     * the remote service.
-     */
-    protected IDataSerializer getKeySerializer() {
-        
-        return keySer;
-        
-    }
+//    /**
+//     * Return the object used to (de-)code the keys when they are sent to the
+//     * remote service.
+//     */
+//    final protected IRabaCoder getKeysCoder() {
+//
+//        return keysCoder;
+//
+//    }
+//
+//    /**
+//     * Return the object used to (de-)code the values when they are sent to the
+//     * remote service.
+//     */
+//    final protected IRabaCoder getValuesCoder() {
+//        
+//        return valsCoder;
+//        
+//    }
     
-    /**
-     * Return the object used to (de-)serialize the values when they are sent to
-     * the remote service.
-     */
-    protected IDataSerializer getValSerializer() {
-        
-        return valSer;
-        
-    }
-    
-    final public void readExternal(ObjectInput in) throws IOException,
+    final public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         readMetadata(in);
 
         final boolean haveVals = in.readBoolean();
-        
-        final int n = toIndex - fromIndex;
-        
-        keys = new MutableValuesRaba( 0, 0, new byte[n][] );
-        
-        getKeySerializer().read(in, keys );
+
+//        final int n = toIndex - fromIndex;
+
+        {
+            
+            // the keys.
+            
+            final int len = in.readInt();
+            
+            final byte[] a = new byte[len];
+            
+            in.readFully(a);
+            
+            keys = keysCoder.decode(FixedByteArrayBuffer.wrap(a));
+            
+//            keys = new MutableValuesRaba(0, 0, new byte[n][]);
+//
+//            getKeysCoder().read(in, keys);
+            
+        }
 
         if(haveVals) {
         
-            vals = new MutableValuesRaba( 0, 0, new byte[n][] );
-        
-            getValSerializer().read(in, vals);
+            /*
+             * Wrap the coded the values.
+             */
+            
+            // the byte length of the coded values.
+            final int len = in.readInt();
+            
+            // allocate backing array.
+            final byte[] a = new byte[len];
+            
+            // read the coded record into the array.
+            in.readFully(a);
+            
+            // wrap the coded record.
+            vals = valsCoder.decode(FixedByteArrayBuffer.wrap(a));
+            
+//            vals = new MutableValuesRaba( 0, 0, new byte[n][] );
+//        
+//            getValuesCoder().read(in, vals);
             
         } else {
             
@@ -315,67 +341,102 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         
     }
 
-    final public void writeExternal(ObjectOutput out) throws IOException {
+    final public void writeExternal(final ObjectOutput out) throws IOException {
 
         writeMetadata(out);
 
         out.writeBoolean(vals != null); // haveVals
 
-        getKeySerializer().write(out, keys);
+        final DataOutputBuffer buf = new DataOutputBuffer();
+        {
+
+            // code the keys
+            final AbstractFixedByteArrayBuffer slice = keysCoder.encode(keys,
+                    buf);
+
+            // The #of bytes in the coded keys.
+            out.writeInt(slice.len());
+
+            // The coded keys.
+            slice.writeOn(out);
+
+        }
 
         if (vals != null) {
 
-            getValSerializer().write(out, vals);
+            // reuse the buffer.
+            buf.reset();
+            
+            // code the values.
+            final AbstractFixedByteArrayBuffer slice = valsCoder.encode(vals,
+                    buf);
+
+            // The #of bytes in the coded keys.
+            out.writeInt(slice.len());
+
+            // The coded keys.
+            slice.writeOn(out);
 
         }
-        
+
     }
 
     /**
      * Reads metadata written by {@link #writeMetadata(ObjectOutput)}.
-     * <p>
-     * The default implementation reads and sets {@link #toIndex}. The
-     * {@link #fromIndex} is always set to zero on de-serialization.
      * 
      * @param in
      * 
      * @throws IOException
-     * @throws ClassNotFoundException 
+     * @throws ClassNotFoundException
      */
-    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
-        
-        fromIndex = 0;
-        
-        toIndex = (int) LongPacker.unpackLong(in);
-        
-        keySer = (IDataSerializer)in.readObject();
+    protected void readMetadata(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
 
-        valSer = (IDataSerializer)in.readObject();
+        final byte version = in.readByte();
+
+        switch (version) {
+        case VERSION0:
+            break;
+        default:
+            throw new IOException();
+        }
         
+//        fromIndex = 0;
+//
+//        toIndex = (int) LongPacker.unpackLong(in);
+
+        keysCoder = (IRabaCoder) in.readObject();
+
+        valsCoder = (IRabaCoder) in.readObject();
+
     }
 
     /**
      * Writes metadata (not the keys or values, but just other metadata used by
      * the procedure).
      * <p>
-     * The default implementation writes <code>toIndex - fromIndex</code>, which
-     * is the #of keys.
+     * The default implementation writes out the {@link #getKeysCoder()} and the
+     * {@link #getValuesCoder()}.
      * 
      * @param out
      * 
      * @throws IOException
      */
-    protected void writeMetadata(ObjectOutput out) throws IOException {
-        
-        final int n = toIndex - fromIndex;
-        
-        LongPacker.packLong(out, n);
-        
-        out.writeObject(keySer);
+    protected void writeMetadata(final ObjectOutput out) throws IOException {
 
-        out.writeObject(valSer);
+        out.write(VERSION0);
+        
+//        final int n = toIndex - fromIndex;
+//        
+//        LongPacker.packLong(out, n);
+        
+        out.writeObject(keysCoder);
+
+        out.writeObject(valsCoder);
         
     }
+    
+    private static final byte VERSION0 = 0x00;
 
     /**
      * A class useful for sending some kinds of data back from a remote
@@ -386,14 +447,9 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      */
     public static class ResultBuffer implements Externalizable {
         
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -5705501700787163863L;
+        private IRaba vals;
 
-        private MutableValuesRaba a;
-
-        private IDataSerializer valSer;
+        private IRabaCoder valsCoder;
         
         /**
          * De-serialization ctor.
@@ -412,56 +468,103 @@ abstract public class AbstractKeyArrayIndexProcedure extends
          * @param valSer
          *            The data are serialized using using this object. Typically
          *            this is the value returned by
-         *            {@link ITupleSerializer#getLeafValueSerializer()}.
+         *            {@link ITupleSerializer#getLeafValuesCoder()}.
          */
-        public ResultBuffer(int n, byte[][] a, IDataSerializer valSer) {
+        public ResultBuffer(final int n, final byte[][] a,
+                final IRabaCoder valsCoder) {
 
             assert n >= 0;
             assert a != null;
-            assert valSer != null;
+            assert valsCoder != null;
                         
-            this.a = new MutableValuesRaba(0/*fromIndex*/,n/*toIndex*/,a);
+            this.vals = new ReadOnlyValuesRaba(0/* fromIndex */, n/* toIndex */, a);
             
-            this.valSer = valSer;
+            this.valsCoder = valsCoder;
             
         }
         
+        public IRaba getValues() {
+            
+            return vals;
+            
+        }
+        
+        /**
+         * @deprecated by {@link #getValues()}
+         */
         public int getResultCount() {
             
-            return a.size();
+            return vals.size();
             
         }
         
-        public byte[] getResult(int index) {
+        /**
+         * @deprecated by {@link #getValues()}
+         */
+        public byte[] getResult(final int index) {
 
-            return a.get(index);
+            return vals.get(index);
 
         }
 
-        public void readExternal(ObjectInput in) throws IOException,
+        public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
-            final int n = in.readInt();
+            final byte version = in.readByte();
+            
+            switch (version) {
+            case VERSION0:
+                break;
+            default:
+                throw new IOException();
+            }
 
-            valSer = (IDataSerializer) in.readObject();
+//            final int n = in.readInt();
 
-            // FIXME do not deserialize, just wrap the record!
-            a = new MutableValuesRaba(0/* fromIndex */, 0/* toIndex */,
-                    n/* capacity */, new byte[n][]);
+            // The values coder.
+            valsCoder = (IRabaCoder) in.readObject();
 
-            valSer.read(in, a);
+            // The #of bytes in the coded values.
+            final int len = in.readInt();
+            
+            final byte[] b = new byte[len];
+            
+            in.readFully(b);
+            
+            // Wrap the coded values.
+            vals = valsCoder.decode(FixedByteArrayBuffer.wrap(b));
+
+//            a = new MutableValuesRaba(0/* fromIndex */, 0/* toIndex */,
+//                    n/* capacity */, new byte[n][]);
+//
+//            valSer.read(in, a);
             
         }
 
-        public void writeExternal(ObjectOutput out) throws IOException {
+        public void writeExternal(final ObjectOutput out) throws IOException {
 
-            out.writeInt(a.size());
+            out.writeByte(VERSION0);
             
-            out.writeObject(valSer);
+//            out.writeInt(a.size());
+
+            // The values coder.
+            out.writeObject(valsCoder);
             
-            valSer.write(out, a);
+            // Code the values.
+            final AbstractFixedByteArrayBuffer slice = valsCoder.encode(vals,
+                    new DataOutputBuffer());
+            
+            // The #of bytes in the coded keys.
+            out.writeInt(slice.len());
+
+            // The coded keys.
+            slice.writeOn(out);
+            
+//            valSer.write(out, a);
 
         }
+        
+        private static final byte VERSION0 = 0x00;
         
     }
 
@@ -469,26 +572,31 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      * A class useful for sending a logical <code>boolean[]</code> back from a
      * remote procedure call.
      * 
-     * @todo provide run-length coding for bits.
+     * @todo provide run-length coding for bits?
      * 
-     * @todo is a byte[] a more efficient storage than a boolean[] for java?
+     * @todo use {@link LongArrayBitVector} for more compact storage?
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     public static class ResultBitBuffer implements Externalizable {
-        
-        /**
-         * 
-         */
-        private static final long serialVersionUID = -5705501700787163863L;
 
         private int n;
+
+        /**
+         * @todo represent using a {@link BitVector}. {@link LongArrayBitVector}
+         *       when allocating. Directly write the long[] backing bits
+         *       (getBits()) onto the output stream. Reconstruct from backing
+         *       long[] when reading. Hide the boolean[] from the API by
+         *       modifying {@link #getResult()} to accept the index of the bit
+         *       of interest or to return the {@link BitVector} directly.
+         */
+//        private BitVector a;
         private boolean[] a;
 
         /**
          * De-serialization ctor.
-         *
          */
         public ResultBitBuffer() {
             
@@ -501,14 +609,8 @@ abstract public class AbstractKeyArrayIndexProcedure extends
          * @param a
          *            The data.
          */
-        public ResultBitBuffer(int n, boolean[] a) {
+        public ResultBitBuffer(final int n, final boolean[] a) {
 
-            setResult( n, a );
-            
-        }
-        
-        public void setResult(int n, boolean[] a ) {
-            
             this.n = n;
 
             this.a = a;
@@ -527,30 +629,35 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         }
 
-        public void readExternal(ObjectInput in) throws IOException,
+        public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
             final InputBitStream ibs = new InputBitStream((InputStream) in,
                     0/* unbuffered */, false/* reflectionTest */);
 
             n = ibs.readNibble();
-            
+
+//            a = LongArrayBitVector.getInstance(n);
             a = new boolean[n];
-            
-            for(int i=0; i<n; i++) {
-                
-                a[i] = ibs.readBit() == 1 ? true : false;
+
+            for (int i = 0; i < n; i++) {
+
+                final boolean bit = ibs.readBit() == 1 ? true : false;
+//                a.set(i, bit);
+                a[i] = bit;
                 
             }
             
         }
 
-        public void writeExternal(ObjectOutput out) throws IOException {
+        public void writeExternal(final ObjectOutput out) throws IOException {
 
             final OutputBitStream obs = new OutputBitStream((OutputStream) out,
                     0/* unbuffered! */, false/*reflectionTest*/);
 
             obs.writeNibble(n);
+            
+//            obs.write(a.iterator());
             
             for(int i=0; i<n; i++) {
                 
@@ -574,35 +681,39 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             IResultHandler<ResultBuffer, ResultBuffer> {
 
         private final byte[][] results;
-        private final IDataSerializer valueSerializer;
+        private final IRabaCoder valsCoder;
 
-        public ResultBufferHandler(int nkeys, IDataSerializer valueSerializer) {
+        public ResultBufferHandler(final int nkeys, final IRabaCoder valsCoder) {
 
             this.results = new byte[nkeys][];
 
-            this.valueSerializer = valueSerializer;
+            this.valsCoder = valsCoder;
             
         }
 
-        public void aggregate(ResultBuffer result, Split split) {
+        public void aggregate(final ResultBuffer result, final Split split) {
 
+            final IRaba src = result.getValues();
+            
             for (int i = 0, j = split.fromIndex; i < split.ntuples; i++, j++) {
 
-                results[j] = result.getResult(i);
+                results[j] = src.get(i);
                 
             }
             
-//            System.arraycopy(result.getResult(), 0, results, split.fromIndex,
-//                    split.ntuples);
-
         }
 
         /**
          * The aggregated results.
+         * 
+         * FIXME It would be better to wrap the results from each split and
+         * index into them directly in order to avoid decoding the byte[][]s
+         * associated with each split. We would need to return an appropriate
+         * {@link IRaba} implementation here instead.
          */
         public ResultBuffer getResult() {
 
-            return new ResultBuffer(results.length, results, valueSerializer);
+            return new ResultBuffer(results.length, results, valsCoder);
 
         }
 
@@ -616,13 +727,13 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         private final boolean[] results;
 
-        public ResultBitBufferHandler(int nkeys) {
+        public ResultBitBufferHandler(final int nkeys) {
 
             results = new boolean[nkeys];
 
         }
 
-        public void aggregate(ResultBitBuffer result, Split split) {
+        public void aggregate(final ResultBitBuffer result, final Split split) {
 
             System.arraycopy(result.getResult(), 0, results, split.fromIndex,
                     split.ntuples);
@@ -652,7 +763,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         }
 
-        public void aggregate(ResultBitBuffer result, Split split) {
+        public void aggregate(final ResultBitBuffer result, final Split split) {
 
             int delta = 0;
 

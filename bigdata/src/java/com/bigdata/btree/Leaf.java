@@ -34,7 +34,6 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.ILeafData;
-import com.bigdata.btree.data.ReadOnlyLeafData;
 import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
@@ -215,11 +214,23 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
     }
 
     final public boolean hasVersionTimestamps() {
-        
+
         return data.hasVersionTimestamps();
-        
+
     }
-    
+
+    final public long getMinimumVersionTimestamp() {
+
+        return data.getMinimumVersionTimestamp();
+
+    }
+
+    final public long getMaximumVersionTimestamp() {
+
+        return data.getMinimumVersionTimestamp();
+
+    }
+
     final public boolean isDoubleLinked() {
         
         return data.isDoubleLinked();
@@ -1419,6 +1430,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
             System.arraycopy(data.versionTimestamps, entryIndex,
                     data.versionTimestamps, entryIndex + 1, count);
+            
         }
         
         /*

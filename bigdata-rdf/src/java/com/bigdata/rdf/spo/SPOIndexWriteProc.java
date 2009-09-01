@@ -32,10 +32,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.StatementEnum;
@@ -101,7 +101,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @param keys
      * @param vals
      */
-    protected SPOIndexWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+    protected SPOIndexWriteProc(IRabaCoder keySer, IRabaCoder valSer,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, vals);
@@ -127,8 +127,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
         
-        public SPOIndexWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
+        public SPOIndexWriteProc newInstance(IRabaCoder keySer,
+                IRabaCoder valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             return new SPOIndexWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);
@@ -189,6 +189,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             /*
              * The current value for the statement in this index partition (or
              * null iff the stmt is not asserted).
+             * 
+             * @todo reuse Tuple for lookup to reduce byte[] allocation.
              */
             final byte[] oldval = ndx.lookup(key);
             

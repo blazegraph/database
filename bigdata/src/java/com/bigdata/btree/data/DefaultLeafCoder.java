@@ -27,9 +27,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
+import it.unimi.dsi.bits.Fast;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
+
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
@@ -45,6 +51,9 @@ import com.bigdata.io.DataOutputBuffer;
  * @version $Id$
  */
 public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
+
+    protected static final Logger log = Logger
+            .getLogger(DefaultLeafCoder.class);
 
     protected static final byte VERSION0 = 0x00;
     
@@ -203,24 +212,22 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
 //        
 //        buf.putInt(encodedValues.length); // valuesSize
         
-        // version timestamps
-        final int O_versionTimestamps;
-        if (leaf.hasVersionTimestamps()) {
+        // encode the keys into the buffer
+        final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(leaf
+                .getKeys(), buf);
 
-            O_versionTimestamps = buf.pos();
-            
-            for (int i = 0; i < nkeys; i++) {
+        // encode the values into the buffer.
+        final AbstractFixedByteArrayBuffer encodedValues = valsCoder.encode(
+                leaf.getValues(), buf);
 
-                buf.putLong(leaf.getVersionTimestamp(i));
-
-            }
-
-        } else {
+        /*
+         * Patch the buffer to indicate the byte length of the encoded keys and
+         * the encoded values.
+         */
+        buf.putInt(O_keysSize, encodedKeys.len());
+        buf.putInt(O_keysSize + AbstractReadOnlyNodeData.SIZEOF_KEYS_SIZE,
+                encodedValues.len());
         
-            O_versionTimestamps = -1;
-            
-        }
-
         // delete markers (bit coded).
         final int O_deleteMarkers;
         if (leaf.hasDeleteMarkers()) {
@@ -252,40 +259,82 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
             
         }
 
-        // encode the keys into the buffer
-//      this.keys = keysCoder.encode(leaf.getKeys());
-//      final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
-      final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(leaf
-              .getKeys(), buf);
-//      this.keys = keysCoder.decode(encodedKeys);
+        // The byte offset to minVersionTimestamp.
+        final int O_versionTimestamps;
+        if (leaf.hasVersionTimestamps()) {
 
-      // encode the values.
-//      this.vals = valuesCoder.encode(leaf.getValues());
-//      final ByteBuffer encodedValues = ((IRabaDecoder) vals).data();
-      final AbstractFixedByteArrayBuffer encodedValues = valsCoder.encode(
-              leaf.getValues(), buf);
-//      this.vals = valuesCoder.decode(encodedValues);
+            /*
+             * The (min,max) are written out as full length long values. The per
+             * tuple revision timestamps are written out using the minimum #of
+             * bits required to code the data.
+             */
 
-      // patch the buffer to indicate the byte length of the encoded keys and
-      // the encoded values.
-      buf.putInt(O_keysSize, encodedKeys.len());
-      buf.putInt(O_keysSize + AbstractReadOnlyNodeData.SIZEOF_KEYS_SIZE, encodedValues.len());
+            final long min = leaf.getMinimumVersionTimestamp();
 
-        // write the encoded keys on the buffer.
-//        final int O_keys = b.pos();
-//        encodedKeys.limit(encodedKeys.capacity());
-//        encodedKeys.rewind();
+            final long max = leaf.getMaximumVersionTimestamp();
 
-        // write the encoded values on the buffer.
-//        final int O_values = b.pos();
-//        encodedValues.limit(encodedValues.capacity());
-//        encodedValues.rewind();
+//            final long delta = max - min;
+//            assert delta >= 0;
 
-//        // prepare buffer for writing on the store [limit := pos; pos : =0] 
-//        b.flip();
-//        
-//        // save read-only reference to the buffer.
-//        this.b = b.asReadOnlyBuffer();
+            // will be in [1:64]
+            final byte versionTimestampBits = (byte) (Fast
+                    .mostSignificantBit(max - min) + 1);
+
+            // one byte.
+            buf.putByte((byte) versionTimestampBits);
+
+            // offset of minVersionTimestamp.
+            O_versionTimestamps = buf.pos();
+
+            // int64
+            buf.putLong(min);
+
+            // int64
+            buf.putLong(max);
+
+            /*
+             * FIXME pre-extend the buffer and use slice ctor for obs for less
+             * allocation and copying.
+             * 
+             * FIXME Use pluggable coding for version timestamps.
+             */
+            final int byteLength = BytesUtil.bitFlagByteLength(nkeys
+                    * versionTimestampBits/* nbits */);
+            final byte[] a = new byte[byteLength];
+            final OutputBitStream obs = new OutputBitStream(a);
+            try {
+                
+                // array of [versionTimestampBits] fields.
+                for (int i = 0; i < nkeys; i++) {
+
+                    final long deltat = leaf.getVersionTimestamp(i) - min;
+                    assert deltat >= 0;
+                    
+                    obs.writeLong(deltat, versionTimestampBits);
+
+                }
+
+                obs.flush();
+                
+                // copy onto the buffer.
+                buf.put(a);
+                
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+                // Note: close is not necessary if flushed and backed by byte[].
+//            } finally {
+//                try {
+//                    obs.close();
+//                } catch (IOException e) {
+//                    log.error(e);
+//                }
+            }
+
+        } else {
+
+            O_versionTimestamps = -1;
+
+        }
 
         return buf.slice(O_origin, buf.pos() - O_origin);
         
@@ -317,31 +366,31 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
         private final int nkeys;
         private final short flags;
         private final IRaba keys;
-        private final IRaba vals; 
-
-        /**
-         * Offset of the encoded timestamp[] in the buffer -or- <code>-1</code> if
-         * the leaf does not report those data.
-         */
-        private final int O_versionTimestamps;
-
+        private final IRaba vals;
+        
         /**
          * Offset of the bit flags in the buffer encoding the presence of deleted
          * tuples -or- <code>-1</code> if the leaf does not report those data.
          */
         private final int O_deleteMarkers;
 
-//        /**
-//         * Offset of the encoded keys in the buffer.
-//         */
-//        private final int O_keys;
-    //    
-//        /**
-//         * Offset of the encoded values in the buffer.
-//         */
-//        private final int O_values;
+        /**
+         * The byte offset of the minimum version timestamp in the buffer -or-
+         * <code>-1</code> if the leaf does not report those data. The minimum
+         * timestamp is coded as a full length long. The next field in the
+         * buffer is the maximum version timestamp. The following fields are an
+         * array of {@link #nkeys} coded timestamp values (one per tuple). Those
+         * timestamps are coded in {@link #versionTimestampBits} each.
+         */
+        private final int O_versionTimestamps;
 
-        public final AbstractFixedByteArrayBuffer buf() {
+        /**
+         * The #of bits used to code the version timestamps -or- ZERO (0) if
+         * they are not present.
+         */
+        private final int versionTimestampBits;
+
+        public final AbstractFixedByteArrayBuffer data() {
 
             return b;
             
@@ -413,19 +462,19 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
             final int valuesSize = buf.getInt(pos);
             pos += SIZEOF_KEYS_SIZE;
 
-            // version timestamps
-            if (hasVersionTimestamps) {
+            // keys
+//            final int O_keys = pos;
+//            buf.limit(buf.pos() + keysSize);
+            this.keys = keysCoder.decode(buf.slice(pos, keysSize));
+//            assert buf.position() == O_keys + keysSize;
+            pos += keysSize;// skip over the keys.
 
-                O_versionTimestamps = pos;
-                
-                // advance past the timestamps.
-                pos += nkeys * SIZEOF_TIMESTAMP;
-                
-            } else {
-                
-                O_versionTimestamps = -1;
-                
-            }
+            // values
+//            final int O_values = pos;
+//            buf.limit(buf.position() + valuesSize);
+            this.vals = valuesCoder.decode(buf.slice(pos,valuesSize));
+//            assert buf.position() == O_values + valuesSize;
+            pos += valuesSize;// skip over the values.
 
             // delete markers
             if (hasDeleteMarkers) {
@@ -441,19 +490,27 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
                 
             }
 
-            // keys
-//            final int O_keys = pos;
-//            buf.limit(buf.pos() + keysSize);
-            this.keys = keysCoder.decode(buf.slice(pos, keysSize));
-//            assert buf.position() == O_keys + keysSize;
-            pos += keysSize;// skip over the keys.
+            // version timestamps
+            if (hasVersionTimestamps) {
 
-            // values
-//            final int O_values = pos;
-//            buf.limit(buf.position() + valuesSize);
-            this.vals = valuesCoder.decode(buf.slice(pos,valuesSize));
-//            assert buf.position() == O_values + valuesSize;
-            pos += valuesSize;// skip over the values.
+                versionTimestampBits = buf.getByte(pos);
+                pos++;
+
+                O_versionTimestamps = pos;
+                // advance past the timestamps.
+                pos += (2 * SIZEOF_TIMESTAMP)
+                        + BytesUtil.bitFlagByteLength(nkeys
+                                * versionTimestampBits/* nbits */);
+
+//                // advance past the timestamps.
+//                pos += nkeys * SIZEOF_TIMESTAMP;
+                
+            } else {
+                
+                O_versionTimestamps = -1;
+                versionTimestampBits = 0;
+                
+            }
 
 //            assert buf.pos() == buf.limit();
             
@@ -466,191 +523,6 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
 
         }
 
-//        /**
-//         * Encode the leaf data.
-//         * 
-//         * @param leaf
-//         *            The leaf data.
-//         * @param keysCoder
-//         *            The object which will be used to code the keys into the
-//         *            record.
-//         * @param valuesCoder
-//         *            The object which will be used to code the values into the
-//         *            record.
-//         * @param doubleLinked
-//         *            <code>true</code> to generate a data record with room for the
-//         *            priorAddr and nextAddr fields.
-//         * @param buf
-//         *            The buffer on which the coded representation will be written.
-//         */
-//        public ReadOnlyLeafData(final ILeafData leaf, final IRabaCoder keysCoder,
-//                final IRabaCoder valuesCoder, final boolean doubleLinked,
-//                final DataOutputBuffer buf) {
-//
-//            if (leaf == null)
-//                throw new IllegalArgumentException();
-//
-//            if (keysCoder == null)
-//                throw new IllegalArgumentException();
-//            
-//            if (valuesCoder == null)
-//                throw new IllegalArgumentException();
-//
-//            if (buf == null)
-//                throw new IllegalArgumentException();
-//
-//            // cache some fields.
-////            this.doubleLinked = doubleLinked;
-//            this.nkeys = leaf.getKeyCount();
-//
-////            // figure out how the size of the buffer (exact fit).
-////            final int capacity = //
-////                    SIZEOF_TYPE + //
-////                    (doubleLinked ? SIZEOF_ADDR * 2 : 0) + // priorAddr, nextAddr.
-////                    SIZEOF_VERSION + // version
-////                    SIZEOF_FLAGS + // flags
-////                    SIZEOF_NKEYS + // nkeys
-////                    Bytes.SIZEOF_INT + // keysSize
-////                    Bytes.SIZEOF_INT + // valuesSize
-////                    BytesUtil.bitFlagByteLength(nkeys)+// nulls
-////                    (leaf.hasVersionTimestamps() ? SIZEOF_TIMESTAMP * nkeys : 0) + //
-////                    (leaf.hasDeleteMarkers() ? BytesUtil.bitFlagByteLength(nkeys) : 0) + // deleted
-////                    encodedKeys.len() + // keys
-////                    encodedValues.len() // values
-////            ;
-//
-//            // The byte offset of the start of the coded record into the buffer.
-//            final int O_origin = buf.pos();
-//            
-////            final ByteBuffer b = ByteBuffer.allocate(capacity);
-////            buf.ensureCapacity(capacity);
-//
-//            buf.putByte((byte) (doubleLinked ? LINKED_LEAF : LEAF));
-//            
-//            if(doubleLinked) {
-//
-//                /*
-//                 * Skip over priorAddr/nextAddr fields (java will have zeroed the
-//                 * entire buffer when we allocated it). These fields need to be
-//                 * filled in on the record after it has been serialized (and
-//                 * potentially after it has been compressed) so we know its space on
-//                 * disk requirements.
-//                 */
-//
-//                buf.skip(SIZEOF_ADDR * 2);
-//                
-//            }
-//
-//            buf.putShort(VERSION0);
-//            
-//            short flags = 0;
-//            if (leaf.hasDeleteMarkers()) {
-//                flags |= FLAG_DELETE_MARKERS;
-//            }
-//            if (leaf.hasVersionTimestamps()) {
-//                flags |= FLAG_VERSION_TIMESTAMPS;
-//            }
-//            this.flags = flags;
-//
-//            buf.putShort(flags);
-//            
-//            buf.putInt(nkeys); // pack?
-//
-//            final int O_keysSize = buf.pos();
-//            
-//            // skip past the keysSize and valuesSize fields.
-//            buf.skip(SIZEOF_KEYS_SIZE * 2);
-//            
-////            buf.putInt(encodedKeys.length); // keysSize
-////            
-////            buf.putInt(encodedValues.length); // valuesSize
-//            
-//            // version timestamps
-//            if (leaf.hasVersionTimestamps()) {
-//
-//                O_versionTimestamps = buf.pos();
-//                
-//                for (int i = 0; i < nkeys; i++) {
-//
-//                    buf.putLong(leaf.getVersionTimestamp(i));
-//
-//                }
-//
-//            } else {
-//            
-//                O_versionTimestamps = -1;
-//                
-//            }
-//
-//            // delete markers (bit coded).
-//            if (leaf.hasDeleteMarkers()) {
-//
-//                O_deleteMarkers = buf.pos();
-//
-//                for (int i = 0; i < nkeys;) {
-//
-//                    byte bits = 0;
-//                    
-//                    for (int j = 0; j < 8 && i < nkeys; j++, i++) {
-//
-//                        if(leaf.getDeleteMarker(i)) {
-//
-//                            // Note: bit order is per BitInputStream & BytesUtil!
-//                            bits |= 1 << (7 - j);
-//                                
-//                        }
-//                        
-//                    }
-//
-//                    buf.putByte(bits);
-//
-//                }
-//
-//            } else {
-//            
-//                O_deleteMarkers = -1;
-//                
-//            }
-//
-//            // encode the keys into the buffer
-////          this.keys = keysCoder.encode(leaf.getKeys());
-////          final ByteBuffer encodedKeys = ((IRabaDecoder) keys).data();
-//          final AbstractFixedByteArrayBuffer encodedKeys = keysCoder.encode(leaf
-//                  .getKeys(), buf);
-//          this.keys = keysCoder.decode(encodedKeys);
-//
-//          // encode the values.
-////          this.vals = valuesCoder.encode(leaf.getValues());
-////          final ByteBuffer encodedValues = ((IRabaDecoder) vals).data();
-//          final AbstractFixedByteArrayBuffer encodedValues = valuesCoder.encode(
-//                  leaf.getValues(), buf);
-//          this.vals = valuesCoder.decode(encodedValues);
-//
-//          // patch the buffer to indicate the byte length of the encoded keys and
-//          // the encoded values.
-//          buf.putInt(O_keysSize, encodedKeys.len());
-//          buf.putInt(O_keysSize + Bytes.SIZEOF_INT, encodedValues.len());
-//
-//            // write the encoded keys on the buffer.
-////            final int O_keys = b.pos();
-////            encodedKeys.limit(encodedKeys.capacity());
-////            encodedKeys.rewind();
-//
-//            // write the encoded values on the buffer.
-////            final int O_values = b.pos();
-////            encodedValues.limit(encodedValues.capacity());
-////            encodedValues.rewind();
-//
-////            // prepare buffer for writing on the store [limit := pos; pos : =0] 
-////            b.flip();
-////            
-////            // save read-only reference to the buffer.
-////            this.b = b.asReadOnlyBuffer();
-//
-//            this.b = buf.slice(O_origin, buf.pos() - O_origin);
-//            
-//        }
-        
         /**
          * Always returns <code>true</code>.
          */
@@ -708,12 +580,55 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
             
         }
 
+        public long getMinimumVersionTimestamp() {
+
+            if (!hasVersionTimestamps())
+                throw new UnsupportedOperationException();
+
+            return b.getLong(O_versionTimestamps);
+
+        }
+
+        public long getMaximumVersionTimestamp() {
+
+            if (!hasVersionTimestamps())
+                throw new UnsupportedOperationException();
+
+            return b.getLong(O_versionTimestamps + SIZEOF_TIMESTAMP);
+
+        }
+
         final public long getVersionTimestamp(final int index) {
 
             if (!hasVersionTimestamps())
                 throw new UnsupportedOperationException();
 
-            return b.getLong(O_versionTimestamps + index * SIZEOF_TIMESTAMP);
+//            return b.getLong(O_versionTimestamps + index * SIZEOF_TIMESTAMP);
+
+            final InputBitStream ibs = b.getInputBitStream();
+            try {
+
+                final long bitpos = ((O_versionTimestamps + (2L * SIZEOF_TIMESTAMP)) << 3)
+                        + (index * versionTimestampBits);
+
+                ibs.position(bitpos);
+
+                final long deltat = ibs
+                        .readLong(versionTimestampBits/* nbits */);
+
+                return getMinimumVersionTimestamp() + deltat;
+                
+            } catch(IOException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            } finally {
+                try {
+                    ibs.close();
+                } catch (IOException ex) {
+                    log.error(ex);
+                }
+            }
 
         }
 
@@ -879,7 +794,9 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
 
         if (leaf.hasVersionTimestamps()) {
 
-            sb.append(", versionTimestamps=[");
+            sb.append(", versionTimestamps={min="
+                    + leaf.getMinimumVersionTimestamp() + ",max="
+                    + leaf.getMaximumVersionTimestamp() + "[");
 
             for (int i = 0; i < nkeys; i++) {
 
