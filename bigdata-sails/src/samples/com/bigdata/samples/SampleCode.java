@@ -528,7 +528,7 @@ public class SampleCode {
      * 
      * @param args
      */
-    public static final void main(String[] args) {
+    public static void main(String[] args) {
         try {
             SampleCode sampleCode = new SampleCode();
             
