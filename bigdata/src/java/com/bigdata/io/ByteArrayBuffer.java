@@ -32,6 +32,7 @@ import it.unimi.dsi.fastutil.io.RepositionableStream;
 import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -921,7 +922,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     
     /**
      * Packs a non-negative long value into the minimum #of bytes in which the
-     * value can be represented and writes those bytes onto the output stream.
+     * value can be represented and writes those bytes onto the buffer.
      * The first byte determines whether or not the long value was packed and,
      * if packed, how many bytes were required to represent the packed long
      * value. When the high bit of the first byte is a one (1), then the long
@@ -930,7 +931,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * a long. Otherwise the next three (3) bits are interpreted as an unsigned
      * integer giving the #of bytes (nbytes) required to represent the packed
      * long value. To recover the long value the high nibble is cleared and the
-     * first byte together with the next nbytes are interpeted as an unsigned
+     * first byte together with the next nbytes are interpreted as an unsigned
      * long value whose leading zero bytes were not written.
      * 
      * <pre>
@@ -951,7 +952,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @return The #of bytes onto which the unsigned long value was packed.
      */
-    final public int packLong( final long v ) throws IOException {
+    final public int packLong( final long v ) {
         
         /*
          * You can only pack non-negative long values with this method.
@@ -1088,21 +1089,21 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     /*
      * Pack unsigned short integer.
      */
-    
+
     /**
      * Packs a non-negative short value into one or two bytes and writes them on
-     * <i>os </i>. A short in [0:127] is packed into one byte. Larger values are
+     * the buffer. A short in [0:127] is packed into one byte. Larger values are
      * packed into two bytes. The high bit of the first byte is set if the value
      * was packed into two bytes. If the bit is set, clear the high bit, read
      * the next byte, and interpret the two bytes as a short value. Otherwise
      * interpret the byte as a short value.
      * 
-     * @param v The unsigned short integer.
+     * @param v
+     *            The unsigned short integer.
      * 
      * @return The #of bytes into which the value was packed.
      */ 
-    final public int packShort( final short v ) throws IOException
-    {
+    final public int packShort(final short v) {
     
         /*
          * You can only pack non-negative values with this method.
@@ -1127,6 +1128,88 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
             return 1;
         }
     }
+
+//    /*
+//     * unpack unsigned long integer.
+//     */
+//
+//    /**
+//     * Unpack a long value from the current buffer position, incrementing the
+//     * buffer position as a side-effect.
+//     * 
+//     * @return The long value.
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo unit test for pack/unpack in this class.
+//     */
+//    final public long unpackLong() throws IOException {
+//        if (pos + 1 > limit)
+//            throw new EOFException();
+//        int b = buf[pos++];
+//        int nbytes;
+//        long l;
+//        if ((b & 0x80) != 0) {
+//            // high bit is set.
+//            nbytes = 8; // use 8 bytes (this one plus the next 7).
+//            l = b & 0x7f; // clear the high bit - the rest of the byte is the
+//                            // start value.
+//        } else {
+//            // high bit is clear.
+//            nbytes = b >> 4; // nbytes is the upper nibble. (right shift one
+//                                // nibble).
+//            l = b & 0x0f; // starting value is lower nibble (clear the upper
+//                            // nibble).
+//        }
+//        if (pos + nbytes - 1 > limit)
+//            throw new EOFException();
+//        for (int i = 1; i < nbytes; i++) {
+//            // Read the next byte.
+//            b = buf[pos++];
+//            // Shift the existing value one byte left and add into the low
+//            // (unsigned) byte.
+//            l = (l << 8) + (0xff & b);
+//        }
+//        return l;
+//    }
+//
+//    /*
+//     * unpack unsigned short integer.
+//     */
+//    
+//    /**
+//     * Unpack a non-negative short value from the input stream, incrementing
+//     * the buffer position as a side-effect.
+//     * 
+//     * @param is
+//     *            The input stream.
+//     * 
+//     * @return The short value.
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo unit tests for pack/unpack in this class.
+//     */
+//    final public short unpackShort() throws IOException {
+//        if (pos + 1 > limit)
+//            throw new EOFException();
+//        short b = (short) buf[pos++];
+//        short v;
+//        if ((b & 0x80) != 0) { // high bit is set.
+//            /*
+//             * clear the high bit and shift over one byte.
+//             */
+//            v = (short) ((b & 0x7f) << 8);
+//            if (pos+ 1 > limit)
+//                throw new EOFException();
+//            b = buf[pos++]; // read the next byte.
+//            v |= (b & 0xff); // and combine it together with the high byte.
+//        } else {
+//            // high bit is clear.
+//            v = b; // interpret the byte as a short value.
+//        }
+//        return (short) v;
+//    }
 
     /*
      * OutputStream integration.  Operations all set the read limit to the

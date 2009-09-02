@@ -217,6 +217,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         assert values != null;
 
+        // the expected #of values (size, not capacity).
         final int nvalues = values.length;
 
         if (msg == null) {
@@ -225,9 +226,15 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         }
 
-        // verify the capacity of the values[] on the node.
-        assertEquals(msg + "values[] capacity", leaf.maxKeys() + 1, leaf
-                .getValues().capacity());
+        if (!leaf.isReadOnly()) {
+            /*
+             * Verify the capacity of the values[] on the node.
+             * 
+             * Note: When read only, nkeys==size==capacity.
+             */
+            assertEquals(msg + "values[] capacity", leaf.maxKeys() + 1, leaf
+                    .getValues().capacity());
+        }
 
         // verify the #of defined values (same as the #of defined keys).
         assertEquals(msg + "nvalues", nvalues, leaf.getKeyCount());

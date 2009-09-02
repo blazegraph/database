@@ -354,7 +354,8 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
          */
         assert src != null;
         assert !src.isDirty();
-        assert src.isPersistent();
+//        assert src.isPersistent();
+        assert src.isReadOnly();
 
         /*
          * Copy the parent reference. The parent must be defined unless the
@@ -458,7 +459,8 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
      */
     protected AbstractNode<T> copyOnWrite(final long triggeredByChildId) {
 
-        if (isPersistent()) {
+//        if (isPersistent()) {
+        if (isReadOnly()) {
 
             if(INFO) {
                 log.info("this="+this+", trigger="+triggeredByChildId);
@@ -481,7 +483,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
 
             if (this instanceof Node) {
 
-                newNode = new Node((Node) this, triggeredByChildId );
+                newNode = new Node((Node) this, triggeredByChildId);
                 
                 btree.getBtreeCounters().nodesCopyOnWrite++;
 
@@ -1021,8 +1023,8 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
          * separator key from the parent.
          */
         
-        if( rightSibling != null ) {
-            
+        if (rightSibling != null) {
+
             merge(rightSibling, true);
 
             return;

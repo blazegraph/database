@@ -629,14 +629,19 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      */
     public void test_deserialization() {
 
-        doDeserializationTest(1000/* N */, true/* deleteMarkers */);
+        doDeserializationTest(1000/* N */, true/* deleteMarkers */, true/* versionTimestamps */);
 
-        doDeserializationTest(1000/* N */, false/* deleteMarkers */);
-        
+        doDeserializationTest(1000/* N */, true/* deleteMarkers */, false/* versionTimestamps */);
+
+        doDeserializationTest(1000/* N */, false/* deleteMarkers */, true/* versionTimestamps */);
+
+        doDeserializationTest(1000/* N */, false/* deleteMarkers */, false/* versionTimestamps */);
+
     }
-    
-    protected void doDeserializationTest(int N, boolean deleteMarkers) {
-        
+
+    protected void doDeserializationTest(final int N,
+            final boolean deleteMarkers, final boolean versionTimestamps) {
+
         final String name = "testIndex";
 
         final IndexMetadata metadata = new IndexMetadata(name, UUID
@@ -644,6 +649,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         
         // optionally enable delete markers.
         metadata.setDeleteMarkers(deleteMarkers);
+
+        // optionally enable version timestamps.
+        metadata.setVersionTimestamps(versionTimestamps);
 
         // the default serializer will work fine for this.
         final ITupleSerializer<Long, String> tupleSer = new DefaultTupleSerializer<Long, String>(
@@ -672,12 +680,35 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
              */ 
             data[i] = new TupleData<Long, String>(i * 2L, getRandomString(
                     100/* len */, i/* id */), tupleSer); 
-        
-            // add to the tree as we go.
-            ndx.insert(data[i].k, data[i].v);
+
+            boolean delete = false;
+            if (deleteMarkers && r.nextInt(100) < 5) {
+                delete = true;
+            }
             
+            long timestamp = 0L;
+            if(versionTimestamps) {
+                timestamp = System.currentTimeMillis() + r.nextInt(10) * 5000;
+            }
+
+            final byte[] key = tupleSer.serializeKey(data[i].k);
+
+            final byte[] val = tupleSer.serializeVal(data[i].v);
+
+            // insert first
+            ndx.insert(key, val, false/* delete */, timestamp, ndx
+                    .getWriteTuple());
+
+            if (delete) {
+
+                // then convert to a delete marker.
+                ndx.insert(key, null/* val */, true/* delete */, timestamp, ndx
+                        .getWriteTuple());
+                
+            }
+
         }
-        
+
         /*
          * Verify a full index scan.
          */
@@ -701,7 +732,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
                 IRangeQuery.DEFAULT/* flags */, null/* filter */);
         
         /*
-         * Verify with overriden capacity.
+         * Verify with overridden capacity.
          */
 
         doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,

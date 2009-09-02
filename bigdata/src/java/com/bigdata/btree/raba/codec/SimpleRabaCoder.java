@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba.codec;
 
+import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
@@ -48,7 +49,7 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class SimpleRabaCoder implements IRabaCoder {
+public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
     private static final byte VERSION0 = 0x00;
 
@@ -245,7 +246,7 @@ public class SimpleRabaCoder implements IRabaCoder {
         
     }
 
-    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
+    public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new SimpleDataDecoder(data);
 

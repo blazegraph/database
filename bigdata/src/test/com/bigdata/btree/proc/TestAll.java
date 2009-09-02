@@ -55,10 +55,15 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("Index procedures");
+        final TestSuite suite = new TestSuite("Index procedures");
 
         /*
          * Note: Index procedures are generally tested where they are used.
+         * 
+         * FIXME The ability to interchange the data and results for index
+         * procedures via RMI should be tested here.
+         * 
+         * @todo also test BatchInsert and the other "bundled" index procedures.
          */
         
         return suite;

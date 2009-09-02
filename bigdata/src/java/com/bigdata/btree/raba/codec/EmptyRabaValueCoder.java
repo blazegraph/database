@@ -100,21 +100,21 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
 
     }
 
-    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
+    public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
         
         return new EmptyRabaValueDecoder(data);
         
     }
 
     /**
-     * An {@link IRabaDecoder} for use when the encoded logical byte[][] was
+     * An {@link ICodedRaba} for use when the encoded logical byte[][] was
      * empty.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
      */
-    static private class EmptyRabaValueDecoder implements IRabaDecoder {
+    static private class EmptyRabaValueDecoder implements ICodedRaba {
 
 //        public static final EmptyRabaDecoder INSTANCE = new EmptyRabaDecoder();
         

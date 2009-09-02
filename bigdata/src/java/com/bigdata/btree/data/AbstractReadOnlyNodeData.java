@@ -42,8 +42,7 @@ import com.bigdata.rawstore.Bytes;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData>
-        implements IAbstractNodeCodedData {
+abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
 
     /**
      * A B+Tree node data record.

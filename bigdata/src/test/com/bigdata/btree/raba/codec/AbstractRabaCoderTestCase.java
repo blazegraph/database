@@ -47,7 +47,6 @@ import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
@@ -111,7 +110,7 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
                 final AbstractFixedByteArrayBuffer data = rabaCoder.encode(
                         expected, new DataOutputBuffer());
 
-                final IRabaDecoder actual = rabaCoder.decode(data);
+                final ICodedRaba actual = rabaCoder.decode(data);
 
                 // verify correct insertion point for an empty byte[].
                 assertEquals(-1, actual.search(new byte[] {}));
@@ -629,7 +628,7 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
             {
              
                 // decode.
-                final IRabaDecoder actual0 = rabaCoder.decode(originalData);
+                final ICodedRaba actual0 = rabaCoder.decode(originalData);
 
                 // Verify encode() results in object which can decode the
                 // byte[]s.
@@ -879,7 +878,7 @@ abstract public class AbstractRabaCoderTestCase extends TestCase2 {
             final Random r, final Op op) {
 
         // The raba under test.  This can be recoded by one of the ops.
-        IRabaDecoder actual;
+        ICodedRaba actual;
         final byte[] originalData;
         {
 

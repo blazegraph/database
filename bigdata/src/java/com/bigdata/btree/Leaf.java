@@ -38,6 +38,7 @@ import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;
@@ -171,6 +172,18 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         
     }
 
+    final public boolean isCoded() {
+        
+        return data.isCoded();
+        
+    }
+    
+    final public AbstractFixedByteArrayBuffer data() {
+        
+        return data.data();
+        
+    }
+    
     final public boolean getDeleteMarker(final int index) {
         
         return data.getDeleteMarker(index);
@@ -425,7 +438,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         super(src);
 
         assert !src.isDirty();
-        assert src.isPersistent();
+        assert src.isReadOnly();
+//        assert src.isPersistent();
 
         // steal/clone the data record.
         this.data = src.isReadOnly() ? new MutableLeafData(src
@@ -1231,7 +1245,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         final Node p = getParent();
         
         // children of the same node.
-        assert s.getParent() == p;
+        assert s.getParent() == p : "this.parent="
+                + (p == null ? null : ((Object)p).toString()) + " != s.parent="
+                + (s.getParent() == null ? null : ((Object)s).toString());
 
         if (INFO) {
             log.info("this="+this+", sibling="+sibling+", rightSibling="+isRightSibling);
@@ -1621,9 +1637,9 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
             // update entry count on ancestors.
             
             parent.get().updateEntryCount(this, -1);
-            
-            if( getKeyCount() < minKeys() ) {
-                
+
+            if (getKeyCount() < minKeys()) {
+
                 /*
                  * The leaf is deficient. Join it with a sibling, causing their
                  * keys to be redistributed such that neither leaf is deficient.
@@ -1846,7 +1862,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
         final StringBuilder sb = new StringBuilder();
 
-        sb.append(getClass().getName());
+//      sb.append(getClass().getName());
+        sb.append(super.toString());
 
         sb.append("{ isDirty="+isDirty());
 

@@ -483,9 +483,9 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         }
         
     }
-    
+
     /**
-     * Unit test for copy-on-write (the leaf is clean and then and update,
+     * Unit test for copy-on-write (the leaf is clean and then an update,
      * insert, or remove is requested which forces copy-on-write to clone the
      * leaf). The listener needs to notice the event and relocate itself within
      * the BTree.
@@ -495,7 +495,7 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
         final BTree btree;
         {
        
-            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
 
             // Note: at m=3 this example splits the root leaf if anything is inserted.
             md.setBranchingFactor(3);
@@ -510,13 +510,13 @@ public class TestMutableBTreeCursors extends AbstractBTreeCursorTestCase {
 
         {
 
-            ITupleCursor2<String> cursor = newCursor(btree);
+            final ITupleCursor2<String> cursor = newCursor(btree);
 
             /*
              * flush the btree to the store making all nodes clean. any mutation
              * will trigger copy on write.
              */
-            assertTrue( btree.flush() );
+            assertTrue(btree.flush());
 
             assertTrue(cursor.hasNext());
 

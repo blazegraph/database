@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.data;
 
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 /**
  * Interface for low-level data access.
@@ -40,13 +41,26 @@ public interface IAbstractNodeData {
     /**
      * True iff this is a leaf node.
      */
-    public boolean isLeaf();
+    boolean isLeaf();
 
     /**
      * True iff this is an immutable data structure.
      */
-    public boolean isReadOnly();
+    boolean isReadOnly();
 
+    /**
+     * <code>true</code> iff this is a coded data structure.
+     */
+    boolean isCoded();
+
+    /**
+     * The coded (aka compressed) data.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless {@link #isCoded()} returns <code>true</code>.
+     */
+    AbstractFixedByteArrayBuffer data();
+    
     /**
      * Return <code>true</code> iff the leaves maintain tuple revision
      * timestamps. When <code>true</code>, the minimum and maximum tuple
@@ -54,7 +68,7 @@ public interface IAbstractNodeData {
      * {@link #getMinimumVersionTimestamp()} and
      * {@link #getMaximumVersionTimestamp()}.
      */
-    public boolean hasVersionTimestamps();
+    boolean hasVersionTimestamps();
 
     /**
      * The earliest tuple revision timestamp associated with any tuple spanned
@@ -63,7 +77,7 @@ public interface IAbstractNodeData {
      * @throws UnsupportedOperationException
      *             unless tuple revision timestamps are being maintained.
      */
-    public long getMinimumVersionTimestamp();
+    long getMinimumVersionTimestamp();
 
     /**
      * The most recent tuple revision timestamp associated with any tuple
@@ -72,7 +86,7 @@ public interface IAbstractNodeData {
      * @throws UnsupportedOperationException
      *             unless tuple revision timestamps are being maintained.
      */
-    public long getMaximumVersionTimestamp();
+    long getMaximumVersionTimestamp();
     
     /**
      * The #of tuples spanned by this node or leaf. For a leaf this is always
@@ -80,7 +94,7 @@ public interface IAbstractNodeData {
      * 
      * @see INodeData#getChildEntryCounts()
      */
-    public int getSpannedTupleCount();
+    int getSpannedTupleCount();
 
     /**
      * Return the #of keys in the node or leaf. A node has <code>nkeys+1</code>
@@ -90,11 +104,11 @@ public interface IAbstractNodeData {
      * 
      * @return The #of defined keys.
      */
-    public int getKeyCount();
+    int getKeyCount();
 
     /**
      * The object used to contain and manage the keys.
      */
-    public IRaba getKeys();
+    IRaba getKeys();
 
 }

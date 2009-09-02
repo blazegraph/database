@@ -1,6 +1,7 @@
 package com.bigdata.btree.data;
 
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 /**
  * Mock object for {@link INodeData}.
@@ -82,6 +83,21 @@ class MockNodeData extends AbstractMockNodeData implements INodeData {
     final public boolean isReadOnly() {
         
         return true;
+        
+    }
+
+    /**
+     * No.
+     */
+    final public boolean isCoded() {
+        
+        return false;
+        
+    }
+    
+    final public AbstractFixedByteArrayBuffer data() {
+        
+        throw new UnsupportedOperationException();
         
     }
 

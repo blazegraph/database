@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
@@ -221,24 +220,23 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     
     protected static final transient Logger log = Logger
             .getLogger(IndexMetadata.class);
-    
+
     /**
      * Options and their defaults for the {@link com.bigdata.btree} package and
      * the {@link BTree} and {@link IndexSegment} classes. Options that apply
-     * equally to views and {@link AbstractBTree}s are in the package
-     * namespace, such as whether or not a bloom filter is enabled. Options that
-     * apply to all {@link AbstractBTree}s are specified within that namespace
-     * while those that are specific to {@link BTree} or {@link IndexSegment}
-     * are located within their respective class namespaces. Some properties,
-     * such as the branchingFactor, are defined for both the {@link BTree} and
-     * the {@link IndexSegment} because their defaults tend to be different when
-     * an {@link IndexSegment} is generated from an {@link BTree}.
+     * equally to views and {@link AbstractBTree}s are in the package namespace,
+     * such as whether or not a bloom filter is enabled. Options that apply to
+     * all {@link AbstractBTree}s are specified within that namespace while
+     * those that are specific to {@link BTree} or {@link IndexSegment} are
+     * located within their respective class namespaces. Some properties, such
+     * as the branchingFactor, are defined for both the {@link BTree} and the
+     * {@link IndexSegment} because their defaults tend to be different when an
+     * {@link IndexSegment} is generated from an {@link BTree}.
      * 
-     * @todo It should be possible to specify the key compression (serializer)
-     *       for nodes and leaves and the value compression (serializer) via
-     *       this interface. This is easy enough if there is a standard factory
-     *       interface, since we can specify the class name, and more difficult
-     *       if we need to create an instance.
+     * @todo It should be possible to specify the key, value, and node/leaf
+     *       coders via this interface. This is easy enough if there is a
+     *       standard factory interface, since we can specify the class name,
+     *       and more difficult if we need to create an instance.
      *       <p>
      *       Note: The basic pattern here is using the class name, having a
      *       default instance of the class (or a factory for that instance), and
@@ -253,7 +251,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      *       properties via options (as you can with beans or jini
      *       configurations).
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     public static interface Options {
@@ -401,8 +400,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + "keyBuilderFactory";
 
         /**
-         * Override the {@link IDataSerializer} used for the keys in the nodes
-         * of a B+Tree (the default is a {@link FrontCodedRabaCoder} instance).
+         * Override the {@link IRabaCoder} used for the keys in the nodes of a
+         * B+Tree (the default is a {@link FrontCodedRabaCoder} instance).
          */
         String NODE_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
@@ -410,19 +409,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         /**
          * Override the {@link IRabaCoder} used for the keys of leaves in
-         * B+Trees (the default is a {@link FrontCodedRabaCoder} instance). This
-         * is set using
-         * {@link DefaultTupleSerializer#setLeafKeysCoder(IDataSerializer)}.
+         * B+Trees (the default is a {@link FrontCodedRabaCoder} instance).
+         * 
+         * @see DefaultTupleSerializer#setLeafKeysCoder(IRabaCoder)
          */
         String LEAF_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
                 + ".leafKeysCoder";
 
         /**
-         * Override the {@link IDataSerializer} used for the values of leaves in
-         * B+Trees (default is a {@link CanonicalHuffmanRabaCoder}). This is set
-         * using
-         * {@link DefaultTupleSerializer#setLeafValuesCoder(IDataSerializer)}.
+         * Override the {@link IRabaCoder} used for the values of leaves in
+         * B+Trees (default is a {@link CanonicalHuffmanRabaCoder}).
+         * 
+         * @see DefaultTupleSerializer#setLeafValuesCoder(IRabaCoder)
          */
         String LEAF_VALUES_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
@@ -571,6 +570,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@value #DEFAULT_BTREE_RECORD_COMPRESSOR_FACTORY}).
          * 
          * @see #INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
+         * 
+         * FIXME Record level compression support is not finished.
          */
         String BTREE_RECORD_COMPRESSOR_FACTORY = BTree.class.getName()
                 + ".recordCompressorFactory";
@@ -688,6 +689,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@value #DEFAULT_INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY}).
          * 
          * @see #BTREE_RECORD_COMPRESSOR_FACTORY
+         * 
+         * FIXME Record level compression support is not finished.
          */
         String INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY = IndexSegment.class.getName()
                 + ".recordCompressorFactory";
@@ -1031,9 +1034,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private String checkpointClassName;
     private IAddressSerializer addrSer;
     private IRabaCoder nodeKeysCoder;
-    private ITupleSerializer tupleSer;
-    private IRecordCompressorFactory btreeRecordCompressorFactory;
-    private IRecordCompressorFactory indexSegmentRecordCompressorFactory;
+    private ITupleSerializer<?, ?> tupleSer;
+    private IRecordCompressorFactory<?> btreeRecordCompressorFactory;
+    private IRecordCompressorFactory<?> indexSegmentRecordCompressorFactory;
     private IConflictResolver conflictResolver;
     private boolean childLocks;
     private boolean deleteMarkers;
@@ -1353,20 +1356,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Object used to (de-)serialize the addresses of the children of a node.
      */
     public final IAddressSerializer getAddressSerializer() {return addrSer;}
-    
+
     /**
-     * Object used to (de-)serialize/(de-)compress the keys in a node.
+     * Object used to code (compress) the keys in a node.
      * <p>
      * Note: The keys for nodes are separator keys for the leaves. Since they
      * are chosen to be the minimum length separator keys dynamically when a
      * leaf is split or joined the keys in the node typically DO NOT conform to
-     * application expectations and are normally assigned a different serializer
-     * for that reason.
-     * <p>
-     * Note: This handles the "serialization" of the <code>byte[][]</code>
-     * containing all of the keys for some node of the index. As such it may be
-     * used to provide compression across the already serialized node for the
-     * leaf.
+     * application expectations and MAY be assigned a different
+     * {@link IRabaCoder} for that reason.
      * 
      * @see #getTupleSerializer()
      */

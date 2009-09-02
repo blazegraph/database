@@ -37,7 +37,7 @@ public interface IRabaCoder extends Serializable {
      * Note: Implementations of this method are typically heavy. While it is
      * always valid to {@link #encode(IRaba, DataOutputBuffer)} an {@link IRaba}
      * , DO NOT invoke this <em>arbitrarily</em> on data which may already be
-     * coded. The {@link IRabaDecoder} interface will always be implemented for
+     * coded. The {@link ICodedRaba} interface will always be implemented for
      * coded data.
      * 
      * @param raba
@@ -74,6 +74,6 @@ public interface IRabaCoder extends Serializable {
      * 
      * @return A view of the coded data.
      */
-    IRabaDecoder decode(AbstractFixedByteArrayBuffer data);
+    ICodedRaba decode(AbstractFixedByteArrayBuffer data);
 
 }

@@ -41,6 +41,7 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.raba.AbstractRaba;
@@ -1190,6 +1191,30 @@ public class ResultSet implements ILeafData, Externalizable {
     final public boolean isReadOnly() {
         
         return true;
+        
+    }
+
+    /**
+     * @todo The {@link ResultSet} is not coded while it is being generated, but
+     *       it is coded when it is deserialized (at present, only the keys and
+     *       values remain coded during deserialization).
+     */
+    final public boolean isCoded() {
+        
+        return false;
+        
+    }
+
+    /**
+     * FIXME If we extend {@link DefaultLeafCoder} or implement "ResultSetCoder"
+     * then we can really adhere to these semantics.
+     */
+    final public AbstractFixedByteArrayBuffer data() {
+       
+        if(!isCoded())
+            throw new UnsupportedOperationException();
+        
+        throw new UnsupportedOperationException();
         
     }
 

@@ -239,8 +239,8 @@ public class DumpIndexSegment {
                     final ByteBuffer data = store.read(addr);
 
                     // note: does NOT set the parent reference on the Node!
-                    child = (Node) node.btree.nodeSer.getNode(node.btree, addr,
-                            data);
+                    child = (Node) node.btree.nodeSer.decode(node.btree,
+                            addr, data);
 
                 }
 
@@ -271,8 +271,9 @@ public class DumpIndexSegment {
             final AbstractBTree btree = store.loadIndexSegment(); 
             
             // note: does NOT set the parent reference on the read Node!
-            final Node child = (Node) btree.nodeSer.getNode(btree, addr, data);
-            
+            final Node child = (Node) btree.nodeSer.decode(btree, addr,
+                    data);
+
             // left most child
             return getFirstLeafAddr(store, child.getChildAddr(0));
             
@@ -301,8 +302,9 @@ public class DumpIndexSegment {
             final AbstractBTree btree = store.loadIndexSegment(); 
             
             // note: does NOT set the parent reference on the read Node!
-            final Node child = (Node) btree.nodeSer.getNode(btree, addr, data);
-            
+            final Node child = (Node) btree.nodeSer.decode(btree, addr,
+                    data);
+
             // right most child
             return getLastLeafAddr(store, child.getChildAddr(child.getKeyCount()));
             
@@ -372,7 +374,8 @@ public class DumpIndexSegment {
             final ByteBuffer data = store.read(addr);
 
             // note: does NOT set the parent reference on the Leaf!
-            final Leaf leaf = (Leaf) btree.nodeSer.getLeaf(btree, addr, data);
+            final Leaf leaf = (Leaf) btree.nodeSer.decode(btree, addr,
+                    data);
 
             if(dumpLeafState) leaf.dump(System.out);
             
@@ -473,10 +476,11 @@ public class DumpIndexSegment {
             }
             
             // lower level read 
-            ByteBuffer data = store.read(addr);
+            final ByteBuffer data = store.read(addr);
 
             // note: does NOT set the parent reference on the Leaf!
-            Leaf leaf = (Leaf) btree.nodeSer.getLeaf(btree, addr, data);
+            final Leaf leaf = (Leaf) btree.nodeSer.decode(btree, addr,
+                    data);
 
             if(dumpLeafState) leaf.dump(System.out);
             

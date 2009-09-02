@@ -1443,7 +1443,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
-    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
+    public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new RabaDecoder(data);
 

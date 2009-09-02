@@ -31,6 +31,7 @@ import it.unimi.dsi.bits.Fast;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.io.OutputBitStream;
 
+import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
@@ -50,7 +51,8 @@ import com.bigdata.io.DataOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
+public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
+        Externalizable {
 
     protected static final Logger log = Logger
             .getLogger(DefaultLeafCoder.class);
@@ -88,14 +90,14 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
     }
 
     /** Yes. */
-    final public boolean isLeafCoder() {
+    final public boolean isLeafDataCoder() {
         
         return true;
         
     }
 
     /** No. */
-    public boolean isNodeCoder() {
+    public boolean isNodeDataCoder() {
 
         return false;
         
@@ -536,6 +538,15 @@ public class DefaultLeafCoder implements IAbstractNodeCoder<ILeafData> {
          * Yes.
          */
         final public boolean isReadOnly() {
+            
+            return true;
+            
+        }
+
+        /**
+         * Yes.
+         */
+        final public boolean isCoded() {
             
             return true;
             

@@ -38,6 +38,7 @@ import com.bigdata.btree.data.DefaultNodeCoder;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -273,6 +274,18 @@ public class Node extends AbstractNode<Node> implements INodeData {
     final public boolean isReadOnly() {
         
         return data.isReadOnly();
+        
+    }
+
+    final public boolean isCoded() {
+        
+        return data.isCoded();
+        
+    }
+    
+    final public AbstractFixedByteArrayBuffer data() {
+        
+        return data.data();
         
     }
 
@@ -637,12 +650,15 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
         assert !src.isDirty();
         
-        assert src.isPersistent();
+        assert src.isReadOnly();
+//        assert src.isPersistent();
 
         // steal/clone the data record.
+        assert src.data != null;
         this.data = src.isReadOnly() ? new MutableNodeData(src
                 .getBranchingFactor(), src.data) : src.data;
-        
+        assert this.data != null;
+
         // clear reference on source.
         src.data = null;
         
@@ -804,12 +820,13 @@ public class Node extends AbstractNode<Node> implements INodeData {
      */
     void replaceChildRef(final long oldChildId, final AbstractNode newChild) {
 
-        assert oldChildId != NULL;
+        assert oldChildId != NULL || btree.store == null;
         assert newChild != null;
 
         // This node MUST have been cloned as a pre-condition, so it can not
         // be persistent.
         assert !isPersistent();
+        assert !isReadOnly();
 
         // The newChild MUST have been cloned and therefore MUST NOT be
         // persistent.
@@ -826,24 +843,33 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
             if (data.childAddr[i] == oldChildId) {
 
-                if (true) {
-
-                    /*
-                     * Do some paranoia checks.
-                     */
-
-                    final AbstractNode oldChild = childRefs[i] != null ? childRefs[i]
-                            .get() : null;
-
-                    if (oldChild != null) {
-
-                        assert oldChild.isPersistent();
-
-//                        assert !dirtyChildren.contains(oldChild);
-
-                    }
-
-                }
+                /*
+                 * Note: We can not check anything which depends on
+                 * oldChild.data since that field was cleared when we cloned the
+                 * oldChild to obtain a mutable node/leaf. Since
+                 * oldChild.isPersistent() does not capture the correct
+                 * semantics for a transient B+Tree (we are interested if the
+                 * node was read-only), this entire section has been commented
+                 * out.
+                 */
+//                if (true) {
+//
+//                    /*
+//                     * Do some paranoia checks.
+//                     */
+//
+//                    final AbstractNode oldChild = childRefs[i] != null ? childRefs[i]
+//                            .get() : null;
+//
+//                    if (oldChild != null) {
+//
+////                        assert oldChild.isPersistent();
+//
+////                        assert !dirtyChildren.contains(oldChild);
+//
+//                    }
+//
+//                }
 
                 // Clear the old key.
                 data.childAddr[i] = NULL;
@@ -3400,7 +3426,8 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         final StringBuilder sb = new StringBuilder();
 
-        sb.append(getClass().getName());
+//        sb.append(getClass().getName());
+        sb.append(super.toString());
 
         sb.append("{ isDirty="+isDirty());
 

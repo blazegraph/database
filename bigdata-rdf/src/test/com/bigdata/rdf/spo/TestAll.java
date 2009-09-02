@@ -75,8 +75,9 @@ public class TestAll extends TestCase {
         // @todo test IKeyOrder impl (comparators).
         suite.addTestSuite(TestSPOKeyOrder.class);
 
-        // @todo test various key and value compressors here.
-        suite.addTestSuite(TestKeyCompression.class);
+        // key/value coders
+        suite.addTestSuite(TestSPOKeyCoders.class);
+        suite.addTestSuite(TestSPOValueCoders.class);
 
         // key and value (de-)serialization of SPO tuples for B+Tree.
         suite.addTestSuite(TestSPOTupleSerializer.class);

@@ -123,7 +123,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
         final int writeRetentionQueueCapacity = btree.writeRetentionQueue
                 .capacity();
 
-        System.err.println(btree.toString());
+        if (log.isInfoEnabled())
+            log.info(btree.toString());
 
         /*
          * Until the write retention queue is full.
@@ -137,7 +138,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
             
         }
         
-        System.err.println(btree.toString());
+        if (log.isInfoEnabled())
+            log.info(btree.toString());
         
         // insert several more leaves worth of data into the btree.
         for (int i = 0; i < branchingFactor * 10; i++) {
@@ -148,7 +150,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
 
         }
         
-        System.err.println(btree.toString());
+        if (log.isInfoEnabled())
+            log.info(btree.toString());
         
         /*
          * no errors!
@@ -184,7 +187,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
         
         final BTree btree = BTree.createTransient(md);
 
-        System.err.println(btree.toString());
+        if (log.isInfoEnabled())
+            log.info(btree.toString());
 
         /*
          * Until the write retention queue is full.
@@ -198,8 +202,9 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
             
         }
         
-        System.err.println(btree.toString());
-        
+        if (log.isInfoEnabled())
+            log.info(btree.toString());
+
         /*
          * Populate a weak value collection from the BTree's nodes and leaves.
          */
@@ -216,10 +221,12 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
                 
             }
 
-            System.err.println("There are "+refs.size()+" nodes in the btree");
-         
-            System.err.println("after inserting keys: "+btree.toString());
-            
+            if (log.isInfoEnabled())
+                log.info("There are " + refs.size() + " nodes in the btree");
+
+            if (log.isInfoEnabled())
+                log.info("after inserting keys: " + btree.toString());
+
             assertEquals(btree.getNodeCount()+btree.getLeafCount(),refs.size());
             
         }
@@ -243,7 +250,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
                 
             }
             
-            System.err.println("after deleting key range: " + btree.toString());
+            if (log.isInfoEnabled())
+                log.info("after deleting key range: " + btree.toString());
         
             assertTrue(btree.getNodeCount() + btree.getLeafCount() < refs
                     .size());        
@@ -259,7 +267,8 @@ public class TestTransientBTree extends AbstractBTreeTestCase {
 
             final int n = countClearedRefs(refs);
 
-            System.err.println("#of cleared references=" + n);
+            if (log.isInfoEnabled())
+                log.info("#of cleared references=" + n);
             
             if (n < refs.size()) {
              

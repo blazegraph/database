@@ -504,7 +504,7 @@ public class IndexSegment extends AbstractBTree {
      * reads by the {@link LeafIterator} which are made without using the node
      * hierarchy.
      */
-    protected AbstractNode readNodeOrLeaf(final long addr) {
+    protected AbstractNode<?> readNodeOrLeaf(final long addr) {
 
         final Long tmp = Long.valueOf(addr);
 
@@ -535,7 +535,7 @@ public class IndexSegment extends AbstractBTree {
         }
         
         // read the node or leaf
-        final AbstractNode node = super.readNodeOrLeaf(addr);
+        final AbstractNode<?> node = super.readNodeOrLeaf(addr);
 
         if (node.isLeaf()) {
 

@@ -34,8 +34,8 @@ import java.io.ObjectOutput;
 
 import org.CognitiveWeb.extser.LongPacker;
 
+import com.bigdata.btree.raba.codec.ICodedRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.btree.raba.codec.IRabaDecoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 
@@ -110,7 +110,7 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
         
     }
 
-    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
+    public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         final boolean isSmall = data.getByte(0) == 1 ? true : false;
 

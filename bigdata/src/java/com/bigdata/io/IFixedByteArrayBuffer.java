@@ -59,7 +59,7 @@ public interface IFixedByteArrayBuffer extends IRawRecord {
      * 
      * @return A new array containing data in the slice.
      * 
-     * @see #wrap()
+     * @see #asByteBuffer()
      */
     byte[] toByteArray();
 
@@ -70,6 +70,6 @@ public interface IFixedByteArrayBuffer extends IRawRecord {
      * @return A {@link ByteBuffer} encapsulating a reference to the data in the
      *         slice.
      */
-    ByteBuffer wrap();
+    ByteBuffer asByteBuffer();
 
 }
