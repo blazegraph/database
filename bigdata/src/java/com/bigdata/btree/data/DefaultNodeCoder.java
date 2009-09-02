@@ -51,7 +51,7 @@ import com.bigdata.io.DataOutputBuffer;
  *       (they are fixed length fields). Of course, we have a more compact
  *       representation when those fields ARE coded.
  */
-public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
+public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         Externalizable {
 
     protected static final byte VERSION0 = 0x00;
@@ -81,14 +81,14 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
     }
 
     /** No. */
-    final public boolean isLeafCoder() {
+    final public boolean isLeafDataCoder() {
         
         return false;
         
     }
 
     /** Yes. */
-    public boolean isNodeCoder() {
+    public boolean isNodeDataCoder() {
 
         return true;
         
@@ -178,7 +178,7 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
         // Patch the byte length of the coded keys on the buffer.
         buf.putInt(O_keysSize, encodedKeys.len());
 
-        // childAddr[] : @todo code childAddr[]
+        // childAddr[] : @todo code childAddr[] (needs IAddressManager if store aware coding).
         final int O_childAddr = buf.pos();
         for (int i = 0; i <= nkeys; i++) {
             
@@ -292,9 +292,11 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
             flags = buf.getShort(pos);
             pos += SIZEOF_FLAGS;
 
+            // @todo unpack - must wrap buf as DataInputStream for this, so updating internal pos.
             this.nkeys = buf.getInt(pos);
             pos += SIZEOF_NKEYS;
             
+            // @todo unpack - must wrap buf as DataInputStream for this.
             this.nentries = buf.getInt(pos);
             pos += SIZEOF_ENTRY_COUNT;
             
@@ -378,6 +380,15 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
         }
         
         /**
+         * Yes.
+         */
+        final public boolean isCoded() {
+            
+            return true;
+            
+        }
+        
+        /**
          * {@inheritDoc}. This field is cached.
          */
         final public int getKeyCount() {
@@ -410,13 +421,14 @@ public class DefaultNodeCoder implements IAbstractNodeCoder<INodeData>,
          * @throws IndexOutOfBoundsException
          *             if <i>index</i> is LT ZERO (0)
          * @throws IndexOutOfBoundsException
-         *             if <i>index</i> is GE <i>nkeys</i>
+         *             if <i>index</i> is GT <i>nkeys+1</i>
          */
         protected boolean assertChildIndex(final int index) {
             
-            if (index < 0 || index > nkeys)
-                throw new IndexOutOfBoundsException();
-            
+            if (index < 0 || index > nkeys + 1)
+                throw new IndexOutOfBoundsException("index=" + index
+                        + ", nkeys=" + nkeys);
+
             return true;
             
         }

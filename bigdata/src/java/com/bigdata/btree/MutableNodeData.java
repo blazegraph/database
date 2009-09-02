@@ -30,6 +30,7 @@ package com.bigdata.btree;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 /**
  * Implementation maintains Java objects corresponding to the persistent data
@@ -51,9 +52,7 @@ public class MutableNodeData implements INodeData {
      * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
      * A leaf has one key per value - that is, the maximum #of keys for a leaf
      * is specified by the branching factor. In contrast a node has m-1 keys
-     * where m is the maximum #of children (aka the branching factor). Therefore
-     * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
-     * the {@link AbstractNode}.
+     * where m is the maximum #of children (aka the branching factor).
      * <p>
      * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
      * accept one more key than the maximum capacity so that the key that causes
@@ -216,7 +215,7 @@ public class MutableNodeData implements INodeData {
     }
 
     /**
-     * Ctor based on just the "data".  Mainly used by unit tests.
+     * Ctor based on just the "data" -- used by unit tests.
      *  
      * @param nentries
      * @param keys
@@ -260,6 +259,21 @@ public class MutableNodeData implements INodeData {
         
     }
     
+    /**
+     * No.
+     */
+    final public boolean isCoded() {
+        
+        return false;
+        
+    }
+    
+    final public AbstractFixedByteArrayBuffer data() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
     public final int getSpannedTupleCount() {
         
         return nentries;

@@ -51,10 +51,10 @@ public class DefaultEvictionListener implements
      */
     final static protected boolean INFO = log.isInfoEnabled();
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final static protected boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final static protected boolean DEBUG = log.isDebugEnabled();
 
     public void evicted(final HardReferenceQueue<PO> cache, final PO ref) {
 
@@ -76,10 +76,10 @@ public class DefaultEvictionListener implements
             if( node.deleted ) {
                 
                 /*
-                 * Deleted nodes are ignored as the are evicted from the queue.
+                 * Deleted nodes are ignored as they are evicted from the queue.
                  */
 
-                if( DEBUG ) log.debug("ignoring deleted");
+//                if( DEBUG ) log.debug("ignoring deleted");
                 
                 return;
                 
@@ -112,10 +112,19 @@ public class DefaultEvictionListener implements
 
                 }
 
-                // Verify the object is now persistent.
-                assert !ref.dirty;
-                assert ref.identity != PO.NULL;
-
+                // is a coded data record.
+                assert node.isCoded();
+                
+                // no longer dirty.
+                assert !node.dirty;
+                
+                if (btree.store != null) {
+                 
+                    // object is persistent (has assigned addr).
+                    assert ref.identity != PO.NULL;
+                    
+                }
+                
                 if (btree.readRetentionQueue != null) {
 
                     btree.readRetentionQueue.add(ref);

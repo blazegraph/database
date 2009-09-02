@@ -29,7 +29,6 @@ package com.bigdata.btree;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -46,7 +45,7 @@ import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
-import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.TemporaryRawStore;
@@ -107,9 +106,6 @@ import com.bigdata.rawstore.WormAddressManager;
  * @see "Batch-Construction of B+-Trees" by Kim and Won, ACM 2001. The approach
  *      outlined by Kim and Won is designed for B+-Trees, but it appears to be
  *      less efficient on first glance.
- * 
- * @todo use the shortest separator key (this provides space savings on the
- *       nodes, but prefix compression of the keys has much the same effect).
  * 
  * @todo allow builds where the #of index entries would exceed an [int].
  * 
@@ -202,6 +198,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * {@link #compactingMerge} is <code>false</code>).
      */
     final boolean deleteMarkers;
+    
+    /**
+     * <code>true</code> iff the source index has tuple revision timestamps
+     * enabled.
+     */
+    final boolean versionTimestamps;
     
     /**
      * The unique identifier for the generated {@link IndexSegment} resource.
@@ -728,6 +730,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         
         // true iff the source index is isolatable.
         this.isolatable = metadata.isIsolatable();
+        
+        /*
+         * true iff the source index maintains tuple revision timestamps.
+         */
+        this.versionTimestamps = metadata.getVersionTimestamps();
 
         /*
          * true iff the source index supports delete markers (but they will be
@@ -786,7 +793,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             for (int h = 0; h < plan.height; h++) {
 
-                SimpleNodeData node = new SimpleNodeData(h, plan.m);
+                final SimpleNodeData node = new SimpleNodeData(h, plan.m,
+                        versionTimestamps);
 
                 node.max = plan.numInNode[h][0];
 
@@ -837,14 +845,14 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                      * two bits to encode the region, there by reducing the
                      * maximum possible byte offset within any region (including
                      * BASE). However, that should not pose problems for any
-                     * IAddressSerializer strategy as long as the accept any
+                     * IAddressSerializer strategy as long as it accepts any
                      * legal [byteCount] and [offset] - it is just that our
                      * offsets are essentially 4x larger than they would be
                      * otherwise.
                      */
                     addressManager,//
                     NOPNodeFactory.INSTANCE,//
-                    plan.m,//
+                    plan.m,// the output branching factor.
                     0, // initialBufferCapacity - will be estimated.
                     metadata, //
                     false, // NOT read-only (we are using it for writing).
@@ -960,7 +968,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
                 leaf.reset(plan.numInNode[leaf.level][i]);
 
-                final MutableKeyBuffer keys = (MutableKeyBuffer)leaf.keys;
+                final MutableKeyBuffer keys = leaf.keys;
                 
                 /*
                  * Fill in defined keys and values for this leaf.
@@ -993,7 +1001,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 //                    
 //                    leaf.vals[j] = ((Leaf)sourceLeaf).values[nconsumed];
 
-                    final ITuple tuple;
+                    final ITuple<?> tuple;
 
                     try {
                         
@@ -1066,10 +1074,21 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
                     if (deleteMarkers)
                         leaf.deleteMarkers[j] = tuple.isDeletedVersion();
-                    
-                    if(isolatable)
-                        leaf.versionTimestamps[j] = tuple.getVersionTimestamp();
-                    
+
+                    if (versionTimestamps) {
+                     
+                        final long t = tuple.getVersionTimestamp();
+                        
+                        leaf.versionTimestamps[j] = t; 
+
+                        if (t < leaf.minimumVersionTimestamp)
+                            leaf.minimumVersionTimestamp = t;
+
+                        if (t > leaf.maximumVersionTimestamp)
+                            leaf.maximumVersionTimestamp = t;
+                        
+                    }
+
                     final byte[] val;
 
                     if(deleteMarkers && tuple.isDeletedVersion()) {
@@ -1096,7 +1115,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     
                     }
                     
-                    leaf.vals[j] = val; 
+                    leaf.vals.values[j] = val; 
 
                     if (bloomFilter != null) {
 
@@ -1116,6 +1135,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     }
                     
                     keys.nkeys++;
+                    leaf.vals.nvalues++;
                     
 //                    nconsumed++;
 
@@ -1309,10 +1329,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         
         if(parent != null) {
 
-            // #of entries spanned by this node.
-            final int nentries = node.getSpannedTupleCount();
-            
-            addChild(parent, addr, nentries);
+            addChild(parent, addr, node);
             
         }
 
@@ -1337,15 +1354,19 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            The parent.
      * @param childAddr
      *            The address of the child (node or leaf).
-     * @param nentries
-     *            The #of entries spanned by the child (node or leaf).
+     * @param child
+     *            The child reference.
      * 
      * @throws IOException
      */
-    protected void addChild(SimpleNodeData parent, long childAddr, int nentries)
-            throws IOException {
+    protected void addChild(final SimpleNodeData parent, final long childAddr,
+            final AbstractSimpleNodeData child) throws IOException {
 
+        // #of entries spanned by this node.
+        final int nentries = child.getSpannedTupleCount();
+        
         if (parent.nchildren == parent.max) {
+            
             /*
              * If there are more nodes to be filled at this level then prepare
              * this node to receive its next values/children.
@@ -1353,8 +1374,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             final int h = parent.level;
 
             /*
-             * the index into the level for this node. note that we subtract one
-             * since the node is full and was already "closed". what we are
+             * The index into the level for this node. Note that we subtract one
+             * since the node is full and was already "closed". What we are
              * trying to figure out here is whether the node may be reset so as
              * to allow more children into what is effectively a new node or
              * whether there are no more nodes allowed at this level of the
@@ -1364,7 +1385,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             if (col + 1 < plan.numInLevel[h]) {
 
-                int max = plan.numInNode[h][col + 1];
+                final int max = plan.numInNode[h][col + 1];
 
                 parent.reset(max);
 
@@ -1389,13 +1410,25 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 + writtenInLevel[parent.level] + ", addr="
                 + addressManager.toString(childAddr));
         
-        int nchildren = parent.nchildren;
+        final int nchildren = parent.nchildren;
         
         parent.childAddr[nchildren] = childAddr;
         
         parent.childEntryCount[nchildren] = nentries;
 
         parent.nentries += nentries;
+        
+        if(versionTimestamps) {
+
+            parent.minimumVersionTimestamp = Math.max(
+                    parent.minimumVersionTimestamp,
+                    child.minimumVersionTimestamp);
+
+            parent.maximumVersionTimestamp = Math.max(
+                    parent.maximumVersionTimestamp,
+                    child.maximumVersionTimestamp);
+            
+        }
         
         parent.nchildren++;
 
@@ -1406,7 +1439,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         }
         
     }
-    
+
     /**
      * Copies the first key of a new leaf as a separatorKey for the appropriate
      * parent (if any) of that leaf. This must be invoked when the first key is
@@ -1415,16 +1448,16 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * @param leaf
      *            The current leaf. The first key on that leaf must be defined.
      */
-    protected void addSeparatorKey(SimpleLeafData leaf) {
+    protected void addSeparatorKey(final SimpleLeafData leaf) {
         
-        SimpleNodeData parent = getParent(leaf);
-        
-        if( parent != null ) {
+        final SimpleNodeData parent = getParent(leaf);
 
-            addSeparatorKey(parent,leaf);
-            
+        if (parent != null) {
+
+            addSeparatorKey(parent, leaf);
+
         }
-        
+
     }
 
     /**
@@ -1435,13 +1468,18 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            A parent of that leaf (non-null).
      * @param leaf
      *            The current leaf. The first key on the leaf must be defined.
+     * 
+     * @todo use the shortest separator key (this provides space savings on the
+     *       nodes, but prefix compression of the keys has much the same
+     *       effect).
      */
-    private void addSeparatorKey(SimpleNodeData parent, SimpleLeafData leaf) {
+    private void addSeparatorKey(final SimpleNodeData parent,
+            final SimpleLeafData leaf) {
 
-        if(parent==null) {
-            
+        if (parent == null) {
+
             throw new AssertionError();
-            
+
         }
         
         /*
@@ -1450,8 +1488,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */ 
         final int maxKeys = parent.max - 1;
         
-        MutableKeyBuffer parentKeys = (MutableKeyBuffer) parent.keys;
-        
+        final MutableKeyBuffer parentKeys = parent.keys;
+
         if( parentKeys.nkeys < maxKeys ) {
             
             /*
@@ -1478,8 +1516,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * into which the separatorKey can be inserted.
              */
 
-            addSeparatorKey(getParent(parent),leaf);
-            
+            addSeparatorKey(getParent(parent), leaf);
+
         }
         
     }
@@ -1553,8 +1591,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final long addr;
         {
             
-            // serialize the leaf, obtaining a view onto a internal buffer.
-            final ByteBuffer buf = nodeSer.putLeaf(leaf);
+            // code the leaf, obtaining a view onto an internal (shared) buffer.
+            final ByteBuffer buf = nodeSer.encode(leaf).asByteBuffer();
 
             // Allocate a record for the leaf on the temporary store.
             final long addr1 = leafBuffer.allocate(buf.remaining());
@@ -1716,7 +1754,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     private ByteBuffer bufLastLeaf = ByteBuffer.allocate(10 * Bytes.kilobyte32);
     
     /**
-     * Serialize and write the node onto the {@link #nodeBuffer}.
+     * Code and write the node onto the {@link #nodeBuffer}.
      * 
      * @return An <em>relative</em> address that must be correctly decoded
      *         before you can read the compressed node from the file. This value
@@ -1733,10 +1771,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final long addr2;
         {
 
-            // serialize node.
-            final ByteBuffer buf = nodeSer.putNode(node);
+            // code node, obtaining slice onto shared buffer and wrap that
+            // shared buffer.
+            final ByteBuffer buf = nodeSer.encode(node).asByteBuffer();
 
-            // write the node on the buffer.
+            // write the node on the buffer (a temporary store).
             addr2 = nodeBuffer.write(buf);
             
         }
@@ -2059,15 +2098,17 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         
     }
     private SegmentMetadata segmentMetadata = null;
-    
+
     /**
      * Abstract base class for classes used to construct and serialize nodes and
      * leaves written onto the index segment.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
-    abstract protected static class AbstractSimpleNodeData implements IAbstractNodeData {
+    abstract protected static class AbstractSimpleNodeData implements
+            IAbstractNodeData {
 
         /**
          * The level in the output tree for this node or leaf (origin zero). The
@@ -2076,9 +2117,18 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final int level;
         final int m;
 
-        // mutable.
-        IRaba keys;
+        /**
+         * Mutable keys (directly managed by the {@link IndexSegmentBuilder}).
+         */
+        MutableKeyBuffer keys;
 
+        /**
+         * The max/max version timestamp for the node/leaf. These data are only
+         * used when the B+Tree is maintaining per tuple revision timestamps.
+         */
+        long minimumVersionTimestamp = Long.MAX_VALUE;
+        long maximumVersionTimestamp = Long.MIN_VALUE;
+        
         /**
          * We precompute the #of children to be assigned to each node and the
          * #of values to be assigned to each leaf and store that value in this
@@ -2087,22 +2137,33 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         int max = -1;
 
-        protected AbstractSimpleNodeData(final int level, final int m,
-                final byte[][] keys) {
+        protected AbstractSimpleNodeData(final int level, final int m) {
 
             this.level = level;
             
             this.m = m;
             
+            /*
+             * @todo This should probably be dimensioned to m-1 for a node and m
+             * for a leaf. The mutable B+Tree would have dimensions to m for a
+             * node and m+1 for a leaf to allow for overflow during split/join,
+             * but we only need the exact number of slots.
+             */
             this.keys = new MutableKeyBuffer(m);
             
         }
 
         protected void reset(final int max) {
             
-            this.keys = new MutableKeyBuffer(m);
+            // @todo just clear to size:=0?
+//            this.keys = new MutableKeyBuffer(m);
+            this.keys.nkeys = 0;
             
             this.max = max;
+            
+            this.minimumVersionTimestamp = Long.MAX_VALUE;
+            
+            this.maximumVersionTimestamp = Long.MIN_VALUE;
             
         }
         
@@ -2118,26 +2179,49 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        public final byte[] getKey(final int index) {
+        /**
+         * Yes (however, note that the {@link IndexSegmentBuilder} directly
+         * accesses and modified the internal data structures).
+         */
+        final public boolean isReadOnly() {
             
-            return keys.get(index);
-            
-        }
-    
-        final public void copyKey(final int index, final OutputStream os) {
-            
-            try {
-                
-                os.write(keys.get(index));
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+            return true;
             
         }
         
+        /**
+         * No.
+         */
+        final public boolean isCoded() {
+            
+            return false;
+            
+        }
+        
+        final public AbstractFixedByteArrayBuffer data() {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
+        final public long getMaximumVersionTimestamp() {
+            
+            if(!hasVersionTimestamps())
+                throw new UnsupportedOperationException();
+            
+            return minimumVersionTimestamp;
+            
+        }
+
+        final public long getMinimumVersionTimestamp() {
+         
+            if(!hasVersionTimestamps())
+                throw new UnsupportedOperationException();
+            
+            return maximumVersionTimestamp;
+         
+        }
+
     }
     
     /**
@@ -2158,22 +2242,14 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 //        int leafIndex;
 
         /**
-         * The values stored in the leaf.
-         * 
-         * @todo use {@link MutableValueBuffer} instead so {@link #getValues()}
-         *       does not need to wrap the byte[][].
+         * The values stored in the leaf (directly accessed by the
+         * {@link IndexSegmentBuilder}).
          */
-        final byte[][] vals;
+        final MutableValueBuffer vals;
         
         final public IRaba getValues() {
             
-            return new ReadOnlyValuesRaba(vals);
-            
-        }
-        
-        final public byte[] getValue(final int index) {
-        
-            return vals[index];
+            return vals;
             
         }
         
@@ -2190,9 +2266,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         public SimpleLeafData(final int level, final int m,
                 final IndexMetadata metadata) {
 
-            super(level, m, new byte[m][]);
+            super(level, m);
 
-            this.vals = new byte[m][];
+            this.vals = new MutableValueBuffer(m);
 
             this.deleteMarkers = metadata.getDeleteMarkers() ? new boolean[m]
                     : null;
@@ -2202,15 +2278,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
         
-//        /**
-//         * 
-//         * @param max The #of values that must be assigned to this leaf.
-//         */
-//        public void reset(int max) {
-//
-//            super.reset(max);
-//            
-//        }
+        protected void reset(final int max) {
+
+            super.reset(max);
+
+            vals.nvalues = 0;
+            
+        }
         
         final public int getSpannedTupleCount() {
             
@@ -2230,12 +2304,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        final public boolean isReadOnly() {
-            
-            return true;
-            
-        }
-        
         final public boolean getDeleteMarker(final int index) {
 
             if (deleteMarkers == null)
@@ -2282,7 +2350,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final public long getPriorAddr() {
             throw new UnsupportedOperationException();
         }
-        
+
     }
 
     /**
@@ -2345,6 +2413,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          * The #of entries spanned by each child of this node.
          */
         final int[] childEntryCount;
+
+        /**
+         * <code>true</code> iff the node is tracking the min/max tuple revision
+         * timestamps.
+         */
+        final boolean hasVersionTimestamps;
         
         final public int getSpannedTupleCount() {
             
@@ -2370,13 +2444,16 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
         }
 
-        public SimpleNodeData(final int level, final int m) {
+        public SimpleNodeData(final int level, final int m,
+                final boolean hasVersionTimestamps) {
 
-            super(level, m, new byte[m - 1][]);
+            super(level, m);
 
             this.childAddr = new long[m];
             
             this.childEntryCount = new int[m];
+            
+            this.hasVersionTimestamps = hasVersionTimestamps;
             
         }
         
@@ -2409,13 +2486,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             return false;
             
         }
-        
-        final public boolean isReadOnly() {
+
+        final public boolean hasVersionTimestamps() {
             
-            return true;
+            return hasVersionTimestamps;
             
         }
-
+        
     }
 
     /**

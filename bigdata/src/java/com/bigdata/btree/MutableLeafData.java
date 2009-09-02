@@ -33,6 +33,7 @@ import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.btree.raba.MutableValueBuffer;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 /**
  * Implementation maintains Java objects corresponding to the persistent data
@@ -57,9 +58,7 @@ public class MutableLeafData implements ILeafData {
      * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
      * A leaf has one key per value - that is, the maximum #of keys for a leaf
      * is specified by the branching factor. In contrast a node has m-1 keys
-     * where m is the maximum #of children (aka the branching factor). Therefore
-     * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
-     * the {@link AbstractNode}.
+     * where m is the maximum #of children (aka the branching factor).
      * <p>
      * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
      * accept one more key than the maximum capacity so that the key that causes
@@ -130,8 +129,7 @@ public class MutableLeafData implements ILeafData {
 
         keys = new MutableKeyBuffer(branchingFactor + 1);
 
-        values = new MutableValueBuffer(0/* size */,
-                new byte[branchingFactor + 1][]);
+        values = new MutableValueBuffer(branchingFactor + 1);
 
         this.versionTimestamps = (versionTimestamps ? new long[branchingFactor + 1]
                 : null);
@@ -151,9 +149,9 @@ public class MutableLeafData implements ILeafData {
      */
     public MutableLeafData(final int branchingFactor, final ILeafData src) {
 
-        keys = new MutableKeyBuffer(branchingFactor, src.getKeys());
+        keys = new MutableKeyBuffer(branchingFactor + 1, src.getKeys());
 
-        values = new MutableValueBuffer(branchingFactor, src.getValues());
+        values = new MutableValueBuffer(branchingFactor + 1, src.getValues());
 
         this.versionTimestamps = (src.hasVersionTimestamps() ? new long[branchingFactor + 1]
                 : null);
@@ -186,8 +184,10 @@ public class MutableLeafData implements ILeafData {
     }
 
     /**
+     * Ctor based on just "data" -- used by unit tests.
+     * 
      * @param keys
-     *            A representation of the defined keys in the node.
+     *            A representation of the defined keys in the leaf.
      * @param values
      *            An array containing the values found in the leaf.
      * @param versionTimestamps
@@ -243,6 +243,21 @@ public class MutableLeafData implements ILeafData {
     final public boolean isReadOnly() {
         
         return false;
+        
+    }
+
+    /**
+     * No.
+     */
+    final public boolean isCoded() {
+        
+        return false;
+        
+    }
+    
+    final public AbstractFixedByteArrayBuffer data() {
+        
+        throw new UnsupportedOperationException();
         
     }
 

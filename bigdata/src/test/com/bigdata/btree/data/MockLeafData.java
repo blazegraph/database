@@ -1,6 +1,7 @@
 package com.bigdata.btree.data;
 
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 
 /**
  * Mock object for {@link ILeafData} used for unit tests.
@@ -17,7 +18,7 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
     final private long[] versionTimestamps;
     
     final private long minVersionTimestamp, maxVersionTimestamp;
-
+    
     final public IRaba getValues() {
 
         return vals;
@@ -51,6 +52,21 @@ class MockLeafData extends AbstractMockNodeData implements ILeafData {
     final public boolean isReadOnly() {
         
         return true;
+        
+    }
+    
+    /**
+     * No.
+     */
+    final public boolean isCoded() {
+        
+        return false;
+        
+    }
+    
+    final public AbstractFixedByteArrayBuffer data() {
+        
+        throw new UnsupportedOperationException();
         
     }
 

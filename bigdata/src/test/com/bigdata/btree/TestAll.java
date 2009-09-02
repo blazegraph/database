@@ -64,12 +64,8 @@ public class TestAll extends TestCase {
         // unsigned byte[] key encoding and decoding.
         suite.addTest(com.bigdata.btree.keys.TestAll.suite());
 
-        // test random access byte[][] implementations, including key search
-        // and implementations which access coded (compressed) data in place.
+        // test rabas implementations, including key search and coded data.
         suite.addTest(com.bigdata.btree.raba.TestAll.suite());
-        
-        // key[] and value[] compression.
-        suite.addTest(com.bigdata.btree.compression.TestAll.suite());
         
         // test suite for the B+Tree node and leaf data records.
         suite.addTest(com.bigdata.btree.data.TestAll.suite());
@@ -81,22 +77,22 @@ public class TestAll extends TestCase {
         suite.addTest(TestAll_IndexSegment.suite());
 
         /*
-         * test fused views, including iterators for the fused view.
+         * Test fused views, including iterators for the fused view.
          */
-        suite.addTestSuite( TestFusedView.class );
-        
+        suite.addTestSuite(TestFusedView.class);
+
         /*
-         * test the Map and Set implementations.
+         * Test the Map and Set implementations.
          */
-        suite.addTestSuite( TestBigdataMap.class );
-        suite.addTestSuite( TestBigdataSet.class );
-        
+        suite.addTestSuite(TestBigdataMap.class);
+        suite.addTestSuite(TestBigdataSet.class);
+
         // @todo this test belongs in the isolation package.
-//      suite.addTestSuite(TestIsolatedFusedViewCursors.class);
+        // suite.addTestSuite(TestIsolatedFusedViewCursors.class);
 
         // test index procedures.
-        suite.addTest( com.bigdata.btree.proc.TestAll.suite());
-        
+        suite.addTest(com.bigdata.btree.proc.TestAll.suite());
+
         return suite;
         
     }

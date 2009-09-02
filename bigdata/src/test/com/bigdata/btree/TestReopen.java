@@ -107,7 +107,7 @@ public class TestReopen extends AbstractBTreeTestCase {
          */
         final BTree btree;
         {
-            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
             
             md.setBranchingFactor(3);
             

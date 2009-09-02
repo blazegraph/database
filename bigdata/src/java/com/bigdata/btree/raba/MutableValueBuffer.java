@@ -70,6 +70,18 @@ public class MutableValueBuffer implements IRaba {
     }
 
     /**
+     * Create a new, empty byte[][] of the specified capacity.
+     * 
+     * @param nvalues
+     *            The capacity of the byte[][].
+     */
+    public MutableValueBuffer(final int nvalues) {
+        
+        this(0/* size */, new byte[nvalues][]);
+        
+    }
+
+    /**
      * Create a view of a byte[][]. All elements in the array are visible in the
      * view.
      * 

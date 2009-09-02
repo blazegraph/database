@@ -60,7 +60,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
     /**
      * Set by concrete test suite classes to the coder under test.
      */
-    protected IAbstractNodeCoder<?> coder = null;
+    protected IAbstractNodeDataCoder<?> coder = null;
     
     /**
      * De-serialization stress test conducted for a variety of and branching
@@ -141,7 +141,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
      * @param buf
      */
     protected void doRoundTripTest(final IAbstractNodeData expected,
-            final IAbstractNodeCoder<?> coder, final DataOutputBuffer buf) {
+            final IAbstractNodeDataCoder<?> coder, final DataOutputBuffer buf) {
 
         // clear the buffer before encoding data on it.
         buf.reset();
@@ -153,14 +153,14 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
              */
 
             // encode
-            final AbstractFixedByteArrayBuffer originalData = ((IAbstractNodeCoder<ILeafData>) coder)
+            final AbstractFixedByteArrayBuffer originalData = ((IAbstractNodeDataCoder<ILeafData>) coder)
                     .encode((ILeafData) expected, buf);
 
             // Verify we can decode the record.
             {
                 
                 // decode.
-                final ILeafData actual = ((IAbstractNodeCoder<ILeafData>) coder)
+                final ILeafData actual = ((IAbstractNodeDataCoder<ILeafData>) coder)
                         .decode(originalData);
 
                 // verify the decoded data.
@@ -178,7 +178,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                         new byte[1000 + off]);
 
                 // encode onto that buffer.
-                final AbstractFixedByteArrayBuffer slice = ((IAbstractNodeCoder<ILeafData>) coder)
+                final AbstractFixedByteArrayBuffer slice = ((IAbstractNodeDataCoder<ILeafData>) coder)
                         .encode((ILeafData) expected, out);
 
                 // verify same encoded data for the slice.
@@ -203,7 +203,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                 assertEquals(originalData.toByteArray(), slice.toByteArray());
 
                 // decode the slice.
-                final ILeafData actual = ((IAbstractNodeCoder<ILeafData>) coder)
+                final ILeafData actual = ((IAbstractNodeDataCoder<ILeafData>) coder)
                         .decode(slice);
 
                 // verify the decoded slice.
@@ -218,14 +218,14 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
              */
 
             // encode
-            final AbstractFixedByteArrayBuffer originalData = ((IAbstractNodeCoder<INodeData>) coder)
+            final AbstractFixedByteArrayBuffer originalData = ((IAbstractNodeDataCoder<INodeData>) coder)
                     .encode((INodeData) expected, buf);
 
             // Verify we can decode the record.
             {
 
                 // decode
-                final INodeData actual = ((IAbstractNodeCoder<INodeData>) coder)
+                final INodeData actual = ((IAbstractNodeDataCoder<INodeData>) coder)
                         .decode(originalData);
 
                 // verify the decoded data.
@@ -243,7 +243,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                         new byte[1000 + off]);
 
                 // encode onto that buffer.
-                final AbstractFixedByteArrayBuffer slice = ((IAbstractNodeCoder<INodeData>) coder)
+                final AbstractFixedByteArrayBuffer slice = ((IAbstractNodeDataCoder<INodeData>) coder)
                         .encode((INodeData) expected, out);
 
                 // verify same encoded data for the slice.
@@ -268,7 +268,7 @@ abstract public class AbstractNodeOrLeafDataRecordTestCase extends
                 assertEquals(originalData.toByteArray(), slice.toByteArray());
 
                 // decode the slice.
-                final INodeData actual = ((IAbstractNodeCoder<INodeData>) coder)
+                final INodeData actual = ((IAbstractNodeDataCoder<INodeData>) coder)
                         .decode(slice);
 
                 // verify the decoded slice.

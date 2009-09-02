@@ -32,19 +32,20 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.data.IAbstractNodeDataCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test of storing null values under a key with persistence.
+ * <p>
+ * Note that the stress tests for the {@link IRabaCoder}s and the
+ * {@link IAbstractNodeDataCoder}s already test the ability to encode and decode
+ * with nulls, delete markers, and version timestamps.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo test with various {@link IDataSerializer}s for the values.
- * 
- * @todo There also need to be tests when delete markers are enabled for this.
  */
 public class TestNullValues extends AbstractBTreeTestCase {
 

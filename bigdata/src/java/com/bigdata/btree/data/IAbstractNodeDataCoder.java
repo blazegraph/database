@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.data;
 
+import java.io.Serializable;
+
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 
@@ -37,20 +39,33 @@ import com.bigdata.io.DataOutputBuffer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IAbstractNodeCoder<T extends IAbstractNodeData> {
+public interface IAbstractNodeDataCoder<T extends IAbstractNodeData> extends
+        Serializable {
     
     /**
-     * Return <code>true</code> if this implementation can code B+Tree nodes.
+     * Return <code>true</code> if this implementation can code data records for
+     * B+Tree nodes.
+     * 
+     * @see INodeData
      */
-    boolean isNodeCoder();
+    boolean isNodeDataCoder();
 
     /**
-     * Return <code>true</code> if this implementation can code B+Tree leaves.
+     * Return <code>true</code> if this implementation can code data records
+     * for B+Tree leaves.
+     * 
+     * @see ILeafData
      */
-    boolean isLeafCoder();
+    boolean isLeafDataCoder();
 
     /**
      * Encode the data.
+     * <p>
+     * Note: Implementations of this method are typically heavy. While it is
+     * always valid to {@link #encode(IAbstractNodeData, DataOutputBuffer)} an
+     * {@link IAbstractNodeData}, DO NOT invoke this <em>arbitrarily</em> on
+     * data which may already be coded. The {@link IAbstractNodeCodedData}
+     * interface will always be implemented for coded data.
      * 
      * @param node
      *            The node or leaf data.
@@ -64,12 +79,12 @@ public interface IAbstractNodeCoder<T extends IAbstractNodeData> {
      * 
      * @throws UnsupportedOperationException
      *             if {@link IAbstractNodeData#isLeaf()} is <code>true</code>
-     *             and this {@link IAbstractNodeCoder} can not code B+Tree
+     *             and this {@link IAbstractNodeDataCoder} can not code B+Tree
      *             {@link ILeafData} records.
      * 
      * @throws UnsupportedOperationException
      *             if {@link IAbstractNodeData#isLeaf()} is <code>false</code>
-     *             and this {@link IAbstractNodeCoder} can not code B+Tree
+     *             and this {@link IAbstractNodeDataCoder} can not code B+Tree
      *             {@link INodeData} records.
      */
     AbstractFixedByteArrayBuffer encode(T node, DataOutputBuffer buf);

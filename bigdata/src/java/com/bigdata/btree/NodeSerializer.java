@@ -26,29 +26,26 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
-import org.CognitiveWeb.extser.LongPacker;
-
-import com.bigdata.btree.IndexMetadata.Options;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.data.AbstractReadOnlyNodeData;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.DefaultNodeCoder;
-import com.bigdata.btree.data.IAbstractNodeCodedData;
-import com.bigdata.btree.data.IAbstractNodeCoder;
 import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.io.compression.NOPRecordCompressor;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.rawstore.IRawStore;
 
 /**
  * <p>
@@ -74,11 +71,6 @@ import com.bigdata.rawstore.IAddressManager;
  * given {@link BTree}.
  * </p>
  * <p>
- * The {@link IDataSerializer}s for the keys and the values hide the use of
- * {@link ByteBuffer}s from the application. The use of compression or packing
- * techniques within the implementations of this interface is encouraged.
- * </p>
- * <p>
  * Note: while the {@link NodeSerializer} is NOT thread-safe for writers, it is
  * thread-safe for readers. This design mirrors the concurrency capabilities of
  * the {@link AbstractBTree}.
@@ -89,57 +81,35 @@ import com.bigdata.rawstore.IAddressManager;
  * 
  * @see AbstractBTree
  * @see IndexMetadata
- * @see INodeData
- * @see ILeafData
- * @see IRabaCoder
- * @see IAbstractNodeCoder
- * @see LongPacker
- * 
- * @todo isolate this class with an interface to allow pluggable
- *       implementations?
+ * @see IAbstractNodeData
+ * @see IAbstractNodeDataCoder
  */
 public class NodeSerializer {
-
-    private final IAddressManager addressManager;
     
     /**
-     * An object that knows how to constructor nodes and leaves.
+     * An object that knows how to constructor {@link Node}s and {@link Leaf}s.
      */
     private final INodeFactory nodeFactory;
-    
+
     /**
-     * The declared branching factor for the {@link AbstractBTree} using
-     * this {@link NodeSerializer}.
-     */
-    private final int branchingFactor;
-    
-    /**
-     * When <code>true</code> the {@link NodeSerializer} instance will refuse
-     * to serialize nodes or leaves (this keeps us from allocating the
-     * {@link #_writeBuffer}).
+     * When <code>true</code> the {@link NodeSerializer} instance will refuse to
+     * {@link #encode(IAbstractNodeData)} nodes or leaves (this keeps us from
+     * allocating the {@link #_writeBuffer}). Note that this MUST be
+     * <code>false</code> for a transient B+Tree so we can convert its nodes and
+     * leaves into coded data records as they are evicted from the write
+     * retention queue.
      */
     private final boolean readOnly;
+
+    /**
+     * Used to code the nodes.
+     */
+    final IAbstractNodeDataCoder<INodeData> nodeCoder;
     
     /**
-     * An object that knows how to (de-)serialize child addresses. an
-     * {@link INodeData}.
+     * Used to code the nodes.
      */
-    private final IAddressSerializer addrSerializer;
-
-    /**
-     * An object that knows how to (de-)serialize keys in a {@link Node}.
-     */
-    private final IRabaCoder nodeKeysCoder;
-
-    /**
-     * An object that knows how to (de-)serialize keys in a {@link Leaf}.
-     */
-    private final IRabaCoder leafKeyCoder;
-
-    /**
-     * An object that knows how to (de-)serialize the values on leaves.
-     */
-    private final IRabaCoder valueCoder;
+    final IAbstractNodeDataCoder<ILeafData> leafCoder;
     
     /**
      * Factory for record-level (de-)compression of nodes and leaves (optional).
@@ -204,84 +174,6 @@ public class NodeSerializer {
     public static final transient int DEFAULT_BUFFER_CAPACITY_PER_ENTRY = Bytes.kilobyte32 / 4;
     
     /**
-     * The size of the boolean field indicating whether a serialized record
-     * contains is a node, leaf, or a linked leaf.
-     */
-    static final int SIZEOF_NODE_TYPE = Bytes.SIZEOF_BYTE;
-
-    /**
-     * The size of the short integer field containing the serialization version
-     * used for this node or leaf.
-     */
-    static final int SIZEOF_VERSION = Bytes.SIZEOF_SHORT;
-
-    /**
-     * Size of an <em>unpacked</em> persistent node or leaf address. This is
-     * only used for leaves since they need to serialize the prior and next
-     * references in fixed length fields.
-     */
-    static final int SIZEOF_REF = Bytes.SIZEOF_LONG;
-
-    /**
-     * Offset of the byte whose low bit indicates whether the record is a
-     * serialized node (the low bit is a zero) or a serialized leaf (the low bit
-     * is a one).
-     */
-    static final int OFFSET_NODE_TYPE = 0;
-    
-    /**
-     * Offset of the short integer whose value is the version identifier for the
-     * serialization format.
-     * 
-     * @see #VERSION0
-     * 
-     * FIXME could use the high seven bits of the node type for this.  Just be
-     * careful about that sign bit.
-     */
-    static final int OFFSET_VERSION = OFFSET_NODE_TYPE + SIZEOF_NODE_TYPE;
-
-    /**
-     * When used, the offset in the leaf header at which the reference of the
-     * prior leaf in key order is found.
-     */
-    static final int OFFSET_PRIOR = OFFSET_VERSION + SIZEOF_VERSION;
-
-    /**
-     * When used, the offset in the leaf header at which the reference of the
-     * next leaf in key order is found.
-     */
-    static final int OFFSET_NEXT = OFFSET_PRIOR + SIZEOF_REF;
-
-    /**
-     * Size of the fixed length header for a serialized node (does not include
-     * the prior/next references).
-     */
-    static final int SIZEOF_NODE_HEADER = SIZEOF_NODE_TYPE + SIZEOF_VERSION;
-
-    /**
-     * Size of the fixed length header for a serialized leaf (the prior and next
-     * references are -1L unless their values are known).
-     */
-    static final int SIZEOF_LEAF_HEADER = SIZEOF_NODE_HEADER + (SIZEOF_REF * 2);
-
-    /**
-     * The only defined serialization format.
-     */
-    private static short VERSION0 = (short) 0;
-
-//    final private boolean isNode(final byte b) {
-//
-//        return (b & 0x1) == 0;
-//
-//    }
-//
-//    final private boolean isLeaf(final byte b) {
-//
-//        return (b & 0x1) == 1;
-//
-//    }
-
-    /**
      * Constructor is disallowed.
      */
     private NodeSerializer() {
@@ -298,8 +190,11 @@ public class NodeSerializer {
      *            {@link ILeafData leaves}.
      * 
      * @param branchingFactor
-     *            The branching factor for nodes or leaves serialized
-     *            using this object.
+     *            The branching factor for target B+Tree. For the
+     *            {@link IndexSegmentBuilder} this should be the branching
+     *            factor of the {@link IndexSegment} which is being generated.
+     *            Otherwise it is the branching factor of the
+     *            {@link AbstractBTree} itself.
      * 
      * @param initialBufferCapacity
      *            The initial capacity for internal buffer used to serialize
@@ -317,6 +212,12 @@ public class NodeSerializer {
      *            <code>true</code> IFF the caller is asserting that they WILL
      *            NOT attempt to serialize any nodes or leaves using this
      *            {@link NodeSerializer} instance.
+     * 
+     *            FIXME {@link IRecordCompressorFactory} should either be used
+     *            here or moved into the {@link IRawStore} impl.
+     * 
+     * @todo the {@link IAddressManager} is not used any more. It was used by
+     *       the {@link IAddressSerializer}.
      */
     public NodeSerializer(//
             final IAddressManager addressManager,
@@ -327,37 +228,25 @@ public class NodeSerializer {
             final boolean readOnly,//
             final IRecordCompressorFactory recordCompressorFactory
             ) {
-
-        assert addressManager != null;
         
         assert nodeFactory != null;
-
-        /*
-         * @todo already available from IndexMetadata#getBranchingFactor() so
-         * drop as argument here.
-         */
-        assert branchingFactor >= Options.MIN_BRANCHING_FACTOR : "branchingFactor="+branchingFactor;
 
         assert initialBufferCapacity >= 0;
 
         assert indexMetadata != null;
-
-        this.addressManager = addressManager;
         
         this.nodeFactory = nodeFactory;
 
-        this.branchingFactor = branchingFactor;
-
         this.readOnly = readOnly;
+
+        // @todo parameter for the node/leaf coder impls or the NodeSerializer?
+        this.nodeCoder = new DefaultNodeCoder(indexMetadata
+                .getNodeKeySerializer());
+
+        this.leafCoder = new DefaultLeafCoder(indexMetadata
+                .getTupleSerializer().getLeafKeysCoder(), indexMetadata
+                .getTupleSerializer().getLeafValuesCoder());
         
-        this.addrSerializer = indexMetadata.getAddressSerializer();
-
-        this.nodeKeysCoder = indexMetadata.getNodeKeySerializer();
-
-        this.leafKeyCoder = indexMetadata.getTupleSerializer().getLeafKeysCoder();
-
-        this.valueCoder = indexMetadata.getTupleSerializer().getLeafValuesCoder();
-
         // MAY be null
         this.recordCompressorFactory = recordCompressorFactory;
         
@@ -370,7 +259,7 @@ public class NodeSerializer {
         } else {
             
             if (initialBufferCapacity == 0) {
-
+                
                 this.initialBufferCapacity = DEFAULT_BUFFER_CAPACITY_PER_ENTRY
                         * branchingFactor;
 
@@ -409,7 +298,7 @@ public class NodeSerializer {
 
         if (readOnly) {
 
-            throw new UnsupportedOperationException("read-only");
+            throw new UnsupportedOperationException();
             
         }
 
@@ -425,47 +314,68 @@ public class NodeSerializer {
     }
 
     /**
-     * De-serialize a node or leaf (thread-safe). This method is used when the
-     * caller does not know a-priori whether the reference is to a node or leaf.
-     * The decision is made based on inspection of the {@link #OFFSET_NODE_TYPE}
-     * byte in the supplied buffer.
+     * Wrap a coded {@link INodeData} or {@link ILeafData} record, returning an
+     * {@link AbstractNode} (thread-safe). This method is used when the caller
+     * does not know a-priori whether the reference is to a node or leaf. The
+     * decision is made based on inspection of the first byte byte in the
+     * supplied buffer, which codes for a node, leaf, or linked-leaf.
      * 
      * @param btree
-     *            The btree.
+     *            The B+Tree.
      * @param addr
-     *            The address of the node or leaf being de-serialized.
+     *            The address of the record in the backing store.
      * @param buf
-     *            The buffer containing the serialized data.
+     *            A buffer containing the record as read from the backing store.
      * 
-     * @todo document and verify effects on buf position and limit.
+     * @return A {@link Node} or {@link Leaf} for that data record.
      * 
-     * @return The de-serialized node.
+     *         FIXME modify to operate on a byte[] slice for faster performance.
+     *         Compression should occur at the store level with a header
+     *         mechanism. We should only see a
+     *         {@link AbstractFixedByteArrayBuffer} here, suitable for
+     *         {@link IRabaCoder#decode(com.bigdata.io.AbstractFixedByteArrayBuffer)}
      */
-    public IAbstractNodeData getNodeOrLeaf(final AbstractBTree btree,
-            final long addr, final ByteBuffer buf) {
+    public AbstractNode<?> decode(final AbstractBTree btree, final long addr,
+            final ByteBuffer buf) {
 
         //        assert btree != null;
         //        assert addr != 0L;
         assert buf != null;
-
         assert buf.position() == 0;
 
-        final IAbstractNodeData ret;
+        final AbstractNode<?> ret;
 
         final boolean isNode = AbstractReadOnlyNodeData.isNode(buf
-                .get(OFFSET_NODE_TYPE));
+                .get(AbstractReadOnlyNodeData.O_TYPE));
 
+        // FIXME should be done at the store level during decompress.
+        final AbstractFixedByteArrayBuffer slice;
+        if (!buf.hasArray()) {
+            // backing array is not accessible, so copy into new byte[].
+            final byte[] tmp = new byte[buf.capacity()];
+            buf.get(tmp);
+            slice = FixedByteArrayBuffer.wrap(tmp);
+        } else {
+            // backing array is accessible, so wrap as slice.
+            slice = new FixedByteArrayBuffer(buf.array(), buf.arrayOffset(),
+                    buf.capacity());
+        }
+        
         if(isNode) {
 
-            // deserialize
-            ret = getNode(btree, addr, buf);
-//            return new ReadOnlyNodeData(buf, nodeKeySerializer);
+            // wrap the record.
+            final INodeData data = nodeCoder.decode(slice);
+
+            // wrap as Node.
+            ret = nodeFactory.allocNode(btree, addr, data);
             
         } else {
-            
-            // deserialize
-            ret = getLeaf(btree, addr, buf);
-//            return new ReadOnlyLeafData(buf, leafKeySerializer, valueSerializer);
+
+            // wrap buffer as data record.
+            final ILeafData data = leafCoder.decode(slice);
+
+            // wrap data record as Leaf.
+            ret = nodeFactory.allocLeaf(btree, addr, data);
 
         }
 
@@ -474,353 +384,54 @@ public class NodeSerializer {
     }
 
     /**
-     * Serialize a node or leaf onto an internal buffer and return that buffer
-     * (NOT thread-safe). The operation writes on an internal buffer which is
+     * Encode a node or leaf onto an internal buffer and return that buffer (NOT
+     * thread-safe). The operation writes on an internal buffer which is
      * automatically extended as required.
      * 
      * @param node
      *            The node or leaf.
      * 
-     * @return The buffer containing the serialized representation of the node
-     *         or leaf in a <em>shared buffer</em>. The contents of this
-     *         buffer may be overwritten by the next node or leaf serialized the
-     *         same instance of this class. The position will be zero and the
-     *         limit will be the #of bytes in the serialized representation.
+     * @return The buffer containing the coded data record for the node or leaf
+     *         in a <em>shared buffer</em>. The contents of this buffer may be
+     *         overwritten by the next node or leaf serialized the same instance
+     *         of this class. The position will be zero and the limit will be
+     *         the #of bytes in the coded representation.
      */
-    public ByteBuffer putNodeOrLeaf(final IAbstractNodeData node) {
-
-        if (node.isLeaf()) {
-
-            return putLeaf((ILeafData) node);
-
-        } else {
-
-            return putNode((INodeData) node);
-
-        }
-
-    }
-
-    /**
-     * Serialize a node onto an internal buffer and returns that buffer (NOT
-     * thread-safe). The operation writes on an internal buffer which is
-     * automatically extended as required.
-     * 
-     * @param node
-     *            The node.
-     * 
-     * @return The buffer containing the serialized representation of the node
-     *         in a <em>shared buffer</em>. The contents of this buffer may
-     *         be overwritten by the next node or leaf serialized the same
-     *         instance of this class. The position will be zero and the limit
-     *         will be the #of bytes in the serialized representation.
-     */
-    public ByteBuffer putNode(final INodeData node) {
+    public AbstractFixedByteArrayBuffer encode(final IAbstractNodeData node) {
 
         if (node == null)
             throw new IllegalArgumentException();
 
-        if (!(node instanceof IAbstractNodeCodedData))
-            throw new IllegalArgumentException();
-
-        if (_writeBuffer == null) {
-
-            // the buffer was released so we reallocate it.
-            allocWriteBuffer();
-
-        }
-
-        try {
-
-            // prepare buffer for reuse.
-            _writeBuffer.reset();
-
-            /*
-             * FIXME IAbstractNodeDecoder should indicate that the node has been
-             * coded and give us access to the slice containing the coded data.
-             * At that point, NodeSerializer does not need to do anything except
-             * wrap the slice as a ByteBuffer and conditionally compress it.
-             * 
-             * The AbstractBTree's write queue eviction should reuse the _writeBuffer
-             * for all evicted nodes so they are coded using the same backing buffer.
-             * We don't need it in the NodeSerializer class any more.  We already
-             * have a coded slice on hand.
-             */
-            
-          // #of bytes actually written.
-          final int nbytes = _writeBuffer.pos();
-  
-          assert nbytes > SIZEOF_NODE_HEADER;
-  
-          final ByteBuffer buf2 = ByteBuffer
-                  .wrap(_writeBuffer.array(), 0, nbytes);
-  
-          /*
-           * Note: The position will be zero(0). The limit will be the #of bytes
-           * in the buffer.
-           */
-  
-          return buf2;
-//            return putNode2(node);
-
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-    }
-
-//    private ByteBuffer putNode2(final INodeData node) throws IOException {
-//
-//        assert _writeBuffer != null;
-//        assert _writeBuffer.pos() == 0;
-//        assert node != null;
-//
-////        assert branchingFactor == node.getBranchingFactor();
-//        final int nentries = node.getSpannedTupleCount();
-////        final int[] childEntryCounts = node.getChildEntryCounts();
-//        final int nkeys = node.getKeyCount();
-////        final IRandomAccessByteArray keys = node.getKeys();
-////        final long[] childAddr = node.getChildAddr();
-//
-//        /*
-//         * fixed length node header.
-//         */
-//
-//        // nodeType (Node)
-//        _writeBuffer.writeByte(0);
-//
-//        // version
-//        _writeBuffer.writeShort(VERSION0);
-//
-//        try {
-//
-//            // #of spanned entries.
-//            _writeBuffer.packLong(nentries);
-//
-//            // keys
-//            nodeKeysCoder.write(_writeBuffer, node.getKeys());
-//
-//            // addresses.
-////            addrSerializer.putChildAddresses(addressManager,_writeBuffer, childAddr, nkeys + 1);
-//            putChildAddresses(addressManager, _writeBuffer, node);
-//
-//            // #of entries spanned per child.
-//            putChildEntryCounts(_writeBuffer, node);
-//
-//        } catch (EOFException ex) {
-//
-//            /*
-//             * Masquerade the EOFException as a buffer overflow since that is
-//             * what it really represents (@todo since ByteBuffer is not used
-//             * anymore we do not need to masquerade this and the javadoc should
-//             * be updated).
-//             */
-//            RuntimeException ex2 = new BufferOverflowException();
-//
-//            ex2.initCause(ex);
-//
-//            throw ex2;
-//
-//        }
-//
-//        // #of bytes actually written.
-//        final int nbytes = _writeBuffer.pos();
-//
-//        assert nbytes > SIZEOF_NODE_HEADER;
-//
-//        final ByteBuffer buf2 = ByteBuffer
-//                .wrap(_writeBuffer.array(), 0, nbytes);
-//
-//        /*
-//         * Note: The position will be zero(0). The limit will be the #of bytes
-//         * in the buffer.
-//         */
-//
-//        return buf2;
-//
-//    }
-
-    /**
-     * De-serialize a node.
-     * 
-     * @param btree
-     *            The btree to which the node belongs.
-     * @param addr
-     *            The address of the node.
-     * @param buf
-     *            The buffer containing the serialized node.
-     * 
-     * @return The deserialized node.
-     */
-    public Node getNode(final AbstractBTree btree, final long addr,
-            final ByteBuffer buf) {
-
-        // assert btree != null;
-        // assert addr != 0L;
-        assert buf != null;
-        assert buf.position() == 0;
-
-        // wrap the record.
-        final INodeData data = new DefaultNodeCoder(nodeKeysCoder)
-                .decode(buf);
-
-        // wrap as Node.
-        return nodeFactory.allocNode(btree, addr, data);
-
-    }
-
-//    /**
-//     * De-serialize a node.
-//     * 
-//     * @param btree
-//     *            The btree to which the node belongs.
-//     * @param addr
-//     *            The address of the node.
-//     * @param buf
-//     *            The buffer containing the serialized node.
-//     *            
-//     * @return The deserialized node.
-//     */
-//    public Node getNode(final AbstractBTree btree, final long addr,
-//            final ByteBuffer buf) {
-//
-//        //        assert btree != null;
-//        //        assert addr != 0L;
-//        assert buf != null;
-//        assert buf.position() == 0;
-//
-//        /*
-//         * Read fixed length node header.
-//         */
-//
-//        if (isLeaf(buf.get()))
-//            throw new RuntimeException("Not a Node: addr=" + addr);
-//
-//        // version
-//        final short versionId = buf.getShort();
-//
-//        if (versionId != VERSION0)
-//            throw new RuntimeException("Unknown serialization version: "
-//                    + versionId);
-//
-//        /*
-//         * Setup input stream reading from the buffer.
-//         * 
-//         * Note: The buffer is never backed by an array since it is read-only
-//         * (per the IRawStore contract for read) and read-only buffers do not
-//         * expose the backing array. This means that we would have to duplicate
-//         * the data in order to use the DataInputBuffer rather than read from
-//         * the Buffer.
-//         */
-//        final DataInput is = new DataInputStream(new ByteBufferInputStream(buf));
-//
-//        try {
-//
-//            // nentries
-//            final int nentries = (int) LongPacker.unpackLong(is);
-//
-//            // Note: [nkeys] minimum is (m+1/2) unless this is the root node.
-//            // assert nkeys >= 0 && nkeys < branchingFactor;
-//
-//            final long[] childAddr = new long[branchingFactor + 1];
-//
-//            final int[] childEntryCounts = new int[branchingFactor + 1];
-//
-//            // Keys.
-//            final IRaba keys;
-//            {
-//                /*
-//                 * FIXME This "explodes" newly read keys so that they are
-//                 * mutable.
-//                 */
-//                MutableKeyBuffer tmp = new MutableKeyBuffer(branchingFactor);
-//                nodeKeySerializer.read(is, tmp);
-////                keys = new ImmutableKeyBuffer(tmp);
-//                keys = tmp;
-//            }
-//
-//            final int nkeys = keys.size();
-//            
-//            // Child addresses (nchildren == nkeys+1).
-////            addrSerializer.getChildAddresses(addressManager,is, childAddr, nkeys+1);
-//            getChildAddresses(addressManager, is, childAddr, nkeys + 1);
-//
-//            // #of entries spanned by each child.
-//            getChildEntryCounts(is,childEntryCounts,nkeys+1);
-//
-//            // reset the buffer position.
-//            buf.position(0);
-//            
-//            // Done : FIXME do not create mutable instances here!
-//            return nodeFactory.allocNode(btree, addr, new MutableNodeData(
-//                    nentries, keys, childAddr, childEntryCounts));
-//
-//        } catch (EOFException ex) {
-//
-//            /*
-//             * Masquerade an EOF reading on the input stream as a buffer
-//             * underflow, which is what it really represents.
-//             */
-//            final RuntimeException ex2 = new BufferUnderflowException();
-//
-//            ex2.initCause(ex);
-//
-//            throw ex2;
-//
-//        }
-//
-//        catch (IOException ex) {
-//
-//            /*
-//             * This should not occur since we are reading from a ByteBuffer, but
-//             * this is thrown by methods reading on the DataInputStream.
-//             */
-//            throw new RuntimeException(ex);
-//
-//        }
-//
-//    }
-    
-    /**
-     * Serialize a leaf onto an internal buffer and returns that buffer (NOT
-     * thread-safe). The operation writes on an internal buffer which is
-     * automatically extended as required.
-     * 
-     * @param leaf
-     *            The leaf node.
-     * 
-     * @return The buffer containing the serialized representation of the leaf
-     *         in a <em>shared buffer</em>. The contents of this buffer may
-     *         be overwritten by the next node or leaf serialized the same
-     *         instance of this class. The position will be zero and the limit
-     *         will be the #of bytes in the serialized representation.
-     */
-    public ByteBuffer putLeaf(final ILeafData leaf) {
-
-        if( _writeBuffer == null ) {
-            
-            // the buffer was released so we reallocate it.
-            allocWriteBuffer();
-            
-        }
-
-        try {
-
-            // prepare buffer for reuse.
-            _writeBuffer.reset();
-
-            return putLeaf2(leaf);
-
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex); // exception is not expected.
+        if (node.isCoded()) {
+        
+            // already coded.
+            throw new IllegalStateException();
 
         }
         
-    }
+        if (_writeBuffer == null) {
+         
+            // re-allocate.
+            allocWriteBuffer();
+            
+        } else {
+        
+            _writeBuffer.reset();
+        
+        }
 
+        if(node.isLeaf()) {
+
+            return leafCoder.encode((ILeafData) node, _writeBuffer);
+
+        } else {
+
+            return nodeCoder.encode((INodeData) node, _writeBuffer);
+
+        }
+
+    }
+    
     /**
      * Update the serialization of a leaf to set the prior and next leaf
      * references and change its serialization type from {@link #TYPE_LEAF} to
@@ -832,23 +443,23 @@ public class NodeSerializer {
      * It is up to the caller to perform these tricks. All this method does is
      * to touch up the serialized record.
      * <p>
-     * Note: This method has NO side-effects on the <i>position</i> or <i>limit</i>
-     * of the caller's {@link ByteBuffer}.
+     * Note: This method has NO side-effects on the <i>position</i> or
+     * <i>limit</i> of the caller's {@link ByteBuffer}.
      * 
      * @param b
      *            The serialization leaf.
      * @param priorAddr
      *            The address of the previous leaf in key order, <code>0L</code>
      *            if it is known that there is no previous leaf, and
-     *            <code>-1L</code> if either: (a) it is not known whether
-     *            there is a previous leaf; or (b) it is known but the address
-     *            of that leaf is not known to the caller.
+     *            <code>-1L</code> if either: (a) it is not known whether there
+     *            is a previous leaf; or (b) it is known but the address of that
+     *            leaf is not known to the caller.
      * @param nextAddr
-     *            The address of the next leaf in key order, <code>0L</code>
-     *            if it is known that there is no next leaf, and
-     *            <code>-1L</code> if either: (a) it is not known whether
-     *            there is a next leaf; or (b) it is known but the address of
-     *            that leaf is not known to the caller.
+     *            The address of the next leaf in key order, <code>0L</code> if
+     *            it is known that there is no next leaf, and <code>-1L</code>
+     *            if either: (a) it is not known whether there is a next leaf;
+     *            or (b) it is known but the address of that leaf is not known
+     *            to the caller.
      * 
      * @see IndexSegmentBuilder
      */
@@ -867,502 +478,5 @@ public class NodeSerializer {
         b.putLong(AbstractReadOnlyNodeData.O_NEXT, nextAddr);
 
     }
-
-    private ByteBuffer putLeaf2(final ILeafData leaf) throws IOException {
-
-        assert _writeBuffer != null;
-        assert _writeBuffer.pos() == 0;
-        assert leaf != null;
-//        assert branchingFactor == leaf.getBranchingFactor();
-
-        /*
-         * Either (a) no compression and we can write the body bytes directly
-         * after the header; or (b) we write the body into a DataOutputBuffer
-         * and then compress it and write it onto the target output buffer.
-         */
-        
-        putLeafHeader(leaf);
-
-        final int nbytes = putLeafBody(_writeBuffer, leaf);
-        
-        final ByteBuffer buf2 = ByteBuffer.wrap(_writeBuffer.array(), 0, nbytes
-                + SIZEOF_LEAF_HEADER);
-
-        /*
-         * Note: The position will be zero(0). The limit will be the #of bytes
-         * in the buffer.
-         */
-
-        return buf2;
-
-    }
-
-//    private void putLeafHeader(final ILeafData leaf) throws IOException {
-//        
-//        // nodeType
-//        _writeBuffer.writeByte(1); // this is a leaf.
-//
-//        // version
-//        _writeBuffer.writeShort(VERSION0);
-//
-//        // previous leaf address. Note: -1L indicates UNKNOWN
-//        _writeBuffer.writeLong(-1L);
-//
-//        // next leaf address.  Note: -1L indicates UNKNOWN.
-//        _writeBuffer.writeLong(-1L);
-//
-//    }
-
-//    /**
-//     * 
-//     * @param _writeBuffer
-//     * @param leaf
-//     * @return The #of bytes written in the leaf body.
-//     * @throws IOException
-//     */
-//    private int putLeafBody(DataOutputBuffer _writeBuffer, final ILeafData leaf)
-//            throws IOException {
-//        
-////        final int nkeys = leaf.getKeyCount();
-////        final IRandomAccessByteArray keys = leaf.getKeys();
-////        final byte[][] vals = leaf.getValues();
-//        
-//        final int pos0 = _writeBuffer.pos();
-//        
-//        try {
-//            
-//            // keys.
-//            leafKeyCoder.write(_writeBuffer, leaf.getKeys());
-//            
-//            // values.
-//            valueCoder.write(_writeBuffer, leaf.getValues());
-//
-//            if(leaf.hasDeleteMarkers()) {
-//                
-//                putDeleteMarkers(_writeBuffer, leaf);
-//                
-//            }
-//            
-//            if(leaf.hasVersionTimestamps()) {
-//                
-//                putVersionTimestamps(_writeBuffer, leaf);
-//                
-//            }
-//            
-//        } catch (EOFException ex) {
-//
-//            /*
-//             * Masquerade the EOFException as a buffer overflow since that is
-//             * what it really represents (@todo we do not need to masquerade
-//             * this exception since we are not using ByteBuffer anymore).
-//             */
-//            RuntimeException ex2 = new BufferOverflowException();
-//
-//            ex2.initCause(ex);
-//
-//            throw ex2;
-//
-//        }
-//
-//        // #of bytes actually written.
-//        final int nbytes = _writeBuffer.pos() - pos0;
-//        
-////        assert nbytes > SIZEOF_LEAF_HEADER;
-//        
-//        return nbytes;
-//
-//    }
-
-    /**
-     * De-serialize a leaf.
-     * 
-     * @param btree
-     *            The owning btree.
-     * @param addr
-     *            The address of the leaf.
-     * @param buf
-     *            The buffer containing the serialized leaf.
-     * 
-     * @return The deserialized leaf.
-     */
-    public ILeafData getLeaf(final AbstractBTree btree, final long addr,
-            final ByteBuffer buf) {
-
-        // assert btree != null;
-        // assert addr != 0L;
-        assert buf != null;
-        assert buf.position() == 0;
-
-        // wrap buffer as data record.
-        final ILeafData data = new DefaultLeafCoder(leafKeyCoder,
-                valueCoder).decode(buf);
-
-        // wrap data record as Leaf.
-        return nodeFactory.allocLeaf(btree, addr, data);
-
-    }
-
-//    /**
-//     * De-serialize a leaf.
-//     * 
-//     * @param btree
-//     *            The owning btree.
-//     * @param addr
-//     *            The address of the leaf.
-//     * @param buf
-//     *            The buffer containing the serialized leaf.
-//     * 
-//     * @return The deserialized leaf.
-//     */
-//    public ILeafData getLeaf(final AbstractBTree btree, final long addr,
-//            final ByteBuffer buf) {
-//        
-////        assert btree != null;
-////        assert addr != 0L;
-//        assert buf != null;
-//        assert buf.position() == 0;
-//
-//        /*
-//         * common data.
-//         */
-//
-//        // nodeType
-//        final byte nodeType = buf.get();
-//        
-//        if (isNode(nodeType))
-//            throw new RuntimeException("Not a leaf: addr=" + addr);
-//        
-//        // version
-//        final short versionId = buf.getShort();
-//        
-//        if (versionId != VERSION0)
-//            throw new RuntimeException("Unknown serialization version: "
-//                    + versionId);
-//
-//        /*
-//         * Setup input stream reading from the buffer.
-//         * 
-//         * @todo It would be faster to bulk copy the ByteBuffer into a shared
-//         * DataInputBuffer and then read on that -- perhaps using a ThreadLocal
-//         * since concurrent readers are allowed.
-//         */
-//        final DataInputStream is = new DataInputStream(
-//                new ByteBufferInputStream(buf));
-//
-//        try {
-//
-//            final long priorAddr = is.readLong();
-//
-//            final long nextAddr = is.readLong();
-//            
-////            // nkeys
-////            final int nkeys = (int) LongPacker.unpackLong(is);
-////               Note: minimum is (m+1)/2 unless root leaf.
-////            assert nkeys >= 0 && nkeys <= branchingFactor;
-//
-//            // keys.
-//            final IRaba keys;
-//            { 
-//                /*
-//                 * FIXME de-serializes rather than using the coded data directly.
-//                 */
-//                keys = new MutableKeyBuffer(branchingFactor+1);
-//                leafKeySerializer.read(is, keys);
-////                keys = new ImmutableKeyBuffer(tmp);
-////                keys = tmp;
-//            }
-//
-//            final int nkeys = keys.size();
-////            assert nkeys == keys.getKeyCount();
-//            
-//            // values.
-//            // FIXME de-serializes rather than using the coded data directly.
-//            final IRaba values = new MutableValueBuffer(0, 
-//                    new byte[branchingFactor + 1][]);
-//            valueSerializer.read(is, values);
-//            
-//            // delete markers.
-//            final boolean[] deleteMarkers;
-//            if(btree.getIndexMetadata().getDeleteMarkers()) {
-//                deleteMarkers = new boolean[branchingFactor+1];
-//                getDeleteMarkers(is, nkeys, deleteMarkers );
-//            } else {
-//                deleteMarkers = null;
-//            }
-//            
-//            // version timestamps.
-//            final long[] versionTimestamps;
-//            if(btree.getIndexMetadata().getVersionTimestamps()) {
-//                versionTimestamps = new long[branchingFactor+1];
-//                getVersionTimestamps(is, nkeys, versionTimestamps );
-//            } else {
-//                versionTimestamps = null;
-//            }
-//
-//            // reset the buffer position.
-//            buf.position(0);
-//            
-//            // Done : FIXME Do not convert to mutable keys/values.
-//            return nodeFactory.allocLeaf(btree, addr, new MutableLeafData(
-//                    (MutableKeyBuffer) keys, (MutableValueBuffer) values,
-//                    versionTimestamps, deleteMarkers), priorAddr, nextAddr);
-//
-//        } catch (EOFException ex) {
-//
-//            /*
-//             * Masquerade an EOF reading on the input stream as a buffer
-//             * underflow, which is what it really represents.
-//             */
-//            final RuntimeException ex2 = new BufferUnderflowException();
-//
-//            ex2.initCause(ex);
-//
-//            throw ex2;
-//
-//        }
-//
-//        catch (IOException ex) {
-//
-//            /*
-//             * This should not occur since we are reading from a ByteBuffer, but
-//             * this is thrown by methods reading on the DataInputStream.
-//             */
-//            throw new RuntimeException(ex);
-//
-//        }
-//
-//    }
-//    
-//    private void putChildAddresses(IAddressManager addressManager,
-//            DataOutputBuffer os, INodeData node)
-//            throws IOException {
-//
-//        final int nchildren = node.getChildCount();
-//        
-//        for (int i = 0; i < nchildren; i++) {
-//
-//            final long addr = node.getChildAddr(i);
-//
-//            /*
-//             * Children MUST have assigned persistent identity.
-//             */
-//            if (addr == 0L) {
-//
-//                throw new RuntimeException("Child is not persistent: index="
-//                        + i);
-//
-//            }
-//
-//            os.writeLong(addr);
-//
-//        }
-//
-//    }
-//
-//    private void getChildAddresses(IAddressManager addressManager, DataInput is,
-//            long[] childAddr, int nchildren) throws IOException {
-//
-//        for (int i = 0; i < nchildren; i++) {
-//
-//            final long addr = is.readLong();
-//
-//            if (addr == 0L) {
-//
-//                throw new RuntimeException(
-//                        "Child does not have persistent address: index=" + i);
-//
-//            }
-//
-//            childAddr[i] = addr;
-//
-//        }
-//
-//    }
-
-//    /**
-//     * Write out a packed array of the #of entries spanned by each child of some
-//     * node.
-//     * 
-//     * @param os
-//     *            The output stream.
-//     * @param childEntryCounts
-//     *            The #of entries spanned by each direct child.
-//     * @param nchildren
-//     *            The #of elements of that array that are defined.
-//     *            
-//     * @throws IOException
-//     * 
-//     * @todo customizable serializer interface configured in {@link IndexMetadata}.
-//     */
-//    static protected void putChildEntryCounts(final DataOutput os,
-//            final INodeData node) throws IOException {
-//
-//        final int nchildren = node.getChildCount();
-//        
-//        for (int i = 0; i < nchildren; i++) {
-//
-//            final long nentries = node.getChildEntryCount(i);
-//
-//            /*
-//             * Children MUST span some entries.
-//             */
-//            if (nentries == 0L) {
-//
-//                throw new RuntimeException(
-//                        "Child does not span entries: index=" + i);
-//
-//            }
-//
-//            LongPacker.packLong(os, nentries);
-//
-//        }
-//
-//    }
-//
-//    /**
-//     * Read in a packed array of the #of entries spanned by each child of some
-//     * node.
-//     * 
-//     * @param is
-//     * @param childEntryCounts
-//     *            The #of entries spanned by each direct child.
-//     * @param nchildren
-//     *            The #of elements of that array that are defined.
-//     * @throws IOException
-//     * 
-//     * @todo customizable serializer interface configured in {@link IndexMetadata}.
-//     */
-//    static protected void getChildEntryCounts(DataInput is,
-//            int[] childEntryCounts, int nchildren) throws IOException {
-//
-//        for (int i = 0; i < nchildren; i++) {
-//
-//            final int nentries = (int) LongPacker.unpackLong(is);
-//
-//            if (nentries == 0L) {
-//
-//                throw new RuntimeException(
-//                        "Child does not span entries: index=" + i);
-//
-//            }
-//
-//            childEntryCounts[i] = nentries;
-//
-//        }
-//
-//    }
-
-//    
-//    
-//    /**
-//     * Write out the delete markers.
-//     * 
-//     * @param os
-//     * @param leaf
-//     * 
-//     * @throws IOException
-//     * 
-//     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
-//     */
-//    static protected void putDeleteMarkers(DataOutputBuffer os, ILeafData leaf)
-//            throws IOException {
-//
-//        final int n = leaf.getKeyCount();
-//
-//        if (n == 0)
-//            return;
-//
-//        final OutputBitStream obs = new OutputBitStream(os,
-//                0/* unbuffered! */, false/* reflectionTest */);
-//
-//        for (int i = 0; i < n; i++) {
-//
-//            obs.writeBit(leaf.getDeleteMarker(i));
-//
-//        }
-//
-//        obs.flush();
-//
-//        obs.close();
-//
-//    }
-//
-//    /**
-//     * Read in the delete markers.
-//     * 
-//     * @param is
-//     * @param n
-//     * @param deleteMarkers
-//     * 
-//     * @throws IOException
-//     */
-//    static protected void getDeleteMarkers(DataInput is, int n, boolean[] deleteMarkers)
-//            throws IOException {
-//
-//        if (n == 0)
-//            return;
-//
-//        final InputBitStream ibs = new InputBitStream((InputStream) is,
-//                0/* unbuffered! */, false/* reflectionTest */);
-//
-//        for (int i = 0; i < n; i++) {
-//
-//            deleteMarkers[i] = ibs.readBit() == 0 ? false : true;
-//            
-//        }
-//        
-////        ibs.close();
-//        
-//    }
-//
-//    /**
-//     * Write out the version timestamps.
-//     * 
-//     * @param os
-//     * @param nentries
-//     * @param versionTimestamps
-//     * 
-//     * @throws IOException
-//     * 
-//     * @todo customizable serializer interface configured in {@link ITupleSerializer}.
-//     * 
-//     * @todo Experiment with other serialization schemes. One of the more
-//     *       obvious would be a huffman encoding of the timestamps since I
-//     *       presume that they will tend to bunch together a lot. If timestamps
-//     *       are non-negative then we can also pack them (or use the nibble
-//     *       coding). this should be configured in the IndexMetadata. it will
-//     *       need to have its own interface since the data are not byte[]s.
-//     */
-//    static protected void putVersionTimestamps(DataOutputBuffer os, ILeafData leaf)
-//            throws IOException {
-//
-//        final int n = leaf.getKeyCount();
-//
-//        if (n == 0)
-//            return;
-//
-//        for (int i = 0; i < n; i++) {
-//
-//            final long timestamp = leaf.getVersionTimestamp(i);
-//
-//            os.writeLong(timestamp);
-//
-//        }
-//
-//    }
-//
-//    static protected void getVersionTimestamps(DataInput is, int n,
-//            long[] versionTimestamps) throws IOException {
-//
-//        if (n == 0)
-//            return;
-//
-//        for (int i = 0; i < n; i++) {
-//
-//            versionTimestamps[i] = is.readLong();
-//
-//        }
-//
-//    }
 
 }

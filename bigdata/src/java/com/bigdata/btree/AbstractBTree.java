@@ -60,6 +60,7 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
@@ -220,7 +221,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     /**
-     * The persistence store.
+     * The persistence store -or- <code>null</code> iff the B+Tree is transient.
      */
     final protected IRawStore store;
 
@@ -626,52 +627,49 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         this.store = store;
 
+        this.writeRetentionQueue = newWriteRetentionQueue();
+
+        this.nodeSer = new NodeSerializer(//
+                store, // addressManager
+                nodeFactory,//
+                branchingFactor,//
+                0, //initialBufferCapacity
+                metadata,//
+                readOnly,//
+                recordCompressorFactory
+                );
+        
         if (store == null) {
 
             /*
              * Transient BTree.
              * 
-             * Note: The write retention queue does not have much of a role for
-             * a transient BTree and the read retention queue is positively
-             * useless.
+             * Note: The write retention queue controls how long nodes remain
+             * mutable. On eviction, they are coded but not written onto the
+             * backing store (since there is none for a transient BTree).
              * 
-             * FIXME The [nodeSer] is not used by a transient BTree - the nodes
-             * and leaves are NOT serialized since they are NOT persistent.
-             * [This should be changed. On eviction, the node/leaf should be
-             * coded so it is in a compact in-memory form, but the coded record
-             * will not be written onto a backing store]
+             * The readRetentionQueue is not used for a transient BTree since
+             * the child nodes and the parents are connected using hard links
+             * rather than weak references.
              */
 
-            this.writeRetentionQueue = new HardReferenceQueue<PO>(//
-                    NOPEvictionListener.INSTANCE,//
-                    metadata.getWriteRetentionQueueCapacity(),//
-                    metadata.getWriteRetentionQueueScan()//
-                    );
-            
             this.readRetentionQueue = null;
-
-            this.nodeSer = null;
             
         } else {
-        
+
             /*
              * Persistent BTree.
+             * 
+             * The read retention queue is used to retain recently used nodes in
+             * memory.
+             * 
+             * FIXME This will be replaced by a global (per live journal or even
+             * perhaps per JVM) read retention queue. That will allow us to
+             * focus RAM on the recently used nodes across all indices.
              */
             
-            this.writeRetentionQueue = newWriteRetentionQueue();
-
             this.readRetentionQueue = newReadRetentionQueue();
         
-            this.nodeSer = new NodeSerializer(//
-                    store, // addressManager
-                    nodeFactory,//
-                    branchingFactor,//
-                    0, //initialBufferCapacity
-                    metadata,//
-                    readOnly,//
-                    recordCompressorFactory
-                    );
-            
         }
 
     }
@@ -1564,7 +1562,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
 
-    final public byte[] insert(byte[] key, byte[] value) {
+    final public byte[] insert(final byte[] key, final byte[] value) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -2905,7 +2903,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     synchronized
 //    final 
-    protected void touch(final AbstractNode node) {
+    protected void touch(final AbstractNode<?> node) {
 
         assert node != null;
 
@@ -3056,7 +3054,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             final long elapsed = System.currentTimeMillis() - begin;
             
@@ -3082,10 +3080,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     /**
-     * Writes the node on the store (non-recursive). The node MUST be dirty. If
-     * the node has a parent, then the parent is notified of the persistent
-     * identity assigned to the node by the store. This method is NOT recursive
-     * and dirty children of a node will NOT be visited.
+     * Codes the node and writes the coded record on the store (non-recursive).
+     * The node MUST be dirty. If the node has a parent, then the parent is
+     * notified of the persistent identity assigned to the node by the store.
+     * This method is NOT recursive and dirty children of a node will NOT be
+     * visited. By coding the nodes and leaves as they are evicted from the
+     * {@link #writeRetentionQueue}, the B+Tree continuously converts nodes and
+     * leaves to their more compact coded record forms which results in a
+     * smaller in memory footprint.
+     * <p>
+     * Note: For a transient B+Tree, this merely codes the node but does not
+     * write the node on the store (there is none).
      * 
      * @throws UnsupportedOperationException
      *             if the B+Tree (or the backing store) is read-only.
@@ -3100,6 +3105,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         assert node.dirty;
         assert !node.deleted;
         assert !node.isPersistent();
+        assert !node.isReadOnly();
         assertNotReadOnly();
         
         /*
@@ -3137,36 +3143,59 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        /*
-         * Serialize the node or leaf onto a shared buffer.
-         * 
-         * FIXME This should replace node.data with a ReadOnlyNodeData or a
-         * ReadOnlyLeafData wrapping the coded record.
-         */
-
         if (debug)
             node.assertInvariants();
-
-        final ByteBuffer buf;
+        
+        // the coded data record.
+        final FixedByteArrayBuffer slice;
         {
-            
+
+            /*
+             * Code the node or leaf onto a shared buffer, replacing the data
+             * record reference on the node/leaf with a reference to the coded
+             * data record.
+             */
+
             final long begin = System.nanoTime();
-            
+
+            /*
+             * Code the record, then _clone_ the backing byte[] buffer (it is a
+             * shared buffer) and wrap the cloned byte[] as a slice.
+             */
+            slice = FixedByteArrayBuffer
+                    .wrap(nodeSer.encode(node).toByteArray());
+
             if (node.isLeaf()) {
 
-                buf = nodeSer.putLeaf(((Leaf) node).data);
-
+                // wrap coded record and _replace_ the data ref.
+                ((Leaf) node).data = nodeSer.leafCoder.decode(slice);
+                
                 btreeCounters.leavesWritten++;
 
             } else {
 
-                buf = nodeSer.putNode(((Node) node).data);
+                // wrap coded record and _replace_ the data ref.
+                ((Node) node).data = nodeSer.nodeCoder.decode(slice);
 
                 btreeCounters.nodesWritten++;
 
             }
             
             btreeCounters.serializeNanos += System.nanoTime() - begin;
+            
+        }
+
+        if (store == null) {
+
+            /*
+             * This is a transient B+Tree so we do not actually write anything
+             * on the backing store.
+             */
+
+            // No longer dirty (prevents re-coding on re-eviction).
+            node.setDirty(false);
+
+            return 0L;
             
         }
         
@@ -3176,7 +3205,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             final long begin = System.nanoTime();
             
-            addr = store.write(buf);
+            // wrap as ByteBuffer and write on the store.
+            addr = store.write(slice.asByteBuffer());
 
             btreeCounters.writeNanos += System.nanoTime() - begin;
     
@@ -3222,7 +3252,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @return The node or leaf.
      */
-    protected AbstractNode readNodeOrLeaf(final long addr) {
+    protected AbstractNode<?> readNodeOrLeaf(final long addr) {
 
         final ByteBuffer tmp;
         {
@@ -3262,14 +3292,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         /* 
          * Extract the node from the buffer.
          */
-        final AbstractNode node;
+        final AbstractNode<?> node;
         {
 
             final long begin = System.nanoTime();
             
             try {
 
-                node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
+                node = nodeSer.decode(this, addr, tmp);
                 
             } catch(Throwable t) {
                 

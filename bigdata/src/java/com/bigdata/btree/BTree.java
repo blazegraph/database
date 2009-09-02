@@ -705,7 +705,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         
         if (root != null && root.dirty) {
 
-            writeNodeRecursive( root );
+            writeNodeRecursive(root);
             
             if(INFO)
                 log.info("flushed root: addr=" + root.identity);

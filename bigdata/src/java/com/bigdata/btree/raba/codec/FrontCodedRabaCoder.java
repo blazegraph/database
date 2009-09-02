@@ -203,7 +203,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
-    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
+    public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new FrontCodedDecoder(data);
 

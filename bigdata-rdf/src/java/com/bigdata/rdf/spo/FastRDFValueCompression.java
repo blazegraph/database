@@ -15,7 +15,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.AbstractRabaDecoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.btree.raba.codec.IRabaDecoder;
+import com.bigdata.btree.raba.codec.ICodedRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
@@ -23,9 +23,10 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * We encode the value in 3 bits per statement. The 1st bit is the override
- * flag. The remaining two bits are the statement type {inferred, explicit, or
- * axiom}. The bit sequence <code>111</code> is used as a placeholder for a
+ * Coder for statement index with inference enabled but without SIDS. We encode
+ * the value in 3 bits per statement. The 1st bit is the override flag. The
+ * remaining two bits are the statement type {inferred, explicit, or axiom}. The
+ * bit sequence <code>111</code> is used as a placeholder for a
  * <code>null</code> value and de-serializes to a [null].
  * <p>
  * Note: the 'override' flag is NOT stored in the statement indices, but it is
@@ -36,13 +37,12 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * Note: this procedure can not be used if
  * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} are enabled.
  * 
- * @todo test suite (this is currently tested by its use on stores where
- *       statement identifiers are not enabled).
- * 
  * @see StatementEnum
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Fast coder for SIDs+type?
  */
 public class FastRDFValueCompression implements Externalizable, IRabaCoder {
 
@@ -184,7 +184,7 @@ public class FastRDFValueCompression implements Externalizable, IRabaCoder {
         
     }
 
-    public IRabaDecoder decode(final AbstractFixedByteArrayBuffer data) {
+    public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new RabaDecoderImpl(data);
         
@@ -311,7 +311,7 @@ public class FastRDFValueCompression implements Externalizable, IRabaCoder {
          */
         final protected byte getBits(final int index) {
 
-            if (index <= 0 || index > size)
+            if (index < 0 || index >= size)
                 throw new IndexOutOfBoundsException();
 
             int value = 0;

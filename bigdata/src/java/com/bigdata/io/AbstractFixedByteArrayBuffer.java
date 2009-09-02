@@ -339,7 +339,7 @@ abstract public class AbstractFixedByteArrayBuffer implements IFixedByteArrayBuf
         
     }
 
-    final public ByteBuffer wrap() {
+    final public ByteBuffer asByteBuffer() {
 
         return ByteBuffer.wrap(array(), off, len);
         

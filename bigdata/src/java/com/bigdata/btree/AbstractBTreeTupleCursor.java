@@ -1502,7 +1502,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @return <code>true</code> if there is successor of the current
          *         leaf.
          */
-        protected boolean nextLeaf(ILeafCursor<L> leafCursor) {
+        protected boolean nextLeaf(final ILeafCursor<L> leafCursor) {
 
             if (leafCursor.next() == null) {
             

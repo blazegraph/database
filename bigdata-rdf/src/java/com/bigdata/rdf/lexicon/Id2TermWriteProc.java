@@ -30,7 +30,6 @@ import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
