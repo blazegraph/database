@@ -9,6 +9,8 @@ import org.openrdf.repository.sail.SailGraphQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
 import org.openrdf.sail.SailConnection;
 
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+
 public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
    
     public BigdataSailRepositoryConnection(BigdataSailRepository repository,
@@ -44,5 +46,20 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         super.commit();
     }
     
+    public void computeClosure() throws RepositoryException {
+        
+        try {
+        
+            ((BigdataSailConnection)getSailConnection()).computeClosure();
+            
+        } catch(Exception ex) {
+            
+            throw new RepositoryException(ex);
+            
+        }
+        
+    }
+    
+
     
 }
