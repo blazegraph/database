@@ -385,9 +385,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         if (btree == null) {
 
-            log
-                    .warn("No such index: name=" + name + ", timestamp="
-                            + timestamp);
+            if (log.isInfoEnabled())
+                log.info("No such index: name=" + name + ", timestamp="
+                        + timestamp);
 
             return null;
 
@@ -594,7 +594,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 
                 if (sources == null) {
 
-                    log.warn("No such index: name="+name+", timestamp="+timestamp);
+                    if (log.isInfoEnabled())
+                        log.info("No such index: name="+name+", timestamp="+timestamp);
                     
                     return null;
                     

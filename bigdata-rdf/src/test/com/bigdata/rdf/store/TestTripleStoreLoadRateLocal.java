@@ -91,7 +91,7 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
         final String file = "../rdf-data/lehigh/U10";
 
-        final String baseURI = file;
+        final String baseURI = null;//new File(file).toURI().toString();
         
         doTest(new File(file), baseURI, RDFFormat.RDFXML, new FilenameFilter() {
 
@@ -106,7 +106,7 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
         String file = "../rdf-data/lehigh/U5";
 
-        final String baseURI = file;
+        final String baseURI = null;//new File(file).toURI().toString();
         
         doTest(new File(file), baseURI, RDFFormat.RDFXML, new FilenameFilter() {
 
@@ -121,7 +121,7 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
         
         final String file = "../rdf-data/lehigh/U1";
 
-        final String baseURI = file;
+        final String baseURI = null;//new File(file).toURI().toString();
 
         doTest(new File(file), baseURI, RDFFormat.RDFXML, new FilenameFilter() {
 
