@@ -569,6 +569,9 @@ public class BytesUtil {
      */
     final public static String toString(final byte[] key) {
         
+        if (key == null)
+            return NULL;
+        
         return toString(key, 0, key.length);
         
     }

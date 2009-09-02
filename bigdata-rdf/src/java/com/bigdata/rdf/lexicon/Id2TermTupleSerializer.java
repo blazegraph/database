@@ -59,6 +59,7 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.ConditionalRabaCoder;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
@@ -117,21 +118,23 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
         super(//
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
                 getDefaultLeafKeysCoder(),//
-                new ConditionalRabaCoder(
-                        getDefaultValuesCoder(),
-                        CanonicalHuffmanRabaCoder.INSTANCE,
+//                getDefaultValuesCoder()
+//                CanonicalHuffmanRabaCoder.INSTANCE
+                new ConditionalRabaCoder(//
+                        SimpleRabaCoder.INSTANCE, // small
+                        CanonicalHuffmanRabaCoder.INSTANCE, // large
                         33/*btreeBranchingFactor+1*/
                         )
-//                getDefaultValueKeySerializer()//
         );
 
         if (namespace == null)
             throw new IllegalArgumentException();
         
         this.namespace = namespace;
-        
-        this.valueSer = BigdataValueFactoryImpl.getInstance(namespace).getValueSerializer();
-        
+
+        this.valueSer = BigdataValueFactoryImpl.getInstance(namespace)
+                .getValueSerializer();
+
     }
     
     /**

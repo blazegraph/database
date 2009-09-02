@@ -184,38 +184,38 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
         
     }
 
-    public void test_rdf01() {
-
-        fail("write test");
-        
-    }
+//    public void test_rdf01() {
+//
+//        fail("write test");
+//        
+//    }
     
-    /**
-     * FIXME test all of these rules with some hard coded range counts based on
-     * some fake data and make sure that we are producing good join orderings in
-     * each case. Note that some data sets will not have anything for some of
-     * these rules. In those cases, we should verify that the plan detects that
-     * there will be no solutions AND also find a data set that can be used to
-     * verify a plan that does have solutions for the rule.
-     * <p>
-     * RuleRdf01.java RuleRdfs03.java RuleRdfs04a.java RuleRdfs04b.java
-     * RuleRdfs05.java RuleRdfs06.java RuleRdfs07.java RuleRdfs08.java
-     * RuleRdfs09.java RuleRdfs10.java RuleRdfs11.java RuleRdfs12.java
-     * RuleRdfs13.java
-     * <p>
-     * RuleFastClosure11.java RuleFastClosure13.java RuleFastClosure3.java
-     * RuleFastClosure5.java RuleFastClosure6.java RuleFastClosure7.java
-     * RuleFastClosure9.java
-     * <P>
-     * RuleOwlEquivalentClass.java RuleOwlEquivalentProperty.java
-     * RuleOwlSameAs1.java RuleOwlSameAs1b.java RuleOwlSameAs2.java
-     * RuleOwlSameAs3.java
-     */
-    public void test_rdfs02() {
-
-        fail("write test");
-        
-    }
+//    /**
+//     * FIXME test all of these rules with some hard coded range counts based on
+//     * some fake data and make sure that we are producing good join orderings in
+//     * each case. Note that some data sets will not have anything for some of
+//     * these rules. In those cases, we should verify that the plan detects that
+//     * there will be no solutions AND also find a data set that can be used to
+//     * verify a plan that does have solutions for the rule.
+//     * <p>
+//     * RuleRdf01.java RuleRdfs03.java RuleRdfs04a.java RuleRdfs04b.java
+//     * RuleRdfs05.java RuleRdfs06.java RuleRdfs07.java RuleRdfs08.java
+//     * RuleRdfs09.java RuleRdfs10.java RuleRdfs11.java RuleRdfs12.java
+//     * RuleRdfs13.java
+//     * <p>
+//     * RuleFastClosure11.java RuleFastClosure13.java RuleFastClosure3.java
+//     * RuleFastClosure5.java RuleFastClosure6.java RuleFastClosure7.java
+//     * RuleFastClosure9.java
+//     * <P>
+//     * RuleOwlEquivalentClass.java RuleOwlEquivalentProperty.java
+//     * RuleOwlSameAs1.java RuleOwlSameAs1b.java RuleOwlSameAs2.java
+//     * RuleOwlSameAs3.java
+//     */
+//    public void test_rdfs02() {
+//
+//        fail("write test");
+//        
+//    }
         
     /**
      * Mock object.

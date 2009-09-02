@@ -51,9 +51,10 @@ public class TestArrayBuffer extends TestCase2 {
         super(arg0);
     }
 
-    public void test_arrayBuffer() {
-        
-        fail("write tests");
+    /**
+     * @todo place holder for unit tests.
+     */
+    public void test_something() {
         
     }
     

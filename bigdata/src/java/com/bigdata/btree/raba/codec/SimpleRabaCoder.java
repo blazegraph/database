@@ -73,7 +73,10 @@ public class SimpleRabaCoder implements IRabaCoder, Externalizable {
         
     }
     
-    private SimpleRabaCoder() {
+    /**
+     * De-serialization ctor. Use {@link #INSTANCE} otherwise.
+     */
+    public SimpleRabaCoder() {
         
     }
     

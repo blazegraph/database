@@ -68,6 +68,13 @@ public class TestAll extends TestCase {
         // canonical huffman coding.
         suite.addTestSuite(TestCanonicalHuffmanRabaCoder.class);
 
+        /*
+         * Tests of conditional raba coders (one coder is used when there are LT
+         * N entries, otherwise the other coder is used).
+         */
+        suite.addTestSuite(TestConditionalRabaCoder_keys_simple_frontCoded.class);
+        suite.addTestSuite(TestConditionalRabaCoder_values_simple_canonical.class);
+        
         return suite;
         
     }

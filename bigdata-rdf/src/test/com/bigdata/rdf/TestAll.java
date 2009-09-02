@@ -27,9 +27,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
 /**
  * Aggregates test suites into increasing dependency order.
  * 
