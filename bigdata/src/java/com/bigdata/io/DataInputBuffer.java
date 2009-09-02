@@ -206,7 +206,7 @@ public class DataInputBuffer extends InputStream implements DataInput {
         if (off >= limit)
             return -1; // EOF
         
-        return buf[off++];
+        return 0xff & buf[off++];
         
     }
     
