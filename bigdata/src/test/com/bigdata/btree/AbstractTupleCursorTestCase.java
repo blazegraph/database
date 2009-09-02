@@ -113,7 +113,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      * 
      * @see #getBaseCaseBTree()
      */
-    protected void doBaseCaseTest(AbstractBTree btree) {
+    protected void doBaseCaseTest(final AbstractBTree btree) {
 
         // test first()
         {

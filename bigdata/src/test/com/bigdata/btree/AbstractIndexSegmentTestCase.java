@@ -64,7 +64,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
 
         // materialize the leaves.
         
-        final ILeafCursor cursor = seg.newLeafCursor(SeekEnum.First);
+        final ILeafCursor<?> cursor = seg.newLeafCursor(SeekEnum.First);
 
         int n = 0;
         while (cursor.next() != null) {

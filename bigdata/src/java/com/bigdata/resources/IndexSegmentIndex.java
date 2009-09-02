@@ -119,7 +119,7 @@ public class IndexSegmentIndex extends BTree {
      *                if there is already an entry registered under for the
      *                given timestamp.
      */
-    synchronized public void add(SegmentMetadata resourceMetadata) {
+    synchronized public void add(final SegmentMetadata resourceMetadata) {
 
         if (resourceMetadata == null)
             throw new IllegalArgumentException();

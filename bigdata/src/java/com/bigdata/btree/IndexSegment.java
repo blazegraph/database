@@ -31,7 +31,12 @@ import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
@@ -185,7 +190,7 @@ public class IndexSegment extends AbstractBTree {
      * queue is the right order of magnitude to fully buffer the visited nodes
      * of an {@link IndexSegment} while the {@link #leafCache} capacity and
      * whether or not the nodes region are fully buffered may be used to control
-     * the responsivness for leaves.
+     * the responsiveness for leaves.
      */
     final protected int getReadRetentionQueueCapacity() {
         
@@ -226,6 +231,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Extended to also close the backing file.
      */
+    @Override
     public void close() {
 
         if (root == null) {
@@ -266,6 +272,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Overridden to a more constrained type.
      */
+    @Override
     final public IndexSegmentStore getStore() {
         
         return fileStore;
@@ -280,6 +287,7 @@ public class IndexSegment extends AbstractBTree {
      * to the {@link IndexSegmentStore} being left open. The finalizer fixes
      * that.
      */
+    @Override
     protected void finalize() throws Throwable {
 
         if (isOpen()) {
@@ -414,7 +422,8 @@ public class IndexSegment extends AbstractBTree {
      * single-tuple operations do not require that we hold a hard reference to
      * the leaf.
      */
-    protected void touch(AbstractNode node) {
+    @Override
+    protected void touch(final AbstractNode<?> node) {
 
         if (node.isLeaf())
             return;
@@ -472,6 +481,7 @@ public class IndexSegment extends AbstractBTree {
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     final public void removeAll() {
         
         throw new UnsupportedOperationException(ERROR_READ_ONLY);
@@ -504,6 +514,7 @@ public class IndexSegment extends AbstractBTree {
      * reads by the {@link LeafIterator} which are made without using the node
      * hierarchy.
      */
+    @Override
     protected AbstractNode<?> readNodeOrLeaf(final long addr) {
 
         final Long tmp = Long.valueOf(addr);
@@ -704,12 +715,14 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
+            @Override
             public void delete() {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
+            @Override
             public Tuple insert(byte[] key, byte[] val, boolean deleted,
                     long timestamp, Tuple tuple) {
 
@@ -717,10 +730,109 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
+            @Override
             public Tuple remove(byte[] key, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
+            }
+
+        }
+
+        /**
+         * A double-linked, read-only, empty leaf. This is used for the root leaf of an
+         * empty {@link IndexSegment}.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        private static class EmptyReadOnlyLeafData implements ILeafData {
+
+            final private boolean deleteMarkers;
+            final private boolean versionTimestamps;
+            
+            public EmptyReadOnlyLeafData(final boolean deleteMarkers,
+                    final boolean versionTimestamps) {
+
+                this.deleteMarkers = deleteMarkers;
+
+                this.versionTimestamps = versionTimestamps;
+                
+            }
+            
+            final public boolean hasDeleteMarkers() {
+                return deleteMarkers;
+            }
+
+            final public boolean hasVersionTimestamps() {
+                return versionTimestamps;
+            }
+
+            final public int getValueCount() {
+                return 0;
+            }
+
+            final public IRaba getValues() {
+                return ReadOnlyValuesRaba.EMPTY;
+            }
+
+            final public boolean getDeleteMarker(int index) {
+                throw new IndexOutOfBoundsException();
+            }
+
+            final public long getVersionTimestamp(int index) {
+                throw new IndexOutOfBoundsException();
+            }
+
+            /** Yes. */
+            final public boolean isDoubleLinked() {
+                return true;
+            }
+
+            /** Returns ZERO (0) since there is no next leaf. */
+            final public long getNextAddr() {
+                return 0L;
+            }
+
+            /** Returns ZERO (0) since there is no prior leaf. */
+            final public long getPriorAddr() {
+                return 0L;
+            }
+
+            final public int getKeyCount() {
+                return 0;
+            }
+
+            final public IRaba getKeys() {
+                return ReadOnlyKeysRaba.EMPTY;
+            }
+
+            public long getMaximumVersionTimestamp() {
+                return 0;
+            }
+
+            public long getMinimumVersionTimestamp() {
+                return 0;
+            }
+
+            final public int getSpannedTupleCount() {
+                return 0;
+            }
+
+            final public boolean isLeaf() {
+                return true;
+            }
+
+            final public boolean isReadOnly() {
+                return true;
+            }
+
+            final public boolean isCoded() {
+                return true;
+            }
+
+            final public AbstractFixedByteArrayBuffer data() {
+                return FixedByteArrayBuffer.EMPTY;
             }
 
         }
@@ -767,8 +879,20 @@ public class IndexSegment extends AbstractBTree {
              * @param btree
              */
             protected ImmutableLeaf(final AbstractBTree btree) {
-                
+
+                // Note: This creates a _mutable_ leaf.
                 super(btree);
+
+                /*
+                 * So we replace the data record with a special immutable leaf
+                 * data object that is double-linked.  This is only used for
+                 * the empty, immutable root leaf of an IndexSegment.
+                 */
+                this.data = new EmptyReadOnlyLeafData(//
+                        btree.getIndexMetadata().getDeleteMarkers(), //
+                        btree.getIndexMetadata().getVersionTimestamps());
+
+//                super(btree);
                 
 //                priorAddr = nextAddr = 0L;
                 
@@ -798,12 +922,14 @@ public class IndexSegment extends AbstractBTree {
                 
             }
 
+            @Override
             public void delete() {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
+            @Override
             public Tuple insert(byte[] key, byte[] val, boolean deleted,
                     long timestamp, Tuple tuple) {
 
@@ -811,6 +937,7 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
+            @Override
             public Tuple remove(byte[] key, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
@@ -1060,14 +1187,14 @@ public class IndexSegment extends AbstractBTree {
     }
 
     @Override
-    public ImmutableLeafCursor newLeafCursor(SeekEnum where) {
+    public ImmutableLeafCursor newLeafCursor(final SeekEnum where) {
         
         return new ImmutableLeafCursor(where);
         
     }
     
     @Override
-    public ImmutableLeafCursor newLeafCursor(byte[] key) {
+    public ImmutableLeafCursor newLeafCursor(final byte[] key) {
         
         return new ImmutableLeafCursor(key);
         

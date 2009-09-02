@@ -119,20 +119,28 @@ public class TestNullValues extends AbstractBTreeTestCase {
                     .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
                     true/*compactingMerge*/).call();
 
-             /*
-              * Verify can load the index file and that the metadata
-              * associated with the index file is correct (we are only
-              * checking those aspects that are easily defined by the test
-              * case and not, for example, those aspects that depend on the
-              * specifics of the length of serialized nodes or leaves).
-              */
-            
+            /*
+             * Verify can load the index file and that the metadata associated
+             * with the index file is correct (we are only checking those
+             * aspects that are easily defined by the test case and not, for
+             * example, those aspects that depend on the specifics of the length
+             * of serialized nodes or leaves).
+             */
+
             final IndexSegmentStore segStore = new IndexSegmentStore(outFile);
-            
+
             final IndexSegment seg = segStore.loadIndexSegment();
-            
-            assertNull(seg.lookup(k1));
-            assertTrue(seg.contains(k1));
+
+            try {
+
+                assertNull(seg.lookup(k1));
+                assertTrue(seg.contains(k1));
+
+            } finally {
+
+                seg.close();
+                
+            }
             
         } finally {
 

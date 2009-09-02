@@ -413,7 +413,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     }
 
-    public PartitionLocator get(byte[] key) {
+    public PartitionLocator get(final byte[] key) {
         
 //        return (PartitionLocator)SerializerUtil.deserialize(lookup(key));
         
@@ -422,7 +422,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
         
     }
 
-    public PartitionLocator find(byte[] key) {
+    public PartitionLocator find(final byte[] key) {
 
         return view.find(key);
         

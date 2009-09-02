@@ -61,7 +61,7 @@ import com.bigdata.rawstore.IRawStore;
  * providing isolation for the object index.
  * </p>
  * <p>
- * Note: This implementation is thread-safe for concurent readers BUT NOT for
+ * Note: This implementation is thread-safe for concurrent readers BUT NOT for
  * concurrent writers. If a writer has access to a {@link BTree} then there MUST
  * NOT be any other reader -or- writer operating on the {@link BTree} at the
  * same time.
@@ -653,7 +653,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      * 
      * @param listener The listener.
      */
-    final public void setDirtyListener(IDirtyListener listener) {
+    final public void setDirtyListener(final IDirtyListener listener) {
 
         assertNotReadOnly();
         
@@ -1206,6 +1206,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      * 
      * @return The transient {@link BTree}.
      */
+    @SuppressWarnings("unchecked")
     public static BTree createTransient(final IndexMetadata metadata) {
         
         /*
@@ -1301,6 +1302,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      * @return The {@link BTree} or derived class loaded from that
      *         {@link Checkpoint} record.
      */
+    @SuppressWarnings("unchecked")
     public static BTree load(final IRawStore store, final long addrCheckpoint,
             final boolean readOnly) {
 
@@ -1404,7 +1406,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
 
         private final BTree btree;
         
-        public Counter(BTree btree) {
+        public Counter(final BTree btree) {
             
             assert btree != null;
             
@@ -1546,18 +1548,18 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         
     }
 
-    public LeafCursor newLeafCursor(SeekEnum where) {
-     
-        return new LeafCursor( where );
-        
+    public LeafCursor newLeafCursor(final SeekEnum where) {
+
+        return new LeafCursor(where);
+
     }
 
-    public LeafCursor newLeafCursor(byte[] key) {
-     
-        return new LeafCursor( key );
-        
+    public LeafCursor newLeafCursor(final byte[] key) {
+
+        return new LeafCursor(key);
+
     }
-        
+
     /**
      * A simple stack based on an array used to maintain hard references for the
      * parent {@link Node}s in the {@link LeafCursor}. This class is optimized
@@ -1565,7 +1567,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      * operation is used to support atomic state changes for
      * {@link LeafCursor#prior()} and {@link LeafCursor#next()}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     protected static class Stack {
@@ -1589,7 +1592,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             
         }
         
-        public Stack(int capacity) {
+        public Stack(final int capacity) {
             
             a = new Node[capacity];
             
@@ -1619,7 +1622,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
          * @param item
          *            The element (required).
          */
-        public void push(Node item) {
+        public void push(final Node item) {
             
             assert item != null;
             
@@ -1688,7 +1691,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
          * @param src
          *            The source {@link Stack}.
          */
-        public void copyFrom(Stack src) {
+        public void copyFrom(final Stack src) {
 
             assert src != null;
             
@@ -1849,7 +1852,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         /**
          * Copy constructor used by {@link #clone()}.
          */
-        private LeafCursor(LeafCursor src) {
+        private LeafCursor(final LeafCursor src) {
             
             if (src == null)
                 throw new IllegalArgumentException();
@@ -1862,7 +1865,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             
         }
         
-        public LeafCursor(SeekEnum where) {
+        public LeafCursor(final SeekEnum where) {
 
             switch (where) {
 
@@ -1886,7 +1889,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             
         }
         
-        public LeafCursor(byte[] key) {
+        public LeafCursor(final byte[] key) {
             
             seek(key);
             
@@ -1896,7 +1899,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
 
             stack.clear();
             
-            AbstractNode node = getRoot();
+            AbstractNode<?> node = getRoot();
 
             while (!node.isLeaf()) {
 
@@ -1917,7 +1920,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             
             stack.clear();
             
-            AbstractNode node = getRoot();
+            AbstractNode<?> node = getRoot();
 
             while (!node.isLeaf()) {
 
@@ -1939,11 +1942,11 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
          * the leaf may not actually contain the key, in which case it is the
          * leaf that contains the insertion point for the key.
          */
-        public Leaf seek(byte[] key) {
+        public Leaf seek(final byte[] key) {
 
             stack.clear();
             
-            AbstractNode node = getRoot();
+            AbstractNode<?> node = getRoot();
             
             while(!node.isLeaf()) {
                 
@@ -1961,7 +1964,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             
         }
 
-        public Leaf seek(ILeafCursor<Leaf> src) {
+        public Leaf seek(final ILeafCursor<Leaf> src) {
 
             if (src == null)
                 throw new IllegalArgumentException();
@@ -1999,16 +2002,16 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
              * Starting with the current leaf, recursive ascent until there is a
              * right-sibling of the current child.
              */
-            AbstractNode sibling = null;
+            AbstractNode<?> sibling = null;
             {
 
-                AbstractNode child = leaf;
+                AbstractNode<?> child = leaf;
 
                 Node p = child.getParent();
 
                 while (true) {
 
-                    if(p == null) {
+                    if (p == null) {
                         
                         /*
                          * No right-sibling (must be the last leaf).
@@ -2099,10 +2102,10 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
              * Starting with the current leaf, recursive ascent until there is a
              * left-sibling of the current child.
              */
-            AbstractNode sibling = null;
+            AbstractNode<?> sibling = null;
             {
 
-                AbstractNode child = leaf;
+                AbstractNode<?> child = leaf;
 
                 Node p = child.getParent();
 

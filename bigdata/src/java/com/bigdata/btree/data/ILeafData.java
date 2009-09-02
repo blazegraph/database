@@ -60,6 +60,8 @@ public interface ILeafData extends IAbstractNodeData {
      * 
      * @return The version timestamp for the index entry.
      * 
+     * @throws IndexOutOfBoundsException
+     *             unless index is in [0:ntuples-1].
      * @throws UnsupportedOperationException
      *             if version timestamps are not being maintained (they are only
      *             required for indices on which transaction processing will be
@@ -71,6 +73,8 @@ public interface ILeafData extends IAbstractNodeData {
      * Return <code>true</code> iff the entry at the specified index is marked
      * as deleted.
      * 
+     * @throws IndexOutOfBoundsException
+     *             unless index is in [0:ntuples-1].
      * @throws UnsupportedOperationException
      *             if delete markers are not being maintained.
      */

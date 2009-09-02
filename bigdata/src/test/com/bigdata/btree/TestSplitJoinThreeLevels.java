@@ -75,7 +75,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
      * postconditions for that operation. In particular, testing at m == 3 helps
      * to check for fenceposts in the split/join logic.
      * 
-     * Note: a branching factor of three (3) is equivilent to a 2-3 tree, where
+     * Note: a branching factor of three (3) is equivalent to a 2-3 tree, where
      * the minimum #of children (for a node) or values (for a leaf) is two (2)
      * and the maximum #of children (for a node) or values (for a leaf) is three
      * (3). This makes it very easy to provoke splits and joins.
@@ -84,7 +84,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
      * a different sequence of keys during removal. This provokes some code
      * paths in {@link Node#merge(AbstractNode, boolean)} and
      * {@link Node#redistributeKeys(AbstractNode, boolean)} that are not
-     * excercised by this test.
+     * exercised by this test.
      * 
      * @see #test_removeOrder3a()
      */

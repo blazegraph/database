@@ -257,7 +257,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
          */
         System.err.println("Opening index segment w/ bloom filter.");
         final IndexSegment seg2 = new IndexSegmentStore(outFile2).loadIndexSegment();
-
+        try {
+        
         /*
          * Verify the total index order.
          */
@@ -283,8 +284,11 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         doRandomLookupTest("btree", btree, keys, vals);
         doRandomLookupTest("w/ bloom", seg2, keys, vals);
         
+        } finally {
         System.err.println("Closing index segments.");
         seg2.close();
+        
+        }
 
         if (!outFile2.delete()) {
 
