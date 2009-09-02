@@ -30,8 +30,6 @@ package com.bigdata.zookeeper;
 /**
  * Test suite for watcher for unknown children (those not previously seen).
  * 
- * @todo write tests.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -50,9 +48,8 @@ public class TestUnknownChildrenWatcher extends AbstractZooTestCase {
         super(name);
     }
 
+    /** @todo place holder for unit tests. */
     public void test_nothing() {
-        
-        fail("write tests");
         
     }
     

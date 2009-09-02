@@ -224,7 +224,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
     }
     
     /**
-	 * Initiaties discovery for one or more service registrars and establishes a
+	 * Initiates discovery for one or more service registrars and establishes a
 	 * lookup caches for various bigdata services.
 	 * 
 	 * @param client

@@ -27,10 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.raba;
 
+import java.io.DataInput;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.io.OutputStream;
+import java.util.Iterator;
 
 import org.CognitiveWeb.extser.LongPacker;
 
@@ -45,8 +48,6 @@ import com.bigdata.io.DataOutputBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME Unit tests for this class.
  */
 public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
 
@@ -62,7 +63,7 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
      * 
      * @return
      */
-    protected boolean isSmall(int size) {
+    protected boolean isSmall(final int size) {
         
         return size < bigSize;
         
@@ -80,6 +81,13 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
         
     }
     
+    /**
+     * De-serialization ctor.
+     */
+    public ConditionalRabaCoder() {
+        
+    }
+
     /**
      * 
      * @param smallCoder
@@ -117,16 +125,22 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
         final AbstractFixedByteArrayBuffer slice = data
                 .slice(1, data.len() - 1);
 
+        final ICodedRaba codedRaba;
         if (isSmall) {
 
-            return smallCoder.decode(slice);
+            codedRaba = smallCoder.decode(slice);
 
+        } else {
+
+            codedRaba = bigCoder.decode(slice);
+            
         }
 
-        return bigCoder.decode(slice);
-
+        // wraps coded raba to return the original data().
+        return new CodedRabaSlice(codedRaba,data);
+        
     }
-
+    
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -134,19 +148,26 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
 
         final boolean isSmall = isSmall(size);
 
+        final int O_origin = buf.pos();
+        
         buf.putByte((byte) (isSmall ? 1 : 0));
 
+        final AbstractFixedByteArrayBuffer slice;
         if (isSmall) {
 
-            return smallCoder.encode(raba, buf);
+            slice = smallCoder.encode(raba, buf);
 
+        } else {
+
+            slice = bigCoder.encode(raba, buf);
+            
         }
 
-        return bigCoder.encode(raba, buf);
-
+        return buf.slice(O_origin, slice.len() + 1);
+        
     }
 
-    public void readExternal(ObjectInput in) throws IOException,
+    public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
         final byte version = in.readByte();
@@ -159,13 +180,13 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
 
         bigSize = (int) LongPacker.unpackLong(in);
 
-        smallCoder = (IRabaCoder) smallCoder;
+        smallCoder = (IRabaCoder) in.readObject();
 
-        bigCoder = (IRabaCoder) bigCoder;
+        bigCoder = (IRabaCoder) in.readObject();
 
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
         
         out.writeByte(VERSION0);
         
@@ -179,4 +200,102 @@ public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
     
     private static final byte VERSION0 = 0x00;
 
+    /**
+     * Helper class used to wrap an {@link ICodedRaba} while returning the
+     * caller's slice for the backing data. We use this to have the
+     * {@link ConditionalRabaCoder} return the original slice, not the slice
+     * after the first byte (which indicates whether to use the small or large
+     * coder) has been chopped off.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    private static class CodedRabaSlice implements ICodedRaba {
+        
+        private final IRaba delegate;
+
+        private final AbstractFixedByteArrayBuffer data;
+        
+        CodedRabaSlice(final IRaba delegate,
+                final AbstractFixedByteArrayBuffer data) {
+
+            this.delegate = delegate;
+            
+            this.data = data;
+
+        }
+
+        public AbstractFixedByteArrayBuffer data() {
+            
+            return data;
+            
+        }
+        
+        public int add(byte[] value, int off, int len) {
+            return delegate.add(value, off, len);
+        }
+
+        public int add(byte[] a) {
+            return delegate.add(a);
+        }
+
+        public int add(DataInput in, int len) throws IOException {
+            return delegate.add(in, len);
+        }
+
+        public int capacity() {
+            return delegate.capacity();
+        }
+
+        public int copy(int index, OutputStream os) {
+            return delegate.copy(index, os);
+        }
+
+        public byte[] get(int index) {
+            return delegate.get(index);
+        }
+
+        public boolean isEmpty() {
+            return delegate.isEmpty();
+        }
+
+        public boolean isFull() {
+            return delegate.isFull();
+        }
+
+        public boolean isKeys() {
+            return delegate.isKeys();
+        }
+
+        public boolean isNull(int index) {
+            return delegate.isNull(index);
+        }
+
+        public boolean isReadOnly() {
+            return delegate.isReadOnly();
+        }
+
+        public Iterator<byte[]> iterator() {
+            return delegate.iterator();
+        }
+
+        public int length(int index) {
+            return delegate.length(index);
+        }
+
+        public int search(byte[] searchKey) {
+            return delegate.search(searchKey);
+        }
+
+        public void set(int index, byte[] a) {
+            delegate.set(index, a);
+        }
+
+        public int size() {
+            return delegate.size();
+        }
+        
+    }
+    
 }

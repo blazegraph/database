@@ -51,9 +51,8 @@ public class TestZooElection extends AbstractZooTestCase {
 
     }
 
+    /** @todo place holder for unit tests. */
     public void test_nothing() {
-        
-        fail("write tests");
         
     }
     

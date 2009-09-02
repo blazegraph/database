@@ -411,7 +411,7 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
      */
     static protected void setSecurityManager() {
 
-        SecurityManager sm = System.getSecurityManager();
+        final SecurityManager sm = System.getSecurityManager();
         
         if (sm == null) {
 
