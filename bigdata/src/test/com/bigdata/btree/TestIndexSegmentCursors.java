@@ -102,10 +102,10 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
      * 
      * @return
      * 
-     * @throws IOException
      * @throws Exception
      */
-    protected IndexSegment buildIndexSegment(BTree btree) throws IOException, Exception {
+    protected IndexSegment buildIndexSegment(final BTree btree)
+            throws Exception {
 
         new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 30/* m */, btree.getIndexMetadata(), System
@@ -118,8 +118,8 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
         
     }
     
-    protected ITupleCursor2<String> newCursor(AbstractBTree btree, int flags,
-            byte[] fromKey, byte[] toKey) {
+    protected ITupleCursor2<String> newCursor(final AbstractBTree btree,
+            final int flags, final byte[] fromKey, final byte[] toKey) {
 
         return new IndexSegmentTupleCursor<String>((IndexSegment) btree,
                 new Tuple<String>(btree, IRangeQuery.DEFAULT),
@@ -129,46 +129,64 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
 
     public void test_oneTuple() throws IOException, Exception {
 
-        BTree btree = getOneTupleBTree();
+        final BTree btree = getOneTupleBTree();
  
-        IndexSegment seg = buildIndexSegment(btree);
-        
-        doOneTupleTest(seg);
-        
-        /*
-         * Verify that {@link ITupleCursor#remove()} will thrown an exception if
-         * the source {@link BTree} does not allow writes.
-         */
-        {
-            ITupleCursor2<String> cursor = newCursor(seg);
+        final IndexSegment seg = buildIndexSegment(btree);
 
-            assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
+        try {
 
-            try {
-                cursor.remove();
-                fail("Expecting: " + UnsupportedOperationException.class);
-            } catch (UnsupportedOperationException ex) {
-                log.info("Ignoring expected exception: " + ex);
+            doOneTupleTest(seg);
+
+            /*
+             * Verify that {@link ITupleCursor#remove()} will thrown an
+             * exception if the source {@link BTree} does not allow writes.
+             */
+            {
+                ITupleCursor2<String> cursor = newCursor(seg);
+
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.next());
+
+                try {
+                    cursor.remove();
+                    fail("Expecting: " + UnsupportedOperationException.class);
+                } catch (UnsupportedOperationException ex) {
+                    log.info("Ignoring expected exception: " + ex);
+                }
+
             }
 
+        } finally {
+
+            // close so it can be deleted by tearDown().
+            seg.close();
+            
         }
         
     }
 
     /**
      * A test for first(), last(), next(), prior(), and seek() given a B+Tree
-     * that has been pre-popluated with a few tuples.
+     * that has been pre-populated with a few tuples.
      * 
      * @throws Exception
      * @throws IOException
      */
     public void test_baseCase() throws IOException, Exception {
 
-        BTree btree = getBaseCaseBTree();
+        final BTree btree = getBaseCaseBTree();
 
-        IndexSegment seg = buildIndexSegment(btree);
+        final IndexSegment seg = buildIndexSegment(btree);
 
-        doBaseCaseTest(seg);
+        try {
+
+            doBaseCaseTest(seg);
+
+        } finally {
+
+            // close so it can be deleted by tearDown().
+            seg.close();
+
+        }
 
     }
 

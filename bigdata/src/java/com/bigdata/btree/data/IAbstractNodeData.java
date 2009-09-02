@@ -76,6 +76,9 @@ public interface IAbstractNodeData {
      * 
      * @throws UnsupportedOperationException
      *             unless tuple revision timestamps are being maintained.
+     * 
+     *             FIXME specify the correct return for an empty root leaf for
+     *             min/max version timestamp.
      */
     long getMinimumVersionTimestamp();
 

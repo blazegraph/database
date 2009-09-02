@@ -62,8 +62,10 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
     File outFile;
     File tmpDir;
     
-    public void setUp() {
+    public void setUp() throws Exception {
 
+        super.setUp();
+        
         outFile = new File(getName() + ".seg");
 
         if (outFile.exists() && !outFile.delete()) {
@@ -76,7 +78,7 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
 
     }
 
-    public void tearDown() {
+    public void tearDown() throws Exception {
 
         if (outFile != null && outFile.exists() && !outFile.delete()) {
 
@@ -84,6 +86,8 @@ public class TestIndexSegmentBuilderWithIncrementalBuild extends
 
         }
 
+        super.tearDown();
+        
     }
 
     /**

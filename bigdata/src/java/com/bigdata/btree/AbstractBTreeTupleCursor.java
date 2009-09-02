@@ -1031,7 +1031,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     }
 
     /**
-     * FIXME This needs to be overriden for the {@link IsolatedFusedView} in
+     * FIXME This needs to be overridden for the {@link IsolatedFusedView} in
      * order to correctly propagate the version timestamp onto the tuple. See
      * the insert() and remove() methods on that class. This will probably be
      * done inside of an implementation that extends the {@link FusedView}

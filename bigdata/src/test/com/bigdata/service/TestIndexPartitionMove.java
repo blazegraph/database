@@ -70,12 +70,12 @@ public class TestIndexPartitionMove extends AbstractEmbeddedFederationTestCase {
     }
 
     /**
-     * Overriden to specify the {@link BufferMode#Disk} mode and to lower the
+     * Overridden to specify the {@link BufferMode#Disk} mode and to lower the
      * threshold at which an overflow operation will be selected.
      */
     public Properties getProperties() {
         
-        Properties properties = new Properties( super.getProperties() );
+        final Properties properties = new Properties( super.getProperties() );
         
         // overrides Transient in the base class.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk

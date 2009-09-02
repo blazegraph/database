@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
 
+import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.io.ByteArrayBuffer;
 
@@ -64,6 +65,13 @@ import com.bigdata.io.ByteArrayBuffer;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo consider discarding all of the {@link #add(byte[])} methods. It is
+ *       typically easier and more convenient to directly manage the existing
+ *       {@link MutableKeyBuffer} and {@link MutableValueBuffer}. However, there
+ *       are also {@link MutableKeysRaba} and {@link MutableValueRaba}
+ *       implementations which are, I believe, only used by the
+ *       {@link ResultSet}.
  */
 public interface IRaba extends Iterable<byte[]> {
 
@@ -90,6 +98,13 @@ public interface IRaba extends Iterable<byte[]> {
 
     /**
      * The capacity of the logical byte[][].
+     * 
+     * @todo Coded rabas generally impose <code>capacity == size</code> while
+     *       only mutable rabas have a sense of capacity GTE size. Some of the
+     *       unit tests assume that all rabas are dimensions based on the
+     *       branching factor, which is no longer true. By moving this method
+     *       onto the mutable IRaba implementations we would uncover those
+     *       assumptions and clean things up a bit more.
      */
     public int capacity();
 
@@ -116,6 +131,8 @@ public interface IRaba extends Iterable<byte[]> {
      * 
      * @param index
      *            The index in [0:{@link #size()}-1].
+     * @throws IndexOutOfBoundsException
+     *             unless index is in [0:{@link #size()}-1].
      */
     public boolean isNull(int index);
 
@@ -129,6 +146,8 @@ public interface IRaba extends Iterable<byte[]> {
      * 
      * @throws NullPointerException
      *             if the key at that index is <code>null</code>.
+     * @throws IndexOutOfBoundsException
+     *             unless index is in [0:{@link #size()}-1].
      */
     public int length(int index);
 
@@ -143,7 +162,7 @@ public interface IRaba extends Iterable<byte[]> {
      *         <code>null</code> value was stored at that index.
      * 
      * @throws IndexOutOfBoundsException
-     *             if the index is not in the legal range.
+     *             unless index is in [0:{@link #size()}-1].
      */
     public byte[] get(int index);
 
@@ -160,7 +179,7 @@ public interface IRaba extends Iterable<byte[]> {
      * @return The #of bytes copied.
      * 
      * @throws IndexOutOfBoundsException
-     *             if the index is not in the legal range.
+     *             unless index is in [0:{@link #size()}-1].
      * @throws NullPointerException
      *             if the byte[] value at that index is <code>null</code>.
      * @throws RuntimeException
@@ -189,6 +208,8 @@ public interface IRaba extends Iterable<byte[]> {
      * @param a
      *            The byte[] value.
      * 
+     * @throws IndexOutOfBoundsException
+     *             unless index is in [0:{@link #size()}-1].
      * @throws IllegalArgumentException
      *             if the value is <code>null</code> and null values are not
      *             supported by this implementation.
@@ -202,7 +223,7 @@ public interface IRaba extends Iterable<byte[]> {
      * @param a
      *            A value.
      * 
-     * @return The #of values in the logical byte[][].
+     * @return The #of values in the logical byte[][] (postcondition).
      * 
      * @throws IllegalArgumentException
      *             if the value is <code>null</code> and null values are not
@@ -221,7 +242,7 @@ public interface IRaba extends Iterable<byte[]> {
      * @param len
      *            The #of bytes to be copied.
      * 
-     * @return The #of values in the logical byte[][].
+     * @return The #of values in the logical byte[][] (postcondition).
      * 
      * @throws IllegalArgumentException
      *             if the value is <code>null</code>.
@@ -237,7 +258,7 @@ public interface IRaba extends Iterable<byte[]> {
      * @param len
      *            The #of bytes to be read.
      * 
-     * @return The #of values in the logical byte[][].
+     * @return The #of values in the logical byte[][] (postcondition).
      * 
      * @throws IllegalArgumentException
      *             if <i>in</i> is <code>null</code>.

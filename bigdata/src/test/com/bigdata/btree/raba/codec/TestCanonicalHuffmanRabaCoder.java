@@ -29,6 +29,7 @@ package com.bigdata.btree.raba.codec;
 
 import it.unimi.dsi.bits.BitVector;
 import it.unimi.dsi.compression.CanonicalFast64CodeWordDecoder;
+import it.unimi.dsi.compression.Coder;
 import it.unimi.dsi.compression.Fast64CodeWordCoder;
 import it.unimi.dsi.compression.HuffmanCodec;
 import it.unimi.dsi.compression.PrefixCoder;
@@ -123,7 +124,9 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
     }
 
     /**
-     * Fails.
+     * Fails due to a known bug in {@link HuffmanCodec}. This is just here as
+     * place holder for this bug. We work around this bug in the
+     * {@link CanonicalHuffmanRabaCoder}.
      * 
      * <pre>
      * java.lang.ArrayIndexOutOfBoundsException: -2
@@ -142,7 +145,9 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
     }
 
     /**
-     * Fails.
+     * Fails due to a known bug in {@link HuffmanCodec}. This is just here as
+     * place holder for this bug. We work around this bug in the
+     * {@link CanonicalHuffmanRabaCoder}.
      * 
      * <pre>
      * java.lang.ArrayIndexOutOfBoundsException: -1
@@ -360,6 +365,12 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
 
     /**
      * Unit test for processing an empty {@link IRaba} representing B+Tree keys.
+     * <p>
+     * For an empty {@link IRaba}, {@link RabaCodingSetup} actually assigns
+     * <code>null</code> for the {@link DecoderInputs} due to a bug in the
+     * {@link HuffmanCodec} when nsymbols == 0. Therefore, this verifies that
+     * the {@link Coder} and {@link DecoderInputs} are <code>null</code> and
+     * that the symbol count is zero.
      * 
      * @throws IOException
      */
@@ -371,14 +382,18 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
         final IRaba raba = new ReadOnlyKeysRaba(a);
 
         final AbstractCodingSetup setup = new RabaCodingSetup(raba);
+        
+        assertEquals(0,setup.getSymbolCount());
+        assertNull(setup.codec());
+        assertNull(setup.decoderInputs());
 
-        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
-                .decoderInputs());
-
-        // verify that we can re-create the coder.
-        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
-                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
-                setup.decoderInputs().getSymbols());
+//        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
+//                .decoderInputs());
+//
+//        // verify that we can re-create the coder.
+//        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
+//                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
+//                setup.decoderInputs().getSymbols());
 
     }
 
@@ -449,6 +464,12 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
     /**
      * Unit test for processing an empty {@link IRaba} representing B+Tree
      * values.
+     * <p>
+     * For an empty {@link IRaba}, {@link RabaCodingSetup} actually assigns
+     * <code>null</code> for the {@link DecoderInputs} due to a bug in the
+     * {@link HuffmanCodec} when nsymbols == 0. Therefore, this verifies that
+     * the {@link Coder} and {@link DecoderInputs} are <code>null</code> and
+     * that the symbol count is zero.
      * 
      * @throws IOException
      */
@@ -461,14 +482,18 @@ public class TestCanonicalHuffmanRabaCoder extends AbstractRabaCoderTestCase {
 
         final RabaCodingSetup setup = new RabaCodingSetup(raba);
 
-        // verify that we can re-create the decoder.
-        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
-                .decoderInputs());
-
-        // verify that we can re-create the coder.
-        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
-                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
-                setup.decoderInputs().getSymbols());
+        assertEquals(0,setup.getSymbolCount());
+        assertNull(setup.codec());
+        assertNull(setup.decoderInputs());
+        
+//        // verify that we can re-create the decoder.
+//        doDecoderInputRoundTripTest(setup.getSymbolCount(), setup
+//                .decoderInputs());
+//
+//        // verify that we can re-create the coder.
+//        doCoderRoundTripTest(setup.codec().codeWords(), setup.decoderInputs()
+//                .getShortestCodeWord(), setup.decoderInputs().getLengths(),
+//                setup.decoderInputs().getSymbols());
 
     }
 

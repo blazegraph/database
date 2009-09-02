@@ -37,17 +37,24 @@ import com.bigdata.btree.keys.KeyBuilder;
  * 
  * @see src/architecture/btree.xls, which has the detailed examples.
  */
-public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTestCase {
+public class TestIndexSegmentBuilderWithSmallTree extends
+        AbstractIndexSegmentTestCase {
 
     File outFile;
-    File tmpDir;
-    
-    public TestIndexSegmentBuilderWithSmallTree() {}
-    
-    public TestIndexSegmentBuilderWithSmallTree(String name) {super(name);}
-    
-    public void setUp() {
 
+    File tmpDir;
+
+    public TestIndexSegmentBuilderWithSmallTree() {
+    }
+
+    public TestIndexSegmentBuilderWithSmallTree(String name) {
+        super(name);
+    }
+
+    public void setUp() throws Exception {
+
+        super.setUp();
+        
         outFile = new File(getName() + ".seg");
 
         if (outFile.exists() && !outFile.delete()) {
@@ -60,7 +67,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
 
     }
 
-    public void tearDown() {
+    public void tearDown() throws Exception {
 
         if (outFile != null && outFile.exists() && !outFile.delete()) {
 
@@ -68,6 +75,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
 
         }
 
+        super.tearDown();
+        
     }
 
     /*
@@ -86,7 +95,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
      */
     public BTree getProblem1() {
 
-        BTree btree = getBTree(3);
+        final BTree btree = getBTree(3);
 
         for (int i = 1; i <= 10; i++) {
 
@@ -128,6 +137,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
         assertEquals(10,segStore.getCheckpoint().nentries);
         
         final IndexSegment seg = segStore.loadIndexSegment();
+        
+        try {
         
         assertEquals(3,seg.getBranchingFactor());
         assertEquals(2,seg.getHeight());
@@ -177,6 +188,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
          */
         assertSameBTree(btree, seg);
         
+        } finally {
+            
+            // close so we can delete the backing store.
+            seg.close();
+            
+        }
+
     }
 
     /**
@@ -217,6 +235,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
 
         final IndexSegment seg = segStore.loadIndexSegment();
 
+        try {
+        
         assertEquals(9, seg.getBranchingFactor());
         assertEquals(1, seg.getHeight());
         assertEquals(2, seg.getLeafCount());
@@ -297,6 +317,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
          */
         assertSameBTree(btree, seg);
         
+        } finally {
+            
+            // close so we can delete the backing store.
+            seg.close();
+            
+        }
+
     }
 
     /**
@@ -333,6 +360,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
 
         final IndexSegment seg = segStore.loadIndexSegment();
 
+        try {
+        
         assertEquals(10,seg.getBranchingFactor());
         assertEquals(0,seg.getHeight());
         assertEquals(1,seg.getLeafCount());
@@ -366,6 +395,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
          */
         assertSameBTree(btree, seg);
         
+        } finally {
+            
+            // close so we can delete the backing store.
+            seg.close();
+            
+        }
+
     }
     
     /*
@@ -424,6 +460,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
           */
         final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
 
+        try {
+        
         assertEquals(3,seg.getBranchingFactor());
         assertEquals(1,seg.getHeight());
         assertEquals(3,seg.getLeafCount());
@@ -459,6 +497,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
          */
         assertSameBTree(btree, seg);
         
+        } finally {
+        
+            // close so we can delete the backing store.
+            seg.close();
+            
+        }
+        
     }
 
     /*
@@ -478,7 +523,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
      */
     public BTree getProblem3() {
 
-        BTree btree = getBTree(3);
+        final BTree btree = getBTree(3);
 
         for (int i = 1; i <= 20; i++) {
 
@@ -519,6 +564,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
           */
         final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
 
+        try {
+        
         assertEquals(3,seg.getBranchingFactor());
         assertEquals(2,seg.getHeight());
         assertEquals(7,seg.getLeafCount());
@@ -572,6 +619,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends AbstractIndexSegmentTe
          * Verify the total index order.
          */
         assertSameBTree(btree, seg);
+
+        } finally {
+            
+            // close so we can delete the backing store.
+            seg.close();
+            
+        }
         
     }
     

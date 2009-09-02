@@ -81,11 +81,6 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
     final protected static boolean INFO = log.isInfoEnabled();
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * The BTree.
      * 
      * Note: This field MUST be patched when the node is read from the store.
@@ -369,7 +364,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
                 || (src.parent != null && src.parent.get() != null);
         
         // copy the parent reference.
-        this.parent = src.parent;
+        this.parent = src.parent; // @todo clear src.parent (disconnect it)?
         
 //        /*
 //         * Steal/copy the keys.
@@ -939,7 +934,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
 //            }
         }
         
-        if( this instanceof Leaf ) {
+        if( isLeaf() ) {
 
             btree.getBtreeCounters().leavesJoined++;
 
@@ -959,9 +954,10 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
         AbstractNode<?> rightSibling = parent.getRightSibling(this, false);
 
         AbstractNode<?> leftSibling = parent.getLeftSibling(this, false);
-        
+
         /*
-         * prefer a sibling that is already materialized with enough keys to share.
+         * Prefer a sibling that is already materialized with enough keys to
+         * share.
          */
         if (rightSibling != null
                 && rightSibling.getKeyCount() > rightSibling.minKeys()) {
@@ -982,7 +978,7 @@ public abstract class AbstractNode<T extends AbstractNode<T>> extends PO impleme
         }
 
         /*
-         * if either sibling was not materialized, then materialize and test
+         * If either sibling was not materialized, then materialize and test
          * that sibling.
          */
         if (rightSibling == null) {

@@ -65,6 +65,28 @@ Full tx support for RDF
      - Connection point for state change listener on Statement and its
        type {inferred, explicit}.
 
+     - Extend API to report the revision timestamp for a tx.
+
+     - Log tx commit times together with their associated revision
+       timestamps.
+
+--------------------
+
+Distributed Tx
+
+     - Distributed tx protocol.
+
+     - Failover for tx service.
+
+     - Bottlenecks
+     
+     - The IsolatedFusedView's tuple cursor needs to override remove()
+       in order to propagate the tuple revision timestamp correctly.
+       See AbstractBTreeTupleCursor#remove().
+
+     - Unit tests to verify correct propagation of version timestamps
+       for index segments and views.
+
 --------------------
 Sync of disconnected clients:
 
@@ -552,71 +574,12 @@ x. Done. Verify all RabaCoder and leaf/node data records.
 
 	 - Done. Bug fix for search on front-coded raba.
 
-4. (***) Get rid of all uses of IDataSerializer, replacing them with
+4. Done.  Get rid of all uses of IDataSerializer, replacing them with
    IRabaCoder.
-
-	 - For RMI, we need to pass along the byte length of the coded
-	   rabas for that to work since we can not just read to the
-	   end of the input stream if there is more data following the
-	   coded raba.  This looks like:
-
-                 final ByteArrayBuffer buf = new ByteArrayBuffer();
-                 tupleSerializer.getLeafKeyCoder().encode(keys, buf);
-                 final int nbytes = buf.limit();
-                 out.writeInt(nbytes);
-                 out.write(buf.array(), 0/*off*/, nbytes);
-
-	   This also means that we will no longer have to worry about
-	   whether RMI output streams are buffered.
-		
-	   What we lose is the ability to stream coded data onto the
-	   network without first fully buffering it in memory.  What
-	   we gain is the ability to access the coded representation.
-	   However, for RMI we MUST buffer the coded representation
-	   when sending or receiving.
-
-	 - (***) RMI SHOULD reuse buffers whenever possible.
-
-	   - Index write pipeline.  This is easier to do for things
-	     like the index write pipeline.
-
-	   - ResultSet. It is not clear how to do this for the
-	     Externalizable interface used by the ResultSet.  Probably
-	     we need to have a ResultSetCoder so we can pass in the
-	     buffer.  Then the Externalizable implementation just
-	     invokes the coder.
-
-	   - Index procedure invocations.  Re-review use of
-	     IRabaCoding for IIndexProcedure impls.  Can we use a
-	     "Coder" model here as well and only code if we will do an
-	     RMI?  Also review the KVO(C)[] model and compare with the
-	     IRaba model.
-	   
-	   - Unit tests for serialization of ResultSet, index
-	     procedure abstract classes, and the means they have of
-	     passing back byte[][]s and bit[]s.
-
-	 - (***) Clean up (de-)serialization to avoid decoding keys
-	         and values.
-
-	   - Done. Examine use of rabas in index procedures.
-
-	   - Make sure that the IndexSegmentBuilder reuses buffers and
-             slices in an optimal manner.  See flush() in that class.
-
-	   - Unit test for IndexSegment with version timestamps
-             enabled which verifies the correct max/max version
-             timestamps on the nodes and leaves.
 
          - Done. IndexMetadata will need to be updated to reflect the
 	   codec interface change and the reconcilation of the
 	   IDataSerializer with the IRabaCoder.
-       
-         - NodeSerializer and IAddressSerializer are deprecated and
-           will be deleted. IKeyBuffer(done) is deprecated and should
-           be deleted - it is only used by the test suites.  The
-           ImmutableKeyBuffer(done) is deprecated and should be
-           deleted.
 
 	 - Done. ITupleSerializer - update (IDataSerializer).
 
@@ -625,52 +588,57 @@ x. Done. Verify all RabaCoder and leaf/node data records.
 
 	 - Done. The IIndexProcedure implementations MUST NOT
            deserialize the coded rabas.  Just wrap them.
-	   
-	 - getKeys():IRaba and getValues():IRaba SHOULD be raised into
-	   the IKeyArrayIndexProcedure API.  This will make it easier
-	   to use efficient access to the coded data.
 
 	 - Done.  Verify min/max version timestamps for nodes and
            leaves are correctly maintained and persisted with unit
            tests.  The IRaba unit tests MUST explore the value space
            here for both nodes and leaves.
 
-	 - Share pluggable timestamp serialization logic for
-	   DefaultLeafCoder and ResultSet.
-
-5. (***) Replace data record in AbstractBTree on eviction with coded
+5. Done. Replace data record in AbstractBTree on eviction with coded
    data record.
 
-        - Make sure that we DO NOT recode a coded IRaba accidently.
-          This can of course be done intentionally, but we should not
-          be recoding records which are already coded as that is a
-          heavy operation.
+        - Done. Make sure that we DO NOT recode a coded IRaba
+          accidently.  This can of course be done intentionally, but
+          we should not be recoding records which are already coded as
+          that is a heavy operation.
 
-        - (****) IAbstractNodeDecoder should indicate that the node
-	  has been coded and give us access to the slice containing
-	  the coded data.  At that point, NodeSerializer does not need
-	  to do anything except wrap the slice as a ByteBuffer and
-	  conditionally compress it.
+        - Done [it was a unit test problem.] There is a problem either
+	  with unit test or the code for delete markers in
+	  TestChunkedIterators.  The unit test did not historically
+	  generate deleted tuples, so the problem could be either with
+	  the B+Tree or the ResultSet or the test's own assumptions.
 
-	  The AbstractBTree's write queue eviction should reuse the
-	  _writeBuffer for all evicted nodes so they are coded using
-	  the same backing buffer.  We don't need it in the
-	  NodeSerializer class any more.  We already have a coded
-	  slice on hand.
+	- Done. [The root leaf of an empty IndexSegment had a mutable
+	  data record.]  Finally, there is an odd problem with one
+	  IndexSegment unit tests where the segment is verifying that
+	  the iterator (tuple cursor) is exhausted and winds up trying
+	  to request the nextAddr from the leaf data record, which is
+	  a MutableLeafData instance(?!?).
 
-	  Read should tunnel through the ByteBuffer to the byte[].
+	- Done. Verify that all methods with generic parameters
+          AbstractNode<?> in AbstractBTree which are overridden are
+          overridden with exactly the same method signature.  Use
+          @Override to avoid this problem in the future.
 
-	  Decompress should be byte[] to byte[] using streams ala
-	  DataInputBuffer and DataOutputBuffer.
+	  Done. Also check classes which extend AbstractNode (Leaf,
+	  Node, ImmutableLeaf, ImmutableNode).
 
-	  If a "compression service" is added, make sure that it can
-	  not cause deadlocks.
-             
-        - Optimize out the use of the ByteBuffer.  This should be easy
-          to hack w/ record level compression if we use a
-          ByteArrayBuffer as the (de-)compression target.
+        - Done. Must replace the [data] with the read-only record.
+          This will change the NodeSerializer API since we need the
+          ReadOnlyLeafData or ReadOnlyNodeData object back, not just
+          the ByteBuffer (this is available from those classes).
 
-        - Record level compression for the store.
+	   AbstractBTree#writeNodeOrLeaf(final AbstractNode node)
+
+        - Done. Each mutable B+Tree should use a single backing buffer
+          instance for key and value compression (NodeSerializer did
+          it this way, so there might be a reason to keep an object
+          around which has those buffers)
+
+        - (*) Should run all of the persistence tests against each of
+          the IRabaCoder combinations.
+
+x. Transient B+Tree issues.
 
 	- (*) Verify that transient B+Trees convert data records to
           immutable data records when there is an eviction event.
@@ -688,52 +656,51 @@ x. Done. Verify all RabaCoder and leaf/node data records.
           might not always be the case. For example, it is possible to
           have mutable coded node/leaf impls.
 
-	- Some odd problems.  At least some of them can be traced to
-          allocating the wrong capacity for a node or leaf (m vs m+1).
-          That causes various condition tests to fail for split/join
-          and then everything is off on the wrong track.
+	 - (***) A weird problem shows up for transient B+Trees during
+           remove.  The problem is during removeAll().  One of the
+           siblings for a merge has a deleted parent, so they are not
+           in fact siblings of the same parent node!
 
-	- IRaba#capacity() is trouble.  Move that onto mutable IRaba
-          since we use capacity==size for all coded rabas.
+	   This looks like a real bug.  It might be connected to the
+           transient B+Tree semantics, but we should never have a
+           child which does not point back to its parent!
 
-Nearly the entire B+Tree test suite is working.
+	   One possibility is that the update of the parent on the
+	   children during merge() is broken, e.g., it does not update
+	   the last child's parent for some code path.
+	   Node#redistributeKeys() also does this.  The copyOnWrite
+	   Node() ctor is another place where we do this.  And
+	   copyOnWrite() also invokes replaceChildRef(), which is
+	   another place where the parent is changed.
 
-There is a problem either with unit test or the code for delete markers in TestChunkedIterators.  The unit test did not historically generate deleted tuples, so the problem could be either with the B+Tree or the ResultSet or the test's own assumptions.
+	   split() also updates the child references, but it is less
+	   likely to be the cause of a deleted parent.
 
-Another weird problem which shows up for transient B+Trees during remove.  Support was added for converting mutable nodes/leaves to immutable (coded) nodes/leaves, so this is probably related to that change.  However, the error is reported for siblings which have a different parent.
+	   There are unit tests for these things, but perhaps they are
+	   not verifying that the parents are updated correctly?
 
-Finally, there is an odd problem with one IndexSegment unit tests where the segment is verifying that the iterator (tuple cursor) is exhausted and winds up trying to request the nextAddr from the leaf data record, which is a MutableLeafData instance(?!?).
+	   Why does TestRemoveAll() not trigger this?
 
-	- Either keep or drop the IAddressSerializer.
-
-	  Note: This must be provisioned with information about the
-          IAddressManager if it will use address aware coding.
-
-        - (*) Should run all of the persistence tests against each of
-          the IRabaCoder combinations.
-
-        - Must replace the [data] with the read-only record.  This
-          will change the NodeSerializer API since we need the
-          ReadOnlyLeafData or ReadOnlyNodeData object back, not just
-          the ByteBuffer (this is available from those classes).
-
-	   AbstractBTree#writeNodeOrLeaf(final AbstractNode node)
-
-        - Verify that we do this for transient B+Tree instances as
-          well (check in unit tests).
-
-        - Each mutable B+Tree should use a single backing buffer
-          instance for key and value compression (NodeSerializer did
-          it this way, so there might be a reason to keep an object
-          around which has those buffers)
-
-	- The persistence tests should use the default codec for keys
-          and values.  Either front-coded or canonical huffman for
-          keys and canonical huffman for values.
+	   Checl TestSplitJoinThreeLevels.  It it is not testing the
+	   parent reference assumptions then perhaps the problem
+	   exists even in a simple and well documented unit test.
+	   
+	 - (***) There really need to be more unit tests for transient
+	   B+Trees to get at other broken assumptions, primarily
+	   asserts which are no longer valid.
 
 6. Tighter coding & versioning.
 
    - Make sure all records and Externalizable interfaces are versioned.
+       
+         - NodeSerializer and IAddressSerializer are deprecated and
+           will be deleted. IKeyBuffer(done) is deprecated and should
+           be deleted - it is only used by the test suites.  The
+           ImmutableKeyBuffer(done) is deprecated and should be
+           deleted.
+
+	 - Share pluggable timestamp serialization logic for
+	   DefaultLeafCoder and ResultSet.
 
 	 - (*) ReadOnlyNode/Leaf Coding.
 
@@ -761,6 +728,12 @@ Finally, there is an odd problem with one IndexSegment unit tests where the segm
 	     strictly increasing (again, not true since they code the
 	     region, the byte offset, and the byte length).
 
+	     - Either keep or drop the IAddressSerializer.
+	     
+	       Note: This must be provisioned with information about
+	       the IAddressManager if it will use address aware
+	       coding.
+
 	   - Code the childEntryCount[].
 
 	     A similar scheme might apply here.  Since the B+Tree is
@@ -768,7 +741,74 @@ Finally, there is an odd problem with one IndexSegment unit tests where the segm
 	     roughly comparable, hence substracting out the minimum
 	     could save space.
 
-       - (***) Performance tuning:
+7. Buffering & caching.
+
+	- The IndexSegment has a leaf cache.  That should be a global
+          cache.
+
+        - Make sure that the IndexSegmentBuilder reuses buffers and
+          slices in an optimal manner.  See flush() in that class.
+
+	- Unit test for IndexSegment with version timestamps enabled
+          which verifies the correct max/max version timestamps on the
+          nodes and leaves.
+
+x. RMI SHOULD reuse buffers whenever possible.
+
+	 - Index write pipeline.  This is easier to do for things like
+	   the index write pipeline.
+
+         - ResultSet. It is not clear how to do this for the
+	   Externalizable interface used by the ResultSet.  Probably
+	   we need to have a ResultSetCoder so we can pass in the
+	   buffer.  Then the Externalizable implementation just
+	   invokes the coder.
+
+	 - Index procedure invocations.  Re-review use of IRabaCoding
+	   for IIndexProcedure impls.  Can we use a "Coder" model here
+	   as well and only code if we will do an RMI?  Also review
+	   the KVO(C)[] model and compare with the IRaba model.
+	   
+         - Unit tests for serialization of index procedure abstract
+	   classes, and the means they have of passing back byte[][]s
+	   and bit[]s.
+
+	 - Review use of rabas in index procedures with an eye to
+           minimizing allocation once more.
+   
+	 - getKeys():IRaba and getValues():IRaba SHOULD be raised into
+	   the IKeyArrayIndexProcedure API.  This will make it easier
+	   to use efficient access to the coded data.
+
+9. Compression
+
+        - Decompress should be byte[] to byte[] using streams ala
+	  DataInputBuffer and DataOutputBuffer.
+
+	  If a "compression service" is added, make sure that it can
+	  not cause deadlocks.
+             
+        - Optimize out the use of the ByteBuffer.  This should be easy
+          to hack w/ record level compression if we use a
+          ByteArrayBuffer as the (de-)compression target.
+
+        - Record level compression for the store.
+
+	- The IndexSegment nodes region can be read into a byte[]
+          rather than a direct ByteBuffer.  I do not believe that we
+          gain access to any additional memory with direct ByteBuffers
+          and they are definately slower and consume memory which can
+          not be otherwise reused.  This will make it possible to do
+          perfect allocations for the nodes region.
+	  
+	  The nodes region could be compressed as a single record if
+          we get tricky.  That would be better compression, but all
+          addressing into the nodes region would have to be in terms
+          of the decompressed record.  You could not directly read on
+          the file system at the given byte address since it would be
+          in the middle of a compressed region.
+
+10. Performance tuning:
 
 	 AbstractRabaCoderTestCase#main(String[])
 

@@ -61,44 +61,44 @@ public class TestAll_BTreeBasics extends TestCase {
          * test btree fundamentals.
          */
         // test static and instance utility methods on AbstractNode and ArrayType.
-        suite.addTestSuite( TestUtilMethods.class );
+        suite.addTestSuite(TestUtilMethods.class);
         // test finding a child of a node by its key.
-        suite.addTestSuite( TestFindChild.class );
+        suite.addTestSuite(TestFindChild.class);
         // test insert, lookup, and remove for root leaf w/o splitting it.
-        suite.addTestSuite( TestInsertLookupRemoveKeysInRootLeaf.class );
+        suite.addTestSuite(TestInsertLookupRemoveKeysInRootLeaf.class);
         // test splitting the root leaf.
-        suite.addTestSuite( TestSplitRootLeaf.class );
+        suite.addTestSuite(TestSplitRootLeaf.class);
         // test splitting and joining the root leaf (no more than two levels).
-        suite.addTestSuite( TestSplitJoinRootLeaf.class );
+        suite.addTestSuite(TestSplitJoinRootLeaf.class);
         // test splitting and joining with more than two levels.
-        suite.addTestSuite( TestSplitJoinThreeLevels.class );
+        suite.addTestSuite(TestSplitJoinThreeLevels.class);
         // test indexOf, keyAt, valueAt.
-        suite.addTestSuite( TestLinearListMethods.class );
+        suite.addTestSuite(TestLinearListMethods.class);
         // test getCounter()
-        suite.addTestSuite( TestIndexCounter.class );
-        
+        suite.addTestSuite(TestIndexCounter.class);
+
         // test iterator semantics.
         suite.addTest(TestAll_Iterators.suite());
 
         // test delete semantics (also see the isolation package).
-        suite.addTestSuite( TestRemoveAll.class );
+        suite.addTestSuite(TestRemoveAll.class);
         // test contract for BTree#touch(node) w/o IO.
-        suite.addTestSuite( TestTouch.class );
+        suite.addTestSuite(TestTouch.class);
         // stress test basic tree operations w/o IO.
-        suite.addTestSuite( TestBTree.class );
+        suite.addTestSuite(TestBTree.class);
         // @todo test child address serialization (keep or discard?).
-        suite.addTestSuite( TestAddressSerializer.class );
-        suite.addTestSuite( TestPackedAddressSerializer.class );
+        suite.addTestSuite(TestAddressSerializer.class);
+        suite.addTestSuite(TestPackedAddressSerializer.class);
         // test node/leaf serialization.
 //        suite.addTestSuite( TestNodeSerializer.class );
         
         // test iterator semantics for visiting only "dirty" nodes or leaves.
-        suite.addTestSuite( TestDirtyIterators.class );
-        
+        suite.addTestSuite(TestDirtyIterators.class);
+
         // test incremental write of leaves and nodes.
-        suite.addTestSuite( TestIncrementalWrite.class );
+        suite.addTestSuite(TestIncrementalWrite.class);
         // test copy-on-write scenarios.
-        suite.addTestSuite( TestCopyOnWrite.class );
+        suite.addTestSuite(TestCopyOnWrite.class);
 
         /*
          * test with delete markers.
