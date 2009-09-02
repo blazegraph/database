@@ -403,7 +403,11 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
                     if (log.isInfoEnabled())
                         log.info("Done: " + resource);
-                    
+//                    + " : tps="
+//                                + loader.getInsertRate() + ", elapsed="
+//                                + loader.getInsertTime() + ", statementsAdded="
+//                                + loader.getStatementsAdded());
+
                 } catch (Exception ex) {
 
                     throw new RuntimeException("While loading: " + resource, ex);
