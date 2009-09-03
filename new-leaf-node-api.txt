@@ -1,13 +1,9 @@
 Issues to be resolved in this branch.
 
-1. Re-design of the node/leaf API to support processing of serialized
-   nodes and leaves without materializing their contents as java
-   objects.  Nodes and leaves are now expanded into Java objects iff a
-   mutation needs to be performed on the node or leaf. 
-
-   Note: Since search may have more overhead, operations per second
-   (lookup, insert, etc) may actually be slower until caching effects
-   trump IO Wait.
+1. Done. Re-design of the node/leaf API to support processing of
+   serialized nodes and leaves without materializing their contents as
+   java objects.  Nodes and leaves are now expanded into Java objects
+   iff a mutation needs to be performed on the node or leaf.
 
 2. Global record or B+Tree node/leaf record buffering for a DS.  This
    allows us to efficiently use all available RAM to buffer the
@@ -58,6 +54,18 @@ Full tx support for RDF
 
      - In the OpenAnzo data source.
 
+     - Verify transactional create of indices and kb.
+
+     - Non-tx writes MUST assign a revision timestamp if they are
+       targeting an index which supports transactions and on which
+       transactions may have already written data.  The revision
+       timestamp can be a timestamp associated with the task holding
+       the lock on the index.
+
+     - TM can be done as an extension of the tx processing.  Just
+       bring the tx write set to a fixed point, then resolve conflicts
+       during validation and merge down for the commit.
+
      - Reconcile adds but reject conflicting retractions.
 
      - Connection point for disconnected synchronization.
@@ -77,6 +85,8 @@ Distributed Tx
      - Distributed tx protocol.
 
      - Failover for tx service.
+
+     - Write sets must stick with their corresponding index partition.
 
      - Bottlenecks
      
@@ -217,7 +227,7 @@ Other:
 - Examine opportunities for "rack aware" selection of the CS or DS
   when integrating with HDFS.
 
--- merge to branch -- 
+-- merge to branch #1 -- 
 
 from: https://bigdata.svn.sourceforge.net/svnroot/bigdata/trunk
 
@@ -231,6 +241,18 @@ Revision: Head
 Commit message: Merging trunk into branch BTREE_BUFFER_BRANCH [2004]:[2022].
 
 See http://openmrs.org/wiki/Subversion_Branching_and_Merging_Techniques
+
+-- merge to branch #2 --
+
+from: https://bigdata.svn.sourceforge.net/svnroot/bigdata/trunk
+
+Revision: 2022 (last revision in the previous merge to branch)
+
+to: https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BTREE_BUFFER_BRANCH
+
+Revision: Head
+
+Commit message: Merging trunk into branch BTREE_BUFFER_BRANCH [2022]:[2038].
 
 ------------------------------------------------------------
 -------------- Store level record compression --------------
@@ -656,6 +678,10 @@ x. Transient B+Tree issues.
           might not always be the case. For example, it is possible to
           have mutable coded node/leaf impls.
 
+	 - (***) There really need to be more unit tests for transient
+	   B+Trees to get at other broken assumptions, primarily
+	   asserts which are no longer valid.
+
 	 - (***) A weird problem shows up for transient B+Trees during
            remove.  The problem is during removeAll().  One of the
            siblings for a merge has a deleted parent, so they are not
@@ -681,23 +707,60 @@ x. Transient B+Tree issues.
 
 	   Why does TestRemoveAll() not trigger this?
 
-	   Checl TestSplitJoinThreeLevels.  It it is not testing the
+	   Check TestSplitJoinThreeLevels.  It it is not testing the
 	   parent reference assumptions then perhaps the problem
 	   exists even in a simple and well documented unit test.
-	   
-	 - (***) There really need to be more unit tests for transient
-	   B+Trees to get at other broken assumptions, primarily
-	   asserts which are no longer valid.
 
-6. Tighter coding & versioning.
+x. Other unit test problems:
+
+         - (****) Merge from the trunk.
+
+         - TestIsolatedFusedView is broken.
+
+	   Add a unit test here with cursor#remove(), then fix
+	   remove() to propagate the tuple revision timestamp with the
+	   delete marker.
+
+	 - TestTx#test_writeIsolation() also shows what is probably
+           the same problem.  Also test itr#remove() for tx isolation.
+
+	 - TestRangeQuery#reverseScan() and #removeAll() are broken
+           (services).
+
+	 - Rerun the "resources" test suite (split, join, merge).
+
+	 - TestDatabaseAtOnceClosure - showing array store errors
+           related to join nexus changes.
+
+	 - FastRDFValueCompression is broken (due to the changes to
+	   BytesUtil to use the same big endian format for bit flags
+	   as OutputBitStream?)
+
+	 - The EmptyRabaCoder MAY need to discard the IRaba.  E.g.,
+           when used for the statement indices the B+Tree will
+           maintain the values but they will be empty (a different
+           option might allow us to not maintain the values at all).
+
+	 - The min/max tuple revision timestamps are not being
+           maintained by Leaf.  Write unit tests for this.  Plan for
+           iterator filter on tuple revision timestamp using the
+           min/max on a node to skip all spanned nodes when they are
+           not relevant to the query.
+
+6. (***) Tighter coding & versioning.
 
    - Make sure all records and Externalizable interfaces are versioned.
        
-         - NodeSerializer and IAddressSerializer are deprecated and
-           will be deleted. IKeyBuffer(done) is deprecated and should
-           be deleted - it is only used by the test suites.  The
-           ImmutableKeyBuffer(done) is deprecated and should be
-           deleted.
+   - Compare the size on disk of the trunk and this branch.
+
+   - Compare size on disk once compression is enabled.
+
+         - IAddressSerializer is deprecated and should be deleted or
+           reused by the INodeCoder.
+
+	   Note: This must be provisioned with information about the
+	   IAddressManager if it will use address aware coding.  That
+	   information is not currently available to the INodeCoder.
 
 	 - Share pluggable timestamp serialization logic for
 	   DefaultLeafCoder and ResultSet.
@@ -727,13 +790,7 @@ x. Transient B+Tree issues.
 	     For an index segment, the childAddr[] values will also be
 	     strictly increasing (again, not true since they code the
 	     region, the byte offset, and the byte length).
-
-	     - Either keep or drop the IAddressSerializer.
 	     
-	       Note: This must be provisioned with information about
-	       the IAddressManager if it will use address aware
-	       coding.
-
 	   - Code the childEntryCount[].
 
 	     A similar scheme might apply here.  Since the B+Tree is
@@ -741,7 +798,22 @@ x. Transient B+Tree issues.
 	     roughly comparable, hence substracting out the minimum
 	     could save space.
 
-7. Buffering & caching.
+7. (***) Buffering & caching.
+
+	- There will have to be lookup (hash table) by store UUID and
+          addr for node/leaf data records which are still in the
+          cache.  In fact, since those data records are immutable and
+          the IAbstractNodeData implementations are thread-safe for
+          readers, we can share them across all requests for the same
+          store+addr, even when the B+Tree instances are different.
+
+	  The problem with the hard reference cache is its fixed
+	  capacity.  The Java LRU has this same limitation.  We can
+	  place an upper bound on the ring buffer and then manage the
+	  size on disk of the buffered nodes.  The buffer is not
+	  thread safe so it will have to be wrapped for that purpose.
+	  A concurrent version would be a nice touch, but only if we
+	  observe a hot spot on touch().
 
 	- The IndexSegment has a leaf cache.  That should be a global
           cache.
@@ -753,7 +825,7 @@ x. Transient B+Tree issues.
           which verifies the correct max/max version timestamps on the
           nodes and leaves.
 
-x. RMI SHOULD reuse buffers whenever possible.
+x. (***) RMI SHOULD reuse buffers whenever possible.
 
 	 - Index write pipeline.  This is easier to do for things like
 	   the index write pipeline.
@@ -773,6 +845,11 @@ x. RMI SHOULD reuse buffers whenever possible.
 	   classes, and the means they have of passing back byte[][]s
 	   and bit[]s.
 
+	 - There are no unit tests for serialization coverage for
+           IndexMetadata.
+
+	 - Unit tests of serialization for the IRabaCoders.
+
 	 - Review use of rabas in index procedures with an eye to
            minimizing allocation once more.
    
@@ -781,6 +858,10 @@ x. RMI SHOULD reuse buffers whenever possible.
 	   to use efficient access to the coded data.
 
 9. Compression
+
+	- The IRawStore API SHOULD NOT make the ByteBuffer's read-only
+          and would be better off if it used an IRawRecord/Slice
+          combination.
 
         - Decompress should be byte[] to byte[] using streams ala
 	  DataInputBuffer and DataOutputBuffer.
@@ -809,6 +890,45 @@ x. RMI SHOULD reuse buffers whenever possible.
           in the middle of a compressed region.
 
 10. Performance tuning:
+
+         - trunk vs branch performance comparisons (also compare the
+           space on the disk).  For scale-out, also look at the RAM
+           profile.
+
+------------------------------------------------------------
+laptop 9/2/2009
+
+-server -Xmx1000m
+
+Note: JVM tuning effects can differ for trunk vs branch.
+
+trunk:
+U10      : 1316700 stmts added in 75.533 secs, rate= 17432, commitLatency=0ms
+U5       : 645835 stmts added in 30.848 secs, rate= 20936, commitLatency=0ms
+U1	 : 103104 stmts added in 4.703 secs, rate= 21923, commitLatency=0ms
+wordnet  : 273681 stmts added in 13.984 secs, rate= 19571, commitLatency=328ms
+thesaurus: 1086012 stmts added in 60.907 secs, rate= 17830, commitLatency=250ms
+alibaba  : 45655 stmts added in 1.766 secs, rate= 25852, commitLatency=156ms
+NCIOnc   : 464841 stmts added in 24.422 secs, rate= 19033, commitLatency=312ms
+baseball : 
+
+B+Tree branch:
+U10	 : 1316700 stmts added in 85.797 secs, rate= 15346, commitLatency=0ms
+U5	 : 645835 stmts added in 36.251 secs, rate= 17815, commitLatency=0ms
+U1	 : 103104 stmts added in 4.359 secs, rate= 23653, commitLatency=0ms
+wordnet	 : 273681 stmts added in 15.093 secs, rate= 18132, commitLatency=360ms
+thesaurus: 273681 stmts added in 15.093 secs, rate= 18132, commitLatency=360ms
+alibaba	 : 45655 stmts added in 1.719 secs, rate= 26559, commitLatency=219ms
+NCIOnc	 : 464841 stmts added in 26.75 secs, rate= 17377, commitLatency=422ms
+baseball :
+
+	 - Performance comparisons of different coders (primarily
+           simple vs huffman) for the RDF DB (impacts TERM2ID, ID2TERM
+           and statement indices when using SIDS).
+
+	 - Performance comparisons of load rate change due to the
+           coding of nodes and leaves when they are evicted and their
+           subsequent use as coded data records.
 
 	 AbstractRabaCoderTestCase#main(String[])
 
@@ -888,12 +1008,6 @@ com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder@9b04ac : elapsed=50066, r
           - Add unit tests for keys NOT present in the raba.
 
 	  - Done. Special case when nsymbols==1 (dsiutils bug).
-
-       - Done. Refactor the FastRDFValueSerializer (no test suite yet).
-
-	   (***) FastRDFValueCompression MAY be broken due to the
-		 changes to BytesUtil to use the same big endian
-		 format for bit flags as OutputBitStream.
 
        - RDF Front Coding or Canonical Huffman Leaf Key Coders.
 
@@ -1084,9 +1198,82 @@ com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder@9b04ac : elapsed=50066, r
            fastutils.  Possibly do this as part of the lgpl-utils
            build.
 
-	 - (*) Make sure that the ant script builds the lgpl-utils jar
-           first and then links with it to reference the classes
-           inside of that jar.
+	 - (***) Make sure that the ant script builds the lgpl-utils
+           jar first and then links with it to reference the classes
+           inside of that jar.  Work with the old lgpl-utils ant
+           script which correctly propagated the binary files to
+           support coding in the bit streams.
+
+------------------------------------------------------------
+Errors:
+
+     - TM blew out on baseball stats file @ 2G
+
+ERROR: 447969 com.bigdata.journal.TemporaryStore.executorService1         com.bigdata.journal.AbstractBufferStrategy.overflow(AbstractBufferStrategy.java:301): Would exceed int32 bytes.
+java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: De-serialization problem: addr={nbytes=517,offset=2130370317} from store=D:\DOCUME~1\mikep\LOCALS~1\Temp\bigdata1406701428727139694.tmp : cause=java.lang.IllegalArgumentException: Would truncate written data.
+	at com.bigdata.rdf.spo.SPORelation.insert(SPORelation.java:1392)
+	at com.bigdata.rdf.store.AbstractTripleStore.addStatements(AbstractTripleStore.java:2951)
+	at com.bigdata.rdf.rio.StatementBuffer.writeSPOs(StatementBuffer.java:1017)
+	at com.bigdata.rdf.rio.StatementBuffer.addStatements(StatementBuffer.java:883)
+	at com.bigdata.rdf.rio.StatementBuffer.incrementalWrite(StatementBuffer.java:742)
+	at com.bigdata.rdf.rio.StatementBuffer.add(StatementBuffer.java:803)
+	at com.bigdata.rdf.rio.StatementBuffer.add(StatementBuffer.java:814)
+	at com.bigdata.rdf.rio.StatementBuffer.processDeferredStatements(StatementBuffer.java:511)
+	at com.bigdata.rdf.rio.StatementBuffer.flush(StatementBuffer.java:413)
+	at com.bigdata.rdf.sail.BigdataSail$BigdataSailConnection.flushStatementBuffers(BigdataSail.java:1673)
+	at com.bigdata.rdf.sail.BigdataSail$BigdataSailConnection.commit(BigdataSail.java:1589)
+	at org.openrdf.repository.sail.SailRepositoryConnection.commit(SailRepositoryConnection.java:81)
+	at com.bigdata.rdf.sail.BigdataSailRepositoryConnection.commit(BigdataSailRepositoryConnection.java:44)
+	at com.bigdata.samples.SampleCode.loadSomeDataFromADocument(SampleCode.java:118)
+	at com.bigdata.samples.TestBaseball.main(TestBaseball.java:48)
+Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: De-serialization problem: addr={nbytes=517,offset=2130370317} from store=D:\DOCUME~1\mikep\LOCALS~1\Temp\bigdata1406701428727139694.tmp : cause=java.lang.IllegalArgumentException: Would truncate written data.
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:222)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:83)
+	at com.bigdata.rdf.spo.SPORelation.insert(SPORelation.java:1377)
+	... 14 more
+Caused by: java.lang.RuntimeException: De-serialization problem: addr={nbytes=517,offset=2130370317} from store=D:\DOCUME~1\mikep\LOCALS~1\Temp\bigdata1406701428727139694.tmp : cause=java.lang.IllegalArgumentException: Would truncate written data.
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:3254)
+	at com.bigdata.btree.Node._getChild(Node.java:2262)
+	at com.bigdata.btree.Node.getChild(Node.java:2176)
+	at com.bigdata.btree.Node.lookup(Node.java:688)
+	at com.bigdata.btree.Node.lookup(Node.java:690)
+	at com.bigdata.btree.Node.lookup(Node.java:690)
+	at com.bigdata.btree.Node.lookup(Node.java:690)
+	at com.bigdata.btree.AbstractBTree.lookup(AbstractBTree.java:1858)
+	at com.bigdata.btree.AbstractBTree.lookup(AbstractBTree.java:1790)
+	at com.bigdata.rdf.spo.SPOIndexWriteProc.apply(SPOIndexWriteProc.java:193)
+	at com.bigdata.btree.UnisolatedReadWriteIndex.submit(UnisolatedReadWriteIndex.java:795)
+	at com.bigdata.rdf.spo.SPOIndexWriter.call(SPOIndexWriter.java:263)
+	at com.bigdata.rdf.spo.SPOIndexWriter.call(SPOIndexWriter.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+	at java.lang.Thread.run(Thread.java:619)
+Caused by: java.lang.IllegalArgumentException: Would truncate written data.
+	at com.bigdata.journal.DiskOnlyStrategy.truncate(DiskOnlyStrategy.java:2355)
+	at com.bigdata.journal.AbstractBufferStrategy.overflow(AbstractBufferStrategy.java:341)
+	at com.bigdata.journal.DiskOnlyStrategy.overflow(DiskOnlyStrategy.java:2133)
+	at com.bigdata.journal.DiskOnlyStrategy.allocate(DiskOnlyStrategy.java:1854)
+	at com.bigdata.journal.DiskOnlyStrategy.write(DiskOnlyStrategy.java:2027)
+	at com.bigdata.journal.TemporaryRawStore.write(TemporaryRawStore.java:472)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:3157)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:98)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
+	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:251)
+	at com.bigdata.cache.HardReferenceQueue.beforeOffer(HardReferenceQueue.java:224)
+	at com.bigdata.cache.RingBuffer.offer(RingBuffer.java:165)
+	at com.bigdata.cache.RingBuffer.add(RingBuffer.java:153)
+	at com.bigdata.cache.HardReferenceQueue.add(HardReferenceQueue.java:203)
+	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:2920)
+	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:342)
+	at com.bigdata.btree.Leaf.<init>(Leaf.java:141)
+	at com.bigdata.btree.BTree$NodeFactory.allocLeaf(BTree.java:1384)
+	at com.bigdata.btree.NodeSerializer.getLeaf(NodeSerializer.java:1011)
+	at com.bigdata.btree.NodeSerializer.getNodeOrLeaf(NodeSerializer.java:463)
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:3250)
+	... 17 more
+
 
 Access:
 
@@ -1496,3 +1683,21 @@ you could share.
 Thanks,
 
 -bryan
+
+
+----------------------------------------
+Faster Searches Key to a Greener Web
+University of Glasgow (United Kingdom) (08/31/09) Forsyth, Stuart 
+
+University of Glasgow researchers created a system using field programmable gate arrays (FPGAs) to search a document index 20 times faster than a system based on standard processors. The researchers plan to develop the system for use in Web servers to speed up Internet searches, which they say would reduce the Internet's energy consumption and carbon cost. Estimates for the amount of carbon dioxide generated by a single Internet search request range from 0.2g per search, according to Google, to 7g per search, according to Harvard University physicist Alex Wisser-Gross. "Few people stop to think about the carbon costs of their computing," says project researcher Wim Vanderbauwhede. "By making Internet searches faster, servers will use less energy to produce results, even if the power consumption of the actual equipment is the same because they will use that energy for a fraction of the time." The researchers found that a system of two Xilinx FPGAs running the information retrieval and filtering algorithms for a document database were 20 times faster in returning results than a dual-core Intel Itanium-2 processor, and consumed only 1.25 watts each compared to the 130 watts consumed by the Itanium processor. The researchers plan to improve the performance of the current prototype and test it in a data center environment.
+
+View Full Article | Return to Headlines 
+
+cell processor: http://domino.research.ibm.com/comm/research.nsf/pages/r.arch.innovation.html
+
+------------------------------------------------------------
+
+Mac Java 1.6 Setup
+
+http://www.netbeans.org/kb/61/java/javafx-jdk6-on-32-bit-mac.html
+http://landonf.bikemonkey.org/static/soylatte/
