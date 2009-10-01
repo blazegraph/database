@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.lexicon;
 
 import java.io.Externalizable;
+import java.util.Locale;
+import java.util.Properties;
 
 import junit.framework.TestCase2;
 
@@ -42,6 +44,7 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 
@@ -176,7 +179,12 @@ public class TestSerialization extends TestCase2 {
      * This is an odd issue someone reported for the trunk. There are two
      * version of a plain Literal <code>Brian McCarthy</code>, but it appears
      * that one of the two versions has a leading bell character when you decode
-     * the Unicode byte[].
+     * the Unicode byte[]. I think that this is actually an issue with the
+     * {@link Locale} and the Unicode sort key generation. If {@link KeyBuilder}
+     * as configured on the system generates Unicode sort keys which compare as
+     * EQUAL for these two inputs then that will cause the lexicon to report an
+     * "apparent" inconsistency. In fact, what we probably need to do is just
+     * disable the inconsistency check in the lexicon.
      * 
      * <pre>
      * ERROR: com.bigdata.rdf.lexicon.Id2TermWriteProc.apply(Id2TermWriteProc.java:205): val=[0, 2, 0, 14, 66, 114, 105, 97, 110, 32, 77, 99, 67, 97, 114, 116, 104, 121]
@@ -202,7 +210,28 @@ public class TestSerialization extends TestCase2 {
 
         System.err.println("old=" + oldValue);
 
-        final IKeyBuilder keyBuilder = new KeyBuilder();
+        /*
+         * Note: This uses the default Locale and the implied Unicode collation
+         * order to generate the sort keys.
+         */
+//        final IKeyBuilder keyBuilder = new KeyBuilder();
+
+        /*
+         * Note: This allows you to explicitly configure the behavior of the
+         * KeyBuilder instance based on the specified properties.  If you want
+         * your KB to run with these properties, then you need to specify them
+         * either in your environment or using -D to java.
+         */
+        final Properties properties = new Properties();
+        
+        // specify that all aspects of the Unicode sequence are significant.
+        properties.setProperty(KeyBuilder.Options.STRENGTH,StrengthEnum.Identical.toString());
+        
+//        // specify that that only primary character differences are significant.
+//        properties.setProperty(KeyBuilder.Options.STRENGTH,StrengthEnum.Primary.toString());
+        
+        final IKeyBuilder keyBuilder = KeyBuilder
+                .newUnicodeInstance(properties);
 
         final LexiconKeyBuilder lexKeyBuilder = new LexiconKeyBuilder(
                 keyBuilder);
@@ -215,6 +244,12 @@ public class TestSerialization extends TestCase2 {
         System.err.println("newValKey=" + BytesUtil.toString(newValKey));
         
         System.err.println("oldValKey=" + BytesUtil.toString(oldValKey));
+
+        /*
+         * Note: if this assert fails then the two distinct Literals were mapped
+         * onto the same unsigned byte[] key.
+         */
+        assertFalse(BytesUtil.bytesEqual(newValKey, oldValKey));
 
     }
 
