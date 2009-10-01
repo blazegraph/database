@@ -67,8 +67,10 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      * <p>
      * Validation may be disabled for releases, however it is not really that
      * much overhead since the operation is on the in-memory representation.
-     */
-    static protected transient final boolean validate = true;
+     *
+     * @deprecated Validation can not be reasonably applied it the
+     * Unicode collation is less than Identical.  */
+    static protected transient final boolean validate = false;
     
     public final boolean isReadOnly() {
         
