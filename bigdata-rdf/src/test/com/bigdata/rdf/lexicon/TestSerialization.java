@@ -39,6 +39,10 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.XMLSchema;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 
 /**
@@ -167,5 +171,51 @@ public class TestSerialization extends TestCase2 {
 //        assertEquals(a, roundTrip_tuned(a));
 //        
 //    }
+
+    /**
+     * This is an odd issue someone reported for the trunk. There are two
+     * version of a plain Literal <code>Brian McCarthy</code>, but it appears
+     * that one of the two versions has a leading bell character when you decode
+     * the Unicode byte[].
+     * 
+     * <pre>
+     * ERROR: com.bigdata.rdf.lexicon.Id2TermWriteProc.apply(Id2TermWriteProc.java:205): val=[0, 2, 0, 14, 66, 114, 105, 97, 110, 32, 77, 99, 67, 97, 114, 116, 104, 121]
+     * ERROR: com.bigdata.rdf.lexicon.Id2TermWriteProc.apply(Id2TermWriteProc.java:206): oldval=[0, 2, 0, 15, 127, 66, 114, 105, 97, 110, 32, 77, 99, 67, 97, 114, 116, 104, 121]
+     * </pre>
+     */
+    public void test_consistencyIssue() {
+
+        final BigdataValueSerializer<Value> fixture = new BigdataValueSerializer<Value>(
+                ValueFactoryImpl.getInstance());
+
+        final byte[] newValBytes = new byte[] { 0, 2, 0, 14, 66, 114, 105, 97, 110, 32,
+                77, 99, 67, 97, 114, 116, 104, 121 };
+
+        final byte[] oldValBytes = new byte[] { 0, 2, 0, 15, 127, 66, 114, 105,
+                97, 110, 32, 77, 99, 67, 97, 114, 116, 104, 121 };
+
+        final Value newValue = fixture.deserialize(newValBytes);
+
+        final Value oldValue = fixture.deserialize(oldValBytes);
+
+        System.err.println("new=" + newValue);
+
+        System.err.println("old=" + oldValue);
+
+        final IKeyBuilder keyBuilder = new KeyBuilder();
+
+        final LexiconKeyBuilder lexKeyBuilder = new LexiconKeyBuilder(
+                keyBuilder);
+
+        // encode as unsigned byte[] key.
+        final byte[] newValKey = lexKeyBuilder.value2Key(newValue);
+
+        final byte[] oldValKey = lexKeyBuilder.value2Key(oldValue);
+
+        System.err.println("newValKey=" + BytesUtil.toString(newValKey));
+        
+        System.err.println("oldValKey=" + BytesUtil.toString(oldValKey));
+
+    }
 
 }
