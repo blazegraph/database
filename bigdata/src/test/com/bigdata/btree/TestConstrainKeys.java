@@ -180,14 +180,14 @@ public class TestConstrainKeys extends TestCase2 {
 
         }
 
-        @Override
+        //@Override
         public byte[] getLeftSeparatorKey() {
 
             return fromKey;
             
         }
 
-        @Override
+        //@Override
         public byte[] getRightSeparatorKey() {
             
             return toKey;

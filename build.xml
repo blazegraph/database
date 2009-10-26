@@ -243,6 +243,8 @@
 		<include name="bigdata-jini/src/**" />
 		<include name="bigdata-rdf/src/**" />
 		<include name="bigdata-sails/src/**" />
+		<include name="lgpl-utils/src/**" />
+		<include name="src/**" />
 		<exclude name="classes/**" />
 		<exclude name="${version}.jar" />
 		<exclude name="lib/**" />
