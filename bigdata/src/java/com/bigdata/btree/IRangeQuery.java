@@ -37,6 +37,7 @@ import com.bigdata.btree.filter.ITupleFilter;
 import com.bigdata.btree.filter.TupleRemover;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ndx.IClientIndex;
 
 import cutthecrap.utils.striterators.Striterator;
 
@@ -262,6 +263,24 @@ public interface IRangeQuery {
      * which is responsible for issuing continuation queries.
      */
     public static final int FIXED_LENGTH_SUCCESSOR = 1 << 7;
+
+    /**
+     * Flag indicates that the iterator may process multiple index partitions in
+     * parallel. While tuples are visited in each index partition in the natural
+     * ordering, this flag breaks the total ordering guarantee of the iterator
+     * if multiple index partitions are visited as tuples from each index
+     * partition will be visited concurrently and appear in an interleaved
+     * ordering. To maintain efficiency, the tuples are interleaved in chunks so
+     * processing which benefits from order effects can exploit the within chunk
+     * ordering of the tuples. The semantics of this flag are realized by the
+     * {@link IClientIndex} implementation. This flag has no effect on an
+     * {@link ILocalBTreeView} and is not passed through to the
+     * {@link IDataService}.
+     * 
+     * @todo This flag is not supported in combination with {@link #CURSOR}?
+     * @todo This flag is not supported in combination with {@link #REVERSE}?
+     */
+    public static final int PARALLEL = 1 << 8;
     
     /**
      * Visits all tuples in key order. This is identical to

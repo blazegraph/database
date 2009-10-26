@@ -58,7 +58,6 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.DataService;
 import com.bigdata.service.LocalDataServiceFederation;
-import com.bigdata.service.RawDataServiceTupleIterator;
 import com.bigdata.service.Split;
 
 /**

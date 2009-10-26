@@ -29,6 +29,8 @@ package com.bigdata.relation.rule;
 
 import java.util.Set;
 
+import com.bigdata.rdf.spo.SPOKeyOrder;
+
 /**
  * Test suite for basic {@link Rule} mechanisms.
  *
@@ -90,9 +92,11 @@ public class TestRule extends AbstractRuleTestCase {
 
             final IBindingSet bindings = new HashBindingSet();
             
-            assertFalse(r.getTail(0).isFullyBound());
+            assertFalse(r.getTail(0).isFullyBound(SPOKeyOrder.SPO));
+            assertFalse(r.getTail(0).isFullyBound(SPOKeyOrder.SPOC));
             
-            assertEquals(1, r.getTail(0).getVariableCount());
+            assertEquals(1, r.getTail(0).getVariableCount(SPOKeyOrder.SPO));
+            assertEquals(2, r.getTail(0).getVariableCount(SPOKeyOrder.SPOC));
             
             assertFalse(r.isFullyBound(0, bindings));
             

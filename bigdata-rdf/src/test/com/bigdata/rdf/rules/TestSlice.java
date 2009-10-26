@@ -249,7 +249,7 @@ public class TestSlice extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         

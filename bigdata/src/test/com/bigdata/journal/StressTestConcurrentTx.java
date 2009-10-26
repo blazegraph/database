@@ -117,6 +117,18 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
     
     public void tearDownComparisonTest() throws Exception {
         
+        if (journal != null) {
+            
+            if (journal.isOpen()) {
+
+                journal.shutdownNow();
+
+            }
+            
+            journal.deleteResources();
+            
+        }
+
     }
     
     /**
@@ -124,24 +136,41 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      */
     public void test_concurrentClients() throws InterruptedException {
 
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Properties properties = getProperties();
 
-        if(false && journal.getBufferStrategy() instanceof MappedBufferStrategy) {
-            
-            /*
-             * @todo the mapped buffer strategy has become cpu bound w/o
-             * termination when used with concurrent clients - this needs to be
-             * looked into further.
-             */
-            
-            fail("Mapped buffer strategy may have problem with tx concurrency");
-            
+        final Journal journal = new Journal(properties);
+
+        try {
+
+            if (false && journal.getBufferStrategy() instanceof MappedBufferStrategy) {
+
+                /*
+                 * @todo the mapped buffer strategy has become cpu bound w/o
+                 * termination when used with concurrent clients - this needs to
+                 * be looked into further.
+                 */
+
+                fail("Mapped buffer strategy may have problem with tx concurrency");
+
+            }
+
+            doConcurrentClientTest(journal, 10, 20, 1000, 3, 100, .10);
+
+        } finally {
+         
+            if (journal != null) {
+
+                if (journal.isOpen()) {
+
+                    journal.shutdownNow();
+
+                }
+
+                journal.deleteResources();
+
+            }
+
         }
-
-        doConcurrentClientTest(journal, 10, 20, 1000, 3, 100, .10);
-        
     }
 
     /**
@@ -209,7 +238,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         { // Setup the named index and commit the journal.
             
-            IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+            final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
             
             md.setIsolatable(true);
             
@@ -218,16 +247,16 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             journal.commit();
             
         }
-        
-        ExecutorService executorService = Executors.newFixedThreadPool(
+
+        final ExecutorService executorService = Executors.newFixedThreadPool(
                 nclients, DaemonThreadFactory.defaultThreadFactory());
-        
-        Collection<Callable<Long>> tasks = new HashSet<Callable<Long>>(); 
-        
-        for(int i=0; i<ntrials; i++) {
-            
+
+        final Collection<Callable<Long>> tasks = new HashSet<Callable<Long>>();
+
+        for (int i = 0; i < ntrials; i++) {
+
             tasks.add(new Task(journal, name, i, keyLen, nops, abortRate));
-            
+
         }
 
         /*
@@ -236,13 +265,14 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         final long begin = System.currentTimeMillis();
         
-        List<Future<Long>> results = executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+        final List<Future<Long>> results = executorService.invokeAll(tasks,
+                timeout, TimeUnit.SECONDS);
 
         final long elapsed = System.currentTimeMillis() - begin;
 
         executorService.shutdownNow();
         
-        Iterator<Future<Long>> itr = results.iterator();
+        final Iterator<Future<Long>> itr = results.iterator();
         
         int ninterrupt = 0; // #of tasks that throw InterruptedException.
 //        int nretry = 0; // #of transactions that were part of a commit group that failed but MAY be retried.
@@ -317,7 +347,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         log.warn("Shutting down now!");
         journal.shutdownNow();
         
-        Result ret = new Result();
+        final Result ret = new Result();
         
         /*
          * #of bytes written on the backing store (does not count writes on the

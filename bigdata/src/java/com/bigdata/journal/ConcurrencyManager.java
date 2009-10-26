@@ -21,6 +21,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
@@ -32,7 +33,6 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.TaskCounters;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
@@ -92,10 +92,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
     final protected static Logger log = Logger.getLogger(ConcurrencyManager.class);
     
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
@@ -455,7 +455,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         open = false;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
 
         // time when shutdown begins.
@@ -482,7 +482,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         try {
 
-            if (INFO) log.info("Awaiting transaction service termination");
+            if (log.isInfoEnabled()) log.info("Awaiting transaction service termination");
             
             final long elapsed = System.currentTimeMillis() - begin;
             
@@ -500,7 +500,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         try {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Awaiting read service termination");
 
             final long elapsed = System.currentTimeMillis() - begin;
@@ -523,7 +523,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
             final long timeout = shutdownTimeout-elapsed;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Awaiting write service termination: will wait "
                         + timeout + "ms");
 
@@ -541,13 +541,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
     
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Done: elapsed=" + elapsed + "ms");
         
     }
 
     /**
-     * Immediate shutdown (running tasks are cancelled rather than being
+     * Immediate shutdown (running tasks are canceled rather than being
      * permitted to complete).
      * 
      * @see #shutdown()
@@ -558,7 +558,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         open = false;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("begin");
         
         final long begin = System.currentTimeMillis();
@@ -574,7 +574,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Done: elapsed=" + elapsed + "ms");
 
     }
@@ -630,7 +630,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(ConcurrencyManager.Options.TX_SERVICE_CORE_POOL_SIZE
                         + "=" + txServicePoolSize);
 
@@ -652,7 +652,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(ConcurrencyManager.Options.READ_SERVICE_CORE_POOL_SIZE
                         + "=" + readServicePoolSize);
 
@@ -673,7 +673,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(ConcurrencyManager.Options.SHUTDOWN_TIMEOUT + "="
                         + shutdownTimeout);
 
@@ -728,7 +728,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(ConcurrencyManager.Options.WRITE_SERVICE_CORE_POOL_SIZE
                                     + "=" + writeServiceCorePoolSize);
 
@@ -749,7 +749,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(ConcurrencyManager.Options.WRITE_SERVICE_MAXIMUM_POOL_SIZE
                                     + "=" + writeServiceMaximumPoolSize);
 
@@ -770,7 +770,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 }
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info(ConcurrencyManager.Options.WRITE_SERVICE_QUEUE_CAPACITY+ "="
                         + writeServiceQueueCapacity);
 
@@ -783,7 +783,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                         ConcurrencyManager.Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS,
                         ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_PRESTART_ALL_CORE_THREADS));
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info(ConcurrencyManager.Options.WRITE_SERVICE_PRESTART_ALL_CORE_THREADS
                                     + "=" + writeServicePrestart);
 
@@ -795,7 +795,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                     ConcurrencyManager.Options.WRITE_SERVICE_GROUP_COMMIT_TIMEOUT,
                                     ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_GROUP_COMMIT_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log
                         .info(ConcurrencyManager.Options.WRITE_SERVICE_GROUP_COMMIT_TIMEOUT
                                 + "=" + groupCommitTimeout);
@@ -806,7 +806,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                     ConcurrencyManager.Options.WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT,
                                     ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log
                         .info(ConcurrencyManager.Options.WRITE_SERVICE_OVERFLOW_LOCK_REQUEST_TIMEOUT
                                 + "=" + overflowLockRequestTimeout);
@@ -817,7 +817,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                     ConcurrencyManager.Options.WRITE_SERVICE_KEEP_ALIVE_TIME,
                                     ConcurrencyManager.Options.DEFAULT_WRITE_SERVICE_KEEP_ALIVE_TIME));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log
                         .info(ConcurrencyManager.Options.WRITE_SERVICE_KEEP_ALIVE_TIME
                                 + "=" + keepAliveTime);
@@ -860,7 +860,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                     IBigdataClient.Options.COLLECT_QUEUE_STATISTICS,
                                     IBigdataClient.Options.DEFAULT_COLLECT_QUEUE_STATISTICS));
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info(IBigdataClient.Options.COLLECT_QUEUE_STATISTICS + "="
                         + collectQueueStatistics);
 
@@ -1134,7 +1134,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
              * committed state of the index.
              */
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Submitted to the read service: "
                         + task.getClass().getName() + ", timestamp="
                         + task.timestamp);
@@ -1152,7 +1152,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * not for the reads against the historical data.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Submitted to the transaction service: "
                             + task.getClass().getName() + ", timestamp="
                             + task.timestamp);
@@ -1168,7 +1168,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                  * never more than one task with access to a given live index.
                  */
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Submitted to the write service: "
                             + task.getClass().getName() + ", timestamp="
                             + task.timestamp);
@@ -1321,7 +1321,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                          * the CORE pool size.
                          */
 
-                        if (INFO)
+                        if (BigdataStatics.debug)
                             System.err.print("z");
 
                         Thread.sleep(50/* ms */);
@@ -1354,7 +1354,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
     }
 
     /**
-     * When <code>true</code> imposes dynamic latency on ariving tasks in
+     * When <code>true</code> imposes dynamic latency on arriving tasks in
      * {@link #submitWithDynamicLatency(AbstractTask, ExecutorService, TaskCounters)}.
      * 
      * @todo revisit the question of imposed latency here based on performance
@@ -1383,7 +1383,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @exception InterruptedException
      *                if interrupted while waiting, in which case unfinished
-     *                tasks are cancelled.
+     *                tasks are canceled.
      * @exception NullPointerException
      *                if tasks or any of its elements are null
      * @exception RejectedExecutionException
@@ -1480,7 +1480,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @exception InterruptedException
      *                if interrupted while waiting, in which case unfinished
-     *                tasks are cancelled.
+     *                tasks are canceled.
      * @exception NullPointerException
      *                if tasks or any of its elements are null
      * @exception RejectedExecutionException

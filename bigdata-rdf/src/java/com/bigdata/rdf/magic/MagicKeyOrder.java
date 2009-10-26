@@ -16,7 +16,7 @@ public class MagicKeyOrder implements IKeyOrder<IMagicTuple>, Serializable {
     
     private final int[] keyMap;
     
-    public MagicKeyOrder(String indexName, int[] keyMap) {
+    public MagicKeyOrder(final String indexName, final int[] keyMap) {
         
         this.indexName = indexName;
         
@@ -65,7 +65,13 @@ public class MagicKeyOrder implements IKeyOrder<IMagicTuple>, Serializable {
         
     }
     
-    public int getArity() {
+    public int getKeyOrder(final int keyPos) {
+        
+        return keyMap[keyPos];
+        
+    }
+    
+    public int getKeyArity() {
         
         return keyMap.length;
         
@@ -82,7 +88,7 @@ public class MagicKeyOrder implements IKeyOrder<IMagicTuple>, Serializable {
         
     }
     
-    public boolean canService(int[] bound) {
+    public boolean canService(final int[] bound) {
         
         return MagicKeyOrderStrategy.match(bound, keyMap);
         

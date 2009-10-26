@@ -55,7 +55,13 @@ import com.bigdata.service.ndx.ClientIndexView;
  *       out the left separator key and which uses prefix compression to only
  *       write the delta for the right separator key over the left separator
  *       key? this would require de-serialization of the partition locator and
- *       then re-serialization in a compressed form and may not be worth it.
+ *       then re-serialization in a record format which does not include the
+ *       left separator key, but the aggregate space savings could be quite
+ *       large. Further space savings could be realized if we simply factored
+ *       out both keys in the index but delivered the keys to the client when a
+ *       single partition locator was requested. When a key-range of locators is
+ *       requested, the space savings again make it worth while to factor out
+ *       the left/right keys.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -69,7 +75,7 @@ public class PartitionLocator implements IPartitionMetadata, Externalizable {
 
     /**
      * The unique partition identifier.
-     */
+o     */
     private int partitionId;
 
     /**

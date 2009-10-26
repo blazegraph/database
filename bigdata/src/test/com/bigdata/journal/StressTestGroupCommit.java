@@ -71,7 +71,7 @@ import com.bigdata.util.NV;
  * In order for there to be a commit, each task must write some data. In the
  * current design each task creates a named index. This means that there is some
  * data to write, but also that some synchronization is required on
- * {@link AbstractJournal#name2Addr}.
+ * {@link AbstractJournal#_name2Addr}.
  * 
  * @todo another way to do this is to pre-generate all the indices, note the
  *       current commit counter, and then submit a bunch of simple index write
@@ -115,10 +115,12 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      */
     public void test_singleThreadIndexCreationRate() {
         
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
         
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
 
+        try {
+        
         // the initial value of the commit counter.
         final long beginCommitCounter = journal.getRootBlockView().getCommitCounter();
 
@@ -157,9 +159,11 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
                 + ", #indices created per second="
                 + (int)(1000d * ntasks / elapsed1) + ", commit=" + elapsed2 + "ms");
         
-        journal.shutdownNow();
-        
-        journal.deleteResources();
+        } finally {
+
+            journal.destroy();
+            
+        }
         
     }
 
@@ -175,10 +179,12 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      */
     public void test_twothreadIndexCreationRate() throws InterruptedException {
 
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
         
         final Journal journal = new Journal(properties);
 
+        try {
+        
         // the initial value of the commit counter.
         final long beginCommitCounter = journal.getRootBlockView().getCommitCounter();
 
@@ -281,9 +287,11 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
                 + ", #indices created per second="
                 + (int)(1000d * ntasks / elapsed1) + ", commit=" + elapsed2 + "ms");
         
-        journal.shutdownNow();
+        } finally {
         
-        journal.deleteResources();
+            journal.destroy();
+            
+        }
 
     }
     
@@ -296,7 +304,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
 
         final int writeServiceCorePoolSize = 100;
         
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
 
         properties.setProperty(TestOptions.TIMEOUT,"10");
         
@@ -371,8 +379,10 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         final long ninsert = Long.parseLong(properties.getProperty(TestOptions.NINSERT,TestOptions.DEFAULT_NINSERT));
         
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
 
+        try {
+        
         // the initial value of the commit counter.
         final long beginCommitCounter = journal.getRootBlockView().getCommitCounter();
 
@@ -509,17 +519,22 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         
         System.err.println(result.toString(true/*newline*/));
 
-        /*
-         * This is using shutdownNow so we don't wait for all tasks to complete --
-         * ignore the messy warnings and errors once shutdown is called!
-         */
-        
-        journal.shutdownNow();
-        
-        journal.deleteResources();
-        
         return result;
-        
+
+        } finally {
+
+            /*
+             * This is using shutdownNow so we don't wait for all tasks to
+             * complete -- ignore the messy warnings and errors once shutdown is
+             * called!
+             */
+            
+            journal.shutdownNow();
+
+            journal.deleteResources();
+            
+        }
+
     }
 
     public void setUpComparisonTest(Properties properties) throws Exception {

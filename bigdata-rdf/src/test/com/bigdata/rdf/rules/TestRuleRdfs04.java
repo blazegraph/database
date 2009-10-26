@@ -128,7 +128,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -179,7 +179,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -244,7 +244,7 @@ public class TestRuleRdfs04 extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 

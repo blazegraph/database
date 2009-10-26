@@ -234,6 +234,12 @@ public class RdfsAxioms extends BaseAxioms {
         
     }
 
+    final public boolean isNone() {
+        
+        return false;
+        
+    }
+    
     final public boolean isRdfSchema() {
         
         return true;

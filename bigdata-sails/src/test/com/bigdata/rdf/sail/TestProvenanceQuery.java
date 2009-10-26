@@ -132,11 +132,13 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
                 while (itr.hasNext()) {
 
-                    BigdataStatementImpl stmt = (BigdataStatementImpl)itr.next();
+                    final BigdataStatementImpl stmt = (BigdataStatementImpl) itr
+                            .next();
 
                     // only write the explicit statements.
-                    if(!stmt.isExplicit()) continue;
-                    
+                    if (!stmt.isExplicit())
+                        continue;
+
                     rdfWriter.handleStatement(stmt);
 
                 }
@@ -147,20 +149,13 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
             } finally {
 
-                try {
-                    
-                    itr.close();
-
-                } catch (SailException e) {
-                    
-                    throw new RuntimeException(e);
-                    
-                }
+                itr.close();
 
             }
 
-            // write the rdf/xml on the console.
-            System.err.println(rdfXml);
+            // write the rdf/xml
+            if (log.isInfoEnabled())
+                log.info(rdfXml);
 
         }
         
@@ -265,7 +260,7 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
         

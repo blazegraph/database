@@ -342,7 +342,7 @@ public class SplitUtility {
         
         // separator key is the first key in the leaf.
         final byte[] separatorKey = leaf == null ? null : leaf.getKeys()
-                .getKey(0/* index */);
+                .get(0/* index */);
 
         if (leaf == null || separatorKey == null) {
 

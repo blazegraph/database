@@ -60,8 +60,10 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
     File outFile;
     File tmpDir;
     
-    public void setUp() {
+    public void setUp() throws Exception {
 
+        super.setUp();
+        
         outFile = new File(getName() + ".seg");
 
         if (outFile.exists() && !outFile.delete()) {
@@ -74,13 +76,15 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
 
     }
 
-    public void tearDown() {
+    public void tearDown() throws Exception {
 
         if (outFile != null && outFile.exists() && !outFile.delete()) {
 
             log.warn("Could not delete file: " + outFile);
 
         }
+        
+        super.tearDown();
 
     }
 
@@ -168,7 +172,7 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             } finally {
 
                 if (segmentStore != null)
-                    segmentStore.close();
+                    segmentStore.destroy();
                 
                 outFile.delete();
                 
@@ -231,7 +235,7 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             } finally {
 
                 if (segmentStore != null)
-                    segmentStore.close();
+                    segmentStore.destroy();
                 
                 outFile.delete();
                 
@@ -298,7 +302,7 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             } finally {
 
                 if (segmentStore != null)
-                    segmentStore.close();
+                    segmentStore.destroy();
                 
                 outFile.delete();
                 

@@ -3,6 +3,7 @@ package com.bigdata.service;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,6 +36,7 @@ import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
 import com.bigdata.rawstore.Bytes;
@@ -51,7 +53,7 @@ import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounter
  * The {@link LoadBalancerService} collects a variety of performance counters
  * from hosts and services, identifies over- and under- utilized hosts and
  * services based on the collected data and reports those to {@link DataService}s
- * so that they can auto-balance, and acts as a clearning house for WARN and
+ * so that they can auto-balance, and acts as a clearing house for WARN and
  * URGENT alerts for hosts and services.
  * <p>
  * While the {@link LoadBalancerService} MAY observe service start/stop events,
@@ -67,7 +69,7 @@ import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounter
  * self- reported by various services.
  * <p>
  * Note: utilization should be defined in terms of transient system resources :
- * CPU, IO (DISK and NET), RAM. DISK exhaustion on the otherhand is the basis
+ * CPU, IO (DISK and NET), RAM. DISK exhaustion on the other hand is the basis
  * for WARN or URGENT alerts since it can lead to immediate failure of all
  * services on the same host.
  * <p>
@@ -76,7 +78,7 @@ import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounter
  * rapidly apparent (within a few minutes). Once we have collected performance
  * counters for the new hosts / services, a subsequent overflow event(s) on
  * existing {@link DataService}(s) will cause index partition moves to be
- * nominated targetting the new hosts and services. The amount of time that it
+ * nominated targeting the new hosts and services. The amount of time that it
  * takes to re-balance the load on the services will depend in part on the write
  * rate, since writes drive overflow events and index partition splits, both of
  * which lead to pre-conditions for index partition moves.
@@ -232,11 +234,22 @@ abstract public class LoadBalancerService extends AbstractService
     private final RoundRobinServiceLoadHelper roundRobinServiceLoadHelper;
     
     /**
-     * The directory in which the service will log the {@link CounterSet}s.
+     * The directory in which the service will log the {@link CounterSet}s
+     * and {@link Event}s.
      * 
      * @see Options#LOG_DIR
      */
     protected final File logDir;
+
+    /**
+     * <code>true</code> iff the LBS will refrain from writing state on the
+     * disk. This option causes the LBS to use an in memory {@link #eventStore}.
+     * In addition, it will refuse to write counter snapshots when this option
+     * is specified.
+     * 
+     * @see Options#TRANSIENT
+     */
+    protected final boolean isTransient;
     
     /**
      * A copy of the properties used to start the service.
@@ -300,12 +313,19 @@ abstract public class LoadBalancerService extends AbstractService
     final protected Journal eventStore;
 
     protected final EventReceiver eventReceiver;
-    
+
     /**
      * Options understood by the {@link LoadBalancerService}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
+     * 
+     * @todo The LBS needs to support a 'transient' option in which it (a) does
+     *       not log counters; and (b) keeps the events in a transient B+Tree
+     *       (not backed by a file on the disk). Without this we can not have a
+     *       transient {@link EmbeddedFederation} or
+     *       {@link LocalDataServiceFederation} instances.
      */
     public interface Options {
 
@@ -330,13 +350,13 @@ abstract public class LoadBalancerService extends AbstractService
          * round-robin.
          */
         String DEFAULT_INITIAL_ROUND_ROBIN_UPDATE_COUNT = "5";
-        
+
         /**
          * The delay between scheduled invocations of the {@link UpdateTask}.
          * <p>
          * Note: the {@link AbstractStatisticsCollector} implementations SHOULD
          * sample at one minute intervals by default and clients SHOULD report
-         * the collected performance counters at approproximately one minute
+         * the collected performance counters at approximately one minute
          * intervals. The update rate can be no more frequent than the reporting
          * rate, but could be 2-5x slower, especially if we use WARN and URGENT
          * events to immediately re-score services.
@@ -363,13 +383,24 @@ abstract public class LoadBalancerService extends AbstractService
                 + ".historyMinutes"; 
 
         String DEFAULT_HISTORY_MINUTES = "5";
-        
+
         /**
-         * The path of the directory where the load balancer will log a copy of
-         * the counters every time it runs its {@link UpdateTask}. By default
-         * it will log the files in the directory from which the load balancer
-         * service was started. You may specify an alternative directory using
-         * this property.
+         * When <code>true</code> the load balancer will not record any state on
+         * the disk (neither events nor counters). The default is
+         * <code>false</code>. This option is used by some unit tests to
+         * simplify cleanup.
+         */
+        String TRANSIENT = LoadBalancerService.class.getName() + ".transient";
+
+        String DEFAULT_TRANSIENT = "false";
+
+        /**
+         * The path of the data directory for the load balancer. The load
+         * balancer will log a copy of the counters every time it runs its
+         * {@link UpdateTask}. It will also log {@link Event}s received from
+         * other services here. By default, the load balancer will use the
+         * directory in which it was started. You may specify an alternative
+         * directory using this property.
          */
         String LOG_DIR = LoadBalancerService.class.getName()+".log.dir";
         
@@ -378,7 +409,7 @@ abstract public class LoadBalancerService extends AbstractService
         /**
          * The delay in milliseconds between writes of the {@link CounterSet} on
          * a log file (default is {@value #DEFAULT_LOG_DELAY}, which is
-         * equivilent to one hour).
+         * equivalent to one hour).
          */
         String LOG_DELAY = LoadBalancerService.class.getName()+".log.delay";
         
@@ -417,7 +448,7 @@ abstract public class LoadBalancerService extends AbstractService
          * Default is one hour of completed events.
          */
         String DEFAULT_EVENT_HISTORY_MILLIS = "" + (60 * 60 * 1000);
-
+        
     }
 
     /**
@@ -427,7 +458,7 @@ abstract public class LoadBalancerService extends AbstractService
      * running on the same host to collect statistics for that host and those
      * statistics are then reported to the load balancer and aggregated along
      * with the rest of the performance counters reported by the other services
-     * in the federation. However, if the load balanacer itself collects host
+     * in the federation. However, if the load balancer itself collects host
      * statistics then it will only know about and report the current (last 60
      * seconds) statistics for the host rather than having the historical data
      * for the host.
@@ -435,16 +466,26 @@ abstract public class LoadBalancerService extends AbstractService
      * @param properties
      *            See {@link Options}
      */
-    public LoadBalancerService(Properties properties) {
+    public LoadBalancerService(final Properties properties) {
 
         if (properties == null)
             throw new IllegalArgumentException();
         
         this.properties = (Properties) properties.clone();
 
-        // setup the log directory.
-        {
+        this.isTransient = Boolean.valueOf(properties.getProperty(
+                Options.TRANSIENT, Options.DEFAULT_TRANSIENT));
 
+        if (log.isInfoEnabled())
+            log.info(Options.TRANSIENT + "=" + isTransient);
+        
+        if(isTransient) {
+            
+            logDir = null;
+            
+        } else {
+        
+            // setup the log directory.
             final String val = properties.getProperty(
                     Options.LOG_DIR,
                     Options.DEFAULT_LOG_DIR);
@@ -564,23 +605,34 @@ abstract public class LoadBalancerService extends AbstractService
                         + eventHistoryMillis);
 
             /*
-             * Setup a BTree backed by a file on the disk that will be used to
-             * persist the completed events. This is passed to the
-             * EventReceiver. The BTree is used to get the events out of RAM and
-             * to decouple the reporting from the receiving. We delegate
-             * everything dealing with the events to that class.
+             * Setup a BTree backed that will be used to persist the completed
+             * events. This is passed to the EventReceiver. The BTree is used to
+             * get the events out of RAM and to decouple the reporting from the
+             * receiving. We delegate everything dealing with the events to that
+             * class.
              */
 
-            // Uses a temporary store.
-//          eventStore = new TemporaryRawStore();
+            if(isTransient) {
+                
+                /*
+                 * Use an in-memory store.
+                 */
 
-            // Uses a restart safe store.
-            {
+                final Properties p = new Properties();
+
+                p.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+                        BufferMode.Transient.toString());
+
+                eventStore = new Journal(p);
+                
+            } else {
+                
+                /*
+                 * Use a restart-safe store.
+                 */
                 
                 final Properties p = new Properties();
 
-//                p.setProperty(com.bigdata.journal.Options.BUFFER_MODE, BufferMode.Disk);
-                
                 p.setProperty(com.bigdata.journal.Options.FILE, new File(
                         logDir, "events" + com.bigdata.journal.Options.JNL)
                         .toString());
@@ -689,6 +741,43 @@ abstract public class LoadBalancerService extends AbstractService
 
     }
 
+    synchronized public void destroy() {
+        
+        super.destroy();
+
+        if (!isTransient) {
+
+            eventStore.destroy();
+
+            final File[] logFiles = logDir.listFiles(new FileFilter() {
+
+                public boolean accept(File pathname) {
+
+                    return pathname.getName().startsWith("counters")
+                            && pathname.getName().endsWith(".xml");
+
+                }
+
+            });
+
+            if (logFiles != null) {
+
+                for (File file : logFiles) {
+
+                    if (!file.delete())
+                        log.warn("Could not delete: " + file);
+
+                }
+
+            }
+
+            // delete the log directory (works iff it is empty).
+            logDir.delete();
+
+        }
+
+    }
+    
     /**
      * Returns {@link ILoadBalancerService}.
      */
@@ -1870,6 +1959,14 @@ abstract public class LoadBalancerService extends AbstractService
      */
     protected void logCounters(final String basename) {
 
+        if(isTransient) {
+            
+            log.warn("LBS is transient - request ignored.");
+
+            return;
+            
+        }
+        
         final File file = new File(logDir, "counters" + basename + ".xml");
 
         logCounters(file);

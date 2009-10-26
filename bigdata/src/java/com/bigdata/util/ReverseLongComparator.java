@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util;
 
+import java.io.Serializable;
 import java.util.Comparator;
 
 /**
@@ -36,8 +37,13 @@ import java.util.Comparator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ReverseLongComparator implements Comparator<Long> {
+public class ReverseLongComparator implements Comparator<Long>, Serializable {
     
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -234224494051463945L;
+
     public int compare(final Long o1, final Long o2) {
 
         final long l1 = o1.longValue();

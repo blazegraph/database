@@ -29,7 +29,7 @@ package com.bigdata.btree.proc;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Batch existence test operation. Existence tests SHOULD be used in place of
@@ -68,16 +68,16 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
             
         }
  
-        public BatchContains newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
+        public BatchContains newInstance(IRabaCoder keysCoder,
+                IRabaCoder valsCoder, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             assert vals == null;
             
-            return new BatchContains(keySer, fromIndex, toIndex, keys);
+            return new BatchContains(keysCoder, fromIndex, toIndex, keys);
             
         }
-        
+
     }
 
     /**
@@ -97,10 +97,10 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
      * 
      * @see BatchContainsConstructor
      */
-    protected BatchContains(IDataSerializer keySer, int fromIndex, int toIndex,
+    protected BatchContains(IRabaCoder keysCoder, int fromIndex, int toIndex,
             byte[][] keys) {
 
-        super(keySer, null, fromIndex, toIndex, keys, null/*vals*/);
+        super(keysCoder, null, fromIndex, toIndex, keys, null/*vals*/);
 
     }
 
@@ -117,15 +117,15 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
      * 
      * @return A {@link ResultBitBuffer}.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
 
         final int n = getKeyCount();
-        
+
         final boolean[] ret = new boolean[n];
-        
+
         int i = 0;
-        
-        while( i < n ) {
+
+        while (i < n) {
 
             ret[i] = ndx.contains(getKey(i));
 
@@ -133,8 +133,8 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        return new ResultBitBuffer(n,ret);
-        
+        return new ResultBitBuffer(n, ret);
+
     }
     
 }

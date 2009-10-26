@@ -24,8 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import it.unimi.dsi.mg4j.io.InputBitStream;
-import it.unimi.dsi.mg4j.io.OutputBitStream;
+import it.unimi.dsi.bits.BitVector;
+import it.unimi.dsi.bits.LongArrayBitVector;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.Externalizable;
 import java.io.IOException;
@@ -39,26 +41,39 @@ import org.CognitiveWeb.extser.LongPacker;
 import org.CognitiveWeb.extser.ShortPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.compression.IRandomAccessByteArray;
-import com.bigdata.btree.compression.RandomAccessByteArray;
+import com.bigdata.btree.data.DefaultLeafCoder;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.filter.ITupleFilter;
+import com.bigdata.btree.raba.AbstractRaba;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.MutableKeysRaba;
+import com.bigdata.btree.raba.MutableValuesRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.service.IDataService;
 
 /**
  * An object used to stream key scan results back to the client.
+ * <p>
+ * Note: The {@link IRangeQuery} bit flags may be used to indicate which data
+ * and metadata are returned. If the corresponding data was not requested then
+ * the access methods for that data will throw an
+ * {@link UnsupportedOperationException}. You can test this using
+ * {@link #hasDeleteMarkers()}, {@link #hasVersionTimestamps()} and related
+ * methods.
  * 
- * @todo harmonize this with {@link ILeafData}? We could reuse the same
- *       serialization logic with extensions for the additional metadata
- *       conveyed by the {@link ResultSet}.
+ * FIXME Do not decode the delete flags or version timestamps. Code per
+ * {@link ReadOnlyLeafData} and then use the coded representations in place.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ResultSet implements Externalizable {
-
-    private static final long serialVersionUID = -390738836663476282L;
+public class ResultSet implements ILeafData, Externalizable {
 
     protected transient static final Logger log = Logger.getLogger(ResultSet.class);
 
@@ -72,23 +87,40 @@ public class ResultSet implements Externalizable {
     /** true iff values were requested. */
     private boolean sendVals;
     
+    /**
+     * The #of tuples in the buffer.
+     */
     private int ntuples;
 
     private boolean exhausted;
 
     private byte[] lastKey;
 
-    private RandomAccessByteArray keys;
+    /** The keys -or- <code>null</code> iff keys were not requested. */
+    private IRaba keys;
 
-    private RandomAccessByteArray vals;
+    /** The values -or- <code>null</code> iff values were not requested. */
+    private IRaba vals;
 
+    /**
+     * The version timestamps -or- <code>null</code> if not requested -or- not
+     * maintained.
+     */
     private long[] versionTimestamps;
     
+    private long minimumVersionTimestamp;
+    private long maximumVersionTimestamp;
+
     /**
      * <code>null</code> unless delete markers were enabled for the source
-     * index. When non-<code>null</code>, a ONE (1) means that the
-     * corresponding tuple was deleted while a ZERO (0) means that the
-     * corresponding tuple was NOT deleted.
+     * index. When non-<code>null</code>, a ONE (1) means that the corresponding
+     * tuple was deleted while a ZERO (0) means that the corresponding tuple was
+     * NOT deleted.
+     * 
+     * @todo represent using a {@link BitVector}. {@link LongArrayBitVector}
+     *       when allocating. Directly write the long[] backing bits (getBits())
+     *       onto the output stream. Reconstruct from backing long[] when
+     *       reading.  Could also consider run length encoding.
      */
     private byte[] deleteMarkers;
 
@@ -100,7 +132,7 @@ public class ResultSet implements Externalizable {
     
     /**
      * Set automatically based on the first visited {@link ITuple}. By setting
-     * this value lazily, the {@link ITupleSerializer} can be overriden by an
+     * this value lazily, the {@link ITupleSerializer} can be overridden by an
      * {@link ITupleFilter} chain. For example, the logical row scan for the
      * SparseRowStore does this when it converts between the sparse row format
      * that is actually stored in the index and the timestamped property sets
@@ -179,13 +211,13 @@ public class ResultSet implements Externalizable {
     /**
      * Return the keys.
      * 
-     * @throws IllegalStateException
+     * @throws UnsupportedOperationException
      *             if the keys were not retrieved.
      */
-    final public IRandomAccessByteArray getKeys() {
+    final public IRaba getKeys() {
         
         if (keys == null)
-            throw new IllegalStateException();
+            throw new UnsupportedOperationException();
         
         return keys;
         
@@ -194,89 +226,23 @@ public class ResultSet implements Externalizable {
     /**
      * Return the values.
      * 
-     * @throws IllegalStateException
+     * @throws UnsupportedOperationException
      *             if the values were not retrieved.
      */
-    final public IRandomAccessByteArray getValues() {
+    final public IRaba getValues() {
         
         if (vals == null)
-            throw new IllegalStateException();
+            throw new UnsupportedOperationException();
         
         return vals;
         
     }
     
     /**
-     * Return the key at the specified index.
-     * 
-     * @param index
-     *            The index of the key to be returned.
-     * 
-     * @see #getKeys()
-     * 
-     * @throws IllegalStateException
-     *             if the keys were not retrieved.
-     */
-    final public byte[] getKey(int index) {
-        
-        if (keys == null)
-            throw new IllegalStateException();
-        
-        return keys.getKey(index);
-        
-    }
-
-    /**
-     * Return the value at the specified index.
-     * 
-     * @param index
-     *            The index of the value to be returned.
-     * 
-     * @see #getValues()
-     * 
-     * @throws IllegalStateException
-     *             if the values were not retrieved.
-     */
-    final public byte[] getValue(int index) {
-        
-        if (vals == null)
-            throw new IllegalStateException();
-        
-        return vals.getKey(index);
-        
-    }
-
-    /**
-     * The visited version timestamps iff the index maintains version
-     * timestamps.
-     * 
-     * @return The version timestamps -or- <code>null</code> iff the index
-     *         does not maintain version timestamps.
-     */
-    final public long[] getVersionTimestamps() {
-        
-        return versionTimestamps;
-        
-    }
-    
-    /**
-     * The visited delete markers iff the the index maintains delete markers.
-     * The bytes are coded as ONE (1) is true and ZERO (0) is false.
-     * 
-     * @return The delete markers -or- <code>null</code> iff the index does
-     *         not maintain delete markers.
-     */
-    final public byte[] getDeleteMarkers() {
-        
-        return deleteMarkers;
-        
-    }
-
-    /**
      * The values returned by {@link ITuple#getSourceIndex()} for each visited
      * index entry.
      */
-    final public int getSourceIndex(int index) {
+    final public int getSourceIndex(final int index) {
         
         if (sources.length == 1) {
 
@@ -369,11 +335,13 @@ public class ResultSet implements Externalizable {
             limit = -limit;
             
         }
-        
-        this.keys = (sendKeys ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
 
-        this.vals = (sendVals ? new RandomAccessByteArray(0,0,new byte[limit][]) : null);
-        
+        this.keys = (sendKeys ? new MutableKeysRaba(0, 0, limit,
+                new byte[limit][]) : null);
+
+        this.vals = (sendVals ? new MutableValuesRaba(0, 0, limit,
+                new byte[limit][]) : null);
+
         if(indexMetadata.getDeleteMarkers()) {
             
             // index has delete markers so we send them along.
@@ -385,6 +353,10 @@ public class ResultSet implements Externalizable {
 
             // index has version timestamps so we send them along.
             versionTimestamps = new long[limit];
+            
+            minimumVersionTimestamp = Long.MIN_VALUE;
+            
+            maximumVersionTimestamp = Long.MAX_VALUE;
 
         }
 
@@ -427,13 +399,13 @@ public class ResultSet implements Externalizable {
 
         if (this.keys != null) {
 
-            this.keys = this.keys.resize(limit);
+            this.keys = ((AbstractRaba) this.keys).resize(limit);
 
         }
 
         if (this.vals != null) {
 
-            this.vals = this.vals.resize(limit);
+            this.vals = ((AbstractRaba) this.vals).resize(limit);
 
         }
 
@@ -503,7 +475,7 @@ public class ResultSet implements Externalizable {
      *            that there is no data for the query in the key range on this
      *            index partition and hence that it is <i>exhausted</i>).
      */
-    protected void done(boolean exhausted, byte[] lastKey) {
+    protected void done(final boolean exhausted, final byte[] lastKey) {
 
         if (!exhausted && lastKey == null) {
 
@@ -554,7 +526,7 @@ public class ResultSet implements Externalizable {
      * @param tuple
      *            The tuple.
      */
-    protected void copyTuple(ITuple tuple) {
+    protected void copyTuple(final ITuple<?> tuple) {
 
         if (tuple == null)
             throw new IllegalArgumentException();
@@ -582,8 +554,16 @@ public class ResultSet implements Externalizable {
 
         if (versionTimestamps != null) {
 
-            versionTimestamps[ntuples] = tuple.getVersionTimestamp();
+            final long t = tuple.getVersionTimestamp();
+            
+            versionTimestamps[ntuples] = t;
 
+            if (t < minimumVersionTimestamp)
+                minimumVersionTimestamp = t;
+
+            if (t > maximumVersionTimestamp)
+                maximumVersionTimestamp = t;
+            
         }
 
         if (sourceIndices != null) {
@@ -658,8 +638,8 @@ public class ResultSet implements Externalizable {
 
         }
 
-        tupleSerializer = (ITupleSerializer)in.readObject();
-        
+        tupleSerializer = (ITupleSerializer) in.readObject();
+
 // if (ntuples == 0) {
 //
 //            // Nothing more to read.
@@ -669,18 +649,43 @@ public class ResultSet implements Externalizable {
 //        }
         
         if (haveKeys) {
-            
-            keys = new RandomAccessByteArray( 0, 0, new byte[ntuples][] );
-            
-            if (ntuples > 0) {
-             
-                assert tupleSerializer != null;
+
+            if (ntuples == 0) {
+
+                keys = ReadOnlyKeysRaba.EMPTY;
                 
-                assert tupleSerializer.getLeafKeySerializer() != null;
+            } else {
                 
-                tupleSerializer.getLeafKeySerializer().read(in, keys);
-                
+                /*
+                 * Wrap the coded the keys.
+                 */
+
+                // the byte length of the coded keys.
+                final int len = in.readInt();
+
+                // allocate backing array.
+                final byte[] a = new byte[len];
+
+                // read the coded record into the array.
+                in.readFully(a);
+
+                // wrap the coded record.
+                keys = tupleSerializer.getLeafKeysCoder().decode(
+                        FixedByteArrayBuffer.wrap(a));
+
             }
+            
+//            keys = new MutableValuesRaba( 0, 0, new byte[ntuples][] );
+//            
+//            if (ntuples > 0) {
+//             
+//                assert tupleSerializer != null;
+//                
+//                assert tupleSerializer.getLeafKeysCoder() != null;
+//                
+//                tupleSerializer.getLeafKeysCoder().read(in, keys);
+//                
+//            }
             
         } else {
             
@@ -690,20 +695,45 @@ public class ResultSet implements Externalizable {
 
         if (haveVals) {
             
-            vals = new RandomAccessByteArray(0, 0, new byte[ntuples][]);
-            
-            if (ntuples > 0) {
+            if (ntuples == 0) {
 
-                tupleSerializer.getLeafValueSerializer().read(in, vals);
+                vals = ReadOnlyValuesRaba.EMPTY;
+
+            } else {
+                
+                /*
+                 * Wrap the coded the values.
+                 */
+
+                // the byte length of the coded values.
+                final int len = in.readInt();
+
+                // allocate backing array.
+                final byte[] a = new byte[len];
+
+                // read the coded record into the array.
+                in.readFully(a);
+
+                // wrap the coded record.
+                vals = tupleSerializer.getLeafValuesCoder().decode(
+                        FixedByteArrayBuffer.wrap(a));
 
             }
-            
+
+            // vals = new MutableValuesRaba(0, 0, new byte[ntuples][]);
+            //            
+            // if (ntuples > 0) {
+            //
+            // tupleSerializer.getLeafValuesCoder().read(in, vals);
+            //
+            // }
+
         } else {
-            
+
             vals = null;
-            
+
         }
-        
+
         if (haveDeleteMarkers) {
             
             deleteMarkers = new byte[ntuples];
@@ -720,10 +750,10 @@ public class ResultSet implements Externalizable {
 //                
 //              ibs.read(deleteMarkers, ntuples/* len */);
 
-                for(int i=0; i<ntuples; i++) {
+                for (int i = 0; i < ntuples; i++) {
 
-                    deleteMarkers[i] = (byte)(ibs.readBit() == 0 ? 0 : 1);
-                    
+                    deleteMarkers[i] = (byte) (ibs.readBit() == 0 ? 0 : 1);
+
                 }
                 
                 // ibs.close();
@@ -739,13 +769,17 @@ public class ResultSet implements Externalizable {
         }
 
         if (haveVersionTimestamps) {
+
+            minimumVersionTimestamp = in.readLong();
+            
+            maximumVersionTimestamp = in.readLong();
             
             versionTimestamps = new long[ntuples];
-            
-            for(int i=0; i<ntuples; i++) {
-                
+
+            for (int i = 0; i < ntuples; i++) {
+
                 versionTimestamps[i] = in.readLong();
-                
+
             }
             
         }
@@ -770,7 +804,7 @@ public class ResultSet implements Externalizable {
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         ShortPacker.packShort(out, VERSION0);
 
@@ -816,17 +850,55 @@ public class ResultSet implements Externalizable {
 //            return;
 //            
 //        }
-            
+        
+        // buffer for keys and/or values.
+        final DataOutputBuffer buf = keys != null || vals != null ? new DataOutputBuffer()
+                : null;
+        
         if (keys != null && ntuples > 0) {
 
-            tupleSerializer.getLeafKeySerializer().write(out, keys);
+            /*
+             * Write out the coded keys.
+             */
+            
+//            tupleSerializer.getLeafKeysCoder().write(out, keys);
+
+            // reuse the buffer.
+            buf.reset();
+            
+            // code the keys
+            final AbstractFixedByteArrayBuffer slice = tupleSerializer
+                    .getLeafKeysCoder().encode(keys, buf);
+
+            // The #of bytes in the coded keys.
+            out.writeInt(slice.len());
+
+            // The coded keys.
+            slice.writeOn(out);
 
         }
 
         if (vals != null && ntuples > 0) {
 
-            tupleSerializer.getLeafValueSerializer().write(out, vals);
+            /*
+             * Write out the coded values.
+             */
+            
+//            tupleSerializer.getLeafValuesCoder().write(out, vals);
 
+            // reuse the buffer.
+            buf.reset();
+            
+            // code the values.
+            final AbstractFixedByteArrayBuffer slice = tupleSerializer
+                    .getLeafValuesCoder().encode(vals, buf);
+            
+            // The #of bytes in the coded keys.
+            out.writeInt(slice.len());
+
+            // The coded keys.
+            slice.writeOn(out);
+            
         }
         
         /*
@@ -857,17 +929,21 @@ public class ResultSet implements Externalizable {
 //            }
             
         }
-        
+
         /*
-         * @todo reuse the timestamp serialization logic from the NodeSerializer
-         * once something efficient has been identified, e.g., huffman encoding
-         * of timestamps.
+         * FIXME Reuse the timestamp serialization logic from the NodeSerializer
+         * once something efficient has been identified, e.g., delta coding of
+         * timestamps, etc.
          * 
-         * @todo config on IndexMetadata along with serialization for the
-         * deleteMarkers.
+         * @todo config on timestamp serialization IndexMetadata along with
+         * serialization for the deleteMarkers.
          */
 
         if (versionTimestamps != null) {
+
+            out.writeLong(minimumVersionTimestamp);
+
+            out.writeLong(maximumVersionTimestamp);
             
             for (int i = 0; i < ntuples; i++) {
 
@@ -973,7 +1049,7 @@ public class ResultSet implements Externalizable {
          * Copy tuples into the result set buffers.
          */
 
-        ITuple tuple = null;
+        ITuple<?> tuple = null;
 
         while (!isFull() && itr.hasNext()) {
 
@@ -1024,7 +1100,163 @@ public class ResultSet implements Externalizable {
         done(exhausted, lastKey);
 
     }
+
+    /*
+     * ILeafData
+     */
     
+    private boolean rangeCheckIndex(final int index) {
+
+        if (index < 0 || index >= ntuples)
+            throw new IndexOutOfBoundsException();
+        
+        return true;
+        
+    }
+
+    final public boolean hasDeleteMarkers() {
+
+        return deleteMarkers != null;
+
+    }
+
+    final public boolean hasVersionTimestamps() {
+
+        return versionTimestamps != null;
+
+    }
+
+    final public long getVersionTimestamp(final int index) {
+        
+        if(versionTimestamps == null)
+            throw new UnsupportedOperationException();
+        
+        assert rangeCheckIndex(index);
+        
+        return versionTimestamps[index];
+        
+    }
+
+    final public boolean getDeleteMarker(final int index) {
+        
+        if (deleteMarkers == null)
+            throw new UnsupportedOperationException();
+
+        assert rangeCheckIndex(index);
+
+        return deleteMarkers[index] == 0 ? false : true;
+
+    }
+
+    final public int getKeyCount() {
+
+        return ntuples;
+        
+    }
+
+    final public int getValueCount() {
+        
+        return ntuples;
+        
+    }
+
+    /**
+     * The #of tuples visited by the iterator.
+     * <p>
+     * Note: This is is the same as the values returned by
+     * {@link #getKeyCount()} or {@link #getValueCount()}. It DOES NOT report
+     * the #of tuples spanned by the key range. Use
+     * {@link IRangeQuery#rangeCount(byte[], byte[])} for that purpose.
+     */
+    public int getSpannedTupleCount() {
+
+        return ntuples;
+        
+    }
+
+    /**
+     * Yes (this data structure logically corresponds to a leaf since it
+     * implements the {@link ILeafData} API).
+     */
+    final public boolean isLeaf() {
+
+        return true;
+        
+    }
+
+    /**
+     * Yes (the data structure is populated during the ctor and is read-only
+     * thereafter).
+     */
+    final public boolean isReadOnly() {
+        
+        return true;
+        
+    }
+
+    /**
+     * @todo The {@link ResultSet} is not coded while it is being generated, but
+     *       it is coded when it is deserialized (at present, only the keys and
+     *       values remain coded during deserialization).
+     */
+    final public boolean isCoded() {
+        
+        return false;
+        
+    }
+
+    /**
+     * FIXME If we extend {@link DefaultLeafCoder} or implement "ResultSetCoder"
+     * then we can really adhere to these semantics.
+     */
+    final public AbstractFixedByteArrayBuffer data() {
+       
+        if(!isCoded())
+            throw new UnsupportedOperationException();
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    /**
+     * No.
+     */
+    final public boolean isDoubleLinked() {
+     
+        return false;
+        
+    }
+
+    final public long getNextAddr() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    final public long getPriorAddr() {
+        
+        throw new UnsupportedOperationException();
+        
+    }
+
+    final public long getMinimumVersionTimestamp() {
+        
+        if(!hasVersionTimestamps())
+            throw new UnsupportedOperationException();
+        
+        return minimumVersionTimestamp;
+        
+    }
+
+    final public long getMaximumVersionTimestamp() {
+        
+        if(!hasVersionTimestamps())
+            throw new UnsupportedOperationException();
+        
+        return maximumVersionTimestamp;
+        
+    }
+
 //    /**
 //     * FIXME Remove. This is for debugging.
 //     */

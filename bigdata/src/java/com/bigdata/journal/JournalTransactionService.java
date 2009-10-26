@@ -392,8 +392,8 @@ public class JournalTransactionService extends AbstractTransactionService {
             if (localTransactionManager == null)
                 throw new IllegalArgumentException();
         
-            if (state == null)
-                throw new IllegalArgumentException();
+//            if (state == null)
+//                throw new IllegalArgumentException();
             
             this.localTransactionManager = localTransactionManager;
             

@@ -53,11 +53,6 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
     final protected static Logger log = Logger.getLogger(AbstractChunkedResolverator.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
-
-    /**
      * True iff the {@link #log} level is DEBUG or less.
      */
     final protected static boolean DEBUG = log.isDebugEnabled();
@@ -130,7 +125,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
      * @param service
      *            The service on which the task will be executed.
      */
-    public AbstractChunkedResolverator<E, F, S> start(ExecutorService service) {
+    public AbstractChunkedResolverator<E, F, S> start(final ExecutorService service) {
         
         if (resolvedItr != null)
             throw new IllegalStateException();
@@ -139,7 +134,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
          * Create and run a task which reads chunks from the source iterator and
          * writes resolved chunks on the buffer.
          */
-        final Future f = service.submit(new ChunkConsumerTask());
+        final Future<?> f = service.submit(new ChunkConsumerTask());
 
         /*
          * Set the future for that task on the buffer.
@@ -219,7 +214,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
 
                 final long elapsed = (System.currentTimeMillis() - begin);
                     
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Finished: nchunks=" + nchunks + ", nelements="
                             + nelements + ", elapsed=" + elapsed + "ms");
 
@@ -320,7 +315,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
 
     public void close() {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("lastIndex=" + lastIndex + ", chunkSize="
                     + (chunk != null ? "" + chunk.length : "N/A"));
 

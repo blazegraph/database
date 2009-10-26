@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -375,7 +376,7 @@ public class TestKeyBuilder extends TestCase2 {
     
     public void test_keyBuilder_short_key() {
         
-        IKeyBuilder keyBuilder = new KeyBuilder();
+        final IKeyBuilder keyBuilder = new KeyBuilder();
 
         final short smin = Short.MIN_VALUE;
         final short sm1  = (short)-1;
@@ -395,16 +396,31 @@ public class TestKeyBuilder extends TestCase2 {
         assertEquals(2,kp1.length);
         assertEquals(2,kmax.length);
 
-        System.err.println("kmin("+smin+")="+BytesUtil.toString(kmin));
-        System.err.println("km1("+sm1+")="+BytesUtil.toString(km1));
-        System.err.println("k0("+s0+")="+BytesUtil.toString(k0));
-        System.err.println("kp1("+sp1+")="+BytesUtil.toString(kp1));
-        System.err.println("kmax("+smax+")="+BytesUtil.toString(kmax));
-        
-        assertTrue("kmin<km1",BytesUtil.compareBytes(kmin, km1)<0);
-        assertTrue("km1<k0",BytesUtil.compareBytes(km1, k0)<0);
-        assertTrue("k0<kp1",BytesUtil.compareBytes(k0, kp1)<0);
-        assertTrue("kp1<kmax",BytesUtil.compareBytes(kp1, kmax)<0);
+        System.err.println("kmin(" + smin + ")=" + BytesUtil.toString(kmin));
+        System.err.println("km1(" + sm1 + ")=" + BytesUtil.toString(km1));
+        System.err.println("k0(" + s0 + ")=" + BytesUtil.toString(k0));
+        System.err.println("kp1(" + sp1 + ")=" + BytesUtil.toString(kp1));
+        System.err.println("kmax(" + smax + ")=" + BytesUtil.toString(kmax));
+
+        assertTrue("kmin<km1", BytesUtil.compareBytes(kmin, km1) < 0);
+        assertTrue("km1<k0", BytesUtil.compareBytes(km1, k0) < 0);
+        assertTrue("k0<kp1", BytesUtil.compareBytes(k0, kp1) < 0);
+        assertTrue("kp1<kmax", BytesUtil.compareBytes(kp1, kmax) < 0);
+
+        assertEquals((short) 0, KeyBuilder.decodeShort(KeyBuilder
+                .asSortKey(Short.valueOf((short) 0)), 0/* off */));
+
+        assertEquals((short) -1, KeyBuilder.decodeShort(KeyBuilder
+                .asSortKey(Short.valueOf((short) -1)), 0/* off */));
+
+        assertEquals((short) 1, KeyBuilder.decodeShort(KeyBuilder
+                .asSortKey(Short.valueOf((short) 1)), 0/* off */));
+
+        assertEquals(Short.MIN_VALUE, KeyBuilder.decodeShort(KeyBuilder
+                .asSortKey(Short.valueOf(Short.MIN_VALUE)), 0/* off */));
+
+        assertEquals(Short.MAX_VALUE, KeyBuilder.decodeShort(KeyBuilder
+                .asSortKey(Short.valueOf(Short.MAX_VALUE)), 0/* off */));
 
     }
     
@@ -1350,7 +1366,7 @@ public class TestKeyBuilder extends TestCase2 {
 
             assertTrue(b != KeyBuilder.encodeByte(b));
 
-            assertTrue(b == KeyBuilder.decodeByte(KeyBuilder.encodeByte(b)));
+//            assertTrue(b == KeyBuilder.decodeByte(KeyBuilder.encodeByte(b)));
 
             final byte actual = KeyBuilder.decodeByte(KeyBuilder.encodeByte(b));
 
@@ -1361,7 +1377,220 @@ public class TestKeyBuilder extends TestCase2 {
             }
             
         }
-          
+
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.valueOf((byte)-1)),
+                KeyBuilder.asSortKey(Byte.valueOf((byte)0))
+                )<0);
+        
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.valueOf((byte)0)),
+                KeyBuilder.asSortKey(Byte.valueOf((byte)1))
+                )<0);
+
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.MAX_VALUE-1),
+                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                )<0);
+
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.MIN_VALUE),
+                KeyBuilder.asSortKey(Byte.MIN_VALUE+1)
+                )<0);
+     
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.MIN_VALUE),
+                KeyBuilder.asSortKey(Byte.valueOf((byte)-1))
+                )<0);
+        
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.MIN_VALUE),
+                KeyBuilder.asSortKey(Byte.valueOf((byte)0))
+                )<0);
+        
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.MIN_VALUE),
+                KeyBuilder.asSortKey(Byte.valueOf((byte)1))
+                )<0);
+
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.valueOf((byte)-1)),
+                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                )<0);
+        
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.valueOf((byte)0)),
+                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                )<0);
+        
+        assertTrue(BytesUtil.compareBytes(//
+                KeyBuilder.asSortKey(Byte.valueOf((byte)1)),
+                KeyBuilder.asSortKey(Byte.MAX_VALUE)
+                )<0);
+        
+
     }
+
+//    /*
+//     * Note: BigInteger has both leading sign bit and a variable length
+//     * encoding, each of which means that BigInteger#toByteArray() does not
+//     * return a byte[] that respects a total ordering over the BigInteger value
+//     * space. I think that the only way to handle this is to promote all values
+//     * out to some fixed byte[] size.
+//     */
+//    /*
+//     * BigInteger.
+//     */
+//    
+//    /**
+//     * Convert an unsigned byte[] into a {@link BigInteger}.
+//     * 
+//     * @param key
+//     *            The bytes.
+//     *            
+//     * @return The big integer value.
+//     */
+//    private BigInteger decodeBigInteger(final byte[] key) {
+//
+////        // decode w/ conversion from unsigned byte[].
+////        final byte[] b = key.clone();
+////        for (int i = 0; i < b.length; i++) {
+////            b[i] = KeyBuilder.decodeByte(b[i]);
+////        }
+////        return new BigInteger(b);
+//        
+//        // decode w/o conversion from unsigned byte[]. 
+//        return new BigInteger(key);
+//
+////        // decode and negate from unsigned byte[]. 
+////        return new BigInteger(key).negate();
+//        
+//    }
+//
+//    private byte[] encodeBigInteger(final BigInteger i) {
+//
+//        final KeyBuilder keyBuilder = new KeyBuilder();
+//        
+//        keyBuilder.reset();
+//
+////        // encode w/ conversion to unsigned byte[].
+////        for(byte b : i.toByteArray()) {
+////            
+////            keyBuilder.append(b);
+////            
+////        }
+//
+//        // encode w/o conversion to unsigned byte[].
+//        keyBuilder.append(i.toByteArray());
+//        
+////        // encode negation of the big integer as an unsigned byte[]. 
+////        keyBuilder.append(i.negate().toByteArray());
+//        
+//        final byte[] key = keyBuilder.getKey();
+//        
+//        return key;
+//        
+//    }
+//
+//    protected void doEncodeDecodeTest(final BigInteger expected) {
+//        
+//        final byte[] encoded = encodeBigInteger(expected);
+//
+//        final BigInteger actual = decodeBigInteger(encoded);
+//
+//        if(log.isInfoEnabled()) {
+//            log.info("BigInteger"+
+//                     "\nexpected="+expected+//
+//                     "\nencoded ="+BytesUtil.toString(encoded)+//
+//                     "\nactual  ="+actual//
+//                     );
+//        }
+//        
+//        assertEquals(expected, actual);
+//
+//    }
+//
+//    protected void doLTTest(final BigInteger i1, final BigInteger i2) {
+//
+//        final byte[] k1 = encodeBigInteger(i1);
+//        final byte[] k2 = encodeBigInteger(i2);
+//        final int ret = BytesUtil.compareBytes(k1, k2);
+//        
+//        if(log.isInfoEnabled()) {
+//            log.info("BigInteger"+
+//                     "\ni1="+i1+//
+//                     "\ni2="+i2+//
+//                     "\nk1="+BytesUtil.toString(k1)+//
+//                     "\nk2="+BytesUtil.toString(k2)+//
+//                     "\nret="+(ret==0?"EQ":(ret<0?"LT":"GT"))
+//                     );
+//        }
+//        
+//        assertTrue(ret < 0);
+//
+//    }
+//    
+//    /**
+//     * Unit tests for encoding {@link BigInteger} keys.
+//     */
+//    public void test_bigIntegerKey() {
+//
+////        assertEquals(BigInteger.valueOf(0), decodeKey(new byte[0]));
+////        
+////        assertEquals(BigInteger.valueOf(0), decodeBigInteger(new byte[] { 0 }));
+////
+////        assertEquals(BigInteger.valueOf(1), decodeBigInteger(new byte[] { 1 }));
+////
+////        assertEquals(BigInteger.valueOf(-1), decodeBigInteger(new byte[] { -1 }));
+//
+////        assertEquals(BigInteger.valueOf(Long.MIN_VALUE + 1),
+////                decodeBigInteger(KeyBuilder.asSortKey(1L)));
+//
+//        doEncodeDecodeTest(BigInteger.valueOf(0));
+//        doEncodeDecodeTest(BigInteger.valueOf(1));
+//        doEncodeDecodeTest(BigInteger.valueOf(-1));
+//        doEncodeDecodeTest(BigInteger.valueOf(Long.MIN_VALUE));
+//        doEncodeDecodeTest(BigInteger.valueOf(Long.MAX_VALUE));
+//        doEncodeDecodeTest(BigInteger.valueOf(Long.MIN_VALUE-1));
+//        doEncodeDecodeTest(BigInteger.valueOf(Long.MAX_VALUE+1));
+//
+////        assertEquals(Long.MAX_VALUE, decodeBigInteger(KeyBuilder.asSortKey(-1L))
+////                .longValue());
+//
+//        doLTTest(BigInteger.valueOf(1), BigInteger.valueOf(2));
+//
+//        doLTTest(BigInteger.valueOf(0), BigInteger.valueOf(1));
+//
+//        doLTTest(BigInteger.valueOf(-1), BigInteger.valueOf(0));
+//
+//        doLTTest(BigInteger.valueOf(-2), BigInteger.valueOf(-1));
+//
+//        /*
+//         * try codings that go beyond a single byte.
+//         */
+//        assertTrue(BytesUtil.compareBytes(//
+//                BigInteger.valueOf(10).toByteArray(),//
+//                BigInteger.valueOf(11).toByteArray()//
+//                ) < 0);
+//
+//        assertTrue(BytesUtil.compareBytes(//
+//                BigInteger.valueOf(258).toByteArray(),//
+//                BigInteger.valueOf(259).toByteArray()//
+//                ) < 0);
+//
+//        /*
+//         * try codings that have different byte lengths.
+//         */
+//        assertTrue(BytesUtil.compareBytes(//
+//                BigInteger.valueOf(3).toByteArray(),// codes as [3]
+//                BigInteger.valueOf(259).toByteArray()// codes as [1,3]
+//                ) < 0);
+//
+////      assertTrue(BytesUtil.compareBytes(//
+////      BigInteger.valueOf(-1).toByteArray(),//
+////      BigInteger.valueOf(0).toByteArray()//
+////      ) < 0);
+//
+//    }
     
 }

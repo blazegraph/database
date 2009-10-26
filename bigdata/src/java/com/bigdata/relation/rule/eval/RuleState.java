@@ -196,7 +196,8 @@ public class RuleState implements IRuleState {
 
             // save results.
             a[tailIndex] = keyOrder;
-            nvars[tailIndex] = asBound.getVariableCount();
+            nvars[tailIndex] = keyOrder == null ? asBound.getVariableCount()
+                    : asBound.getVariableCount(keyOrder);
             
             final int arity = pred.arity();
 

@@ -87,7 +87,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @version $Id$
      */
     public interface Options extends com.bigdata.journal.Options,
-            com.bigdata.journal.ConcurrencyManager.Options {
+            com.bigdata.journal.ConcurrencyManager.Options,
+            com.bigdata.journal.TemporaryStoreFactory.Options {
 
         /**
          * The capacity of the {@link HardReferenceQueue} backing the
@@ -99,7 +100,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
          * weak references and the control of the JVM over when they are
          * cleared. Once an {@link ILocatableResource} becomes weakly reachable,
          * the JVM will eventually GC the object. Since objects which are
-         * strongly reachable are never cleared, this provides our guarentee
+         * strongly reachable are never cleared, this provides our guarantee
          * that resources are never closed if they are in use.
          * 
          * @see #DEFAULT_LOCATOR_CACHE_CAPACITY
@@ -131,10 +132,12 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @param properties
      *            See {@link com.bigdata.journal.Options}.
      */
-    public Journal(Properties properties) {
+    public Journal(final Properties properties) {
         
         super(properties);
      
+        tempStoreFactory = new TemporaryStoreFactory(properties);
+        
         executorService = Executors.newCachedThreadPool(new DaemonThreadFactory
                 (getClass().getName()+".executorService"));
 
@@ -385,9 +388,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
         if (btree == null) {
 
-            log
-                    .warn("No such index: name=" + name + ", timestamp="
-                            + timestamp);
+            if (log.isInfoEnabled())
+                log.info("No such index: name=" + name + ", timestamp="
+                        + timestamp);
 
             return null;
 
@@ -509,7 +512,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              * committed or aborted.
              */
             
-            log.warn("No such transaction: name=" + name + ", tx=" + tx);
+            log.warn("No such transaction: name=" + name + ", tx=" + timestamp);
 
             return null;
             
@@ -594,7 +597,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 
                 if (sources == null) {
 
-                    log.warn("No such index: name="+name+", timestamp="+timestamp);
+                    if (log.isInfoEnabled())
+                        log.info("No such index: name="+name+", timestamp="+timestamp);
                     
                     return null;
                     
@@ -744,7 +748,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Returns the next timestamp from the {@link ILocalTransactionManager}.
      * 
      * @deprecated This is here for historical reasons and is only used by the
-     *             test suite.
+     *             test suite.  Use {@link #getLocalTransactionManager()} and
+     *             {@link ITransactionService#nextTimestamp()}.
      */
     public long nextTimestamp() {
     
@@ -840,6 +845,14 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         localTransactionManager.shutdownNow();
 
         super.shutdownNow();
+        
+    }
+    
+    public void deleteResources() {
+        
+        super.deleteResources();
+        
+        tempStoreFactory.closeAll();
         
     }
 
@@ -1038,7 +1051,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         return tempStoreFactory.getTempStore();
         
     }
-    private final TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
+    private final TemporaryStoreFactory tempStoreFactory;
 
     public DefaultResourceLocator getResourceLocator() {
 

@@ -40,7 +40,7 @@ public class OSPComparator implements Comparator<ISPO> {
         
     }
 
-    public int compare(ISPO stmt1, ISPO stmt2) {
+    public int compare(final ISPO stmt1, final ISPO stmt2) {
 
         if (stmt1 == stmt2)
             return 0;

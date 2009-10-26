@@ -45,7 +45,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
-import com.bigdata.service.RawDataServiceTupleIterator;
+import com.bigdata.service.ndx.RawDataServiceTupleIterator;
 
 /**
  * A service for {@link IReduceTask} processing. Those tasks are distributed by

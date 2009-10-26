@@ -33,6 +33,7 @@ import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -577,6 +578,10 @@ public class ReplicatedStore implements IRawStore {
 
     public boolean isStable() {
         return localStore.isStable();
+    }
+
+    public UUID getUUID() {
+        return localStore.getUUID();
     }
 
     public IResourceMetadata getResourceMetadata() {

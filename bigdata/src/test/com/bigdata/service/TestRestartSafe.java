@@ -69,13 +69,12 @@ public class TestRestartSafe extends AbstractEmbeddedFederationTestCase {
      */
     public Properties getProperties() {
         
-        Properties properties = new Properties( super.getProperties() );
-        
-        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
-                .toString());
-        
+        final Properties properties = new Properties(super.getProperties());
+
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+
         return properties;
-        
+
     }
     
     /**

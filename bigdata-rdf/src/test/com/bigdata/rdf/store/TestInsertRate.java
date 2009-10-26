@@ -260,7 +260,7 @@ public class TestInsertRate extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
         }
 
     }

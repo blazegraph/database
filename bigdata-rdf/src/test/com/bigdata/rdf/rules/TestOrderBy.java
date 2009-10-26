@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.rules;
 
-import com.bigdata.btree.IKeyBuffer;
 import com.bigdata.relation.rule.IQueryOptions;
 
 /**
@@ -52,6 +51,8 @@ public class TestOrderBy extends AbstractRuleTestCase {
     }
     
     /**
+     * @todo write unit tests for "orderBy".
+     * 
      * @todo unit test where empty result set.
      * 
      * @todo unit test where duplicate records exit and verify that duplicates
@@ -67,7 +68,7 @@ public class TestOrderBy extends AbstractRuleTestCase {
      */
     public void test_orderBy() {
         
-        fail("write tests");
+//        fail("write tests");
         
     }
     

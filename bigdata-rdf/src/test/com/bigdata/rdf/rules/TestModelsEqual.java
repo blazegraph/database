@@ -184,8 +184,8 @@ public class TestModelsEqual extends AbstractRuleTestCase {
             assertFalse(TripleStoreUtility.modelsEqual(store1, store2));
 
         } finally {
-            store1.close();
-            store2.close();
+            store1.__tearDownUnitTest();
+            store2.__tearDownUnitTest();
         }
     }
 

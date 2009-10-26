@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.proc;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Batch lookup operation.
@@ -66,14 +66,15 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
             return false;
             
         }
-        
-        public BatchLookup newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
+
+        public BatchLookup newInstance(IRabaCoder keysCoder,
+                IRabaCoder valsCoder, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             assert vals == null;
-            
-            return new BatchLookup(keySer,valSer,fromIndex, toIndex, keys);
+
+            return new BatchLookup(keysCoder, valsCoder, fromIndex, toIndex,
+                    keys);
             
         }
         
@@ -95,10 +96,10 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
      * 
      * @see BatchLookupConstructor
      */
-    protected BatchLookup(IDataSerializer keySer, IDataSerializer valSer,
+    protected BatchLookup(IRabaCoder keysCoder, IRabaCoder valsCoder,
             int fromIndex, int toIndex, byte[][] keys) {
 
-        super(keySer, valSer, fromIndex, toIndex, keys, null/* values */);
+        super(keysCoder, valsCoder, fromIndex, toIndex, keys, null/* values */);
         
     }
 
@@ -111,7 +112,7 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
     /**
      * @return {@link ResultBuffer}
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
 
         final int n = getKeyCount();
         
@@ -128,7 +129,7 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
         }
         
         return new ResultBuffer(n, ret, ndx.getIndexMetadata()
-                .getTupleSerializer().getLeafValueSerializer());
+                .getTupleSerializer().getLeafValuesCoder());
 
     }
 

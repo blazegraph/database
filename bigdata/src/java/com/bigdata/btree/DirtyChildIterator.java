@@ -58,7 +58,7 @@ class DirtyChildIterator implements INodeIterator {
      * {@link #next()} since it may have been written out between
      * {@link #hasNext()} and {@link #next()}.
      */
-    private AbstractNode child = null;
+    private AbstractNode<?> child = null;
 
     /**
      * 
@@ -79,7 +79,7 @@ class DirtyChildIterator implements INodeIterator {
      *         than the last visited dirty child at the moment that this method
      *         was invoked. If this method returns <code>true</code> then an
      *         immediate invocation of {@link #next()} will succeed. However,
-     *         that guarentee does not hold if intervening code forces the
+     *         that guarantee does not hold if intervening code forces the
      *         scheduled dirty child to be written onto the store.
      */
     public boolean hasNext() {
@@ -99,17 +99,22 @@ class DirtyChildIterator implements INodeIterator {
             
         }
         
-        for( ; index <= node.nkeys; index++ ) {
-            
-            Reference<AbstractNode> childRef = node.childRefs[index];
-            
-            if( childRef == null ) continue;
-            
+        final int nkeys = node.getKeyCount();
+
+        for (; index <= nkeys; index++) {
+
+            final Reference<AbstractNode<?>> childRef = node.getChildRef(index);
+
+            if (childRef == null)
+                continue;
+
             child = childRef.get();
-            
-            if( child == null ) continue;
-            
-            if( ! child.isDirty() ) continue;
+
+            if (child == null)
+                continue;
+
+            if (!child.isDirty())
+                continue;
 
             /*
              * Note: We do NOT touch the hard reference queue here since the
@@ -130,7 +135,7 @@ class DirtyChildIterator implements INodeIterator {
             
         }
         
-        return index <= node.nkeys;
+        return index <= nkeys;
 
     }
 
@@ -146,7 +151,7 @@ class DirtyChildIterator implements INodeIterator {
 
         assert child.isDirty();
 
-        AbstractNode tmp = child;
+        final AbstractNode<?> tmp = child;
 
         // advance the index where the scan will start next() time.
         lastVisited = index++;
@@ -178,7 +183,7 @@ class DirtyChildIterator implements INodeIterator {
             
         }
         
-        return node.keys.getKey(lastVisited);
+        return node.getKeys().get(lastVisited);
         
     }
 

@@ -43,7 +43,7 @@ public class TimestampUtility {
      * 
      * @return
      */
-    static public String toString(long timestamp) {
+    static public String toString(final long timestamp) {
 
         if (timestamp == ITx.UNISOLATED)
             return "unisolated";
@@ -65,40 +65,49 @@ public class TimestampUtility {
      *            The timestamp.
      * @return
      */
-    static public boolean isCommitTime(long timestamp) {
+    static public boolean isCommitTime(final long timestamp) {
         
         return timestamp > 0;
         
     }
 
-    static public boolean isReadOnly(long timestamp) {
+    static public boolean isReadOnly(final long timestamp) {
         
 //        return timestamp < ITx.READ_COMMITTED;
         return timestamp > 0 || timestamp == ITx.READ_COMMITTED;
         
     }
 
-    static public boolean isReadWriteTx(long timestamp) {
+    static public boolean isReadWriteTx(final long timestamp) {
         
 //        return timestamp > 0;
-        
+
+        /*
+         * Note: timestamp != ITx.UNISOLATED is a redundant test since
+         * 
+         * READ_COMMITTED == -1
+         * 
+         * and
+         * 
+         * UNISOLATED == 0
+         */
         return timestamp < ITx.READ_COMMITTED;
-        
+
     }
     
-    static public boolean isReadCommittedOrUnisolated(long timestamp) {
+    static public boolean isReadCommittedOrUnisolated(final long timestamp) {
         
         return timestamp == ITx.READ_COMMITTED || timestamp == ITx.UNISOLATED;
         
     }
 
-    static public boolean isReadCommitted(long timestamp) {
+    static public boolean isReadCommitted(final long timestamp) {
         
         return timestamp == ITx.READ_COMMITTED;
         
     }
 
-    static public boolean isUnisolated(long timestamp) {
+    static public boolean isUnisolated(final long timestamp) {
         
         return timestamp == ITx.UNISOLATED;
         

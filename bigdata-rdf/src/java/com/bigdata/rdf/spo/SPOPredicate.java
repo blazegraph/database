@@ -26,11 +26,15 @@ package com.bigdata.rdf.spo;
 import java.util.Arrays;
 
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.ArrayBindingSet;
+import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * A predicate that is a triple with one or more variables. While the general
@@ -42,11 +46,11 @@ import com.bigdata.relation.rule.IVariableOrConstant;
  */
 public class SPOPredicate implements IPredicate<ISPO> {
 
-    public SPOPredicate copy() {
-        
-        return new SPOPredicate(this, relationName);
-        
-    }
+//    public SPOPredicate copy() {
+//        
+//        return new SPOPredicate(this, relationName);
+//        
+//    }
     
     /**
      * 
@@ -81,7 +85,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
     
-    public String getRelationName(int index) {
+    public String getRelationName(final int index) {
         
         return relationName[index];
         
@@ -119,11 +123,32 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param p
      * @param o
      */
-    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
+    public SPOPredicate(final String relationName,
+            final IVariableOrConstant<Long> s,
+            final IVariableOrConstant<Long> p, final IVariableOrConstant<Long> o) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
                 null/* c */, false/* optional */, null/* constraint */, null/* expander */);
+
+    }
+
+    /**
+     * Partly specified ctor. The predicate is NOT optional. No constraint is
+     * specified. No expander is specified.
+     * 
+     * @param relationName
+     * @param s
+     * @param p
+     * @param o
+     * @param c
+     */
+    public SPOPredicate(final String relationName,
+            final IVariableOrConstant<Long> s,
+            final IVariableOrConstant<Long> p,
+            final IVariableOrConstant<Long> o, final IVariableOrConstant<Long> c) {
+
+        this(new String[] { relationName }, -1/* partitionId */, s, p, o, c,
+                false/* optional */, null/* constraint */, null/* expander */);
 
     }
 
@@ -137,8 +162,9 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param p
      * @param o
      */
-    public SPOPredicate(String[] relationName, IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
+    public SPOPredicate(final String[] relationName,
+            final IVariableOrConstant<Long> s,
+            final IVariableOrConstant<Long> p, final IVariableOrConstant<Long> o) {
 
         this(relationName, -1/* partitionId */, s, p, o,
                 null/* c */, false/* optional */, null/* constraint */, null/* expander */);
@@ -155,9 +181,10 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param o
      * @param optional
      */
-    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
-            final boolean optional) {
+    public SPOPredicate(final String relationName,
+            final IVariableOrConstant<Long> s,
+            final IVariableOrConstant<Long> p,
+            final IVariableOrConstant<Long> o, final boolean optional) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
                 null/* c */, optional, null/* constraint */, null/* expander */);
@@ -175,9 +202,11 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param expander
      *            MAY be <code>null</code>.
      */
-    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, 
-            ISolutionExpander<ISPO> expander) {
+    public SPOPredicate(final String relationName,
+            final IVariableOrConstant<Long> s,
+            final IVariableOrConstant<Long> p,
+            final IVariableOrConstant<Long> o,
+            final ISolutionExpander<ISPO> expander) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
                 null/* c */, false/* optional */, null/* constraint */,
@@ -197,9 +226,11 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param expander
      *            MAY be <code>null</code>.
      */
-    public SPOPredicate(String relationName, IVariableOrConstant<Long> s,
-            IVariableOrConstant<Long> p, IVariableOrConstant<Long> o,
-            final boolean optional, ISolutionExpander<ISPO> expander) {
+    public SPOPredicate(final String relationName,
+            final IVariableOrConstant<Long> s,
+            final IVariableOrConstant<Long> p,
+            final IVariableOrConstant<Long> o, final boolean optional,
+            final ISolutionExpander<ISPO> expander) {
 
         this(new String[] { relationName }, -1/* partitionId */, s, p, o,
                 null/* c */, optional, null/* constraint */, expander);
@@ -214,7 +245,7 @@ public class SPOPredicate implements IPredicate<ISPO> {
      * @param s
      * @param p
      * @param o
-     * @parma c MAY be <code>null</code>.
+     * @param c MAY be <code>null</code>.
      * @param optional
      * @param constraint
      *            MAY be <code>null</code>.
@@ -355,6 +386,102 @@ public class SPOPredicate implements IPredicate<ISPO> {
         
     }
 
+    /**
+     * Constrain the predicate by setting the context position. If the context
+     * position on the {@link SPOPredicate} is non-<code>null</code>, then you
+     * must use {@link #asBound(IBindingSet)} to replace all occurrences of the
+     * variable appearing in the context position of the predicate with the
+     * desired constant. If the context position is already bound the a
+     * constant, then you can not modify it (you can only increase the
+     * constraint, not change the constraint).
+     * 
+     * @throws IllegalStateException
+     *             unless the context position on the {@link SPOPredicate} is
+     *             <code>null</code>.
+     */
+    public SPOPredicate setC(final IConstant<Long> c) {
+
+        if(c == null)
+            throw new IllegalArgumentException();
+
+        return new SPOPredicate(//
+                relationName, //
+                partitionId, //
+                s,//
+                p,//
+                o,//
+                c, // override.
+                optional, //
+                constraint,//
+                expander//
+        );
+
+    }
+    
+    /**
+     * Constrain the predicate by layering on another constraint (the existing
+     * constraint, if any, is combined with the new constraint).
+     */
+    public SPOPredicate setConstraint(final IElementFilter<ISPO> newConstraint) {
+
+        if(newConstraint == null)
+            throw new IllegalArgumentException();
+
+        final IElementFilter<ISPO> tmp = this.constraint == null ? newConstraint
+                : new WrappedSPOFilter(newConstraint, this.constraint);
+
+        return new SPOPredicate(//
+                relationName, //
+                partitionId, //
+                s,//
+                p,//
+                o,//
+                c, // 
+                optional, //
+                tmp,// override.
+                expander//
+        );
+
+    }
+
+    /**
+     * Wraps two {@link IElementFilter}s as a single logical filter.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class WrappedSPOFilter extends SPOFilter {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3946650536738814437L;
+        
+        private final IElementFilter<ISPO> a;
+        private final IElementFilter<ISPO> b;
+        
+        public WrappedSPOFilter(final IElementFilter<ISPO> a,
+                final IElementFilter<ISPO> b) {
+
+            this.a = a;
+            this.b = b;
+            
+        }
+
+        public boolean accept(final ISPO e) {
+
+            if (a.canAccept(e) && a.accept(e) && b.canAccept(e) && b.accept(e)) {
+
+                return true;
+                
+            }
+
+            return false;
+
+        }
+        
+    }
+    
     public final IVariableOrConstant<Long> get(final int index) {
         switch (index) {
         case 0:
@@ -364,10 +491,26 @@ public class SPOPredicate implements IPredicate<ISPO> {
         case 2:
             return o;
         case 3:
-            if(c!=null) return c;
+            return c;
+//            if(c!=null) return c;
             // fall through
         default:
             throw new IndexOutOfBoundsException(""+index);
+        }
+    }
+    
+    public final IConstant<Long> get(final ISPO spo, final int index) {
+        switch (index) {
+        case 0:
+            return new Constant<Long>(spo.s());
+        case 1:
+            return new Constant<Long>(spo.p());
+        case 2:
+            return new Constant<Long>(spo.o());
+        case 3:
+            return new Constant<Long>(spo.c());
+        default:
+            throw new IndexOutOfBoundsException("" + index);
         }
     }
     
@@ -421,28 +564,146 @@ public class SPOPredicate implements IPredicate<ISPO> {
         return c;
         
     }
-    
+
     /**
      * Return true iff the {s,p,o} arguments of the predicate are bound (vs
-     * variables) - the context position is NOT tested.
+     * variables) - the context position is considered iff it is
+     * <code>non-null</code>.
+     * 
+     * @deprecated by {@link #isFullyBound(IKeyOrder)}
      */
     final public boolean isFullyBound() {
 
-        return !s.isVar() && !p.isVar() && !o.isVar();
+        return !s.isVar() && !p.isVar() && !o.isVar()
+                && (c == null ? true : (!c.isVar()));
 
     }
 
     /**
-     * The #of arguments in the predicate that are variables (vs constants) (the
-     * context position is NOT counted).
+     * The #of arguments in the predicate that are variables (the context
+     * position iff it is non-null).
      */
     final public int getVariableCount() {
+
+        return (s.isVar() ? 1 : 0) + (p.isVar() ? 1 : 0) + (o.isVar() ? 1 : 0)
+                + (c == null ? 0 : (c.isVar() ? 1 : 0));
+
+    }
+    
+    public boolean isFullyBound(final IKeyOrder<ISPO> keyOrder) {
+
+        return getVariableCount(keyOrder) == 0;
+
+    }
+    
+    public int getVariableCount(final IKeyOrder<ISPO> keyOrder) {
+        int nunbound = 0;
+        final int keyArity = keyOrder.getKeyArity();
+        for (int keyPos = 0; keyPos < keyArity; keyPos++) {
+            final int index = keyOrder.getKeyOrder(keyPos);
+            final IVariableOrConstant<?> t = get(index);
+            if (t == null || t.isVar()) {
+                nunbound++;
+            }
+        }
+        return nunbound;
+    }
+
+    /**
+     * Return a new instance in which all occurrences of the variable in the
+     * predicate have been replaced by the specified constant.
+     * 
+     * @param var
+     *            The variable.
+     * @param val
+     *            The constant.
+     * @return A new instance of the predicate in which all occurrences of the
+     *         variable have been replaced by the constant.
+     * 
+     * @throws IllegalArgumentException
+     *             if either argument is <code>null</code>.
+     */
+    public SPOPredicate asBound(final IVariable<Long> var,
+            final IConstant<Long> val) {
+
+        return asBound(new ArrayBindingSet(new IVariable[]{var}, new IConstant[]{val}));
         
-        return (s.isVar() ? 1 : 0) + (p.isVar() ? 1 : 0) + (o.isVar() ? 1 : 0);
+//        if (var == null)
+//            throw new IllegalArgumentException();
+//        
+//        if (val == null)
+//            throw new IllegalArgumentException();
+//        
+////        if(!var.isVar()) {
+////            return this;
+////        }
+//
+//        final IVariableOrConstant<Long> s;
+//        {
+//
+//            if (this.s.isVar() && this.s.equals(var)) {
+//
+//                s = val;
+//
+//            } else {
+//
+//                s = this.s;
+//
+//            }
+//        
+//        }
+//        
+//        final IVariableOrConstant<Long> p;
+//        {
+//
+//            if (this.p.isVar() && this.p.equals(var)) {
+//
+//                p = val;
+//
+//            } else {
+//
+//                p = this.p;
+//
+//            }
+//            
+//        }
+//        
+//        final IVariableOrConstant<Long> o;
+//        {
+//            
+//            if (this.o.isVar() && this.o.equals(var)) {
+//
+//                o = val;
+//
+//            } else {
+//
+//               o = this.o;
+//
+//            }
+//            
+//        }
+//        
+//        final IVariableOrConstant<Long> c;
+//        {
+//
+//            if (this.c != null && this.c.isVar() && this.c.equals(var)) {
+//
+//                c = val;
+//
+//            } else {
+//
+//               c = this.c;
+//
+//            }
+//            
+//        }
+//        
+//        return new SPOPredicate(relationName, partitionId, s, p, o, c,
+//                optional, constraint, expander);
         
     }
     
-    public SPOPredicate asBound(IBindingSet bindingSet) {
+    public SPOPredicate asBound(final IBindingSet bindingSet) {
         
         final IVariableOrConstant<Long> s;
         {
@@ -675,21 +936,4 @@ public class SPOPredicate implements IPredicate<ISPO> {
      */
     private int hash = 0;
 
-//    /**
-//     * Cached access path reference for this predicate.
-//     * <p>
-//     * Note: Does needs to be volatile unless ALL code is synchronized when this
-//     * field is set/read.
-//     * <p>
-//     * Note: This field IS NOT copied when we specialize the predicate since the
-//     * bindings may have been specialized as well.
-//     * 
-//     * FIXME There is some danger associated with this cached reference since
-//     * the access path is really linked to the timestamp of the view. However
-//     * the timestamp is not part of the predicate state and we are not enforcing
-//     * anywhere the constraint that predicate instances are distinct per
-//     * timestamp.
-//     */
-//    volatile SPOAccessPath accessPath = null;
-    
 }

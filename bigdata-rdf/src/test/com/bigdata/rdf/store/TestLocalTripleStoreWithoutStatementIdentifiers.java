@@ -85,23 +85,30 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
          * this test class and its optional .properties file.
          */
 
+        // basic test suite.
         suite.addTest(TestTripleStoreBasics.suite());
         
+        // rules, inference, and truth maintenance test suite.
+        suite.addTest( com.bigdata.rdf.rules.TestAll.suite() );
+
         return suite;
         
     }
 
     public Properties getProperties() {
+        
+        final Properties properties = super.getProperties();
 
-        /*
-         * Note: nothing needs to be overriden.  This test corresponds to the
-         * default configuration for the LocalTripleStore.
-         */
-        
-        Properties properties = super.getProperties();
-        
         // turn off statement identifiers.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,"false");
+        properties
+                .setProperty(
+                        com.bigdata.rdf.store.AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,
+                        "false");
+
+        // triples only.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.QUADS,
+                "false");
 
         return properties;
         
@@ -126,33 +133,34 @@ public class TestLocalTripleStoreWithoutStatementIdentifiers extends AbstractTes
      *                be re-opened, e.g., from failure to obtain a file lock,
      *                etc.
      */
-    protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
+    protected AbstractTripleStore reopenStore(final AbstractTripleStore store) {
         
         // close the store.
         store.close();
-        
+
         if (!store.isStable()) {
-            
-            throw new UnsupportedOperationException("The backing store is not stable");
-            
+
+            throw new UnsupportedOperationException(
+                    "The backing store is not stable");
+
         }
-        
+
         // Note: clone to avoid modifying!!!
-        Properties properties = (Properties)getProperties().clone();
-        
+        Properties properties = (Properties) getProperties().clone();
+
         // Turn this off now since we want to re-open the same store.
-        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-        
+        properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+
         // The backing file that we need to re-open.
         File file = ((LocalTripleStore) store).store.getFile();
-        
+
         assertNotNull(file);
-        
-        // Set the file property explictly.
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return new LocalTripleStore( properties );
-        
+
+        // Set the file property explicitly.
+        properties.setProperty(Options.FILE, file.toString());
+
+        return new LocalTripleStore(properties);
+
     }
 
 }

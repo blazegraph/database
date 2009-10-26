@@ -246,7 +246,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
     @Override
     public List<String> getCommand() {
         
-        List<String> command = new LinkedList<String>();
+        final List<String> command = new LinkedList<String>();
         
         command.add(new File(SysstatUtil.getPath(), "pidstat").getPath());
 

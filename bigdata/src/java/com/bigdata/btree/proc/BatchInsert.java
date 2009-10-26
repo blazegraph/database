@@ -34,7 +34,7 @@ import java.io.ObjectOutput;
 import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Batch insert operation.
@@ -106,12 +106,12 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        public BatchInsert newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
+        public BatchInsert newInstance(IRabaCoder keysCoder,
+                IRabaCoder valsCoder, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
-            return new BatchInsert(keySer, valSer, fromIndex, toIndex, keys,
-                    vals, returnOldValues);
+            return new BatchInsert(keysCoder, valsCoder, fromIndex, toIndex,
+                    keys, vals, returnOldValues);
 
         }
         
@@ -145,11 +145,11 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * 
      * @see BatchInsertConstructor
      */
-    protected BatchInsert(IDataSerializer keySer, IDataSerializer valSer,
+    protected BatchInsert(IRabaCoder keysCoder, IRabaCoder valsCoder,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals,
             boolean returnOldValues) {
 
-        super(keySer, valSer, fromIndex, toIndex, keys, vals);
+        super(keysCoder, valsCoder, fromIndex, toIndex, keys, vals);
 
         if (vals == null)
             throw new IllegalArgumentException(Errors.ERR_VALS_NULL);
@@ -212,7 +212,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
         if (returnOldValues) {
             
             return new ResultBuffer(n, ret, ndx.getIndexMetadata()
-                    .getTupleSerializer().getLeafValueSerializer());
+                    .getTupleSerializer().getLeafValuesCoder());
             
         }
         

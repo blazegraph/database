@@ -49,6 +49,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.service.ndx.DataServiceTupleIterator;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
@@ -580,12 +581,12 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      */
     public boolean isOverflowActive() throws IOException;
     
-    /**
-     * Shutdown the service immediately and destroy any persistent data
-     * associated with the service.
-     * 
-     * @todo move to {@link IService}?
-     */
-    public void destroy() throws IOException;
+//    /**
+//     * Shutdown the service immediately and destroy any persistent data
+//     * associated with the service.
+//     * 
+//     * moved to {@link IService}?
+//     */
+//    public void destroy() throws IOException;
     
 }

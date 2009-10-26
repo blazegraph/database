@@ -19,7 +19,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -31,9 +30,11 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.PrefixFilter;
@@ -51,9 +52,7 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
-import com.bigdata.rdf.load.AssignedSplits;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataValue;
@@ -65,8 +64,6 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOComparator;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BigdataSolutionResolverator;
-import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -152,6 +149,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 properties.setProperty(AbstractTripleStore.Options.OVERWRITE,
                         "false");
 
+            if (textIndex) {
+                /*
+                 * Also index datatype literals?
+                 */
+                textIndexDatatypeLiterals = Boolean
+                        .parseBoolean(getProperty(
+                                AbstractTripleStore.Options.TEXT_INDEX_DATATYPE_LITERALS,
+                                AbstractTripleStore.Options.DEFAULT_TEXT_INDEX_DATATYPE_LITERALS));
+            } else {
+                textIndexDatatypeLiterals = false;
+            }
+
         }
         
         this.storeBlankNodes = Boolean.parseBoolean(getProperty(
@@ -161,8 +170,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         {
 
             final String defaultValue;
-            if (indexManager instanceof IBigdataFederation
-                    && ((IBigdataFederation) indexManager).isScaleOut()) {
+            if (indexManager instanceof IBigdataFederation<?>
+                    && ((IBigdataFederation<?>) indexManager).isScaleOut()) {
 
                 defaultValue = AbstractTripleStore.Options.DEFAULT_TERMID_BITS_TO_REVERSE;
 
@@ -209,20 +218,34 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         }
 
         /*
-         * cache hard references to the indices.
+         * Note: I am deferring resolution of the indices to minimize the
+         * latency and overhead required to "locate" the relation. In scale out,
+         * resolving the index will cause a ClientIndexView to spring into
+         * existence for the appropriate timestamp, and we often do not need
+         * that view for each index of the relation during query.
          */
+        
+//        /*
+//         * cache hard references to the indices.
+//         */
+//
+//        term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+//
+//        id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+//
+//        if(textIndex) {
+//            
+//            getSearchEngine();
+//            
+//        }
 
-        term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
-
-        id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
-
-        if(textIndex) {
-            
-            getSearchEngine();
-            
-        }
-
-        // lookup/create value factory for the lexicon's namespace.
+        /*
+         * Lookup/create value factory for the lexicon's namespace.
+         * 
+         * Note: The same instance is used for read-only tx, read-write tx,
+         * read-committed, and unisolated views of the lexicon for a given
+         * triple store.
+         */
         valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
         
     }
@@ -238,31 +261,31 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
     final private BigdataValueFactoryImpl valueFactory;
     
+    /**
+     * Strengthens the return type.
+     */
+    @Override
+    public AbstractTripleStore getContainer() {
+        
+        return (AbstractTripleStore) super.getContainer();
+        
+    }
+    
     public boolean exists() {
 
-        return term2id != null && id2term != null;
+        for(String name : getIndexNames()) {
+            
+            if (getIndex(name) == null)
+                return false;
+            
+        }
+        
+        return true;
 
     }
 
     public void create() {
         
-        create( null );
-        
-    }
-    
-    /**
-     * 
-     * @param assignedSplits
-     *            An map providing pre-assigned separator keys describing index
-     *            partitions and optionally the data service {@link UUID}s on
-     *            which to register the index partitions. The keys of the map
-     *            identify the index whose index partitions are described by the
-     *            corresponding value. You may specify one or all of the
-     *            indices. This parameter is optional and when <code>null</code>,
-     *            the default assignments will be used.
-     */
-    public void create(final Map<IKeyOrder, AssignedSplits> assignedSplits) {
-
         final IResourceLock resourceLock = acquireExclusiveLock();
         
         try {
@@ -273,40 +296,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             // register the indices.
 
-            {
-                final IndexMetadata md = getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID));
+            indexManager
+                    .registerIndex(getTerm2IdIndexMetadata(getFQN(LexiconKeyOrder.TERM2ID)));
 
-                final AssignedSplits splits = assignedSplits == null ? null
-                        : assignedSplits.get(LexiconKeyOrder.TERM2ID);
-
-                if (splits != null) {
-
-                    splits.registerIndex(indexManager, md);
-
-                } else {
-
-                    indexManager.registerIndex(md);
-
-                }
-            }
-
-            {
-
-                final IndexMetadata md = getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM));
-
-                final AssignedSplits splits = assignedSplits == null ? null
-                        : assignedSplits.get(LexiconKeyOrder.ID2TERM);
-
-                if (splits != null) {
-
-                    splits.registerIndex(indexManager, md);
-
-                } else {
-
-                    indexManager.registerIndex(md);
-
-                }
-            }
+            indexManager
+                    .registerIndex(getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM)));
 
             if (textIndex) {
 
@@ -318,13 +312,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             }
 
-            term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
-
-            id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
-
-            assert term2id != null;
-
-            assert id2term != null;
+            /*
+             * Note: defer resolution of the newly created index objects.
+             */
+            
+//            term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+//
+//            id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+//
+//            assert term2id != null;
+//
+//            assert id2term != null;
 
         } finally {
 
@@ -369,11 +367,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     }
     
-    private IIndex id2term;
-    private IIndex term2id;
+    volatile private IIndex id2term;
+    volatile private IIndex term2id;
     private final boolean textIndex;
+    private final boolean textIndexDatatypeLiterals;
     final boolean storeBlankNodes;
-//    private final boolean scaleOutTermIds;
     final int termIdBitsToReverse;
 
     /**
@@ -412,10 +410,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     }
     
     /**
-     * Overriden to return the hard reference for the index.
+     * Overridden to return the hard reference for the index.
      */
     @Override
-    public IIndex getIndex(IKeyOrder<? extends BigdataValue> keyOrder) {
+    public IIndex getIndex(final IKeyOrder<? extends BigdataValue> keyOrder) {
 
         if (keyOrder == LexiconKeyOrder.ID2TERM) {
      
@@ -435,8 +433,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     final public IIndex getTerm2IdIndex() {
 
-        if (term2id == null)
-            throw new IllegalStateException();
+        if (term2id == null) {
+
+            synchronized (this) {
+
+                if (term2id == null) {
+
+                    term2id = super.getIndex(LexiconKeyOrder.TERM2ID);
+
+                    if (term2id == null)
+                        throw new IllegalStateException();
+
+                }
+
+            }
+            
+        }
 
         return term2id;
 
@@ -444,8 +456,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     final public IIndex getId2TermIndex() {
 
-        if (id2term == null)
-            throw new IllegalStateException();
+        if (id2term == null) {
+
+            synchronized (this) {
+                
+                if (id2term == null) {
+
+                    id2term = super.getIndex(LexiconKeyOrder.ID2TERM);
+                
+                    if (id2term == null)
+                        throw new IllegalStateException();
+
+                }
+
+            }
+
+        }
 
         return id2term;
 
@@ -454,6 +480,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     /**
      * A factory returning the softly held singleton for the
      * {@link FullTextIndex}.
+     * 
+     * @see Options#TEXT_INDEX
      * 
      * @todo replace with the use of the {@link IResourceLocator} since it
      *       already imposes a canonicalizing mapping within for the index name
@@ -550,6 +578,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         throw new UnsupportedOperationException();
         
     }
+    
+    public Class<BigdataValue> getElementClass() {
+        
+        return BigdataValue.class;
+        
+    }
 
     /**
      * Note : this method is part of the mutation api. it is primarily (at this
@@ -594,7 +628,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         return prefixScan(new Literal[] { lit });
         
     }
-    
+
     /**
      * A scan of all literals having any of the given literals as a prefix.
      * 
@@ -615,10 +649,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         if (lits == null || lits.length == 0)
             throw new IllegalArgumentException();
 
-        if(log.isInfoEnabled()) {
+        if (log.isInfoEnabled()) {
 
-            log.info("#lits="+lits.length);
-            
+            log.info("#lits=" + lits.length);
+
         }
 
         /*
@@ -632,7 +666,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final LexiconKeyBuilder keyBuilder;
         {
 
-            Properties properties = new Properties();
+            final Properties properties = new Properties();
 
             properties.setProperty(KeyBuilder.Options.STRENGTH,
                     StrengthEnum.Primary.toString());
@@ -648,7 +682,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          * Note: Each key is encoded with the appropriate bytes to indicate the
          * kind of literal (plain, languageCode, or datatype literal).
          * 
-         * Note: The key builder was choosen to only encode the PRIMARY
+         * Note: The key builder was chosen to only encode the PRIMARY
          * characteristics so that we obtain a prefix[] suitable for the
          * completion scan.
          */
@@ -758,7 +792,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * operation.
      * <p>
      * Note: This implementation is designed to use unisolated batch writes on
-     * the terms and ids index that guarentee consistency.
+     * the terms and ids index that guarantee consistency.
      * <p>
      * If the full text index is enabled, then the terms will also be inserted
      * into the full text index.
@@ -957,7 +991,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         }
         
     }
-    
+
     /**
      * Assign unique statement identifiers to triples.
      * <p>
@@ -970,8 +1004,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * Note: Statement identifiers are NOT inserted into the reverse (id:term)
      * index. Instead, they are written into the values associated with the
      * {s,p,o} in each of the statement indices. That is handled by
-     * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)},
-     * which is also responsible for invoking this method in order to have the
+     * {@link AbstractTripleStore#addStatements(AbstractTripleStore, boolean, IChunkedOrderedIterator, IElementFilter)}
+     * , which is also responsible for invoking this method in order to have the
      * statement identifiers on hand before it writes on the statement indices.
      * <p>
      * Note: The caller's {@link ISPO}[] is sorted into SPO order as a
@@ -979,6 +1013,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * <p>
      * Note: The statement identifiers are assigned to the {@link ISPO}s as a
      * side-effect.
+     * <p>
+     * Note: SIDs are NOT supported for quads, so this code is never executed
+     * for quads.
      */
     public void addStatementIdentifiers(final ISPO[] a, final int n) {
 
@@ -1042,8 +1079,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             final long _begin = System.currentTimeMillis();
 
             // local instance, no unicode support.
-            final IKeyBuilder keyBuilder = KeyBuilder.newInstance(1
-                    + IRawTripleStore.N * Bytes.SIZEOF_LONG);
+            final IKeyBuilder keyBuilder = KeyBuilder
+                    .newInstance(1/* statement byte */+ (3/* triple */* Bytes.SIZEOF_LONG));
 
             for (int i = 0; i < n; i++) {
 
@@ -1102,6 +1139,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
                                 for (int i = split.fromIndex, j = 0; i < split.toIndex; i++, j++) {
 
+//                                    if (b[i].c() != 0L
+//                                            && b[i].c() != result.ids[j]) {
+//                                        System.err.println("spo="
+//                                                + getContainer().toString(b[i])
+//                                                + ", sid="
+//                                                + getContainer().toString(
+//                                                        result.ids[j]));
+//                                    }
+
                                     b[i].setStatementIdentifier(result.ids[j]);
 
                                 }
@@ -1143,33 +1189,38 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * {@link Locale}.
      * </p>
      * 
-     * @param itr Iterator visiting the terms to be indexed.
+     * @param itr
+     *            Iterator visiting the terms to be indexed.
      * 
      * @see #textSearch(String, String)
      * 
      * @todo allow registeration of datatype specific tokenizers (we already
      *       have language family based lookup).
      */
-    protected void indexTermText(final int capacity, final Iterator<BigdataValue> itr) {
-        
+    protected void indexTermText(final int capacity,
+            final Iterator<BigdataValue> itr) {
+
         final FullTextIndex ndx = getSearchEngine();
 
         final TokenBuffer buffer = new TokenBuffer(capacity, ndx);
 
         int n = 0;
 
-        while(itr.hasNext()) {
+        while (itr.hasNext()) {
 
             final BigdataValue val = itr.next();
 
             if (!(val instanceof Literal))
                 continue;
-            
-            final Literal lit = (Literal)val;
 
-            // do not index datatype literals in this manner.
-            if (lit.getDatatype() != null)
+            final Literal lit = (Literal) val;
+
+            if (!textIndexDatatypeLiterals && lit.getDatatype() != null) {
+
+                // do not index datatype literals in this manner.
                 continue;
+
+            }
 
             final String languageCode = lit.getLanguage();
 
@@ -1211,10 +1262,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @return A map from term identifier to the {@link BigdataValue}. If a
      *         term identifier was not resolved then the map will not contain an
      *         entry for that term identifier.
-     * 
-     * @todo write unit tests getTerms(ids) - it's mainly used by the
-     *       {@link BigdataStatementIteratorImpl} and
-     *       {@link BigdataSolutionResolverator}.
      * 
      * @todo performance tuning for statement pattern scans with resolution to
      *       terms, e.g., LUBM Q6.
@@ -1445,7 +1492,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             // aggregates results if lookup split across index partitions.
             final ResultBufferHandler resultHandler = new ResultBufferHandler(
                     toIndex, ndx.getIndexMetadata().getTupleSerializer()
-                            .getLeafValueSerializer());
+                            .getLeafValuesCoder());
 
             // batch lookup
             ndx.submit(fromIndex, toIndex/* toIndex */, keys, null/* vals */,
@@ -1695,7 +1742,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 //    }
 
     /**
-     * Recently resolved term identifers are cached to improve performance when
+     * Recently resolved term identifiers are cached to improve performance when
      * externalizing statements.
      * 
      * @todo consider using this cache in the batch API as well or simply modify
@@ -2080,4 +2127,130 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
     }
 
+    /**
+     * Dumps the lexicon in a variety of ways.
+     */
+    public StringBuilder dumpTerms() {
+
+        final StringBuilder sb = new StringBuilder();
+        
+        /*
+         * Note: it is no longer true that all terms are stored in the reverse
+         * index (BNodes are not). Also, statement identifiers are stored in the
+         * forward index, so we can't really write the following assertion
+         * anymore.
+         */
+//        // Same #of terms in the forward and reverse indices.
+//        assertEquals("#terms", store.getIdTermIndex().rangeCount(null, null),
+//                store.getTermIdIndex().rangeCount(null, null));
+        
+        /**
+         * Dumps the forward mapping.
+         */
+        {
+
+            sb.append("---- terms index (forward mapping) ----\n");
+
+            final IIndex ndx = getTerm2IdIndex();
+
+            final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                final ITuple<?> tuple = itr.next();
+                
+//                // the term identifier.
+//                Object val = itr.next();
+
+                /*
+                 * The sort key for the term. This is not readily decodable. See
+                 * RdfKeyBuilder for specifics.
+                 */
+                final byte[] key = tuple.getKey();
+
+                /*
+                 * deserialize the term identifier (packed long integer).
+                 */
+                final long id;
+                
+                try {
+
+                    id = tuple.getValueStream().readLong();
+//                    id = tuple.getValueStream().unpackLong();
+
+                } catch (IOException ex) {
+
+                    throw new RuntimeException(ex);
+
+                }
+
+                sb.append(BytesUtil.toString(key) + " : " + id+"\n");
+
+            }
+
+        }
+
+        /**
+         * Dumps the reverse mapping.
+         */
+        {
+
+            sb.append("---- ids index (reverse mapping) ----\n");
+
+            final IIndex ndx = getId2TermIndex();
+
+            final ITupleIterator<BigdataValue> itr = ndx.rangeIterator(null, null);
+
+            while (itr.hasNext()) {
+
+                final ITuple<BigdataValue> tuple = itr.next();
+                
+                final BigdataValue term = tuple.getObject();
+                
+                sb.append(term.getTermId()+ " : " + term+"\n");
+
+            }
+
+        }
+        
+        /**
+         * Dumps the term:id index.
+         */
+        sb.append("---- term->id ----\n");
+        for( Iterator<Long> itr = termIdIndexScan(); itr.hasNext(); ) {
+            
+            sb.append(itr.next());
+            
+            sb.append("\n");
+            
+        }
+
+        /**
+         * Dumps the id:term index.
+         */
+        sb.append("---- id->term ----\n");
+        for( Iterator<Value> itr = idTermIndexScan(); itr.hasNext(); ) {
+            
+            sb.append(itr.next());
+            
+            sb.append("\n");
+            
+        }
+
+        /**
+         * Dumps the terms in term order.
+         */
+        sb.append("---- terms in term order ----\n");
+        for( Iterator<Value> itr = termIterator(); itr.hasNext(); ) {
+            
+            sb.append(itr.next().toString());
+            
+            sb.append("\n");
+            
+        }
+        
+        return sb;
+        
+    }
+    
 }

@@ -25,6 +25,7 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.service.DataService;
 
 /**
@@ -35,7 +36,8 @@ import com.bigdata.service.DataService;
  * The {@link #Direct} and {@link #Mapped} options may not be used for files
  * exceeding {@link Integer#MAX_VALUE} bytes in length since a
  * {@link ByteBuffer} is indexed with an <code>int</code> (the pragmatic limit
- * is much lower since a JVM does not have access to more than 2G of RAM).
+ * is typically much lower and depends on the size of the JVM heap for the
+ * {@link #Direct} mode).
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -47,14 +49,17 @@ public enum BufferMode {
     /**
      * <p>
      * A variant on the {@link #Direct} mode that is not restart-safe. This mode
-     * is useful for segments whose contents do not require persistence, applets,
-     * etc.
+     * is useful for temporary stores which can reside entirely in memory and do
+     * not require disk.  It can be used in environments, such as an applet,
+     * where you can not access the disk (however, you can also use a transient
+     * {@link BTree} with much the same effect).  The {@link #Temporary} mode
+     * is much more scalable.
      * </p>
      * 
      * @see TransientBufferStrategy
      */
-    Transient(false/*stable*/),
-    
+    Transient(false/* stable */, true/* fullyBuffered */),
+
     /**
      * <p>
      * A direct buffer is allocated for the file image. Writes are applied
@@ -73,8 +78,8 @@ public enum BufferMode {
      * 
      * @see DirectBufferStrategy
      */
-    Direct(true/*stable*/),
-    
+    Direct(true/* stable */, true/* fullyBuffered */),
+
     /**
      * <p>
      * A memory-mapped buffer is allocated for the file image. Writes are
@@ -84,42 +89,42 @@ public enum BufferMode {
      * <p>
      * This option yields control over IO and memory resources to the OS.
      * However, there is currently no way to force release of the mapped memory
-     * per the bug described below. This means (a) that the mapped file might
-     * not be deletable; and (b) that native memory can be exhausted. While
-     * performance is good on at least some benchmarks, it is difficult to
+     * per the bug described below. This means (a) you might not be able to
+     * delete the mapped file; and (b) that native memory can be exhausted.
+     * While performance is good on at least some benchmarks, it is difficult to
      * recommend this solution given its downsides.
      * </p>
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      * @see MappedBufferStrategy
      */
-    Mapped(true/*stable*/),
-    
+    Mapped(true/* stable */, false/* fullyBuffered */),
+
     /**
      * <p>
      * The journal is managed on disk. This option may be used with files of
-     * more than {@link Integer#MAX_VALUE} bytes in extent, but no more than
-     * {@link Integer#MAX_VAlUE} slots. Journal performance for large files
-     * should be fair on write, but performance will degrade as the journal is
-     * NOT optimized for random reads (poor locality).
+     * more than {@link Integer#MAX_VALUE} bytes in extent. Journal performance
+     * for large files should be fair on write, but performance will degrade as
+     * the journal is NOT optimized for random reads (poor locality).
      * </p>
      * 
      * @see DiskOnlyStrategy
      */
-    Disk(true/*stable*/),
-    
+    Disk(true/* stable */, false/* fullyBuffered */),
+
     /**
      * <p>
      * A variant on the {@link #Disk} mode that is not restart-safe. This mode
      * is useful for all manners of temporary data with full concurrency control
      * and scales-up to very large temporary files. The backing file (if any) is
-     * always destroyed when the store is closed.
+     * always destroyed when the store is closed. This is much more scalable
+     * than the {@link #Transient} mode.
      * </p>
      * 
      * @see DiskOnlyStrategy
      */
-    Temporary(false/*stable*/),
-    
+    Temporary(false/* stable */, false/* fullyBuffered */),
+
     /**
      * <p>
      * The journal is managed on disk, but with a direct {@link ByteBuffer}
@@ -131,16 +136,27 @@ public enum BufferMode {
      * higher read concurrency than {@link #Disk} and faster asynchronous
      * overflow processing (since it is not reading through to the disk).
      * </p>
+     * <p>
+     * Note: The implementation in fact limits the capacity of the buffer to a
+     * maximum extent. Beyond that, this solution degrades into a partly
+     * buffered approach.
+     * </p>
      * 
      * @see BufferedDiskStrategy
+     * 
+     * @deprecated This has not been implemented yet. It may not be necessary
+     *             with the use of global buffers for B+Tree nodes and leaves.
      */
-    BufferedDisk(true/*stable*/);
-    
+    BufferedDisk(true/* stable */, false/* fullyBuffered */);
+
     private final boolean stable;
+    private final boolean fullyBuffered;
     
-    private BufferMode(boolean stable) {
+    private BufferMode(final boolean stable, final boolean fullyBuffered) {
         
         this.stable = stable;
+        
+        this.fullyBuffered = fullyBuffered;
         
     }
     
@@ -151,6 +167,18 @@ public enum BufferMode {
     public boolean isStable() {
        
         return stable;
+        
+    }
+    
+    /**
+     * <code>true</code> iff this {@link BufferMode} is fully buffered 
+     * in memory - this implies that there is an absolute upper bound
+     * of {@link Integer#MAX_VALUE} bytes in the store since that is
+     * the limit on a byte[] in Java.
+     */
+    public boolean isFullyBuffered() {
+       
+        return fullyBuffered;
         
     }
     

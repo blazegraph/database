@@ -71,7 +71,7 @@ public class ThickAsynchronousIterator<E> implements IAsynchronousIterator<E>,
      * @throws IllegalArgumentException
      *             if <i>a</i> is <code>null</code>.
      */
-    public ThickAsynchronousIterator(E[] a) {
+    public ThickAsynchronousIterator(final E[] a) {
 
         if (a == null)
             throw new IllegalArgumentException();

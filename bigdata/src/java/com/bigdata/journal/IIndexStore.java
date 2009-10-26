@@ -98,7 +98,7 @@ public interface IIndexStore {
      * It is important that processes do not hold a hard reference to a
      * {@link TemporaryStore} beyond the end of the process as that will prevent
      * the {@link TemporaryStore} from being finalized. Holding reference to an
-     * {@link AbstractBTree} created on a {@link TemporaryStore} is equivilent
+     * {@link AbstractBTree} created on a {@link TemporaryStore} is equivalent
      * to holding a hard reference to the {@link TemporaryStore} itself since
      * the {@link AbstractBTree} holds onto the backing {@link IRawStore} using
      * a hard reference.

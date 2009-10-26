@@ -27,13 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
-import java.util.Iterator;
-
-import info.aduna.iteration.CloseableIteration;
-
-import org.openrdf.sail.SailException;
-
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.striterator.ICloseableIterator;
 
 /**
  * Iterator visiting {@link BigdataStatement}s.
@@ -42,7 +37,6 @@ import com.bigdata.rdf.model.BigdataStatement;
  * @version $Id$
  */
 public interface BigdataStatementIterator extends
-        CloseableIteration<BigdataStatement, SailException>,
-        Iterator<BigdataStatement> {
+        ICloseableIterator<BigdataStatement> {
 
 }

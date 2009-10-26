@@ -59,7 +59,7 @@ import com.bigdata.rdf.spo.SPOIndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
- * Helper class writes an {@link SPO}[] on one of the statement indices.
+ * Helper class writes an {@link ISPO}[] on one of the statement indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -92,7 +92,7 @@ public class SPOIndexWriter implements Callable<Long> {
      * @param statementStore
      *            The store on which the statements will be written.
      * @param a
-     *            The {@link SPO}[].
+     *            The {@link ISPO}[].
      * @param numStmts
      *            The #of elements in <i>a</i> to be written.
      * @param clone
@@ -118,10 +118,12 @@ public class SPOIndexWriter implements Callable<Long> {
      *            incremented when writing on the SPO index to avoid double
      *            counting).
      */
-    public SPOIndexWriter(SPORelation spoRelation, ISPO[] a, int numStmts,
-            boolean clone, SPOKeyOrder keyOrder, IElementFilter<ISPO> filter,
-            AtomicLong sortTime, AtomicLong insertTime, AtomicLong numWritten) {
-        
+    public SPOIndexWriter(final SPORelation spoRelation, final ISPO[] a,
+            final int numStmts, final boolean clone,
+            final SPOKeyOrder keyOrder, final IElementFilter<ISPO> filter,
+            final AtomicLong sortTime, final AtomicLong insertTime,
+            final AtomicLong numWritten) {
+
         if (spoRelation == null)
             throw new IllegalArgumentException();
         
@@ -161,12 +163,8 @@ public class SPOIndexWriter implements Callable<Long> {
         // Note: Use the index on [statementStore]!
         this.ndx = spoRelation.getIndex(keyOrder);
         
-        if (ndx == null) {
-            
-            throw new IllegalStateException("No index? keyOrder=" + keyOrder);
-            
-        }
-
+        assert ndx != null;
+        
     }
 
     /**
@@ -181,15 +179,13 @@ public class SPOIndexWriter implements Callable<Long> {
      */
     public Long call() throws Exception {
 
-        final long beginIndex = System.currentTimeMillis();
+        final long begin = System.currentTimeMillis();
 
         { // sort
 
-            final long _begin = System.currentTimeMillis();
-
             Arrays.sort(stmts, 0, numStmts, comparator);
 
-            sortTime.addAndGet(System.currentTimeMillis() - _begin);
+            sortTime.addAndGet(System.currentTimeMillis() - begin);
 
         }
 
@@ -238,11 +234,18 @@ public class SPOIndexWriter implements Callable<Long> {
                 continue;
 
             // skip duplicate records.
-            if (last != null && last.equals(spo))
-                continue;
+            if (last != null && last.equals(spo)) {
+                if (keyOrder.getKeyArity() == 4) {
+                    // must also compare context for quads.
+                    if (last.c() == spo.c())
+                        continue;
+
+                } else
+                    continue;
+            }
 
             // generate key for the index.
-            keys[numToAdd] = tupleSer.statement2Key(keyOrder, spo);
+            keys[numToAdd] = tupleSer.serializeKey(spo);
             
             // generate value for the index.
             vals[numToAdd] = spo.serializeValue(vbuf);
@@ -266,10 +269,10 @@ public class SPOIndexWriter implements Callable<Long> {
         
         final long writeCount = aggregator.getResult();
 
-        insertTime.addAndGet(System.currentTimeMillis()
-                - _begin);
-        
-        if (keyOrder == SPOKeyOrder.SPO) {
+        insertTime.addAndGet(System.currentTimeMillis() - _begin);
+
+        if (keyOrder.isPrimaryIndex()) {
+//        if (keyOrder == SPOKeyOrder.SPO) {
 
             /*
              * Note: Only the task writing on the SPO index takes responsibility
@@ -282,9 +285,7 @@ public class SPOIndexWriter implements Callable<Long> {
 
         }
 
-        final long elapsed = System.currentTimeMillis() - beginIndex;
-
-        return elapsed;
+        return System.currentTimeMillis() - begin;
 
     }
 

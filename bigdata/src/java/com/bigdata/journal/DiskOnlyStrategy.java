@@ -35,7 +35,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree.Counter;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -215,8 +218,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * Written records are NOT entered into the read cache since (when the
      * {@link #writeCache} is enabled), recently written records are already in
      * the {@link #writeCache}.
-     * 
-     * @todo purge old entries based on last touched time?
+     * <p>
+     * Note: The higher-level data structures use the {@link LRUNexus}, which
+     * provides a read cache of the decompressed records. For this reason there
+     * is little reason to enable this lower-level read cache.
      */
     private LRUCache<Long, byte[]> readCache = null;
     
@@ -395,7 +400,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * @param data
          *            The record.
          */
-        void write(long addr, ByteBuffer data) {
+        void write(final long addr, final ByteBuffer data) {
 
             // the position() at which the record is cached.
             final int position = buf.position();
@@ -404,7 +409,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             buf.put(data);
 
             // add the record to the write cache index for read(addr).
-            writeCacheIndex.put(new Long(addr), new Integer(position));
+            writeCacheIndex.put(Long.valueOf(addr), Integer.valueOf(position));
 
         }
 
@@ -430,8 +435,8 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          *         for those cases when the record to be updated in still in
          *         the {@link WriteCache}.
          */
-        ByteBuffer read(long addr,int nbytes) {
-                
+        ByteBuffer read(final long addr, final int nbytes) {
+
             /*
              * The return value is the position in the writeCache where that
              * record starts and [null] if the record is not in the writeCache.
@@ -1836,7 +1841,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             throw new IllegalStateException(ERR_READ_ONLY);
         
         if (nbytes <= 0)
-            throw new IllegalArgumentException("Bad record size");
+            throw new IllegalArgumentException(ERR_BAD_RECORD_SIZE);
         
         final long addr; // address in the store.
         
@@ -2202,7 +2207,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      *            <code>true</code> iff the write is an append (most record
      *            writes are appends).
      */
-    void writeOnDisk(final ByteBuffer data, final long offset, final boolean append) {
+    private void writeOnDisk(final ByteBuffer data, final long offset, final boolean append) {
 
         final long begin = System.nanoTime();
 
@@ -2247,9 +2252,29 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             
         }
 
+        final long elapsed = (System.nanoTime() - begin);
         storeCounters.bytesWrittenOnDisk += nbytes;
-        storeCounters.elapsedDiskWriteNanos += (System.nanoTime() - begin);
+        storeCounters.elapsedDiskWriteNanos += elapsed;
 
+        if (false&&BigdataStatics.debug) {
+			/*
+			 * Note: There are only two places where the journal writes on the
+			 * disk using this backing buffer implementation. Here and when it
+			 * updates the root blocks. It only syncs the disk at the commit.
+			 */
+			System.err.println("wrote on disk: bytes="
+					+ nbytes
+					+ ", elapsed="
+					+ TimeUnit.NANOSECONDS.toMillis(elapsed)
+					+ "ms; totals: write="
+					+ TimeUnit.NANOSECONDS
+							.toMillis(storeCounters.elapsedDiskWriteNanos)
+					+ "ms, read="
+					+ TimeUnit.NANOSECONDS
+							.toMillis(storeCounters.elapsedDiskReadNanos)
+					+ "ms");
+		}
+        
     }
 
     public ByteBuffer readRootBlock(final boolean rootBlock0) {

@@ -27,9 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
-
-
-
 /**
  * Utility methods for computing the successor of a value for various data
  * types.
@@ -167,7 +164,7 @@ public class SuccessorUtil {
      * @exception NoSuccessorException
      *                if there is no successor for that value.
      */
-    public static byte successor( byte n ) throws NoSuccessorException {
+    public static byte successor(final byte n) throws NoSuccessorException {
 
         if (Byte.MAX_VALUE == n) {
 
@@ -192,8 +189,7 @@ public class SuccessorUtil {
      * @exception NoSuccessorException
      *                if there is no successor for that value.
      */
-    public static char successor( char n ) throws NoSuccessorException
-    {
+    public static char successor(final char n) throws NoSuccessorException {
         
         if (Character.MAX_VALUE == n) {
 
@@ -218,8 +214,7 @@ public class SuccessorUtil {
      * @exception NoSuccessorException
      *                if there is no successor for that value.
      */
-    public static short successor( short n ) throws NoSuccessorException
-    {
+    public static short successor(final short n) throws NoSuccessorException {
         
         if (Short.MAX_VALUE == n) {
 
@@ -244,8 +239,7 @@ public class SuccessorUtil {
      * @exception NoSuccessorException
      *                if there is no successor for that value.
      */
-    public static int successor( int n ) throws NoSuccessorException
-    {
+    public static int successor(final int n) throws NoSuccessorException {
     
         if (Integer.MAX_VALUE == n) {
 
@@ -270,8 +264,7 @@ public class SuccessorUtil {
      * @exception NoSuccessorException
      *                if there is no successor for that value.
      */
-    public static long successor( long n ) throws NoSuccessorException
-    {
+    public static long successor(final long n) throws NoSuccessorException {
 
         if (Long.MAX_VALUE == n) {
 
@@ -312,9 +305,7 @@ public class SuccessorUtil {
      * @exception NoSuccessorException
      *                if there is no next value in the value space.
      */
-    static public float successor( float f )
-        throws NoSuccessorException
-    {
+    static public float successor(final float f) throws NoSuccessorException {
         
         if (f == Float.MAX_VALUE) {
 
@@ -402,9 +393,7 @@ public class SuccessorUtil {
      * @exception NoSuccessorException
      *                if there is no next value in the value space.
      */
-    public static double successor( double d ) 
-        throws NoSuccessorException
-    {
+    public static double successor(final double d) throws NoSuccessorException {
         
         if (d == Double.MAX_VALUE) {
 
@@ -476,7 +465,7 @@ public class SuccessorUtil {
      * 
      * @return The successor and never <code>null</code>
      */
-    public static String successor(String s) {
+    public static String successor(final String s) {
 
         if (s == null)
             return "\0";
@@ -499,7 +488,7 @@ public class SuccessorUtil {
      * @throws NoSuccessorException
      *             If the byte[] has zero length.
      */
-    static public byte[] successor(byte[] b) {
+    static public byte[] successor(final byte[] b) {
         
         return successor(b, 0, b.length);
         
@@ -526,7 +515,7 @@ public class SuccessorUtil {
      * 
      * @todo unit tests when offset is non-zero.
      */
-    static public byte[] successor(byte[] b, int off, int len) {
+    static public byte[] successor(final byte[] b, final int off, final int len) {
 
         if (len == 0) {
 

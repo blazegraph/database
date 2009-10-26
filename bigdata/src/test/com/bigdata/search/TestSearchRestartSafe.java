@@ -28,8 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.search;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.StringReader;
 import java.util.Properties;
 
@@ -60,21 +58,21 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
         super(arg0);
     }
 
-    final File file;
-    {
-        
-        try {
-
-            file = File.createTempFile(getName(), ".tmp");
-   
-            System.err.println("file="+file);
-         
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-    }
+//    final File file;
+//    {
+//        
+//        try {
+//
+//            file = File.createTempFile(getName(), ".tmp");
+//   
+//            System.err.println("file="+file);
+//         
+//        } catch (IOException ex) {
+//
+//            throw new RuntimeException(ex);
+//
+//        }
+//    }
 
 //    public Properties getProperties() {
 //
@@ -109,8 +107,8 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
             final String languageCode = "EN";
             {
 
-                final FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
-                        ITx.UNISOLATED, properties);
+                final FullTextIndex ndx = new FullTextIndex(indexManager,
+                        NAMESPACE, ITx.UNISOLATED, properties);
 
                 ndx.create();
 
@@ -129,10 +127,10 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
             /* Search w/o restart. */
             {
 
-                FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
-                        ITx.UNISOLATED, properties);
+                final FullTextIndex ndx = new FullTextIndex(indexManager,
+                        NAMESPACE, ITx.UNISOLATED, properties);
 
-                Hiterator itr = ndx.search(text, languageCode);
+                final Hiterator itr = ndx.search(text, languageCode);
 
                 assertEquals(2, itr.size());
 
@@ -158,16 +156,16 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
             /* Search with restart. */
             {
 
-                FullTextIndex ndx = new FullTextIndex(indexManager, NAMESPACE,
-                        ITx.UNISOLATED, properties);
+                final FullTextIndex ndx = new FullTextIndex(indexManager,
+                        NAMESPACE, ITx.UNISOLATED, properties);
 
-                Hiterator itr = ndx.search(text, languageCode);
+                final Hiterator itr = ndx.search(text, languageCode);
 
                 assertEquals(2, itr.size());
 
                 assertTrue(itr.hasNext());
 
-                IHit hit1 = itr.next();
+                final IHit hit1 = itr.next();
 
                 System.err.println("hit1:" + hit1);
 

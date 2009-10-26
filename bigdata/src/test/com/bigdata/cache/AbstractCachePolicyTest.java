@@ -421,11 +421,11 @@ public abstract class AbstractCachePolicyTest extends TestCase2 {
         };
         
         String[] obj = new String[] {
-                new String("o1"),
-                new String("o2"),
-                new String("o3"),
-                new String("o4"),
-                new String("o5")
+                "o1",
+                "o2",
+                "o3",
+                "o4",
+                "o5"
         };
 
         MyCacheListener<Long,String> listener = new MyCacheListener<Long,String>();

@@ -84,6 +84,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * See the end of the source file for distribution license (Modified BSD
  * licence)
+ * 
+ * @version $Id$
  */
 public class NanoHTTPD implements IServiceShutdown
 {

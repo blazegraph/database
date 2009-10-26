@@ -26,7 +26,7 @@ package com.bigdata.journal;
 import java.util.Date;
 
 import com.bigdata.btree.ILocalBTreeView;
-import com.bigdata.isolation.IsolatedFusedView;
+import com.bigdata.btree.isolation.IsolatedFusedView;
 
 /**
  * <p>

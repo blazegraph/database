@@ -193,6 +193,15 @@ abstract public class AbstractKeyRangeIndexProcedure extends
 
             }
 
+        } else {
+
+            /*
+             * There is no lower bound, so accept the lower bound of the index
+             * partition.
+             */
+
+            fromKey = pmd.getLeftSeparatorKey();
+            
         }
 
         return fromKey;
@@ -216,23 +225,39 @@ abstract public class AbstractKeyRangeIndexProcedure extends
         if (pmd == null)
             return toKey;
 
-        if (toKey != null && pmd.getRightSeparatorKey() != null) {
+        if (toKey != null) {
 
-            /*
-             * Choose the right separator key if the toKey is strictly greater
-             * than the right separator key. This has the effect of constraining
-             * the toKey to be within the index partition key range.
-             */
+            if (pmd.getRightSeparatorKey() != null) {
 
-            final int ret = BytesUtil.compareBytes(toKey, pmd
-                    .getRightSeparatorKey());
+                /*
+                 * Choose the right separator key if the toKey is strictly
+                 * greater than the right separator key. This has the effect of
+                 * constraining the toKey to be within the index partition key
+                 * range.
+                 */
 
-            if (ret > 0) {
+                final int ret = BytesUtil.compareBytes(toKey, pmd
+                        .getRightSeparatorKey());
 
-                toKey = pmd.getRightSeparatorKey();
+                if (ret > 0) {
+
+                    toKey = pmd.getRightSeparatorKey();
+
+                }
 
             }
 
+        } else {
+
+            /*
+             * If the toKey was unconstrained, then use the upper bound of the
+             * index partition. If this is the last index partition for an
+             * index, then the index partition will also have an unconstrained
+             * upper bound.
+             */
+            
+            toKey = pmd.getRightSeparatorKey();
+            
         }
 
         return toKey;

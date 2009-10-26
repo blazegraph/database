@@ -741,8 +741,17 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     public void add(final E e) {
 
         try {
-            
-            add(e, Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+            if (!add(e, Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
+
+                /*
+                 * Note: with an infinite timeout, the add should always
+                 * succeed. A false return indicates a problem.
+                 */
+                
+                throw new AssertionError();
+                
+            }
             
         } catch(InterruptedException ex) {
             
@@ -922,10 +931,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
             }
 
-            assert ((Object[]) e) != null : "chunk with nulls: chunkSize="
-                    + ((Object[]) e).length + ", chunk="
-                    + Arrays.toString(((Object[]) e));
-            
         }
 
         final long begin = System.nanoTime();
@@ -938,10 +943,29 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         boolean didCombine = false;
         
         // nanoseconds remaining until the timeout.
-        long nanos;
+        long nanos = unit.toNanos(timeout);
+        
+        long lastTime = begin;
 
-        while ((nanos = (System.nanoTime() - begin)) > 0) {
+        while (true) {
 
+            {
+
+                final long now = System.nanoTime();
+
+                nanos -= now - lastTime;
+
+                lastTime = now;
+
+                if (nanos <= 0) {
+
+                    // timeout.
+                    return false;
+
+                }
+                
+            } 
+            
             if (/* lock.tryLock()|| */lock.tryLock(nanos, TimeUnit.NANOSECONDS)) {
 
                 try {
@@ -961,7 +985,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      */
 
                     if (!didCombine && minimumChunkSize > 0
-                            && queue instanceof BlockingDeque
+                            && queue instanceof BlockingDeque<?>
                             && e.getClass().getComponentType() != null) {
 
                         if (combineChunkOnAdd(e)) {
@@ -993,7 +1017,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     } else {
 
                         // update in case we waited a while for the lock.
-                        nanos = (System.nanoTime() - begin);
+                        final long now = System.nanoTime();
+                        
+                        nanos -= now - lastTime;
+                        
+                        lastTime = now;
 
                         final long offerTimeoutNanos = Math.min(nanos,
                                 TimeUnit.MILLISECONDS
@@ -1091,9 +1119,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
         } // while
 
-        // timeout
-        return false;
-
     }
 
     public long flush() {
@@ -1116,7 +1141,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      * Note: If the {@link IAsynchronousIterator} is
      * {@link ICloseableIterator#close()}d before the {@link Future} of the
      * process writing on the {@link BlockingBuffer} is done, then the
-     * {@link Future} will be cancelled using {@link Thread#interrupt()}. Owing
+     * {@link Future} will be canceled using {@link Thread#interrupt()}. Owing
      * to a feature of {@link FileChannel}, this will cause the backing store to
      * be asynchronously closed if the interrupt is detected during an IO. The
      * backing store will be re-opened transparently, but there is overhead
@@ -1851,20 +1876,25 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         	// elapsed is measured against this timestamp.
             final long startTime = System.nanoTime();
             
-        	// convert timeout to nanos seconds.
-        	timeout = TimeUnit.NANOSECONDS.convert(timeout, unit);
-        	
-            // time remaining in nanoseconds.
-            long nanos = timeout;
+            long lastTime = startTime;
+
+            /*
+             * [nanos] is the time remaining in nanoseconds.
+             * 
+             * Note: we convert [timeout] to nanoseconds on entry since it is
+             * passed into combineChunks() as nanoseconds.
+             */
+            long nanos = timeout = TimeUnit.NANOSECONDS.convert(timeout, unit);
             
             if (!hasNext(nanos, TimeUnit.NANOSECONDS)) {
 
-                // nothing available within timeout.
-                final long elapsed = System.nanoTime() - startTime;
+                final long now = System.nanoTime();
                 
-                final boolean isTimeout = elapsed >= timeout;
+                nanos -= now - lastTime;
                 
-                if (isTimeout) {
+                lastTime = now;
+
+                if (nanos <= 0) {
 
                     /*
                      * Since the timeout was exceeded we can not know whether
@@ -1889,7 +1919,6 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 final long now = System.nanoTime();
 
-                // remaining nanos until timeout.
                 nanos = now - startTime;
 
                 if (nanos > 0) {

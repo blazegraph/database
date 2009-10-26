@@ -39,24 +39,24 @@ public enum StatementEnum {
      * A statement that was inserted into the database explicitly by the
      * application.
      */
-    Explicit((byte)0),
+    Explicit((byte) 0),
     /**
      * Something that is directly entailed by the appropriate model theory.
      */
-    Axiom((byte)1),
+    Axiom((byte) 1),
     /**
      * A statement that was inferred from the explicit statements by the
      * appropriate model theory.
      */
-    Inferred((byte)2),
+    Inferred((byte) 2),
     /**
-	 * For debugging.
- 	 */
-    Backchained((byte)4);
+     * For debugging.
+     */
+    Backchained((byte) 4);
 
     private final byte code;
     
-    private StatementEnum(byte code) {
+    private StatementEnum(final byte code) {
      
         this.code = code;
         
@@ -79,8 +79,8 @@ public enum StatementEnum {
      * @param b
      * @return
      */
-    static public StatementEnum max(StatementEnum a, StatementEnum b) {
-        
+    static public StatementEnum max(final StatementEnum a, final StatementEnum b) {
+
         if (a.code < b.code) {
         
             return a;
@@ -103,7 +103,7 @@ public enum StatementEnum {
      *            
      * @return The {@link StatementEnum} value.
      */
-    static public StatementEnum decode(byte b) {
+    static public StatementEnum decode(final byte b) {
 
         switch (b & ~MASK_OVERRIDE) {
 
@@ -136,7 +136,7 @@ public enum StatementEnum {
 //        
 //    }
 
-    static public StatementEnum deserialize(byte[] val) {
+    static public StatementEnum deserialize(final byte[] val) {
 
         if (val.length != 1 && val.length != (1 + 8)) {
 
@@ -158,10 +158,10 @@ public enum StatementEnum {
 
     /**
      * A bit mask used to isolate the bit that indicates that the existing
-     * statement type should be overriden thereby allowing the downgrade of a
+     * statement type should be overridden thereby allowing the downgrade of a
      * statement from explicit to inferred.
      */
-    public static final int MASK_OVERRIDE = 0x1<<3;
+    public static final int MASK_OVERRIDE = 0x1 << 3;
 
     /**
      * Return <code>true</code> iff the override bit is set.
@@ -169,9 +169,10 @@ public enum StatementEnum {
      * @param b
      *            The byte.
      */
-    public static boolean isOverride(byte b) {
-        
-        return (b & StatementEnum.MASK_OVERRIDE) == 1;
+    public static boolean isOverride(final byte b) {
+
+        return (b & StatementEnum.MASK_OVERRIDE) != 0;
+//        return (b & StatementEnum.MASK_OVERRIDE) == 1;
         
     }
     

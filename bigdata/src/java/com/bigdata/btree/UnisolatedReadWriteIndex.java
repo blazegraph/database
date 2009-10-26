@@ -42,6 +42,7 @@ import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.journal.ConcurrencyManager;

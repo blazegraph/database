@@ -155,13 +155,13 @@ public class TestLDS extends
     }
 
     @Override
-    protected LocalDataServiceFederation getStore(Properties properties) {
+    protected LocalDataServiceFederation getStore(final Properties properties) {
 
         return new LocalDataServiceClient(properties).connect();
     }
 
     @Override
-    protected LocalDataServiceFederation reopenStore(LocalDataServiceFederation fed) {
+    protected LocalDataServiceFederation reopenStore(final LocalDataServiceFederation fed) {
         
         final Properties properties = fed.getClient().getProperties();
         

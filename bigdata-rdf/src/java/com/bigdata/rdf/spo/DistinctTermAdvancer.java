@@ -66,10 +66,14 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
 
     private static final long serialVersionUID = 2500001864793869957L;
 
+    private final int arity;
+
     private transient KeyBuilder keyBuilder;
 
-    public DistinctTermAdvancer() {
-
+    public DistinctTermAdvancer(final int arity) {
+        
+        this.arity = arity;
+        
     }
 
     @Override
@@ -78,13 +82,15 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
         if (keyBuilder == null) {
 
             /*
-             * Note: It appears that you can not set this either implictly or
+             * Note: It appears that you can not set this either implicitly or
              * explicitly during ctor initialization if you want it to exist
              * during de-serialization. Hence it is initialized lazily here.
              * This is Ok since the iterator pattern is single threaded.
              */
+
+            assert arity == 3 || arity == 4;
             
-            keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * IRawTripleStore.N);
+            keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * arity);
 
         }
         

@@ -107,7 +107,8 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
      * @param src
      *            The source iterator.
      */
-    public BigdataValueIteratorImpl(AbstractTripleStore db, IChunkedIterator<Long> src) {
+    public BigdataValueIteratorImpl(final AbstractTripleStore db,
+            final IChunkedIterator<Long> src) {
 
         if (db == null)
             throw new IllegalArgumentException();
@@ -205,8 +206,8 @@ public class BigdataValueIteratorImpl implements BigdataValueIterator {
         
         if(log.isDebugEnabled()) {
             
-            log.debug("termId="+id+", value="+val);
-            
+            log.debug("termId=" + id + ", value=" + val);
+
         }
 
         return val;

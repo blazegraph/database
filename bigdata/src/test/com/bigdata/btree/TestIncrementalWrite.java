@@ -264,7 +264,7 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
         
         // verify that we set the identity of b on its parent so that it can be
         // recovered from the store if necessary.
-        assertEquals(b.getIdentity(), c.childAddr[1]);
+        assertEquals(b.getIdentity(), c.getChildAddr(1));
 
     }
     
@@ -353,8 +353,8 @@ public class TestIncrementalWrite extends AbstractBTreeTestCase {
         assertTrue(b.isPersistent());
         
         // verify that we set the identity of (a,b) on their parent (c).
-        assertEquals(a.getIdentity(), c.childAddr[0]);
-        assertEquals(b.getIdentity(), c.childAddr[1]);
+        assertEquals(a.getIdentity(), c.getChildAddr(0));
+        assertEquals(b.getIdentity(), c.getChildAddr(1));
 
     }
 

@@ -1,6 +1,7 @@
 package com.bigdata.util.concurrent;
 
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -10,7 +11,8 @@ import java.util.concurrent.ExecutionException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class ExecutionExceptions extends ExecutionException {
+public class ExecutionExceptions extends ExecutionException implements
+        Iterable<Throwable> {
 
     /**
      * 
@@ -40,6 +42,12 @@ public class ExecutionExceptions extends ExecutionException {
 
         this.causes = causes;
 
+    }
+
+    public Iterator<Throwable> iterator() {
+        
+        return (Iterator<Throwable>) causes.iterator();
+        
     }
 
 }

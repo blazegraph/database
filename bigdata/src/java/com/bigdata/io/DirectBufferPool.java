@@ -345,11 +345,15 @@ public class DirectBufferPool {
      */
     public void release(final ByteBuffer b) throws InterruptedException {
 
-        release(b, Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+        if (!release(b, Long.MAX_VALUE, TimeUnit.MILLISECONDS)) {
+
+            throw new AssertionError();
+            
+        }
 
     }
 
-    public void release(final ByteBuffer b, long timeout, TimeUnit units)
+    public boolean release(final ByteBuffer b, long timeout, TimeUnit units)
             throws InterruptedException {
 
         if(INFO)
@@ -365,7 +369,8 @@ public class DirectBufferPool {
             assertOurBuffer(b);
 
             // add to the pool.
-            pool.offer(b, timeout, units);
+            if(!pool.offer(b, timeout, units))
+                return false;
 
             /*
              * Signal ONE thread that there is a buffer available.
@@ -384,6 +389,8 @@ public class DirectBufferPool {
              */
             bufferRelease.signal();
 
+            return true;
+            
         } finally {
 
             lock.unlock();

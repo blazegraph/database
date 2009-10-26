@@ -37,9 +37,13 @@ public class BigdataSolutionResolverator
      * @param src
      *            The source iterator (will be closed when this iterator is
      *            closed).
+     * 
+     *            FIXME must accept reverse bnodes map (from term identifier to
+     *            blank nodes) for resolution of blank nodes within a Sesame
+     *            connection context.
      */
-    public BigdataSolutionResolverator(AbstractTripleStore db,
-            IChunkedOrderedIterator<ISolution> src) {
+    public BigdataSolutionResolverator(final AbstractTripleStore db,
+            final IChunkedOrderedIterator<ISolution> src) {
 
         super(db, src, new BlockingBuffer<IBindingSet[]>(
                 db.getChunkOfChunksCapacity(),
@@ -65,15 +69,16 @@ public class BigdataSolutionResolverator
      */
     protected IBindingSet[] resolveChunk(final ISolution[] chunk) {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Fetched chunk: size=" + chunk.length);
 
         /*
          * Create a collection of the distinct term identifiers used in this
          * chunk.
          */
-
-        final Collection<Long> ids = new HashSet<Long>(chunk.length * 4);
+        
+        final Collection<Long> ids = new HashSet<Long>(chunk.length
+                * state.getSPOKeyArity());
 
         for (ISolution solution : chunk) {
 
@@ -90,23 +95,31 @@ public class BigdataSolutionResolverator
 
                 final Long termId = (Long) entry.getValue().get();
 
+                if (termId.longValue() == IRawTripleStore.NULL) {
+
+                    throw new RuntimeException("NULL? : var=" + entry.getKey()
+                            + ", " + bindingSet);
+                    
+                }
+                
                 ids.add(termId);
 
             }
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Resolving " + ids.size() + " term identifiers");
 
         // batch resolve term identifiers to terms.
-        final Map<Long,BigdataValue> terms = state.getLexiconRelation().getTerms(ids);
+        final Map<Long, BigdataValue> terms = state.getLexiconRelation()
+                .getTerms(ids);
 
         /*
          * Assemble a chunk of resolved elements.
          */
         {
-            
+
             final IBindingSet[] chunk2 = new IBindingSet[chunk.length];
             int i = 0;
             for (ISolution e : chunk) {
@@ -131,7 +144,7 @@ public class BigdataSolutionResolverator
      * resolved to their corresponding {@link BigdataValue}s.
      * 
      * @param solution
-     *            A solution whose {@link Long}s will be interepreted as term
+     *            A solution whose {@link Long}s will be interpreted as term
      *            identifiers and resolved to the corresponding
      *            {@link BigdataValue}s.
      * 
@@ -164,28 +177,29 @@ public class BigdataSolutionResolverator
             throw new IllegalStateException("BindingSet was not materialized");
             
         }
-        
-        final Iterator<Map.Entry<IVariable,IConstant>> itr = bindingSet.iterator();
 
-        while(itr.hasNext()) {
+        final Iterator<Map.Entry<IVariable, IConstant>> itr = bindingSet
+                .iterator();
 
-            final Map.Entry<IVariable,IConstant> entry = itr.next();
-            
+        while (itr.hasNext()) {
+
+            final Map.Entry<IVariable, IConstant> entry = itr.next();
+
             final Object boundValue = entry.getValue().get();
-            
+
             if (!(boundValue instanceof Long)) {
 
                 /*
                  * FIXME This assumes that any Long is a term identifier. The
                  * term identifiers should be strongly typed.
                  */
-                
+
                 continue;
-                
+
             }
-            
-            final Long termId = (Long)boundValue;
-            
+
+            final Long termId = (Long) boundValue;
+
             final BigdataValue value = terms.get(termId);
 
             if (value == null) {
@@ -193,8 +207,13 @@ public class BigdataSolutionResolverator
                 throw new RuntimeException("Could not resolve termId="
                         + termId);
             }
-            
-            // replace the binding.
+
+            /*
+             * Replace the binding.
+             * 
+             * FIXME This probably needs to strip out the BigdataSail#NULL_GRAPH
+             * since that should not become bound.
+             */
             bindingSet.set(entry.getKey(), new Constant<BigdataValue>(
                     value));
             

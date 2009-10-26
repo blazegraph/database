@@ -1,7 +1,6 @@
 package com.bigdata.search;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -71,8 +70,9 @@ public class Hiterator<A extends IHit> implements Iterator<A> {
      * @param minCosine
      * @param maxRank
      */
-    public Hiterator(Collection<A> hits, long elapsed, double minCosine, int maxRank) {
-        
+    public Hiterator(final Collection<A> hits, final long elapsed,
+            final double minCosine, final int maxRank) {
+
         if (hits == null)
             throw new IllegalArgumentException();
 

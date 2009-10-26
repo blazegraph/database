@@ -89,25 +89,36 @@ public class PIDUtil {
         }
         
         if (pr.exitValue() == 0) {
-        
-            BufferedReader outReader = new BufferedReader(
+
+            final BufferedReader outReader = new BufferedReader(
                     new InputStreamReader(pr.getInputStream()));
-            
+
             final String val;
             try {
-            
-                val = outReader.readLine().trim();
+
+                val = outReader.readLine();
                 
             } catch (IOException ex) {
                 
                 throw new RuntimeException(ex);
                 
+            } finally {
+                
+                try {
+                    outReader.close();
+                } catch (IOException ex) {
+                    log.error(ex, ex);
+                }
+                
             }
             
-            if(INFO)
-            log.info("read: [" + val + "]");
-            
-            int pid = Integer.parseInt(val);
+            if (val == null)
+                throw new RuntimeException("Nothing read.");
+
+            if (log.isInfoEnabled())
+                log.info("read: [" + val + "]");
+
+            final int pid = Integer.parseInt(val.trim());
             
             return pid;
             
@@ -127,8 +138,8 @@ public class PIDUtil {
      *             if the pid can not be extracted.
      * 
      * @see RuntimeMXBean#getName(), A web search will show that this is
-     *      generally of the form "pid@host". However this is definately NOT
-     *      guarenteed by the javadoc.
+     *      generally of the form "pid@host". However this is definitely NOT
+     *      guaranteed by the javadoc.
      */
     static public int getPIDWithRuntimeMXBean() {
 

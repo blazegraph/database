@@ -69,7 +69,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestDefaultSplitHandler.class);
 
         /*
-         * unit tests for identifying separator keys for a split based on seach
+         * unit tests for identifying separator keys for a split based on search
          * across the nodes of the sources in the view using the combined #of
          * spanned tuples for each source.
          */ 

@@ -61,7 +61,7 @@ public class InferredSPOFilter extends SPOFilter {
         
     }
 
-    public boolean accept(ISPO spo) {
+    public boolean accept(final ISPO spo) {
 
         return spo.getStatementType() == StatementEnum.Inferred;
 

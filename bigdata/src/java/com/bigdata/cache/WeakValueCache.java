@@ -43,10 +43,10 @@ import com.bigdata.counters.CounterSet;
  * which is assumed to implement a hard reference LRU or similar cache policy.
  * </p>
  * <p>
- * Performance can be drammatically effect by the selection of the size of the
+ * Performance can be dramatically effect by the selection of the size of the
  * LRU cache and by the choice of soft vs. weak references. The interaction of
  * these parameters and the choice of the load factor for the weak value and LRU
- * caches is non-trival. Good performance is observed for default settings, but
+ * caches is non-trivial. Good performance is observed for default settings, but
  * you can see 2-4x or better improvements through a tuned cache. You need a
  * performance benchmark in order to tune your cache. The best performance
  * benchmark is a solid and representative sample of real operations performed
@@ -227,7 +227,7 @@ final public class WeakValueCache<K,T>
 	 * 
 	 * @param initialCapacity
 	 *            May be used to reduce re-hashing by starting with a larger
-	 *            initial capacicty in the {@link HashMap} with weak values.
+	 *            initial capacity in the {@link HashMap} with weak values.
 	 *            (The capacity of the delegate hard reference cache map is
 	 *            configured separately.)
 	 * 
@@ -586,12 +586,12 @@ final public class WeakValueCache<K,T>
      * Note: Objects evicted from the hard reference cache that are still weakly
      * reachable are no longer accessible from the weak cache iterators. This is
      * consistent with the policy that dirty objects are installed onto pages in
-     * the peristence layer when they are evicted from the inner hard reference
+     * the persistence layer when they are evicted from the inner hard reference
      * cache and provides a fast iterator mechanism for scanning the object
      * cache. While it means that you are not able to fully enumerate the
      * entries in the weak reference cache, when integrated with a persistence
      * layer handling installation of dirty objects onto pages, objects that are
-     * not visitable are guarenteed to be clean.
+     * not visitable are guaranteed to be clean.
      * </p>
      * <p>
      * Note: While the iterator supports removal, its behavior is delegated to
@@ -617,12 +617,12 @@ final public class WeakValueCache<K,T>
      * Note: Objects evicted from the hard reference cache that are still weakly
      * reachable are no longer accessible from the weak cache iterators. This is
      * consistent with the policy that dirty objects are installed onto pages in
-     * the peristence layer when they are evicted from the inner hard reference
+     * the persistence layer when they are evicted from the inner hard reference
      * cache and provides a fast iterator mechanism for scanning the object
      * cache. While it means that you are not able to fully enumerate the
      * entries in the weak reference cache, when integrated with a persistence
      * layer handling installation of dirty objects onto pages, entries that are
-     * not visitable are guarenteed to be clean.
+     * not visitable are guaranteed to be clean.
      * </p>
      * <p>
      * Note: While the iterator supports removal, its behavior is delegated to

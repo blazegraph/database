@@ -393,7 +393,7 @@ public class Name2Addr extends BTree {
      *            The capacity of the inner {@link LRUCache} for the
      *            {@link WeakValueCache}.
      * @param cacheTimeout
-     *            The timeout for stale entries in the cache.
+     *            The timeout in milliseconds for stale entries in the cache.
      * 
      * @see Options#LIVE_INDEX_CACHE_CAPACITY
      * @see Options#LIVE_INDEX_CACHE_TIMEOUT

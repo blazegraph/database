@@ -41,8 +41,9 @@ public class RelationFusedView<E> implements IRelation<E> {
      * @param relation1
      * @param relation2
      */
-    public RelationFusedView(IRelation<E> relation1, IRelation<E> relation2) {
-        
+    public RelationFusedView(final IRelation<E> relation1,
+            final IRelation<E> relation2) {
+
         if (relation1 == null)
             throw new IllegalArgumentException();
         
@@ -107,10 +108,18 @@ public class RelationFusedView<E> implements IRelation<E> {
         
     }
     
-    public E newElement(IPredicate<E> predicate, IBindingSet bindingSet) {
+    public E newElement(final IPredicate<E> predicate,
+            final IBindingSet bindingSet) {
 
         return relation1.newElement(predicate, bindingSet);
 
+    }
+    
+    public Class<E> getElementClass() {
+        
+        // @todo could choose the common ancestor Class.  If so, do that in the ctor and validate that one exists.
+        return relation1.getElementClass();
+        
     }
 
     /**

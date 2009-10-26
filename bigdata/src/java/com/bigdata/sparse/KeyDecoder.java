@@ -448,8 +448,9 @@ public class KeyDecoder {
     public String toString() {
         
         return "KeyDecoder{primaryKeyType=" + primaryKeyType + ",col=" + col
-                + ",timestamp=" + timestamp + ",key=" + key + "}";
-        
+                + ",timestamp=" + timestamp + ",key=" + BytesUtil.toString(key)
+                + "}";
+
     }
     
 }

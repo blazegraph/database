@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.MutableKeyBuffer;
+
 
 /**
  * Test code that chooses the child to search during recursive traversal of the
@@ -56,9 +59,9 @@ public class TestFindChild extends AbstractBTreeTestCase {
      */
     public void test_node_findChild01() {
      
-        int m = 4;
+        final int m = 4;
         
-        BTree btree = getBTree(m);
+        final BTree btree = getBTree(m);
 
         /*
          * Create a test node.  We do not both to build this up from scratch
@@ -72,17 +75,16 @@ public class TestFindChild extends AbstractBTreeTestCase {
         final long[] childAddrs = new long[] { 1, 2, 3, 4, 0 };
         final int[] childEntryCounts = new int[]{m2,m2,m2,m2,0};
         
-        IKeyBuffer keys = new MutableKeyBuffer(3, new byte[][] {//
+        final IRaba keys = new MutableKeyBuffer(3, new byte[][] {//
                 new byte[] { 5 }, //
                 new byte[] { 9 }, //
                 new byte[] { 12 }, //
                 null });
 
-        Node node = new Node(btree, 1, m, nentries, keys,
-                childAddrs,
-                childEntryCounts
-                );
-        
+        final Node node = new Node(btree, 1, new MutableNodeData(nentries,
+                keys, childAddrs, childEntryCounts,
+                false/* versionTimestamps */, 0L, 0L));
+
         assertEquals(0,node.findChild(new byte[]{1}));
         assertEquals(0,node.findChild(new byte[]{2}));
         assertEquals(0,node.findChild(new byte[]{3}));

@@ -168,7 +168,7 @@ public class XMLUtility {
                 w.write(" name=\"" + name + "\"");
                 w.write(" type=\"" + type + "\"");
                 w.write(" time=\"" + time + "\"");
-                w.write(" value=\""+HTMLUtility.escapeForXHTML(value==null?"":value.toString())+"\"");
+                w.write(" value=\""+HTMLUtility.escapeForXHTML(value.toString())+"\"");
                 w.write(">");
                 
                 if(counter.getInstrument() instanceof HistoryInstrument) {

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 
 import com.bigdata.concurrent.NamedLock;
@@ -63,7 +64,7 @@ public class ResourceLockService implements IResourceLockService {
     }
 
     public IResourceLock acquireLock(final String namespace,
-            final long timeout) throws InterruptedException {
+            final long timeout) throws InterruptedException, TimeoutException {
 
         final Lock lock = locks.acquireLock(namespace, timeout,
                 TimeUnit.MILLISECONDS);
@@ -78,7 +79,7 @@ public class ResourceLockService implements IResourceLockService {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private final class ResourceLock implements IResourceLock {
+    private static final class ResourceLock implements IResourceLock {
         
         private final Lock lock;
 

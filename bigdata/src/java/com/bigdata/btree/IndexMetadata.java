@@ -38,21 +38,25 @@ import java.util.concurrent.TimeUnit;
 import org.CognitiveWeb.extser.LongPacker;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.compression.DefaultDataSerializer;
-import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.compression.PrefixSerializer;
+import com.bigdata.LRUNexus;
+import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.isolation.IConflictResolver;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.config.Configuration;
 import com.bigdata.config.IValidator;
 import com.bigdata.config.IntegerRangeValidator;
 import com.bigdata.config.IntegerValidator;
-import com.bigdata.config.LongValidator;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.io.compression.IRecordCompressorFactory;
-import com.bigdata.isolation.IConflictResolver;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
@@ -102,7 +106,7 @@ import com.bigdata.sparse.SparseRowStore;
  * Delete markers combined with an ordered set of index resources is sufficient
  * to support all features of range-partitioned indices, including compacting
  * merge. Given three index resources {A,B,C} for a single index partition, the
- * order over the resources gives us the guarentee that any index entry in A
+ * order over the resources gives us the guarantee that any index entry in A
  * will be more recent than any index enty in B or C. So when reading a fused
  * view we always stop once we have an index entry for a key, even if that entry
  * has the deleted flag set.
@@ -219,24 +223,23 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     
     protected static final transient Logger log = Logger
             .getLogger(IndexMetadata.class);
-    
+
     /**
      * Options and their defaults for the {@link com.bigdata.btree} package and
      * the {@link BTree} and {@link IndexSegment} classes. Options that apply
-     * equally to views and {@link AbstractBTree}s are in the package
-     * namespace, such as whether or not a bloom filter is enabled. Options that
-     * apply to all {@link AbstractBTree}s are specified within that namespace
-     * while those that are specific to {@link BTree} or {@link IndexSegment}
-     * are located within their respective class namespaces. Some properties,
-     * such as the branchingFactor, are defined for both the {@link BTree} and
-     * the {@link IndexSegment} because their defaults tend to be different when
-     * an {@link IndexSegment} is generated from an {@link BTree}.
+     * equally to views and {@link AbstractBTree}s are in the package namespace,
+     * such as whether or not a bloom filter is enabled. Options that apply to
+     * all {@link AbstractBTree}s are specified within that namespace while
+     * those that are specific to {@link BTree} or {@link IndexSegment} are
+     * located within their respective class namespaces. Some properties, such
+     * as the branchingFactor, are defined for both the {@link BTree} and the
+     * {@link IndexSegment} because their defaults tend to be different when an
+     * {@link IndexSegment} is generated from an {@link BTree}.
      * 
-     * @todo It should be possible to specify the key compression (serializer)
-     *       for nodes and leaves and the value compression (serializer) via
-     *       this interface. This is easy enough if there is a standard factory
-     *       interface, since we can specify the class name, and more difficult
-     *       if we need to create an instance.
+     * @todo It should be possible to specify the key, value, and node/leaf
+     *       coders via this interface. This is easy enough if there is a
+     *       standard factory interface, since we can specify the class name,
+     *       and more difficult if we need to create an instance.
      *       <p>
      *       Note: The basic pattern here is using the class name, having a
      *       default instance of the class (or a factory for that instance), and
@@ -251,7 +254,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      *       properties via options (as you can with beans or jini
      *       configurations).
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     public static interface Options {
@@ -285,7 +289,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         /**
          * A reasonable maximum write retention queue capacity.
          */
-        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 2000;
+        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 20000;
         
          /*
          * Options that apply to FusedViews as well as to AbstractBTrees.
@@ -382,7 +386,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 .getPackage().getName()
                 + ".writeRetentionQueue.scan";
 
-        String DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = "500";
+        String DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY = "500";// was 500
 
         String DEFAULT_WRITE_RETENTION_QUEUE_SCAN = "20";
 
@@ -392,37 +396,39 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@link DefaultKeyBuilderFactory} initialized with an empty
          * {@link Properties} object).
          * 
-         * FIXME Support for this has not been finished yet.
+         * FIXME {@link KeyBuilder} configuration support is not finished.
          */
         String KEY_BUILDER_FACTORY = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
                 + "keyBuilderFactory";
 
         /**
-         * Override the {@link IDataSerializer} used for the keys in the nodes
-         * of a B+Tree (the default is {@link PrefixSerializer}).
+         * Override the {@link IRabaCoder} used for the keys in the nodes of a
+         * B+Tree (the default is a {@link FrontCodedRabaCoder} instance).
          */
-        String NODE_KEY_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+        String NODE_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + "nodeKeySerializer";
+                + "nodeKeysCoder";
 
         /**
-         * Override the {@link IDataSerializer} used for the keys of leaves in
-         * B+Trees (the default is {@link PrefixSerializer}). This is set using
-         * {@link DefaultTupleSerializer#setLeafKeySerializer(IDataSerializer)}.
+         * Override the {@link IRabaCoder} used for the keys of leaves in
+         * B+Trees (the default is a {@link FrontCodedRabaCoder} instance).
+         * 
+         * @see DefaultTupleSerializer#setLeafKeysCoder(IRabaCoder)
          */
-        String LEAF_KEY_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+        String LEAF_KEYS_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".leafKeySerializer";
+                + ".leafKeysCoder";
 
         /**
-         * Override the {@link IDataSerializer} used for the values of leaves in
-         * B+Trees (default is {@link DefaultDataSerializer}). This is set using
-         * {@link DefaultTupleSerializer#setLeafValueSerializer(IDataSerializer)}.
+         * Override the {@link IRabaCoder} used for the values of leaves in
+         * B+Trees (default is a {@link CanonicalHuffmanRabaCoder}).
+         * 
+         * @see DefaultTupleSerializer#setLeafValuesCoder(IRabaCoder)
          */
-        String LEAF_VALUE_SERIALIZER = com.bigdata.btree.AbstractBTree.class
+        String LEAF_VALUES_CODER = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
-                + ".leafValueSerializer";
+                + ".leafValuesCoder";
 
         /**
          * Option determines whether or not per-child locks are used by
@@ -486,80 +492,89 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * @see #INDEX_SEGMENT_BRANCHING_FACTOR
          */
         String BTREE_BRANCHING_FACTOR = BTree.class.getName()+".branchingFactor";
-        
+
         /**
          * The default branching factor for a mutable {@link BTree}.
-         * 
-         * @todo Performance is best for up to at least a 4M triple RDF dataset for
-         *       load, closure and query at m=256, but thereafter performance begins
-         *       to drag. Reconsider once I get rid of the
-         *       {@link ImmutableKeyBuffer} and other cruft that is driving GC.
+         * <p>
+         * Note: on 9/11/2009 I changed the default B+Tree branching factor and
+         * write retention queue capacity to 64 (was 32) and 8000 (was 500)
+         * respectively. This change in the B+Tree branching factor reduces the
+         * height of B+Trees on the Journal, increases the size of the
+         * individual records on the disk, and aids performance substantially.
+         * The larger write retention queue capacity helps to prevent B+Tree
+         * nodes and leaves from being coded and flushed to disk too soon, which
+         * decreases disk IO and keeps things in their mutable form in memory
+         * longer, which improves search performance and keeps down the costs of
+         * mutation operations. Systems with less RAM may need to reduce the
+         * size of the {@link LRUNexus} global LRU to avoid
+         * {@link OutOfMemoryError}s. [Dropped back to 32/500 on 9/15/09 since
+         * this does not do so well at scale on machines with less RAM.]
          */
         String DEFAULT_BTREE_BRANCHING_FACTOR = "32"; //"256"
 
-        /**
-         * The capacity of the hard reference queue used to retain recently used
-         * nodes (or leaves) (default
-         * {@value #DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY}). When zero
-         * (0), this queue is disabled.
-         * <p>
-         * The read retention queue complements the write retention queue. The
-         * latter has a strong buffering effect, but we can not increase the
-         * size of the write retention queue without bound as that will increase
-         * the commit latency. However, the read retention queue can be quite
-         * large and will "simply" buffer "recently" used nodes and leaves in
-         * memory. This can have a huge effect, especially when a complex
-         * high-level query would otherwise thrash the disk as nodes that are
-         * required for query processing fall off of the write retention queue
-         * and get garbage collected. The pragmatic upper bound for this
-         * probably depends on the index workload. At some point, you will stop
-         * seeing an increase in performance as a function of the read retention
-         * queue for a given workload. The larger the read retention queue, the
-         * more burden the index can impose on the heap. However, copy-on-write
-         * explicitly clears all references in a node so the JVM can collect the
-         * data for nodes that are no longer part of the index before they fall
-         * off of the queue even if it can not collect the node reference
-         * itself.
-         * <p>
-         * A large values works well for scale-up but you <i>might</i> need to
-         * reduce the read retention queue capacity since if you expect to have
-         * a large #of smaller indices open, e.g., for scale-out scenarios. Zero
-         * will disable the read-retention queue. This queue ONLY applies to
-         * {@link BTree}s (vs {@link IndexSegment}s).
-         * 
-         * @todo The size of the read retention queue should be set dynamically
-         *       as a function of the depth of the BTree (or the #of nodes and
-         *       leaves), the branching factor, and the RAM available to the
-         *       HOST (w/o swapping) and to the JVM. For a mutable {@link BTree}
-         *       the depth changes only slowly, but the other factors are always
-         *       changing. Regardless, changing the read-retention queue size is
-         *       never a problem as cleared references will never cause a
-         *       strongly reachable node to be released.
-         *       <p>
-         *       To avoid needless effort, there should be a minimum queue
-         *       capacity that is used up to depth=2/3. If the queue capacity is
-         *       set to n=~5-10% of the maximum possible #of nodes in a btree of
-         *       a given depth, then we can compute the capacity dynamically
-         *       based on that parameter. And of course it can be easily
-         *       provisioned when the BTree is {@link #reopen()}ed.
-         */
-        String BTREE_READ_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.BTree.class
-                .getPackage().getName()
-                + ".readRetentionQueue.capacity";
-
-        String DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY = "10000";
-
-        /**
-         * The #of entries on the hard reference queue that will be scanned for
-         * a match before a new reference is appended to the queue. This trades
-         * off the cost of scanning entries on the queue, which is handled by
-         * the queue itself, against the cost of queue churn.
-         */
-        String BTREE_READ_RETENTION_QUEUE_SCAN = com.bigdata.btree.BTree.class
-                .getPackage().getName()
-                + ".readRetentionQueue.scan";
-
-        String DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN = "20";
+//        /**
+//         * The capacity of the hard reference queue used to retain recently used
+//         * nodes (or leaves) (default
+//         * {@value #DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY}). When zero
+//         * (0), this queue is disabled.
+//         * <p>
+//         * The read retention queue complements the write retention queue. The
+//         * latter has a strong buffering effect, but we can not increase the
+//         * size of the write retention queue without bound as that will increase
+//         * the commit latency. However, the read retention queue can be quite
+//         * large and will "simply" buffer "recently" used nodes and leaves in
+//         * memory. This can have a huge effect, especially when a complex
+//         * high-level query would otherwise thrash the disk as nodes that are
+//         * required for query processing fall off of the write retention queue
+//         * and get garbage collected. The pragmatic upper bound for this
+//         * probably depends on the index workload. At some point, you will stop
+//         * seeing an increase in performance as a function of the read retention
+//         * queue for a given workload. The larger the read retention queue, the
+//         * more burden the index can impose on the heap. However, copy-on-write
+//         * explicitly clears all references in a node so the JVM can collect the
+//         * data for nodes that are no longer part of the index before they fall
+//         * off of the queue even if it can not collect the node reference
+//         * itself.
+//         * <p>
+//         * A large values works well for scale-up but you <i>might</i> need to
+//         * reduce the read retention queue capacity since if you expect to have
+//         * a large #of smaller indices open, e.g., for scale-out scenarios. Zero
+//         * will disable the read-retention queue. This queue ONLY applies to
+//         * {@link BTree}s (vs {@link IndexSegment}s).
+//         * 
+//         * @todo The size of the read retention queue should be set dynamically
+//         *       as a function of the depth of the BTree (or the #of nodes and
+//         *       leaves), the branching factor, and the RAM available to the
+//         *       HOST (w/o swapping) and to the JVM. For a mutable {@link BTree}
+//         *       the depth changes only slowly, but the other factors are always
+//         *       changing. Regardless, changing the read-retention queue size is
+//         *       never a problem as cleared references will never cause a
+//         *       strongly reachable node to be released.
+//         *       <p>
+//         *       To avoid needless effort, there should be a minimum queue
+//         *       capacity that is used up to depth=2/3. If the queue capacity is
+//         *       set to n=~5-10% of the maximum possible #of nodes in a btree of
+//         *       a given depth, then we can compute the capacity dynamically
+//         *       based on that parameter. And of course it can be easily
+//         *       provisioned when the BTree is {@link #reopen()}ed.
+//         */
+//        String BTREE_READ_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.BTree.class
+//                .getPackage().getName()
+//                + ".readRetentionQueue.capacity";
+//
+//        String DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY = "10000";
+//
+//        /**
+//         * The #of entries on the hard reference queue that will be scanned for
+//         * a match before a new reference is appended to the queue. This trades
+//         * off the cost of scanning entries on the queue, which is handled by
+//         * the queue itself, against the cost of queue churn.
+//         */
+//        String BTREE_READ_RETENTION_QUEUE_SCAN = com.bigdata.btree.BTree.class
+//                .getPackage().getName()
+//                + ".readRetentionQueue.scan";
+//
+//        String DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN = "20";
 
         /**
          * An optional factory providing record-level compression for the nodes
@@ -567,6 +582,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@value #DEFAULT_BTREE_RECORD_COMPRESSOR_FACTORY}).
          * 
          * @see #INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY
+         * 
+         * FIXME Record level compression support is not finished.
          */
         String BTREE_RECORD_COMPRESSOR_FACTORY = BTree.class.getName()
                 + ".recordCompressorFactory";
@@ -593,9 +610,6 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         /**
          * The default branching factor for an {@link IndexSegment}.
-         * 
-         * @todo experiment with performance for various values in {128:4096}
-         *       for commonly used scale-out indices.
          */
         String DEFAULT_INDEX_SEGMENT_BRANCHING_FACTOR = "512";
 
@@ -630,53 +644,53 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          */
         String DEFAULT_INDEX_SEGMENT_BUFFER_NODES = "false";
      
-        /**
-         * The size of the LRU cache backing the weak reference cache for leaves
-         * (default {@value #DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY}).
-         * <p>
-         * While the {@link AbstractBTree} already provides caching for nodes
-         * and leaves based on navigation down the hierarchy from the root node,
-         * the {@link IndexSegment} uses an additional leaf cache to optimize
-         * access to leaves based on the double-linked list connecting the
-         * leaves.
-         * <p>
-         * A larger value will tend to retain leaves longer at the expense of
-         * consuming more RAM when many parts of the {@link IndexSegment} are
-         * hot.
-         */
-        String INDEX_SEGMENT_LEAF_CACHE_CAPACITY = IndexSegment.class.getName()
-                + ".leafCacheCapacity";
-
-        /**
-         * 
-         * @see #INDEX_SEGMENT_LEAF_CACHE_CAPACITY
-         */
-        String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY = "100";
-
-        /**
-         * The timeout in nanoseconds for the LRU cache backing the weak
-         * reference cache for {@link IndexSegment} leaves (default
-         * {@value #DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT}).
-         * <p>
-         * While the {@link AbstractBTree} already provides caching for nodes
-         * and leaves based on navigation down the hierarchy from the root node,
-         * the {@link IndexSegment} uses an additional leaf cache to optimize
-         * access to leaves based on the double-linked list connecting the
-         * leaves.
-         * <p>
-         * A larger value will tend to retain leaves longer at the expense of
-         * consuming more RAM when many parts of the {@link IndexSegment} are
-         * hot.
-         */
-        String INDEX_SEGMENT_LEAF_CACHE_TIMEOUT = IndexSegment.class.getName()
-                + ".leafCacheTimeout";
-
-        /**
-         * 
-         * @see #INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
-         */
-        String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT = ""
-                + TimeUnit.SECONDS.toNanos(30);
+//        /**
+//         * The size of the LRU cache backing the weak reference cache for leaves
+//         * (default {@value #DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY}).
+//         * <p>
+//         * While the {@link AbstractBTree} already provides caching for nodes
+//         * and leaves based on navigation down the hierarchy from the root node,
+//         * the {@link IndexSegment} uses an additional leaf cache to optimize
+//         * access to leaves based on the double-linked list connecting the
+//         * leaves.
+//         * <p>
+//         * A larger value will tend to retain leaves longer at the expense of
+//         * consuming more RAM when many parts of the {@link IndexSegment} are
+//         * hot.
+//         */
+//        String INDEX_SEGMENT_LEAF_CACHE_CAPACITY = IndexSegment.class.getName()
+//                + ".leafCacheCapacity";
+//
+//        /**
+//         * 
+//         * @see #INDEX_SEGMENT_LEAF_CACHE_CAPACITY
+//         */
+//        String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY = "100";
+//
+//        /**
+//         * The timeout in nanoseconds for the LRU cache backing the weak
+//         * reference cache for {@link IndexSegment} leaves (default
+//         * {@value #DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT}).
+//         * <p>
+//         * While the {@link AbstractBTree} already provides caching for nodes
+//         * and leaves based on navigation down the hierarchy from the root node,
+//         * the {@link IndexSegment} uses an additional leaf cache to optimize
+//         * access to leaves based on the double-linked list connecting the
+//         * leaves.
+//         * <p>
+//         * A larger value will tend to retain leaves longer at the expense of
+//         * consuming more RAM when many parts of the {@link IndexSegment} are
+//         * hot.
+//         */
+//        String INDEX_SEGMENT_LEAF_CACHE_TIMEOUT = IndexSegment.class.getName()
+//                + ".leafCacheTimeout";
+//
+//        /**
+//         * 
+//         * @see #INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
+//         */
+//        String DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT = ""
+//                + TimeUnit.SECONDS.toNanos(30);
 
         /**
          * An optional factory providing record-level compression for the nodes
@@ -684,6 +698,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@value #DEFAULT_INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY}).
          * 
          * @see #BTREE_RECORD_COMPRESSOR_FACTORY
+         * 
+         * FIXME Record level compression support is not finished.
          */
         String INDEX_SEGMENT_RECORD_COMPRESSOR_FACTORY = IndexSegment.class.getName()
                 + ".recordCompressorFactory";
@@ -1020,20 +1036,21 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private int branchingFactor;
     private int writeRetentionQueueCapacity;
     private int writeRetentionQueueScan;
-    private int btreeReadRetentionQueueCapacity;
-    private int btreeReadRetentionQueueScan;
+//    private int btreeReadRetentionQueueCapacity;
+//    private int btreeReadRetentionQueueScan;
     private LocalPartitionMetadata pmd;
     private String btreeClassName;
     private String checkpointClassName;
     private IAddressSerializer addrSer;
-    private IDataSerializer nodeKeySer;
-    private ITupleSerializer tupleSer;
-    private IRecordCompressorFactory btreeRecordCompressorFactory;
-    private IRecordCompressorFactory indexSegmentRecordCompressorFactory;
+    private IRabaCoder nodeKeysCoder;
+    private ITupleSerializer<?, ?> tupleSer;
+    private IRecordCompressorFactory<?> btreeRecordCompressorFactory;
+    private IRecordCompressorFactory<?> indexSegmentRecordCompressorFactory;
     private IConflictResolver conflictResolver;
     private boolean childLocks;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
+    private boolean versionTimestampFilters;
     private BloomFilterFactory bloomFilterFactory;
     private IOverflowHandler overflowHandler;
     private ISplitHandler splitHandler;
@@ -1055,15 +1072,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     private boolean indexSegmentBufferNodes;
 
-    /**
-     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
-     */
-    private int indexSegmentLeafCacheCapacity;
-    
-    /**
-     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
-     */
-    private long indexSegmentLeafCacheTimeout;
+//    /**
+//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
+//     */
+//    private int indexSegmentLeafCacheCapacity;
+//    
+//    /**
+//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
+//     */
+//    private long indexSegmentLeafCacheTimeout;
     
     /**
      * The unique identifier for the (scale-out) index whose data is stored in
@@ -1192,53 +1209,53 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    /**
-     * Return the capacity of the LRU cache of leaves for an
-     * {@link IndexSegment}.
-     * 
-     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
-     */
-    public final int getIndexSegmentLeafCacheCapacity() {
-        
-        return indexSegmentLeafCacheCapacity;
-        
-    }
-
-    public final void setIndexSegmentLeafCacheCapacity(final int newValue) {
-        
-        if (newValue <= 0) {
-            
-            throw new IllegalArgumentException();
-            
-        }
-        
-        this.indexSegmentLeafCacheCapacity = newValue;
-        
-    }
-    
-    /**
-     * Return the timeout in nanoseconds of the LRU cache of leaves of
-     * an {@link IndexSegment}.
-     * 
-     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
-     */
-    public final long getIndexSegmentLeafCacheTimeout() {
-        
-        return indexSegmentLeafCacheTimeout;
-        
-    }
-
-    public final void setIndexSegmentLeafCacheTimeout(final long nanos) {
-        
-        if (nanos <= 0) {
-            
-            throw new IllegalArgumentException();
-            
-        }
-        
-        this.indexSegmentLeafCacheTimeout = nanos;
-        
-    }
+//    /**
+//     * Return the capacity of the LRU cache of leaves for an
+//     * {@link IndexSegment}.
+//     * 
+//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_CAPACITY
+//     */
+//    public final int getIndexSegmentLeafCacheCapacity() {
+//        
+//        return indexSegmentLeafCacheCapacity;
+//        
+//    }
+//
+//    public final void setIndexSegmentLeafCacheCapacity(final int newValue) {
+//        
+//        if (newValue <= 0) {
+//            
+//            throw new IllegalArgumentException();
+//            
+//        }
+//        
+//        this.indexSegmentLeafCacheCapacity = newValue;
+//        
+//    }
+//    
+//    /**
+//     * Return the timeout in nanoseconds of the LRU cache of leaves of
+//     * an {@link IndexSegment}.
+//     * 
+//     * @see Options#INDEX_SEGMENT_LEAF_CACHE_TIMEOUT
+//     */
+//    public final long getIndexSegmentLeafCacheTimeout() {
+//        
+//        return indexSegmentLeafCacheTimeout;
+//        
+//    }
+//
+//    public final void setIndexSegmentLeafCacheTimeout(final long nanos) {
+//        
+//        if (nanos <= 0) {
+//            
+//            throw new IllegalArgumentException();
+//            
+//        }
+//        
+//        this.indexSegmentLeafCacheTimeout = nanos;
+//        
+//    }
     
     /**
      * @see Options#WRITE_RETENTION_QUEUE_CAPACITY
@@ -1270,35 +1287,35 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    /**
-     * @see Options#BTREE_READ_RETENTION_QUEUE_CAPACITY
-     */
-    public final int getBTreeReadRetentionQueueCapacity() {
-        
-        return btreeReadRetentionQueueCapacity;
-        
-    }
-    
-    public final void setBTreeReadRetentionQueueCapacity(int v) {
-        
-        this.btreeReadRetentionQueueCapacity = v;
-        
-    }
-
-    /**
-     * @see Options#BTREE_READ_RETENTION_QUEUE_SCAN
-     */
-    public final int getBTreeReadRetentionQueueScan() {
-        
-        return btreeReadRetentionQueueScan;
-        
-    }
-    
-    public final void setBTreeReadRetentionQueueScan(int v) {
-        
-        this.btreeReadRetentionQueueScan = v;
-        
-    }
+//    /**
+//     * @see Options#BTREE_READ_RETENTION_QUEUE_CAPACITY
+//     */
+//    public final int getBTreeReadRetentionQueueCapacity() {
+//        
+//        return btreeReadRetentionQueueCapacity;
+//        
+//    }
+//    
+//    public final void setBTreeReadRetentionQueueCapacity(int v) {
+//        
+//        this.btreeReadRetentionQueueCapacity = v;
+//        
+//    }
+//
+//    /**
+//     * @see Options#BTREE_READ_RETENTION_QUEUE_SCAN
+//     */
+//    public final int getBTreeReadRetentionQueueScan() {
+//        
+//        return btreeReadRetentionQueueScan;
+//        
+//    }
+//    
+//    public final void setBTreeReadRetentionQueueScan(int v) {
+//        
+//        this.btreeReadRetentionQueueScan = v;
+//        
+//    }
 
     /**
      * When non-<code>null</code>, this is the description of the view of
@@ -1349,24 +1366,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Object used to (de-)serialize the addresses of the children of a node.
      */
     public final IAddressSerializer getAddressSerializer() {return addrSer;}
-    
+
     /**
-     * Object used to (de-)serialize/(de-)compress the keys in a node.
+     * Object used to code (compress) the keys in a node.
      * <p>
      * Note: The keys for nodes are separator keys for the leaves. Since they
      * are chosen to be the minimum length separator keys dynamically when a
      * leaf is split or joined the keys in the node typically DO NOT conform to
-     * application expectations and are normally assigned a different serializer
-     * for that reason.
-     * <p>
-     * Note: This handles the "serialization" of the <code>byte[][]</code>
-     * containing all of the keys for some node of the index. As such it may be
-     * used to provide compression across the already serialized node for the
-     * leaf.
+     * application expectations and MAY be assigned a different
+     * {@link IRabaCoder} for that reason.
      * 
      * @see #getTupleSerializer()
      */
-    public final IDataSerializer getNodeKeySerializer() {return nodeKeySer;}
+    public final IRabaCoder getNodeKeySerializer() {return nodeKeysCoder;}
     
     /**
      * The object used to form unsigned byte[] keys from Java objects, to
@@ -1404,7 +1416,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     
     public final void setChildLocks(final boolean newValue) {
 
-        this.childLocks = childLocks;
+        this.childLocks = newValue;
         
     }
 
@@ -1438,13 +1450,64 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * When <code>true</code> the index will maintain a per-index entry
      * timestamp. The primary use of this is in support of transactional
      * isolation.
+     * 
+     * @see #getVersionTimestampFilters()
      */
-    public final boolean getVersionTimestamps() {return versionTimestamps;}
-    
-    public final void setVersionTimestamps(boolean versionTimestamps) {
+    public final boolean getVersionTimestamps() {
+
+        return versionTimestamps;
         
+    }
+
+    /**
+     * When <code>true</code> the index will maintain the min/max of the per
+     * tuple-revision timestamp on each {@link Node} of the B+Tree. This
+     * information can be used to perform efficient filtering of iterators such
+     * that they visit only nodes and leaves having data for a specified tuple
+     * revision timestamp range. This filtering is efficient because it skips
+     * any node (and all spanned nodes or leaves) which does not have data for
+     * the desired revision timestamp range. In order to find all updates after
+     * a given timestamp revision, you specify (fromRevision,Long.MAX_VALUE). In
+     * order to visit the delta between two revisions, you specify
+     * (fromRevision, toRevision+1).
+     * <p>
+     * Tuple revision filtering can be very efficient for some purposes. For
+     * example, it can be used to synchronize disconnected clients or compute
+     * the write set of a committed transaction. However, it requires more space
+     * in the {@link INodeData} records since we must store the minimum and
+     * maximum timestamp revision for each child of a given node.
+     * <p>
+     * Per-tuple timestamp revisions MAY be used without support for per-tuple
+     * revision filtering.
+     * 
+     * @see #getVersionTimestamps()
+     */
+    public final boolean getVersionTimestampFilters() {
+
+        return versionTimestampFilters;
+        
+    }
+
+    /**
+     * Sets {@link #versionTimestampFilters}. You MUST also use
+     * {@link #setVersionTimestamps(boolean)} to <code>true</code> for version
+     * timestamp filtering to be supported.
+     * 
+     * @param versionTimestampFilters
+     *            <code>true</code> iff version timestamp filtering should be
+     *            supported.
+     */
+    public final void setVersionTimestampFilters(
+            final boolean versionTimestampFilters) {
+
+        this.versionTimestampFilters = versionTimestampFilters;
+
+    }
+
+    public final void setVersionTimestamps(final boolean versionTimestamps) {
+
         this.versionTimestamps = versionTimestamps;
-        
+
     }
 
     /**
@@ -1457,10 +1520,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
+    /**
+     * Convenience method sets both {@link #getDeleteMarkers()} and
+     * {@link #getVersionTimestamps()} at the same time.
+     * 
+     * @param isolatable
+     *            <code>true</code> if delete markers and version timestamps
+     *            will be enabled -or- <code>false</code> if they will be
+     *            disabled.
+     */
     public void setIsolatable(final boolean isolatable) {
 
         setDeleteMarkers(isolatable);
-        
+
         setVersionTimestamps(isolatable);
         
     }
@@ -1480,12 +1552,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setNodeKeySerializer(final IDataSerializer nodeKeySer) {
+    public void setNodeKeySerializer(final IRabaCoder nodeKeysCoder) {
         
-        if (nodeKeySer == null)
+        if (nodeKeysCoder == null)
             throw new IllegalArgumentException();
         
-        this.nodeKeySer = nodeKeySer;
+        this.nodeKeysCoder = nodeKeysCoder;
         
     }
 
@@ -1681,6 +1753,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      *             if the class does not implement that interface or for any
      *             other reason.
      */
+    @SuppressWarnings("unchecked")
     static private <T> T newInstance(final String className,
             final Class<T> iface) {
 
@@ -1699,8 +1772,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
             if (!iface.isAssignableFrom(cls)) {
 
-                throw new IllegalArgumentException("Does not implement "
-                        + IDataSerializer.class + " : " + className);
+                throw new IllegalArgumentException("Does not implement " + cls
+                        + " : " + className);
 
             }
 
@@ -1836,9 +1909,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 }
                 
                 if (uuid == null && indexManager != null
-                        && indexManager instanceof IBigdataFederation) {
+                        && indexManager instanceof IBigdataFederation<?>) {
 
-                    final IBigdataFederation fed = (IBigdataFederation) indexManager;
+                    final IBigdataFederation<?> fed = (IBigdataFederation<?>) indexManager;
 
                     final IDataService dataService = fed
                             .getDataServiceByName(val);
@@ -1884,15 +1957,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 Options.DEFAULT_WRITE_RETENTION_QUEUE_SCAN,
                 IntegerValidator.GTE_ZERO);
 
-        this.btreeReadRetentionQueueCapacity = getProperty(indexManager,
-                properties, namespace, Options.BTREE_READ_RETENTION_QUEUE_CAPACITY,
-                Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY,
-                IntegerValidator.GTE_ZERO);
-
-        this.btreeReadRetentionQueueScan = getProperty(indexManager,
-                properties, namespace, Options.BTREE_READ_RETENTION_QUEUE_SCAN,
-                Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN,
-                IntegerValidator.GTE_ZERO);
+//        this.btreeReadRetentionQueueCapacity = getProperty(indexManager,
+//                properties, namespace, Options.BTREE_READ_RETENTION_QUEUE_CAPACITY,
+//                Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY,
+//                IntegerValidator.GTE_ZERO);
+//
+//        this.btreeReadRetentionQueueScan = getProperty(indexManager,
+//                properties, namespace, Options.BTREE_READ_RETENTION_QUEUE_SCAN,
+//                Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_SCAN,
+//                IntegerValidator.GTE_ZERO);
 
         this.btreeRecordCompressorFactory = newInstance(getProperty(
                 indexManager, properties, namespace,
@@ -1911,17 +1984,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 Options.INDEX_SEGMENT_BUFFER_NODES,
                 Options.DEFAULT_INDEX_SEGMENT_BUFFER_NODES));
 
-        this.indexSegmentLeafCacheCapacity = getProperty(indexManager,
-                properties, namespace,
-                Options.INDEX_SEGMENT_LEAF_CACHE_CAPACITY,
-                Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY,
-                IntegerValidator.GT_ZERO);
-
-        this.indexSegmentLeafCacheTimeout = getProperty(indexManager,
-                properties, namespace,
-                Options.INDEX_SEGMENT_LEAF_CACHE_TIMEOUT,
-                Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT,
-                LongValidator.GT_ZERO);
+//        this.indexSegmentLeafCacheCapacity = getProperty(indexManager,
+//                properties, namespace,
+//                Options.INDEX_SEGMENT_LEAF_CACHE_CAPACITY,
+//                Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_CAPACITY,
+//                IntegerValidator.GT_ZERO);
+//
+//        this.indexSegmentLeafCacheTimeout = getProperty(indexManager,
+//                properties, namespace,
+//                Options.INDEX_SEGMENT_LEAF_CACHE_TIMEOUT,
+//                Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT,
+//                LongValidator.GT_ZERO);
 
         this.indexSegmentRecordCompressorFactory = newInstance(
                 getProperty(indexManager, properties, namespace,
@@ -1946,9 +2019,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         this.addrSer = AddressSerializer.INSTANCE;
         
 //        this.nodeKeySer = PrefixSerializer.INSTANCE;
-        this.nodeKeySer = newInstance(getProperty(indexManager,
-                properties, namespace, Options.NODE_KEY_SERIALIZER,
-                PrefixSerializer.class.getName()), IDataSerializer.class);
+        this.nodeKeysCoder = newInstance(getProperty(indexManager, properties,
+                namespace, Options.NODE_KEYS_CODER,
+                DefaultFrontCodedRabaCoder.class.getName()), IRabaCoder.class);
 
         // this.tupleSer = DefaultTupleSerializer.newInstance();
         {
@@ -1964,18 +2037,18 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
             final IKeyBuilderFactory keyBuilderFactory = DefaultTupleSerializer
                     .getDefaultKeyBuilderFactory();
 
-            final IDataSerializer leafKeySerializer = newInstance(getProperty(
+            final IRabaCoder leafKeysCoder = newInstance(getProperty(
                     indexManager, properties, namespace,
-                    Options.LEAF_KEY_SERIALIZER, PrefixSerializer.class
-                            .getName()), IDataSerializer.class);
+                    Options.LEAF_KEYS_CODER, DefaultFrontCodedRabaCoder.class
+                            .getName()), IRabaCoder.class);
 
-            final IDataSerializer valueSerializer = newInstance(getProperty(
+            final IRabaCoder valuesCoder = newInstance(getProperty(
                     indexManager, properties, namespace,
-                    Options.LEAF_VALUE_SERIALIZER, DefaultDataSerializer.class
-                            .getName()), IDataSerializer.class);
+                    Options.LEAF_VALUES_CODER, CanonicalHuffmanRabaCoder.class
+                            .getName()), IRabaCoder.class);
 
             this.tupleSer = new DefaultTupleSerializer(keyBuilderFactory,
-                    leafKeySerializer, valueSerializer);
+                    leafKeysCoder, valuesCoder);
             
         }
 
@@ -1988,6 +2061,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         this.deleteMarkers = false;
         
         this.versionTimestamps = false;
+
+        this.versionTimestampFilters = false;
 
         // optional bloom filter setup.
         final boolean bloomFilter = Boolean.parseBoolean(getProperty(
@@ -2216,7 +2291,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", class=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
         sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
-        sb.append(", nodeKeySerializer=" + nodeKeySer.getClass().getName());
+        sb.append(", nodeKeysCoder=" + nodeKeysCoder.getClass().getName());
         sb.append(", btreeRecordCompressorFactory="
                 + (btreeRecordCompressorFactory == null ? "N/A"
                         : btreeRecordCompressorFactory));
@@ -2226,6 +2301,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                         .getClass().getName()));
         sb.append(", deleteMarkers=" + deleteMarkers);
         sb.append(", versionTimestamps=" + versionTimestamps);
+        sb.append(", versionTimestampFilters=" + versionTimestampFilters);
         sb.append(", isolatable=" + isIsolatable());
         sb.append(", bloomFilterFactory=" + (bloomFilterFactory == null ? "N/A"
                 : bloomFilterFactory.toString())); 
@@ -2236,8 +2312,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 + (splitHandler == null ? "N/A" : splitHandler.toString()));
         sb.append(", indexSegmentBranchingFactor=" + indexSegmentBranchingFactor);
         sb.append(", indexSegmentBufferNodes=" + indexSegmentBufferNodes);
-        sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
-        sb.append(", indexSegmentLeafCacheTimeout=" + indexSegmentLeafCacheTimeout);
+//        sb.append(", indexSegmentLeafCacheCapacity=" + indexSegmentLeafCacheCapacity);
+//        sb.append(", indexSegmentLeafCacheTimeout=" + indexSegmentLeafCacheTimeout);
         sb.append(", indexSegmentRecordCompressorFactory="
                 + (indexSegmentRecordCompressorFactory == null ? "N/A"
                         : indexSegmentRecordCompressorFactory));
@@ -2294,9 +2370,22 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private static transient final int VERSION5 = 0x05;
     
     /**
+     * This version introduced {@link #versionTimestampFilters}.  Reads of prior
+     * versions set this field to <code>false</code>.
+     */
+    private static transient final int VERSION6 = 0x06;
+
+    /**
+     * This version gets rid of the read-retention queue capacity and nscan
+     * properties and the index segment leaf cache capacity and timeout
+     * properties.
+     */
+    private static transient final int VERSION7 = 0x07;
+    
+    /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION5;
+    private static transient final int CURRENT_VERSION = VERSION7;
     
     /**
      * @todo review generated record for compactness.
@@ -2313,6 +2402,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION3:
         case VERSION4:
         case VERSION5:
+        case VERSION6:
+        case VERSION7:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2334,21 +2425,26 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         writeRetentionQueueScan = (int)LongPacker.unpackLong(in);
         
-        btreeReadRetentionQueueCapacity = (int)LongPacker.unpackLong(in);
+        if (version < VERSION7) {
         
-        btreeReadRetentionQueueScan = (int)LongPacker.unpackLong(in);
+            /* btreeReadRetentionQueueCapacity = (int) */LongPacker
+                    .unpackLong(in);
+
+            /* btreeReadRetentionQueueScan = (int) */LongPacker.unpackLong(in);
+
+        }
 
         pmd = (LocalPartitionMetadata)in.readObject();
         
         btreeClassName = in.readUTF();
         
         checkpointClassName = in.readUTF();
-        
-        addrSer = (IAddressSerializer)in.readObject();
-        
-        nodeKeySer = (IDataSerializer)in.readObject();
 
-        tupleSer = (ITupleSerializer)in.readObject();
+        addrSer = (IAddressSerializer) in.readObject();
+
+        nodeKeysCoder = (IRabaCoder) in.readObject();
+
+        tupleSer = (ITupleSerializer) in.readObject();
         
         if (version < VERSION4) {
 
@@ -2377,6 +2473,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         versionTimestamps = in.readBoolean();
 
+        if (version < VERSION6) {
+
+            versionTimestampFilters = false;
+
+        } else {
+
+            versionTimestampFilters = in.readBoolean();
+            
+        }
+
         bloomFilterFactory = (BloomFilterFactory) in.readObject();
 
         overflowHandler = (IOverflowHandler)in.readObject();
@@ -2387,21 +2493,29 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * IndexSegment.
          */
 
-        indexSegmentBranchingFactor = (int)LongPacker.unpackLong(in);
+        indexSegmentBranchingFactor = (int) LongPacker.unpackLong(in);
 
-        indexSegmentLeafCacheCapacity = (int)LongPacker.unpackLong(in);
-        
-        if (version < VERSION3) {
+        if (version < VERSION7) {
 
-            indexSegmentLeafCacheTimeout = Long
-                    .parseLong(Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT);
-            
-        } else {
-            
-            indexSegmentLeafCacheTimeout = (long)LongPacker.unpackLong(in);
-            
+            /* indexSegmentLeafCacheCapacity = (int) */LongPacker
+                    .unpackLong(in);
+
+            if (version < VERSION3) {
+
+                /*
+                 * indexSegmentLeafCacheTimeout = Long
+                 * .parseLong(Options.DEFAULT_INDEX_SEGMENT_LEAF_CACHE_TIMEOUT);
+                 */
+
+            } else {
+
+                /* indexSegmentLeafCacheTimeout = (long) */LongPacker
+                        .unpackLong(in);
+
+            }
+
         }
-        
+
         indexSegmentBufferNodes = in.readBoolean();
 
         if (version < VERSION4) {
@@ -2521,10 +2635,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         LongPacker.packLong(out, writeRetentionQueueCapacity);
 
         LongPacker.packLong(out, writeRetentionQueueScan);
-        
-        LongPacker.packLong(out, btreeReadRetentionQueueCapacity);
-       
-        LongPacker.packLong(out, btreeReadRetentionQueueScan);
+
+        // Note: gone with version7.
+//        LongPacker.packLong(out, btreeReadRetentionQueueCapacity);
+//        LongPacker.packLong(out, btreeReadRetentionQueueScan);
 
         out.writeObject(pmd);
         
@@ -2534,7 +2648,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         out.writeObject(addrSer);
         
-        out.writeObject(nodeKeySer);
+        out.writeObject(nodeKeysCoder);
         
         out.writeObject(tupleSer);
         
@@ -2555,6 +2669,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         out.writeBoolean(deleteMarkers);
         
         out.writeBoolean(versionTimestamps);
+        
+        if (version >= VERSION6) {
+
+            out.writeBoolean(versionTimestampFilters);
+            
+        }
 
         out.writeObject(bloomFilterFactory);
         
@@ -2568,13 +2688,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         LongPacker.packLong(out, indexSegmentBranchingFactor);
 
-        LongPacker.packLong(out, indexSegmentLeafCacheCapacity);
-
-        if (version >= VERSION3) {
-
-            LongPacker.packLong(out, indexSegmentLeafCacheTimeout);
-            
-        }
+        // Note: gone with version7.
+//        LongPacker.packLong(out, indexSegmentLeafCacheCapacity);
+//
+//        if (version >= VERSION3) {
+//
+//            LongPacker.packLong(out, indexSegmentLeafCacheTimeout);
+//            
+//        }
 
         out.writeBoolean(indexSegmentBufferNodes);
 
@@ -2637,25 +2758,25 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * 
      * @return The {@link Checkpoint}.
      */
+    @SuppressWarnings("unchecked")
     final public Checkpoint firstCheckpoint() {
 
         try {
             
-            Class cl = Class.forName(getCheckpointClassName());
+            final Class cl = Class.forName(getCheckpointClassName());
             
             /*
              * Note: A NoSuchMethodException thrown here means that you did not
              * declare the required public constructor.
              */
             
-            Constructor ctor = cl.getConstructor(new Class[] {
+            final Constructor ctor = cl.getConstructor(new Class[] {//
                     IndexMetadata.class//
                     });
 
-            Checkpoint checkpoint = (Checkpoint) ctor.newInstance(new Object[] { //
-                    this //
-                    });
-            
+            final Checkpoint checkpoint = (Checkpoint) ctor
+                    .newInstance(new Object[] { this });
+
             return checkpoint;
             
         } catch(Exception ex) {
@@ -2688,6 +2809,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * @throws IllegalArgumentException
      *             if the oldCheckpoint is <code>null</code>.
      */
+    @SuppressWarnings("unchecked")
     final public Checkpoint overflowCheckpoint(final Checkpoint oldCheckpoint) {
        
         if (oldCheckpoint == null) {
@@ -2747,6 +2869,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * 
      * @return The {@link Checkpoint}.
      */
+    @SuppressWarnings("unchecked")
     final public Checkpoint newCheckpoint(final BTree btree) {
         
         try {

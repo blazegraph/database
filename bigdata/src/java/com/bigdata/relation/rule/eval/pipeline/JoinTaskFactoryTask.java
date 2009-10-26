@@ -61,7 +61,7 @@ import com.bigdata.striterator.IKeyOrder;
  *       rules. The simplest answer is that the query or closure operation fails
  *       and can be retried.
  *       <P>
- *       When retried a different data service instance could takeover for the
+ *       When retried a different data service instance could take over for the
  *       failed instance. This presumes some concept of "affinity" for a data
  *       service instance when locating a join task. If there are replicated
  *       instances of a data service, then affinity would be the tendency to
@@ -79,7 +79,7 @@ import com.bigdata.striterator.IKeyOrder;
  *       overgeneration of results, but those results would all be duplicates.
  *       If that is acceptable, then this approach could be considered "safe".
  *       Failure during mutation (aka closure) is even easier for RDF as
- *       redundent writes on an index still lead to the same fixed point.
+ *       redundant writes on an index still lead to the same fixed point.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -390,7 +390,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
         
         private final DataService dataService;
         
-        public DelegateIndexManager(DataService dataService) {
+        public DelegateIndexManager(final DataService dataService) {
             
             if (dataService == null)
                 throw new IllegalArgumentException();
@@ -402,7 +402,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
         /**
          * Delegates to the {@link IndexManager}.
          */
-        public IIndex getIndex(String name, long timestamp) {
+        public IIndex getIndex(final String name, final long timestamp) {
 
             return dataService.getResourceManager().getIndex(name, timestamp);
             
@@ -411,7 +411,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
         /**
          * Not allowed.
          */
-        public void dropIndex(String name) {
+        public void dropIndex(final String name) {
             
             throw new UnsupportedOperationException();
             

@@ -118,7 +118,7 @@ public interface IAccessPath<R> extends Iterable<R> {
      * whatever is the default capacity.
      * <p>
      * Note: Filters should be specified when the {@link IAccessPath} is
-     * constructed so that they will be evalated on the {@link IDataService}
+     * constructed so that they will be evaluated on the {@link IDataService}
      * rather than materializing the elements and then filtering then. This can
      * be accomplished by adding the filter as an {@link IElementFilter} on the
      * {@link IPredicate} when requesting {@link IAccessPath}.
@@ -144,7 +144,8 @@ public interface IAccessPath<R> extends Iterable<R> {
      * 
      * @return The iterator.
      * 
-     * @deprecated by {@link #iterator(long, long, int)}
+     * @deprecated by {@link #iterator(long, long, int)}. Also, [limit] should
+     *             have been a long, not an int.
      */
     public IChunkedOrderedIterator<R> iterator(int limit, int capacity);
 
@@ -156,9 +157,9 @@ public interface IAccessPath<R> extends Iterable<R> {
      * <em>slice</em> that will be visited by the iterator. When a slice is
      * specified, the iterator will count off the elements accepted by the
      * {@link IPredicate} up to the <i>offset</i>, but not materialize them.
-     * Elements by the {@link IPredicate} starting with the <i>offset</i> and
-     * up to (but not including) <i>offset+limit</i> will be materialized for
-     * the client. The iterator will halt processing after observing
+     * Elements by the {@link IPredicate} starting with the <i>offset</i> and up
+     * to (but not including) <i>offset+limit</i> will be materialized for the
+     * client. The iterator will halt processing after observing
      * <i>offset+limit</i> accepted elements. Note that slices for JOINs (vs a
      * simple {@link IAccessPath} scan) are handled by {@link IQueryOptions} for
      * an {@link IRule}.
@@ -173,7 +174,7 @@ public interface IAccessPath<R> extends Iterable<R> {
      *            This is ZERO (0L) to visit all accepted elements.
      * @param limit
      *            The last element accepted by the iterator that it will visit
-     *            (materialize for the client). The limit must be non-negatice.
+     *            (materialize for the client). The limit must be non-negative.
      *            This is ZERO (0L) to visit all accepted elements (the value
      *            {@link Long#MAX_VALUE} is interpreted exactly like ZERO(0L)).
      * @param capacity
@@ -182,6 +183,12 @@ public interface IAccessPath<R> extends Iterable<R> {
      *            is specified, the capacity will never exceed the <i>limit</i>.
      * 
      * @return The iterator.
+     * 
+     *         FIXME The offset and limit should probably be rolled into the
+     *         predicate and removed from the {@link IAccessPath}. This way they
+     *         will be correctly applied when {@link #isEmpty()} is implemented
+     *         using the {@link #iterator()} to determine if any elements can be
+     *         visited.
      */
     public IChunkedOrderedIterator<R> iterator(long offset, long limit,
             int capacity);

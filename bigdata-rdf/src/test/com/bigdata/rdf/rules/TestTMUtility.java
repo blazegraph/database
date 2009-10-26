@@ -75,7 +75,8 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
         final Rule r = new TestRuleRdfs04a(database);
 
-        log.info(r.toString());
+        if (log.isInfoEnabled())
+            log.info(r.toString());
 
         final Program program = TMUtility.INSTANCE.mapRuleForTruthMaintenance(
                 r, focusStore);
@@ -86,12 +87,17 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
             final IRule r0 = (IRule) program.steps().next();
 
-            log.info(r0.toString());
+            if (log.isInfoEnabled())
+                log.info(r0.toString());
 
-            assertTrue(r0.getTail(0).getOnlyRelationName() == focusStore);
-            
+            // reads from the focus store.
+            assertEquals(focusStore, r0.getTail(0).getOnlyRelationName());
+
+            // writes on the focus store.
+            assertEquals(focusStore, r0.getHead().getOnlyRelationName());
+
         }
-        
+
     }
 
     /**
@@ -108,7 +114,8 @@ public class TestTMUtility extends AbstractRuleTestCase {
 
         final Rule r = new TestRuleRdfs9(database);
 
-        log.info(r.toString());
+        if (log.isInfoEnabled())
+            log.info(r.toString());
 
         final Program program = TMUtility.INSTANCE.mapRuleForTruthMaintenance(
                 r, focusStore);
@@ -118,38 +125,45 @@ public class TestTMUtility extends AbstractRuleTestCase {
         final Iterator<? extends IStep> itr = program.steps();
 
         {
-           
-            
+
             final IRule r0 = (IRule) itr.next();
 
-            log.info(r0.toString());
+            if (log.isInfoEnabled())
+                log.info(r0.toString());
 
             // 1st tail.
-            assertEquals(focusStore,r0.getTail(0).getOnlyRelationName());
+            assertEquals(focusStore, r0.getTail(0).getOnlyRelationName());
 
             // 2nd tail
             assertEquals(database, r0.getTail(1).getRelationName(0));
             assertEquals(focusStore, r0.getTail(1).getRelationName(1));
             assertEquals(2, r0.getTail(1).getRelationCount());
 
+            // writes on the focus store.
+            assertEquals(focusStore, r0.getHead().getOnlyRelationName());
+
         }
 
         {
 
-            IRule r1 = (IRule)itr.next();
+            final IRule r1 = (IRule) itr.next();
 
-            log.info(r1.toString());
+            if (log.isInfoEnabled())
+                log.info(r1.toString());
 
             // 1st tail.
             assertEquals(database, r1.getTail(0).getRelationName(0));
             assertEquals(focusStore, r1.getTail(0).getRelationName(1));
             assertEquals(2, r1.getTail(0).getRelationCount());
-            
+
             // 2nd tail
-            assertEquals(focusStore,r1.getTail(1).getOnlyRelationName());
+            assertEquals(focusStore, r1.getTail(1).getOnlyRelationName());
+
+            // writes on the focus store.
+            assertEquals(focusStore, r1.getHead().getOnlyRelationName());
 
         }
-        
+
         assertFalse(itr.hasNext());
 
     }

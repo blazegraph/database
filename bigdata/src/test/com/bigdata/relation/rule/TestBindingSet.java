@@ -57,4 +57,9 @@ public class TestBindingSet extends TestCase2 {
         super(name);
     }
 
+    /** Place holder for unit tests. */
+    public void test_something() {
+        
+    }
+    
 }

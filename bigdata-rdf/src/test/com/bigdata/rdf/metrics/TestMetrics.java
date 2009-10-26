@@ -826,12 +826,12 @@ public class TestMetrics extends AbstractMetricsTestCase {
      * {@link TestCase2#log}.
      */
     private void usage() {
+
+        // @todo do something more interesting here.  See BigdataRepository
         
-        String usage = store.usage();
-        
-        System.err.println(usage);
-        
-        log.warn(usage);
+//        System.err.println(store.getClass().getName());
+//
+//        log.warn(store.getClass().getName());
 
     }
     

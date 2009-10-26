@@ -49,9 +49,8 @@ public abstract class AbstractPendingSetMasterStats<L, HS extends AbstractSubtas
     protected class PendingSetStatisticsTask extends StatisticsTask {
 
         /**
-         * The moving average of the #of elements on the master queues. This
-         * does not count the #of elements which have been drained from a master
-         * queue and are being transferred to a sink queue.
+         * The moving average of the size of the set of pending request (those
+         * assigned to clients) across all masters.
          */
         final MovingAverageTask averageMasterPendingSetSize = new MovingAverageTask(
                 "averageMasterPendingSetSize", new Callable<Long>() {

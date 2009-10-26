@@ -68,9 +68,11 @@ public class TestAddDropIndexTask extends ProxyTestCase {
     public void test_addDropIndex() {
 
         // Note: wrapped since we modify the properties during the test!!!
-        Properties properties = new Properties(getProperties());
+        final Properties properties = new Properties(getProperties());
         
         Journal journal = new Journal(properties);
+        
+        try {
         
         final String name = "abc";
 
@@ -293,6 +295,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
             
         }
 
+        } finally {
         // shutdown again.
         journal.shutdown();
         
@@ -301,6 +304,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
          */
         
         journal.deleteResources();
+        
+        }
         
     }
 
@@ -314,13 +319,15 @@ public class TestAddDropIndexTask extends ProxyTestCase {
      */
     public void test_addDropIndex_twice() throws InterruptedException, ExecutionException {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties(getProperties());
         
-        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
-
-        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+//        properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+//
+//        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
         
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
+        
+        try {
         
         final String name = "abc";
         
@@ -427,10 +434,12 @@ public class TestAddDropIndexTask extends ProxyTestCase {
 
         }
 
-        journal.shutdown();
+        } finally {
 
-        journal.deleteResources();
+            journal.destroy();
 
+        }
+        
     }
 
     /**
@@ -438,16 +447,14 @@ public class TestAddDropIndexTask extends ProxyTestCase {
      * verify that we see {@link NoSuchIndexException}s rather than something
      * odder. This is an edge case since {@link Journal#getCommitRecord()} will
      * have 0L for all root addresses until the first commit - this means that
-     * the {@link AbstractJournal#name2Addr} can not be loaded from the commit
+     * the {@link AbstractJournal#_name2Addr} can not be loaded from the commit
      * record!
      * 
      * @throws InterruptedException
      */
     public void test_NoSuchIndexException() throws InterruptedException {
         
-        Properties properties = getProperties();
-        
-        final Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
         
         try {
         
@@ -486,9 +493,7 @@ public class TestAddDropIndexTask extends ProxyTestCase {
 
         } finally {
 
-            journal.shutdown();
-        
-            journal.deleteResources();
+            journal.destroy();
             
         }
 

@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -64,8 +65,10 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("SPORelation");
+        final TestSuite suite = new TestSuite("SPORelation");
 
+        suite.addTestSuite(TestSPO.class);
+        
         // test predicate impls.
         suite.addTestSuite(TestSPOPredicate.class);
         
@@ -75,11 +78,19 @@ public class TestAll extends TestCase {
         // @todo test IKeyOrder impl (comparators).
         suite.addTestSuite(TestSPOKeyOrder.class);
 
-        // @todo test various key and value compressors here.
-        suite.addTestSuite(TestKeyCompression.class);
+        // key/value coders
+        suite.addTestSuite(TestSPOKeyCoders.class);
+        suite.addTestSuite(TestSPOValueCoders.class);
 
         // key and value (de-)serialization of SPO tuples for B+Tree.
         suite.addTestSuite(TestSPOTupleSerializer.class);
+        
+        // test suite for the access path api.
+        suite.addTestSuite(TestSPOAccessPath.class);
+
+        // test suite for the access path used for SPARQL default graphs (quads
+        // only).
+        suite.addTestSuite(TestDefaultGraphAccessPath.class);
         
         return suite;
         

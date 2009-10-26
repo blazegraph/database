@@ -80,7 +80,7 @@ public class IndexSegmentAddressManager extends WormAddressManager {
     /**
      * @param checkpoint
      */
-    public IndexSegmentAddressManager(IndexSegmentCheckpoint checkpoint) {
+    public IndexSegmentAddressManager(final IndexSegmentCheckpoint checkpoint) {
 
         super(checkpoint.offsetBits);
 

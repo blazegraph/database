@@ -45,7 +45,9 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.service.AbstractClient;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.mapred.AbstractJobAndTaskService;
@@ -86,9 +88,16 @@ public class TestAbstractJobAndTaskService extends TestCase {
     IBigdataClient bigdataClient;
     
     public void setUp() throws Exception {
+
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
+        final Properties properties = new Properties();
         
-        Properties properties = new Properties();
-        
+        // disable platform statistics collection.
+        properties.setProperty(
+                EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+
         properties
                 .setProperty(
                         com.bigdata.service.EmbeddedClient.Options.BUFFER_MODE,
@@ -106,6 +115,9 @@ public class TestAbstractJobAndTaskService extends TestCase {
             
         }
         
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
     }
 
     public void test_ctor() {

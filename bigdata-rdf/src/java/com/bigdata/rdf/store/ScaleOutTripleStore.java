@@ -144,16 +144,16 @@ public class ScaleOutTripleStore extends AbstractTripleStore {
         
     }
 
-    /**
-     * Drops the indices for the {@link ITripleStore}.
-     */
-    public void closeAndDelete() {
-        
-        destroy();
-        
-        super.closeAndDelete();
-        
-    }
+//    /**
+//     * Drops the indices for the {@link ITripleStore}.
+//     */
+//    public void __tearDownUnitTest() {
+//        
+//        destroy();
+//        
+//        super.__tearDownUnitTest();
+//        
+//    }
 
     /**
      * This store is safe for concurrent operations.

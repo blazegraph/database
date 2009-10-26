@@ -4,8 +4,11 @@
 
 package com.bigdata.rdf.sail;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +22,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.Bytes;
@@ -61,8 +65,8 @@ public class BigdataSailHelper {
      * 
      * @return The SAIL.
      */
-    public BigdataSail getSail(IBigdataFederation fed, String namespace,
-            long timestamp) {
+    public BigdataSail getSail(final IBigdataFederation<?> fed,
+            final String namespace, final long timestamp) {
 
         ScaleOutTripleStore tripleStore = (ScaleOutTripleStore) fed
                 .getResourceLocator().locate(namespace, timestamp);
@@ -106,7 +110,8 @@ public class BigdataSailHelper {
      * 
      * @return The SAIL.
      */
-    public BigdataSail getSail(String filename, String namespace, long timestamp) {
+    public BigdataSail getSail(final String filename, final String namespace,
+            final long timestamp) {
 
         final Properties properties = new Properties();
 
@@ -259,6 +264,9 @@ public class BigdataSailHelper {
          */
         properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
 
+        // Triples only.
+        properties.setProperty(Options.QUADS, "false");
+
         /*
          * Turn off justifications (impacts only the load performance, but it is
          * a big impact and only required if you will be doing TM). (Actually,
@@ -337,10 +345,14 @@ public class BigdataSailHelper {
      *            
      *            @return The post-modification properties.
      */
-    public Properties setProperties(BigdataSail sail, Properties properties) {
+    public Properties setProperties(final BigdataSail sail,
+            final Properties properties) {
 
-        return setProperties(sail.getDatabase().getIndexManager(), sail
-                .getDatabase().getNamespace(), properties);
+        return setProperties(//
+                sail.getDatabase().getIndexManager(), //
+                sail.getDatabase().getNamespace(), //
+                properties//
+        );
         
     }
     
@@ -351,8 +363,8 @@ public class BigdataSailHelper {
      * @param properties
      * @return The post-modification properties.
      */
-    protected Properties setProperties(IIndexManager indexManager, String namespace,
-            Properties properties) {
+    protected Properties setProperties(final IIndexManager indexManager,
+            final String namespace, final Properties properties) {
 
         /*
          * Convert the Properties to a Map.
@@ -384,24 +396,25 @@ public class BigdataSailHelper {
          */
         final Properties p2 = new Properties();
 
-        p2.putAll( indexManager.getGlobalRowStore().write(RelationSchema.INSTANCE, map) );
+        p2.putAll(indexManager.getGlobalRowStore().write(
+                RelationSchema.INSTANCE, map));
 
-        if(indexManager instanceof Journal) {
+        if (indexManager instanceof IJournal) {
 
-            // make the changes restart safe (not required for federations).
-            ((Journal)indexManager).commit();
+            // make the changes restart safe (not required for federation).
+            ((Journal) indexManager).commit();
 
         }
-        
+
         // return the post-modification properties.
         return p2;
-        
+
     }
 
-    protected static void showProperties(Properties p) {
-        
+    protected static void showProperties(final Properties p) {
+
         // sorted collection.
-        final TreeMap<String/*name*/, Object/*val*/> map = new TreeMap<String,Object>();
+        final TreeMap<String/* name */, Object/* val */> map = new TreeMap<String, Object>();
 
         // put into alpha order.
         for(Map.Entry<Object,Object> entry : p.entrySet()) {
@@ -435,16 +448,18 @@ public class BigdataSailHelper {
     }
     
     /**
-     * Shows some interesting details about the SPO index.
+     * Shows some interesting details about the primary index for the {@link SPORelation}.
      * 
      * @param sail
      */
-    public static void showSPOIndexDetails(BigdataSail sail) {
+    public static void showSPOIndexDetails(final BigdataSail sail) {
         
-        IIndex ndx = sail.getDatabase().getSPORelation().getSPOIndex();
-        IndexMetadata md = ndx.getIndexMetadata();
-        
-        System.out.println("SPO:");
+        final IIndex ndx = sail.getDatabase().getSPORelation()
+                .getPrimaryIndex();
+
+        final IndexMetadata md = ndx.getIndexMetadata();
+
+        System.out.println(md.getName()+":");
         System.out.println(md.toString());
         System.out.println(md.getTupleSerializer().toString());
         
@@ -464,7 +479,7 @@ public class BigdataSailHelper {
         JDS;
         
     }
-    
+
     /**
      * Utility class.
      * <p>
@@ -474,18 +489,23 @@ public class BigdataSailHelper {
      * be interpreted as a {@link LocalDataServiceFederation} (LDS), an
      * {@link EmbeddedFederation} (EDS), or a {@link JiniFederation} (JDS).
      * <p>
-     * Note: The namespace identifies which triple store you are accessing and
-     * defaults to "kb".
+     * Note: The <i>namespace</i> identifies which triple store you are
+     * accessing and defaults to <code>kb</code>.
      * <p>
-     * Note: The timestamp identifies which commit point you are accessing and
-     * defaults to the {@link ITx#UNISOLATED} view.
+     * Note: The <i>timestamp</i> identifies which commit point you are
+     * accessing and defaults to the {@link ITx#UNISOLATED} view, which can also
+     * be specified as {@value#ITx#UNISOLATED}).
+     * <p>
+     * Note: The <i>properties</i> is a file containing property overrides to be
+     * applied to the kb.
      * 
      * @param args
-     *            <i>filename</i> ((LTS|LDS|EDS|JDS (<i>namespace</i> (<i>timestamp</i>)))
+     *            <i>filename</i> ((LTS|LDS|EDS|JDS ((<i>namespace</i>
+     *            (<i>timestamp</i>)))properties)
      * 
      * @throws SailException
-     * @throws ConfigurationException 
-     * @throws IOException 
+     * @throws ConfigurationException
+     * @throws IOException
      */
     public static void main(String[] args) throws SailException, ConfigurationException, IOException {
        
@@ -512,24 +532,34 @@ public class BigdataSailHelper {
             System.exit(1);
             
         }
-        
-        if (file.isDirectory() && FederationEnum.LTS.equals(fedType)) {
 
-            System.err.println("LTS is a plain file, not a directory: dir="
-                    + filename);
+        switch(fedType) {
+        case LTS:
+        case JDS:
+            if (file.isDirectory()) {
 
-            System.exit(1);
-            
-        }
-        
-        if (!file.isDirectory() && !FederationEnum.LTS.equals(fedType)) {
+                System.err.println(fedType
+                        + " requires plain file, not a directory: dir="
+                        + filename);
 
-            System.err.println(fedType
-                    + "requires a directory, not a plain file: file="
-                    + filename);
+                System.exit(1);
 
-            System.exit(1);
+            }
+            break;
+        case LDS:
+        case EDS:
+            if (!file.isDirectory()) {
 
+                System.err.println(fedType
+                        + " requires a directory, not a plain file: file="
+                        + filename);
+
+                System.exit(1);
+
+            }
+            break;
+        default:
+            throw new AssertionError();
         }
         
         final String namespace = args.length > 2 ? args[2] : "kb";
@@ -537,13 +567,23 @@ public class BigdataSailHelper {
         final long timestamp = args.length > 3 ? Long.valueOf(args[3])
                 : ITx.UNISOLATED;
 
+        final File propertyFile = args.length > 4 ? new File(args[4]) : null;
+
+        if (propertyFile != null && !propertyFile.exists()) {
+
+            System.err.println("No such file: "+propertyFile);
+            
+            System.exit(1);
+            
+        }
+            
         final BigdataSailHelper helper = new BigdataSailHelper();
 
         System.out.println("filename: " + filename);
 
         final BigdataSail sail;
         // Note: iff we need to shutdown the federation in finally{}
-        final AbstractFederation fed;
+        final AbstractFederation<?> fed;
 //        // Note: iff JDS.
 //        final JiniServicesHelper jiniServicesHelper;
 
@@ -569,6 +609,10 @@ public class BigdataSailHelper {
                     com.bigdata.service.LocalDataServiceClient.Options.DATA_DIR,
                     filename);
             
+            // disable platform statistics collection.
+            properties.setProperty(
+                    LocalDataServiceClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+
             fed = new LocalDataServiceClient(properties).connect();
 
             sail = helper.getSail(fed, namespace, timestamp);
@@ -587,6 +631,10 @@ public class BigdataSailHelper {
                     com.bigdata.service.EmbeddedClient.Options.DATA_DIR,
                     filename);
             
+            // disable platform statistics collection.
+            properties.setProperty(
+                    EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+
             fed = new EmbeddedClient(properties).connect();
 
             sail = helper.getSail(fed, namespace, timestamp);
@@ -622,10 +670,27 @@ public class BigdataSailHelper {
             if(true) {
 
                 final Properties p = new Properties();
-                
-                System.out.println("reading new properties from stdin::");
-                
-                p.load(System.in);
+
+                if (propertyFile != null) {
+
+                    System.out.println("reading new properties from file::");
+
+                    final InputStream is = new BufferedInputStream(
+                            new FileInputStream(propertyFile));
+                    try {
+                        p.load(is);
+                    } finally {
+                        is.close();
+                    }
+                    p.store(System.out, "Will apply properties::");
+
+                } else {
+
+                    System.out.println("reading new properties from stdin::");
+
+                    p.load(System.in);
+
+                }
 
 //                p.setProperty(Options.NESTED_SUBQUERY, "false");
 //                p.setProperty(Options.CHUNK_CAPACITY, "100");
@@ -637,6 +702,7 @@ public class BigdataSailHelper {
                 System.out.println("\npost-modification properties::");
 
                 showProperties(helper.setProperties(sail, p));
+                
             }
 
         } finally {

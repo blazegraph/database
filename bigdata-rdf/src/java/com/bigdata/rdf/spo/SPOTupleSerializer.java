@@ -36,15 +36,13 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.IRawTripleStore;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * (De-)serializes {@link SPO}s for statement indices.
@@ -71,8 +69,8 @@ import com.bigdata.striterator.IKeyOrder;
 public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
     private static final long serialVersionUID = 2893830958762265104L;
-
-    private static transient final int N = IRawTripleStore.N;
+    
+    private static final transient long NULL = IRawTripleStore.NULL;
     
     /**
      * The natural order for the index.
@@ -84,17 +82,11 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      */
     private final transient ByteArrayBuffer buf = new ByteArrayBuffer(0);
 
-//    /**
-//     * Used to format the key.
-//     */
-//    private final transient IKeyBuilderFactory keyBuilderFactory = new ThreadLocalKeyBuilderFactory(
-//            new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG));
-//
-//    public IKeyBuilder getKeyBuilder() {
-//      
-//        return keyBuilderFactory.getKeyBuilder();
-//        
-//    };
+    public SPOKeyOrder getKeyOrder() {
+
+        return keyOrder;
+        
+    }
     
     /**
      * De-serialization constructor.
@@ -109,10 +101,9 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * @param keyOrder
      *            The access path.
      */
-    public SPOTupleSerializer(SPOKeyOrder keyOrder) {
+    public SPOTupleSerializer(final SPOKeyOrder keyOrder) {
 
-        this(keyOrder, getDefaultLeafKeySerializer(),
-                getDefaultValueKeySerializer());
+        this(keyOrder, getDefaultLeafKeysCoder(), getDefaultValuesCoder());
 
     }
     
@@ -124,11 +115,11 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
      * @param leafKeySer
      * @param leafValSer
      */
-    public SPOTupleSerializer(SPOKeyOrder keyOrder, IDataSerializer leafKeySer,
-            IDataSerializer leafValSer) {
+    public SPOTupleSerializer(final SPOKeyOrder keyOrder,
+            final IRabaCoder leafKeySer, final IRabaCoder leafValSer) {
 
-        super(new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG), leafKeySer,
-                leafValSer);
+        super(new ASCIIKeyBuilderFactory(keyOrder.getKeyArity()
+                * Bytes.SIZEOF_LONG), leafKeySer, leafValSer);
         
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -142,106 +133,39 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         if (tuple == null)
             throw new IllegalArgumentException();
 
-//      // clone of the key.
-//      final byte[] key = itr.getKey();
-      
         // copy of the key in a reused buffer.
-        final byte[] key = tuple.getKeyBuffer().array(); 
+        final byte[] key = tuple.getKeyBuffer().array();
 
-//        long[] ids = new long[IRawTripleStore.N];
-        
-        /*
-         * Note: GTE since the key is typically a reused buffer which may be
-         * larger than the #of bytes actually holding valid data.
-         */
-        assert key.length >= 8 * N;
-//      assert key.length == 8 * IRawTripleStore.N + 1;
-        
-//        final long _0 = KeyBuilder.decodeLong(key, 1);
-//      
-//        final long _1 = KeyBuilder.decodeLong(key, 1+8);
-//      
-//        final long _2 = KeyBuilder.decodeLong(key, 1+8+8);
+        final SPO spo = keyOrder.decodeKey(key);
+    
+        if ((tuple.flags() & IRangeQuery.VALS) == 0) {
 
-        /*
-         * Decode the key.
-         */
-        
-        final long _0 = KeyBuilder.decodeLong(key, 0);
-        
-        final long _1 = KeyBuilder.decodeLong(key, 8);
-      
-        final long _2 = KeyBuilder.decodeLong(key, 8+8);
-        
-        /*
-         * Re-order the key into SPO order.
-         */
-        
-        final long s, p, o;
-        
-        switch (keyOrder.index()) {
-
-        case SPOKeyOrder._SPO:
-            s = _0;
-            p = _1;
-            o = _2;
-            break;
-            
-        case SPOKeyOrder._POS:
-            p = _0;
-            o = _1;
-            s = _2;
-            break;
-            
-        case SPOKeyOrder._OSP:
-            o = _0;
-            s = _1;
-            p = _2;
-            break;
-
-        default:
-
-            throw new UnsupportedOperationException();
-
-        }
-        
-        if((tuple.flags()&IRangeQuery.VALS)==0) {
-        
             // Note: No type or statement identifier information.
-            final SPO spo = new SPO(s, p, o);
-            
             return spo;
             
         }
-        
+
         /*
          * Decode the StatementEnum and the optional statement identifier.
          */
 
         final ByteArrayBuffer vbuf = tuple.getValueBuffer();
-        
-        final StatementEnum type = StatementEnum.decode( vbuf.array()[0] ); 
-        
-        final SPO spo = new SPO(s, p, o, type);
-        
+
+        final StatementEnum type = StatementEnum.decode(vbuf.array()[0]);
+
+        spo.setStatementType(type);
+
         if (vbuf.limit() == 1 + 8) {
 
             /*
              * The value buffer appears to contain a statement identifier, so we
              * read it.
              */
-            
-            spo.setStatementIdentifier( vbuf.getLong(1) );
 
-            // @todo asserts.
-//            assert AbstractTripleStore.isStatement(sid) : "Not a statement identifier: "
-//                    + toString(sid);
-//
-//            assert type == StatementEnum.Explicit : "statement identifier for non-explicit statement : "
-//                    + toString();
-//
-//            assert sid != NULL : "statement identifier is NULL for explicit statement: "
-//                    + toString();
+            // SIDs only valid for triples.
+            assert keyOrder.getKeyArity() == 3;
+
+            spo.setStatementIdentifier(vbuf.getLong(1));
 
         }
 
@@ -264,49 +188,59 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
         if (obj instanceof SPO)
             return serializeKey((SPO) obj);
 
-        //@todo could allow long[3].
         throw new UnsupportedOperationException();
-        
-    }
-
-    public byte[] serializeKey(final SPO spo) {
-        
-        return statement2Key(keyOrder, spo);
         
     }
 
     /**
      * Forms the statement key.
      * 
-     * @param keyOrder
-     *            The key order.
      * @param spo
      *            The statement.
      * 
      * @return The key.
      */
-    public byte[] statement2Key(final IKeyOrder<ISPO> keyOrder, final ISPO spo) {
+    public byte[] serializeKey(final ISPO spo) {
         
-        switch (((SPOKeyOrder)keyOrder).index()) {
-
-        case SPOKeyOrder._SPO:
-        
-            return statement2Key(spo.s(), spo.p(), spo.o());
-            
-        case SPOKeyOrder._POS:
-            
-            return statement2Key(spo.p(), spo.o(), spo.s());
-            
-        case SPOKeyOrder._OSP:
-            
-            return statement2Key(spo.o(), spo.s(), spo.p());
-            
-        default:
-            throw new UnsupportedOperationException("keyOrder=" + keyOrder);
-        
-        }
+        return keyOrder.encodeKey(getKeyBuilder(), spo);
+//        return statement2Key(keyOrder, spo);
         
     }
+
+//    /**
+//     * Forms the statement key.
+//     * 
+//     * @param keyOrder
+//     *            The key order.
+//     * @param spo
+//     *            The statement.
+//     * 
+//     * @return The key.
+//     * 
+//     * @deprecated by {@link #serializeKey(ISPO)}
+//     */
+//    public byte[] statement2Key(final IKeyOrder<ISPO> keyOrder, final ISPO spo) {
+//        
+//        switch (((SPOKeyOrder)keyOrder).index()) {
+//
+//        case SPOKeyOrder._SPO:
+//        
+//            return statement2Key(spo.s(), spo.p(), spo.o());
+//            
+//        case SPOKeyOrder._POS:
+//            
+//            return statement2Key(spo.p(), spo.o(), spo.s());
+//            
+//        case SPOKeyOrder._OSP:
+//            
+//            return statement2Key(spo.o(), spo.s(), spo.p());
+//            
+//        default:
+//            throw new UnsupportedOperationException("keyOrder=" + keyOrder);
+//        
+//        }
+//        
+//    }
     
     /**
      * Encodes a statement represented as three long integers as an unsigned
@@ -338,7 +272,7 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
     /**
      * Encodes the {@link StatementEnum} and the optional statement identifier.
      */
-    public byte[] serializeVal(SPO spo) {
+    public byte[] serializeVal(final SPO spo) {
 
         if (spo == null)
             throw new IllegalArgumentException();
@@ -353,12 +287,18 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
         buf.putByte(b);
 
-        if (spo.hasStatementIdentifier()) {
+        if (keyOrder.getKeyArity() == 3) {
 
-            assert type == StatementEnum.Explicit : "Statement identifier not allowed: type="
-                    + type;
+            // 4th position is interpretable as SID for triples only (vs quads).
+            
+            if (spo.hasStatementIdentifier()) {
 
-            buf.putLong(spo.getStatementIdentifier());
+                assert type == StatementEnum.Explicit : "Statement identifier not allowed: type="
+                        + type;
+
+                buf.putLong(spo.getStatementIdentifier());
+
+            }
 
         }
 

@@ -1,6 +1,5 @@
 package com.bigdata.service;
 
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -22,12 +21,12 @@ abstract public class AbstractEmbeddedDataService extends DataService {
         
     }
 
-    public void destroy() throws IOException {
+    public void destroy() {
 
         if (log.isInfoEnabled())
             log.info("");
         
-        IResourceManager resourceManager = getResourceManager();
+        final IResourceManager resourceManager = getResourceManager();
 
         shutdownNow();
         

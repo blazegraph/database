@@ -125,7 +125,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -197,7 +197,7 @@ public class TestRuleFastClosure_11_13 extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         

@@ -758,7 +758,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         }
         
         // start service.
-        service.submit(new AcceptTask());
+        service.submit(new AcceptTask<R>(this));
 
         // change the run state.
         lock.lock();
@@ -2010,29 +2010,38 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class AcceptTask implements Runnable {
+    static private class AcceptTask<R extends Comparable<R>> implements
+            Runnable {
 
+        private final NonBlockingLockManagerWithNewDesign<R> lockManager;
+        
+        public AcceptTask(final NonBlockingLockManagerWithNewDesign<R> lockManager) {
+
+            this.lockManager = lockManager;
+            
+        }
+        
         public void run() {
             while (true) {
-                switch (serviceRunState) {
+                switch (lockManager.serviceRunState) {
                 case Starting: {
                     awaitStateChange(Starting);
                     continue;
                 }
                 case Running: {
-                    lock.lock();
+                    lockManager.lock.lock();
                     try {
                         while (processRetryQueue()) {
                             // do work
                         }
                         awaitStateChange(Running);
                     } finally {
-                        lock.unlock();
+                        lockManager.lock.unlock();
                     }
                     continue;
                 }
                 case Shutdown: {
-                    lock.lock();
+                    lockManager.lock.lock();
                     try {
                         while (processRetryQueue()) {
                             /*
@@ -2044,21 +2053,21 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                              * which it has already accepted.
                              */
                         }
-                        if (retryQueue.isEmpty()) {
+                        if (lockManager.retryQueue.isEmpty()) {
                             /*
                              * There is no more work to be performed so we can
                              * change the runState.
                              */
                             if(INFO)
                                 log.info("No more work.");
-                            if (serviceRunState.val < ServiceRunState.ShutdownNow.val) {
-                                setServiceRunState(ServiceRunState.ShutdownNow);
+                            if (lockManager.serviceRunState.val < ServiceRunState.ShutdownNow.val) {
+                                lockManager.setServiceRunState(ServiceRunState.ShutdownNow);
                                 break;
                             }
                         }
                         awaitStateChange(Shutdown);
                     } finally {
-                        lock.unlock();
+                        lockManager.lock.unlock();
                     }
                     continue;
                 }
@@ -2068,29 +2077,29 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                      * tasks which are on [runningTasks] need to be interrupted
                      * as tasks on the other queues are NOT running.
                      */
-                    lock.lock();
+                    lockManager.lock.lock();
                     try {
                         if (INFO)
-                            log.info(serviceRunState);
+                            log.info(lockManager.serviceRunState);
                         // clear retry queue (tasks will not be run).
-                        cancelTasks(retryQueue.iterator(), false/* mayInterruptIfRunning */);
+                        cancelTasks(lockManager.retryQueue.iterator(), false/* mayInterruptIfRunning */);
                         // nothing on the retry queue.
-                        counters.nretry = 0;
+                        lockManager.counters.nretry = 0;
                         // change the run state?
-                        if (serviceRunState.val < ServiceRunState.Halted.val) {
-                            setServiceRunState(ServiceRunState.Halted);
+                        if (lockManager.serviceRunState.val < ServiceRunState.Halted.val) {
+                            lockManager.setServiceRunState(ServiceRunState.Halted);
                             if (INFO)
-                                log.info(serviceRunState);
+                                log.info(lockManager.serviceRunState);
                         }
                         // Done.
                         return;
                     } finally {
-                        lock.unlock();
+                        lockManager.lock.unlock();
                     }
                 }
                 case Halted: {
                     if (INFO)
-                        log.info(serviceRunState);
+                        log.info(lockManager.serviceRunState);
                     // Done.
                     return;
                 }
@@ -2110,30 +2119,30 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          *      Callable)
          */
         private void awaitStateChange(final ServiceRunState expected) {
-            lock.lock();
+            lockManager.lock.lock();
             try {
                 /*
                  * While we hold the lock we verify that there really is no work
                  * to be done and that we are in the expected run state. Then
                  * and only then do we wait on [stateChanged].
                  */
-                if (serviceRunState != expected) {
+                if (lockManager.serviceRunState != expected) {
                     // In a different run state.
                     return;
                 }
-                if (!retryQueue.isEmpty()) {
+                if (!lockManager.retryQueue.isEmpty()) {
                     // Some work can be done.
                     return;
                 }
                 if (INFO)
                     log.info("Waiting...");
-                stateChanged.await();
+                lockManager.stateChanged.await();
                 if (INFO)
                     log.info("Woke up...");
             } catch (InterruptedException ex) {
                 // someone woke us up.
             } finally {
-                lock.unlock();
+                lockManager.lock.unlock();
             }
         }
         
@@ -2167,7 +2176,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
          */
         private boolean processRetryQueue() {
 
-            if (waitsFor != null && waitsFor.isFull()) {
+            if (lockManager.waitsFor != null && lockManager.waitsFor.isFull()) {
 
                 // Nothing to do until some tasks releases its locks.
                 return false;
@@ -2176,7 +2185,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
             
             int nchanged = 0;
 
-            final Iterator<LockFutureTask<R, ? extends Object>> itr = retryQueue
+            final Iterator<LockFutureTask<R, ? extends Object>> itr = lockManager.retryQueue
                     .iterator();
 
             while (itr.hasNext()) {
@@ -2190,7 +2199,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                      * granted its locks.
                      */
                     itr.remove();
-                    counters.nretry--; // was removed from retryQueue.
+                    lockManager.counters.nretry--; // was removed from retryQueue.
                     nchanged++;
                     continue;
                 }
@@ -2611,6 +2620,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      *            The lock.
      * @param task
      *            The task.
+     *            
      * @return <code>true</code> if the lock was held by that task.
      */
     public boolean isLockHeldByTask(final R lock, final Runnable task) {
@@ -2618,7 +2628,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
         final ResourceQueue<R, LockFutureTask<R, ? extends Object>> resourceQueue = resourceQueues
                 .get(lock);
 
-        if (resourceQueues != null && resourceQueue.queue.peek() == task) {
+        if (resourceQueue.queue.peek() == task) {
 
             return true;
 

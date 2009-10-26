@@ -56,7 +56,6 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -126,10 +125,10 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
 
                 };
 
-                // term identifers will be in ascending order.
+                // term identifiers will be in ascending order.
                 Arrays.sort(expected);
 
-                assertSameItr(expected, store.getSPORelation()
+                assertSameIterator(expected, store.getSPORelation()
                         .distinctTermScan(SPOKeyOrder.SPO));
 
             }
@@ -143,10 +142,10 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
 
                 };
 
-                // term identifers will be in ascending order.
+                // term identifiers will be in ascending order.
                 Arrays.sort(expected);
 
-                assertSameItr(expected, store.getSPORelation()
+                assertSameIterator(expected, store.getSPORelation()
                         .distinctTermScan(SPOKeyOrder.POS));
 
             }
@@ -160,17 +159,17 @@ public class TestDistinctTermScan extends AbstractRuleTestCase {
 
                 };
 
-                // term identifers will be in ascending order.
+                // term identifiers will be in ascending order.
                 Arrays.sort(expected);
 
-                assertSameItr(expected, store.getSPORelation()
+                assertSameIterator(expected, store.getSPORelation()
                         .distinctTermScan(SPOKeyOrder.OSP));
 
             }
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 

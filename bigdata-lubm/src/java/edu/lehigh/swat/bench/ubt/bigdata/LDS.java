@@ -75,13 +75,7 @@ public class LDS extends BigdataRepositoryFactory {
 
             if (fed == null) {
 
-                final Properties properties = getProperties();
-
-//                // This can be used to look for code that is doing point tests.
-//                properties.setProperty(
-//                        IBigdataClient.Options.CLIENT_BATCH_API_ONLY, "true");
-
-                fed = new LocalDataServiceClient(properties).connect();
+                fed = new LocalDataServiceClient(getProperties()).connect();
                 
             }
             

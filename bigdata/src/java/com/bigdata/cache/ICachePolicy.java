@@ -49,16 +49,16 @@ import java.util.Iterator;
  * evicted from the hard reference cache.</li>
  * </ul>
  * The rationale for this is that the cache iterator methods are used to perform
- * installs of dirty objects from the cache onto the persitence layer during a
+ * installs of dirty objects from the cache onto the persistence layer during a
  * commit. Since clear references are not reachable, eviction notices are fired
  * when entries are evicted from the hard reference cache. Those notices must be
  * used to install dirty objects onto the persistence layer, in which case the
  * entry for that object in the weak reference cache is marked as <em>clean</em>.
  * When properly integrated with the persistence layer, this provides a
- * guarentee that the iterators will never fail to visit a dirty entry in the
+ * guarantee that the iterators will never fail to visit a dirty entry in the
  * cache. For consistency with the iterator methods, {@link #size()} returns the
  * number of entries in the hard reference cache. Neither visitation of nor
- * counting of all weak cache entries in and of itself is not a forseen use case
+ * counting of all weak cache entries in and of itself is not a foreseen use case
  * and those semantics not supported by this interface.
  * </p>
  * 
@@ -152,7 +152,7 @@ public interface ICachePolicy<K,T>
 
     /**
      * Clear all objects from the cache. This method may be used to reset the
-     * cache when a transaction is being rolledback.  Cache eviction notices
+     * cache when a transaction is being rolled back.  Cache eviction notices
      * are NOT fired when this method is called.
      */
     public void clear();
@@ -179,7 +179,7 @@ public interface ICachePolicy<K,T>
      * <p>
      * Note: This method is used to force dirty objects in the cache to the
      * persistence layer during a transaction commit since it visits entries and
-     * not referants, thereby providing access to the cache entry metadata.
+     * not referents, thereby providing access to the cache entry metadata.
      * </p>
      * 
      * @return Iterator visiting {@link ICacheEntry} objects. If this is a weak

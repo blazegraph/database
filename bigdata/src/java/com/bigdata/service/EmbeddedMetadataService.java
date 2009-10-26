@@ -1,10 +1,7 @@
 package com.bigdata.service;
 
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
-
-import com.bigdata.journal.IResourceManager;
 
 /**
  * A local (in process) metadata service.
@@ -33,51 +30,11 @@ public class EmbeddedMetadataService extends MetadataService {
         
     }
 
-//    @Override
-//    public IDataService getDataService(UUID dataService) {
-//
-//        return federation.getDataService(dataService);
-//        
-//    }
-//
-//    @Override
-//    public IMetadataService getMetadataService() {
-//
-//        return this;
-//        
-//    }
-//    
-//    public ITimestampService getTimestampService() {
-//        
-//        return federation.getTimestampService();
-//        
-//    }
-//    
-//    @Override
-//    public ILoadBalancerService getLoadBalancerService() {
-//        
-//        return federation.getLoadBalancerService();
-//        
-//    }
-
     @Override
     public EmbeddedFederation getFederation() {
 
         return federation;
         
     }
-
-    public void destroy() throws IOException {
-
-        log.info("");
-        
-        IResourceManager resourceManager = getResourceManager();
-
-        shutdownNow();
-        
-        // destroy all resources.
-        resourceManager.deleteResources();
-        
-    }
-
+    
 }

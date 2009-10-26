@@ -48,8 +48,8 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
-import org.openrdf.sail.SailException;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
@@ -73,6 +73,7 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.relation.accesspath.AbstractArrayBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.service.AbstractClient;
 import com.bigdata.service.Split;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -111,7 +112,7 @@ abstract public class AbstractTestCase
     /**
      * Invoked from {@link TestCase#setUp()} for each test in the suite.
      */
-    protected void setUp(ProxyTestCase testCase) throws Exception {
+    protected void setUp(final ProxyTestCase testCase) throws Exception {
 
         begin = System.currentTimeMillis();
         
@@ -119,14 +120,20 @@ abstract public class AbstractTestCase
         log.info("\n\n================:BEGIN:" + testCase.getName()
                 + ":BEGIN:====================");
 
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+        
     }
 
     /**
      * Invoked from {@link TestCase#tearDown()} for each test in the suite.
      */
-    protected void tearDown(ProxyTestCase testCase) throws Exception {
+    protected void tearDown(final ProxyTestCase testCase) throws Exception {
 
-        long elapsed = System.currentTimeMillis() - begin;
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+        
+        final long elapsed = System.currentTimeMillis() - begin;
         
         if (log.isInfoEnabled())
         log.info("\n================:END:" + testCase.getName()
@@ -171,6 +178,12 @@ abstract public class AbstractTestCase
 //            m_properties = new Properties();
             
 //            m_properties = new Properties( m_properties );
+
+            // disable platform statistics collection.
+            m_properties
+                    .setProperty(
+                            AbstractClient.Options.COLLECT_PLATFORM_STATISTICS,
+                            "false");
 
             m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
 //            m_properties.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
@@ -229,7 +242,7 @@ abstract public class AbstractTestCase
     // Test helpers.
     //
 
-    protected static final long N = IRawTripleStore.N;
+//    protected static final long N = IRawTripleStore.N;
 
     protected static final long NULL = IRawTripleStore.NULL;
     
@@ -326,7 +339,7 @@ abstract public class AbstractTestCase
      * 
      * @param store
      */
-    void dumpTerms(AbstractTripleStore store) {
+    protected void dumpTerms(final AbstractTripleStore store) {
 
         /*
          * Note: it is no longer true that all terms are stored in the reverse
@@ -436,19 +449,19 @@ abstract public class AbstractTestCase
         
     }
     
-    /**
-     * Method verifies that the <i>actual</i> {@link Iterator} produces the
-     * expected objects in the expected order. Objects are compared using
-     * {@link Object#equals( Object other )}. Errors are reported if too few or
-     * too many objects are produced, etc.
-     * 
-     * @todo refactor to {@link TestCase2}.
-     */
-    static public void assertSameItr(Object[] expected, Iterator<?> actual) {
-
-        assertSameIterator("", expected, actual);
-
-    }
+//    /**
+//     * Method verifies that the <i>actual</i> {@link Iterator} produces the
+//     * expected objects in the expected order. Objects are compared using
+//     * {@link Object#equals( Object other )}. Errors are reported if too few or
+//     * too many objects are produced, etc.
+//     * 
+//     * Note: refactored to {@link TestCase2}.
+//     */
+//    static public void assertSameItr(Object[] expected, Iterator<?> actual) {
+//
+//        assertSameIterator("", expected, actual);
+//
+//    }
 
     static public void assertSameSPOs(ISPO[] expected, IChunkedOrderedIterator<ISPO>actual) {
 
@@ -616,7 +629,7 @@ abstract public class AbstractTestCase
     }
     
     static public void assertSameStatements(Statement[] expected,
-            BigdataStatementIterator actual) throws SailException {
+            BigdataStatementIterator actual) {
 
         assertSameStatements("", expected, actual);
 
@@ -628,7 +641,7 @@ abstract public class AbstractTestCase
      *       this should test for the same statements in any order
      */
     static public void assertSameStatements(String msg, Statement[] expected,
-            BigdataStatementIterator actual) throws SailException {
+            BigdataStatementIterator actual) {
 
         int i = 0;
 
@@ -673,21 +686,44 @@ abstract public class AbstractTestCase
     static public void assertStatementIndicesConsistent(AbstractTripleStore db, final int maxerrors) {
 
         if (log.isInfoEnabled())
-        log.info("Verifying statement indices");
-        
-        AtomicInteger nerrs = new AtomicInteger(0);
+            log.info("Verifying statement indices");
 
-        // scan SPO, checking...
-        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.POS, nerrs, maxerrors);
-        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.OSP, nerrs, maxerrors);
+        final AtomicInteger nerrs = new AtomicInteger(0);
 
-        // scan POS, checking...
-        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.SPO, nerrs, maxerrors);
-        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.OSP, nerrs, maxerrors);
+        final int from, to;
+        if (db.getSPOKeyArity() == 3) {
+            from = SPOKeyOrder.FIRST_TRIPLE_INDEX;
+            to = SPOKeyOrder.LAST_TRIPLE_INDEX;
+        } else {
+            from = SPOKeyOrder.FIRST_QUAD_INDEX;
+            to = SPOKeyOrder.LAST_QUAD_INDEX;
+        }
         
-        // scan OSP, checking...
-        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.SPO, nerrs, maxerrors);
-        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.POS, nerrs, maxerrors);
+        for (int i = from; i <= to; i++) {
+
+            for (int j = from; j <= to; j++) {
+
+                if (i == j)
+                    continue;
+
+                assertSameStatements(db, SPOKeyOrder.valueOf(i), SPOKeyOrder
+                        .valueOf(j), nerrs, maxerrors);
+
+            }
+
+        }
+        
+//        // scan SPO, checking...
+//        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.POS, nerrs, maxerrors);
+//        assertSameStatements(db, SPOKeyOrder.SPO, SPOKeyOrder.OSP, nerrs, maxerrors);
+//
+//        // scan POS, checking...
+//        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.SPO, nerrs, maxerrors);
+//        assertSameStatements(db, SPOKeyOrder.POS, SPOKeyOrder.OSP, nerrs, maxerrors);
+//        
+//        // scan OSP, checking...
+//        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.SPO, nerrs, maxerrors);
+//        assertSameStatements(db, SPOKeyOrder.OSP, SPOKeyOrder.POS, nerrs, maxerrors);
         
         assertEquals(0,nerrs.get());
         
@@ -723,8 +759,8 @@ abstract public class AbstractTestCase
     ) {
 
         if (log.isInfoEnabled())
-        log.info("Verifying " + keyOrderExpected + " against "
-                        + keyOrderActual);
+            log.info("Verifying " + keyOrderExpected + " against "
+                    + keyOrderActual);
 
         // the access path that is being tested.
         final IIndex actualIndex = db.getSPORelation().getIndex(keyOrderActual);
@@ -884,7 +920,8 @@ abstract public class AbstractTestCase
 
             this.maxerrors = maxerrors;
             
-            this.buffer = new AbstractArrayBuffer<Statement>(capacity, null/* filter */) {
+            this.buffer = new AbstractArrayBuffer<Statement>(capacity,
+                    Statement.class, null/* filter */) {
 
                 @Override
                 protected long flush(int n, Statement[] a) {

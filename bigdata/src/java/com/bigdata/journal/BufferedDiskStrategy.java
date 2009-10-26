@@ -448,7 +448,7 @@ public class BufferedDiskStrategy extends AbstractBufferStrategy implements
             buf.put(data);
 
             // add the record to the write cache index for read(addr).
-            writeCacheIndex.put(new Long(addr), new Integer(position));
+            writeCacheIndex.put(Long.valueOf(addr), Integer.valueOf(position));
 
         }
 

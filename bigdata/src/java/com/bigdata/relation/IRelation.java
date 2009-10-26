@@ -141,4 +141,10 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      */
     E newElement(IPredicate<E> predicate, IBindingSet bindingSet);
 
+    /**
+     * Return the class for the generic type of this relation. This information
+     * is used to dynamically create arrays of that generic type.
+     */
+    Class<E> getElementClass();
+    
 }

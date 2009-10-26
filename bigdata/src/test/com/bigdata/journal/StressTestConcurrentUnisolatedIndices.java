@@ -69,17 +69,29 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         super(name);
         
     }
-    
+
     Journal journal;
 
     public void setUpComparisonTest(Properties properties) throws Exception {
-        
+
         journal = new Journal(properties);
-        
+
     }
-    
+
     public void tearDownComparisonTest() throws Exception {
-        
+
+        if (journal != null) {
+            
+            if (journal.isOpen()) {
+
+                journal.shutdownNow();
+
+            }
+            
+            journal.deleteResources();
+            
+        }
+
     }
     
     /**
@@ -87,10 +99,12 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
      */
     public void test_concurrentClients() throws InterruptedException {
 
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
         
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
 
+        try {
+        
 //        if(journal.getBufferStrategy() instanceof MappedBufferStrategy) {
 //            
 //            /*
@@ -113,6 +127,18 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
                 100, // nops
                 0.02d // failureRate
         );
+        
+        } finally {
+            
+            if(journal.isOpen()) {
+                
+                journal.shutdownNow();
+                
+            }
+            
+            journal.deleteResources();
+            
+        }
         
     }
 

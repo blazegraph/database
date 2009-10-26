@@ -1,5 +1,7 @@
 # Standard query set for benchmark run analysis.
 #
+# $Id$
+#
 # This file contains a list of URLs of interest when doing a post-mortem
 # investigation.  The file is basically a list of URLs which could be used
 # to demand the corresponding counters from the httpd service.  It can be
@@ -17,6 +19,7 @@
 # cpu		    (per host CPU)
 # disk		    (per host DISK)
 # memory	    (per host RAM mixed with some per-service memory stuff)
+# memory/cache	(per DS cache statistics)
 # indices
 # indices/sync  (synchronous index RPC)
 # indices/async (asynchronous index writes)
@@ -78,6 +81,12 @@ http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/
 http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Runtime%20Total%20Memory&correlated=true&depth=12&file=memory/RuntimeTotalMemory
 http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Runtime%20Free%20Memory&correlated=true&depth=12&file=memory/RuntimeFreeMemory
 http://localhost:8080/?regex=/([^/]*)/.*(IDataService|IClientService)/.*/Memory/Garbage%20Collectors/([^/]*)/Cumulative%20Collection%20Time&correlated=true&depth=12&file=memory/GC/CumulativeCollectionTime
+# LRUNexus (cache)
+http://localhost:8080/?regex=/([^/]*)/.*(IMetadataService|IDataService)/.*Memory/LRUNexus/Cache Count&depth=12&period=Minutes&correlated=true&file=memory/cache/CacheCount
+http://localhost:8080/?regex=/([^/]*)/.*(IMetadataService|IDataService)/.*Memory/LRUNexus/Buffered Record Count&depth=12&period=Minutes&correlated=true&file=memory/cache/BufferedRecordCount
+http://localhost:8080/?regex=/([^/]*)/.*(IMetadataService|IDataService)/.*Memory/LRUNexus/Bytes On Disk&depth=12&period=Minutes&correlated=true&file=memory/cache/BytesOnDisk
+http://localhost:8080/?regex=/([^/]*)/.*(IMetadataService|IDataService)/.*Memory/LRUNexus/Buffered Record Eviction Count&depth=12&period=Minutes&correlated=true&file=memory/cache/BufferedRecordEvictionCount
+http://localhost:8080/?regex=/([^/]*)/.*(IMetadataService|IDataService)/.*Memory/LRUNexus/Buffered Record Eviction Byte Count&depth=12&period=Minutes&correlated=true&file=memory/cache/BufferedRecordEvictionByteCount
 
 ##
 # DISK (per host and some per-DS stuff)

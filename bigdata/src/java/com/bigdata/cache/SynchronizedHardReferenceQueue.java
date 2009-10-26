@@ -42,7 +42,7 @@ public class SynchronizedHardReferenceQueue<T> implements IHardReferenceQueue<T>
      * <strong>outer</strong> reference!
      */
     protected final HardReferenceQueue<T> queue;
-    
+
     /**
      * Defaults the #of references to scan on append requests to 10.
      * 
@@ -50,15 +50,16 @@ public class SynchronizedHardReferenceQueue<T> implements IHardReferenceQueue<T>
      *            The listener on which cache evictions are reported.
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
-     *            There is no guarentee that all stored references are distinct.
+     *            There is no guarantee that all stored references are distinct.
      */
-    public SynchronizedHardReferenceQueue(final HardReferenceQueueEvictionListener<T> listener,
+    public SynchronizedHardReferenceQueue(
+            final HardReferenceQueueEvictionListener<T> listener,
             final int capacity) {
-        
+
         this(listener, capacity, DEFAULT_NSCAN);
-        
+
     }
-    
+
     /**
      * Core impl.
      * 
@@ -66,30 +67,70 @@ public class SynchronizedHardReferenceQueue<T> implements IHardReferenceQueue<T>
      *            The listener on which cache evictions are reported (optional).
      * @param capacity
      *            The maximum #of references that can be stored on the cache.
-     *            There is no guarentee that all stored references are distinct.
+     *            There is no guarantee that all stored references are distinct.
      * @param nscan
      *            The #of references to scan from the MRU position before
      *            appended a reference to the cache. Scanning is used to reduce
      *            the chance that references that are touched several times in
      *            near succession from entering the cache more than once. The
-     *            #of reference tests trads off against the latency of adding a
+     *            #of reference tests trades off against the latency of adding a
      *            reference to the cache.
      */
     public SynchronizedHardReferenceQueue(
             final HardReferenceQueueEvictionListener<T> listener,
             final int capacity, final int nscan) {
 
-        this(new HardReferenceQueue<T>(listener, capacity, DEFAULT_NSCAN));
-       
+        this.queue = new InnerHardReferenceQueue(listener, capacity,
+                DEFAULT_NSCAN);
+
     }
-    
-    protected SynchronizedHardReferenceQueue(final HardReferenceQueue<T> innerQueue) {
+
+    /**
+     * All attempts to add an element to the buffer invoke this hook before
+     * checking the remaining capacity in the buffer. The caller will be
+     * synchronized on <i>this</i> when this method is invoked.
+     */
+    protected void beforeOffer(final T t) {
+
+        // NOP
         
-        if(innerQueue == null)
-            throw new IllegalArgumentException();
-        
-        this.queue = innerQueue;
-        
+    }
+
+    /**
+     * Inner class delegates {@link #beforeOffer(Object)} to the outer class.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * @param <T>
+     */
+    private final class InnerHardReferenceQueue extends HardReferenceQueue<T> {
+
+        /**
+         * 
+         * @param listener
+         * @param capacity
+         * @param nscan
+         */
+        public InnerHardReferenceQueue(
+                final HardReferenceQueueEvictionListener<T> listener,
+                final int capacity, final int nscan) {
+
+            super(listener, capacity, nscan);
+
+        }
+
+        @Override
+        protected final void beforeOffer(final T ref) {
+
+            // delegate to the outer class.
+            SynchronizedHardReferenceQueue.this.beforeOffer(ref);
+
+            // delegate to the super class.
+            super.beforeOffer(ref);
+
+        }
+
     }
 
     /*

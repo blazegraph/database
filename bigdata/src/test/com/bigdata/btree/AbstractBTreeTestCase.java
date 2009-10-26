@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
@@ -40,9 +43,14 @@ import junit.framework.TestCase2;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.codec.RandomKeysGenerator;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.Bytes;
@@ -104,20 +112,45 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      *            The actual node.
      */
-    public void assertKeys(AbstractNode expected,AbstractNode actual) {
+    static public void assertKeys(final IRaba expected,
+            final IRaba actual) {
 
-        // verify the #of defined keys.
-        assertEquals("nkeys", expected.keys.getKeyCount(), actual.keys.getKeyCount());
-        assertEquals("nkeys", expected.nkeys, actual.nkeys);
+        assertSameRaba(expected, actual);
         
-        // verify ordered values for the defined keys.
-        for( int i=0; i<expected.nkeys; i++ ) {
+//        // verify the #of defined keys.
+//        assertEquals("nkeys", expected.size(), actual.size());
+//        // assertEquals("nkeys", expected.nkeys, actual.nkeys);
+//
+//        // verify ordered values for the defined keys.
+//        for (int i = 0; i < expected.size(); i++) {
+//
+//            assertEquals(0, BytesUtil.compareBytes(expected.get(i), actual
+//                    .get(i)));
+//
+//        }
 
-            assertEquals(0, BytesUtil.compareBytes(expected.keys.getKey(i),
-                    actual.keys.getKey(i)));
-            
+        /*
+         * Verifies that the keys are in sort order.
+         */
+        final int nkeys = expected.size();
+        for (int i = 1; i < nkeys; i++) {
+
+            if (BytesUtil.compareBytes(expected.get(i), expected.get(i - 1)) <= 0) {
+
+                throw new AssertionError("Keys out of order at index=" + i
+                        + ", keys=" + expected.toString());
+
+            }
+
+            if (BytesUtil.compareBytes(actual.get(i), actual.get(i - 1)) <= 0) {
+
+                throw new AssertionError("Keys out of order at index=" + i
+                        + ", keys=" + actual.toString());
+
+            }
+
         }
-        
+
     }
     
     /**
@@ -131,7 +164,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param node
      *            The node whose keys will be tested.
      */
-    public void assertKeys(int[] keys, AbstractNode node) {
+    public void assertKeys(final int[] keys, final AbstractNode<?> node) {
         
 //        // verify the capacity of the keys[] on the node.
 //        assertEquals("keys[] capacity", (node.maxKeys + 1) * stride,
@@ -140,14 +173,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         final int nkeys = keys.length;
         
         // verify the #of defined keys.
-        assertEquals("nkeys", nkeys, node.nkeys);
+        assertEquals("nkeys", nkeys, node.getKeyCount());
         
         // verify ordered values for the defined keys.
         for( int i=0; i<nkeys; i++ ) {
 
             byte[] expectedKey = keyBuilder.reset().append(keys[i]).getKey();
             
-            byte[] actualKey = node.keys.getKey(i);
+            byte[] actualKey = node.getKeys().get(i);
             
             if(BytesUtil.compareBytes(expectedKey, actualKey)!=0) {
 
@@ -180,64 +213,76 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            (that is, do not include trailing nulls or attempt to size the
      *            array to the branching factor of the tree).
      */
-    public void assertValues(String msg, Object[] values, Leaf leaf ) {
-        
+    public void assertValues(String msg, final Object[] values, final Leaf leaf) {
+
         assert values != null;
-        
-        int nvalues = values.length;
-        
-        if( msg == null ) {
-            
+
+        // the expected #of values (size, not capacity).
+        final int nvalues = values.length;
+
+        if (msg == null) {
+
             msg = "";
-            
+
         }
 
-        // verify the capacity of the values[] on the node.
-        assertEquals(msg+"values[] capacity", leaf.maxKeys+1, leaf.values.length );
-        
+        if (!leaf.isReadOnly()) {
+            /*
+             * Verify the capacity of the values[] on the node.
+             * 
+             * Note: When read only, nkeys==size==capacity.
+             */
+            assertEquals(msg + "values[] capacity", leaf.maxKeys() + 1, leaf
+                    .getValues().capacity());
+        }
+
         // verify the #of defined values (same as the #of defined keys).
-        assertEquals(msg+"nvalues", nvalues, leaf.nkeys);
-        
+        assertEquals(msg + "nvalues", nvalues, leaf.getKeyCount());
+
         // verify ordered values for the defined values.
-        for( int i=0; i<nvalues; i++ ) {
+        for (int i = 0; i < nvalues; i++) {
 
-            assertEquals(msg+"values["+i+"]", values[i], leaf.values[i]);
-            
+            assertEquals(msg + "values[" + i + "]", values[i], leaf.getValues()
+                    .get(i));
+
         }
-        
+
         // verify the undefined values are all null.
-        for( int i=nvalues; i<leaf.values.length; i++ ) {
-            
-            assertEquals(msg+"values["+i+"]", null, leaf.values[i]);
-            
+        for (int i = nvalues; i < leaf.getValues().size(); i++) {
+
+            assertEquals(msg + "values[" + i + "]", null, leaf.getValues().get(
+                    i));
+
         }
-        
+
     }
 
-    public void assertValues(Object[] values, Leaf leaf ) {
-        
-        assertValues("",values,leaf);
-        
+    public void assertValues(final Object[] values, final Leaf leaf) {
+
+        assertValues("", values, leaf);
+
     }
-    
-    public void assertSameNodeOrLeaf(AbstractNode n1, AbstractNode n2 ) {
-        
-        if( n1 == n2 ) return;
-        
-        if( n1.isLeaf() && n2.isLeaf() ) {
-            
-            assertSameLeaf((Leaf)n1,(Leaf)n2);
-            
-        } else if( !n1.isLeaf() && !n2.isLeaf() ) {
-            
-            assertSameNode((Node)n1,(Node)n2);
+
+    static public void assertSameNodeOrLeaf(final AbstractNode<?> n1,
+            final AbstractNode<?> n2) {
+
+        if (n1 == n2)
+            return;
+
+        if (n1.isLeaf() && n2.isLeaf()) {
+
+            assertSameLeaf((Leaf) n1, (Leaf) n2);
+
+        } else if (!n1.isLeaf() && !n2.isLeaf()) {
+
+            assertSameNode((Node) n1, (Node) n2);
 
         } else {
-            
+
             fail("Expecting two nodes or two leaves, but not a node and a leaf");
-            
+
         }
-        
+
     }
 
     /**
@@ -248,42 +293,43 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param n2
      *            The actual node state.
      */
-    public void assertSameNode(Node n1, Node n2 ) {
+    static public void assertSameNode(final Node n1, final Node n2 ) {
 
         if( n1 == n2 ) return;
         
-        assertEquals("index",n1.btree,n2.btree);
-        
+        assertEquals("index", n1.btree, n2.btree);
+
         assertEquals("dirty", n1.isDirty(), n2.isDirty());
 
         assertEquals("persistent", n1.isPersistent(), n2.isPersistent());
-        
+
         if (n1.isPersistent()) {
             
             assertEquals("id", n1.getIdentity(), n2.getIdentity());
-            
+
         }
-        
-        assertEquals("minKeys",n1.minKeys,n2.minKeys);
-        
-        assertEquals("maxKeys",n1.maxKeys,n2.maxKeys);
-        
-        assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
+
+        assertEquals("minKeys", n1.minKeys(), n2.minKeys());
+
+        assertEquals("maxKeys", n1.maxKeys(), n2.maxKeys());
+
+        assertEquals("branchingFactor", n1.getBranchingFactor(), n2
+                .getBranchingFactor());
 
 //        assertEquals("nnodes",n1.nnodes,n2.nnodes);
 //        
 //        assertEquals("nleaves",n1.nleaves,n2.nleaves);
         
-        assertEquals("nentries",n1.nentries,n2.nentries);
+//        assertEquals("nentries", n1.nentries, n2.nentries);
 
-        assertEquals("nkeys",n1.nkeys,n2.nkeys);
+//        assertEquals("nkeys", n1.nkeys, n2.nkeys);
+//
+//        // make sure that the #of keys on the RABA agrees.
+//        assertEquals("keys.size()", n1.nkeys, n1.getKeys().size());
+//        assertEquals("keys.size()", n1.nkeys, n2.getKeys().size());
 
-        assertKeys(n1,n2);
+        assertSameNodeData(n1, n2);
         
-        assertEquals("childAddr",n1.childAddr,n2.childAddr);
-
-        assertEquals("childEntryCounts",n1.childEntryCounts,n2.childEntryCounts);
-
     }
 
     /**
@@ -294,7 +340,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param n2
      *            The actual leaf state.
      */
-    public void assertSameLeaf(Leaf n1, Leaf n2 ) {
+    static public void assertSameLeaf(final Leaf n1, final Leaf n2) {
 
         if( n1 == n2 ) return;
         
@@ -310,22 +356,106 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             
         }
 
-        assertEquals("minKeys",n1.minKeys,n2.minKeys);
-        
-        assertEquals("maxKeys",n1.maxKeys,n2.maxKeys);
-        
-        assertEquals("branchingFactor",n1.branchingFactor,n2.branchingFactor);
-        
-        assertEquals("first", n1.nkeys, n2.nkeys);
+        assertEquals("minKeys", n1.minKeys(), n2.minKeys());
 
-        assertKeys(n1, n2);
+        assertEquals("maxKeys", n1.maxKeys(), n2.maxKeys());
+
+        assertEquals("branchingFactor", n1.getBranchingFactor(), n2
+                .getBranchingFactor());
+
+        assertSameLeafData(n1, n2);
+
+    }
+
+    /**
+     * Verify all data accessible from {@link IAbstractNodeData}.
+     */
+    static protected void assertSameAbstractNodeData(
+            final IAbstractNodeData n1, final IAbstractNodeData n2) {
+
+        assertEquals("isLeaf", n1.isLeaf(), n2.isLeaf());
+
+        assertEquals("entryCount", n1.getSpannedTupleCount(), n2
+                .getSpannedTupleCount());
+
+        assertEquals("keyCount", n1.getKeyCount(), n2.getKeyCount());
+
+        assertKeys(n1.getKeys(), n2.getKeys());
+
+        assertEquals("hasVersionTimestamps", n1.hasVersionTimestamps(), n2
+                .hasVersionTimestamps());
+        
+        if (n1.hasVersionTimestamps()) {
+
+            assertEquals("minimumVersionTimestamp", n1
+                    .getMinimumVersionTimestamp(), n2
+                    .getMinimumVersionTimestamp());
+
+            assertEquals("maximumVersionTimestamp", n1
+                    .getMaximumVersionTimestamp(), n2
+                    .getMaximumVersionTimestamp());
+
+        }
+
+    }
+    
+    /**
+     * Verify all data accessible from {@link INodeData}.
+     */
+    static public void assertSameNodeData(final INodeData n1, final INodeData n2) {
+
+        assertSameAbstractNodeData(n1, n2);
+
+        assertEquals("childCount", n1.getChildCount(), n2.getChildCount());
+
+        for (int i = 0; i < n1.getChildCount(); i++) {
+
+            final long expectedAddr = n1.getChildAddr(i);
+
+            final long actualAddr = n2.getChildAddr(i);
+
+            if (expectedAddr != actualAddr) {
+
+                assertEquals("childAddr(" + i + ")", expectedAddr, actualAddr);
+
+            }
+
+        }
+
+        for (int i = 0; i < n1.getChildCount(); i++) {
+
+            final int expectedChildEntryCount = n1.getChildEntryCount(i);
+
+            final int actualChildEntryCount = n2.getChildEntryCount(i);
+
+            if (expectedChildEntryCount != actualChildEntryCount) {
+
+                assertEquals("childEntryCount(" + i + ")",
+                        expectedChildEntryCount, actualChildEntryCount);
+
+            }
+
+        }
+
+     }
+
+    /**
+     * Verify all data accessible from {@link ILeafData}.
+     */
+    static public void assertSameLeafData(final ILeafData n1, final ILeafData n2) {
+
+        assertSameAbstractNodeData(n1, n2);
+
+        assertEquals("#keys!=#vals", n1.getKeyCount(), n1.getValueCount());
+
+        assertEquals("#keys!=#vals", n2.getKeyCount(), n2.getValueCount());
 
         assertEquals("hasDeleteMarkers", n1.hasDeleteMarkers(), n2
                 .hasDeleteMarkers());
 
         if (n1.hasDeleteMarkers()) {
 
-            for (int i = 0; i < n1.nkeys; i++) {
+            for (int i = 0; i < n1.getKeyCount(); i++) {
 
                 assertEquals("deleteMarkers[" + i + "]", n1.getDeleteMarker(i),
                         n2.getDeleteMarker(i));
@@ -339,7 +469,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
         if (n1.hasVersionTimestamps()) {
 
-            for (int i = 0; i < n1.nkeys; i++) {
+            for (int i = 0; i < n1.getKeyCount(); i++) {
 
                 assertEquals("versionTimestamps[" + i + "]", n1
                         .getVersionTimestamp(i), n2.getVersionTimestamp(i));
@@ -347,13 +477,194 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
             }
             
         }
-        
-        for (int i = 0; i < n1.nkeys; i++) {
 
-            assertEquals("values[" + i + "]", n1.values[i], n2.values[i]);
+        assertSameRaba(n1.getValues(), n2.getValues());
+        
+    }
+
+    /**
+     * Compares the data in two {@link IRaba}s but not their
+     * <code>capacity</code> or things which depend on their capacity, such as
+     * {@link IRaba#isFull()} and whether or not they are
+     * {@link IRaba#isReadOnly()}. If the expected {@link IRaba#isKeys()}, then
+     * both must represent keys and the search API will also be tested.
+     * 
+     * @param expected
+     * @param actual
+     */
+    static public void assertSameRaba(final IRaba expected, final IRaba actual     ) {
+
+        assertEquals("isKeys", expected.isKeys(), actual.isKeys());
+
+        assertEquals("isEmpty", expected.isEmpty(), actual.isEmpty());
+
+        assertEquals("size", expected.size(), actual.size());
+
+        // random permutation for random access test.
+        final int[] order = getRandomOrder(expected.size());
+        
+        // test using random access.
+        for (int i = 0; i < expected.size(); i++) {
+
+            // process the elements in a random order.
+            final int j = order[i];
+            
+            assertEquals("isNull(" + j + ")", expected.isNull(j), actual
+                    .isNull(j));
+
+            if (!expected.isNull(j)) {
+
+                // verify same byte[] contents.
+                final byte[] ea = expected.get(j);
+                final byte[] aa = actual.get(j);
+
+                // same length
+                if (ea.length != aa.length)
+                    assertEquals("get(" + j + ").length", ea.length, aa.length);
+
+                // same data.
+                if (!BytesUtil.bytesEqual(ea, aa))
+                    assertEquals("get(" + j + ")", ea, aa);
+
+                // verify same byte[] length reported.
+                assertEquals("length(" + j + ")", expected.length(j), actual
+                        .length(j));
+
+                // verify copy() gives expected byte[].
+                try {
+                    final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    final DataOutputStream dos = new DataOutputStream(baos);
+                    actual.copy(j, dos);
+                    dos.flush();
+                    assertEquals("copy(" + j + ",dos)", expected.get(j), baos
+                            .toByteArray());
+                } catch (IOException ex) {
+                    fail("Not expecting exception", ex);
+                }
+                
+            } else {
+
+                assertEquals("get(" + j + ")", null, actual.get(j));
+
+                // verify actual throws the expected exception.
+                try {
+                    actual.length(j);
+                    fail("Expecting: " + NullPointerException.class);
+                } catch (NullPointerException ex) {
+                    if (log.isDebugEnabled())
+                        log.debug("Ignoring expected exception: " + ex);
+                }
+
+                // verify actual throws the expected exception.
+                try {
+                    final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    final DataOutputStream dos = new DataOutputStream(baos);
+                    actual.copy(j, dos);
+                    fail("Expecting: " + NullPointerException.class);
+                } catch (NullPointerException ex) {
+                    if (log.isDebugEnabled())
+                        log.debug("Ignoring expected exception: " + ex);
+                } catch (RuntimeException ex) {
+                    fail("Not expecting exception: "+ex, ex);
+                }
+
+            }
             
         }
         
+        // test using iterator access.
+        {
+            
+            final Iterator<byte[]> eitr = expected.iterator();
+            final Iterator<byte[]> aitr = actual.iterator();
+            int i = 0;
+            while (eitr.hasNext()) {
+
+                assertTrue("hasNext", aitr.hasNext());
+                
+                // verify same byte[] (compare data, may both be null).
+                assertEquals("byte[" + i + "]", eitr.next(), aitr.next());
+
+                i++;
+                
+            }
+            
+            assertFalse("hasNext", aitr.hasNext());
+            
+        }
+
+        // test search API (only for B+Tree keys).
+        if (expected.isKeys()) {
+
+            final Random r = new Random();
+            
+            for (int i = 0; i < expected.size(); i++) {
+
+                final int expectedIndex = i;
+                
+                final byte[] key = expected.get(expectedIndex);
+
+                { // search at the key.
+                    
+                    final int actualIndex = actual.search(key);
+
+                    if (actualIndex != expectedIndex) {
+
+                        fail("search(" + BytesUtil.toString(key) + ")" + //
+                                ": expectedIndex=" + expectedIndex + //
+                                ", actualIndex=" + actualIndex + //
+                                ",\nexpected=" + expected + //
+                                ",\nactual=" + actual//
+                        );
+
+                    }
+                }
+                
+                { // search at key plus a random byte[] suffix.
+                    
+                    // random suffix length.
+                    final int suffixLength = r.nextInt(1 + (key.length / 2)) + 1;
+                    
+                    // random fill of entire key.
+                    final byte[] key2 = new byte[key.length + suffixLength];
+                    r.nextBytes(key2);
+                    
+                    // copy shared prefix (all of the original key).
+                    System.arraycopy(key, 0, key2, 0, key.length);
+                    
+                    // expected insert position (or index iff found).
+                    final int epos = expected.search(key2);
+                    
+                    // actual result from search on the coded raba.
+                    final int apos = actual.search(key2);
+                    
+                    assertEquals("search with random prefix", epos, apos);
+                    
+                }
+                { // search at random length prefix of the key.
+                    
+                    // random prefix length (may be zero).
+                    final int prefixLength = Math.max(0,
+                            r.nextInt(Math.max(1,key.length)) - 1);
+                    
+                    // copy shared prefix.
+                    final byte[] key2 = new byte[prefixLength];
+                    System.arraycopy(key, 0, key2, 0, prefixLength);
+
+                    // expected insert position (or index iff found).
+                    final int epos = expected.search(key2);
+                    
+                    // actual result from search on the coded raba.
+                    final int apos = actual.search(key2);
+                    
+                    assertEquals("search with random suffix", epos, apos);
+                    
+                }
+
+            }
+            
+        }
+
     }
 
     /**
@@ -365,31 +676,37 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param node
      *            The node.
      */
-    public void assertChildKeys(long[] childKeys, Node node ) {
+    public void assertChildKeys(final long[] childAddr, final Node node) {
+
+        final int nChildAddr = childAddr.length;
         
-        int nChildKeys = childKeys.length;
+//        long[] actualAddr = node.childAddr;
         
-        long[] actualKeys = node.childAddr;
+//        // verify the capacity of the childAddr[] on the node.
+//        assertEquals("childAddr[] capacity", node.getBranchingFactor() + 1,
+//                node.getChildCount());
+
+        // verify the #of children.
+        assertEquals("childChild", nChildAddr, node.getChildCount());
         
-        // verify the capacity of the childAddr[] on the node.
-        assertEquals("childAddr[] capacity", node.branchingFactor+1, actualKeys.length );
-        
-        // verify the #of defined keys.
-        assertEquals("nChildKeys", nChildKeys, node.nkeys+1);
+        // verify the #of defined keys
+        assertEquals("nkeys", nChildAddr, node.getKeyCount() + 1);
         
         // verify ordered values for the defined keys.
-        for( int i=0; i<nChildKeys; i++ ) {
+        for (int i = 0; i < nChildAddr; i++) {
 
-            assertEquals("childAddr["+i+"]", childKeys[i], actualKeys[i]);
-            
+            assertEquals("childAddr[" + i + "]", childAddr[i], node
+                    .getChildAddr(i));
+
         }
-        
-        // verify the undefined keys are all NULL.
-        for( int i=nChildKeys; i<actualKeys.length; i++ ) {
-            
-            assertEquals("childAddr[" + i + "]", IIdentityAccess.NULL, actualKeys[i]);
-            
-        }
+
+//        // verify the undefined keys are all NULL.
+//        for (int i = nChildAddr; i < actualAddr.length; i++) {
+//
+//            assertEquals("childAddr[" + i + "]", IIdentityAccess.NULL,
+//                    actualAddr[i]);
+//
+//        }
         
     }
 
@@ -402,26 +719,25 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param node
      *            The node.
      */
-    public void assertKeys(byte[][] keys, AbstractNode node ) {
+    public void assertKeys(final byte[][] keys, final AbstractNode<?> node ) {
         
 //        // verify the capacity of the keys[] on the node.
 //        assertEquals("keys[] capacity", (node.maxKeys + 1) * stride,
 //                actualKeys.length);
         
         // verify the #of defined keys.
-        assertEquals("nkeys", keys.length, node.nkeys);
-        assertEquals("nkeys", keys.length, node.keys.getKeyCount());
-        
-        // verify ordered values for the defined keys.
-        for( int i=0; i<keys.length; i++ ) {
+        assertEquals("nkeys", keys.length, node.getKeyCount());
 
-            if( BytesUtil.compareBytes(keys[i], node.keys.getKey(i)) != 0) {
-                
+        // verify ordered values for the defined keys.
+        for (int i = 0; i < keys.length; i++) {
+
+            if (BytesUtil.compareBytes(keys[i], node.getKeys().get(i)) != 0) {
+
                 fail("expected=" + BytesUtil.toString(keys[i]) + ", actual="
-                        + BytesUtil.toString(node.keys.getKey(i)));
-                
+                        + BytesUtil.toString(node.getKeys().get(i)));
+
             }
-            
+
         }
         
 //        // verify the undefined keys are all NEGINF.
@@ -442,41 +758,42 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            corresponding elements in the node as returned by
      *            {@link INodeData#getChildEntryCounts()}. The sum of the
      *            expected array is also tested against the value returned by
-     *            {@link IAbstractNodeData#getEntryCount()}.
+     *            {@link IAbstractNodeData#getSpannedTupleCount()}.
      * @param node
      *            The node.
      */
-    public void assertEntryCounts(int[] expected, INodeData node ) {
+    public void assertEntryCounts(final int[] expected, final INodeData node) {
+
+        final int len = expected.length;
         
-        int len = expected.length;
+//        final int[] actual = (int[]) node.getChildEntryCounts();
         
-        int[] actual = (int[]) node.getChildEntryCounts();
-        
-        // verify the capacity of the keys[] on the node.
-        assertEquals("childEntryCounts[] capacity", node.getBranchingFactor()+1, actual.length );
+//        // verify the capacity of the keys[] on the node.
+//        assertEquals("childEntryCounts[] capacity", node.getBranchingFactor()+1, actual.length );
         
         // verify the #of defined elements.
         assertEquals("nchildren", len, node.getChildCount());
         
         // verify defined elements.
         int nentries = 0;
-        for( int i=0; i<len; i++ ) {
+        for (int i = 0; i < len; i++) {
 
-            assertEquals("childEntryCounts["+i+"]", expected[i], actual[i]);
-            
+            assertEquals("childEntryCounts[" + i + "]", expected[i], node
+                    .getChildEntryCount(i));
+
             nentries += expected[i];
             
         }
         
         // verify total #of spanned entries.
-        assertEquals("nentries",nentries,node.getEntryCount());
-        
-        // verify the undefined keys are all ZERO(0).
-        for( int i=len; i<actual.length; i++ ) {
-            
-            assertEquals("keys[" + i + "]", 0, actual[i]);
-            
-        }
+        assertEquals("nentries", nentries, node.getSpannedTupleCount());
+
+//        // verify the undefined keys are all ZERO(0).
+//        for( int i=len; i<actual.length; i++ ) {
+//            
+//            assertEquals("keys[" + i + "]", 0, actual[i]);
+//            
+//        }
         
     }
 
@@ -498,22 +815,22 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         return getBTree(branchingFactor , DefaultTupleSerializer.newInstance());
         
     }
-    
+
     public BTree getBTree(final int branchingFactor,
             final ITupleSerializer tupleSer) {
-        
+
         final IRawStore store = new SimpleMemoryRawStore();
 
         final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-        
+
         metadata.setBranchingFactor(branchingFactor);
 
         metadata.setTupleSerializer(tupleSer);
-        
+
         // override the BTree class.
         metadata.setBTreeClassName(NoEvictionBTree.class.getName());
-        
-        return (NoEvictionBTree) BTree.create(store,metadata);
+
+        return (NoEvictionBTree) BTree.create(store, metadata);
         
     }
     
@@ -1049,20 +1366,20 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * 
      * @return The populated {@link BTree}.
      */
-    public BTree doInsertRandomSparseKeySequenceTest(int m, int ninserts, int trace) {
+    public BTree doInsertRandomSparseKeySequenceTest(final int m, final int ninserts, final int trace) {
         
         /*
          * generate random keys.  the keys are a sparse monotonic sequence.
          */
-        int keys[] = new int[ninserts];
+        final int keys[] = new int[ninserts];
 
-        SimpleEntry entries[] = new SimpleEntry[ninserts];
+        final SimpleEntry entries[] = new SimpleEntry[ninserts];
         
         int lastKey = 0;
 
         for( int i=0; i<ninserts; i++ ) {
         
-            int key = r.nextInt(100)+lastKey+1;
+            final int key = r.nextInt(100)+lastKey+1;
             
             keys[i] = key;
             
@@ -1150,7 +1467,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      */
     protected BTree doInsertKeySequenceTest(int m, int[] keys, SimpleEntry[] entries, int[] order, int trace){
 
-        BTree btree = getBTree(m);
+        final BTree btree = getBTree(m);
 
         try {
             
@@ -1160,11 +1477,11 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
                 final int ikey = keys[order[i]];
 
-                SimpleEntry entry = entries[order[i]];
+                final SimpleEntry entry = entries[order[i]];
 
                 if( i>0 && i%10000 == 0 ) {
                     
-                    log.info("index=" + i + ", key=" + ikey + ", entry="
+                    if(log.isInfoEnabled()) log.info("index=" + i + ", key=" + ikey + ", entry="
                             + entry);
                     
                 }
@@ -1408,28 +1725,30 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      *            The #of trials.
      */
     public void doInsertLookupRemoveStressTest(int m,int nkeys,int ntrials) {
-        
-        log.info("m="+m+", nkeys="+nkeys+", ntrials="+ntrials);
-        
-        Integer[] keys = new Integer[nkeys];
-        
-        SimpleEntry[] vals = new SimpleEntry[nkeys];
 
-        for( int i=0; i<nkeys; i++ ) {
-            
-            keys[i] = i+1; // Note: this produces dense keys with origin ONE(1).
-            
+        if (log.isInfoEnabled())
+            log.info("m=" + m + ", nkeys=" + nkeys + ", ntrials=" + ntrials);
+
+        final Integer[] keys = new Integer[nkeys];
+
+        final SimpleEntry[] vals = new SimpleEntry[nkeys];
+
+        for (int i = 0; i < nkeys; i++) {
+
+            keys[i] = i + 1; // Note: this produces dense keys with origin
+                             // ONE(1).
+
             vals[i] = new SimpleEntry();
-            
+
         }
-        
+
         final BTree btree = getBTree(m);
 
         /*
          * Run test.
          */
-        Map<Integer,SimpleEntry> expected = new TreeMap<Integer,SimpleEntry>();
-        
+        final Map<Integer, SimpleEntry> expected = new TreeMap<Integer, SimpleEntry>();
+
         for( int i=0; i<ntrials; i++ ) {
             
             boolean insert = r.nextBoolean();
@@ -1607,7 +1926,8 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
      * @param actual
      *            The btree that is being validated.
      */
-    static public void assertSameBTree(AbstractBTree expected, IIndex actual) {
+    static public void assertSameBTree(final AbstractBTree expected,
+            final IIndex actual) {
 
         assert expected != null;
         
@@ -2115,6 +2435,79 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
         
         assertFalse("Not expecting more tuples", actualItr.hasNext());
         
+    }
+
+    /**
+     * Generate a set of N random distinct byte[] keys in sorted order using an
+     * unsigned byte[] comparison function.
+     * 
+     * @param maxKeys
+     *            The capacity of the array.
+     * 
+     * @param nkeys
+     *            The #of keys to generate.
+     * 
+     * @return A byte[][] with nkeys non-null byte[] entries and a capacity of
+     *         maxKeys.
+     */
+    public static byte[][] getRandomKeys(final int maxKeys, final int nkeys) {
+
+        final int maxKeyLength = 20;
+
+        final Random r = new Random();
+        
+        return new RandomKeysGenerator(r, maxKeys, maxKeyLength)
+                .generateKeys(nkeys);
+
+//
+//        assert nkeys >= 0;
+//        assert maxKeys >= nkeys;
+//
+//        /*
+//         * generate maxKeys distinct keys (sort requires that the keys are
+//         * non-null).
+//         */
+//        
+//        // used to ensure distinct keys.
+//        final Set<byte[]> set = new TreeSet<byte[]>(
+//                BytesUtil.UnsignedByteArrayComparator.INSTANCE);
+//
+//        final byte[][] keys = new byte[maxKeys][];
+//
+//        int n = 0;
+//
+//        while (n < maxKeys) {
+//
+//            // random key length in [1:maxKeyLen].
+//            final byte[] key = new byte[r.nextInt(maxKeyLen) + 1];
+//
+//            // random data in the key.
+//            r.nextBytes(key);
+//
+//            if( set.add(key)) {
+//
+//                keys[n++] = key;
+//
+//            }
+//            
+//        }
+//
+//        /*
+//         * place keys into sorted order.
+//         */
+//        Arrays.sort(keys, BytesUtil.UnsignedByteArrayComparator.INSTANCE);
+//
+//        /*
+//         * clear out keys from keys[nkeys] through keys[maxKeys-1].
+//         */
+//        for (int i = nkeys; i < maxKeys; i++) {
+//
+//            keys[i] = null;
+//
+//        }
+//
+//        return keys;
+
     }
 
     /**

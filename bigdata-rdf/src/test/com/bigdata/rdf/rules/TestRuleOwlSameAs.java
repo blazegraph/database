@@ -122,7 +122,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -183,7 +183,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -248,7 +248,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -317,7 +317,7 @@ public class TestRuleOwlSameAs extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         

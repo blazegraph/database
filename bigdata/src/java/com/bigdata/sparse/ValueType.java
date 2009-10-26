@@ -281,7 +281,7 @@ public enum ValueType {
      * @param v
      * @return
      */
-    public static Object decode(byte[] v) {
+    public static Object decode(final byte[] v) {
 
         if (v == null)
             return null;

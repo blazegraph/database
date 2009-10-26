@@ -41,7 +41,6 @@ import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.DataServiceTupleIterator;
 import com.bigdata.service.IDataService;
 
 /**

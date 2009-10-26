@@ -30,6 +30,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -48,6 +49,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -857,7 +859,7 @@ abstract public class JoinTask implements Callable<Void> {
         }
 
         /**
-         * Read chunks from one or more sources until cancelled,
+         * Read chunks from one or more sources until canceled,
          * interrupted, or all sources are exhausted and submits
          * {@link AccessPathTask}s to the caller's {@link ExecutorService}
          * -or- executes those tasks in the caller's thread if no
@@ -907,7 +909,7 @@ abstract public class JoinTask implements Callable<Void> {
                     final Map<IPredicate, Collection<IBindingSet>> map = combineBindingSets(chunk);
 
                     /*
-                     * Generate an AbstractPathTask from each distinct
+                     * Generate an AccessPathTask from each distinct
                      * asBound predicate that will consume all of the source
                      * bindingSets in the chunk which resulted in the same
                      * asBound predicate.
@@ -1075,11 +1077,7 @@ abstract public class JoinTask implements Callable<Void> {
                 final Map.Entry<IPredicate, Collection<IBindingSet>> entry = itr
                         .next();
 
-                final IPredicate predicate = entry.getKey();
-
-                final Collection<IBindingSet> bindingSets = entry.getValue();
-
-                tasks[i++] = new AccessPathTask(predicate, bindingSets);
+                tasks[i++] = new AccessPathTask(entry.getKey(), entry.getValue());
 
             }
 
@@ -1196,10 +1194,15 @@ abstract public class JoinTask implements Callable<Void> {
         final private IAccessPath accessPath;
 
         /**
-         * Return the <em>fromKey</em> for the {@link IAccessPath}
-         * generated from the {@link IBindingSet} for this task.
+         * Return the <em>fromKey</em> for the {@link IAccessPath} generated
+         * from the {@link IBindingSet} for this task.
          * 
-         * @todo layered access paths do not expose a fromKey.
+         * @todo layered access paths do not expose a fromKey. This information
+         *       is always available from the {@link SPOKeyOrder} and that
+         *       method will be raised into the {@link IKeyOrder}.
+         *       Unfortunately, for RDF we also need to know if triples or quads
+         *       are being used, which is a property on the container or the
+         *       relation.
          */
         protected byte[] getFromKey() {
 
@@ -1324,8 +1327,12 @@ abstract public class JoinTask implements Callable<Void> {
                     stats.chunkCount++;
 
                     // process the chunk in the caller's thread.
-                    if (new ChunkTask(bindingSets, unsyncBuffer, chunk).call()) {
+                    final boolean somethingAccepted = new ChunkTask(
+                            bindingSets, unsyncBuffer, chunk).call();
+                    
+                    if (somethingAccepted) {
 
+                        // something in the chunk was accepted.
                         nothingAccepted = false;
 
                     }
@@ -1393,7 +1400,7 @@ abstract public class JoinTask implements Callable<Void> {
      *         Thompson</a>
      * @version $Id$
      */
-    protected class ChunkTask implements Callable {
+    protected class ChunkTask implements Callable<Boolean> {
 
         /**
          * The index of the predicate for the access path that is being
@@ -1522,7 +1529,8 @@ abstract public class JoinTask implements Callable<Void> {
                                 + rule.getName());
                 }
 
-                return nothingAccepted ? Boolean.TRUE : Boolean.FALSE;
+                // if something is accepted in the chunk return true.
+                return nothingAccepted ? Boolean.FALSE: Boolean.TRUE;
 
             } catch (Throwable t) {
 

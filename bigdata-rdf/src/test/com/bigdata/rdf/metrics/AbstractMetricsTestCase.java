@@ -76,14 +76,14 @@ public class AbstractMetricsTestCase extends AbstractTripleStoreTestCase {
     
     public void tearDown() throws Exception {
         
-        if(store!=null) {
-           
-            if(deleteAfter) {
+        if (store != null) {
 
-                store.closeAndDelete();
-                
+            if (deleteAfter) {
+
+                store.__tearDownUnitTest();
+
             } else {
-                
+
                 store.close();
                 
             }

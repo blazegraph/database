@@ -71,7 +71,7 @@ abstract public class AbstractCachingResourceLocator<T extends ILocatableResourc
      * @param capacity
      *            The cache capacity.
      * @param timeout
-     *            The timeout for stale entries.
+     *            The timeout in milliseconds for stale entries.
      */
     protected AbstractCachingResourceLocator(final int capacity,
             final long timeout) {

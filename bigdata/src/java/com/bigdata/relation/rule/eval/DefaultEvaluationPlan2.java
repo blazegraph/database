@@ -42,7 +42,7 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 
 /**
  * The evaluation order is determined by analysis of the propagation of
- * bindings. The most selective predicate is choosen first (having the fewest
+ * bindings. The most selective predicate is chosen first (having the fewest
  * unbound variables with ties broken by a range count on the data) and "fake"
  * bindings are propagated to the other predicates in the tail. This process is
  * repeated until all variables are bound and an evaluation order has been
@@ -573,7 +573,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
      * tails, or one tail and another join.  Theoretically it could be two
      * joins as well, which might be a future optimization worth thinking about.
      */
-    private class Join implements IJoinDimension {
+    private static class Join implements IJoinDimension {
         
         private final IJoinDimension d1, d2;
         private final long cardinality;

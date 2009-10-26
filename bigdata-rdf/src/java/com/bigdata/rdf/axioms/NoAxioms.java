@@ -56,6 +56,12 @@ public class NoAxioms extends BaseAxioms {
         super(db);
         
     }
+    
+    final public boolean isNone() {
+        
+        return true;
+        
+    }
 
     final public boolean isRdfSchema() {
         

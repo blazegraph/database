@@ -69,7 +69,7 @@ public class RuleStats {
     /**
      * Delimiter string used for output.
      */
-    private final String sep = ", ";//"\t";//", ";
+    private final static transient String sep = ", ";//"\t";//", ";
     
     /**
      * Initializes statistics for an {@link IStep}.
@@ -567,7 +567,7 @@ public class RuleStats {
      * relate the predicates back to the original query form (which may already
      * have been re-ordered so that is not a great loss in many cases).
      */
-    final private boolean showInEvalOrder = true;
+    final private static boolean showInEvalOrder = true;
     
     /**
      * Return a human readable representation of the predicate. Subclasses may
@@ -700,6 +700,8 @@ public class RuleStats {
 
         toString(minElapsed, joinDetails, depth+1, sb, a);
 
+        sb.append("\n");
+        
         return sb.toString();
 
     }

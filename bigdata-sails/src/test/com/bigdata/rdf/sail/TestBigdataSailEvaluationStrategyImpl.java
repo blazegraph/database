@@ -199,7 +199,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 
@@ -323,7 +323,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 
@@ -452,7 +452,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 
@@ -577,7 +577,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 
@@ -696,7 +696,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 
@@ -819,7 +819,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 
@@ -953,7 +953,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 

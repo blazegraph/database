@@ -7,9 +7,9 @@ import java.util.Map;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.service.Event;
 
 /**

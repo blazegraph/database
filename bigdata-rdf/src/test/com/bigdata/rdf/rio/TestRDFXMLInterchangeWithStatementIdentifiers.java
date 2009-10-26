@@ -67,7 +67,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
-import org.openrdf.sail.SailException;
+//import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -76,7 +76,6 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.BNS;
@@ -126,8 +125,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
      * @throws RDFHandlerException
      * @throws IOException
      */
-    public void test_rdfXmlInterchange() throws SailException,
-            RDFHandlerException, IOException {
+    public void test_rdfXmlInterchange() throws RDFHandlerException,
+            IOException {
 
         final AbstractTripleStore store = getStore();
 
@@ -145,7 +144,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -162,8 +161,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
      * @throws RDFHandlerException
      * @throws IOException
      */
-    public void test_blankNodeHandling() throws SailException,
-            RDFHandlerException, IOException {
+    public void test_blankNodeHandling() throws RDFHandlerException,
+            IOException {
 
         final AbstractTripleStore store = getStore();
 
@@ -173,7 +172,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -225,7 +224,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
          * @throws SailException
          */
         public BigdataStatement getOnlyStatement(AbstractTripleStore store,
-                Resource s, URI p, Value o) throws SailException {
+                Resource s, URI p, Value o) {
 
             final BigdataStatementIterator itr = store.getStatements(s, p, o);
 
@@ -351,7 +350,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
          * 
          * @throws SailException
          */
-       private void verifyGraph(AbstractTripleStore store) throws SailException {
+       private void verifyGraph(AbstractTripleStore store) {
 
             /*
              * First, verify the fully grounded stmt.
@@ -449,8 +448,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
          * @throws RDFHandlerException
          * @throws IOException
          */
-        protected void doTest() throws SailException, RDFHandlerException,
-                IOException {
+        protected void doTest() throws RDFHandlerException, IOException {
 
             loadData(store);
 
@@ -486,12 +484,8 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
 
             } finally {
 
-                try {
-                    itr.close();
-                } catch (SailException e) {
-                    throw new RuntimeException(e);
-                }
-
+                itr.close();
+                
             }
 
             // write the rdf/xml on the console.
@@ -531,7 +525,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
 
             } finally {
 
-                tempStore.closeAndDelete();
+                tempStore.__tearDownUnitTest();
 
             }
 
@@ -551,7 +545,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
      * @throws IOException
      */
     protected void doStatementIdentifiersTest(final AbstractTripleStore store)
-            throws SailException, RDFHandlerException, IOException {
+            throws RDFHandlerException, IOException {
 
         assert store.getStatementIdentifiers() == true;
 
@@ -608,11 +602,11 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              */
             {
 
-                final SPO spo1 = store.getStatement(x.getTermId(), rdfType
+                final ISPO spo1 = store.getStatement(x.getTermId(), rdfType
                         .getTermId(), A.getTermId());
-                final SPO spo2 = store.getStatement(y.getTermId(), rdfType
+                final ISPO spo2 = store.getStatement(y.getTermId(), rdfType
                         .getTermId(), B.getTermId());
-                final SPO spo3 = store.getStatement(z.getTermId(), rdfType
+                final ISPO spo3 = store.getStatement(z.getTermId(), rdfType
                         .getTermId(), C.getTermId());
 
                 assertNotNull(spo1);
@@ -664,11 +658,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             
         } finally {
 
-            try {
-                itr.close();
-            } catch (SailException e) {
-                throw new RuntimeException(e);
-            }
+            itr.close();
 
         }
 
@@ -745,11 +735,11 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
              * care about TM here.
              */
             
-            final SPO spo1 = tempStore.getStatement(x.getTermId(), rdfType
+            final ISPO spo1 = tempStore.getStatement(x.getTermId(), rdfType
                     .getTermId(), A.getTermId());
-            final SPO spo2 = tempStore.getStatement(y.getTermId(), rdfType
+            final ISPO spo2 = tempStore.getStatement(y.getTermId(), rdfType
                     .getTermId(), B.getTermId());
-            final SPO spo3 = tempStore.getStatement(z.getTermId(), rdfType
+            final ISPO spo3 = tempStore.getStatement(z.getTermId(), rdfType
                     .getTermId(), C.getTermId());
 
             assertNotNull(spo1);
@@ -775,7 +765,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
             
         } finally {
             
-            tempStore.closeAndDelete();
+            tempStore.__tearDownUnitTest();
             
         }
 

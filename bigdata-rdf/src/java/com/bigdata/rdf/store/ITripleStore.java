@@ -9,15 +9,15 @@ Contact:
      licenses@bigdata.com
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
+it under the terms of the GNU General License as published by
 the Free Software Foundation; version 2 of the License.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GNU General License for more details.
 
-You should have received a copy of the GNU General Public License
+You should have received a copy of the GNU General License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
@@ -31,7 +31,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataStatementImpl;
@@ -46,7 +45,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
- * Interface for a triple store.
+ * Interface for a triple -or- quad store.
  * <p>
  * Note: This API does NOT implement a Truth Maintenance (TM) strategy and by
  * itself only supports "explicit" triples. If the knowledge base is NOT to
@@ -74,7 +73,28 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface ITripleStore {
+interface ITripleStore {
+
+    /**
+     * The #of named graphs.
+     * 
+     * @throws UnsupportedOperationException
+     *             unless this is a quad store.
+     */
+    long getNamedGraphCount();
+
+    /**
+     * The #of triples in the named graph, or in the database if <i>c</i> is not
+     * specified.
+     * 
+     * @param c
+     *            The context (optional).
+     * 
+     * @return The #of triples in the named graph or in the database.
+     * 
+     * @deprecated by {@link #getStatementCount(Resource, boolean)}
+     */
+    long getStatementCount(Resource c);
 
     /**
      * The #of triples in the store.
@@ -84,8 +104,10 @@ public interface ITripleStore {
      *         an upper bound.
      * 
      * @see #getStatementCount(boolean)
+     * 
+     * @deprecated by {@link #getStatementCount(Resource, boolean)}
      */
-    public long getStatementCount();
+    long getStatementCount();
 
     /**
      * The #of triples in the store.
@@ -99,32 +121,54 @@ public interface ITripleStore {
      *         <code>false</code> and either transactions or key-range
      *         partitioned indices are being used, then this will be an upper
      *         bound.
+     *         
+     * @deprecated by {@link #getStatementCount(Resource, boolean)}
      */
-    public long getStatementCount(boolean exact);
+    long getStatementCount(boolean exact);
 
     /**
-     * The #of terms in the store.
+     * The #of triples in the named graph or in the database if no context is
+     * specified.
+     * 
+     * @param c
+     *            The context (optional).
+     * @param exact
+     *            When <code>true</code> the result will be an exact count,
+     *            which may require a full key-range scan of one of the
+     *            statement indices.
+     * 
+     * @return The #of statements in the named graph or in the database if
+     *         <i>c</i> is <code>null</code>. When <i>exact</i> is
+     *         <code>false</code> and either transactions or key-range
+     *         partitioned indices are being used, then this will be an upper
+     *         bound.
+     */
+    long getStatementCount(Resource c, boolean exact);
+
+    /**
+     * The #of terms in the lexicon (this is not specific to any named graph).
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public long getTermCount();
+    long getTermCount();
 
     /**
-     * The #of URIs in the store.
+     * The #of URIs in the lexicon (this is not specific to any named graph).
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public long getURICount();
+    long getURICount();
 
     /**
-     * The #of Literals in the store.
+     * The #of Literals in the lexicon (this is not specific to any named
+     * graph).
      * <p>
      * This may be an estimate when using partitioned indices.
      */
-    public long getLiteralCount();
+    long getLiteralCount();
 
     /**
-     * The #of BNodes in the store.
+     * The #of BNodes in the lexicon (this is not specific to any named graph).
      * <p>
      * This may be an estimate when using partitioned indices.
      * <p>
@@ -133,7 +177,7 @@ public interface ITripleStore {
      * <code>false</code> since there will not be any blank nodes in the
      * lexicon.
      */
-    public long getBNodeCount();
+    long getBNodeCount();
 
     /**
      * Add a single {@link StatementEnum#Explicit} statement by lookup and/or
@@ -144,17 +188,30 @@ public interface ITripleStore {
      * objects is:
      * 
      * <pre>
-     *  
+     * 
      *  StatementBuffer buffer = new StatementBuffer(store, ...);
      *  
      *  buffer.add( s, p, o );
      *  ...
      *  
      *  buffer.flush();
-     *  
+     * 
      * </pre>
+     * 
+     * @param s
+     *            The subject (required).
+     * @param p
+     *            The predicate (required).
+     * @param o
+     *            The object (required).
+     * @param c
+     *            The context (required IFF a quad store and otherwise ignored).
      */
-    public void addStatement(Resource s, URI p, Value o);
+    void addStatement(Resource s, URI p, Value o, Resource c);
+    /**
+     * @deprecated by {@link #addStatement(Resource, URI, Value, Resource)}
+     */
+    void addStatement(Resource s, URI p, Value o);
 
     /**
      * Return true if the triple pattern matches any statements in the store
@@ -163,13 +220,20 @@ public interface ITripleStore {
      * Note: This does not verify whether or not the statement is explicit.
      * 
      * @param s
-     *            Optional subject.
+     *            The subject (optional).
      * @param p
-     *            Optional predicate.
+     *            The predicate (optional).
      * @param o
-     *            Optional object.
+     *            The object (optional).
+     * @param c
+     *            The context (optional and ignored unless a quad store).
      */
-    public boolean hasStatement(Resource s, URI p, Value o);
+    boolean hasStatement(Resource s, URI p, Value o, Resource c);
+
+    /**
+     * @deprecated by {@link #hasStatement(Resource, URI, Value, Resource)}
+     */
+    boolean hasStatement(Resource s, URI p, Value o);
 
     /**
      * Return the statement from the database matching the fully bound query.
@@ -187,15 +251,21 @@ public interface ITripleStore {
      *            The predicate (required).
      * @param o
      *            The object (required).
+     * @param c
+     *            The context (required iff a quad store and otherwise ignored).
      * 
-     * @return The statement for that triple -or- <code>null</code> iff the
-     *         triple is not defined in the database.
+     * @return The statement -or- <code>null</code> iff the triple is not
+     *         defined in the database.
      * 
      * @see #asValue(Value)
      */
-    public BigdataStatement getStatement(Resource s, URI p, Value o)
-            throws SailException;
-    
+    BigdataStatement getStatement(Resource s, URI p, Value o, Resource c);
+
+    /**
+     * @deprecated by {@link #getStatement(Resource, URI, Value, Resource)}
+     */
+    BigdataStatement getStatement(Resource s, URI p, Value o);
+
     /**
      * Return an iterator that will visit all {@link BigdataStatement}s in the
      * database matching the triple pattern.
@@ -206,11 +276,19 @@ public interface ITripleStore {
      *            The predicate (optional).
      * @param o
      *            The object (optional).
-     * 
+     * @param c
+     *            The context (optional and ignored unless a quad store).
+     *            
      * @return The iterator.
      */
-    public BigdataStatementIterator getStatements(Resource s, URI p, Value o);
-    
+    BigdataStatementIterator getStatements(Resource s, URI p, Value o,
+            Resource c);
+
+    /**
+     * @deprecated by {@link #getStatements(Resource, URI, Value, Resource)}
+     */
+    BigdataStatementIterator getStatements(Resource s, URI p, Value o);
+
     /**
      * Converts a {@link BigdataValue} to a Sesame {@link Value} object.
      * 
@@ -221,8 +299,8 @@ public interface ITripleStore {
      * @return A corresponding Sesame {@link Value} object -or-
      *         <code>null</code> iff <i>value</i> is <code>null</code>.
      */
-    public BigdataValue asValue(Value value);
-    
+    BigdataValue asValue(Value value);
+
     /**
      * Unconditionally removes statement(s) matching the triple pattern (NO
      * truth maintenance).
@@ -233,10 +311,17 @@ public interface ITripleStore {
      *            The predicate (optional).
      * @param o
      *            The object (optional).
-     * 
+     * @param c
+     *            The context (optional).
+     *            
      * @return The #of statements removed.
      */
-    public long removeStatements(Resource s, URI p, Value o);
+    long removeStatements(Resource s, URI p, Value o, Resource c);
+
+    /**
+     * @deprecated by {@link #removeStatements(Resource, URI, Value, Resource)}
+     */
+    long removeStatements(Resource s, URI p, Value o);
 
     /**
      * Returns an {@link IAccessPath} matching the triple pattern.
@@ -247,6 +332,8 @@ public interface ITripleStore {
      *            The predicate (optional).
      * @param o
      *            The object (optional).
+     * @param c
+     *            The context (optional).
      * 
      * @return The object that may be used to read efficiently on the indices
      *         for that triple pattern. In the special case where any of the
@@ -256,10 +343,17 @@ public interface ITripleStore {
      * @see IAccessPath
      * @see #asStatementIterator(IChunkedOrderedIterator)
      */
-    public IAccessPath<ISPO> getAccessPath(Resource s, URI p, Value o);
-    
+    IAccessPath<ISPO> getAccessPath(Resource s, URI p, Value o,
+            Resource c);
+
     /**
-     * Wraps an {@link IChunkedOrderedIterator} as a {@link BigdataStatementIterator}.
+     * @deprecated by {@link #getAccessPath(Resource, URI, Value, Resource)}
+     */
+    IAccessPath<ISPO> getAccessPath(Resource s, URI p, Value o);
+
+    /**
+     * Wraps an {@link IChunkedOrderedIterator} as a
+     * {@link BigdataStatementIterator}.
      * <p>
      * Note: The object visited will be {@link BigdataStatementImpl}s.
      * 
@@ -271,7 +365,8 @@ public interface ITripleStore {
      * @see IAccessPath
      * @see #getAccessPath(Resource, URI, Value)
      */
-    public BigdataStatementIterator asStatementIterator(IChunkedOrderedIterator<ISPO> src);
+    BigdataStatementIterator asStatementIterator(
+            IChunkedOrderedIterator<ISPO> src);
 
     /**
      * Convert an internal {@link ISPO} into a Sesame {@link Statement}.
@@ -283,15 +378,15 @@ public interface ITripleStore {
      * 
      * @return The Sesame {@link Statement} -or- <code>null</code>.
      */
-    public BigdataStatement asStatement(ISPO spo);
-    
+    BigdataStatement asStatement(ISPO spo);
+
     /**
      * Return a {@link DataLoader} singleton configured using the properties
      * that were used to configure the database.
      * 
      * @see Options
      */
-    public DataLoader getDataLoader();
+    DataLoader getDataLoader();
     
     /**
      * Return an {@link InferenceEngine} singleton configured using the
@@ -302,7 +397,7 @@ public interface ITripleStore {
      * 
      * @see Options
      */
-    public InferenceEngine getInferenceEngine();
+    InferenceEngine getInferenceEngine();
     
     /**
      * Discard the write set.
@@ -312,7 +407,7 @@ public interface ITripleStore {
      * not restart safe), or a federation (ignored since unisolated writes on
      * the federation are atomic and auto-committed).
      */
-    public void abort();
+    void abort();
     
     /**
      * Commit changes on the database.
@@ -321,21 +416,26 @@ public interface ITripleStore {
      * embedded (does a commit), temporary (ignored), or a federation (ignored
      * since unisolated writes on the federation are atomic and auto-committed).
      */
-    public void commit();
+    void commit();
     
     /**
      * Deletes all data for the {@link ITripleStore}.
      */
-    public void destroy();
+    void destroy();
     
     /**
      * Close the connection to the {@link ITripleStore}.
      */
-    public void close();
+    void close();
 
     /**
      * True iff the database view is read-only.
      */
-    public boolean isReadOnly();
+    boolean isReadOnly();
 
+    /**
+     * Return <code>true</code> iff this is a quad store.
+     */
+    boolean isQuads();
+    
 }

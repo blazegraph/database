@@ -55,7 +55,7 @@ import com.bigdata.journal.AbstractInterruptsTestCase.InterruptMyselfTask;
 import com.bigdata.journal.AbstractTask.ResubmitException;
 import com.bigdata.journal.ConcurrencyManager.Options;
 import com.bigdata.service.DataService;
-import com.bigdata.service.DataServiceTupleIterator;
+import com.bigdata.service.ndx.DataServiceTupleIterator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -90,25 +90,33 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_shutdown() {
 
-        Properties properties = getProperties();
+        final Journal journal = new Journal(getProperties());
+
+        try {
+
+            journal.shutdown();
         
-        Journal journal = new Journal(properties);
-        
-        journal.shutdown();
-        
-        journal.deleteResources();
+        } finally {
+
+            journal.deleteResources();
+
+        }
         
     }
 
     public void test_shutdownNow() {
         
-        Properties properties = getProperties();
+        final Journal journal = new Journal(getProperties());
         
-        Journal journal = new Journal(properties);
+        try {
+
+            journal.shutdownNow();
         
-        journal.shutdownNow();
-        
-        journal.deleteResources();
+        } finally {
+
+            journal.deleteResources();
+            
+        }
 
     }
     
@@ -120,9 +128,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_submit_readService_01() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
         
         try {
 
@@ -183,9 +189,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_submit_writeService_01() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
 
         try {
 
@@ -253,9 +257,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_submit_txService_readOnly_01() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
 
         try {
 
@@ -325,10 +327,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_submit_txService_readCommitted_01()
             throws InterruptedException, ExecutionException {
-        
-        Properties properties = getProperties();
 
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
 
         try {
 
@@ -405,9 +405,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_submit_txService_readWrite_01() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
         
         try {
 
@@ -481,9 +479,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_submit_interrupt01() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
         
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
 
         try {
 
@@ -612,11 +610,11 @@ public class TestConcurrentJournal extends ProxyTestCase {
     public void test_submit_interrupt02() throws InterruptedException,
             ExecutionException {
 
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
 
         properties.setProperty(Options.SHUTDOWN_TIMEOUT, "500");
 
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
 
         try {
 
@@ -911,9 +909,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_tasksAreNotThreadSafe() throws InterruptedException, ExecutionException {
         
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
         
         try {
 
@@ -987,9 +983,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_writeService001() throws Exception {
         
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
 
         try {
 
@@ -1167,9 +1161,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_writeServiceCheckpointDirtyIndex()throws Exception {
 
-        Properties properties = getProperties();
-        
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(getProperties());
 
         try {
         
@@ -1246,7 +1238,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
      */
     public void test_writeService002()throws Exception {
 
-        Properties properties = new Properties( getProperties() );
+        final Properties properties = new Properties(getProperties());
         
         /*
          * Note: restricting the thread pool size does not give us the control
@@ -1428,7 +1420,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
              * The expectation is that the tasks that succeed make it into the
              * same commit group while the task that throws an exception does
              * not cause the commit group to be aborted. Therefore there should
-             * be ONE (1) commit more than we we submitted the tasks.
+             * be ONE (1) commit more than when we submitted the tasks.
              * 
              * Note: The tasks will make it into the same commit group iff the
              * first task that completes is willing to wait for the others to
@@ -1645,7 +1637,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
     public void test_concurrentReadersAreOk() throws Throwable {
 
         // Note: clone so that we do not modify!!!
-        Properties properties = new Properties(getProperties());
+        final Properties properties = new Properties(getProperties());
 
         // Mostly serialize the readers.
         properties.setProperty(Options.READ_SERVICE_CORE_POOL_SIZE, "2");

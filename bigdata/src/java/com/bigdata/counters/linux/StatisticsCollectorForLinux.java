@@ -100,7 +100,7 @@ public class StatisticsCollectorForLinux extends AbstractStatisticsCollector {
     
     synchronized public CounterSet getCounters() {
         
-        CounterSet root = super.getCounters();
+        final CounterSet root = super.getCounters();
         
         if( ! countersAdded ) {
 

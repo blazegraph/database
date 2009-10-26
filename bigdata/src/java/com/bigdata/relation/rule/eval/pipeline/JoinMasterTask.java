@@ -526,9 +526,9 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
             } catch (CancellationException ex) {
 
                 /*
-                 * A JoinTask will be cancelled if any of its output buffers
+                 * A JoinTask will be canceled if any of its output buffers
                  * are asynchronously closed. This will occur if a
-                 * downstream JoinTask discovers that it has satisifed a
+                 * downstream JoinTask discovers that it has satisfied a
                  * SLICE or encountered an error during processing. Either
                  * way, we treat the CancellationException as a "info" NOT
                  * an error.
@@ -697,8 +697,10 @@ abstract public class JoinMasterTask implements IStepTask, IJoinMaster {
     
         if(log.isInfoEnabled()) {
             
+            // the rule state.
             log.info("\n" + ruleState);
 
+            // the rule statistics.
             log.info("\n" + ruleStats);
             
         }

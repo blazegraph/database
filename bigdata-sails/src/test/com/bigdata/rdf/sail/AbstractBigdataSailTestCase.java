@@ -39,7 +39,6 @@ import junit.framework.TestCase2;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * <p>
@@ -206,9 +205,9 @@ abstract public class AbstractBigdataSailTestCase extends TestCase2 {
     // Test helpers.
     //
 
-    protected static final long N = IRawTripleStore.N;
+//    protected static final long N = IRawTripleStore.N;
 
-    protected static final long NULL = IRawTripleStore.NULL;
+//    protected static final long NULL = IRawTripleStore.NULL;
     
     /*
      * test fixtures

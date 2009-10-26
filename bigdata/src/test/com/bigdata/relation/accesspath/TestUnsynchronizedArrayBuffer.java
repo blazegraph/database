@@ -70,14 +70,14 @@ public class TestUnsynchronizedArrayBuffer extends TestCase2 {
      */
     protected static class TestArrayBuffer<E> extends AbstractArrayBuffer<E> {
 
-        TestArrayBuffer(int capacity) {
+        TestArrayBuffer(final int capacity) {
             
-            super(capacity, null/* filter */);
+            super(capacity, Object.class, null/* filter */);
             
         }
 
         @Override
-        protected long flush(int n, E[] a) {
+        protected long flush(final int n, final E[] a) {
 
             fail("Not expecting the syncBuffer to be flushed by this test");
 
@@ -93,10 +93,10 @@ public class TestUnsynchronizedArrayBuffer extends TestCase2 {
          *            
          * @return The chunk at that index.
          */
-        public E get(int index) {
+        public E get(final int index) {
 
-            if (index < 0 || index > size)
-                throw new IndexOutOfBoundsException("index=" + index);
+//            if (index < 0 || index >= size)
+//                throw new IndexOutOfBoundsException("index=" + index);
             
             return buffer[index];
             

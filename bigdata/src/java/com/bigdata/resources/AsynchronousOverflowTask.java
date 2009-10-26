@@ -28,7 +28,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.ITuple;
@@ -39,6 +38,7 @@ import com.bigdata.btree.ScatterSplitConfiguration;
 import com.bigdata.btree.proc.BatchLookup;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IRequiredHostCounters;
@@ -2847,19 +2847,24 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         assert resourceManager.overflowTasksConcurrent >= 0;
         
         final ExecutorService executorService;
+        final boolean shutdownAfter;
         if (resourceManager.overflowTasksConcurrent == 0) {
 
-            // run all tasks in parallel.
+            // run all tasks in parallel on a shared service.
             executorService = resourceManager.getFederation()
                     .getExecutorService();
+            
+            shutdownAfter = false;
 
         } else {
 
-            // run with limited parallelism.
+            // run with limited parallelism on our own service.
             executorService = Executors.newFixedThreadPool(
                     resourceManager.overflowTasksConcurrent,
                     new DaemonThreadFactory(getClass().getName()));
-            
+
+            shutdownAfter = true;
+
         }
 
         try {
@@ -2883,7 +2888,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
                 /*
                  * Non-blocking: all tasks have already either completed or been
-                 * cancelled.
+                 * canceled.
                  */
 
                 getFutureForTask(f, task, 0L, TimeUnit.NANOSECONDS);
@@ -2891,8 +2896,17 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             }
 
         } finally {
+            
+            if(shutdownAfter) {
 
-            executorService.shutdownNow();
+                /*
+                 * Note: this test prevents us from shutting down the
+                 * federation's thread pool!
+                 */
+
+                executorService.shutdownNow();
+                
+            }
 
             //        executorService.awaitTermination(arg0, arg1)
 

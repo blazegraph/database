@@ -141,9 +141,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(y,NULL,NULL);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -181,9 +181,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(y,b,NULL);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -215,9 +215,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(NULL,NULL,w);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -255,9 +255,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(NULL,a,w);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -284,9 +284,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(x,NULL,z);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -313,9 +313,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(x,b,z);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -340,9 +340,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(NULL,a,NULL);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -378,9 +378,9 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
                 SPOAccessPath accessPath = (SPOAccessPath)db.getAccessPath(NULL,NULL,NULL);
                 
                 IChunkedOrderedIterator<ISPO> itr = new OwlSameAsPropertiesExpandingIterator(//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         db, //
                         same,//
                         accessPath.getKeyOrder()
@@ -437,7 +437,7 @@ public class TestOwlSameAsPropertiesExpandingIterator extends AbstractInferenceE
           
         } finally {
             
-            db.closeAndDelete();
+            db.__tearDownUnitTest();
             
         }
         

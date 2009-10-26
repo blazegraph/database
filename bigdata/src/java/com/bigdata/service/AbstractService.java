@@ -181,6 +181,12 @@ abstract public class AbstractService implements IService {
 //    }
 //    private boolean open = true;
 
+    public void destroy() {
+        
+        shutdownNow();
+        
+    }
+    
     /**
      * Note: This is overridden in the jini integration to return a configured
      * name for the service.

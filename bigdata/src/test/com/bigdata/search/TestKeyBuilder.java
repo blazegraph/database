@@ -73,7 +73,7 @@ public class TestKeyBuilder extends TestCase2 {
      */
     protected IKeyBuilder getKeyBuilder() {
 
-        Properties properties = getProperties();
+        final Properties properties = getProperties();
 
         properties.setProperty(KeyBuilder.Options.STRENGTH, properties
             .getProperty(Options.INDEXER_COLLATOR_STRENGTH,
@@ -154,7 +154,7 @@ public class TestKeyBuilder extends TestCase2 {
      * @param a
      * @param b
      */
-    protected void LT(byte[] a, byte[] b) {
+    protected void LT(final byte[] a, final byte[] b) {
 
         final int cmp = BytesUtil.compareBytes(a, b);
 
@@ -172,7 +172,7 @@ public class TestKeyBuilder extends TestCase2 {
      * @param a
      * @param b
      */
-    protected void GT(byte[] a, byte[] b) {
+    protected void GT(final byte[] a, final byte[] b) {
 
         final int cmp = BytesUtil.compareBytes(a, b);
 

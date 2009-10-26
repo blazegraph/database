@@ -43,6 +43,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IBindingSet;
@@ -323,6 +324,12 @@ public class TestDefaultResourceLocator extends TestCase2 {
             return null;
         }
         
+        public Class<ISPO> getElementClass() {
+
+            return null;
+
+        }
+    
     }
     
 }

@@ -57,7 +57,7 @@ public class TestJournalBasics extends TestCase {
     /**
      * Aggregates the test suites into something approximating increasing
      * dependency. This is designed to run as a <em>proxy test suite</em> in
-     * which all tests are run using a common configuration and a delegatation
+     * which all tests are run using a common configuration and a delegation
      * mechanism. You MUST add the returned {@link Test} into a properly
      * configured {@link ProxyTestSuite}.
      * 
@@ -66,7 +66,7 @@ public class TestJournalBasics extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("journal basics");
+        final TestSuite suite = new TestSuite("journal basics");
 
         // tests of creation, lookup, use, commit of named indices.
         suite.addTestSuite(TestNamedIndices.class);
@@ -80,8 +80,14 @@ public class TestJournalBasics extends TestCase {
         // tests the ability to recover and find historical commit records.
         suite.addTestSuite(TestCommitHistory.class);
 
+        // tests the ability to abort operations.
+        suite.addTestSuite(TestAbort.class);
+
         // test ability to rollback a commit.
         suite.addTestSuite(TestRollbackCommit.class);
+
+        // test behavior when journal is opened by two threads.
+        suite.addTestSuite(TestDoubleOpen.class);
 
         // test compacting merge of a Journal.
         suite.addTestSuite(TestCompactJournal.class);

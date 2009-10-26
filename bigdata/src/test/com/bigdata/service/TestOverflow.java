@@ -90,8 +90,8 @@ import com.bigdata.sparse.SparseRowStore;
  *       re-issue the request.
  *       <p>
  *       If the test merely writes and removes index entries under random keys
- *       then it will fairely quickly converge on a stable set of index
- *       partitions. Therefor this should be a "torture" test in the sense that
+ *       then it will fairly quickly converge on a stable set of index
+ *       partitions. Therefore this should be a "torture" test in the sense that
  *       it should focus on causing splits, joins, and moves by its actions.
  *       E.g., write so much data on an index partition that it will be split on
  *       overflow or delete most of the data from an index partition. The client
@@ -126,7 +126,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
     }
 
     /**
-     * Overriden to specify the {@link BufferMode#Disk} mode and to lower the
+     * Overridden to specify the {@link BufferMode#Disk} mode and to lower the
      * threshold at which an overflow operation will be selected.
      */
     public Properties getProperties() {
@@ -272,7 +272,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             // The target #of index entries per partition.
             ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setEntryCountPerSplit(entryCountPerSplit);
 
-            // Overcapacity multipler before an index partition will be split.
+            // Overcapacity multiplier before an index partition will be split.
             ((DefaultSplitHandler)indexMetadata.getSplitHandler()).setOverCapacityMultiplier(overCapacityMultiplier);
             
             // must support delete markers
@@ -394,7 +394,8 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
             nwritten += nentries;
             
-            log.info("Populating the index: nrounds=" + nrounds
+            if (log.isInfoEnabled())
+                log.info("Populating the index: nrounds=" + nrounds
                     + ", nwritten=" + nwritten + ", nentries="
                     + groundTruth.getEntryCount() + " ("
                     + fed.getIndex(name, ITx.UNISOLATED).rangeCount(null, null)
@@ -412,7 +413,8 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Compare the index against ground truth after overflow.
          */
         
-        log.info("Verifying scale-out index against ground truth");
+        if (log.isInfoEnabled())
+            log.info("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name, ITx.UNISOLATED));
 
@@ -437,17 +439,18 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
             
             final byte[][] keys = new byte[ndelete][];
 
-            final ITupleIterator itr = groundTruth.rangeIterator(fromKey,
+            final ITupleIterator<?> itr = groundTruth.rangeIterator(fromKey,
                     toKey, ndelete, IRangeQuery.KEYS, null/* filter */);
-            
-            for(int i=0; i<ndelete; i++) {
-                
+
+            for (int i = 0; i < ndelete; i++) {
+
                 keys[i] = itr.next().getKey();
-                
+
             }
-            
-            log.info("Will delete " + ndelete + " of " + rangeCount
-                    + " entries from " + locator + " to trigger underflow");
+
+            if (log.isInfoEnabled())
+                log.info("Will delete " + ndelete + " of " + rangeCount
+                        + " entries from " + locator + " to trigger underflow");
 
             groundTruth.submit(0/* fromIndex */, ndelete/* toIndex */, keys,
                     null/* vals */, BatchRemoveConstructor.RETURN_NO_VALUES,
@@ -481,7 +484,8 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Compare the index against ground truth after overflow.
          */
         
-        log.info("Verifying scale-out index against ground truth");
+        if (log.isInfoEnabled())
+            log.info("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name, ITx.UNISOLATED));
 
@@ -533,7 +537,8 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
          * Compare the index against ground truth after overflow.
          */
         
-        log.info("Verifying scale-out index against ground truth");
+        if (log.isInfoEnabled())
+            log.info("Verifying scale-out index against ground truth");
 
         assertSameEntryIterator(groundTruth, fed.getIndex(name,ITx.UNISOLATED));
         

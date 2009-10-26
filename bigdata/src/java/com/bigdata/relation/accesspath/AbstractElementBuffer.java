@@ -49,7 +49,7 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
      * @param keyOrder
      *            The natural order in which the elements will appear in the
      *            buffer -or- <code>null</code> if you do not have a
-     *            <em>strong</em> guarentee for that order.
+     *            <em>strong</em> guarantee for that order.
      * @param filter
      *            An optional filter for keeping elements out of the buffer.
      */
@@ -57,10 +57,10 @@ abstract public class AbstractElementBuffer<R> extends AbstractArrayBuffer<R> {
             final IMutableRelation<R> relation, final IKeyOrder<R> keyOrder,
             final IElementFilter<R> filter) {
 
-        super(capacity, filter);
+        super(capacity, relation.getElementClass(), filter);
 
-        if (relation == null)
-            throw new IllegalArgumentException();
+//        if (relation == null)
+//            throw new IllegalArgumentException();
 
         this.relation = relation;
 

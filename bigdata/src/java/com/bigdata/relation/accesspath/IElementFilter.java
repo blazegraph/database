@@ -47,9 +47,15 @@ public interface IElementFilter<E> extends Serializable {
      * @return true iff the element is accepted by the filter.
      */
     public boolean accept(E e);
-    
+
     /**
-     * Can this filter be used on the specified object.
+     * Return true iff this this filter can be used on the specified
+     * object (filter on the object class). 
+     * <p>
+     * Note: This was added
+     * by MikeP to filter out cases where the runtime type system was
+     * throwing a {@link ClassCastException} in the {@link
+     * #accept(Object)} implementation.
      * 
      * @param o
      * @return

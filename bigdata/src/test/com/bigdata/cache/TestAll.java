@@ -64,10 +64,16 @@ public class TestAll extends TestCase {
 //        retval.addTestSuite( TestCacheEntry.class );
 
         // Test LRU semantics.
-        suite.addTestSuite( TestLRUCache.class );
-        
+        suite.addTestSuite(TestLRUCache.class);
+
         // Test cache semantics with weak/soft reference values.
-        suite.addTestSuite( TestWeakValueCache.class );
+        suite.addTestSuite(TestWeakValueCache.class);
+
+        suite.addTestSuite(TestHardReferenceGlobalLRU.class);
+
+        suite.addTestSuite(TestHardReferenceGlobalLRURecycler.class);
+
+        suite.addTestSuite(TestHardReferenceGlobalLRURecyclerExplicitDeleteRequired.class);
         
 //        // Generic test of cache policy.
 //        retval.addTestSuite( TestCachePolicy.class );

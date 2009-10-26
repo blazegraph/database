@@ -73,6 +73,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
@@ -86,12 +87,12 @@ import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.lexicon.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdTupleSerializer;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
-import com.bigdata.rdf.lexicon.Term2IdTupleSerializer.LexiconKeyBuilder;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
 import com.bigdata.rdf.lexicon.Term2IdWriteTask.AssignTermId;
 import com.bigdata.rdf.load.ConcurrentDataLoader;
@@ -294,7 +295,7 @@ import cutthecrap.utils.striterators.Striterator;
  * 
  * }
  * </pre>
- * 
+ *
  * @todo evaluate this approach for writing on a local triple store. if there is
  *       a performance benefit then refactor accordingly (requires asynchronous
  *       write API for BTree and friends).
@@ -399,9 +400,16 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
     private IRunnableBuffer<KVO<BigdataValue>[]> buffer_t2id;
     private IRunnableBuffer<KVO<BigdataValue>[]> buffer_id2t;
     private IRunnableBuffer<KVO<BigdataValue>[]> buffer_text;
-    private IRunnableBuffer<KVO<ISPO>[]> buffer_spo;
-    private IRunnableBuffer<KVO<ISPO>[]> buffer_pos;
-    private IRunnableBuffer<KVO<ISPO>[]> buffer_osp;
+
+    /**
+     * A map containing an entry for each statement index on which this
+     * class will write.
+     */
+    private final Map<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>> buffer_stmts;
+
+//    private IRunnableBuffer<KVO<ISPO>[]> buffer_spo;
+//    private IRunnableBuffer<KVO<ISPO>[]> buffer_pos;
+//    private IRunnableBuffer<KVO<ISPO>[]> buffer_osp;
 
     /**
      * If the TERM2ID asynchronous write buffer is open, then close it to flush
@@ -422,6 +430,35 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         }
 
+        final AsynchronousIndexWriteConfiguration config = tripleStore
+                .getLexiconRelation().getTerm2IdIndex().getIndexMetadata()
+                .getAsynchronousIndexWriteConfiguration();
+        
+//        if(true||BigdataStatics.debug)
+//            System.err.println(config.toString());
+
+        if (config.getSinkIdleTimeoutNanos() > TimeUnit.SECONDS.toNanos(60)) {
+
+            /*
+             * Note: If there is a large sink idle timeout on the TERM2ID index
+             * then the sink will not flush itself automatically once its master
+             * is no longer pushing data. This situation can occur any time the
+             * parser pool is paused. A low sink idle timeout is required for
+             * the TERM2ID sink to flush its writes to the database, so the TIDs
+             * will be assigned, statements for the parsed documents will be
+             * buffered, and new parser threads can begin.
+             * 
+             * @todo This should probably be automatically overridden for this
+             * use case.  However, the asynchronous index configuration is not
+             * currently passed through with the requests but is instead global
+             * (on the IndexMetadata object for the index on the MDS).
+             */
+
+            log.error("Large idle timeout will not preserve liveness: "
+                    + config);
+
+        }
+        
         buffer_t2id = ((IScaleOutClientIndex) lexiconRelation.getTerm2IdIndex())
                 .newWriteBuffer(
                         new Term2IdWriteProcAsyncResultHandler(false/* readOnly */),
@@ -491,56 +528,80 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         }
 
-        if (buffer_spo != null) {
+        for (Map.Entry<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>> e : buffer_stmts
+                .entrySet()) {
 
-            buffer_spo.close();
+            final SPOKeyOrder keyOrder = e.getKey();
 
-            buffer_spo = null;
+            IRunnableBuffer<KVO<ISPO>[]> buffer = e.getValue();
 
-        }
+            if (buffer != null) {
 
-        buffer_spo = ((IScaleOutClientIndex) spoRelation.getSPOIndex())
-                .newWriteBuffer(statementResultHandler,
-                        new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
-                        SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
-
-        if (!tripleStore.getSPORelation().oneAccessPath) {
-
-            if (buffer_pos != null) {
-
-                buffer_pos.close();
-
-                buffer_pos = null;
+                buffer.close();
 
             }
 
-            buffer_pos = ((IScaleOutClientIndex) spoRelation.getPOSIndex())
+            buffer = ((IScaleOutClientIndex) spoRelation.getIndex(keyOrder))
                     .newWriteBuffer(
-                            null/* resultHandler */,
+                            keyOrder.isPrimaryIndex() ? statementResultHandler
+                                    : null,
                             new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
                             SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
-
-            if (buffer_osp != null) {
-
-                buffer_osp.close();
-
-                buffer_osp = null;
-
-            }
-
-            buffer_osp = ((IScaleOutClientIndex) spoRelation.getOSPIndex())
-                    .newWriteBuffer(
-                            null/* resultHandler */,
-                            new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
-                            SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
-
-        } else {
-
-            buffer_pos = null;
-
-            buffer_osp = null;
-
+            
+            e.setValue(buffer);
+            
         }
+        
+//        if (buffer_spo != null) {
+//
+//            buffer_spo.close();
+//
+//            buffer_spo = null;
+//
+//        }
+//
+//        buffer_spo = ((IScaleOutClientIndex) spoRelation.getIndex(SPOKeyOrder.SPO))
+//                .newWriteBuffer(statementResultHandler,
+//                        new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
+//                        SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
+//
+//        if (!tripleStore.getSPORelation().oneAccessPath) {
+//
+//            if (buffer_pos != null) {
+//
+//                buffer_pos.close();
+//
+//                buffer_pos = null;
+//
+//            }
+//
+//            buffer_pos = ((IScaleOutClientIndex) spoRelation.getIndex(SPOKeyOrder.POS))
+//                    .newWriteBuffer(
+//                            null/* resultHandler */,
+//                            new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
+//                            SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
+//
+//            if (buffer_osp != null) {
+//
+//                buffer_osp.close();
+//
+//                buffer_osp = null;
+//
+//            }
+//
+//            buffer_osp = ((IScaleOutClientIndex) spoRelation.getIndex(SPOKeyOrder.OSP))
+//                    .newWriteBuffer(
+//                            null/* resultHandler */,
+//                            new DefaultDuplicateRemover<ISPO>(true/* testRefs */),
+//                            SPOIndexWriteProc.IndexWriteProcConstructor.INSTANCE);
+//
+//        } else {
+//
+//            buffer_pos = null;
+//
+//            buffer_osp = null;
+//
+//        }
 
     }
     
@@ -760,8 +821,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * document have been buffered.  This is used to close the TERM2ID buffer in
      * a timely manner in {@link #close()}.
      */
-    private final Latch bufferGuard_term2Id = new Latch("guard_term2Id",
-            lock);
+    private final Latch guardLatch_term2Id = new Latch("guard_term2Id", lock);
 
     /**
      * {@link Latch} guarding tasks until they have buffered their writes on the
@@ -769,9 +829,14 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * for a given document have been buffered. This is used to close the other
      * buffers in a timely manner in {@link #close()}.
      */
-    private final Latch bufferGuard_other = new Latch("guard_other",
-            lock);
-    
+    private final Latch guardLatch_other = new Latch("guard_other", lock);
+
+    /**
+     * {@link Latch} guarding the notify service until all notices have been
+     * delivered.
+     */
+    private final Latch guardLatch_notify = new Latch("guard_notify", lock);
+
     /*
      * Parser service pause/resume.
      */
@@ -972,6 +1037,45 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         lock.lock();
         try {
 
+            // Note: the parser task will obtain the lock when it runs.
+            final Callable<?> task = newParserTask(resource);
+
+            submitOne(resource, task);
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
+
+    }
+
+    /**
+     * Inner method allows the caller to allocate the task once when the caller
+     * will retry if there is a {@link RejectedExecutionException}.
+     * 
+     * @param The
+     *            resource (file or URL, but not a directory).
+     * @param The
+     *            parser task to run.
+     * 
+     * @throws Exception
+     *             if there is a problem creating the parser task.
+     * @throws RejectedExecutionException
+     *             if the work queue for the parser service is full.
+     */
+    private void submitOne(final R resource, final Callable<?> task)
+            throws Exception {
+
+        if (resource == null)
+            throw new IllegalArgumentException();
+
+        if (task == null)
+            throw new IllegalArgumentException();
+
+        lock.lock();
+        try {
+
             assertSumOfLatchs();
 
             notifyStart();
@@ -986,44 +1090,44 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             assertSumOfLatchs();
 
+            try {
+                
+                /*
+                 * Submit resource for parsing.
+                 * 
+                 * @todo it would be nice to return a Future here that tracked the
+                 * document through the workflow.
+                 */
+
+                parserService.submit(task);
+                
+            } catch (RejectedExecutionException ex) {
+
+                /*
+                 * Back out the document since the task was not accepted for
+                 * execution.
+                 */
+
+//                lock.lock();
+//                try {
+                    assertSumOfLatchs();
+                    workflowLatch_document.dec();
+                    workflowLatch_parser.dec();
+                    assertSumOfLatchs();
+//                } finally {
+//                    lock.unlock();
+//                }
+                
+                throw ex;
+
+            }
+
         } finally {
 
             lock.unlock();
 
         }
-
-        try {
         
-            /*
-             * Submit resource for parsing.
-             * 
-             * @todo it would be nice to return a Future here that tracked the
-             * document through the workflow.
-             */
-
-            parserService.submit(newParserTask(resource));
-            
-        } catch (RejectedExecutionException ex) {
-
-            /*
-             * Back out the document since the task was not accepted for
-             * execution.
-             */
-
-            lock.lock();
-            try {
-                assertSumOfLatchs();
-                workflowLatch_document.dec();
-                workflowLatch_parser.dec();
-                assertSumOfLatchs();
-            } finally {
-                lock.unlock();
-            }
-            
-            throw ex;
-
-        }
-
     }
 
     /**
@@ -1032,7 +1136,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * @param resource
      *            The resource (file or URL, but not a directory).
      * @param retryMillis
-     *            The number of millisseconds to wait between retrys when the
+     *            The number of milliseconds to wait between retries when the
      *            parser service work queue is full. When ZERO (0L), a
      *            {@link RejectedExecutionException} will be thrown out instead.
      * 
@@ -1042,7 +1146,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      *             if the service is shutdown -or- the retryMillis is ZERO(0L).
      */
     public void submitOne(final R resource, final long retryMillis)
-            throws InterruptedException {
+            throws InterruptedException, Exception {
 
         if (resource == null)
             throw new IllegalArgumentException();
@@ -1052,12 +1156,18 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         
         int retryCount = 0;
         
+        final long begin = System.currentTimeMillis();
+        long lastLogTime = begin;
+        
+        // Note: the parser task will obtain the lock when it runs.
+        final Callable<?> task = newParserTask(resource);
+
         while (true) {
             
             try {
 
                 // submit resource for processing.
-                submitOne(resource);
+                submitOne(resource, task);
                 
                 return;
 
@@ -1079,8 +1189,21 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 // sleep for the retry interval.
                 Thread.sleep(retryMillis);
-                
+
                 retryCount++;
+
+                if (log.isInfoEnabled()) {
+                    final long now = System.currentTimeMillis();
+                    final long elapsedSinceLastLogTime = now - lastLogTime;
+                    if (elapsedSinceLastLogTime > 5000) {
+                        final long elapsed = now - begin;
+                        lastLogTime = now;
+                        log.info("Parser pool blocking: retryCount="
+                                + retryCount + ", elapsed=" + elapsed
+                                + "ms, resource=" + resource);
+//                        log.info(getCounters().toString());
+                    }
+                }
                 
                 // retry
                 continue;
@@ -1109,7 +1232,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      *            An optional filter. Only the files selected by the filter will
      *            be processed.
      * @param retryMillis
-     *            The number of millisseconds to wait between retrys when the
+     *            The number of milliseconds to wait between retries when the
      *            parser service work queue is full. When ZERO (0L), a
      *            {@link RejectedExecutionException} will be thrown out instead.
      * 
@@ -1133,8 +1256,18 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * 
      * @param resource
      *            The resource identifier.
+     * 
+     * @todo This will only read the first entry from a ZIP file. Archives need
+     *       to be recognized as such by the driver and expanded into a sequence
+     *       of parser calls with the input stream. That will require a
+     *       different entry point since we can't close the
+     *       {@link ZipInputStream} until we have read all the entries in that
+     *       file. The {@link ZipInputStream} is likely not thread safe so the
+     *       same parser thread would have to consume each of the entries even
+     *       though they must also be dealt with as distinct documents. Given
+     *       all that, reading more than the first entry might not be worth it.
      */
-    protected InputStream getInputStream(R resource) throws IOException {
+    protected InputStream getInputStream(final R resource) throws IOException {
         
         InputStream is;
 
@@ -1428,6 +1561,12 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
         this.pauseParserPoolStatementThreshold = pauseParsedPoolStatementThreshold;
         
+//        if (tripleStore.getSPOKeyArity() != 3) {
+//
+//            throw new UnsupportedOperationException("Quads not supported");
+//            
+//        }
+
         if (tripleStore.isStatementIdentifiers()) {
 
             throw new UnsupportedOperationException("SIDs not supported");
@@ -1443,6 +1582,29 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         try {
 
             reopenBuffer_term2Id();
+
+            /*
+             * Allocate and populate map with the SPOKeyOrders that we will be
+             * using.
+             */
+            buffer_stmts = new LinkedHashMap<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>>(
+                    tripleStore.isQuads() ? 6 : 3);
+
+            final Iterator<SPOKeyOrder> itr = tripleStore.getSPORelation()
+                    .statementKeyOrderIterator();
+
+            while (itr.hasNext()) {
+
+                final SPOKeyOrder keyOrder = itr.next();
+
+                buffer_stmts.put(keyOrder, null/* value */);
+
+            }
+
+            /*
+             * Allocate various buffers. This will populate the buffers in the
+             * map for the keyOrders specified in the map above.
+             */
 
             reopenBuffer_others();
 
@@ -1659,16 +1821,15 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 if (buffer_text.getFuture().isDone())
                     return true;
 
-            if (buffer_spo.getFuture().isDone())
-                return true;
+            for (Map.Entry<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>> e : buffer_stmts
+                    .entrySet()) {
 
-            if (buffer_pos != null)
-                if (buffer_pos.getFuture().isDone())
+                final IRunnableBuffer<KVO<ISPO>[]> buffer = e.getValue();
+
+                if (buffer != null && buffer.getFuture().isDone())
                     return true;
 
-            if (buffer_osp != null)
-                if (buffer_osp.getFuture().isDone())
-                    return true;
+            }
 
             if (parserService.isTerminated())
                 return true;
@@ -1683,6 +1844,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 return true;
 
             return false;
+            
         } finally {
 
             lock.unlock();
@@ -1704,13 +1866,15 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         if (buffer_text != null)
             buffer_text.getFuture().cancel(mayInterruptIfRunning);
 
-        buffer_spo.getFuture().cancel(mayInterruptIfRunning);
+        for (Map.Entry<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>> e : buffer_stmts
+                .entrySet()) {
 
-        if (buffer_pos != null)
-            buffer_pos.getFuture().cancel(mayInterruptIfRunning);
+            final IRunnableBuffer<KVO<ISPO>[]> buffer = e.getValue();
 
-        if (buffer_osp != null)
-            buffer_osp.getFuture().cancel(mayInterruptIfRunning);
+            if (buffer != null)
+                buffer.getFuture().cancel(mayInterruptIfRunning);
+
+        }
 
         notifyEnd();
 
@@ -1739,7 +1903,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                  * No more tasks will request TIDs, so close the TERM2ID master.
                  * It will flush its writes. 
                  */
-                bufferGuard_term2Id.await();
+                guardLatch_term2Id.await();
                 {
                     if (buffer_t2id != null) {
                         if (log.isInfoEnabled()) {
@@ -1765,7 +1929,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                  * No new index write tasks may start (and all should have
                  * terminated by now).
                  */
-                bufferGuard_other.await();
+                guardLatch_other.await();
                 {
                     if (log.isInfoEnabled())
                         log.info("Closing remaining buffers.");
@@ -1775,14 +1939,17 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     if (buffer_text != null)
                         buffer_text.close();
 
-                    buffer_spo.close();
 
-                    if (buffer_pos != null)
-                        buffer_pos.close();
+                    for (Map.Entry<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>> e : buffer_stmts
+                            .entrySet()) {
 
-                    if (buffer_osp != null)
-                        buffer_osp.close();
+                        final IRunnableBuffer<KVO<ISPO>[]> buffer = e.getValue();
 
+                        if(buffer!=null)
+                            buffer.close();
+                        
+                    }
+                    
                     workflowLatch_bufferOther.await();
                     otherWriterService.shutdown();
                     new ShutdownHelper(term2IdWriterService, 10L, TimeUnit.SECONDS) {
@@ -1801,7 +1968,10 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 assertSumOfLatchs();
 
                 if (notifyService != null) {
-                    // shutdown and wait until all files have been delete.
+                    // wait until no notifications are pending.
+                    guardLatch_notify.await();
+                    // note: shutdown should be immediate since nothing should
+                    // be pending.
                     notifyService.shutdown();
                     new ShutdownHelper(notifyService, 10L, TimeUnit.SECONDS) {
                         protected void logTimeout() {
@@ -1844,14 +2014,19 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         if (buffer_text != null)
             buffer_text.getFuture().get();
 
-        buffer_spo.getFuture().get();
+        for (Map.Entry<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>> e : buffer_stmts
+                .entrySet()) {
 
-        if (buffer_pos != null)
-            buffer_pos.getFuture().get();
+            final IRunnableBuffer<KVO<ISPO>[]> buffer = e.getValue();
 
-        if (buffer_osp != null)
-            buffer_osp.getFuture().get();
+            if (buffer != null) {
 
+                buffer.getFuture().get();
+
+            }
+
+        }
+        
         if(log.isInfoEnabled())
             log.info("Done.");
 
@@ -1867,17 +2042,42 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     final protected void documentDone(final R resource) {
 
-        final Runnable task = newSuccessTask(resource);
-       
-        if (task != null) {
-        
-            // queue up success notice.
-            notifyService.submit(task);
+        try {
+            
+            final Runnable task = newSuccessTask(resource);
+
+            if (task != null) {
+                
+                // increment before we submit the task.
+                guardLatch_notify.inc();
+
+                // queue up success notice.
+                notifyService.submit(new Runnable() {
+                    public void run() {
+                        try {
+                            task.run();
+                        } finally {
+                            lock.lock();
+                            try {
+                                // decrement after the task is done.
+                                guardLatch_notify.dec();
+                            } finally {
+                                lock.unlock();
+                            }
+                        }
+                    }
+                });
+                
+            }
+            
+        } catch (Throwable t) {
+
+            log.error(t,t);
             
         }
 
     }
-    
+
     /**
      * Invoked after a document has failed. If
      * {@link #newFailureTask(Object, Throwable)} returns a {@link Runnable}
@@ -1890,35 +2090,53 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     final protected void documentError(final R resource, final Throwable t) {
 
-        lock.lock();
+        assert lock.isHeldByCurrentThread();
+
+        documentErrorCount.incrementAndGet();
+
+        /*
+         * Note: this is responsible for decrementing the #of documents whose
+         * processing is not yet complete. This must be done for each task whose
+         * future is not watched. However, we MUST NOT do this twice for any
+         * given document since that would mess with the counter. That counter
+         * is critical as it forms part of the termination condition for the
+         * total data load operation.
+         */
+
+        workflowLatch_document.dec();
+
         try {
+            
+            final Runnable task = newFailureTask(resource, t);
 
-            documentErrorCount.incrementAndGet();
-            
-            /*
-             * Note: this is responsible for decrementing the #of documents whose
-             * processing is not yet complete. This must be done for each task whose
-             * future is not watched. However, we MUST NOT do this twice for any
-             * given document since that would mess with the counter. That counter
-             * is critical as it forms part of the termination condition for the
-             * total data load operation.
-             */
-            
-            workflowLatch_document.dec();
+            if (task != null) {
 
-        } finally {
-            
-            lock.unlock();
-            
-        }
+                // increment before we submit the task.
+                guardLatch_notify.inc();
 
-        final Runnable task = newFailureTask(resource, t);
-        
-        if (task != null) {
-        
-            // queue up success notice.
-            notifyService.submit(task);
-            
+                // queue up failure notice.
+                notifyService.submit(new Runnable() {
+                    public void run() {
+                        try {
+                            task.run();
+                        } finally {
+                            lock.lock();
+                            try {
+                                // decrement after the task is done.
+                                guardLatch_notify.dec();
+                            } finally {
+                                lock.unlock();
+                            }
+                        }
+                    }
+                });
+
+            }
+
+        } catch (Throwable ex) {
+
+            log.error(ex, ex);
+
         }
 
     }
@@ -1928,15 +2146,14 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      * successfully processed and whose assertions are now restart safe on the
      * database. The task, if any, will be run on the {@link #notifyService}.
      * <p>
-     * The default implementation runs a {@link DeleteTask} IFF <i>deleteAfter</i>
-     * was specified as <code>true</code> to the ctor and otherwise returns
-     * <code>null</code>. The event is logged @ INFO.
+     * The default implementation runs a {@link DeleteTask} IFF
+     * <i>deleteAfter</i> was specified as <code>true</code> to the ctor and
+     * otherwise returns <code>null</code>. The event is logged @ INFO.
      * 
      * @param resource
      *            The resource.
      * 
-     * @return The task to run -or- <code>null</code> if no task should be
-     *         run.
+     * @return The task to run -or- <code>null</code> if no task should be run.
      */
     protected Runnable newSuccessTask(final R resource) {
         
@@ -2196,14 +2413,21 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             bufferGuardSet.addCounter("guardTerm2Id", new Instrument<Long>() {
                 @Override
                 protected void sample() {
-                    setValue(bufferGuard_term2Id.get());
+                    setValue(guardLatch_term2Id.get());
                 }
             });
 
             bufferGuardSet.addCounter("guardOther", new Instrument<Long>() {
                 @Override
                 protected void sample() {
-                    setValue(bufferGuard_other.get());
+                    setValue(guardLatch_other.get());
+                }
+            });
+
+            bufferGuardSet.addCounter("guardNotify", new Instrument<Long>() {
+                @Override
+                protected void sample() {
+                    setValue(guardLatch_notify.get());
                 }
             });
             
@@ -2274,6 +2498,18 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     serviceStatisticsTask.getCounters());
             
         }
+
+//        if(log.isInfoEnabled())
+//        { // @todo this is just for debugging problems with parser blocking.
+//
+//            final String fqn = tripleStore.getLexiconRelation().getFQN(
+//                    LexiconKeyOrder.TERM2ID);
+//
+//            counterSet.makePath("TERM2ID").attach(
+//                    ((AbstractFederation) tripleStore.getIndexManager())
+//                            .getIndexCounters(fqn).getCounters());
+//
+//        }
         
         return counterSet;
 
@@ -2285,11 +2521,11 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
      */
     private class RunnableFileSystemLoader implements Callable<Integer> {
 
-        volatile boolean done = false;
+//        volatile boolean done = false;
 
         private int count = 0;
 
-        private long retryCount = 0L;
+//        private long retryCount = 0L;
         
         final File fileOrDir;
 
@@ -2906,8 +3142,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                     "Not fully bound: " + spo.toString());
 
                         // generate key for the index.
-                        final byte[] key = tupleSer
-                                .statement2Key(keyOrder, spo);
+                        final byte[] key = tupleSer.serializeKey(spo);
 
                         // generate value for the index.
                         final byte[] val = spo.serializeValue(vbuf);
@@ -3196,8 +3431,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 }
 
-                if (log.isDebugEnabled())
-                    log.debug("added: " + bnode);
+                if (log.isTraceEnabled())
+                    log.trace("added: " + bnode);
 
                 // was inserted into the map.
                 return bnode;
@@ -3221,8 +3456,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 // insert this blank node into the map.
                 bnodes.put(id, bnode);
 
-                if (log.isDebugEnabled())
-                    log.debug("added: " + bnode);
+                if (log.isTraceEnabled())
+                    log.trace("added: " + bnode);
 
                 // was inserted into the map.
                 return bnode;
@@ -3311,8 +3546,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             }
 
-            if (log.isDebugEnabled())
-                log.debug("n=" + values.size() + ", added: " + term);
+            if (log.isTraceEnabled())
+                log.trace("n=" + values.size() + ", added: " + term);
 
             // return the new term.
             return term;
@@ -3378,8 +3613,8 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             // total #of statements accepted.
             statementCount++;
 
-            if (log.isDebugEnabled())
-                log.debug("n=" + statementCount + ", added: " + stmt);
+            if (log.isTraceEnabled())
+                log.trace("n=" + statementCount + ", added: " + stmt);
 
         }
 
@@ -3593,29 +3828,20 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
             }
 
-            tasks.add(new AsyncSPOIndexWriteTask(documentRestartSafeLatch,
-                    SPOKeyOrder.SPO, spoRelation,
-                    // (IChunkedOrderedIterator<ISPO>)
-                    statements.iterator(), buffer_spo));
+            for (Map.Entry<SPOKeyOrder, IRunnableBuffer<KVO<ISPO>[]>> e : buffer_stmts
+                    .entrySet()) {
 
-            if (buffer_pos != null) {
+                final SPOKeyOrder keyOrder = e.getKey();
 
+                final IRunnableBuffer<KVO<ISPO>[]> buffer = e.getValue();
+                
                 tasks.add(new AsyncSPOIndexWriteTask(documentRestartSafeLatch,
-                        SPOKeyOrder.POS, spoRelation,
+                        keyOrder, spoRelation,
                         // (IChunkedOrderedIterator<ISPO>)
-                        statements.iterator(), buffer_pos));
+                        statements.iterator(), buffer));
 
             }
-
-            if (buffer_osp != null) {
-
-                tasks.add(new AsyncSPOIndexWriteTask(documentRestartSafeLatch,
-                        SPOKeyOrder.OSP, spoRelation,
-                        // (IChunkedOrderedIterator<ISPO>)
-                        statements.iterator(), buffer_osp));
-
-            }
-
+            
             /*
              * Submit all tasks. They will run in parallel. If they complete
              * successfully then all we know is that the data has been buffered
@@ -3704,7 +3930,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             // new workflow state.
             lock.lock();
             try {
-                bufferGuard_term2Id.inc();
+                guardLatch_term2Id.inc();
                 workflowLatch_parser.dec();
                 workflowLatch_bufferTerm2Id.inc();
                 documentTIDsWaitingCount.incrementAndGet();
@@ -3719,7 +3945,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 lock.lock();
                 try {
-                    bufferGuard_term2Id.dec();
+                    guardLatch_term2Id.dec();
                 } finally {
                     lock.unlock();
                 }
@@ -3730,7 +3956,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 lock.lock();
                 try {
-                    bufferGuard_term2Id.dec();
+                    guardLatch_term2Id.dec();
                     workflowLatch_bufferTerm2Id.dec();
                     documentTIDsWaitingCount.decrementAndGet();
                     documentError(buffer.getDocumentIdentifier(), t);
@@ -3776,7 +4002,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             // new workflow state.
             lock.lock();
             try {
-                bufferGuard_other.inc();
+                guardLatch_other.inc();
                 workflowLatch_bufferTerm2Id.dec();
                 workflowLatch_bufferOther.inc();
                 assertSumOfLatchs();
@@ -3790,7 +4016,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 lock.lock();
                 try {
-                    bufferGuard_other.dec();
+                    guardLatch_other.dec();
                 } finally {
                     lock.unlock();
                 }
@@ -3801,7 +4027,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
 
                 lock.lock();
                 try {
-                    bufferGuard_other.dec();
+                    guardLatch_other.dec();
                     workflowLatch_bufferOther.dec();
                     documentError(buffer.getDocumentIdentifier(), t);
                     outstandingStatementCount.addAndGet(-buffer.statementCount);
@@ -3889,7 +4115,23 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                     
                     while (isPaused()) {
 
-                        unpaused.await();
+                        if (!unpaused.await(60, TimeUnit.SECONDS)) {
+
+//                            /*
+//                             * Note: This was a trial workaround for a liveness
+//                             * problem.  Unfortunately, it did not fix the
+//                             * problem. [The issue was a deadlock in the global
+//                             * LRU, which has been fixed.]
+//                             */
+//                            
+//                            log.error("Flushing TERM2ID buffer: "
+//                                            + AbstractStatisticsCollector.fullyQualifiedHostName);
+//
+//                            reopenBuffer_term2Id();
+
+                            // fall through : while(isPaused()) will retest.
+                            
+                        }
 
                     }
 
@@ -3917,5 +4159,5 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         }
 
     }
-    
+
 } // StatementBufferFactory impl.

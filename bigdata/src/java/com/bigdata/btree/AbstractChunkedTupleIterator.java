@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -489,11 +488,12 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
         lastVisited++; // index of last visited tuple in current result set.
 
-        return tuple;
+        return tuple = new ResultSetTuple(rset, lastVisited);
 
     }
 
-    final private ResultSetTuple tuple = new ResultSetTuple();
+    /** The last tuple returned by #next(). */
+    private ResultSetTuple tuple = null;
 
     /**
      * An {@link ITuple} that draws its data from a {@link ResultSet}.
@@ -501,10 +501,16 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public class ResultSetTuple implements ITuple<E> {
+    private class ResultSetTuple implements ITuple<E> {
 
-        protected ResultSetTuple() {
+        private final ResultSet rset;
+        private final int lastVisited;
+        
+        protected ResultSetTuple(final ResultSet rset, final int lastVisited) {
 
+            this.rset = rset;
+            this.lastVisited = lastVisited;
+            
         }
 
         public int getSourceIndex() {
@@ -539,10 +545,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (lastVisited == -1)
                 throw new IllegalStateException();
 
-            if (!getKeysRequested())
-                throw new UnsupportedOperationException();
-
-            return rset.getKey(lastVisited);
+            return rset.getKeys().get(lastVisited);
 
         }
 
@@ -553,7 +556,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
             if (keyBuffer == null) {
 
-                final int initialCapacity = rset.getKeys().getLength(lastVisited);
+                final int initialCapacity = rset.getKeys().length(lastVisited);
                 
                 keyBuffer = new DataOutputBuffer(initialCapacity);
                 
@@ -561,17 +564,9 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             
             keyBuffer.reset();
             
-            try {
-            
-                rset.getKeys().copyKey(lastVisited, keyBuffer);
+            rset.getKeys().copy(lastVisited, keyBuffer);
 
-                keyBuffer.flip();
-
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+            keyBuffer.flip();
             
             return keyBuffer;
             
@@ -592,7 +587,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (!getValuesRequested())
                 throw new UnsupportedOperationException();
 
-            return rset.getValue(lastVisited);
+            return rset.getValues().get(lastVisited);
 
         }
 
@@ -609,7 +604,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             
             if (valueBuffer == null) {
                 
-                final int initialCapacity = rset.getValues().getLength(lastVisited);
+                final int initialCapacity = rset.getValues().length(lastVisited);
 
                 valueBuffer = new DataOutputBuffer(initialCapacity);
                 
@@ -617,17 +612,9 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             
             valueBuffer.reset();
             
-            try {
+            rset.getValues().copy(lastVisited, valueBuffer);
             
-                rset.getValues().copyKey(lastVisited, valueBuffer);
-                
-                valueBuffer.flip();
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+            valueBuffer.flip();
             
             return valueBuffer;
             
@@ -654,7 +641,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (lastVisited == -1)
                 throw new IllegalStateException();
 
-            if (rset.getVersionTimestamps() == null) {
+            if (!rset.hasVersionTimestamps()) {
 
                 // Version timestamps not maintained by the index.
 
@@ -662,7 +649,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
 
             }
 
-            return rset.getVersionTimestamps()[lastVisited];
+            return rset.getVersionTimestamp(lastVisited);
 
         }
 
@@ -671,7 +658,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
             if (lastVisited == -1)
                 throw new IllegalStateException();
 
-            if (rset.getDeleteMarkers() == null) {
+            if (!rset.hasDeleteMarkers()) {
 
                 // Delete markers not maintained by the index.
                 
@@ -679,7 +666,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
                 
             }
 
-            return rset.getDeleteMarkers()[lastVisited] == 0 ? false : true;
+            return rset.getDeleteMarker(lastVisited);
 
         }
 

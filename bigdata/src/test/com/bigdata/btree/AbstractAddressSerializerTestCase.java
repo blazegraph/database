@@ -111,7 +111,7 @@ abstract public class AbstractAddressSerializerTestCase extends TestCase2 {
 
             DataOutputBuffer os = new DataOutputBuffer(estimatedCapacity);
 
-            ser.putChildAddresses(store.getAddressManger(), os, expectedChildAddrs, nchildren);
+            ser.putChildAddresses(store.getAddressManager(), os, expectedChildAddrs, nchildren);
 
             serialized = os.toByteArray();
 
@@ -128,7 +128,7 @@ abstract public class AbstractAddressSerializerTestCase extends TestCase2 {
 
 //            DataInputBuffer is = new DataInputBuffer(serialized);
             
-            ser.getChildAddresses(store.getAddressManger(),is, actualChildAddrs, nchildren);
+            ser.getChildAddresses(store.getAddressManager(),is, actualChildAddrs, nchildren);
 
             assertEquals("Child addresses", expectedChildAddrs,
                     actualChildAddrs);

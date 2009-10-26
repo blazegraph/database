@@ -167,7 +167,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -235,7 +235,7 @@ public class TestMagicStore extends AbstractInferenceEngineTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         

@@ -31,6 +31,7 @@ package com.bigdata.rdf.spo;
 import java.util.Properties;
 
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.lexicon.ITermIdCodes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -49,7 +50,7 @@ import com.bigdata.relation.rule.NE;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ActionEnum;
-import com.bigdata.relation.rule.eval.DefaultEvaluationPlan;
+import com.bigdata.relation.rule.eval.DefaultEvaluationPlan2;
 import com.bigdata.relation.rule.eval.DefaultEvaluationPlanFactory2;
 import com.bigdata.relation.rule.eval.IEvaluationPlan;
 import com.bigdata.relation.rule.eval.IEvaluationPlanFactory;
@@ -86,20 +87,41 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
         
     }
 
+    /**
+     * This methods was introduced to make the assigned identifiers conform with
+     * the expectations for identifiers as assigned by the lexicon. This was
+     * necessitated by the change to {@link ISPO#hasStatementIdentifier()} to
+     * test the term id bits.
+     */
+    private static long uriId(long in) {
+        return in << ITermIdCodes.TERMID_CODE_MASK_BITS
+                | ITermIdCodes.TERMID_CODE_URI;
+    }
+
+//    private static long literalId(long in) {
+//        return in << ITermIdCodes.TERMID_CODE_MASK_BITS
+//                | ITermIdCodes.TERMID_CODE_LITERAL;
+//    }
+//
+//    private static long bnodeId(long in) {
+//        return in << ITermIdCodes.TERMID_CODE_MASK_BITS
+//                | ITermIdCodes.TERMID_CODE_BNODE;
+//    }
+
     protected final static Constant<Long> rdfsSubClassOf = new Constant<Long>(
-            1L);
+            uriId(1L));
     
     protected final static Constant<Long> rdfsResource = new Constant<Long>(
-            2L);
+            uriId(2L));
     
     protected final static Constant<Long> rdfType = new Constant<Long>(
-            3L);
+            uriId(3L));
     
     protected final static Constant<Long> rdfsClass = new Constant<Long>(
-            4L);
+            uriId(4L));
 
     protected final static Constant<Long> rdfProperty = new Constant<Long>(
-            5L);
+            uriId(5L));
 
     /**
      * this is rdfs9:
@@ -231,10 +253,10 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         // tail
                         new SPOPredicate[] {//
                                 new SPOPredicate(relationIdentifier,
-                                        new Constant<Long>(2L), Var.var("y"),
+                                        new Constant<Long>(uriId(2L)), Var.var("y"),
                                         Var.var("z")),//
                                 new SPOPredicate(relationIdentifier, Var.var("x"),
-                                        Var.var("y"), new Constant<Long>(1L)) //
+                                        Var.var("y"), new Constant<Long>(uriId(1L))) //
                         },
                         // constraints
                         new IConstraint[] {});
@@ -256,7 +278,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -292,11 +314,11 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             final SPORelation spoRelation = store.getSPORelation();
 
             // define some vocabulary.
-            final IConstant<Long> U1 = new Constant<Long>(11L);
-            final IConstant<Long> U2 = new Constant<Long>(12L);
-            final IConstant<Long> V1 = new Constant<Long>(21L);
-            final IConstant<Long> V2 = new Constant<Long>(22L);
-            final IConstant<Long> X1 = new Constant<Long>(31L);
+            final IConstant<Long> U1 = new Constant<Long>(uriId(11L));
+            final IConstant<Long> U2 = new Constant<Long>(uriId(12L));
+            final IConstant<Long> V1 = new Constant<Long>(uriId(21L));
+            final IConstant<Long> V2 = new Constant<Long>(uriId(22L));
+            final IConstant<Long> X1 = new Constant<Long>(uriId(31L));
             // final IConstant<Long> X2 = new Constant<Long>(32L);
 
             // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
@@ -311,7 +333,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
              */
             {
 
-                final IEvaluationPlan plan = new DefaultEvaluationPlan(
+                final IEvaluationPlan plan = new DefaultEvaluationPlan2(
                         joinNexus, rule);
 
                 log.info("original plan=" + plan);
@@ -405,7 +427,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
              */
             {
 
-                final IEvaluationPlan plan = new DefaultEvaluationPlan(
+                final IEvaluationPlan plan = new DefaultEvaluationPlan2(
                         joinNexus, rule);
 
                 log.info("updated plan=" + plan);
@@ -461,7 +483,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -476,7 +498,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
      * 
      * @todo the test is only verifying insert by range counts on access paths
      *       corresponding to the predicates in the tail of the rule. it should
-     *       go futher and verify the specific elements.
+     *       go further and verify the specific elements.
      * 
      * @todo test rule that deletes the computed solutions.
      */
@@ -504,11 +526,11 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
             final SPORelation spoRelation = store.getSPORelation();
 
             // define some vocabulary.
-            final IConstant<Long> U1 = new Constant<Long>(11L);
-            final IConstant<Long> U2 = new Constant<Long>(12L);
-            final IConstant<Long> V1 = new Constant<Long>(21L);
-            final IConstant<Long> V2 = new Constant<Long>(22L);
-            final IConstant<Long> X1 = new Constant<Long>(31L);
+            final IConstant<Long> U1 = new Constant<Long>(uriId(11L));
+            final IConstant<Long> U2 = new Constant<Long>(uriId(12L));
+            final IConstant<Long> V1 = new Constant<Long>(uriId(21L));
+            final IConstant<Long> V2 = new Constant<Long>(uriId(22L));
+            final IConstant<Long> X1 = new Constant<Long>(uriId(31L));
             // final IConstant<Long> X2 = new Constant<Long>(32L);
 
             // (?u,rdfs:subClassOf,?x), (?v,rdf:type,?u) -> (?v,rdf:type,?x)
@@ -618,7 +640,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 //                 */
 //                store.commit();
                 
-                log.info("\n\nQuery with data in KB\n");
+                if(log.isInfoEnabled())
+                        log.info("\n\nQuery with data in KB\n");
 
                 final IChunkedOrderedIterator<ISolution> itr = joinNexus
                         .runQuery(rule);
@@ -656,6 +679,10 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
                     }
 
+                    if(itr.hasNext()) {
+                        fail("Not expecting another solution: "+itr.next());
+                    }
+                    
                 } finally {
 
                     itr.close();
@@ -677,7 +704,8 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
                         backchain, planFactory).newInstance(
                         store.getIndexManager());
 
-                log.info("\n\nRun rules as insert operations\n");
+                if(log.isInfoEnabled())
+                    log.info("\n\nRun rules as insert operations\n");
 
                 final long mutationCount = joinNexus.runMutation(rule);
 
@@ -704,7 +732,7 @@ public class TestSPORelation extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 

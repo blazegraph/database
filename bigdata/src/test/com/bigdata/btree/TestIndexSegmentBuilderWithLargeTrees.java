@@ -199,7 +199,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     
     /**
      * A stress test for building {@link IndexSegment}s. A variety of
-     * {@link BTree}s are built from spase random keys using a variety of
+     * {@link BTree}s are built from sparse random keys using a variety of
      * branching factors. For each {@link BTree}, a variety of
      * {@link IndexSegment}s are built using a variety of output branching
      * factors. For each {@link IndexSegment}, we then compare it against its
@@ -207,11 +207,11 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
      */
     public void test_randomSparseKeys() throws Exception {
 
-        int trace = 0;
+        final int trace = 0;
         
-        for(int i=0; i<branchingFactors.length; i++) {
-            
-            int m = branchingFactors[i];
+        for (int i = 0; i < branchingFactors.length; i++) {
+
+            final int m = branchingFactors[i];
             
             doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m,trace));
             
@@ -233,8 +233,9 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
      * 
      * @param btree The source btree.
      */
-    public void doBuildIndexSegmentAndCompare(BTree btree) throws Exception {
-        
+    public void doBuildIndexSegmentAndCompare(final BTree btree) throws Exception {
+
+        try {
         // branching factors used for the index segment.
         final int branchingFactors[] = new int[] { 257, 512, 4196, 8196};
         
@@ -272,6 +273,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
              */
             System.err.println("Opening index segment.");
             final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
+            try {
             
             // verify fast forward leaf scan.
             testForwardScan(seg);
@@ -289,30 +291,34 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
             seg.close();
 
             /*
-             * Note: close() is a reversable operation. This verifies that by
+             * Note: close() is a reversible operation. This verifies that by
              * immediately re-verifying the index segment. The index segment
              * SHOULD be transparently re-opened for this operation.
              */
             System.err.println("Re-verifying index segment.");
             assertSameBTree(btree, seg);
-
+            } finally {
             // Close again so that we can delete the backing file.
             System.err.println("Re-closing index segment.");
             seg.close();
-            
+            seg.getStore().destroy();
+
             if (!outFile.delete()) {
 
                 log.warn("Could not delete index segment: " + outFile);
 
             }
+            }
 
         } // build index segment with the next branching factor.
 
+        } finally {
         /*
          * Closing the journal.
          */
         System.err.println("Closing journal.");
         btree.getStore().destroy();
+        }
         
     }
 

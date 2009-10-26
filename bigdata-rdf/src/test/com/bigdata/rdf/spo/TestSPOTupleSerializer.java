@@ -60,9 +60,12 @@ import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOTupleSerializer;
 
 /**
+ * Test suite for {@link SPOTupleSerializer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @see TestSPO#test_valueEncodingRoundTrip()
  */
 public class TestSPOTupleSerializer extends TestCase2 {
 
@@ -83,9 +86,9 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
         SPOTupleSerializer fixture = new SPOTupleSerializer(SPOKeyOrder.SPO);
         
-        byte[] k1 = fixture.statement2Key(1, 2, 3);
-        byte[] k2 = fixture.statement2Key(2, 2, 3);
-        byte[] k3 = fixture.statement2Key(2, 2, 4);
+        byte[] k1 = fixture.serializeKey(new SPO(1, 2, 3));
+        byte[] k2 = fixture.serializeKey(new SPO(2, 2, 3));
+        byte[] k3 = fixture.serializeKey(new SPO(2, 2, 4));
         
         System.err.println("k1(1,2,2) = "+BytesUtil.toString(k1));
         System.err.println("k2(2,2,3) = "+BytesUtil.toString(k2));
@@ -95,8 +98,8 @@ public class TestSPOTupleSerializer extends TestCase2 {
         assertTrue(BytesUtil.compareBytes(k2, k3)<0);
 
     }
-    
-    public void test_encodeDecode() {
+
+    public void test_encodeDecodeTriple() {
 
         doEncodeDecodeTest(new SPO(1, 2, 3, StatementEnum.Axiom),
                 SPOKeyOrder.SPO);
@@ -106,6 +109,10 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
         doEncodeDecodeTest(new SPO(1, 2, 3, StatementEnum.Inferred),
                 SPOKeyOrder.OSP);
+
+    }
+    
+    public void test_encodeDecodeTripleWithSID() {
 
         /*
          * Note: [sid] is a legal statement identifier.
@@ -143,20 +150,38 @@ public class TestSPOTupleSerializer extends TestCase2 {
             doEncodeDecodeTest(spo, SPOKeyOrder.OSP);
             
         }
-        
 
     }
-    
+
+    public void test_encodeDecodeQuad() {
+
+        for (int i = SPOKeyOrder.FIRST_QUAD_INDEX; i <= SPOKeyOrder.LAST_QUAD_INDEX; i++) {
+         
+            final SPOKeyOrder keyOrder = SPOKeyOrder.valueOf(i);
+            
+            doEncodeDecodeTest(new SPO(1, 2, 3, 4, StatementEnum.Axiom),
+                    keyOrder);
+            
+            doEncodeDecodeTest(new SPO(1, 2, 3, 4, StatementEnum.Inferred),
+                    keyOrder);
+            
+            doEncodeDecodeTest(new SPO(1, 2, 3, 4, StatementEnum.Explicit),
+                    keyOrder);
+            
+        }
+
+    }
+
     protected void doEncodeDecodeTest(final SPO expected, SPOKeyOrder keyOrder) {
         
         final SPOTupleSerializer fixture = new SPOTupleSerializer(
                 keyOrder);
 
         // encode key
-        byte[] key = fixture.serializeKey(expected);
+        final byte[] key = fixture.serializeKey(expected);
 
         // encode value.
-        byte[] val = fixture.serializeVal(expected);
+        final byte[] val = fixture.serializeVal(expected);
 
         /*
          * verify decoding.
@@ -181,17 +206,24 @@ public class TestSPOTupleSerializer extends TestCase2 {
             
         }
         
+        // Note: equals() does not test the context position.
+        assertEquals("c", expected.c(), actual.c()); 
+        
         if (expected.hasStatementType()) {
 
-            assertEquals("type", expected.getStatementType(), actual.getStatementType());
+            assertEquals("type", expected.getStatementType(), actual
+                    .getStatementType());
 
         }
-        
+
+        assertEquals(expected.hasStatementIdentifier(), actual
+                .hasStatementIdentifier());
+
         if(expected.hasStatementIdentifier()) {
             
             assertEquals("statementIdentifier", expected
                     .getStatementIdentifier(), actual.getStatementIdentifier());
-
+            
         }
 
     }

@@ -102,7 +102,7 @@ public class ReadCommittedView implements ILocalBTreeView {
          * @param name
          *            The name of the index.
          */
-        public Basis(AbstractJournal journal, String name) {
+        public Basis(final AbstractJournal journal, final String name) {
 
             // the live journal.
             this.journal = journal;

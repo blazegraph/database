@@ -63,7 +63,7 @@ public class EmbeddedClient<T> extends AbstractScaleOutClient<T> {
         
     }
     
-    synchronized public void disconnect(boolean immediateShutdown) {
+    synchronized public void disconnect(final boolean immediateShutdown) {
         
         if (fed != null) {
 
@@ -115,13 +115,16 @@ public class EmbeddedClient<T> extends AbstractScaleOutClient<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    public static interface Options extends IBigdataClient.Options, MetadataService.Options {
+    public static interface Options extends IBigdataClient.Options,
+            MetadataService.Options {
 
         /**
          * The name of the optional property whose value is the #of data
          * services that will be (re-)started.
          */
-        public static String NDATA_SERVICES = EmbeddedFederation.class.getName()+".ndataServices";
+        public static String NDATA_SERVICES = EmbeddedFederation.class
+                .getName()
+                + ".ndataServices";
 
         /**
          * The default is two (2).
@@ -146,7 +149,9 @@ public class EmbeddedClient<T> extends AbstractScaleOutClient<T> {
          * data directory. Otherwise a new federation starting up with another
          * federation's data directory will attempt to re-start that federation.
          */
-        public static final String DATA_DIR = EmbeddedFederation.class.getName()+".dataDir";
+        public static final String DATA_DIR = EmbeddedFederation.class
+                .getName()
+                + ".dataDir";
 
     }
 

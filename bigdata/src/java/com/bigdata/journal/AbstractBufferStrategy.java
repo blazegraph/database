@@ -28,6 +28,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
+import java.util.UUID;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -97,7 +98,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * array or native memory (both are limited to int32 bytes since they
      * are addressed by a Java <code>int</code>).
      */
-    protected static final String ERR_INT32 = "Would exceed int32 bytes.";
+    protected static final String ERR_INT32 = "Would exceed int32 bytes (not allowed unless backed by disk).";
     
     /**
      * Text of the error message used when
@@ -110,6 +111,14 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * Error message used when the writes are not allowed.
      */
     protected static final String ERR_READ_ONLY = "Read only";
+
+    /**
+     * Error message used when the record size is invalid (e.g., negative).
+     * 
+     * @todo There is some overlap with {@link #ERR_RECORD_LENGTH_ZERO} and
+     *       {@link #ERR_BUFFER_EMPTY}.
+     */
+    protected static final String ERR_BAD_RECORD_SIZE = "Bad record size";
     
     /**
      * Error message used when the store is closed. 
@@ -125,6 +134,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * <code>true</code> iff the {@link IBufferStrategy} is read-only.
      */
     private boolean readOnly;
+
+//    private final UUID storeUUID;
     
     protected final long initialExtent;
     protected final long maximumExtent;
@@ -162,6 +173,12 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
     
+//    final public UUID getUUID() {
+//        
+//        return storeUUID;
+//        
+//    }
+    
     final public long getInitialExtent() {
         
         return initialExtent;
@@ -185,14 +202,16 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         return nextOffset;
         
     }
-    
+
     /**
      * (Re-)open a buffer.
      * 
-     * @param initialExtent -
-     *            as defined by {@link #getInitialExtent()}
-     * @param maximumExtent -
-     *            as defined by {@link #getMaximumExtent()}.
+     * @param storeUUID
+     *            The UUID that identifies the owning {@link IRawStore}.
+     * @param initialExtent
+     *            - as defined by {@link #getInitialExtent()}
+     * @param maximumExtent
+     *            - as defined by {@link #getMaximumExtent()}.
      * @param offsetBits
      *            The #of bits that will be used to represent the byte offset in
      *            the 64-bit long integer addresses for the store. See
@@ -204,15 +223,20 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * @param bufferMode
      *            The {@link BufferMode}.
      */
-    AbstractBufferStrategy(long initialExtent, long maximumExtent,
-            int offsetBits, long nextOffset, BufferMode bufferMode, boolean readOnly) {
+    AbstractBufferStrategy(
+            // UUID storeUUID,
+            long initialExtent, long maximumExtent, int offsetBits,
+            long nextOffset, BufferMode bufferMode, boolean readOnly) {
 
         super(offsetBits);
         
         assert nextOffset >= 0;
-        
-        if( bufferMode == null ) throw new IllegalArgumentException();
 
+        if (bufferMode == null)
+            throw new IllegalArgumentException();
+
+//        this.storeUUID = storeUUID;
+        
         this.initialExtent = initialExtent;
         
         this.maximumExtent = maximumExtent; // MAY be zero!
@@ -277,22 +301,24 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     /**
      * Invoked if the store would exceed its current extent by
      * {@link #write(ByteBuffer)}. The default behavior extends the capacity of
-     * the buffer by the maximum of 32M or the {@link Options#INITIAL_EXTENT}.
+     * the buffer by the at least the requested amount and a maximum of 32M or
+     * the {@link Options#INITIAL_EXTENT}.
+     * <p>
+     * If the data are fully buffered, then the maximum store size is limited to
+     * int32 bytes which is the maximum #of bytes that can be addressed in RAM
+     * (the pragmatic maximum is slightly less than 2G due to the limits of the
+     * JVM to address system memory).
      * 
      * @return true if the capacity of the store was extended and the write
-     *         operation should be retried. If the data are fully buffered, the
-     *         the maximum store size is limited to int32 bytes which is the
-     *         maximum #of bytes that can be addressed in RAM (the pragmatic
-     *         maximum is slightly less than 2G due to the limits of the JVM to
-     *         address system memory).
+     *         operation should be retried.
      */
-    final public boolean overflow(long needed) {
+    final public boolean overflow(final long needed) {
 
         final long userExtent = getUserExtent();
         
         final long required = userExtent + needed;
         
-        if (required > Integer.MAX_VALUE && bufferMode != BufferMode.Disk) {
+        if (required > Integer.MAX_VALUE && bufferMode.isFullyBuffered()) {
             
             /*
              * Would overflow int32 bytes and data are buffered in RAM.
@@ -303,9 +329,9 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
             return false;
             
         }
-        
-        if( maximumExtent != 0L && required > maximumExtent ) {
-            
+
+        if (maximumExtent != 0L && required > maximumExtent) {
+
             /*
              * Would exceed the maximum extent (iff a hard limit).
              * 
@@ -313,32 +339,48 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
              * overflows the in-memory buffer onto the disk.
              */
 
-            if(WARN)
-                log.warn("Would exceed maximumExtent="+maximumExtent);
+            if (WARN)
+                log.warn("Would exceed maximumExtent=" + maximumExtent);
 
             return false;
-            
+
         }
-        
+
         /*
-         * Increase by the initial extent or by 32M, whichever is greater.
+         * Increase by the initial extent or by 32M, whichever is greater, but
+         * by no less that the requested amount.
          */
         long newExtent = userExtent
-                + Math.max(initialExtent, Bytes.megabyte * 32);
+                + Math.max(needed, Math.max(initialExtent,
+                                Bytes.megabyte * 32));
         
-        if( newExtent > Integer.MAX_VALUE && bufferMode != BufferMode.Disk) {
+        if (newExtent > Integer.MAX_VALUE && bufferMode.isFullyBuffered()) {
 
             /*
-             * Do not allocate more than int32 bytes when using a buffered mode.
+             * Do not allocate more than int32 bytes when using a buffered mode
+             * (anything not backed by the disk).
              */
+
             newExtent = Integer.MAX_VALUE;
+
+            if (newExtent - userExtent < needed) {
+
+                /*
+                 * Not enough room in memory for the requested extension.
+                 */
+
+                log.error(ERR_INT32);
+                
+                return false;
+                
+            }
             
         }
 
         /*
          * Extend the capacity.
          */
-        truncate( newExtent );
+        truncate(newExtent);
 
         // report event.
         ResourceManager.extendJournal(getFile() == null ? null : getFile()
@@ -494,6 +536,18 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 //                + "ms");
 //
 //        return count;
+        
+    }
+
+    /**
+     * Not supported - this is available on the {@link AbstractJournal}.
+     * 
+     * @throws UnsupportedOperationException
+     *             always
+     */
+    public UUID getUUID() {
+        
+        throw new UnsupportedOperationException();
         
     }
 

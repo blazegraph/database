@@ -69,11 +69,13 @@ public class TestPredicate extends TestCase2 {
 
             final IPredicate p1 = new P(relation, new IVariableOrConstant[] { u, c1, c2 });
             
-            log.info(p1.toString());
+            if (log.isInfoEnabled())
+                log.info(p1.toString());
 
             assertEquals("arity", 3, p1.arity());
             
-            assertEquals("variableCount", 1, p1.getVariableCount());
+            // Note: test can not be written for getVariableCount(keyOrder) w/o a keyOrder impl.
+//            assertEquals("variableCount", 1, p1.getVariableCount());
 
             assertEquals(u,p1.get(0));
 
@@ -91,11 +93,13 @@ public class TestPredicate extends TestCase2 {
 
             final IPredicate p1 = new P(relation, new IVariableOrConstant[]{u, c1, v});
 
-            log.info(p1.toString());
+            if (log.isInfoEnabled())
+                log.info(p1.toString());
 
             assertEquals("arity", 3, p1.arity());
 
-            assertEquals("variableCount", 2, p1.getVariableCount());
+            // Note: test can not be written for getVariableCount(keyOrder) w/o a keyOrder impl.
+//            assertEquals("variableCount", 2, p1.getVariableCount());
 
             assertEquals(u, p1.get(0));
 
@@ -118,9 +122,13 @@ public class TestPredicate extends TestCase2 {
 
         final IPredicate p2 = new P(relation, new IVariableOrConstant[] { u, c3, c4 });
 
-        log.info(p1.toString());
+        if (log.isInfoEnabled()) {
 
-        log.info(p2.toString());
+            log.info(p1.toString());
+            
+            log.info(p2.toString());
+            
+        }
 
         assertFalse(p1.equals(p2));
 

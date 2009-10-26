@@ -198,8 +198,8 @@ public class AbstractMasterTestCase extends TestCase2 {
 
                 // Note: Could have hashed on the Object value as easily as the
                 // key, which would make sense for some applications.
-                final int i = e.key.hashCode() % N;
-
+                final int i = Math.abs(java.util.Arrays.hashCode(e.key) % N);
+                
                 if (v[i] == null) {
 
                     v[i] = new LinkedList<KVO<O>>();

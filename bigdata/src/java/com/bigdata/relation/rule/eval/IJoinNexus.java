@@ -152,7 +152,7 @@ public interface IJoinNexus {
      * <p>
      * Note: The bindings are propagated before the constraints are verified so
      * this method will have a side-effect on the bindings even if the
-     * constraints were not satisified. Therefore you should clone the bindings
+     * constraints were not satisfied. Therefore you should clone the bindings
      * before calling this method.
      * 
      * @param rule

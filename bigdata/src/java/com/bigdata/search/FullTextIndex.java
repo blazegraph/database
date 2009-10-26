@@ -76,13 +76,13 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryStore;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.relation.AbstractRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.service.IBigdataClient;
-import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.concurrent.ExecutionHelper;
 
@@ -166,13 +166,13 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * convention of assuming a token frequency of ONE (1) for each document in
  * which the token appears.
  * <p>
- * Tokenization is informed by the language code for a {@link Literal} (when
- * declared) and by the configured {@link Locale} for the database otherwise. An
- * appropriate {@link Analyzer} is chosen based on the language code or
- * {@link Locale} and the "document" is broken into a token-frequency
- * distribution (alternatively a set of tokens). The same process is used to
- * tokenize queries, and the API allows the caller to specify the language code
- * used to select the {@link Analyzer} to tokenize the query.
+ * Tokenization is informed by the language code (when declared) and by the
+ * configured {@link Locale} for the database otherwise. An appropriate
+ * {@link Analyzer} is chosen based on the language code or {@link Locale} and
+ * the "document" is broken into a token-frequency distribution (alternatively a
+ * set of tokens). The same process is used to tokenize queries, and the API
+ * allows the caller to specify the language code used to select the
+ * {@link Analyzer} to tokenize the query.
  * <p>
  * Once the tokens are formed the language code / {@link Locale} used to produce
  * the token is discarded (it is not represented in the index). The reason for
@@ -188,9 +188,6 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  * application, the {@link Locale} for the collator is likewise not critical and
  * PRIMARY strength will produce significantly shorter Unicode sort keys.
  * <p>
- * A map from tokens extracted from {@link Literal}s to the term identifiers of
- * the literals from which those tokens were extracted.
- * 
  * The term frequency within that literal is an optional property associated
  * with each term identifier, as is the computed weight for the token in the
  * term.
@@ -251,7 +248,8 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  */
 public class FullTextIndex extends AbstractRelation {
 
-    final protected static Logger log = Logger.getLogger(FullTextIndex.class);
+    final protected static transient Logger log = Logger
+            .getLogger(FullTextIndex.class);
 
 //    /**
 //     * True iff the {@link #log} level is INFO or less.
@@ -266,13 +264,26 @@ public class FullTextIndex extends AbstractRelation {
     /**
      * The backing index.
      */
-    private IIndex ndx;
+    volatile private IIndex ndx;
 
     /**
      * The index used to associate term identifiers with tokens parsed from
      * documents.
      */
     public IIndex getIndex() {
+        
+        if(ndx == null) {
+
+            synchronized (this) {
+
+                ndx = getIndex(getNamespace() + "." + NAME_SEARCH);
+
+                if (ndx == null)
+                    throw new IllegalStateException();
+                
+            }
+            
+        }
         
         return ndx;
         
@@ -310,9 +321,9 @@ public class FullTextIndex extends AbstractRelation {
          * 
          * @todo the configuration should probably come from a configuration
          *       properties stored for the full text indexer in the
-         *       {@link IBigdataFederation#getGlobalRowStore(timestamp)}. The main issue
-         *       is how you want to encode unicode strings for search, which can
-         *       be different than encoding for other purposes.
+         *       {@link IIndexManager#getGlobalRowStore()}. The main issue is
+         *       how you want to encode unicode strings for search, which can be
+         *       different than encoding for other purposes.
          * 
          * @todo consider modifying the default system so that defaults can be
          *       made on a per-index, per-application, or per-namespace basis.
@@ -364,7 +375,7 @@ public class FullTextIndex extends AbstractRelation {
      */
     final public boolean isReadOnly() {
         
-        return getTimestamp() != ITx.UNISOLATED;
+        return TimestampUtility.isReadOnly(getTimestamp());
         
     }
 
@@ -394,8 +405,9 @@ public class FullTextIndex extends AbstractRelation {
      *       #of entries) are reasonable. The #of entries per split could be
      *       smaller if we know that we are storing more data in the values.
      */
-    public FullTextIndex(IIndexManager indexManager, String namespace,
-            Long timestamp, Properties properties) {
+    public FullTextIndex(final IIndexManager indexManager,
+            final String namespace, final Long timestamp,
+            final Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
         
@@ -412,17 +424,20 @@ public class FullTextIndex extends AbstractRelation {
 
         // indexer.timeout
         {
-            
+
             timeout = Long.parseLong(properties.getProperty(
                     Options.INDEXER_TIMEOUT, Options.DEFAULT_INDEXER_TIMEOUT));
 
             if (log.isInfoEnabled())
-            log.info(Options.INDEXER_TIMEOUT+ "=" + timeout);
+                log.info(Options.INDEXER_TIMEOUT + "=" + timeout);
 
         }
-        
-        // resolve index (might not exist, in which case this will be null).
-        ndx = getIndex(getNamespace()+"."+NAME_SEARCH);
+
+        /*
+         * Note: defer resolution of the index.
+         */
+//        // resolve index (might not exist, in which case this will be null).
+//        ndx = getIndex(getNamespace()+"."+NAME_SEARCH);
         
     }
 
@@ -467,7 +482,10 @@ public class FullTextIndex extends AbstractRelation {
             if (log.isInfoEnabled())
                 log.info("Registered new text index: name=" + name);
 
-            ndx = getIndex(name);
+            /*
+             * Note: defer resolution of the index.
+             */
+//            ndx = getIndex(name);
 
 //        } finally {
 //
@@ -509,7 +527,7 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @return The token analyzer best suited to the indicated language family.
      */
-    protected Analyzer getAnalyzer(String languageCode) {
+    protected Analyzer getAnalyzer(final String languageCode) {
 
         final IKeyBuilder keyBuilder = getKeyBuilder();
 
@@ -811,7 +829,7 @@ public class FullTextIndex extends AbstractRelation {
              * a B+Tree.
              */
 
-            Properties properties = getProperties();
+            final Properties properties = getProperties();
 
             properties.setProperty(KeyBuilder.Options.STRENGTH, properties
                     .getProperty(Options.INDEXER_COLLATOR_STRENGTH,
@@ -1068,7 +1086,7 @@ public class FullTextIndex extends AbstractRelation {
      * 
      * @see Options#INDEXER_TIMEOUT
      */
-    public Hiterator search(String query, String languageCode) {
+    public Hiterator search(final String query, final String languageCode) {
 
         return search(query, languageCode, false/* prefixMatch */);
         
@@ -1077,8 +1095,8 @@ public class FullTextIndex extends AbstractRelation {
     /*
      * FIXME [prefixMatch] has not been implemented yet.
      */
-    public Hiterator search(String query, String languageCode,
-            boolean prefixMatch) {
+    public Hiterator search(final String query, final String languageCode,
+            final boolean prefixMatch) {
 
         return search( //
                 query,//
@@ -1339,14 +1357,17 @@ public class FullTextIndex extends AbstractRelation {
      * @todo implement the relevant methods.
      */
 
+    @SuppressWarnings("unchecked")
     public long delete(IChunkedOrderedIterator itr) {
         throw new UnsupportedOperationException();
     }
 
+    @SuppressWarnings("unchecked")
     public long insert(IChunkedOrderedIterator itr) {
         throw new UnsupportedOperationException();
     }
 
+    @SuppressWarnings("unchecked")
     public IAccessPath getAccessPath(IPredicate predicate) {
         throw new UnsupportedOperationException();
     }
@@ -1355,8 +1376,13 @@ public class FullTextIndex extends AbstractRelation {
         throw new UnsupportedOperationException();
     }
 
+    @SuppressWarnings("unchecked")
     public Object newElement(IPredicate predicate,
             IBindingSet bindingSet) {
+        throw new UnsupportedOperationException();
+    }
+    
+    public Class<?> getElementClass() {
         throw new UnsupportedOperationException();
     }
         

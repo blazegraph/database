@@ -72,8 +72,9 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
      * @param db
      * @param head The statement whose justifications will be materialized.
      */
-    public FullyBufferedJustificationIterator(AbstractTripleStore db, ISPO head) {
-        
+    public FullyBufferedJustificationIterator(final AbstractTripleStore db,
+            final ISPO head) {
+
         assert db != null;
         
         assert head != null;
@@ -82,16 +83,17 @@ public class FullyBufferedJustificationIterator implements IJustificationIterato
         
         this.head = head;
         
-        this.ndx = db.getJustificationIndex();
+        this.ndx = db.getSPORelation().getJustificationIndex();
         
-        keyBuilder = new KeyBuilder(db.N * (1 + 3) * Bytes.SIZEOF_LONG);
-        
-        byte[] fromKey = keyBuilder.reset().append(head.s()).append(head.p())
-                .append(head.o()).getKey();
+        keyBuilder = new KeyBuilder(db.getSPOKeyArity() * (1 + 3)
+                * Bytes.SIZEOF_LONG);
 
-        byte[] toKey = keyBuilder.reset().append(head.s()).append(head.p())
-                .append(head.o() + 1).getKey();
-        
+        final byte[] fromKey = keyBuilder.reset().append(head.s()).append(
+                head.p()).append(head.o()).getKey();
+
+        final byte[] toKey = keyBuilder.reset().append(head.s()).append(
+                head.p()).append(head.o() + 1).getKey();
+
         final long rangeCount = ndx.rangeCount(fromKey,toKey);
 
         if (rangeCount > 1000000) {

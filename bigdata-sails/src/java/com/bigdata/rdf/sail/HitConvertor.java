@@ -9,7 +9,6 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -39,8 +38,8 @@ public class HitConvertor implements
     final private BindingSet bindings;
 
     @SuppressWarnings("unchecked")
-    public HitConvertor(AbstractTripleStore database, Iterator<IHit> src,
-            Var svar, BindingSet bindings) {
+    public HitConvertor(final AbstractTripleStore database,
+            final Iterator<IHit> src, final Var svar, final BindingSet bindings) {
 
 //        this.database = database;
 
@@ -78,29 +77,13 @@ public class HitConvertor implements
 
     public void close() throws QueryEvaluationException {
 
-        try {
-
-            src.close();
-
-        } catch (SailException e) {
-
-            throw new QueryEvaluationException(e);
-
-        }
-
+        src.close();
+        
     }
 
     public boolean hasNext() throws QueryEvaluationException {
 
-        try {
-
-            return src.hasNext();
-
-        } catch (SailException e) {
-
-            throw new QueryEvaluationException(e);
-
-        }
+        return src.hasNext();
 
     }
 
@@ -113,16 +96,7 @@ public class HitConvertor implements
 
         final QueryBindingSet result = new QueryBindingSet(bindings);
 
-        final BigdataValue val;
-        try {
-
-            val = src.next();
-
-        } catch (SailException e) {
-
-            throw new QueryEvaluationException(e);
-
-        }
+        final BigdataValue val = src.next();
 
         if (!(val instanceof Literal)) {
 

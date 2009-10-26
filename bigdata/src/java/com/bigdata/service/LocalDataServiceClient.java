@@ -75,7 +75,7 @@ public class LocalDataServiceClient<T> extends AbstractClient<T> {
      * 
      * @see Options
      */
-    public LocalDataServiceClient(Properties properties) {
+    public LocalDataServiceClient(final Properties properties) {
        
         super(properties);
 

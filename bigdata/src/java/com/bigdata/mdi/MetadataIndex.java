@@ -34,9 +34,9 @@ import org.CognitiveWeb.extser.LongPacker;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.rawstore.IRawStore;
@@ -413,7 +413,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
 
     }
 
-    public PartitionLocator get(byte[] key) {
+    public PartitionLocator get(final byte[] key) {
         
 //        return (PartitionLocator)SerializerUtil.deserialize(lookup(key));
         
@@ -422,7 +422,7 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
         
     }
 
-    public PartitionLocator find(byte[] key) {
+    public PartitionLocator find(final byte[] key) {
 
         return view.find(key);
         

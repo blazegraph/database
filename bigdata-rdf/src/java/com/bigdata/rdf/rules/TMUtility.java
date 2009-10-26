@@ -32,14 +32,15 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IConstraint;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.Predicate;
 import com.bigdata.relation.rule.Program;
 import com.bigdata.relation.rule.Rule;
 
@@ -57,6 +58,16 @@ import com.bigdata.relation.rule.Rule;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo There are no unit tests for the magic predicate handling or handling of
+ *       non-{@link SPORelation} {@link Predicate}s. The code tests on the
+ *       {@link SPOPredicate} class, so it will break when generalizing to other
+ *       relations. At some point, we should add a predicate "name" attribute,
+ *       which is really the relation base name (without its container) and then
+ *       test on the predicate name rather than its Class. The test in this
+ *       class could then be written as pred.isInstance(relationBaseName) and
+ *       the predicate interface could be constrained to only allow the
+ *       predicate view to include relations sharing the same base name.
  */
 public class TMUtility {
 
@@ -71,14 +82,14 @@ public class TMUtility {
      */
     public static final transient TMUtility DEBUG = new TMUtility(false/*parallel*/);
     
-    protected final boolean parallel;
+    private final boolean parallel;
     
     /**
      * @param parallel
      *            When <code>true</code>, the new {@link IRule}s will be
      *            added to a program that executes its steps in parallel.
      */
-    public TMUtility(boolean parallel) {
+    public TMUtility(final boolean parallel) {
     
         this.parallel = parallel;
         
@@ -134,21 +145,35 @@ public class TMUtility {
         if (rule.getHead() == null)
             throw new IllegalArgumentException("No head for this rule: rule="
                     + rule);
-        
-        IPredicate head = rule.getHead();
-        
-        if (head instanceof SPOPredicate) {
-            
-            head = head.setRelationName(new String[] { focusStore });
-            
-        } else { 
-            
-            // head is a magic predicate with the relation already correctly set
-            // it will write on the appropriate magic relation, wherever that
-            // may be (probably in the focus store)
-            
-        }
 
+        final IPredicate<?> head;
+
+//        if (magicSets) {
+        
+            if (rule.getHead() instanceof SPOPredicate) {
+
+                head = rule.getHead().setRelationName(new String[] { focusStore });
+
+            } else {
+
+                /*
+                 * head is a magic predicate with the relation already correctly
+                 * set so it will write on the appropriate magic relation,
+                 * wherever that may be (probably in the focus store).
+                 */
+
+                head = rule.getHead();
+                
+            }
+
+/*        } else {
+            
+            // pre-magic.
+            
+            head = rule.getHead().setRelationName(new String[] { focusStore });
+
+        }
+*/        
         /*
          * Populate an array with the same predicate instances that are found
          * in the tail of the rule.
@@ -211,44 +236,83 @@ public class TMUtility {
             
             for (int j = 0; j < tailCount; j++) {
 
-                final IPredicate p = tail[j];
-                final IPredicate p2;
+                final IPredicate<?> p = tail[j];
+                final IPredicate<?> p2;
 
-                if (p instanceof SPOPredicate) {
+//                if (magicSets) {
                 
-                    if (i == j || tailCount == 1) {
-    
-                        /*
-                         * Override the [ith] predicate in the tail so that it 
-                         * reads only from the focusStore.
-                         * 
-                         * Note: This is also done if there is only one 
-                         * predicate in the tail.
-                         */
-    
-                        p2 = p.setRelationName(new String[]{focusStore});
-    
+                    if (p instanceof SPOPredicate) {
+
+                        if (i == j || tailCount == 1) {
+
+                            /*
+                             * Override the [ith] predicate in the tail so that
+                             * it reads only from the focusStore.
+                             * 
+                             * Note: This is also done if there is only one
+                             * predicate in the tail.
+                             */
+
+                            p2 = p.setRelationName(new String[] { focusStore });
+
+                        } else {
+
+                            /*
+                             * Override the predicate so that it reads from the
+                             * fused view of the focusStore and the database.
+                             */
+
+                            p2 = p.setRelationName(new String[] {
+                                    p.getOnlyRelationName(), focusStore });
+
+                        }
+
                     } else {
-    
+
+                        // copy is not required.  Predicate is an immutable type.
+//                        p2 = p.copy();
+                        p2 = p;
+
                         /*
-                         * Override the predicate so that it reads from the 
-                         * fused view of the focusStore and the database.
+                         * tail is a magic predicate with the relation already
+                         * correctly set so it will read from the appropriate
+                         * magic relation, wherever that may be (probably in the
+                         * focus store).
                          */
-    
-                        p2 = p.setRelationName(new String[] {
-                                p.getOnlyRelationName(), focusStore });
-    
+
                     }
-                    
-                } else {
-                    
-                    p2 = p.copy();
-                    
-                    // tail is a magic predicate with the relation already correctly set
-                    // it will read from the appropriate magic relation, wherever that
-                    // may be (probably in the focus store)
-                    
-                }
+
+//                } else {
+//
+//                    /*
+//                     * pre-magic.
+//                     */
+//                    
+//                    if (i == j || tailCount == 1) {
+//
+//                        /*
+//                         * Override the [ith] predicate in the tail so that it reads
+//                         * only from the focusStore.
+//                         * 
+//                         * Note: This is also done if there is only one predicate in
+//                         * the tail.
+//                         */
+//
+//                        p2 = p.setRelationName(new String[]{focusStore});
+//
+//                    } else {
+//
+//                        /*
+//                         * Override the predicate so that it reads from the fused
+//                         * view of the focusStore and the database.
+//                         */
+//
+//                        p2 = p.setRelationName(new String[] {
+//                                p.getOnlyRelationName(), focusStore });
+//
+//                    }
+//
+//                }
 
                 // save a reference to the modified predicate.
                 tail2[j] = p2;

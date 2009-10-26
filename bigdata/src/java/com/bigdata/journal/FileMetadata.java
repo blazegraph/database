@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
@@ -199,7 +200,7 @@ public class FileMetadata {
      * existing file it is based on an examination of both root blocks.
      */
     final IRootBlockView rootBlock;
-    
+
     /**
      * Prepare a journal file for use by an {@link IBufferStrategy}.
      * 
@@ -229,9 +230,9 @@ public class FileMetadata {
      *            treated as an error since it does not contain valid root
      *            blocks.
      * @param deleteOnExit
-     *            When set, a <em>new</em> file will be marked for deletion
-     *            when the VM exits. This may be used as part of a temporary
-     *            store strategy.
+     *            When set, a <em>new</em> file will be marked for deletion when
+     *            the VM exits. This may be used as part of a temporary store
+     *            strategy.
      * @param readOnly
      *            When true, the file is opened in a read-only mode and it is an
      *            error if the file does not exist.
@@ -251,7 +252,10 @@ public class FileMetadata {
      *            option is only supported by the {@link DiskOnlyStrategy}.
      *            Further note that most of the other {@link IBufferStrategy}s
      *            are already fully buffered and hence can not benefit from a
-     *            read cache.
+     *            read cache. Finally, note that the higher-level data
+     *            structures use the {@link LRUNexus}, which provides a read
+     *            cache of the decompressed records. For these reasons there is
+     *            little reason to enable this lower-level read cache.
      * @param readCacheMaxRecordSize
      *            The maximum size of a record that will be allowed into the
      *            optional read cache.
@@ -268,21 +272,22 @@ public class FileMetadata {
      *            The create time to be assigned to the root block iff a new
      *            file is created.
      * @param validateChecksum
-     *            When <code>true</code>, the checksum stored in the root
-     *            blocks of an existing file will be validated when the file is
-     *            opened. See {@link Options#VALIDATE_CHECKSUM}.
+     *            When <code>true</code>, the checksum stored in the root blocks
+     *            of an existing file will be validated when the file is opened.
+     *            See {@link Options#VALIDATE_CHECKSUM}.
      * @param checker
      *            The object used to compute the checksum of the root blocks.
      * @param alternateRootBlock
-     *            When <code>true</code> the prior root block will be used.
-     *            This option may be used when a commit record is valid but the
-     *            data associated with the commit point is invalid. There are
-     *            two root blocks. Normally the one which has been most recently
+     *            When <code>true</code> the prior root block will be used. This
+     *            option may be used when a commit record is valid but the data
+     *            associated with the commit point is invalid. There are two
+     *            root blocks. Normally the one which has been most recently
      *            written will be loaded on restart. When this option is
      *            specified, the older of the two root blocks will be loaded
      *            instead. <strong>If you use this option and then do a commit
      *            then the more recent of the root blocks will be lost and any
-     *            data associated with that commit point will be lost as well!</strong>
+     *            data associated with that commit point will be lost as
+     *            well!</strong>
      * 
      * @throws RuntimeException
      *             if there is a problem preparing the file for use by the

@@ -138,7 +138,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -156,7 +156,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -175,7 +175,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -193,7 +193,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -216,7 +216,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -234,7 +234,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -253,7 +253,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -272,7 +272,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -295,7 +295,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -314,7 +314,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -333,7 +333,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -351,7 +351,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -385,7 +385,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -412,7 +412,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -437,7 +437,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -462,7 +462,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -751,11 +751,11 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
             assertTrue(TripleStoreUtility.modelsEqual(groundTruth, tmp));
             
-            tmp.closeAndDelete();
+            tmp.__tearDownUnitTest();
             
         } finally {
             
-            groundTruth.closeAndDelete();
+            groundTruth.__tearDownUnitTest();
             
         }
         
@@ -872,7 +872,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         

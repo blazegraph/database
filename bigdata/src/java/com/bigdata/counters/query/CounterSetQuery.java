@@ -162,18 +162,26 @@ public class CounterSetQuery {
 
         final BufferedReader r = new BufferedReader(new FileReader(file));
 
-        String s;
-        while ((s = r.readLine()) != null) {
+        try {
 
-            s = s.trim();
+            String s;
+            while ((s = r.readLine()) != null) {
 
-            if (s.isEmpty())
-                continue;
+                s = s.trim();
 
-            if (s.startsWith("#"))
-                continue;
+                if (s.isEmpty())
+                    continue;
 
-            tmp.add(new URL(s));
+                if (s.startsWith("#"))
+                    continue;
+
+                tmp.add(new URL(s));
+
+            }
+
+        } finally {
+
+            r.close();
 
         }
 

@@ -24,18 +24,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.magic;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
+import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * A predicate that is a triple with one or more variables. While the general
@@ -49,11 +51,11 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
 
     protected static final Logger log = Logger.getLogger(MagicPredicate.class);
     
-    public MagicPredicate copy() {
-        
-        return new MagicPredicate(this, relationName);
-        
-    }
+//    public MagicPredicate copy() {
+//        
+//        return new MagicPredicate(this, relationName);
+//        
+//    }
 
     /**
      * 
@@ -269,6 +271,12 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
         return terms.get(index);
         
     }
+
+    public final IConstant<Long> get(final IMagicTuple e, final int index) {
+
+        return new Constant<Long>(e.getTerm(index));
+        
+    }
     
     /**
      * Return true iff all terms of the predicate are bound (vs
@@ -290,10 +298,25 @@ public class MagicPredicate implements IPredicate<IMagicTuple> {
 
     }
 
-    /**
-     * The #of arguments in the predicate that are variables (vs constants) (the
-     * context position is NOT counted).
-     */
+    public boolean isFullyBound(final IKeyOrder<IMagicTuple> keyOrder) {
+
+        return getVariableCount(keyOrder) == 0;
+
+    }
+
+    public int getVariableCount(final IKeyOrder<IMagicTuple> keyOrder) {
+        int nunbound = 0;
+        final int keyArity = keyOrder.getKeyArity();
+        for (int keyPos = 0; keyPos < keyArity; keyPos++) {
+            final int index = keyOrder.getKeyOrder(keyPos);
+            final IVariableOrConstant<?> t = get(index);
+            if (t == null || t.isVar()) {
+                nunbound++;
+            }
+        }
+        return nunbound;
+    }
+    
     final public int getVariableCount() {
         
         int i = 0;

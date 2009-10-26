@@ -65,7 +65,7 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
     private final long locatorCacheTimeout;
     private final int indexCacheCapacity;
     private final long indexCacheTimeout;
-    private final long tempStoreMaxExtent;
+//    private final long tempStoreMaxExtent;
     private final boolean collectPlatformStatistics;
     private final boolean collectQueueStatistics;
     private final int httpdPort;
@@ -134,11 +134,11 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
         
     }
     
-    public long getTempStoreMaxExtent() {
-        
-        return tempStoreMaxExtent;
-        
-    }
+//    public long getTempStoreMaxExtent() {
+//        
+//        return tempStoreMaxExtent;
+//        
+//    }
     
     public boolean getCollectPlatformStatistics() {
         
@@ -163,7 +163,7 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
      * @param properties
      *            See {@link IBigdataClient.Options}
      */
-    protected AbstractClient(Properties properties) {
+    protected AbstractClient(final Properties properties) {
         
         // show the copyright banner during statup.
         Banner.banner();
@@ -320,22 +320,22 @@ abstract public class AbstractClient<T> implements IBigdataClient<T> {
         
         }
         
-        // tempStoreMaxExtent
-        {
-
-            tempStoreMaxExtent = Long.parseLong(properties.getProperty(
-                    Options.TEMP_STORE_MAXIMUM_EXTENT,
-                    Options.DEFAULT_TEMP_STORE_MAXIMUM_EXTENT));
-
-            if (log.isInfoEnabled())
-                log.info(Options.TEMP_STORE_MAXIMUM_EXTENT + "="
-                        + tempStoreMaxExtent);
-
-            if (tempStoreMaxExtent < 0)
-                throw new RuntimeException(Options.TEMP_STORE_MAXIMUM_EXTENT
-                        + " must be non-negative");
-
-        }
+//        // tempStoreMaxExtent
+//        {
+//
+//            tempStoreMaxExtent = Long.parseLong(properties.getProperty(
+//                    Options.TEMP_STORE_MAXIMUM_EXTENT,
+//                    Options.DEFAULT_TEMP_STORE_MAXIMUM_EXTENT));
+//
+//            if (log.isInfoEnabled())
+//                log.info(Options.TEMP_STORE_MAXIMUM_EXTENT + "="
+//                        + tempStoreMaxExtent);
+//
+//            if (tempStoreMaxExtent < 0)
+//                throw new RuntimeException(Options.TEMP_STORE_MAXIMUM_EXTENT
+//                        + " must be non-negative");
+//
+//        }
 
         {
             

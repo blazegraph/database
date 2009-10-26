@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
+import java.util.Arrays;
+
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.service.ndx.pipeline.KVOC;
 
@@ -118,8 +120,8 @@ public class KVO<O> implements Comparable<KVO<O>>{
 
     public String toString() {
 
-        return "KVO{key=" + BytesUtil.toString(key) + ", val=" + val + ", obj="
-                + obj + "}";
+        return "KVO{key=" + BytesUtil.toString(key) + ", val="
+                + Arrays.toString(val) + ", obj=" + obj + "}";
 
     }
 

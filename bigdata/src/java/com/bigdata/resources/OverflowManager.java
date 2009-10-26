@@ -424,7 +424,7 @@ abstract public class OverflowManager extends IndexManager {
          * Option may be used to permit a fixed number of synchronous overflow
          * operations after which overflow is disabled (default
          * {@value #DEFAULT_OVERFLOW_MAX_COUNT}). When ZERO (0) there is no
-         * limit on the #of synchonous overflow operations. This option is
+         * limit on the #of synchronous overflow operations. This option is
          * mainly used for testing, but it can be enabled if you want higher
          * throughput (for a while) and you know that the data will be well
          * distributed on the federation after N overflows. Once synchronous
@@ -674,7 +674,7 @@ abstract public class OverflowManager extends IndexManager {
          * that are neither split, joined, moved, nor copied will use
          * incremental builds. An incremental build is generally cheaper since
          * it only copies the data on the mutable {@link BTree} for the
-         * lastCommitTime rather than the fused view. Acompacting merge permits
+         * lastCommitTime rather than the fused view. A compacting merge permits
          * the older index segments to be released and results in a simpler view
          * with view {@link IndexSegment}s. Either a compacting merge or an
          * incremental build will permit old journals to be released once the
@@ -683,10 +683,10 @@ abstract public class OverflowManager extends IndexManager {
          * Note: Mandatory compacting merges are identified based on
          * {@link #MAXIMUM_JOURNALS_PER_VIEW} and
          * {@link #MAXIMUM_SEGMENTS_PER_VIEW}. There is NO limit the #of
-         * manditory compacting merges that will be performed during an
-         * asynchronous overflow event. However, each manditory compacting merge
+         * mandatory compacting merges that will be performed during an
+         * asynchronous overflow event. However, each mandatory compacting merge
          * does count towards the maximum #of optional merges. Therefore if the
-         * #of manditory compacting merges is greater than this parameter then
+         * #of mandatory compacting merges is greater than this parameter then
          * NO optional compacting merges will be selected in a given overflow
          * cycle.
          */
@@ -715,7 +715,7 @@ abstract public class OverflowManager extends IndexManager {
 //         * Split and move operations have the same effect as a compacting merge
 //         * since their output will contain at most one {@link IndexSegment}.
 //         * 
-//         * @deprecated should be redundent with
+//         * @deprecated should be redundant with
 //         *             {@link #MAXIMUM_JOURNALS_PER_VIEW} and
 //         *             {@link #MAXIMUM_SEGMENTS_PER_VIEW}.
 //         */
@@ -748,7 +748,7 @@ abstract public class OverflowManager extends IndexManager {
          * based on this parameter.
          * <p>
          * Note: Synchronous overflow will refuse to copy tuples for an index
-         * partition whose mutable {@link BTree} otherwise satisifies the
+         * partition whose mutable {@link BTree} otherwise satisfies the
          * {@link #COPY_INDEX_THRESHOLD} if the #of sources in the view exceeds
          * thresholds which demand a compacting merge.
          */
@@ -777,7 +777,7 @@ abstract public class OverflowManager extends IndexManager {
          * based on this parameter.
          * <p>
          * Note: Synchronous overflow will refuse to copy tuples for an index
-         * partition whose mutable {@link BTree} otherwise satisifies the
+         * partition whose mutable {@link BTree} otherwise satisfies the
          * {@link #COPY_INDEX_THRESHOLD} if the #of sources in the view exceeds
          * thresholds which demand a compacting merge.
          */

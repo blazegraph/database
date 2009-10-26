@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.store;
 
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -44,7 +45,6 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc;
@@ -59,7 +59,6 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.IStatementBuffer;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rules.InferenceEngine.Options;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -95,6 +94,19 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     public TestTripleStore(String name) {
         super(name);
     }
+
+    /**
+     * Verify that {@link AbstractTripleStore#isLiteral(long)} and friends all
+     * reported <code>false</code> for {@link IRawTripleStore#NULL}.
+     */
+    public void test_bitFlagsReportFalseForNULL() {
+
+        assertFalse(AbstractTripleStore.isStatement(NULL));
+        assertFalse(AbstractTripleStore.isLiteral(NULL));
+        assertFalse(AbstractTripleStore.isURI(NULL));
+        assertFalse(AbstractTripleStore.isBNode(NULL));
+
+    }
     
     /**
      * Test helper verifies that the term is not in the lexicon, adds the term
@@ -105,7 +117,8 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      * @param term
      *            The term.
      */
-    protected void doAddTermTest(AbstractTripleStore store, Value term) {
+    protected void doAddTermTest(final AbstractTripleStore store,
+            final Value term) {
 
         assertEquals(NULL, store.getTermId(term));
 
@@ -172,11 +185,14 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         final Properties properties = super.getProperties();
         
         // override the default vocabulary.
-        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+                NoVocabulary.class.getName());
 
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
         final AbstractTripleStore store = getStore(properties);
         
         try {
@@ -195,8 +211,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     
 //            store.commit();
     
-            dumpTerms(store);
-
+            if(log.isInfoEnabled()) {
+                log.info(store.getLexiconRelation().dumpTerms());
+            }
+            
             /*
              * verify that we can detect literals by examining the term identifier.
              */
@@ -217,7 +235,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -290,8 +308,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
             }
 
-            dumpTerms(store);
-        
+            if(log.isInfoEnabled()) {
+                log.info(store.getLexiconRelation().dumpTerms());
+            }
+            
             /*
              * verify that we can detect literals by examining the term
              * identifier.
@@ -313,7 +333,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
 
@@ -378,7 +398,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -468,7 +488,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -481,13 +501,16 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     public void test_statements() {
 
         final Properties properties = super.getProperties();
-        
+
         // override the default vocabulary.
-        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+                NoVocabulary.class.getName());
 
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
         final AbstractTripleStore store = getStore(properties);
 
         try {
@@ -586,12 +609,24 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             assertEquals(rdfType_id, store.getTermId(rdfType));
             assertEquals(rdfsSubClassOf_id, store.getTermId(rdfsSubClassOf));
     
-            assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(null,
-                    null));
-            assertEquals("statementCount", 5, store.getPOSIndex().rangeCount(null,
-                    null));
-            assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(null,
-                    null));
+            {
+                final Iterator<SPOKeyOrder> itr = store.getSPORelation()
+                        .statementKeyOrderIterator();
+                while (itr.hasNext()) {
+                    assertEquals("statementCount", 5, store.getSPORelation()
+                            .getIndex(itr.next()).rangeCount(null, null));
+                }
+            }
+//            for (String fqn : store.getSPORelation().getIndexNames()) {
+//                assertEquals("statementCount", 5, store.getSPORelation()
+//                        .getIndex(fqn).rangeCount(null, null));
+//            }
+//            assertEquals("statementCount", 5, store.getSPORelation().getSPOIndex().rangeCount(null,
+//                    null));
+//            assertEquals("statementCount", 5, store.getSPORelation().getPOSIndex().rangeCount(null,
+//                    null));
+//            assertEquals("statementCount", 5, store.getSPORelation().getOSPIndex().rangeCount(null,
+//                    null));
             assertTrue(store.hasStatement(x, rdfType, C));
             assertTrue(store.hasStatement(y, rdfType, B));
             assertTrue(store.hasStatement(z, rdfType, A));
@@ -600,12 +635,24 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     
             store.commit();// Note: Should not make any difference.
     
-            assertEquals("statementCount", 5, store.getSPOIndex().rangeCount(null,
-                    null));
-            assertEquals("statementCount", 5, store.getPOSIndex().rangeCount(null,
-                    null));
-            assertEquals("statementCount", 5, store.getOSPIndex().rangeCount(null,
-                    null));
+            {
+                final Iterator<SPOKeyOrder> itr = store.getSPORelation()
+                        .statementKeyOrderIterator();
+                while (itr.hasNext()) {
+                    assertEquals("statementCount", 5, store.getSPORelation()
+                            .getIndex(itr.next()).rangeCount(null, null));
+                }
+            }
+//            for (String fqn : store.getSPORelation().getIndexNames()) {
+//                assertEquals("statementCount", 5, store.getSPORelation()
+//                        .getIndex(fqn).rangeCount(null, null));
+//            }
+//            assertEquals("statementCount", 5, store.getSPORelation().getSPOIndex().rangeCount(null,
+//                    null));
+//            assertEquals("statementCount", 5, store.getSPORelation().getPOSIndex().rangeCount(null,
+//                    null));
+//            assertEquals("statementCount", 5, store.getSPORelation().getOSPIndex().rangeCount(null,
+//                    null));
             assertTrue(store.hasStatement(x, rdfType, C));
             assertTrue(store.hasStatement(y, rdfType, B));
             assertTrue(store.hasStatement(z, rdfType, A));
@@ -624,7 +671,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
 
@@ -639,8 +686,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         final Properties properties = super.getProperties();
         
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+       
         final AbstractTripleStore store = getStore(properties);
         
         try {
@@ -705,9 +754,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             }
 
             // verify range count on each of the statement indices.
-            assertEquals(2,store.getStatementIndex(SPOKeyOrder.SPO).rangeCount());
-            assertEquals(2,store.getStatementIndex(SPOKeyOrder.POS).rangeCount());
-            assertEquals(2,store.getStatementIndex(SPOKeyOrder.OSP).rangeCount());
+            assertEquals(2, store.getSPORelation().getIndex(SPOKeyOrder.SPO)
+                    .rangeCount());
+            assertEquals(2, store.getSPORelation().getIndex(SPOKeyOrder.POS)
+                    .rangeCount());
+            assertEquals(2, store.getSPORelation().getIndex(SPOKeyOrder.OSP)
+                    .rangeCount());
 
             /*
              * check indices for spo1.
@@ -829,7 +881,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
 
@@ -844,10 +896,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         final Properties properties = super.getProperties();
         
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
         final AbstractTripleStore store = getStore(properties);
-        
+
         try {
 
             // verify nothing in the store.
@@ -865,13 +919,16 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
             store.addTerms(new BigdataValue[] { A, B, C, rdfType });
             
             {
+
                 // load statements into db.
-                IStatementBuffer buffer = new StatementBuffer(store, 2);
+                final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
+                        store, 2);
 
                 buffer.add(A, rdfType, B);
                 buffer.add(A, rdfType, C);
 
                 buffer.flush();
+
             }
 
             // store.commit();
@@ -905,7 +962,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -918,10 +975,12 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
     public void test_addInferredExplicitAxiom() {
 
         final Properties properties = super.getProperties();
-        
+
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
         final AbstractTripleStore store = getStore(properties);
 
         try {
@@ -957,7 +1016,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -967,35 +1026,40 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
      * Test the ability to add and remove statements using both fully bound and
      * partly bound triple patterns using the Sesame compatible API.
      */
-    public void test_addRemove_sesameAPI() throws SailException {
-        
+    public void test_addRemove_sesameAPI(){
+
         final Properties properties = super.getProperties();
-        
+
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
         final AbstractTripleStore store = getStore(properties);
 
         try {
 
             // verify nothing in the store.
-            assertSameIterator(new Statement[]{},
-                    store.getAccessPath(null,null,null).iterator());
-            
+            assertSameIterator(new Statement[] {}, store.getAccessPath(null,
+                    null, null).iterator());
+
             final BigdataValueFactory f = store.getValueFactory();
-            
+
             final BigdataURI A = f.createURI("http://www.bigdata.com/A");
             final BigdataURI B = f.createURI("http://www.bigdata.com/B");
             final BigdataURI C = f.createURI("http://www.bigdata.com/C");
             final BigdataURI rdfType = f.asValue(RDF.TYPE);
-            
+
             {
-                IStatementBuffer buffer = new StatementBuffer(store, 100);
+
+                final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
+                        store, 100);
 
                 buffer.add(A, rdfType, B);
                 buffer.add(A, rdfType, C);
 
                 buffer.flush();
+            
             }
 
             assertSameStatements(new Statement[]{
@@ -1021,7 +1085,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -1036,8 +1100,10 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         final Properties properties = super.getProperties();
         
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
         final AbstractTripleStore store = getStore(properties);
         
         try {
@@ -1098,7 +1164,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
 

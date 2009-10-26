@@ -28,7 +28,7 @@
 class=edu.lehigh.swat.bench.ubt.bigdata.LTS
 ontology=../rdf-data/lehigh/univ-bench.owl
 data=../rdf-data/lehigh/U10
-database=e:/LTS.U10
+database=d:/LTS.U10.branch.32
 
 #[BIGDATA_LTS_20]
 #class=edu.lehigh.swat.bench.ubt.bigdata.LTS

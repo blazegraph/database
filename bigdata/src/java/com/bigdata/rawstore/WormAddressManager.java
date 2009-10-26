@@ -75,7 +75,7 @@ public class WormAddressManager implements IAddressManager {
      * The minimum #of bits that may be used to encode an offset as an unsigned
      * integer (31). This value MUST be used when the {@link IRawStore}
      * implementation is backed by an in-memory array since an array index may
-     * not have more than 31 unsigned bits (the equivilent of 32 signed bits).
+     * not have more than 31 unsigned bits (the equivalent of 32 signed bits).
      */
     public static final int MIN_OFFSET_BITS = 31;
     
@@ -107,7 +107,7 @@ public class WormAddressManager implements IAddressManager {
      * bytes) blobs (38).
      * <p>
      * This is a good value when deploying a scale-out solution. For the
-     * scale-out deployment scenarior you will have key-range partitioned
+     * scale-out deployment scenario you will have key-range partitioned
      * indices automatically distributed among data services available on a
      * cluster. The journal files are never permitted to grow very large for
      * scale-out deployments. Instead, the journal periodically overflows,
@@ -203,7 +203,7 @@ public class WormAddressManager implements IAddressManager {
      * 
      * @return true otherwise.
      */
-    final public static boolean assertOffsetBits( int offsetBits ) {
+    final public static boolean assertOffsetBits(final int offsetBits) {
         
         if (offsetBits < MIN_OFFSET_BITS || offsetBits > MAX_OFFSET_BITS) {
             
@@ -407,7 +407,7 @@ public class WormAddressManager implements IAddressManager {
     }
 
     /**
-     * Note: overriden by {@link IndexSegmentAddressManager}.
+     * Note: overridden by {@link IndexSegmentAddressManager}.
      */
     public long getOffset(final long addr) {
 

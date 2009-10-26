@@ -31,6 +31,7 @@ package com.bigdata.concurrent;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -111,11 +112,12 @@ public class NamedReadWriteLock<T> {
     }
 
     public Lock acquireReadLock(T name, long timeout, TimeUnit unit)
-            throws InterruptedException {
+            throws InterruptedException, TimeoutException {
 
         final Lock lock = lockFactory(name).readLock();
 
-        lock.tryLock(timeout, unit);
+        if(!lock.tryLock(timeout, unit))
+            throw new TimeoutException();
 
         return lock;
 
@@ -133,11 +135,12 @@ public class NamedReadWriteLock<T> {
     }
 
     public Lock acquireWriteLock(T name, long timeout, TimeUnit unit)
-            throws InterruptedException {
+            throws InterruptedException, TimeoutException {
 
         final Lock lock = lockFactory(name).writeLock();
 
-        lock.tryLock(timeout, unit);
+        if(!lock.tryLock(timeout, unit))
+            throw new TimeoutException();
 
         return lock;
 

@@ -998,7 +998,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    public IKeyBuilder append(Object val) {
+    public IKeyBuilder append(final Object val) {
         
         if (val == null) {
 
@@ -1246,6 +1246,38 @@ public class KeyBuilder implements IKeyBuilder {
         }
 
         return v;
+        
+    }
+
+    /**
+     * Decodes a signed short value as encoded by {@link #append(short)}.
+     * 
+     * @param buf
+     *            The buffer containing the encoded key.
+     * @param off
+     *            The offset at which to decode the key.
+     *            
+     * @return The signed short value.
+     */
+    static public short decodeShort(final byte[] buf, int off) {
+
+        int v = 0;
+        
+        // big-endian.
+        v += (0xffL & buf[off++]) <<  8;
+        v += (0xffL & buf[off++]) <<  0;
+
+        if (v < 0) {
+            
+            v = v + 0x8000;
+
+        } else {
+            
+            v = v - 0x8000;
+            
+        }
+
+        return (short) v;
         
     }
 

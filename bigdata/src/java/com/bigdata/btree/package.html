@@ -6,12 +6,13 @@
 
 <p>
 The {@link com.bigdata.btree.BTree} is a scalable B+-Tree with copy-on-write
-semantics mapping variable length unsigned byte[] keys to variable length byte[]
-values (null values are allowed) designed for read-write operations. 
+semantics mapping variable length <code>unsigned byte[]</code> keys to variable
+length <code>byte[]</code> values (null values are allowed).  This class is
+designed for read-write operations. 
 </p>
 
 <p>
-The B+-Tree uses a fixed branching factor( aka fan-out) but supports
+The B+-Tree uses a fixed branching factor (aka fan-out) but supports
 variable length keys and values and does not directly constrain the
 serialized size of a node or leaf.  The branching factor is determined
 when the B+Tree is created.  Bulk index builds are supported from a
@@ -25,7 +26,7 @@ B+Tree(s).
 Nodes (and leaves) are either dirty or immutable and persistent.  If
 the node is dirty, then it is always mutable.  If a node is clean,
 then it is always immutable and persistent.  An attempt to write on a
-clean node forces copy-on-write of the node and its ancenstors up to
+clean node forces copy-on-write of the node and its ancestors up to
 the root of the tree.  In any case where the node has already been
 copied and is dirty, the mutable node is always used.  Therefore
 mutations never overwrite the historical state of the B+-Tree and
@@ -34,13 +35,91 @@ accessible from root block of the store after a commit (this is handled
 by the {@link com.bigdata.journal.AbstractJournal}.
 </p>
 
+<h2>Coding (Compression)</h2>
+
 <p>
-A "reference" for a child node is always an int64 value
-encoding an address in a {@link com.bigdata.rawstore.IRawStore}.
-Those slots are read and written as {@link java.nio.ByteBuffer}s.  The
-{@link com.bigdata.btree.NodeSerializer} knows how to access and interpret the
-contents of a {@link java.nio.ByteBuffer} as an index node with a given branching
-factor and provides extensible serialization semantics for leaves and values.
+The {@link com.bigdata.btree.INodeData} and {@link com.bigdata.btree.ILeafData}
+interfaces represent the persistent state of a node or leaf.  The keys of a
+node or leaf are represented by an {@link com.bigdata.btree.raba.IRaba}, which
+is an abstraction for a logical <code>byte[][]</code>.  Likewise, the values
+of a leaf are represented by an {@link com.bigdata.btree.raba.IRaba}.  For keys,
+the rabas support search.  For values, they allow nulls.  The node and leaf
+data records maintain additional persistent state, for example, leaf data
+records track tuple delete markers and tuple revision timestamps while node
+data records track the persistent address of child nodes.
+</p>
+
+<p>
+Coding of node and leaf data records is performed when they are evicted from a
+<em>write retention queue</em>.  The purpose of the write retention queue is
+to maintain recently used nodes and leaves in their mutable form and to defer
+eviction onto the disk until their data is stable (has not been changed recently).
+When a dirty node or leaf is evicted from the write retention queue, it is first
+coded (compressed) using a {@link com.bigdata.btree.data.INodeDataCoder} or a
+{@link com.bigdata.btree.data.ILeafDataCoder} as appropriate.  Those coders in
+turn will apply the configured {@link com.bigdata.btree.raba.IRabaCoder} to
+code the keys and the values.  Once the node or leaf has been coded, it is
+represented as a slice on a byte[].  That slice can be wrapped by the same
+{@link com.bigdata.btree.raba.IRabaCoder}, returning an efficient view of the
+compressed data record supporting search (for keys) and random access to the
+keys and values.
+</p>
+
+<p>
+Front-coding (prefix compression) generally works quite well for keys.  A 
+canonical huffman coder may be used for keys, but is significantly slower and
+is generally used to code values.  Custom coders may be written for either the
+keys or values of a B+Tree leaf in order to take advantage of various properties
+for a specific application index.  However, the coder for the B+Tree node keys
+MUST handle variable length keys since the keys stored in the node are
+separator keys, not full length application keys.
+</p>
+
+<p>
+Coding, decoding, and promotion to a mutable data record are handled transparently
+by the B+Tree.  The {@link com.bigdata.btree.NodeSerializer} provides a facility
+for coding and decoding nodes and leaves.  Coding uses a shared (per B+Tree
+instance) extensible byte[] buffer to reduce heap churn.  Decoding simply wraps
+the coded record.  Promotion to a mutable data record is handled by converting
+to a {@link com.bigdata.btree.MutableNodeData} or {@link com.bigdata.btree.MutableLeafData}
+respectively.
+</p>
+
+<h2>Persistence</h2>
+
+<p>
+When nodes or leaves are evicted from the write retention queue their coded
+data record is written onto the backing {@link com.bigdata.rawstore.IRawStore}.
+The resulting int64 address is updated on the parent of the node or leaf.  Weak
+references are used between a child and its parent.  The existence of the node
+or leaf on the write retention queue prevents weak references from being cleared.
+Once the node or leaf has been evicted from the write retention queue, it can
+be reloaded from its persistent address if its weak reference is cleared.
+</p>
+
+<p>
+When a node is evicted from the write retention queue, a depth-first traversal
+of its dirty children is performed and they are persisted as well.  This ensures
+that we can recover the tree structure later.  When a leaf is evicted, just that
+leaf is persisted.
+</p>
+
+<p>
+A B+-Tree <em>checkpoint</em> record corresponds to a persistent state of the
+B+Tree on the disk.  The B+Tree may be reloaded from that checkpoint.  After
+a checkpoint operation, all nodes and leaves in the B+Tree will be clean. However,
+a checkpoint IS NOT a commit.  The commit protocol is handled by the 
+{@link com.bigdata.journal.AbstractJournal}.
+</p>
+
+<h2>Transient B+-Tree Support</h2>
+
+<p>
+A BTree is designated as transient by specifying <code>null</code> for the backing
+{@link com.bigdata.rawstore.IRawStore}.  Nodes and leaves of a transient B+-Tree
+are linked by hard references to ensure that they remain reachable.  However,
+mutable nodes and leaves are still converted to coded (compressed) nodes and
+leaves when they are evicted from the write retention queue.
 </p>
 
 </body>

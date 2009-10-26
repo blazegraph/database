@@ -12,7 +12,6 @@ import com.bigdata.rdf.load.RDFDataLoadMaster.JobState;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.FederationCallable;
 import com.bigdata.service.IRemoteExecutor;

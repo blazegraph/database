@@ -118,4 +118,10 @@ public class DummyEventReportingService extends EventReceiver implements
 
     final UUID serviceUUID = UUID.randomUUID();
 
+    public void destroy() {
+        
+        // NOP (eventBTree is transient for this mock object).
+        
+    }
+    
 }

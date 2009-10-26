@@ -33,6 +33,7 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
@@ -350,9 +351,19 @@ public class BigdataFileSystem extends
 
         super(indexManager,namespace,timestamp,properties);
         
-        offsetBits = Integer.parseInt(properties.getProperty(
-                Options.OFFSET_BITS, Options.DEFAULT_OFFSET_BITS));
-        
+        /*
+         * @todo This should probably be raised directly to a property reported
+         * by the federation.  Right now it relies on the same default logic
+         * being replicated here and in AbstractJournal.  
+         */
+        offsetBits = Integer
+                .parseInt(properties
+                        .getProperty(
+                                Options.OFFSET_BITS,
+                                Integer
+                                        .toString((indexManager instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
+                                                : WormAddressManager.SCALE_OUT_OFFSET_BITS))));
+
         blockSize = WormAddressManager.getMaxByteCount(offsetBits) - 1;
         
         if (INFO)

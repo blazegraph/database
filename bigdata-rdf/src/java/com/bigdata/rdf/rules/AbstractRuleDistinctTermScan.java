@@ -33,7 +33,6 @@ import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.ArrayBindingSet;
 import com.bigdata.relation.rule.Constant;
@@ -84,14 +83,15 @@ abstract public class AbstractRuleDistinctTermScan extends Rule {
 
         super(name, head, body, constraints);
         
-        // head must be one bound.
+        // head must be one unbound; that variable will be bound by the scan. 
         assert head.getVariableCount() == 1;
 
         // tail must have one predicate.
         assert body.length == 1;
         
         // the predicate in the tail must be "none" bound.
-        assert body[0].getVariableCount() == IRawTripleStore.N;
+//        assert body[0].getVariableCount() == IRawTripleStore.N;
+        assert body[0].getVariableCount() == body[0].arity();//head.arity();
 
         // figure out which position in the head is the variable.
         if(head.s().isVar()) {

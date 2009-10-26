@@ -32,19 +32,20 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.data.IAbstractNodeDataCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test of storing null values under a key with persistence.
+ * <p>
+ * Note that the stress tests for the {@link IRabaCoder}s and the
+ * {@link IAbstractNodeDataCoder}s already test the ability to encode and decode
+ * with nulls, delete markers, and version timestamps.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo test with various {@link IDataSerializer}s for the values.
- * 
- * @todo There also need to be tests when delete markers are enabled for this.
  */
 public class TestNullValues extends AbstractBTreeTestCase {
 
@@ -118,20 +119,28 @@ public class TestNullValues extends AbstractBTreeTestCase {
                     .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
                     true/*compactingMerge*/).call();
 
-             /*
-              * Verify can load the index file and that the metadata
-              * associated with the index file is correct (we are only
-              * checking those aspects that are easily defined by the test
-              * case and not, for example, those aspects that depend on the
-              * specifics of the length of serialized nodes or leaves).
-              */
-            
+            /*
+             * Verify can load the index file and that the metadata associated
+             * with the index file is correct (we are only checking those
+             * aspects that are easily defined by the test case and not, for
+             * example, those aspects that depend on the specifics of the length
+             * of serialized nodes or leaves).
+             */
+
             final IndexSegmentStore segStore = new IndexSegmentStore(outFile);
-            
+
             final IndexSegment seg = segStore.loadIndexSegment();
-            
-            assertNull(seg.lookup(k1));
-            assertTrue(seg.contains(k1));
+
+            try {
+
+                assertNull(seg.lookup(k1));
+                assertTrue(seg.contains(k1));
+
+            } finally {
+
+                seg.close();
+                
+            }
             
         } finally {
 

@@ -61,40 +61,41 @@ public class TestSplitRootLeaf extends AbstractBTreeTestCase {
      * insert key after a split and NOT at the low key in the rightSibling.
      */
     public void test_leafSplitBranchingFactor3_01() {
-        
-        BTree btree = getBTree(3);
-        
-        Leaf a = (Leaf)btree.getRoot();
 
-        SimpleEntry v2 = new SimpleEntry(2);
-        SimpleEntry v3 = new SimpleEntry(3);
-        SimpleEntry v5 = new SimpleEntry(5);
-        SimpleEntry v7 = new SimpleEntry(7);
+        final BTree btree = getBTree(3);
+
+        final Leaf a = (Leaf) btree.getRoot();
+
+        final SimpleEntry v2 = new SimpleEntry(2);
+        final SimpleEntry v3 = new SimpleEntry(3);
+        final SimpleEntry v5 = new SimpleEntry(5);
+        final SimpleEntry v7 = new SimpleEntry(7);
 
         btree.insert(KeyBuilder.asSortKey(3), v3);
         btree.insert(KeyBuilder.asSortKey(5), v5);
         btree.insert(KeyBuilder.asSortKey(7), v7);
         
-        assertKeys(new int[]{3,5,7},a);
-        assertValues(new Object[]{v3,v5,v7},a);
+        assertKeys(new int[] { 3, 5, 7 }, a);
+        assertValues(new Object[] { v3, v5, v7 }, a);
 
         /*
          * split the leaf.
          */
-        btree.insert(KeyBuilder.asSortKey(2),v2);
-        assertTrue(btree.dump(Level.DEBUG,System.err));
-        
-        Node root = (Node)btree.getRoot();
-        assertKeys(new int[]{5},root);
-        assertEquals(a,root.getChild(0));
-        Leaf b = (Leaf) root.getChild(1);
-        assertEntryCounts(new int[]{2,2},root);
-        
-        assertKeys(new int[]{2,3},a);
-        assertValues(new Object[]{v2,v3},a);
-        
-        assertKeys(new int[]{5,7},b);
-        assertValues(new Object[]{v5,v7},b);
+        assertTrue(btree.dump(Level.DEBUG, System.err));
+        btree.insert(KeyBuilder.asSortKey(2), v2);
+        assertTrue(btree.dump(Level.DEBUG, System.err));
+
+        final Node root = (Node) btree.getRoot();
+        assertKeys(new int[] { 5 }, root);
+        assertEquals(a, root.getChild(0));
+        final Leaf b = (Leaf) root.getChild(1);
+        assertEntryCounts(new int[] { 2, 2 }, root);
+
+        assertKeys(new int[] { 2, 3 }, a);
+        assertValues(new Object[] { v2, v3 }, a);
+
+        assertKeys(new int[] { 5, 7 }, b);
+        assertValues(new Object[] { v5, v7 }, b);
 
         assertEquals("height", 1, btree.height);
         assertEquals("#nodes", 1, btree.nnodes);

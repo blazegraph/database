@@ -43,7 +43,7 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rdf.lexicon.ITermIndexCodes;
 
 /**
- * Helper class provides efficient standoff serialization of RDF {@link Value}
+ * Helper class provides efficient stand-off serialization of RDF {@link Value}
  * objects.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -106,9 +106,9 @@ public class BigdataValueSerializer<V extends Value> {
      * 
      * @see {@link #deserialize(byte[])}
      */
-    public byte[] serialize(V val) {
+    public byte[] serialize(final V val) {
         
-        DataOutputBuffer out = new DataOutputBuffer(128);
+        final DataOutputBuffer out = new DataOutputBuffer(128);
 
         return serialize(val, out);
         
@@ -127,7 +127,7 @@ public class BigdataValueSerializer<V extends Value> {
      *         is newly allocated so that a series of invocations of this
      *         method return distinct byte[]s.
      */
-    public byte[] serialize(V val, DataOutputBuffer out) {
+    public byte[] serialize(final V val, final DataOutputBuffer out) {
         
         try {
 
@@ -179,9 +179,9 @@ public class BigdataValueSerializer<V extends Value> {
      * 
      * @see {@link #serialize()}
      */
-    public V deserialize(byte[] b) {
+    public V deserialize(final byte[] b) {
 
-        return deserialize( new DataInputBuffer(b) );
+        return deserialize(new DataInputBuffer(b));
         
     }
 
@@ -202,7 +202,7 @@ public class BigdataValueSerializer<V extends Value> {
      * 
      * @see {@link #serialize()}
      */
-    public V deserialize(DataInputBuffer in) {
+    public V deserialize(final DataInputBuffer in) {
         
         try {
 
@@ -247,8 +247,8 @@ public class BigdataValueSerializer<V extends Value> {
      * 
      * @throws IOException
      */
-    protected void serialize(V val, short version, byte termCode, DataOutput out)
-            throws IOException {
+    protected void serialize(final V val, final short version,
+            final byte termCode, final DataOutput out) throws IOException {
     
         switch(termCode) {
  
@@ -371,8 +371,8 @@ public class BigdataValueSerializer<V extends Value> {
      * @throws IOException
      */
     @SuppressWarnings("unchecked")
-    protected V deserialize(short version, byte termCode, DataInput in)
-            throws IOException {
+    protected V deserialize(final short version, final byte termCode,
+            final DataInput in) throws IOException {
     
         switch(termCode) {
         
@@ -444,7 +444,7 @@ public class BigdataValueSerializer<V extends Value> {
      * 
      * @see ITermIndexCodes
      */
-    protected byte getTermCode(Value val) {
+    protected byte getTermCode(final Value val) {
         
         if (val == null)
             throw new IllegalArgumentException();

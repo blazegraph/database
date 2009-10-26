@@ -184,23 +184,32 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             }
 
-            log.info("#statements before search: "
-                    + sail.database.getExactStatementCount());
+            if (log.isInfoEnabled())
+                log
+                        .info("#statements before search: "
+                                + sail.database.getStatementCount(null/* c */,
+                                        true/* exact */));
 
             doSearchTest(((BigdataSail) sail).getConnection());
 
             doSearchTest(((BigdataSail) sail).asReadCommittedView());
 
-            log.info("#statements before restart: "
-                    + sail.database.getExactStatementCount());
+            if (log.isInfoEnabled())
+                log
+                        .info("#statements before restart: "
+                                + sail.database.getStatementCount(null/* c */,
+                                        true/* exact */));
 
             // re-open the SAIL.
             sail = reopenSail(sail);
 
             sail.initialize();
-            
-            log.info("#statements after restart: "
-                    + sail.database.getExactStatementCount());
+
+            if (log.isInfoEnabled())
+                log
+                        .info("#statements after restart: "
+                                + sail.database.getStatementCount(null/* c */,
+                                        true/* exact */));
 
             doSearchTest(((BigdataSail) sail).getConnection());
 
@@ -208,7 +217,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
             
         } finally {
 
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
 
         }
         
@@ -479,7 +488,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
         } finally {
 
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
 
         }
 

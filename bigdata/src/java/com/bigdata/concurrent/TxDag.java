@@ -331,7 +331,7 @@ public class TxDag {
         outbound = new int[ n ]; // #of outbound edges for each transaction index.
         transactions = new Object[ n ]; // application's transaction objects in index order.
         for( int i=0; i<n; i++ ) {
-            indices.add( new Integer( i ) );
+            indices.add( Integer.valueOf( i ) );
             inbound[ i ] = 0;
             outbound[ i ] = 0;
             transactions[ i ] = null;

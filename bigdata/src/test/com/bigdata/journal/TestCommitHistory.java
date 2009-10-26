@@ -99,8 +99,9 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
 
         try {
         
-        assertNull(journal.getCommitRecord(journal.nextTimestamp()));
-        
+            assertNull(journal.getCommitRecord(journal
+                    .getLocalTransactionManager().nextTimestamp()));
+
         } finally {
 
             journal.destroy();
@@ -280,7 +281,7 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
              * there will be at least one possible timestamp between each commit
              * timestamp.
              */
-            final long ts = journal.nextTimestamp();
+            final long ts = journal.getLocalTransactionManager().nextTimestamp();
             
             assertTrue(ts>commitTime[i]);
             
@@ -422,137 +423,151 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
      */
     public void test_objectCache() {
         
-        Journal journal = new Journal(getProperties());
+        final Journal journal = new Journal(getProperties());
 
-        assertEquals("commitCounter",0,journal.getCommitRecord().getCommitCounter());
+        try {
 
-        final String name = "abc";
+            assertEquals("commitCounter", 0, journal.getCommitRecord()
+                    .getCommitCounter());
 
-        /*
-         * register an index and commit the journal.
-         */
+            final String name = "abc";
 
-        final BTree liveIndex = (BTree) journal.registerIndex(name);
+            /*
+             * register an index and commit the journal.
+             */
 
-        journal.commit();
-        
-        assertEquals("commitCounter",1,journal.getCommitRecord().getCommitCounter());
+            final BTree liveIndex = (BTree) journal.registerIndex(name);
 
-        final long commitTime0 = journal.getCommitRecord().getTimestamp();
-        
-        assertNotSame(commitTime0,0L);
-        assertTrue(commitTime0>0L);
-        
-        /*
-         * obtain the commit record for that commit timestamp.
-         */
-        ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
+            journal.commit();
 
-        // should be the same instance that is held by the journal.
-        assertTrue(commitRecord0 == journal.getCommitRecord());
+            assertEquals("commitCounter", 1, journal.getCommitRecord()
+                    .getCommitCounter());
 
-        /*
-         * verify that a request for last committed state the named index
-         * returns a different instance than the "live" index.
-         */
-        
-        final BTree historicalIndex0 = (BTree)journal.getIndex(name, commitRecord0);
-        
-        assertTrue(liveIndex != historicalIndex0);
+            final long commitTime0 = journal.getCommitRecord().getTimestamp();
 
-        // re-request is still the same object.
-        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
-                commitRecord0));
-        
-        /*
-         * The re-load address for the live index as of that commit record.
-         */
-        final long liveIndexAddr0 = liveIndex.getCheckpoint().getCheckpointAddr();
-        
-        /*
-         * write a record on the store, commit the store, and note the commit
-         * time.
-         * 
-         * Note: This is a raw write on the store, not a write on an index, so
-         * we have to do an explicit commit.
-         */
+            assertNotSame(commitTime0, 0L);
+            assertTrue(commitTime0 > 0L);
 
-        journal.write(ByteBuffer.wrap(new byte[]{1,2,3}));
+            /*
+             * obtain the commit record for that commit timestamp.
+             */
+            ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
 
-        journal.commit();
-        
-        assertEquals("commitCounter",2,journal.getCommitRecord().getCommitCounter());
+            // should be the same instance that is held by the journal.
+            assertTrue(commitRecord0 == journal.getCommitRecord());
 
-        final long commitTime1 = journal.getCommitRecord().getTimestamp();
-        
-        assertTrue(commitTime1>commitTime0);
-        
-        /*
-         * we did NOT write on the named index, so its address in the store must
-         * not change.
-         */
-        assertEquals(liveIndexAddr0,liveIndex.getCheckpoint().getCheckpointAddr());
-        
-        // obtain the commit record for that commit timestamp.
-        ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
+            /*
+             * verify that a request for last committed state the named index
+             * returns a different instance than the "live" index.
+             */
 
-        // should be the same instance that is held by the journal.
-        assertTrue(commitRecord1 == journal.getCommitRecord());
+            final BTree historicalIndex0 = (BTree) journal.getIndex(name,
+                    commitRecord0);
 
-        /*
-         * verify that we get the same historical index object for the new
-         * commit record since the index state was not changed and it will be
-         * reloaded from the same address.
-         */
-        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
-                commitRecord1));
+            assertTrue(liveIndex != historicalIndex0);
 
-        // re-request is still the same object.
-        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
-                commitRecord0));
+            // re-request is still the same object.
+            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                    commitRecord0));
 
-        // re-request is still the same object.
-        assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
-                commitRecord1));
+            /*
+             * The re-load address for the live index as of that commit record.
+             */
+            final long liveIndexAddr0 = liveIndex.getCheckpoint()
+                    .getCheckpointAddr();
 
-        /*
-         * Now write on the live index and commit. verify that there is a new
-         * historical index available for the new commit record, that it is not
-         * the same as the live index, and that it is not the same as the
-         * previous historical index (which should still be accessible).
-         */
-        
-        // live index is the same reference.
-        assertTrue(liveIndex == journal.getIndex(name));
-        
-        liveIndex.insert(new byte[]{1,2}, new byte[]{1,2});
+            /*
+             * write a record on the store, commit the store, and note the
+             * commit time.
+             * 
+             * Note: This is a raw write on the store, not a write on an index,
+             * so we have to do an explicit commit.
+             */
 
-        // do an explicit commit since we are not running a write task.
-        journal.commit();
-        
-        assertEquals("commitCounter",3,journal.getCommitRecord().getCommitCounter());
+            journal.write(ByteBuffer.wrap(new byte[] { 1, 2, 3 }));
 
-        final long commitTime2 = journal.getCommitRecord().getTimestamp();
+            journal.commit();
 
-        assertTrue(commitTime2>commitTime1);
+            assertEquals("commitCounter", 2, journal.getCommitRecord()
+                    .getCommitCounter());
 
-        // obtain the commit record for that commit timestamp.
-        ICommitRecord commitRecord2 = journal.getCommitRecord(commitTime2);
+            final long commitTime1 = journal.getCommitRecord().getTimestamp();
 
-        // should be the same instance that is held by the journal.
-        assertTrue(commitRecord2 == journal.getCommitRecord());
-        
-        // must be a different index object.
-        
-        BTree historicalIndex2 = (BTree) journal.getIndex(name, commitRecord2);
-        
-        assertTrue(historicalIndex0 != historicalIndex2);
+            assertTrue(commitTime1 > commitTime0);
 
-        // the live index must be distinct from the historical index.
-        assertTrue(liveIndex != historicalIndex2); 
-        
-        journal.destroy();
+            /*
+             * we did NOT write on the named index, so its address in the store
+             * must not change.
+             */
+            assertEquals(liveIndexAddr0, liveIndex.getCheckpoint()
+                    .getCheckpointAddr());
+
+            // obtain the commit record for that commit timestamp.
+            ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
+
+            // should be the same instance that is held by the journal.
+            assertTrue(commitRecord1 == journal.getCommitRecord());
+
+            /*
+             * verify that we get the same historical index object for the new
+             * commit record since the index state was not changed and it will
+             * be reloaded from the same address.
+             */
+            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                    commitRecord1));
+
+            // re-request is still the same object.
+            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                    commitRecord0));
+
+            // re-request is still the same object.
+            assertTrue(historicalIndex0 == (BTree) journal.getIndex(name,
+                    commitRecord1));
+
+            /*
+             * Now write on the live index and commit. verify that there is a
+             * new historical index available for the new commit record, that it
+             * is not the same as the live index, and that it is not the same as
+             * the previous historical index (which should still be accessible).
+             */
+
+            // live index is the same reference.
+            assertTrue(liveIndex == journal.getIndex(name));
+
+            liveIndex.insert(new byte[] { 1, 2 }, new byte[] { 1, 2 });
+
+            // do an explicit commit since we are not running a write task.
+            journal.commit();
+
+            assertEquals("commitCounter", 3, journal.getCommitRecord()
+                    .getCommitCounter());
+
+            final long commitTime2 = journal.getCommitRecord().getTimestamp();
+
+            assertTrue(commitTime2 > commitTime1);
+
+            // obtain the commit record for that commit timestamp.
+            ICommitRecord commitRecord2 = journal.getCommitRecord(commitTime2);
+
+            // should be the same instance that is held by the journal.
+            assertTrue(commitRecord2 == journal.getCommitRecord());
+
+            // must be a different index object.
+
+            BTree historicalIndex2 = (BTree) journal.getIndex(name,
+                    commitRecord2);
+
+            assertTrue(historicalIndex0 != historicalIndex2);
+
+            // the live index must be distinct from the historical index.
+            assertTrue(liveIndex != historicalIndex2);
+
+        } finally {
+
+            journal.destroy();
+
+        }
 
     }
-    
+
 }

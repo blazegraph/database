@@ -44,34 +44,49 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     protected static final boolean INFO = log.isInfoEnabled();
 
     protected static final boolean DEBUG = log.isDebugEnabled();
-    
+
+    /**
+     * The capacity of the backing buffer.
+     */
     protected final int capacity;
+    
+    /**
+     * The component type of the backing byte, used when a new instance is
+     * allocated.
+     */
+    protected final Class cls;
+    
+    /**
+     * An optional filter for keeping elements out of the buffer.
+     */
     protected final IElementFilter<E> filter;
     
     protected int size;
     protected E[] buffer;
-    
+
     /**
      * @param capacity
      *            The capacity of the backing buffer.
+     * @param cls
+     *            Array instances of this component type will be allocated.
      * @param filter
      *            An optional filter for keeping elements out of the buffer.
      */
-    protected AbstractArrayBuffer(final int capacity,
+    protected AbstractArrayBuffer(final int capacity, final Class cls,
             final IElementFilter<E> filter) {
         
         if (capacity <= 0)
             throw new IllegalArgumentException();
+
+        if (cls == null)
+            throw new IllegalArgumentException();
         
         this.capacity = capacity;
 
+        this.cls = cls;
+        
         this.filter = filter;
-        
-        /*
-         * Note: The backing array is allocated once we receive the first
-         * element so we can get the array component type right.
-         */
-        
+
     }
     
     /**
@@ -125,7 +140,7 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
     }
 
     @SuppressWarnings("unchecked")
-    public void add(E e) {
+    public void add(final E e) {
 
         if (e == null)
             throw new IllegalArgumentException();
@@ -142,8 +157,8 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
                 if (buffer == null) {
 
-                    buffer = (E[]) java.lang.reflect.Array.newInstance(e
-                            .getClass(), capacity);
+                    buffer = (E[]) java.lang.reflect.Array.newInstance(cls,
+                            capacity);
 
                 } else if (size == buffer.length) {
 
@@ -151,7 +166,20 @@ abstract public class AbstractArrayBuffer<E> implements IBuffer<E> {
 
                 }
 
-                buffer[size++] = e;
+//                try {
+                    buffer[size++] = e;
+//                } catch (ArrayStoreException ex) {
+//                    throw new RuntimeException("bufferClass="
+//                            + buffer.getClass()
+//                            + "["
+//                            + buffer.getClass().getComponentType()
+//                            + "]"
+//                            + ", e.class="
+//                            + e.getClass()
+//                            + (e.getClass().getComponentType() != null ? "["
+//                                    + e.getClass().getComponentType() + "]"
+//                                    : ""));
+//                }
 
             }
 

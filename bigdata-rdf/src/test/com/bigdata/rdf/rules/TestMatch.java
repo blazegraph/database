@@ -285,7 +285,7 @@ public class TestMatch extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         

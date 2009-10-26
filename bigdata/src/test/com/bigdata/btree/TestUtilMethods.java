@@ -27,13 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-
+import com.bigdata.btree.raba.MutableKeyBuffer;
+import com.bigdata.btree.raba.MutableValueBuffer;
 
 /**
  * Test suite for various utility methods, both static and instance, on
  * {@link AbstractNode}.
  * 
- * @todo review converage now that so much has changed with respect to keys.
+ * @todo review coverage now that so much has changed with respect to keys.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -123,26 +124,35 @@ public class TestUtilMethods extends AbstractBTreeTestCase {
         final int nkeys = 3;
         final BTree btree = getBTree(m);
 
-        Leaf leaf = new Leaf(btree, 1L, m, new MutableKeyBuffer(nkeys,
-                // keys
-                new byte[][] {//
-                new byte[] { 1 }, //
+        final Leaf leaf = new Leaf(btree, 1L, //
+                new MutableLeafData(//
+                    new MutableKeyBuffer(nkeys,
+                    // keys
+                        new byte[][] {//
+                        new byte[] { 1 }, //
                         new byte[] { 2 }, //
                         new byte[] { 3 },//
                         null }),//
-                // vals
-                new byte[][] { new byte[]{1}, new byte[]{2}, new byte[]{3}, new byte[]{0} }, //
-                null,// timestamps
-                null// deleteMarkers
-                );
+                    // vals
+                    new MutableValueBuffer(nkeys, //
+                        // vals
+                        new byte[][] { //
+                        new byte[] { 1 },//
+                        new byte[] { 2 },//
+                        new byte[] { 3 },//
+                        new byte[] { 0 }} //
+                    ),
+                    null,// timestamps
+                    null// deleteMarkers
+                    ));
 
         leaf.assertKeysMonotonic();
 
         // access the byte[][].
-        byte[][] keys = ((MutableKeyBuffer)leaf.keys).keys;
+        final byte[][] keys = ((MutableKeyBuffer)leaf.getKeys()).keys;
 
         // swap around two keys so that they are out of order.
-        byte[] tmp = keys[0];
+        final byte[] tmp = keys[0];
         keys[0] = keys[1];
         keys[1] = tmp;
 

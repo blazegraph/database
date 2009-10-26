@@ -71,7 +71,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
      * 
      * @serial
      */
-    private it.unimi.dsi.mg4j.util.BloomFilter2 filter;
+    private it.unimi.dsi.util.BloomFilter2 filter;
 
     /**
      * The natural logarithm of 2, used in the computation of the number of
@@ -208,7 +208,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
 
         final int d = getHashFunctionCount(p);
         
-        filter = new it.unimi.dsi.mg4j.util.BloomFilter2(n, d);
+        filter = new it.unimi.dsi.util.BloomFilter2(n, d);
 
         if (DEBUG)
             log.debug("n=" + n + ", p=" + p + ", d=" + d + ", m=" + filter.m());
@@ -564,7 +564,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
      * that the bloom filter is disabled will write its address as 0L so the
      * bloom filter is no longer reachable from the post-checkpoint record.
      */
-    final void disable() {
+    final public void disable() {
 
         if (enabled) {
 
@@ -573,7 +573,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
             // release the filter impl. this is often 1-10M of data!
             filter = null;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("disabled.");
 
         }
@@ -623,7 +623,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
 
         p = in.readDouble();
         
-        filter = (it.unimi.dsi.mg4j.util.BloomFilter2) in.readObject();
+        filter = (it.unimi.dsi.util.BloomFilter2) in.readObject();
 
         dirty = false;
 

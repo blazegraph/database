@@ -29,7 +29,7 @@
 package com.bigdata.io;
 
 import it.unimi.dsi.fastutil.io.RepositionableStream;
-import it.unimi.dsi.mg4j.io.OutputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -38,15 +38,15 @@ import java.nio.ByteBuffer;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
+
 /**
  * A view on a mutable byte[] that may be extended.
  * <p>
- * Note: This class is designed for uses where {@link ByteBuffer} is not
- * appropriate, primarily those which require transparent extension of the
- * backing buffer. Also note that the facility for native data operations in
- * {@link ByteBuffer} is not meaningful unless you are going to read or write
- * directly on the file system or network channels - and we are always reading
- * and writing on a buffered disk cache rather than directly on the channel.
+ * Note: The backing byte[] slice always has an {@link IDataRecord#off() offset}
+ * of ZERO (0) and a {@link IDataRecord#len() length} equal to the capacity of
+ * the backing byte[]. The {@link IDataRecord#len() length} is automatically
+ * extended iff the backing buffer is extended.
  * <p>
  * Note: This class implements {@link OutputStream} so that it may be wrapped by
  * an {@link OutputBitStream}. Likewise it implements
@@ -60,19 +60,11 @@ import org.apache.log4j.Logger;
  * relative <i>put</i> operations always set the limit to the position as a
  * post-condition of the operation. The absolute get/put operations ignore the
  * limit entirely.
- * 
- * @todo consider method signature conformance with {@link ByteBuffer} for ease
- *       of migrating code (misaligned only on {@link #getByte()}/{@link #putByte(byte)},
- *       and {@link #pos()}).
- * 
- * @todo packed coding for short, int, and long only makes sense in the context
- *       of variable length fields. should those methods be introduced here or
- *       in a derived class?
- * 
- * @todo add put/get char methods?
- * 
- * @todo consider an offset (aka base) for the absolute positioning so that a
- *       view on a larger array may be used.
+ * <p>
+ * This class is NOT thread-safe for mutation. Not only is the underlying
+ * {@link FixedByteArrayBuffer} not thread-safe for mutation, but the operation
+ * which replaces the {@link #slice} when the capacity of the backing buffer
+ * must be extended is not atomic.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -90,18 +82,36 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     final public static int DEFAULT_INITIAL_CAPACITY = 1024;
 
     /**
-     * The buffer. This is re-allocated whenever the capacity of the buffer is
-     * too small and reused otherwise.
+     * The backing byte[]. This is re-allocated whenever the capacity of the
+     * buffer is too small and reused otherwise.
      */
-    protected byte[] buf;
+    byte[] buf;
 
     /**
-     * The backing byte[] buffer. This is re-allocated whenever the capacity of
-     * the buffer is too small and reused otherwise.
+     * {@inheritDoc} This is re-allocated whenever the capacity of the buffer is
+     * too small and reused otherwise.
      */
     final public byte[] array() {
-        
+
         return buf;
+
+    }
+
+    /**
+     * The offset of the slice into the backing byte[] is always zero.
+     */
+    final public int off() {
+        
+        return 0;
+        
+    }
+
+    /**
+     * The length of the slice is always the capacity of the backing byte[].
+     */
+    final public int len() {
+        
+        return buf.length;
         
     }
     
@@ -118,9 +128,10 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * @exception IllegalArgumentException
      *                unless the value is non-negative.
      */
-    protected static int assertNonNegative(String msg, final int v) {
-       
-        if(v<0) throw new IllegalArgumentException(msg);
+    protected static int assertNonNegative(final String msg, final int v) {
+
+        if (v < 0)
+            throw new IllegalArgumentException(msg);
         
         return v;
         
@@ -187,25 +198,23 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * @param capacity
      *            The minimum #of bytes in the buffer.
      * 
-     * @todo this can be potentially overriden in a derived class to only copy
-     *       those bytes up to the current position.
+     * @todo this can be potentially overridden in a derived class to only copy
+     *       those bytes up to the current position, which would be somewhat
+     *       faster.
      */
     /*final*/ public void ensureCapacity(final int capacity) {
         
-        if(capacity<0) throw new IllegalArgumentException();
-//        assert capacity >= 0;
-        
+        if (capacity < 0)
+            throw new IllegalArgumentException();
+
         final int overflow = capacity - buf.length;
-        
-        if(overflow>0) {
+
+        if (overflow > 0) {
         
             /*
              * extend to at least the target capacity.
              */
             final byte[] tmp = new byte[extend(capacity)];
-            
-//            // copy only the defined bytes.
-//            System.arraycopy(buf, 0, tmp, 0, this.len);
             
             // copy all bytes to the new byte[].
             System.arraycopy(buf, 0, tmp, 0, buf.length);
@@ -217,9 +226,6 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     }
 
-    /**
-     * The capacity of the buffer.
-     */
     final public int capacity() {
         
         return buf.length;
@@ -238,9 +244,9 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * @todo this does not need to be final. also, caller's could set the policy
      *       including a policy that refuses to extend the capacity.
      */
-    final protected int extend(final int required) {
+    protected int extend(final int required) {
 
-        int capacity = Math.max(required, buf.length * 2);
+        final int capacity = Math.max(required, buf.length * 2);
 
         if(INFO)
             log.info("Extending buffer to capacity=" + capacity + " bytes.");
@@ -249,29 +255,49 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         
     }
 
-//    /**
-//     * Copy the data from the internal buffer into the supplied buffer.
-//     * 
-//     * @param b
-//     *            A byte[].
-//     * 
-//     * @exception IndexOutOfBoundsException
-//     *                if the supplied buffer is not large enough.
-//     */
-//    final public void copy(byte[] b) {
-//    
-//        System.arraycopy(this.buf, 0, b, 0, this.len);
-//        
-//    }
-    
     /**
-     * Copy bytes into the buffer starting at the specified position.
+     * Trims the backing byte[] to an exact fit by making a copy of the data in
+     * the buffer and returns the old byte[].  All bytes between {@link #off()}
+     * and {@link #limit()} are copied into the exact fit byte[].
+     * <p>
+     * Note: A {@link #slice(int, int)} with a view of <i>this</i>
+     * {@link ByteArrayBuffer} will continue to have a view onto the backing
+     * buffer associated with <i>this</i> instance. This works because
+     * {@link SliceImpl#array()} delegates to the outer
+     * {@link ByteArrayBuffer#array()} method. This makes it possible to
+     * {@link #trim()} a {@link ByteArrayBuffer} on which you have
+     * {@link #slice(int, int)}s, while maintaining the validity of those
+     * slices.
      * 
-     * @param pos
-     *            The position.
-     * @param b
-     *            The data.
+     * @return The old byte[].
      */
+    final public byte[] trim() {
+        
+        final byte[] tmp = buf;
+        
+        // assert not required - only tests RabaCoder assumptions.
+        assert limit == pos;
+        
+        final byte[] a = new byte[limit];
+        
+        // Note: assumes offset==0, otherwise must reset offset!
+        assert off() == 0;
+        
+        // copy onto new buffer.
+        System.arraycopy(tmp, off(), a, 0, a.length);
+        
+        // replace buffer.
+        this.buf = a;
+
+        // return the old buffer.
+        return tmp;
+        
+    }
+    
+    /*
+     * Absolute put/get methods.
+     */
+    
     final public void put(final int pos, //
             final byte[] b) {
 
@@ -279,18 +305,6 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     }
 
-    /**
-     * Copy bytes into the buffer starting at the specified position.
-     * 
-     * @param pos
-     *            The position.
-     * @param b
-     *            The data.
-     * @param off
-     *            The offset of the 1st byte in the source data to be copied.
-     * @param len
-     *            The #of bytes to be copied.
-     */
     final public void put(final int pos,//
             final byte[] b, final int off, final int len) {
 
@@ -300,27 +314,19 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
     }
 
-    /*
-     * @todo rewrite as get/put bits with pos, bit offset from pos (may be
-     * greater than 8), and bit length (must be less than 31 since we have
-     * trouble otherwise with the sign bit). The value in/out will be a 32-bit
-     * integer.
-     */
-//    final public void putBoolean(final int pos, final boolean v) {
-//
-//        if (len + 1 > buf.length)
-//            ensureCapacity(len + 1);
-//
-//        buf[len++] = v ? (byte)1 : (byte)0;
-//
-//    }
+    final public void get(final int srcoff, final byte[] dst) {
+        
+        get(srcoff, dst, 0/* dstoff */, dst.length);
+        
+    }
+    
+    final public void get(final int srcoff, final byte[] dst, final int dstoff,
+            final int dstlen) {
 
-    /**
-     * Absolute <i>put</i> method for writing a byte value.
-     * 
-     * @param v
-     *            The value.
-     */
+        System.arraycopy(buf, srcoff, dst, dstoff, dstlen);
+
+    }
+
     final public void putByte(int pos, final byte v) {
 
         if (pos + 1 > buf.length)
@@ -375,7 +381,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         
         int v = 0;
         
-        // big-endian. @todo verify 0xffL not required.
+        // big-endian.
         v += (0xff & buf[pos++]) << 24;
         v += (0xff & buf[pos++]) << 16;
         v += (0xff & buf[pos++]) <<  8;
@@ -449,7 +455,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @return A new array containing data in the buffer.
      * 
-     * @see #wrap()
+     * @see #asByteBuffer()
      * 
      * @todo this returns the data in [0:pos], which is essentially the data
      *       written on the buffer using relative put operations but without
@@ -461,7 +467,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      */
     final public byte[] toByteArray() {
         
-        byte[] tmp = new byte[this.pos];
+        final byte[] tmp = new byte[this.pos];
         
         System.arraycopy(buf, 0, tmp, 0, this.pos);
         
@@ -477,7 +483,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * A non-negative integer specifying the #of bytes of data in the buffer
      * that contain valid data starting from position zero(0).
      */
-    protected int pos = 0;
+    int pos = 0;
 
     /**
      * The read limit (there is no write limit on the buffer since the capacity
@@ -487,7 +493,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * @todo review absolute writes on the buffer. they are the underlying write
      *       operation in all cases, right?
      */
-    protected int limit;
+    int limit;
     
     /**
      * An optional mark to which the buffer can be rewound and <code>0</code>
@@ -518,12 +524,12 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         if (pos > limit)
             throw new IllegalArgumentException("pos>limit");
 
-        if (limit > buf.length)
-            throw new IllegalArgumentException("limit>buf.length");
-
         if (buf == null)
             throw new IllegalArgumentException("buf");
         
+        if (limit > buf.length)
+            throw new IllegalArgumentException("limit>buf.length");
+
         this.buf = buf;
 
         this.pos = pos;
@@ -626,7 +632,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * {@link #buf buffer} may be grown by this operation but it will not be
      * truncated.
      * <p>
-     * This operation is equivilent to
+     * This operation is equivalent to
      * 
      * <pre>
      * ensureCapacity(this.len + len)
@@ -679,7 +685,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @return The #of bytes copied.
      */
-    final public int copy(ByteBuffer src) {
+    final public int copy(final ByteBuffer src) {
         
         final int n = src.remaining();
 
@@ -710,7 +716,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @see #copyAll(ByteArrayBuffer)
      */
-    final public int copyRest(ByteArrayBuffer src) {
+    final public int copyRest(final ByteArrayBuffer src) {
         
         final int n = src.remaining();
 
@@ -735,7 +741,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @see #copyRest(ByteArrayBuffer)
      */
-    final public int copyAll(ByteArrayBuffer src) {
+    final public int copyAll(final ByteArrayBuffer src) {
 
         final int n = src.limit;
 
@@ -757,7 +763,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      *         current buffer. The data will be overwritten if {@link #reset()}
      *         is invoked followed by any operations that write on the buffer.
      */
-    final public ByteBuffer wrap() {
+    final public ByteBuffer asByteBuffer() {
 
         return ByteBuffer.wrap(buf, pos, limit);
         
@@ -799,12 +805,14 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
         this.limit = this.pos;
         
     }
-    
+
     /**
      * Relative <i>put</i> method for writing a byte value.
      * 
      * @param v
      *            The value.
+     * 
+     * @todo rename as put(byte) to conform with {@link ByteBuffer}?
      */
     final public void putByte(final byte v) {
 
@@ -821,6 +829,8 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @exception IndexOutOfBoundsException
      *                if the position is greater than or equal to the limit.
+     *                
+     * @todo rename as get(byte) to conform with {@link ByteBuffer}?
      */
     final public byte getByte() {
         
@@ -956,7 +966,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     
     /**
      * Packs a non-negative long value into the minimum #of bytes in which the
-     * value can be represented and writes those bytes onto the output stream.
+     * value can be represented and writes those bytes onto the buffer.
      * The first byte determines whether or not the long value was packed and,
      * if packed, how many bytes were required to represent the packed long
      * value. When the high bit of the first byte is a one (1), then the long
@@ -965,7 +975,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * a long. Otherwise the next three (3) bits are interpreted as an unsigned
      * integer giving the #of bytes (nbytes) required to represent the packed
      * long value. To recover the long value the high nibble is cleared and the
-     * first byte together with the next nbytes are interpeted as an unsigned
+     * first byte together with the next nbytes are interpreted as an unsigned
      * long value whose leading zero bytes were not written.
      * 
      * <pre>
@@ -986,7 +996,7 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
      * 
      * @return The #of bytes onto which the unsigned long value was packed.
      */
-    final public int packLong( final long v ) throws IOException {
+    final public int packLong( final long v ) {
         
         /*
          * You can only pack non-negative long values with this method.
@@ -1123,21 +1133,21 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
     /*
      * Pack unsigned short integer.
      */
-    
+
     /**
      * Packs a non-negative short value into one or two bytes and writes them on
-     * <i>os </i>. A short in [0:127] is packed into one byte. Larger values are
+     * the buffer. A short in [0:127] is packed into one byte. Larger values are
      * packed into two bytes. The high bit of the first byte is set if the value
      * was packed into two bytes. If the bit is set, clear the high bit, read
      * the next byte, and interpret the two bytes as a short value. Otherwise
      * interpret the byte as a short value.
      * 
-     * @param v The unsigned short integer.
+     * @param v
+     *            The unsigned short integer.
      * 
      * @return The #of bytes into which the value was packed.
      */ 
-    final public int packShort( final short v ) throws IOException
-    {
+    final public int packShort(final short v) {
     
         /*
          * You can only pack non-negative values with this method.
@@ -1162,6 +1172,88 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
             return 1;
         }
     }
+
+//    /*
+//     * unpack unsigned long integer.
+//     */
+//
+//    /**
+//     * Unpack a long value from the current buffer position, incrementing the
+//     * buffer position as a side-effect.
+//     * 
+//     * @return The long value.
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo unit test for pack/unpack in this class.
+//     */
+//    final public long unpackLong() throws IOException {
+//        if (pos + 1 > limit)
+//            throw new EOFException();
+//        int b = buf[pos++];
+//        int nbytes;
+//        long l;
+//        if ((b & 0x80) != 0) {
+//            // high bit is set.
+//            nbytes = 8; // use 8 bytes (this one plus the next 7).
+//            l = b & 0x7f; // clear the high bit - the rest of the byte is the
+//                            // start value.
+//        } else {
+//            // high bit is clear.
+//            nbytes = b >> 4; // nbytes is the upper nibble. (right shift one
+//                                // nibble).
+//            l = b & 0x0f; // starting value is lower nibble (clear the upper
+//                            // nibble).
+//        }
+//        if (pos + nbytes - 1 > limit)
+//            throw new EOFException();
+//        for (int i = 1; i < nbytes; i++) {
+//            // Read the next byte.
+//            b = buf[pos++];
+//            // Shift the existing value one byte left and add into the low
+//            // (unsigned) byte.
+//            l = (l << 8) + (0xff & b);
+//        }
+//        return l;
+//    }
+//
+//    /*
+//     * unpack unsigned short integer.
+//     */
+//    
+//    /**
+//     * Unpack a non-negative short value from the input stream, incrementing
+//     * the buffer position as a side-effect.
+//     * 
+//     * @param is
+//     *            The input stream.
+//     * 
+//     * @return The short value.
+//     * 
+//     * @throws IOException
+//     * 
+//     * @todo unit tests for pack/unpack in this class.
+//     */
+//    final public short unpackShort() throws IOException {
+//        if (pos + 1 > limit)
+//            throw new EOFException();
+//        short b = (short) buf[pos++];
+//        short v;
+//        if ((b & 0x80) != 0) { // high bit is set.
+//            /*
+//             * clear the high bit and shift over one byte.
+//             */
+//            v = (short) ((b & 0x7f) << 8);
+//            if (pos+ 1 > limit)
+//                throw new EOFException();
+//            b = buf[pos++]; // read the next byte.
+//            v |= (b & 0xff); // and combine it together with the high byte.
+//        } else {
+//            // high bit is clear.
+//            v = b; // interpret the byte as a short value.
+//        }
+//        return (short) v;
+//    }
 
     /*
      * OutputStream integration.  Operations all set the read limit to the
@@ -1225,6 +1317,161 @@ public class ByteArrayBuffer extends OutputStream implements IByteArrayBuffer,
 
         this.pos = (int) v;
         
+    }
+
+    final public boolean getBit(final long bitIndex) {
+
+        final int byteIndexForBit = BytesUtil.byteIndexForBit(bitIndex);
+
+        if (byteIndexForBit > buf.length)
+            ensureCapacity(byteIndexForBit);
+
+        return BytesUtil.getBit(buf, bitIndex);
+
+    }
+
+    final public boolean setBit(final long bitIndex, final boolean value) {
+
+        final int byteIndexForBit = BytesUtil.byteIndexForBit(bitIndex);
+
+        if (byteIndexForBit > buf.length)
+            ensureCapacity(byteIndexForBit);
+
+        return BytesUtil.setBit(buf, bitIndex, value);
+
+    }
+
+    /**
+     * Skip forward or backward the specified number of bytes.
+     * 
+     * @param nbytes
+     *            The #of bytes to skip (MAY be negative).
+     * 
+     * @return The new position.
+     */
+    public int skip(final int nbytes) {
+
+        if (pos + nbytes < 0)
+            throw new IllegalArgumentException();
+
+        if (pos + nbytes > capacity())
+            ensureCapacity(pos + nbytes);
+
+        pos += nbytes;
+        
+        return pos;
+        
+    }
+    
+    /**
+     * Return a slice of the backing buffer. The slice will always reference the
+     * current backing {@link #array()}, even when the buffer is extended and
+     * the array reference is replaced. The {@link #pos()} and {@link #limit()}
+     * are ignored by this method.
+     * 
+     * @param off
+     *            The starting offset into the backing buffer of the slice.
+     * @param len
+     *            The length of that slice.
+     * 
+     * @return The slice.
+     */
+    public AbstractFixedByteArrayBuffer slice(final int off, final int len) {
+
+        return new SliceImpl(off, len);
+
+    }
+
+    /**
+     * A slice of the outer {@link ByteArrayBuffer}. The slice will always
+     * reflect the backing {@link #array()} for the instance of the outer class.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    private class SliceImpl extends AbstractFixedByteArrayBuffer {
+
+        protected SliceImpl(final int off, final int len) {
+
+            super(off, len);
+            
+        }
+
+        public String toString() {
+            
+            return super.toString() + "{off=" + off() + ",len=" + len() + "}";
+            
+        }
+        
+        public byte[] array() {
+
+            return ByteArrayBuffer.this.array();
+
+        }
+
+    };
+    
+    /*
+     * Note: These methods are not included here because the conflicting
+     * semantics of a pos()/limit() based buffer and a byte[] slice make it
+     * impossible to remember which semantics will be applied in any given
+     * context.
+     */
+    
+//    /**
+//     */
+//    public DataInput getInputData() {
+//        
+//        return new DataInputBuffer(buf, pos(), pos() + limit());
+//        
+//    }
+//
+//    /**
+//     * Return a bit stream reading on the data between the {@link #pos()} and
+//     * the {@link #limit()}.
+//     */
+//    public InputBitStream getInputBitStream() {
+//
+//        return new InputBitStream(new DataInputBuffer(this),
+//                0/* unbuffered */, false/* reflectionTest */);
+//
+//    }
+//
+//    /**
+//     * Write the data between the {@link #pos()} and the {@link #limit()} onto
+//     * the stream.
+//     */
+//    final public void writeOn(final OutputStream os) throws IOException {
+//        
+//        os.write(array(), pos(), pos()+limit());
+//        
+//    }
+//    
+//    /**
+//     * Write the data between the {@link #pos()} and the {@link #limit()} onto
+//     * the stream.
+//     */
+//    final public void writeOn(final DataOutput out) throws IOException {
+//        
+//        out.write(array(), pos(), pos()+limit());
+//                
+//    }
+
+    /**
+     * Return a bit stream which will write on this buffer. The stream will
+     * begin at the current {@link #pos()}.
+     * 
+     * @return The bit stream.
+     * 
+     * @todo Add OBS(byte[],off,len) ctor for faster operations. However, you
+     *       MUST pre-extend the buffer to have sufficient capacity since an
+     *       {@link OutputBitStream} wrapping a byte[] will not auto-extend.
+     */
+    public OutputBitStream getOutputBitStream() {
+        
+        return new OutputBitStream(this, 0 /* unbuffered! */, false/* reflectionTest */);
+
     }
 
 }

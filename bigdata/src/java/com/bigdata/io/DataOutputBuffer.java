@@ -65,7 +65,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      * @param initialCapacity
      *            The initial capacity of the internal byte[].
      */
-    public DataOutputBuffer(int initialCapacity) {
+    public DataOutputBuffer(final int initialCapacity) {
         
         super(initialCapacity);
         
@@ -79,10 +79,10 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      *            The buffer reference is used directly rather than making a
      *            copy of the data.
      */
-    public DataOutputBuffer(final int len, byte[] buf) {
+    public DataOutputBuffer(final int len, final byte[] buf) {
 
-        super(len/*pos*/, buf.length/*readLimit*/, buf);
-        
+        super(len/* pos */, buf.length/* readLimit */, buf);
+
     }
 
     /**
@@ -90,7 +90,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      * available in {@link #buf} from position 0 (inclusive) through position
      * {@link #pos} (exclusive).
      */
-    public DataOutputBuffer(InputStream in) throws IOException {
+    public DataOutputBuffer(final InputStream in) throws IOException {
 
         super();
         
@@ -114,7 +114,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      * available in {@link #buf} from position 0 (inclusive) through position
      * {@link #pos} (exclusive).
      */
-    public DataOutputBuffer(ObjectInput in) throws IOException {
+    public DataOutputBuffer(final ObjectInput in) throws IOException {
 
         super();
 
@@ -135,13 +135,14 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
 
     /**
      * Conforms the return type to an instance of this class.
+     * {@inheritDoc}
      */
     public DataOutputBuffer reset() {
-        
-        return (DataOutputBuffer)super.reset();
-        
+
+        return (DataOutputBuffer) super.reset();
+
     }
-    
+
     /**
      * Read <i>len</i> bytes into the buffer.
      * 
@@ -149,17 +150,17 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      *            The input source.
      * @param len
      *            The #of bytes to read.
-     *            
+     * 
      * @throws EOFException
-     *             if the EOF is reached before <i>len</i> bytes have been
-     *             read.
+     *             if the EOF is reached before <i>len</i> bytes have been read.
      * @throws IOException
      *             if an I/O error occurs.
      * 
      * @todo read many bytes at a time.
      * @todo write test.
      */
-    final public void write(DataInput in, final int len) throws IOException {
+    final public void write(final DataInput in, final int len)
+            throws IOException {
 
         ensureCapacity(len);
         
@@ -186,7 +187,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
         if (pos + 1 > buf.length)
             ensureCapacity(pos + 1);
 
-        buf[pos++] = v ? (byte)1 : (byte)0;
+        buf[pos++] = v ? (byte) 1 : (byte) 0;
 
         limit = pos;
 
@@ -294,7 +295,7 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
         limit = pos;
         
     }
-    
+
     /**
      * @todo This is not wildly efficient (it would be fine if
      *       DataOutputStream#writeUTF(String str, DataOutput out)} was public)
@@ -303,6 +304,9 @@ public class DataOutputBuffer extends ByteArrayBuffer implements DataOutput {
      *       application values are already being serialized as byte[]s - which
      *       is always true when there is a client-server divide). It is used by
      *       {@link Name2Addr} to store the index names.
+     * 
+     * @todo Consider changing the access modified on the desired method using
+     *       reflection.
      */
     public void writeUTF(final String str) throws IOException {
         

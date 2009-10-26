@@ -26,15 +26,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.lexicon;
 
+import java.util.Arrays;
+
+import org.openrdf.model.Value;
 import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
@@ -67,10 +70,24 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      * <p>
      * Validation may be disabled for releases, however it is not really that
      * much overhead since the operation is on the in-memory representation.
-     *
-     * @deprecated Validation can not be reasonably applied it the
-     * Unicode collation is less than Identical.  */
-    static protected transient final boolean validate = false;
+     * 
+     * @deprecated Validation can not be reasonably applied it the Unicode
+     *             collation is less than Identical. It also has problems for
+     *             datatype literals if different lexical forms are all mapped
+     *             onto the same key,e.g.,
+     * 
+     *             <pre>
+     * 12&circ;&circ;&lt;xsd:float&gt;
+     * 12.0&circ;&circ;&lt;xsd:float&gt;
+     * 12.00&circ;&circ;&lt;xsd:float&gt;
+     * </pre>
+     * 
+     *             will all be mapped to the same key and hence would give the
+     *             appearance of a conflict if we were to reject any of these
+     *             forms when another of the forms was already present under the
+     *             key.
+     */
+    static private transient final boolean validate = false;
     
     public final boolean isReadOnly() {
         
@@ -85,10 +102,10 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
         
     }
     
-    protected Id2TermWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+    protected Id2TermWriteProc(final IRabaCoder keysCoder, final IRabaCoder valsCoder,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
-        super(keySer, valSer, fromIndex, toIndex, keys, vals);
+        super(keysCoder, valsCoder, fromIndex, toIndex, keys, vals);
         
         assert vals != null;
         
@@ -110,11 +127,12 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         private Id2TermWriteProcConstructor() {}
         
-        public Id2TermWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer,int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public Id2TermWriteProc newInstance(final IRabaCoder keysCoder,
+                final IRabaCoder valsCoder, final int fromIndex,
+                final int toIndex, final byte[][] keys, final byte[][] vals) {
 
-            return new Id2TermWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);
+            return new Id2TermWriteProc(keysCoder, valsCoder, fromIndex, toIndex,
+                    keys, vals);
 
         }
 
@@ -132,13 +150,14 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * @return <code>null</code>.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
         
         final int n = getKeyCount();
         
         for (int i = 0; i < n; i++) {
 
             // Note: the key is the term identifier.
+            // @todo copy key/val into reused buffers to reduce allocation.
             final byte[] key = getKey(i);
             
             // Note: the value is the serialized term (and never a BNode).
@@ -200,20 +219,43 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
                         else
                             suffix = '?';
 
-                        // note: solely for de-serialization of values for error logging.
+                        /*
+                         * We have to go one step further and compare the
+                         * deserialized value in order to decide if there is
+                         * really an inconsistency in the index. For example,
+                         * "abc@en" and "abc@EN" encode as different byte[]s,
+                         * but they are EQUALS() for RDF since the language code
+                         * comparison is case insensitive. The same problem can
+                         * occur for data type literals, since lexically
+                         * distinct literals are are mapped onto the same point
+                         * in the data type space (the same key). However,
+                         * comparison based on data type equality is not really
+                         * provided for by BigdataLiteral, so we get into
+                         * trouble if we attempt to detect errors based on
+                         * datatype literals.
+                         */
                         final BigdataValueSerializer valSer = new BigdataValueSerializer(
                                 new ValueFactoryImpl());
-                        log.error("id=" + id + suffix);
-                        log.error("val=" + BytesUtil.toString(val));
-                        log.error("oldval=" + BytesUtil.toString(oldval));
-                        log.error("val=" + valSer.deserialize(val));
-                        log.error("oldval=" + valSer.deserialize(oldval));
-                        if(ndx.getIndexMetadata().getPartitionMetadata()!=null)
-                            log.error(ndx.getIndexMetadata().getPartitionMetadata().toString());
+
+                        final Value term = valSer.deserialize(val);
+                        final Value oldterm = valSer.deserialize(oldval);
                         
-                        throw new RuntimeException("Consistency problem: id="+ id);
-                        
-                        
+                        if (!term.equals(oldterm)) {
+                            
+                            log.error("term=" + term);
+                            log.error("oldterm=" + oldterm);
+                            log.error("id=" + id + suffix);
+                            log.error("key=" + BytesUtil.toString(key));
+                            log.error("val=" + Arrays.toString(val));
+                            log.error("oldval=" + Arrays.toString(oldval));
+                            if (ndx.getIndexMetadata().getPartitionMetadata() != null)
+                                log.error(ndx.getIndexMetadata()
+                                        .getPartitionMetadata().toString());
+
+                            throw new RuntimeException(
+                                    "Consistency problem: id=" + id);
+                        }
+
                     }
                     
                 }

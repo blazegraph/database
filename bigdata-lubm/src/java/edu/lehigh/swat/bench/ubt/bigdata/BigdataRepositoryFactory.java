@@ -88,7 +88,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
     }
     
     /**
-     * Extended ctor varient passes along the <code>database</code> property
+     * Extended ctor variant passes along the <code>database</code> property
      * from the lubm kb config file.
      * 
      * @param database
@@ -205,7 +205,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
          * owl:inverseOf, owl:TransitiveProperty), but not owl:sameAs.
          */
         properties.setProperty(Options.FORWARD_CHAIN_OWL_INVERSE_OF, "true");
-        properties.setProperty(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY, "true");
+        properties.setProperty(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY, "true");
 
         // Note: FastClosure is the default.
 //        properties.setProperty(Options.CLOSURE_CLASS, FullClosure.class.getName());
@@ -265,6 +265,9 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
          */
         properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
 
+        // Triples only.
+        properties.setProperty(Options.QUADS, "false");
+
         /*
          * Turn off justifications (impacts only the load performance, but
          * it is a big impact and only required if you will be doing TM).
@@ -279,6 +282,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
          */
 //        properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "5");
         properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
+
         /*
          * Choice of the join algorithm.
          * 
@@ -286,9 +290,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
          * 
          * true is nested, which is also the default right now.
          */
-        properties.setProperty(Options.NESTED_SUBQUERY, "false");
-
-        //        properties.setProperty(Options.BRANCHING_FACTOR,"64");// default is 32
+        properties.setProperty(Options.NESTED_SUBQUERY, "true");
         
         {
          
@@ -298,14 +300,15 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
              * configurations.
              */
 
-//            /*
-//             * Don't collect statistics from the OS for either the
-//             * IBigdataClient or the DataService.
-//             */
-//            properties
-//                    .setProperty(
-//                            IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS,
-//                            "false");
+            /*
+             * Don't collect statistics from the OS for either the
+             * IBigdataClient or the DataService.
+             */
+            properties
+                    .setProperty(
+                            IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS,
+                            "false");
+            
 //            /*
 //             * Don't sample the various queues.
 //             */
@@ -336,6 +339,15 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
             // Very small splits.
 //            properties.setProperty(IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT, ""+1 * Bytes.kilobyte32);
 //            properties.setProperty(IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT, ""+5 * Bytes.kilobyte32);
+
+//            // write retention queue (default is 500).
+//            properties.setProperty(
+//                    IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
+//                    "8000");
+//
+//            properties.setProperty(
+//                    IndexMetadata.Options.BTREE_BRANCHING_FACTOR,
+//                    "64");
 
             {
                 /*
@@ -394,13 +406,13 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
             
         }
 
-        /*
-         * A large values works well for scale-up but you might need to reduce
-         * the read retention queue capacity since if you expect to have a large
-         * #of smaller indices open, e.g., for scale-out scenarios. Zero will
-         * disable the read-retention queue.
-         */
-        properties.setProperty(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY, "0");
+//        /*
+//         * A large values works well for scale-up but you might need to reduce
+//         * the read retention queue capacity since if you expect to have a large
+//         * #of smaller indices open, e.g., for scale-out scenarios. Zero will
+//         * disable the read-retention queue.
+//         */
+//        properties.setProperty(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY, "0");
         
         // may be used to turn off database-at-once closure during load.  
 //        properties.setProperty(Options.COMPUTE_CLOSURE, "false");
@@ -513,8 +525,14 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
                 System.err.println(Options.NESTED_SUBQUERY + "="
                         + p.getProperty(Options.NESTED_SUBQUERY));
 
-                System.err.println(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY + "="
-                        + p.getProperty(IndexMetadata.Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY));
+              System.err.println(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY + "="
+              + p.getProperty(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY));
+
+              System.err.println(IndexMetadata.Options.BTREE_BRANCHING_FACTOR+ "="
+              + p.getProperty(IndexMetadata.Options.BTREE_BRANCHING_FACTOR));
+
+//                System.err.println(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY + "="
+//                        + p.getProperty(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY));
                 
                 System.err.println(Options.CHUNK_CAPACITY + "="
                         + p.getProperty(Options.CHUNK_CAPACITY));
@@ -541,7 +559,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
                         + p.getProperty(Options.QUERY_TIME_EXPANDER));
                 
                 System.err.println("bloomFilterFactory="
-                        + tripleStore.getSPORelation().getSPOIndex()
+                        + tripleStore.getSPORelation().getPrimaryIndex()
                                 .getIndexMetadata().getBloomFilterFactory());
                 
             }

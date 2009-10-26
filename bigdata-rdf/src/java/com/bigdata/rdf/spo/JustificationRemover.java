@@ -5,7 +5,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
@@ -15,7 +14,6 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
-import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
  * Class writes on the justification index, removing all {@link Justification}s
@@ -25,10 +23,10 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * the {s,p,o} of the entailed statement as their prefix, so given a statement
  * it is trivial to do a range scan for its justifications.
  * 
- * FIXME Since this task accepts a "chunk" of statements, it should flood range
- * delete requests for each of the statements to the justifications index using
- * the {@link ExecutorService} , but only if the triple store provides
- * concurrency control for writers on the same index.
+ * @todo Since this task accepts a "chunk" of statements, it should flood range
+ *       delete requests for each of the statements to the justifications index
+ *       using the {@link ExecutorService} , but only if the triple store
+ *       provides concurrency control for writers on the same index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -41,14 +39,12 @@ public class JustificationRemover implements Callable<Long> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
     final SPORelation db;
 
@@ -105,7 +101,7 @@ public class JustificationRemover implements Callable<Long> {
         sortTime.addAndGet(beginWrite - begin);
 
         // thread-local key builder.
-        final IKeyBuilder keyBuilder = KeyBuilder.newInstance(IRawTripleStore.N*Bytes.SIZEOF_LONG);
+        final IKeyBuilder keyBuilder = KeyBuilder.newInstance(db.getKeyArity()*Bytes.SIZEOF_LONG);
 
         // remove statements from the index.
         for (int i = 0; i < numStmts; i++) {

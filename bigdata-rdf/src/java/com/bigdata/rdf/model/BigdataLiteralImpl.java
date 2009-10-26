@@ -73,30 +73,11 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
     private final String language;
     private final BigdataURI datatype;
 
-//    public BigdataLiteralImpl(String label) {
-//
-//        this(null, label, null/* language */, null/* datatype */);
-//
-//    }
-//
-//    public BigdataLiteralImpl(String label, String language) {
-//
-//        this(null, label, language, null/* datatype */);
-//
-//    }
-//
-//    public BigdataLiteralImpl(String label, URI datatype) {
-//
-//        this(null, label, null/* language */, new BigdataURIImpl(datatype
-//                .stringValue()));
-//
-//    }
-
     /**
      * Used by {@link BigdataValueFactoryImpl}.
      */
-    BigdataLiteralImpl(BigdataValueFactory valueFactory, String label,
-            String language, BigdataURI datatype) {
+    BigdataLiteralImpl(final BigdataValueFactory valueFactory,
+            final String label, final String language, final BigdataURI datatype) {
 
         super(valueFactory, NULL);
 
@@ -108,18 +89,41 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         
         this.label = label;
         
-        // @todo force to lowercase when defined?
-//        this.language = (language != null ? language.toLowerCase() : null);
-        this.language = language;
+        // force to lowercase (Sesame does this too).
+        this.language = (language != null ? language.toLowerCase() : null);
+//        this.language = language;
         
         this.datatype = datatype;
         
     }
 
-    // @todo return the fully formatted literal.
     public String toString() {
+
+        final StringBuilder sb = new StringBuilder();
+
+        sb.append('\"');
         
-        return label;
+        sb.append(label);
+        
+        sb.append('\"');
+
+        if (language != null) {
+            
+            sb.append('@');
+            
+            sb.append(language);
+            
+        } else if (datatype != null) {
+        
+            sb.append("^^<");
+            
+            sb.append(datatype);
+            
+            sb.append('>');
+            
+        }
+        
+        return sb.toString();
         
     }
     
@@ -162,7 +166,7 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
         
     }
     
-    final public boolean equals(Literal o) {
+    final public boolean equals(final Literal o) {
 
         if (this == o)
             return true;
@@ -175,11 +179,22 @@ public class BigdataLiteralImpl extends BigdataValueImpl implements
 
         if (language != null) {
 
-            return language.equals(o.getLanguage());
+            // the language code is case insensitive.
+            return language.equalsIgnoreCase(o.getLanguage());
 
-        } else if (datatype != null) {
+        } else if (o.getLanguage() != null) {
+
+            return false;
+
+        }
+
+        if (datatype != null) {
 
             return datatype.equals(o.getDatatype());
+
+        } else if (o.getDatatype() != null) {
+
+            return false;
             
         }
         

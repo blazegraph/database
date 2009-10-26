@@ -24,12 +24,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.IOException;
-import java.lang.ref.WeakReference;
-import java.util.Iterator;
 
 import com.bigdata.btree.AbstractBTreeTupleCursor.AbstractCursorPosition;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
-import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
+import com.bigdata.btree.raba.ReadOnlyValuesRaba;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
@@ -60,63 +64,62 @@ public class IndexSegment extends AbstractBTree {
      */
     private volatile Event openCloseEvent = null;
 
-    /**
-     * An LRU for {@link ImmutableLeaf}s. This cache takes advantage of the
-     * fact that the {@link LeafIterator} can read leaves without navigating
-     * down the node hierarchy.  This reference is set to <code>null</code> 
-     * if the {@link IndexSegment} is {@link #close()}d.
-     */
-//    private WeakValueCache<Long, ImmutableLeaf> leafCache;
-    private ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> leafCache;
+//    /**
+//     * An LRU for {@link ImmutableLeaf}s. This cache takes advantage of the
+//     * fact that the {@link LeafIterator} can read leaves without navigating
+//     * down the node hierarchy.  This reference is set to <code>null</code> 
+//     * if the {@link IndexSegment} is {@link #close()}d.
+//     */
+//    private ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> leafCache;
 
-    /**
-     * Return the approximate #of open leaves and zero if the
-     * {@link IndexSegment} is not open.
-     */
-    final public int getOpenLeafCount() {
-
-        final ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> tmp = leafCache;
-
-        if (tmp == null) {
-
-            return 0;
-            
-        }
-        
-        return tmp.size();
-        
-    }
-
-    /**
-     * The approximate #of bytes in the in-memory {@link IndexSegment} leaves
-     * -or- ZERO (0) if the {@link IndexSegment} is closed.
-     */
-    public long getOpenLeafByteCount() {
-
-        final ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> tmp = leafCache;
-
-        if (tmp == null)
-            return 0L;
-
-        final Iterator<WeakReference<ImmutableLeaf>> itr = tmp.iterator();
-
-        long leafByteCount = 0;
-
-        while (itr.hasNext()) {
-
-            final ImmutableLeaf leaf = itr.next().get();
-
-            if (leaf != null) {
-
-                leafByteCount += fileStore.getByteCount(leaf.identity);
-
-            }
-
-        }
-
-        return leafByteCount;
-        
-    }
+//    /**
+//     * Return the approximate #of open leaves and zero if the
+//     * {@link IndexSegment} is not open.
+//     */
+//    final public int getOpenLeafCount() {
+//
+//        final ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> tmp = leafCache;
+//
+//        if (tmp == null) {
+//
+//            return 0;
+//            
+//        }
+//        
+//        return tmp.size();
+//        
+//    }
+//
+//    /**
+//     * The approximate #of bytes in the in-memory {@link IndexSegment} leaves
+//     * -or- ZERO (0) if the {@link IndexSegment} is closed.
+//     */
+//    public long getOpenLeafByteCount() {
+//
+//        final ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf> tmp = leafCache;
+//
+//        if (tmp == null)
+//            return 0L;
+//
+//        final Iterator<WeakReference<ImmutableLeaf>> itr = tmp.iterator();
+//
+//        long leafByteCount = 0;
+//
+//        while (itr.hasNext()) {
+//
+//            final ImmutableLeaf leaf = itr.next().get();
+//
+//            if (leaf != null) {
+//
+//                leafByteCount += fileStore.getByteCount(leaf.identity);
+//
+//            }
+//
+//        }
+//
+//        return leafByteCount;
+//        
+//    }
     
     final public int getHeight() {
 
@@ -173,29 +176,31 @@ public class IndexSegment extends AbstractBTree {
         
     }
 
-    /**
-     * Returns ZERO (0) in order to disable the read-retention queue.
-     * <p>
-     * Note: The read-retention queue is <em>disabled</em> for the
-     * {@link IndexSegment}. Instead the {@link IndexSegment} relies on the
-     * write-retention queue (all touched nodes and leaves are placed on that
-     * queue) and its {@link #leafCache}. The capacity of the write-retention
-     * queue is the right order of magnitude to fully buffer the visited nodes
-     * of an {@link IndexSegment} while the {@link #leafCache} capacity and
-     * whether or not the nodes region are fully buffered may be used to control
-     * the responsivness for leaves.
-     */
-    final protected int getReadRetentionQueueCapacity() {
-        
-        return 0;
-        
-    }
-    
-    final protected int getReadRetentionQueueScan() {
-        
-        return 0;
-        
-    }
+//    /**
+//     * Returns ZERO (0) in order to disable the read-retention queue.
+//     * <p>
+//     * Note: The read-retention queue is <em>disabled</em> for the
+//     * {@link IndexSegment}. Instead the {@link IndexSegment} relies on the
+//     * write-retention queue (all touched nodes and leaves are placed on that
+//     * queue) and its {@link #leafCache}. The capacity of the write-retention
+//     * queue is the right order of magnitude to fully buffer the visited nodes
+//     * of an {@link IndexSegment} while the {@link #leafCache} capacity and
+//     * whether or not the nodes region are fully buffered may be used to control
+//     * the responsiveness for leaves.
+//     */
+//    @Override
+//    final protected int getReadRetentionQueueCapacity() {
+//        
+//        return 0;
+//        
+//    }
+//    
+//    @Override
+//    final protected int getReadRetentionQueueScan() {
+//        
+//        return 0;
+//        
+//    }
 
     /**
      * Open a read-only index segment.
@@ -224,6 +229,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Extended to also close the backing file.
      */
+    @Override
     public void close() {
 
         if (root == null) {
@@ -235,9 +241,9 @@ public class IndexSegment extends AbstractBTree {
         fileStore.lock.lock();
         try {
 
-            // release the leaf cache.
-            leafCache.clear();
-            leafCache = null;
+//            // release the leaf cache.
+//            leafCache.clear();
+//            leafCache = null;
 
             // release buffers and hard reference to the root node.
             super.close();
@@ -264,6 +270,7 @@ public class IndexSegment extends AbstractBTree {
     /**
      * Overridden to a more constrained type.
      */
+    @Override
     final public IndexSegmentStore getStore() {
         
         return fileStore;
@@ -278,6 +285,7 @@ public class IndexSegment extends AbstractBTree {
      * to the {@link IndexSegmentStore} being left open. The finalizer fixes
      * that.
      */
+    @Override
     protected void finalize() throws Throwable {
 
         if (isOpen()) {
@@ -315,15 +323,11 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-//            this.leafCache = new WeakValueCache<Long, ImmutableLeaf>(
-//                    new LRUCache<Long, ImmutableLeaf>(fileStore
+//            this.leafCache = new ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf>(
+//                    fileStore.getIndexMetadata()
+//                            .getIndexSegmentLeafCacheCapacity(), fileStore
 //                            .getIndexMetadata()
-//                            .getIndexSegmentLeafCacheCapacity()));
-            this.leafCache = new ConcurrentWeakValueCacheWithTimeout<Long, ImmutableLeaf>(
-                    fileStore.getIndexMetadata()
-                            .getIndexSegmentLeafCacheCapacity(), fileStore
-                            .getIndexMetadata()
-                            .getIndexSegmentLeafCacheTimeout());
+//                            .getIndexSegmentLeafCacheTimeout());
 
             // the checkpoint record (read when the backing store is opened).
             final IndexSegmentCheckpoint checkpoint = fileStore.getCheckpoint();
@@ -405,21 +409,22 @@ public class IndexSegment extends AbstractBTree {
         
     }
 
-    /**
-     * Extended to not place hard references to leaves into the
-     * {@link AbstractBTree#writeRetentionQueue} since {@link IndexSegment}
-     * leaves are normally held by the {@link #leafCache} for iterators and
-     * single-tuple operations do not require that we hold a hard reference to
-     * the leaf.
-     */
-    protected void touch(AbstractNode node) {
-
-        if (node.isLeaf())
-            return;
-
-        super.touch(node);
-
-    }
+//    /**
+//     * Extended to not place hard references to leaves into the
+//     * {@link AbstractBTree#writeRetentionQueue} since {@link IndexSegment}
+//     * leaves are normally held by the {@link #leafCache} for iterators and
+//     * single-tuple operations do not require that we hold a hard reference to
+//     * the leaf.
+//     */
+//    @Override
+//    protected void touch(final AbstractNode<?> node) {
+//
+//        if (node.isLeaf())
+//            return;
+//
+//        super.touch(node);
+//
+//    }
     
     @Override
     final public BloomFilter getBloomFilter() {
@@ -470,19 +475,20 @@ public class IndexSegment extends AbstractBTree {
      * @throws UnsupportedOperationException
      *             always.
      */
+    @Override
     final public void removeAll() {
         
         throw new UnsupportedOperationException(ERROR_READ_ONLY);
         
     }
-    
+
     /**
-     * Type-safe method reads the leaf from the backing file given the address of
-     * that leaf. This method is suitable for ad-hoc examination of the leaf or
-     * for a low-level iterator based on the prior/next leaf addresses.
+     * Type-safe method reads the leaf from the backing file given the address
+     * of that leaf. This method is suitable for ad-hoc examination of the leaf
+     * or for a low-level iterator based on the prior/next leaf addresses.
      * <p>
      * Note: The parent is NOT set on the leaf but it MAY be defined if the leaf
-     * was read from the {@link #leafCache}.
+     * was read from cache.
      * 
      * @param addr
      *            The address of a leaf.
@@ -491,34 +497,45 @@ public class IndexSegment extends AbstractBTree {
      */
     public ImmutableLeaf readLeaf(final long addr) {
 
-        return (ImmutableLeaf) readNodeOrLeaf(addr);
+        final ImmutableLeaf leaf = (ImmutableLeaf) readNodeOrLeaf(addr);
+
+        // Note: not necessary. Was already touched on the global LRU by
+        // readNodeOrLeaf().
+//        /*
+//         * This method is called in the context of the direct access methods for
+//         * the first and last leaves and the sequential scans of linked leaves.
+//         * Normally, the leaf would have been touched during top-down
+//         * navigation. However, the contexts in which this is invoked do not
+//         * involve top-down navigation so we touch the leaf on the LRU so it
+//         * will be strongly held for a while.
+//         */
+//        globalLRU.add(leaf.getDelegate());
+        
+        return leaf;
         
     }
 
     /**
-     * Extended to use a private cache for {@link ImmutableLeaf}s. By adding a
-     * leaf cache here we are able to catch all reads of leaves from the backing
-     * store and impose an LRU cache semantics for those leaves. This includes
-     * reads by the {@link LeafIterator} which are made without using the node
-     * hierarchy.
+     * Extended to transparently re-open the backing {@link IndexSegmentStore}.
      */
-    protected AbstractNode readNodeOrLeaf(final long addr) {
+    @Override
+    protected AbstractNode<?> readNodeOrLeaf(final long addr) {
 
-        final Long tmp = Long.valueOf(addr);
-
-        {
-
-            // test the leaf cache.
-            final ImmutableLeaf leaf = leafCache.get(tmp);
-
-            if (leaf != null) {
-
-                // cache hit.
-                return leaf;
-                
-            }
-        
-        }
+//        final Long tmp = Long.valueOf(addr);
+//
+//        {
+//
+//            // test the leaf cache.
+//            final ImmutableLeaf leaf = leafCache.get(tmp);
+//
+//            if (leaf != null) {
+//
+//                // cache hit.
+//                return leaf;
+//                
+//            }
+//        
+//        }
 
         if (!fileStore.isOpen()) {
 
@@ -533,32 +550,32 @@ public class IndexSegment extends AbstractBTree {
         }
         
         // read the node or leaf
-        final AbstractNode node = super.readNodeOrLeaf(addr);
+        final AbstractNode<?> node = super.readNodeOrLeaf(addr);
 
-        if (node.isLeaf()) {
-
-            /*
-             * Put the leaf in the LRU cache.
-             */
-            
-            final ImmutableLeaf leaf = (ImmutableLeaf) node;
-
-            /*
-             * Synchronize on the cache first to make sure that the leaf has not
-             * been concurrently entered into the cache.
-             */
-
-            synchronized (leafCache) {
-
-                if (leafCache.get(tmp) == null) {
-
-                    leafCache.put(tmp, leaf);//, false/* dirty */);
-
-                }
-
-            }
-
-        }
+//        if (node.isLeaf()) {
+//
+//            /*
+//             * Put the leaf in the LRU cache.
+//             */
+//            
+//            final ImmutableLeaf leaf = (ImmutableLeaf) node;
+//
+//            /*
+//             * Synchronize on the cache first to make sure that the leaf has not
+//             * been concurrently entered into the cache.
+//             */
+//
+//            synchronized (leafCache) {
+//
+//                if (leafCache.get(tmp) == null) {
+//
+//                    leafCache.put(tmp, leaf);//, false/* dirty */);
+//
+//                }
+//
+//            }
+//
+//        }
 
         return node;
         
@@ -569,7 +586,7 @@ public class IndexSegment extends AbstractBTree {
         if (key == null)
             throw new IllegalArgumentException();
         
-        rangeCheck(key, true/*allowUpperBound*/);
+        assert rangeCheck(key, true/*allowUpperBound*/);
         
         if (getStore().getCheckpoint().height == 0) {
 
@@ -604,7 +621,7 @@ public class IndexSegment extends AbstractBTree {
         if (key == null)
             throw new IllegalArgumentException();
 
-        rangeCheck(key, true/*allowUpperBound*/);
+        assert rangeCheck(key, true/*allowUpperBound*/);
 
         final int height = getStore().getCheckpoint().height; 
         
@@ -620,15 +637,15 @@ public class IndexSegment extends AbstractBTree {
 
         final IndexSegmentAddressManager am = getStore().getAddressManager();
         
-        AbstractNode node = getRootOrFinger(key);
+        AbstractNode<?> node = getRootOrFinger(key);
         
         int i = 0;
         
         while(true) {
             
-            final int childIndex = ((Node)node).findChild(key);
+            final int childIndex = ((Node) node).findChild(key);
 
-            final long childAddr = ((Node)node).childAddr[childIndex];
+            final long childAddr = ((Node) node).getChildAddr(childIndex);
             
             if(am.isLeafAddr(childAddr)) {
         
@@ -637,7 +654,7 @@ public class IndexSegment extends AbstractBTree {
                 
             }
 
-            // desend the node hierarchy.
+            // descend the node hierarchy.
             node = (Node)((Node)node).getChild(childIndex);
             
             i++;
@@ -662,23 +679,17 @@ public class IndexSegment extends AbstractBTree {
         private ImmutableNodeFactory() {
         }
 
-        public ILeafData allocLeaf(IIndex btree, long addr,
-                int branchingFactor, IKeyBuffer keys, byte[][] values,
-                long[] versionTimestamps, boolean[] deleteMarkers,
-                long priorAddr, long nextAddr) {
+        public Leaf allocLeaf(final AbstractBTree btree, final long addr,
+                final ILeafData data) {
 
-            return new ImmutableLeaf((AbstractBTree) btree, addr,
-                    branchingFactor, keys, values, versionTimestamps,
-                    deleteMarkers, priorAddr, nextAddr);
+            return new ImmutableLeaf(btree, addr, data);
 
         }
 
-        public INodeData allocNode(IIndex btree, long addr,
-                int branchingFactor, int nentries, IKeyBuffer keys,
-                long[] childAddr, int[] childEntryCount) {
+        public Node allocNode(final AbstractBTree btree, final long addr,
+                final INodeData data) {
 
-            return new ImmutableNode((AbstractBTree) btree, addr,
-                    branchingFactor, nentries, keys, childAddr, childEntryCount);
+            return new ImmutableNode(btree, addr, data);
 
         }
 
@@ -701,21 +712,21 @@ public class IndexSegment extends AbstractBTree {
              * @param keys
              * @param childKeys
              */
-            protected ImmutableNode(AbstractBTree btree, long addr,
-                    int branchingFactor, int nentries, IKeyBuffer keys,
-                    long[] childKeys, int[] childEntryCount) {
+            protected ImmutableNode(final AbstractBTree btree, final long addr,
+                    final INodeData data) {
 
-                super(btree, addr, branchingFactor, nentries, keys, childKeys,
-                        childEntryCount);
+                super(btree, addr, data);
 
             }
 
+            @Override
             public void delete() {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
+            @Override
             public Tuple insert(byte[] key, byte[] val, boolean deleted,
                     long timestamp, Tuple tuple) {
 
@@ -723,10 +734,109 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
+            @Override
             public Tuple remove(byte[] key, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
+            }
+
+        }
+
+        /**
+         * A double-linked, read-only, empty leaf. This is used for the root leaf of an
+         * empty {@link IndexSegment}.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         * @version $Id$
+         */
+        private static class EmptyReadOnlyLeafData implements ILeafData {
+
+            final private boolean deleteMarkers;
+            final private boolean versionTimestamps;
+            
+            public EmptyReadOnlyLeafData(final boolean deleteMarkers,
+                    final boolean versionTimestamps) {
+
+                this.deleteMarkers = deleteMarkers;
+
+                this.versionTimestamps = versionTimestamps;
+                
+            }
+            
+            final public boolean hasDeleteMarkers() {
+                return deleteMarkers;
+            }
+
+            final public boolean hasVersionTimestamps() {
+                return versionTimestamps;
+            }
+
+            final public int getValueCount() {
+                return 0;
+            }
+
+            final public IRaba getValues() {
+                return ReadOnlyValuesRaba.EMPTY;
+            }
+
+            final public boolean getDeleteMarker(int index) {
+                throw new IndexOutOfBoundsException();
+            }
+
+            final public long getVersionTimestamp(int index) {
+                throw new IndexOutOfBoundsException();
+            }
+
+            /** Yes. */
+            final public boolean isDoubleLinked() {
+                return true;
+            }
+
+            /** Returns ZERO (0) since there is no next leaf. */
+            final public long getNextAddr() {
+                return 0L;
+            }
+
+            /** Returns ZERO (0) since there is no prior leaf. */
+            final public long getPriorAddr() {
+                return 0L;
+            }
+
+            final public int getKeyCount() {
+                return 0;
+            }
+
+            final public IRaba getKeys() {
+                return ReadOnlyKeysRaba.EMPTY;
+            }
+
+            final public long getMaximumVersionTimestamp() {
+                return Long.MIN_VALUE;
+            }
+
+            final public long getMinimumVersionTimestamp() {
+                return Long.MAX_VALUE;
+            }
+
+            final public int getSpannedTupleCount() {
+                return 0;
+            }
+
+            final public boolean isLeaf() {
+                return true;
+            }
+
+            final public boolean isReadOnly() {
+                return true;
+            }
+
+            final public boolean isCoded() {
+                return true;
+            }
+
+            final public AbstractFixedByteArrayBuffer data() {
+                return FixedByteArrayBuffer.EMPTY;
             }
 
         }
@@ -743,62 +853,63 @@ public class IndexSegment extends AbstractBTree {
         public static class ImmutableLeaf extends Leaf {
 
             /**
-             * The address of the previous leaf in key order if known, 0L if it
-             * known that this is the first leaf, and -1L otherwise.
-             */
-            public final long priorAddr;
-
-            /**
-             * The address of the next leaf in key order if known, 0L if it
-             * known that this is the first leaf, and -1L otherwise.
-             */
-            public final long nextAddr;
-            
-            /**
              * Ctor used when the {@link IndexSegment} is empty (no tuples) to
              * create an empty (and immutable) root leaf.
              * 
              * @param btree
              */
-            protected ImmutableLeaf(AbstractBTree btree) {
-                
+            protected ImmutableLeaf(final AbstractBTree btree) {
+
+                // Note: This creates a _mutable_ leaf.
                 super(btree);
+
+                /*
+                 * So we replace the data record with a special immutable leaf
+                 * data object that is double-linked.  This is only used for
+                 * the empty, immutable root leaf of an IndexSegment.
+                 */
+                this.data = new EmptyReadOnlyLeafData(//
+                        btree.getIndexMetadata().getDeleteMarkers(), //
+                        btree.getIndexMetadata().getVersionTimestamps());
+
+//                super(btree);
                 
-                priorAddr = nextAddr = 0L;
+//                priorAddr = nextAddr = 0L;
                 
             }
             
             /**
              * @param btree
              * @param addr
-             * @param branchingFactor
              * @param keys
              * @param values
              */
-            protected ImmutableLeaf(AbstractBTree btree, long addr,
-                    int branchingFactor, IKeyBuffer keys, byte[][] values,
-                    long[] versionTimestamps, boolean[] deleteMarkers,
-                    long priorAddr, long nextAddr) {
+            protected ImmutableLeaf(final AbstractBTree btree, final long addr,
+                    final ILeafData data
+//                    , final long priorAddr,
+//                    final long nextAddr
+                    ) {
 
-                super(btree, addr, branchingFactor, keys, values,
-                        versionTimestamps, deleteMarkers);
+                super(btree, addr, data);
 
-                // prior/next addrs must be known.
-                assert priorAddr != -1L;
-                assert nextAddr != -1L;
-
-                this.priorAddr = priorAddr;
-                
-                this.nextAddr = nextAddr;
+//                // prior/next addrs must be known.
+//                assert priorAddr != -1L;
+//                assert nextAddr != -1L;
+//
+//                this.priorAddr = priorAddr;
+//                
+//                this.nextAddr = nextAddr;
                 
             }
 
+            @Override
             public void delete() {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
 
             }
 
+            @Override
             public Tuple insert(byte[] key, byte[] val, boolean deleted,
                     long timestamp, Tuple tuple) {
 
@@ -806,6 +917,7 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
+            @Override
             public Tuple remove(byte[] key, Tuple tuple) {
 
                 throw new UnsupportedOperationException(ERROR_READ_ONLY);
@@ -814,38 +926,42 @@ public class IndexSegment extends AbstractBTree {
 
             public ImmutableLeaf nextLeaf() {
 
+                final long nextAddr = getNextAddr();
+                
                 if (nextAddr == 0L) {
 
                     // no more leaves.
 
-                    if(INFO)
+                    if (INFO)
                         log.info("No more leaves");
-                    
+
                     return null;
-                    
+
                 }
-                
+
                 // return the next leaf in the key order.
-                return ((IndexSegment)btree).readLeaf(nextAddr);
-                
+                return ((IndexSegment) btree).readLeaf(nextAddr);
+
             }
-            
+
             public ImmutableLeaf priorLeaf() {
-                
-                if(priorAddr == 0L) {
+
+                final long priorAddr = getPriorAddr();
+
+                if (priorAddr == 0L) {
 
                     // no more leaves.
 
-                    if(INFO)
+                    if (INFO)
                         log.info("No more leaves");
-                    
+
                     return null;
-                    
+
                 }
-                
+
                 // return the previous leaf in the key order.
-                return ((IndexSegment)btree).readLeaf(priorAddr);
-                
+                return ((IndexSegment) btree).readLeaf(priorAddr);
+
             }
 
         }
@@ -1051,14 +1167,14 @@ public class IndexSegment extends AbstractBTree {
     }
 
     @Override
-    public ImmutableLeafCursor newLeafCursor(SeekEnum where) {
+    public ImmutableLeafCursor newLeafCursor(final SeekEnum where) {
         
         return new ImmutableLeafCursor(where);
         
     }
     
     @Override
-    public ImmutableLeafCursor newLeafCursor(byte[] key) {
+    public ImmutableLeafCursor newLeafCursor(final byte[] key) {
         
         return new ImmutableLeafCursor(key);
         

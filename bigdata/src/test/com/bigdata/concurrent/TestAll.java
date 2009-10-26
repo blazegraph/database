@@ -59,7 +59,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("concurrent");
+        final TestSuite suite = new TestSuite("concurrent");
        
         // Test suite for deadlock detection.
         suite.addTestSuite(TestTxDag.class);

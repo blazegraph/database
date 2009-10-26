@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.lexicon;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -56,7 +55,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("lexicon");
+        final TestSuite suite = new TestSuite("lexicon");
 
         /*
          * Non-proxy tests.
@@ -72,14 +71,18 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestId2TermTupleSerializer.class);
 
-        /*
-         * FIXME proxy tests should be defined or relocated to this package in
-         * order to test the LexiconRelation. These non-proxy test can just be
-         * run with the proxy tests - it does not hurt anything and it makes it
-         * easier to verify that all tests are being executed.
-         * 
-         */
+        // basic unit tests for adding terms to the lexicon.
+        suite.addTestSuite(TestAddTerms.class);
         
+        // test suite for the vocabulary models and their persistence.
+        suite.addTestSuite(TestVocabulary.class);
+
+        // test suite for the completion scan (prefix match for literals).
+        suite.addTestSuite(TestCompletionScan.class);
+        
+        // test suite for the full-text indexer integration.
+        suite.addTestSuite(TestFullTextIndex.class);
+
         return suite;
         
     }

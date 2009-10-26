@@ -220,7 +220,7 @@ public class StressTestConcurrent extends
      * @todo declare a variety of tests (a) overflow disabled; (b) w/ ground
      *       truth; (c) overflow enabled; (d) with ground truth. these probably
      *       need to be each in their own subclass in order to get the setup
-     *       correct since the properties need to be overriden. See
+     *       correct since the properties need to be overridden. See
      *       {@link #doComparisonTest(Properties)}.
      * 
      * @todo the stress test is not really triggering many of the more

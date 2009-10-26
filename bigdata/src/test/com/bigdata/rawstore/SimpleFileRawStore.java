@@ -34,6 +34,7 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
@@ -53,7 +54,10 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
 
     private boolean open = true;
     
+    private final UUID uuid = UUID.randomUUID();
+    
     public final File file;
+    
     protected final RandomAccessFile raf;
     
 //    /**
@@ -73,8 +77,9 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
      *            The file open mode for
      *            {@link RandomAccessFile#RandomAccessFile(File, String)()}.
      */
-    public SimpleFileRawStore(File file, String mode) throws IOException {
-        
+    public SimpleFileRawStore(final File file, final String mode)
+            throws IOException {
+
         super(WormAddressManager.SCALE_UP_OFFSET_BITS);
         
         if (file == null)
@@ -130,9 +135,15 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
         
     }
     
+    public UUID getUUID() {
+        
+        return uuid;
+        
+    }
+    
     public IResourceMetadata getResourceMetadata() {
 
-        return new ResourceMetadata(file);
+        return new ResourceMetadata(uuid, file);
 
     }
 
@@ -149,12 +160,15 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
          */
         private static final long serialVersionUID = -419665851049132640L;
 
+        private final UUID uuid;
         private final String fileStr;
 
 //        private final long length;
 
-        public ResourceMetadata(File file) {
+        public ResourceMetadata(final UUID uuid, final File file) {
 
+            this.uuid = uuid;
+            
             this.fileStr = file.toString();
 
 //            this.length = file.length();
@@ -182,8 +196,7 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
 
         public UUID getUUID() {
 
-            // no UUID.
-            return null;
+            return uuid;
 
         }
 
@@ -232,7 +245,14 @@ public class SimpleFileRawStore extends AbstractRawWormStore {
 
     public void deleteResources() {
         
-        if(open) throw new IllegalStateException();
+        if (open)
+            throw new IllegalStateException();
+
+        if (LRUNexus.INSTANCE != null) {
+
+            LRUNexus.INSTANCE.deleteCache(getUUID());
+
+        }
         
         if(!file.delete()) {
             

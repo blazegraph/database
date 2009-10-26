@@ -43,7 +43,8 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Tuple;
-import com.bigdata.isolation.IsolatedFusedView;
+import com.bigdata.btree.isolation.IsolatedFusedView;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.InnerCause;
 
 /**

@@ -40,15 +40,12 @@ import org.apache.zookeeper.KeeperException;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.rules.InferenceEngine;
-import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.service.IBigdataClient;
@@ -110,7 +107,7 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
          * <p>
          * Note: This is intended for the one-time load of ontologies pertaining
          * to the data to be loaded. If you need to do additional non-bulk data
-         * loads you can always use the {@link BigdataSail}.
+         * loads you can always use the {@link com.bigdata.rdf.sail.BigdataSail}.
          */
         String ONTOLOGY = "ontology";
 
@@ -225,10 +222,10 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
          * When <code>true</code>, the closure of the data set will be
          * computed.
          * 
-         * @see BigdataSail.Options#TRUTH_MAINTENANCE
+         * @see com.bigdata.rdf.sail.BigdataSail.Options#TRUTH_MAINTENANCE
          * 
          * @todo Note that the closure will be computed ANYWAY if the
-         *       {@link BigdataSail} is configured for incremental truth
+         *       {@link com.bigdata.rdf.sail.BigdataSail} is configured for incremental truth
          *       maintenance. (Create w/o incremental TM).
          * 
          * @todo Change to an enum type with support for justification chains,
@@ -580,7 +577,7 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
     static public void main(final String[] args) throws ConfigurationException,
             ExecutionException, InterruptedException, KeeperException {
 
-        final JiniFederation fed = new JiniClient(args).connect();
+        final JiniFederation<?> fed = new JiniClient(args).connect();
 
         try {
         
@@ -597,7 +594,7 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         
     }
     
-    public RDFDataLoadMaster(final JiniFederation fed)
+    public RDFDataLoadMaster(final JiniFederation<?> fed)
             throws ConfigurationException {
 
         super(fed);
@@ -981,10 +978,7 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         log.info(Options.NESTED_SUBQUERY + "="
                 + p.getProperty(Options.NESTED_SUBQUERY));
 
-        log.info(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY
-                        + "="
-                        + p
-                                .getProperty(IndexMetadata.Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY));
+//        log.info(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY + "=" + p .getProperty(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY));
 
         log.info(Options.CHUNK_CAPACITY + "="
                 + p.getProperty(Options.CHUNK_CAPACITY));
@@ -1009,8 +1003,8 @@ public class RDFDataLoadMaster<S extends RDFDataLoadMaster.JobState, T extends C
         log.info(Options.MAX_PARALLEL_SUBQUERIES + "="
                 + p.getProperty(Options.MAX_PARALLEL_SUBQUERIES));
 
-        // log.info(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
-        // + p.getProperty(BigdataSail.Options.QUERY_TIME_EXPANDER));
+        // log.info(com.bigdata.rdf.sail.BigdataSail.Options.QUERY_TIME_EXPANDER + "="
+        // + p.getProperty(com.bigdata.rdf.sail.BigdataSail.Options.QUERY_TIME_EXPANDER));
 
 //        log.info("bloomFilterFactory="
 //                + tripleStore.getSPORelation().getSPOIndex().getIndexMetadata()
