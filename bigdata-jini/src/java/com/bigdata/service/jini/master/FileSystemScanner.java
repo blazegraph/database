@@ -31,8 +31,6 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.util.Queue;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.relation.accesspath.BlockingBuffer;
 
 /**
@@ -43,7 +41,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
  */
 public class FileSystemScanner extends AbstractResourceScanner<File> {
 
-    volatile boolean done = false;
+//    volatile boolean done = false;
 
     protected final File fileOrDir;
 

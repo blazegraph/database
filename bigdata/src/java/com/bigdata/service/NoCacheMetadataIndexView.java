@@ -11,6 +11,7 @@ import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.service.ndx.RawDataServiceTupleIterator;
 
 /**
  * An implementation that performs NO caching. All methods read through to the

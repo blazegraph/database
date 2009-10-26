@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.File;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,8 +73,8 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
     private final int liveIndexCacheCapacity = 20;
 
     /**
-     * The timeout for stale entries in the live index cache for the
-     * {@link Name2Addr} instance.
+     * The timeout in milliseconds for stale entries in the live index cache for
+     * the {@link Name2Addr} instance.
      * 
      * @todo this should be a configuration property once the temporary store
      *       accepts a {@link Properties} object in its ctor.
@@ -107,7 +108,24 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      */
     public TemporaryStore(final int offsetBits) {
 
-        super(0L/* maximumExtent */, offsetBits, getTempFile());
+        this(offsetBits, getTempFile());
+        
+    }
+
+    /**
+     * A {@link TemporaryStore} provisioned with the specified <i>offsetBits</i>
+     * and backed by the specified file.
+     * 
+     * @param offsetBits
+     *            This determines the capacity of the store file and the maximum
+     *            length of a record. The value is passed through to
+     *            {@link WormAddressManager#WormAddressManager(int)}.
+     * @param file
+     *            The backing file (may exist, but must be empty if it exists).
+     */
+    public TemporaryStore(final int offsetBits, final File file) {
+
+        super(0L/* maximumExtent */, offsetBits, file);
 
         setupName2AddrBTree();
 
@@ -169,7 +187,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * reclaimed). The <i>checkpointAddr</i> is noted as the current
      * {@link #restoreLastCheckpoint()} point.
      */
-    public void restoreCheckpoint(long checkpointAddr) {
+    public void restoreCheckpoint(final long checkpointAddr) {
 
         assertOpen();
 
@@ -217,21 +235,21 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
 
-    public void registerIndex(IndexMetadata metadata) {
+    public void registerIndex(final IndexMetadata metadata) {
         
         registerIndex(metadata.getName(), metadata);
         
     }
     
-    public BTree registerIndex(String name, IndexMetadata metadata) {
+    public BTree registerIndex(final String name, final IndexMetadata metadata) {
     
-        BTree btree = BTree.create(this, metadata);
+        final BTree btree = BTree.create(this, metadata);
 
         return registerIndex(name, btree);
         
     }
     
-    public BTree registerIndex(String name, BTree btree) {
+    public BTree registerIndex(final String name, final BTree btree) {
 
         synchronized (name2Addr) {
 
@@ -246,7 +264,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
     }
     
-    public void dropIndex(String name) {
+    public void dropIndex(final String name) {
         
         synchronized(name2Addr) {
 
@@ -263,7 +281,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      * Return an {@link ITx#UNISOLATED} view of the named index -or-
      * <code>null</code> if there is no registered index by that name.
      */
-    public BTree getIndex(String name) {
+    public BTree getIndex(final String name) {
 
         synchronized(name2Addr) {
 
@@ -291,7 +309,7 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
      *             unless the timestamp is either {@link ITx#READ_COMMITTED} or
      *             {@link ITx#UNISOLATED}.
      */
-    public BTree getIndex(String name, long timestamp) {
+    public BTree getIndex(final String name, final long timestamp) {
 
         assertOpen();
 

@@ -32,7 +32,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -47,6 +47,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
@@ -55,6 +56,7 @@ import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
+import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
@@ -81,9 +83,9 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IRunnableBuffer;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.AbstractScaleOutFederation;
-import com.bigdata.service.DataServiceTupleIterator;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IMetadataService;
@@ -92,6 +94,10 @@ import com.bigdata.service.IBigdataClient.Options;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexAsyncWriteStats;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
+import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.ExecutionHelper;
+import com.bigdata.util.concurrent.MappedTaskExecutor;
 
 /**
  * <p>
@@ -145,6 +151,11 @@ import com.bigdata.service.ndx.pipeline.IndexWriteTask;
  *       semantics. This can be done by choosing a recent broadcast commitTime
  *       for the read or by re-issuing queries that come in with a different
  *       commitTime.
+ * 
+ @todo This class could consolidate parallelized operations by data service,
+ *       issuing a chunk of requests for each index partition on a given data
+ *       service. This would reduce the #of RMI requests to one per data service
+ *       against which the parallelized operation must be mapped.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -683,6 +694,9 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
+        // Parallel scan of each index partition?
+        final boolean parallel = ((flags & PARALLEL) != 0);
+
         /*
          * Does the iterator declare that it will not write back on the index?
          */
@@ -720,11 +734,423 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
-        return new PartitionedTupleIterator(this, ts, isReadConsistentTx,
-                fromKey, toKey, capacity, flags, filter);
-        
+        try {
+
+            if (parallel) {
+
+                /*
+                 * Parallel iterator scan. This breaks the total ordering
+                 * guarantee of the iterator in exchange for faster visitation
+                 * of the tuples in key range which spans multiple index
+                 * partitions.
+                 */
+
+                return parallelRangeIterator(ts, isReadConsistentTx, fromKey,
+                        toKey, capacity, flags, filter);
+
+            } else {
+
+                /*
+                 * Process the index partitions in key order so the total order
+                 * of the keys is preserved by the iterator visitation ordering.
+                 */
+                
+                return new PartitionedTupleIterator(this, ts,
+                        isReadConsistentTx, fromKey, toKey, capacity, flags,
+                        filter);
+
+            }
+            
+        } catch (Throwable t) {
+
+            if (isReadConsistentTx) {
+
+                /*
+                 * Terminate the transaction since we created it ourselves.
+                 */
+
+                try {
+                
+                    fed.getTransactionService().abort(ts);
+                    
+                } catch (Throwable t2) {
+                    
+                    log.error(t2, t2);
+                    
+                }
+
+            }
+            
+            throw new RuntimeException(t);
+            
+        }
+
     }
 
+    /**
+     * Parallel iterator scan. This breaks the total ordering guarantee of the
+     * iterator in exchange for faster visitation of the tuples in key range
+     * which spans multiple index partitions.
+     * 
+     * @param ts
+     *            The timestamp for the view (may be a transaction).
+     * @param isReadConsistentTx
+     *            <code>true</code> iff the caller specified timestamp is a
+     *            read-historical transaction created specifically to give the
+     *            iterator read-consistent semantics. when <code>true</code>,
+     *            this class will ensure that the transaction is eventually
+     *            aborted so that its read lock will be released. This is done
+     *            eagerly when the iterator is exhausted and with a
+     *            {@link #finalize()} method otherwise.
+     * @param fromKey
+     * @param toKey
+     * @param capacity
+     * @param flags
+     * @param filter
+     * @return
+     */
+    private ITupleIterator parallelRangeIterator(final long ts,
+            final boolean isReadConsistentTx, final byte[] fromKey,
+            final byte[] toKey, final int capacity, final int flags,
+            final IFilterConstructor filter) {
+
+        /*
+         * Set up the buffer for aggregating the results from the range
+         * iterators over each index partition.
+         * 
+         * Note: The range iterators will themselves be chunked, so the chunk
+         * size and chunk timeout should not matter too much. As long as they
+         * are small, chunks should be made visible via the asynchronous
+         * iterator as soon as they are received from the remote data service.
+         */
+        final int minimumChunkSize = 100;
+        final long chunkTimeout = 1;
+        final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
+        final BlockingBuffer<ITuple<?>[]> queryBuffer = new BlockingBuffer<ITuple<?>[]>(
+                capacity, minimumChunkSize, chunkTimeout, chunkTimeoutUnit);
+
+        /*
+         * This task will map the range iterator over the index partitions with
+         * limited parallelism.
+         */
+        final ParallelRangeIteratorTask task = new ParallelRangeIteratorTask(
+                ts, isReadConsistentTx, fromKey, toKey, capacity, flags,
+                filter, queryBuffer);
+
+        queryBuffer.setFuture(fed.getExecutorService().submit(task));
+
+        return new UnchunkedTupleIterator(queryBuffer.iterator());
+
+    }
+
+    /**
+     * Converts a chunked iterator to an {@link ITupleIterator}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * @param <E>
+     */
+    private static class UnchunkedTupleIterator<E> implements ITupleIterator<E> {
+
+        private final ICloseableIterator<ITuple<E>[]> src;
+        private ITuple<E>[] chunk = null;
+        private int index = 0;
+        private boolean exhausted = false;
+
+        public UnchunkedTupleIterator(final ICloseableIterator<ITuple<E>[]> src) {
+
+            if (src == null)
+                throw new IllegalArgumentException();
+            
+            this.src = src;
+            
+        }
+        
+        @Override
+        public boolean hasNext() {
+
+            while (!exhausted
+                    && (chunk == null || chunk.length == 0 || index >= chunk.length)) {
+
+                // refresh with another chunk from the source.
+                
+                if (!src.hasNext()) {
+
+                    exhausted = true;
+
+                    break;
+
+                }
+
+                chunk = src.next();
+
+                index = 0;
+
+            }
+
+            return !exhausted;
+
+        }
+
+        @Override
+        public ITuple<E> next() {
+
+            if (!hasNext())
+                throw new NoSuchElementException();
+            
+            return chunk[index++];
+            
+        }
+
+        @Override
+        public void remove() {
+
+            throw new UnsupportedOperationException();
+            
+        }
+
+        /**
+         * @todo {@link ITupleIterator} should extend {@link ICloseableIterator}
+         *       so we do not need to do this in a finalizer. A finalizer is
+         *       driven by GC on the client, but the iterator could be doing a
+         *       lot of work on the remote data services in which case the
+         *       client GC might not be timely.
+         */
+        protected void finalize() throws Exception {
+            
+            src.close();
+            
+        }
+
+    }
+    
+    /**
+     * Inner class runs a range iterator mapped in parallel across multiple
+     * index partitions. 
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * 
+     * @todo report counters for iterator operations.
+     */
+    private class ParallelRangeIteratorTask implements Callable<Void> {
+
+        final private long ts;
+        
+        final private boolean isReadConsistentTx;
+
+        final private byte[] fromKey;
+
+        final private byte[] toKey;
+        
+        final private int capacity;
+
+        final private int flags;
+
+        final private IFilterConstructor filter;
+
+        final private BlockingBuffer<ITuple<?>[]> queryBuffer;
+
+        /** The maximum #of tasks to queue at once. */
+        final private int maxTasks;
+        
+        final private ExecutionHelper<Void> helper;
+        
+        public ParallelRangeIteratorTask(final long ts,
+                final boolean isReadConsistentTx, final byte[] fromKey,
+                final byte[] toKey, final int capacity, final int flags,
+                final IFilterConstructor filter,
+                final BlockingBuffer<ITuple<?>[]> queryBuffer) {
+
+            this.ts = ts;
+            
+            this.isReadConsistentTx = isReadConsistentTx;
+
+            this.fromKey = fromKey;
+            
+            this.toKey = toKey;
+            
+            this.capacity = capacity;
+
+            this.flags = flags;
+
+            this.filter = filter;
+
+            this.queryBuffer = queryBuffer;
+
+            final int poolSize = ((ThreadPoolExecutor) getThreadPool())
+                    .getCorePoolSize();
+
+            final int maxTasksPerRequest = fed.getClient()
+                    .getMaxParallelTasksPerRequest();
+
+            // max #of tasks to queue at once.
+            maxTasks = poolSize == 0 ? maxTasksPerRequest : Math.min(
+                    poolSize, maxTasksPerRequest);
+
+            // verify positive or the loop below will fail to progress.
+            assert maxTasks > 0 : "maxTasks=" + maxTasks + ", poolSize="
+                    + poolSize + ", maxTasksPerRequest=" + maxTasksPerRequest;
+
+            helper = new ExecutionHelper<Void>(fed.getExecutorService(), fed
+                    .getClient().getTaskTimeout(), TimeUnit.MILLISECONDS);
+
+        }
+
+        public Void call() throws Exception {
+
+            try {
+
+                /*
+                 * Scan visits index partition locators in key order.
+                 * 
+                 * Note: We are using the caller's timestamp.
+                 * 
+                 * Note: This iterator is not "closable".
+                 */
+                final Iterator<PartitionLocator> itr = locatorScan(ts, fromKey,
+                        toKey, false/* reverseScan */);
+
+                long nparts = 0;
+
+                while (itr.hasNext()) {
+
+                    /*
+                     * Process the remaining locators a "chunk" at a time. The
+                     * chunk size is chosen to be the configured size of the
+                     * client thread pool. This lets us avoid overwhelming the
+                     * thread pool queue when mapping a procedure across a very
+                     * large #of index partitions.
+                     * 
+                     * The result is an ordered list of the tasks to be
+                     * executed. The order of the tasks is determined by the
+                     * natural order of the index partitions - that is, we
+                     * submit the tasks in key order so that a
+                     * non-parallelizable procedure will be mapped in the
+                     * correct sequence.
+                     */
+
+                    final ArrayList<Callable<Void>> tasks = new ArrayList<Callable<Void>>(
+                            maxTasks);
+
+                    for (int i = 0; i < maxTasks && itr.hasNext(); i++) {
+
+                        final PartitionLocator locator = itr.next();
+
+                        /*
+                         * Constrain the iterator's range to the intersection of
+                         * the index partition and the original iterator range.
+                         */
+
+                        final byte[] _fromKey = AbstractKeyRangeIndexProcedure
+                                .constrainFromKey(fromKey, locator);
+
+                        final byte[] _toKey = AbstractKeyRangeIndexProcedure
+                                .constrainToKey(toKey, locator);
+
+                        tasks.add(new RobustIteratorTask(_fromKey, _toKey));
+
+                        nparts++;
+
+                    }
+
+                    helper.submitTasks(tasks);
+
+                } // next (chunk of) locators.
+
+                // Done.
+                return null;
+
+            } catch (Throwable t) {
+
+                if (isReadConsistentTx) {
+
+                    fed.getTransactionService().abort(ts);
+
+                }
+
+                throw new RuntimeException(t);
+                
+            }
+
+        }
+
+        /**
+         * Runs an iterator against a key-range. If an index partition is split,
+         * joined or moved then the iterator will follow the data.  If the 
+         * {@link BlockingBuffer} is closed, then this task will terminate.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id$
+         */
+        private class RobustIteratorTask implements Callable<Void> {
+
+            private final PartitionedTupleIterator itr;
+
+            /**
+             * 
+             * @param fromKey
+             * @param toKey
+             */
+            RobustIteratorTask(final byte[] fromKey, final byte[] toKey) {
+
+                itr = new PartitionedTupleIterator(ClientIndexView.this, ts,
+                        isReadConsistentTx, fromKey, toKey, capacity, flags,
+                        filter);
+
+            }
+            
+            public Void call() throws Exception {
+
+                try {
+
+                    final UnsynchronizedArrayBuffer unsyncBuffer = new UnsynchronizedArrayBuffer(
+                            queryBuffer, queryBuffer.getMinimumChunkSize());
+
+                    while (itr.hasNext()) {
+
+                        if (!queryBuffer.isOpen()) {
+
+                            // Terminate early.
+                            break;
+                            
+                        }
+                        
+                        unsyncBuffer.add(itr.next());
+
+                    }
+
+                    if (queryBuffer.isOpen()) {
+
+                        // flush buffer if the target buffer is still open.
+                        unsyncBuffer.flush();
+                        
+                    }
+
+                } catch (Throwable t) {
+
+                    if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                        queryBuffer.abort(t);
+
+                    }
+
+                    throw new RuntimeException(t);
+
+                }
+                
+                // done.
+                return null;
+                
+            }
+
+        } // RobustIteratorTask
+        
+    }
+    
     public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
 
         if (readConsistent && proc.isReadOnly()
@@ -948,7 +1374,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
             /*
              * Process the remaining locators a "chunk" at a time. The chunk
-             * size is choosen to be the configured size of the client thread
+             * size is chosen to be the configured size of the client thread
              * pool. This lets us avoid overwhelming the thread pool queue when
              * mapping a procedure across a very large #of index partitions.
              * 
@@ -968,6 +1394,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
                 final Split split = new Split(locator, 0/* fromIndex */, 0/* toIndex */);
 
+                // Note: task will constrain fromKey/toKey to partition.
                 tasks.add(new KeyRangeDataServiceProcedureTask(this, fromKey, toKey,
                         ts, split, proc, resultHandler));
 
@@ -993,7 +1420,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
      * will be mapped in parallel against the relevant index partitions.
      * <p>
      * Note: Unlike mapping an index procedure across a key range, this method
-     * is unable to introduce a truely enourmous burden on the client's task
+     * is unable to introduce a truly enormous burden on the client's task
      * queue since the #of tasks arising is equal to the #of splits and bounded
      * by <code>n := toIndex - fromIndex</code>.
      * 
@@ -1022,9 +1449,12 @@ public class ClientIndexView implements IScaleOutClientIndex {
              * it is read-only and whether or not we need to create a read-only
              * transaction to run it.
              * 
-             * @todo This assumes that people write procedures that are
-             * flyweight in how they encode the data in their ctor. If the don't
-             * then there will be an overhead for this.
+             * FIXME This assumes that people write procedures that are fly
+             * weight in how they encode the data in their ctor. If they don't
+             * then there could be a LOT overhead for this. For example, this
+             * can cause a problem if we are using the same RabaCoders that are
+             * used for the leaves in the index since the compression technique
+             * will be applied to all of the data in this step.
              */
             final IKeyArrayIndexProcedure proc = ctor.newInstance(this,
                     fromIndex, toIndex, keys, vals);

@@ -463,7 +463,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             assertKeys(new byte[][]{k7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.getChild(1));
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             b = (Leaf)c.getChild(1);
             assertEntryCounts(new int[]{2,2}, c);
             
@@ -530,7 +530,7 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             // validate root (c).
             assertKeys(new byte[][]{k5,k7},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             d = (Leaf) c.getChild(1);
             assertEquals(b,c.getChild(2));
             assertEntryCounts(new int[]{2,2,2}, c);
@@ -608,24 +608,24 @@ public class TestLinearListMethods extends AbstractBTreeTestCase {
             g = (Node)btree.getRoot();
             assertKeys(new byte[][]{k5},g);
             assertEquals(c,g.getChild(0));
-            assertNotNull(g.childRefs[1]);
+            assertNotNull(g.getChildRef(1));
             f = (Node) g.getChild(1);
-            assertNull(g.childRefs[2]);
+            assertNull(g.getChildRef(2));
             assertEntryCounts(new int[]{4,4}, g);
             
             // validate old root (c).
             assertKeys(new byte[][]{k3},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             e = (Leaf) c.getChild(1);
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, c);
             
             // validate node(f) split from the old root split(c)->(c,f).
             assertKeys(new byte[][]{k7},f);
             assertEquals(d,f.getChild(0));
             assertEquals(b,f.getChild(1));
-            assertNull(f.childRefs[2]);
+            assertNull(f.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, f);
             
             // validate original leaf (a), which was re-split into (a,e).

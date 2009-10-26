@@ -941,7 +941,7 @@ public abstract class DistributedTransactionService extends
      * 
      * A simple commit protocol is used when the write set of the transaction
      * resides entirely on a single {@link IDataService}. Such commits DO NOT
-     * content for named resource locks (either on the index names or on the
+     * contend for named resource locks (either on the index names or on the
      * {@link IDataService} {@link UUID}s). Since such transactions DO NOT have
      * dependencies outside of the specific {@link IDataService}, a necessary
      * and sufficient partial order will be imposed on the executing tasks
@@ -1164,7 +1164,7 @@ public abstract class DistributedTransactionService extends
         final Thread commitThread;
 
         /**
-         * Condition is signalled when the "prepared" barrier breaks.
+         * Condition is signaled when the "prepared" barrier breaks.
          * <p>
          * Note: If the barrier does not break because a participate fails then
          * the {@link #commitThread} MUST be interrupted in order for it to awaken.
@@ -1172,7 +1172,7 @@ public abstract class DistributedTransactionService extends
         final Condition prepared;
         
         /**
-         * Condition is signalled when the necessary locks are held for the
+         * Condition is signaled when the necessary locks are held for the
          * participating {@link IDataService}s.
          * 
          * @see DistributedTransactionService#dataServiceLockManager
@@ -1180,7 +1180,7 @@ public abstract class DistributedTransactionService extends
         final Condition locksHeld;
         
         /**
-         * Condition is signalled when the "committed" barrier breaks.
+         * Condition is signaled when the "committed" barrier breaks.
          */
         final Condition committed;
         
@@ -1238,7 +1238,7 @@ public abstract class DistributedTransactionService extends
          * holds all of the necessary named index resource locks. This is how we
          * impose a partial order for preparing the transaction. Deadlocks can
          * not arise because we predeclare the locks and {@link LockManager} can
-         * guarentee no deadlocks in that case by sorting the requested
+         * guarantee no deadlocks in that case by sorting the requested
          * resources and acquiring the locks in the sorted order.
          */
         public Long call() throws Exception {
@@ -1341,7 +1341,7 @@ public abstract class DistributedTransactionService extends
                         new TaskRunner());
 
                 /*
-                 * Signalled when the prepared barrier breaks. Interrupted if
+                 * Signaled when the prepared barrier breaks. Interrupted if
                  * the prepare phase fails.
                  */
                 prepared.await();
@@ -1385,7 +1385,7 @@ public abstract class DistributedTransactionService extends
                          */
                         locksHeld.signal();
 
-                        // signalled when the committed barrier breaks.
+                        // Signaled when the committed barrier breaks.
                         committed.await();
 
                         return null;

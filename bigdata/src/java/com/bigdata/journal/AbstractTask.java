@@ -53,11 +53,11 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.LockManager;
 import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.concurrent.NonBlockingLockManager;
@@ -363,14 +363,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         commitList = new ConcurrentHashMap<String,DirtyListener>(resource.length);
         
         // the unisolated name2Addr object.
-        final Name2Addr name2Addr = resourceManager.getLiveJournal().name2Addr;
+        final Name2Addr name2Addr = resourceManager.getLiveJournal()._getName2Addr();
 
         if (name2Addr == null) {
             
             /*
              * Note: I have seen name2Addr be [null] here on a system with too
              * many files open which caused a cascade of failures. I added this
-             * thrown exception so that we could have a referant if the problem
+             * thrown exception so that we could have a referent if the problem
              * shows up again.
              */
 
@@ -598,7 +598,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             BTree btree;
             
             // the unisolated name2Addr object.
-            final Name2Addr name2Addr = resourceManager.getLiveJournal().name2Addr;
+            final Name2Addr name2Addr = resourceManager.getLiveJournal()._getName2Addr();
 
             synchronized (name2Addr) {
 
@@ -958,7 +958,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
             
         }
-        
+
         /*
          * Atomically apply changes to Name2Addr. When the next groupCommit
          * rolls around it will cause name2addr to run its commit protocol
@@ -970,10 +970,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Name2Addr here will become visible as soon as we leave the
          * synchronized(name2addr) block.
          * 
-         * Note: I've choosen to apply the changes to Name2Addr after the
-         * indices have been checkpointed. This means that you will do all the
-         * IO for the index checkpoints before you learn whether or not there is
-         * a conflict with an add/drop for an index. However, the alternative is
+         * Note: I've chosen to apply the changes to Name2Addr after the indices
+         * have been checkpointed. This means that you will do all the IO for
+         * the index checkpoints before you learn whether or not there is a
+         * conflict with an add/drop for an index. However, the alternative is
          * to remain synchronized on [name2addr] during the index checkpoint,
          * which is overly constraining on concurrency. (If you validate first
          * but do not remained synchronized on name2addr then the validation can
@@ -989,7 +989,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          */
 
         // the unisolated name2Addr object.
-        final Name2Addr name2Addr = resourceManager.getLiveJournal().name2Addr;
+        final Name2Addr name2Addr = resourceManager.getLiveJournal()._getName2Addr();
 
         synchronized(name2Addr) {
 
@@ -2291,13 +2291,20 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Returns an {@link TemporaryStore} local to a specific
          * {@link AbstractTask}.
          * <p>
-         * Note: While data can not be shared across {@link AbstractTask}s
-         * using the returned {@link TemporaryStore}, you can create an
+         * Note: While data can not be shared across {@link AbstractTask}s using
+         * the returned {@link TemporaryStore}, you can create an
          * {@link ILocatableResource} on a {@link TemporaryStore} and then
          * locate it from within the {@link AbstractTask}. This has the
          * advantage that the isolation and read/write constraints of the
          * {@link AbstractTask} will be imposed on access to the
-         * {@link ILocatableResource}s
+         * {@link ILocatableResource}s.
+         * 
+         * FIXME Reconsider the inner journal classes on AbstractTask. This is a
+         * heavy weight mechanism for enforcing isolation for temporary stores.
+         * It would be better to have isolation in the locator mechanism itself.
+         * This will especially effect scale-out query using temporary stores
+         * and will break semantics when the task is isolated by a transaction
+         * rather than unisolated.
          */
         public TemporaryStore getTempStore() {
             
@@ -2408,6 +2415,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getProperties();
         }
 
+        public UUID getUUID() {
+            return delegate.getUUID();
+        }
+        
         public IResourceMetadata getResourceMetadata() {
             return delegate.getResourceMetadata();
         }
@@ -2657,13 +2668,20 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Returns an {@link TemporaryStore} local to a specific
          * {@link AbstractTask}.
          * <p>
-         * Note: While data can not be shared across {@link AbstractTask}s
-         * using the returned {@link TemporaryStore}, you can create an
+         * Note: While data can not be shared across {@link AbstractTask}s using
+         * the returned {@link TemporaryStore}, you can create an
          * {@link ILocatableResource} on a {@link TemporaryStore} and then
          * locate it from within the {@link AbstractTask}. This has the
          * advantage that the isolation and read/write constraints of the
          * {@link AbstractTask} will be imposed on access to the
-         * {@link ILocatableResource}s
+         * {@link ILocatableResource}s.
+         * 
+         * FIXME Reconsider the inner journal classes on AbstractTask. This is a
+         * heavy weight mechanism for enforcing isolation for temporary stores.
+         * It would be better to have isolation in the locator mechanism itself.
+         * This will especially effect scale-out query using temporary stores
+         * and will break semantics when the task is isolated by a transaction
+         * rather than unisolated.
          */
         public TemporaryStore getTempStore() {
             
@@ -2782,6 +2800,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getProperties();
         }
 
+        public UUID getUUID() {
+            return delegate.getUUID();
+        }
+        
         public IResourceMetadata getResourceMetadata() {
             return delegate.getResourceMetadata();
         }

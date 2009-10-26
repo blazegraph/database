@@ -29,6 +29,8 @@ package com.bigdata.relation.rule;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.rdf.spo.SPOPredicate;
+
 /**
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -123,7 +125,7 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
 
     }
 
-    protected static class P<E> extends Predicate<E> {
+    protected static class P extends SPOPredicate {
 
         /**
          * @param relation
@@ -134,7 +136,8 @@ abstract public class AbstractRuleTestCase extends TestCase2 {
         public P(String relation, IVariableOrConstant<Long> s,
                 IVariableOrConstant<Long> p, IVariableOrConstant<Long> o) {
 
-            super(relation, new IVariableOrConstant[] { s, p, o });
+//            super(relation, new IVariableOrConstant[] { s, p, o });
+            super(relation, s, p, o );
             
         }
         

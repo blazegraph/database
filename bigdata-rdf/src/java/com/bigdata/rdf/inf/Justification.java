@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.inf;
 
+
 import java.util.Arrays;
 import java.util.UUID;
 
@@ -33,8 +34,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.compression.NoDataSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.InferenceEngine;
@@ -146,7 +147,8 @@ public class Justification implements Comparable<Justification> {
     /**
      * The #of term identifiers in a statement.
      */
-    private static final transient int N = IRawTripleStore.N;
+//    private static final transient int N = IRawTripleStore.N;
+    private final transient int N;
     
     /**
      * From the ctor, but not persisted.
@@ -279,6 +281,8 @@ public class Justification implements Comparable<Justification> {
         // the rule that licensed the entailment.
         final IRule rule = solution.getRule();
         
+        this.N = rule.getHead().arity();
+
         // the entailed statement.
         final SPO head = (SPO) solution.get();
 
@@ -403,9 +407,11 @@ public class Justification implements Comparable<Justification> {
      * @param ids
      *            The bindings on the head and tail(s).
      */
-    public Justification(long[] ids) {
+    public Justification(final int N, final long[] ids) {
         
         this.rule = null; // not serialized.
+        
+        this.N = N;
         
         this.ids = ids;
         
@@ -868,21 +874,21 @@ public class Justification implements Comparable<Justification> {
         
     }
 
-	/**
-	 * A collection of {@link SPO} objects (either fully bound or query
-	 * patterns) that have already been visited.
-	 * <p>
-	 * Note: This is a very specialized {@link SPO} set implementation. How it
-	 * is created and destroyed is tightly integrated with how
-	 * {@link TruthMaintenance} works. 
-	 * 
-	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-	 *         Thompson</a>
-	 * @version $Id$
-	 * 
-	 * @todo this class is public only because of {@link TestJustifications}.
-	 * it should be private.
-	 */
+    /**
+     * A collection of {@link SPO} objects (either fully bound or query
+     * patterns) that have already been visited.
+     * <p>
+     * Note: This is a very specialized {@link SPO} set implementation. How it
+     * is created and destroyed is tightly integrated with how
+     * {@link TruthMaintenance} works.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * 
+     * @todo this class is public only because of TestJustifications. it should
+     *       be private.
+     */
     public static class VisitedSPOSet {
        
         private BTree btree;
@@ -904,16 +910,19 @@ public class Justification implements Comparable<Justification> {
 		 *            The backing store on which the set will be maintained.
 		 *            This is the [focusStore] for {@link TruthMaintenance}.
 		 */
-        public VisitedSPOSet(TemporaryRawStore tempStore) {
+        public VisitedSPOSet(final TemporaryRawStore tempStore) {
             
-            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
             
             metadata.setBranchingFactor(32);
 
+            // FIXME quads : use different tupleSerializer IFF cross graph TM is supported.
+//            assert arity == 3;
+            
             // Note: keys are SPOs; no values stored for the tuples.
             tupleSer = new SPOTupleSerializer(SPOKeyOrder.SPO,
-                    DefaultTupleSerializer.getDefaultLeafKeySerializer(),
-                    NoDataSerializer.INSTANCE);
+                    DefaultTupleSerializer.getDefaultLeafKeysCoder(),
+                    EmptyRabaValueCoder.INSTANCE);
             
             metadata.setTupleSerializer(tupleSer);
             
@@ -928,12 +937,12 @@ public class Justification implements Comparable<Justification> {
          * @return <code>true</code> iff the set did not already contain the
          *         element (i.e., if the element was added to the set).
          */
-        public boolean add(ISPO spo) {
+        public boolean add(final ISPO spo) {
 
             if (DEBUG)
                 log.debug(spo.toString());
             
-            final byte[] key = tupleSer.statement2Key(SPOKeyOrder.SPO, spo);
+            final byte[] key = tupleSer.serializeKey(spo);
 
             if (!btree.contains(key)) {
 

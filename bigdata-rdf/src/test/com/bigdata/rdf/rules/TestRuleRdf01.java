@@ -107,7 +107,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
         
         } finally {
         
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -173,7 +173,7 @@ public class TestRuleRdf01 extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         

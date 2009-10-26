@@ -507,7 +507,7 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
              * apart even if they are using the same data directory.
              */
             dataDir = new File(ZookeeperServerConfiguration.this.dataDir,
-                    Integer.toString(entry.id));
+                    Integer.toString(entry.id)).getAbsoluteFile();
 
             if (log.isInfoEnabled())
                 log.info(Options.DATA_DIR + "=" + dataDir);
@@ -519,14 +519,15 @@ public class ZookeeperServerConfiguration extends JavaServiceConfiguration {
              * is whatever was specified for the dataDir.
              */
             dataLogDir = new File(ZookeeperServerConfiguration.this.dataLogDir,
-                    Integer.toString(entry.id));
+                    Integer.toString(entry.id)).getAbsoluteFile();
 
             if (log.isInfoEnabled())
                 log.info(Options.DATA_LOG_DIR + "=" + dataLogDir);
 
             // the zookeeper configuration file to be generated.
             configFile = new File(dataDir,
-                    ZookeeperServerConfiguration.this.configFile);
+                    ZookeeperServerConfiguration.this.configFile)
+                    .getAbsoluteFile();
 
             // the server id is written on this file.
             myidFile = new File(dataDir, "myid");

@@ -52,10 +52,10 @@ import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import com.bigdata.jini.start.MockListener;
-import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.ZookeeperServerConfiguration;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.start.process.ZookeeperProcessHelper;
+import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.resources.ResourceFileFilter;
 
 /**
@@ -144,7 +144,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
 
     private File dataDir = null;
     
-    // the choosen client port.
+    // the chosen client port.
     int clientPort = -1;
     
     public void setUp() throws Exception {
@@ -173,7 +173,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
                 // overrides the clientPort to be unique.
                 QuorumPeerMain.class.getName() + "."
                         + ZookeeperServerConfiguration.Options.CLIENT_PORT + "="
-                        + +clientPort,
+                        + clientPort,
                 // overrides servers declaration.
                 QuorumPeerMain.class.getName() + "."
                         + ZookeeperServerConfiguration.Options.SERVERS + "=\""
@@ -182,7 +182,7 @@ public abstract class AbstractZooTestCase extends TestCase2 {
                 QuorumPeerMain.class.getName() + "."
                         + ZookeeperServerConfiguration.Options.DATA_DIR
                         + "=new java.io.File("
-                        + ServiceConfiguration.q(dataDir.toString()) + ")"//
+                        + ConfigMath.q(dataDir.toString()) + ")"//
         };
         
         System.err.println("args=" + Arrays.toString(args));
@@ -532,12 +532,19 @@ public abstract class AbstractZooTestCase extends TestCase2 {
      * @param f
      *            A file or directory.
      */
-    private void recursiveDelete(File f) {
+    private void recursiveDelete(final File f) {
 
         if (f.isDirectory()) {
 
             final File[] children = f.listFiles();
 
+            if (children == null) {
+
+                // The directory does not exist.
+                return;
+                
+            }
+            
             for (int i = 0; i < children.length; i++) {
 
                 recursiveDelete(children[i]);

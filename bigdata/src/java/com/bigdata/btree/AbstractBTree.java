@@ -33,6 +33,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -41,10 +42,15 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTreeTupleCursor.MutableBTreeTupleCursor;
 import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
 import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.btree.IndexSegment.IndexSegmentTupleCursor;
+import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.Reverserator;
 import com.bigdata.btree.filter.TupleRemover;
@@ -54,13 +60,16 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IKeyRangeIndexProcedure;
 import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.RingBuffer;
+import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.compression.IRecordCompressorFactory;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.CompactTask;
 import com.bigdata.journal.IAtomicStore;
@@ -219,9 +228,26 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     /**
-     * The persistence store.
+     * The persistence store -or- <code>null</code> iff the B+Tree is transient.
      */
     final protected IRawStore store;
+
+    /**
+     * Optional cache for {@link INodeData} and {@link ILeafData} instances and
+     * always <code>null</code> if the B+Tree is transient.
+     */
+    protected final ILRUCache<Long, Object> storeCache;
+
+//    /**
+//     * Global LRU on which we touch {@link INodeData} and {@link ILeafData}
+//     * instances. This replaces the historical readRetentionQueue, but touch is
+//     * for {@link INodeData} and {@link ILeafData} rather than {@link Node} or
+//     * {@link Leaf}.
+//     * 
+//     * @deprecated I think that this can be safely hidden. Also hide
+//     *             {@link LRUNexus#getGlobalLRU()}
+//     */
+//    final IHardReferenceQueue<Object> globalLRU;
 
     /**
      * The branching factor for the btree.
@@ -243,13 +269,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * the application in a manner consistent with the single-threaded contract
      * for the {@link AbstractBTree}.
      * <p>
-     * Note: This field MUST be marked as [volatile] in order to guarentee
+     * Note: This field MUST be marked as [volatile] in order to guarantee
      * correct semantics for double-checked locking in {@link BTree#reopen()}
      * and {@link IndexSegment#reopen()}.
      * 
      * @see http://en.wikipedia.org/wiki/Double-checked_locking
      */
-    protected volatile AbstractNode root;
+    protected volatile AbstractNode<?> root;
 
     /**
      * An optional bloom filter that will be used to filter point tests against
@@ -370,6 +396,22 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * this is to have {@link HardReferenceQueue#add(Object)} begin to evict
      * objects before is is actually at capacity, but that is also a bit
      * fragile.
+     * <p>
+     * Note: The {@link #writeRetentionQueue} uses a {@link HardReferenceQueue}.
+     * This is based on a {@link RingBuffer} and is very fast. It does not use a
+     * {@link HashMap} because we can resolve the {@link WeakReference} to the
+     * child {@link Node} or {@link Leaf} using top-down navigation as long as
+     * the {@link Node} or {@link Leaf} remains strongly reachable (that is, as
+     * long as it is on the {@link #writeRetentionQueue} or otherwise strongly
+     * held). This means that lookup in a map is not required for top-down
+     * navigation.
+     * <p>
+     * The {@link LRUNexus} provides an {@link INodeData} / {@link ILeafData}
+     * data record cache based on a hash map with lookup by the address of the
+     * node or leaf. This is tested when the child {@link WeakReference} was
+     * never set or has been cleared. This cache is also used by the
+     * {@link IndexSegment} for the linked-leaf traversal pattern, which does
+     * not use top-down navigation.
      * 
      * @todo consider a policy that dynamically adjusts the queue capacities
      *       based on the height of the btree in order to maintain a cache that
@@ -391,35 +433,35 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     protected int ndistinctOnWriteRetentionQueue;
     
-    /**
-     * The {@link #readRetentionQueue} reduces reads through to the backing
-     * store in order to prevent disk reads and reduces de-serialization costs
-     * for nodes by maintaining them as materialized objects.
-     * <p>
-     * Non-deleted nodes (that is nodes or leaves) are placed onto this hard
-     * reference queue when they are evicted from the
-     * {@link #writeRetentionQueue}. Nodes are always converted into their
-     * immutable variants when they are evicted from the
-     * {@link #writeRetentionQueue} so the {@link #readRetentionQueue} only
-     * contains hard references to immutable nodes. If there is a need to write
-     * on a node then {@link AbstractNode#copyOnWrite()} will be used to create
-     * a mutable copy of the node and the old node will be
-     * {@link AbstractNode#delete()}ed. Delete is responsible for releasing any
-     * state associated with the old node, so deleted nodes on the
-     * {@link #readRetentionQueue} will occupy very little space in the heap.
-     * <p>
-     * Note: evictions from this hard reference cache are driven by inserts.
-     * Inserts are driven by evictions of non-deleted nodes from the
-     * {@link #writeRetentionQueue}.
-     * <p>
-     * Note: the {@link #readRetentionQueue} will typically contain multiple
-     * references to a given node.
-     * <p>
-     * Note: the {@link IndexSegment} has an additional leaf cache since its
-     * iterators do not use the {@link Node}s to scan to the prior or next
-     * {@link Leaf}.
-     */
-    final protected HardReferenceQueue<PO> readRetentionQueue;
+//    /**
+//     * The {@link #readRetentionQueue} reduces reads through to the backing
+//     * store in order to prevent disk reads and reduces de-serialization costs
+//     * for nodes by maintaining them as materialized objects.
+//     * <p>
+//     * Non-deleted nodes (that is nodes or leaves) are placed onto this hard
+//     * reference queue when they are evicted from the
+//     * {@link #writeRetentionQueue}. Nodes are always converted into their
+//     * immutable variants when they are evicted from the
+//     * {@link #writeRetentionQueue} so the {@link #readRetentionQueue} only
+//     * contains hard references to immutable nodes. If there is a need to write
+//     * on a node then {@link AbstractNode#copyOnWrite()} will be used to create
+//     * a mutable copy of the node and the old node will be
+//     * {@link AbstractNode#delete()}ed. Delete is responsible for releasing any
+//     * state associated with the old node, so deleted nodes on the
+//     * {@link #readRetentionQueue} will occupy very little space in the heap.
+//     * <p>
+//     * Note: evictions from this hard reference cache are driven by inserts.
+//     * Inserts are driven by evictions of non-deleted nodes from the
+//     * {@link #writeRetentionQueue}.
+//     * <p>
+//     * Note: the {@link #readRetentionQueue} will typically contain multiple
+//     * references to a given node.
+//     * <p>
+//     * Note: the {@link IndexSegment} has an additional leaf cache since its
+//     * iterators do not use the {@link Node}s to scan to the prior or next
+//     * {@link Leaf}.
+//     */
+//    final protected RingBuffer<PO> readRetentionQueue;
 
     /**
      * Return some "statistics" about the btree including both the static
@@ -484,13 +526,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                     }
                 });
 
-        counterSet.addCounter("Read Retention Queue Size",
-                new Instrument<Integer>() {
-                    protected void sample() {
-                        setValue(readRetentionQueue == null ? 0
-                                : readRetentionQueue.size());
-                    }
-                });
+//        counterSet.addCounter("Read Retention Queue Size",
+//                new Instrument<Integer>() {
+//                    protected void sample() {
+//                        setValue(readRetentionQueue == null ? 0
+//                                : readRetentionQueue.size());
+//                    }
+//                });
 
         /*
          * @todo report time open?
@@ -561,13 +603,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         counterSet.addCounter("Write Retention Queue Capacity",
                 new OneShotInstrument<Integer>(writeRetentionQueue.capacity()));
 
-        if (readRetentionQueue != null) {
-
-            counterSet.addCounter("Read Retention Queue Capacity",
-                    new OneShotInstrument<Integer>(readRetentionQueue
-                            .capacity()));
-
-        }
+//        if (readRetentionQueue != null) {
+//
+//            counterSet.addCounter("Read Retention Queue Capacity",
+//                    new OneShotInstrument<Integer>(readRetentionQueue
+//                            .capacity()));
+//
+//        }
 
         return counterSet;
 
@@ -592,7 +634,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final INodeFactory nodeFactory,//
             final boolean readOnly,
             final IndexMetadata metadata,//
-            final IRecordCompressorFactory recordCompressorFactory
+            final IRecordCompressorFactory<?> recordCompressorFactory
             ) {
 
         // show the copyright banner during startup.
@@ -613,55 +655,76 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         if(branchingFactor < Options.MIN_BRANCHING_FACTOR)
             throw new IllegalArgumentException();
-        
+
+        /*
+         * Compute the minimum #of children/values. This is the same whether
+         * this is a Node or a Leaf.
+         */
+        minChildren = (branchingFactor + 1) >> 1;
+
         if (nodeFactory == null)
             throw new IllegalArgumentException();
 
         this.store = store;
 
+        this.writeRetentionQueue = newWriteRetentionQueue();
+
+        this.nodeSer = new NodeSerializer(//
+                store, // addressManager
+                nodeFactory,//
+                branchingFactor,//
+                0, //initialBufferCapacity
+                metadata,//
+                readOnly,//
+                recordCompressorFactory
+                );
+        
         if (store == null) {
-            
+
             /*
              * Transient BTree.
              * 
-             * Note: The write retention queue does not have much of a role for
-             * a transient BTree and the read retention queue is positively
-             * useless.
+             * Note: The write retention queue controls how long nodes remain
+             * mutable. On eviction, they are coded but not written onto the
+             * backing store (since there is none for a transient BTree).
              * 
-             * Note: The [nodeSer] is used by a transient BTree - the nodes and
-             * leaves are NOT serialized since they are NOT persistent.
+             * The readRetentionQueue is not used for a transient BTree since
+             * the child nodes and the parents are connected using hard links
+             * rather than weak references.
              */
 
-            this.writeRetentionQueue = new HardReferenceQueue<PO>(//
-                    NOPEvictionListener.INSTANCE,//
-                    metadata.getWriteRetentionQueueCapacity(),//
-                    metadata.getWriteRetentionQueueScan()//
-                    );
+            this.storeCache = null;
             
-            this.readRetentionQueue = null;
-
-            this.nodeSer = null;
+//            this.globalLRU = null;
+            
+//            this.readRetentionQueue = null;
             
         } else {
-        
+
             /*
              * Persistent BTree.
+             * 
+             * The global LRU is used to retain recently used node/leaf data
+             * records in memory and the per-store cache provides random access
+             * to those data records. Only the INodeData or ILeafData is stored
+             * in the cache. This allows reuse of the data records across B+Tree
+             * instances since the data are read-only and the data records
+             * support concurrent read operations. The INodeData or ILeafData
+             * will be wrapped as a Node or Leaf by the owning B+Tree instance.
              */
-            
-            this.writeRetentionQueue = newWriteRetentionQueue();
 
-            this.readRetentionQueue = newReadRetentionQueue();
-        
-            this.nodeSer = new NodeSerializer(//
-                    store, // addressManager
-                    nodeFactory,//
-                    branchingFactor,//
-                    0, //initialBufferCapacity
-                    metadata,//
-                    readOnly,//
-                    recordCompressorFactory
-                    );
+            /*
+             * FIXME if the LRUNexus is disabled, then use a
+             * ConcurrentWeakValueCacheWithTimeout to buffer the leaves of an
+             * IndexSegment. Essentially, a custom cache. Otherwise we lose some
+             * of the performance of the leaf iterator for the index segment
+             * since leaves are not recoverable by random access without a
+             * cache.
+             */
+            this.storeCache = LRUNexus.getCache(store);
             
+//            this.readRetentionQueue = newReadRetentionQueue();
+        
         }
 
     }
@@ -680,44 +743,38 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
     
-    /**
-     * Note: Method is package private so that it may be overriden for unit
-     * tests.
-     * 
-     * @todo Consider using soft references for the read retention queue. This
-     *       would allow the references to be cleared in a low memory situation.
-     *       However, I think that we are better off closing out indices that
-     *       have not been recently used in the {@link IndexManager} and the
-     *       {@link AbstractJournal}, e.g., after a 60 second timeout.
-     */
-    protected HardReferenceQueue<PO> newReadRetentionQueue() {
+//    /**
+//     * Note: Method is package private so that it may be overridden for unit
+//     * tests.
+//     */
+//    final protected RingBuffer<PO> newReadRetentionQueue() {
+//
+//        final int capacity = getReadRetentionQueueCapacity(); 
+//        
+//        return (capacity != 0
+//
+//        ? new HardReferenceQueue<PO>(//
+//                NOPEvictionListener.INSTANCE,//
+//                capacity, //
+//                getReadRetentionQueueScan())
+//
+//        : null
+//
+//        );
+//          
+//    }
 
-        final int capacity = getReadRetentionQueueCapacity(); 
-        
-        return (capacity != 0
-
-        ? new HardReferenceQueue<PO>(//
-                NOPEvictionListener.INSTANCE,//
-                capacity, //
-                getReadRetentionQueueScan())
-
-        : null
-
-        );
-          
-    }
-
-    /**
-     * The capacity for the {@link #readRetentionQueue} (may differ for
-     * {@link BTree} and {@link IndexSegment}).
-     */
-    abstract protected int getReadRetentionQueueCapacity();
-
-    /**
-     * The capacity for the {@link #readRetentionQueue} (may differ for
-     * {@link BTree} and {@link IndexSegment}).
-     */
-    abstract protected int getReadRetentionQueueScan();
+//    /**
+//     * The capacity for the {@link #readRetentionQueue} (may differ for
+//     * {@link BTree} and {@link IndexSegment}).
+//     */
+//    abstract protected int getReadRetentionQueueCapacity();
+//
+//    /**
+//     * The capacity for the {@link #readRetentionQueue} (may differ for
+//     * {@link BTree} and {@link IndexSegment}).
+//     */
+//    abstract protected int getReadRetentionQueueScan();
     
     /**
      * The contract for {@link #close()} is to reduce the resource burden of the
@@ -766,13 +823,25 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        if (root.dirty) {
+        if (log.isInfoEnabled() || BigdataStatics.debug) {
 
-//            throw new IllegalStateException("Root node is dirty");
-            log.warn("Root is dirty - discarding writes: name="
+            final String msg = "BTree close: name="
                     + metadata.getName()
+                    + ", dirty="
+                    + root.dirty
+                    + ", height="
+                    + getHeight()
+                    + ", nentries="
+                    + getEntryCount()
+                    + ", impl="
                     + (this instanceof BTree ? ((BTree) this).getCheckpoint()
-                            .toString() : getClass().getSimpleName()));
+                            .toString() : getClass().getSimpleName());
+
+            if (log.isInfoEnabled())
+                log.info(msg);
+
+            if (BigdataStatics.debug)
+                System.err.println(msg);
 
         }
 
@@ -791,15 +860,18 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * Note: This is safe since we know as a pre-condition that the root
          * node is clean and therefore that there are no dirty nodes or leaves
          * in the hard reference queue.
+         * 
+         * @todo Clearing the write retention queue here is important. However,
+         * it may fail to transfer clean nodes and leaves to the global LRU.
          */
         writeRetentionQueue.clear(true/* clearRefs */);
         ndistinctOnWriteRetentionQueue = 0;
         
-        if (readRetentionQueue != null) {
-            
-            readRetentionQueue.clear(true/* clearRefs */);
-            
-        }
+//        if (readRetentionQueue != null) {
+//            
+//            readRetentionQueue.clear(true/* clearRefs */);
+//            
+//        }
 
         /*
          * Clear the reference to the root node (permits GC).
@@ -860,7 +932,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * read from the store), the bloom filter, etc. It is invoked by
      * {@link #reopen()} once {@link #root} has been show to be
      * <code>null</code> with double-checked locking. When invoked in this
-     * context, the caller is guarenteed to hold a lock on <i>this</i>. This is
+     * context, the caller is guaranteed to hold a lock on <i>this</i>. This is
      * done to ensure that at most one thread gets to re-open the index from the
      * backing store.
      */
@@ -1201,6 +1273,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     /**
+     * The minimum #of children (for a node) or the minimum #of values (for
+     * a leaf).  This is computed in the same manner for nodes and leaves.
+     * <pre>
+     * (branchingFactor + 1) &lt;&lt; 1
+     * </pre>
+     */
+    final int minChildren;
+
+    /**
      * The height of the btree. The height is the #of levels minus one. A btree
      * with only a root leaf has <code>height := 0</code>. A btree with a
      * root node and one level of leaves under it has <code>height := 1</code>.
@@ -1259,7 +1340,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * {@link #close() closed}. This method automatically {@link #reopen()}s
      * the index if it is closed, making it available for use.
      */
-    final protected AbstractNode getRoot() {
+    final protected AbstractNode<?> getRoot() {
 
         // make sure that the root is defined.
         if (root == null)
@@ -1280,10 +1361,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @return Either the root node of the tree or a recently touched leaf that
      *         is known to span the key.
      * 
-     * @todo This is a placeholder for finger(s) for hot spots in the B+Tree,
+     * @todo This is a place holder for finger(s) for hot spots in the B+Tree,
      *       but the finger(s) are currently disabled.
      */
-    protected AbstractNode getRootOrFinger(final byte[] key) {
+    protected AbstractNode<?> getRootOrFinger(final byte[] key) {
 
         return getRoot();
 //        
@@ -1323,7 +1404,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //                /*
 //                 * The key belongs somewhere in between the first and the last
 //                 * key in the leaf. For all those positions, we are again
-//                 * guarenteed that this key belongs within this leaf.
+//                 * guaranteed that this key belongs within this leaf.
 //                 */
 //
 //                return leaf;
@@ -1545,7 +1626,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
     }
 
-    final public byte[] insert(byte[] key, byte[] value) {
+    final public byte[] insert(final byte[] key, final byte[] value) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1577,15 +1658,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            Data and metadata for the old value under the key will be
      *            copied onto this object (optional).
      * 
-     * @return <i>tuple</i> -or- <code>null</code> if there was no entry
-     *         under that key. See {@link ITuple#isDeletedVersion()} to
-     *         determine whether or not the entry is marked as deleted.
-     *         
+     * @return <i>tuple</i> -or- <code>null</code> if there was no entry under
+     *         that key. See {@link ITuple#isDeletedVersion()} to determine
+     *         whether or not the entry is marked as deleted.
+     * 
      * @throws UnsupportedOperationException
      *             if the index is read-only.
+     * 
+     * @todo add putIfAbsent() variant for insert methods?
      */
-    final public Tuple insert(byte[] key, byte[] value, boolean delete,
-            long timestamp, Tuple tuple) {
+    final public Tuple insert(final byte[] key, final byte[] value,
+            final boolean delete, final long timestamp, final Tuple tuple) {
 
         assert delete == false || getIndexMetadata().getDeleteMarkers();
 
@@ -1680,7 +1763,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Remove the tuple under that key (will write a delete marker if delete
      * markers are enabled).
      */
-    final public byte[] remove(byte[] key) {
+    final public byte[] remove(final byte[] key) {
 
         final Tuple tuple;
         
@@ -1736,7 +1819,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @throws UnsupportedOperationException
      *             if the index is read-only.
      */
-    final public Tuple remove(byte[] key, Tuple tuple) {
+    final public Tuple remove(final byte[] key, final Tuple tuple) {
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1785,7 +1868,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
 
-    public byte[] lookup(byte[] key) {
+    public byte[] lookup(final byte[] key) {
 
         final Tuple tuple = lookup(key, getLookupTuple());
 
@@ -2125,9 +2208,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        int ret = toIndex - fromIndex;
-
-        return ret;
+        return (toIndex - fromIndex);
 
     }
 
@@ -2271,7 +2352,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 filter);
 
     }
-    
+
     /**
      * Core implementation.
      * <p>
@@ -2291,6 +2372,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * is also responsible for constructing an {@link ITupleIterator} in a
      * manner similar to this method. If you are updating the logic here, then
      * check the logic in that method as well!
+     * 
+     * @todo add support to the iterator construct for filtering by a tuple
+     *       revision timestamp range.
      */
     public ITupleIterator rangeIterator(//
             final byte[] fromKey,//
@@ -2612,10 +2696,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     }
     
-    public Object submit(byte[] key, ISimpleIndexProcedure proc) {
-        
+    public Object submit(final byte[] key, final ISimpleIndexProcedure proc) {
+
         // conditional range check on the key.
-        if(key!=null) assert rangeCheck(key,false);
+        if (key != null)
+            assert rangeCheck(key, false);
 
         return proc.apply(this);
         
@@ -2769,21 +2854,19 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            The dump is written on this stream.
      * 
      * @return true unless an inconsistency is detected.
-     * 
-     * @todo modify to write on log vs PrintStream.
      */
-    public boolean dump(PrintStream out) {
+    public boolean dump(final PrintStream out) {
 
         return dump(BTree.dumpLog.getEffectiveLevel(), out);
 
     }
 
-    public boolean dump(Level level, PrintStream out) {
+    public boolean dump(final Level level, final PrintStream out) {
 
         // True iff we will write out the node structure.
         final boolean info = level.toInt() <= Level.INFO.toInt();
 
-        int[] utils = getUtilization();
+        final int[] utils = getUtilization();
 
         if (info) {
 
@@ -2797,7 +2880,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             final int branchingFactor = getBranchingFactor();
 
-            log.info("height=" + height + ", branchingFactor="
+            out.println("height=" + height + ", branchingFactor="
                     + branchingFactor + ", #nodes=" + nnodes + ", #leaves="
                     + nleaves + ", #entries=" + nentries + ", nodeUtil="
                     + utils[0] + "%, leafUtil=" + utils[1] + "%, utilization="
@@ -2818,12 +2901,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Touch the node or leaf on the {@link #writeRetentionQueue}. If the node
      * is not found on a scan of the head of the queue, then it is appended to
      * the queue and its {@link AbstractNode#referenceCount} is incremented. If
-     * the a node is being appended to the queue and the queue is at capacity,
-     * then this will cause a reference to be evicted from the queue. If the
-     * reference counter for the evicted node or leaf is zero, then the node or
-     * leaf will be written onto the store and made immutable. A subsequent
-     * attempt to modify the node or leaf will force copy-on-write for that node
-     * or leaf.
+     * a node is being appended to the queue and the queue is at capacity, then
+     * this will cause a reference to be evicted from the queue. If the
+     * reference counter for the evicted node or leaf is zero and the evicted
+     * node or leaf is dirty, then the evicted node or leaf will be coded and
+     * written onto the backing store. A subsequent attempt to modify the node
+     * or leaf will force copy-on-write for that node or leaf. Regardless of
+     * whether or not the node or leaf is dirty, it is touched on the
+     * {@link LRUNexus#getGlobalLRU()} when it is evicted from the write
+     * retention queue.
      * </p>
      * <p>
      * This method guarantees that the specified node will NOT be synchronously
@@ -2857,11 +2943,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *       Note: I have since seen an exception where the evicted node
      *       reference was [null]. The problem is that the
      *       {@link HardReferenceQueue} is NOT thread-safe. Concurrent readers
-     *       driving {@link HardReferenceQueue#add(Object)} can cause the
-     *       data structure to become inconsistent. This is not much of a
-     *       problem for readers since the queue is being used to retain hard
-     *       references - effectively a cache and the null reference could be
-     *       ignored. For writers, we are always single threaded.
+     *       driving {@link HardReferenceQueue#add(Object)} can cause the data
+     *       structure to become inconsistent. This is not much of a problem for
+     *       readers since the queue is being used to retain hard references -
+     *       effectively a cache and the null reference could be ignored. For
+     *       writers, we are always single threaded.
      *       <p>
      *       Still, it seems best to either make this method synchronized or to
      *       replace the {@link HardReferenceQueue} with an
@@ -2886,7 +2972,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      */
     synchronized
 //    final 
-    protected void touch(final AbstractNode node) {
+    protected void touch(final AbstractNode<?> node) {
 
         assert node != null;
 
@@ -2975,7 +3061,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            MUST be dirty. The node this does NOT have to be the root of
      *            the tree and it does NOT have to be a {@link Node}.
      */
-    protected void writeNodeRecursive(AbstractNode node) {
+    final protected void writeNodeRecursive(final AbstractNode<?> node) {
 
         final long begin = System.currentTimeMillis();
         
@@ -3008,11 +3094,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * 
          * Note: This iterator only visits dirty nodes.
          */
-        final Iterator itr = node.postOrderNodeIterator(true);
+        final Iterator<AbstractNode> itr = node
+                .postOrderNodeIterator(true/* dirtyNodesOnly */);
 
         while (itr.hasNext()) {
 
-            final AbstractNode t = (AbstractNode) itr.next();
+            final AbstractNode<?> t = itr.next();
 
             assert t.dirty;
 
@@ -3031,23 +3118,39 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             writeNodeOrLeaf(t);
 
             ndirty++;
+            
+//            if (BigdataStatics.debug && ndirty > 0 && ndirty % 1000 == 0) {
+//				System.out.println("nwritten=" + ndirty + " in "
+//						+ (System.currentTimeMillis() - begin) + "ms");
+//            }
 
             if (t instanceof Leaf)
                 nleaves++;
 
         }
 
-        if (INFO) {
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        if (log.isInfoEnabled() || elapsed > 5000) {
 
-            final long elapsed = System.currentTimeMillis() - begin;
-            
+            /*
+             * Note: latency here is nearly always a side effect of GC. Unless
+             * you are running the cms-i or similar GC policy, you can see
+             * multi-second GC pauses. Those pauses will cause messages to be
+             * emitted here. This is especially true with multi-GB heaps.
+             */
+
             final int nnodes = ndirty - nleaves;
             
-            final String s = "wrote: " + ndirty + " records (#nodes=" + nnodes
+            final String s = "wrote: "+(metadata.getName()!=null?"name="+metadata.getName()+", ":"") + ndirty + " records (#nodes=" + nnodes
                     + ", #leaves=" + nleaves + ") in " + elapsed
                     + "ms : addrRoot=" + node.getIdentity();
-            
-            if (elapsed > 500/*ms*/) {
+
+            if (elapsed > 5000) {
+
+//            	System.err.println(s);
+//
+//            } else if (elapsed > 500/*ms*/) {
 
                 // log at warning level when significant latency results.
                 log.warn(s);
@@ -3063,17 +3166,24 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
 
     /**
-     * Writes the node on the store (non-recursive). The node MUST be dirty. If
-     * the node has a parent, then the parent is notified of the persistent
-     * identity assigned to the node by the store. This method is NOT recursive
-     * and dirty children of a node will NOT be visited.
+     * Codes the node and writes the coded record on the store (non-recursive).
+     * The node MUST be dirty. If the node has a parent, then the parent is
+     * notified of the persistent identity assigned to the node by the store.
+     * This method is NOT recursive and dirty children of a node will NOT be
+     * visited. By coding the nodes and leaves as they are evicted from the
+     * {@link #writeRetentionQueue}, the B+Tree continuously converts nodes and
+     * leaves to their more compact coded record forms which results in a
+     * smaller in memory footprint.
+     * <p>
+     * Note: For a transient B+Tree, this merely codes the node but does not
+     * write the node on the store (there is none).
      * 
      * @throws UnsupportedOperationException
      *             if the B+Tree (or the backing store) is read-only.
      * 
      * @return The persistent identity assigned by the store.
      */
-    protected long writeNodeOrLeaf(AbstractNode node) {
+    protected long writeNodeOrLeaf(final AbstractNode<?> node) {
 
         assert root != null; // i.e., isOpen().
         assert node != null;
@@ -3081,8 +3191,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         assert node.dirty;
         assert !node.deleted;
         assert !node.isPersistent();
+        assert !node.isReadOnly();
         assertNotReadOnly();
-
+        
         /*
          * Note we have to permit the reference counter to be positive and not
          * just zero here since during a commit there will typically still be
@@ -3118,33 +3229,69 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        /*
-         * Serialize the node or leaf onto a shared buffer.
-         */
-
         if (debug)
             node.assertInvariants();
-
-        final ByteBuffer buf;
+        
+        // the coded data record.
+        final AbstractFixedByteArrayBuffer slice;
         {
-            
+
             final long begin = System.nanoTime();
-            
+
+            /*
+             * Code the node or leaf, replacing the data record reference on the
+             * node/leaf with a reference to the coded data record.
+             * 
+             * Note: This is optimized for the very common use case where we
+             * want to have immediate access to the coded data record. In that
+             * case, many of the IRabaCoder implementations can be optimized by
+             * passing the underlying coding object (FrontCodedByteArray,
+             * HuffmanCodec's decoder) directly into an alternative ctor for the
+             * decoder. This gives us "free" decoding for the case when we are
+             * coding the record. The coded data record is available from the
+             * IRabaDecoder.
+             * 
+             * About the only time when we do not need to do this is the
+             * IndexSegmentBuilder, since the coded record will not be used
+             * other than to write it on the disk.
+             */
             if (node.isLeaf()) {
 
-                buf = nodeSer.putLeaf((Leaf) node);
+                // code data record and _replace_ the data ref.
+                ((Leaf) node).data = nodeSer.encodeLive(((Leaf) node).data);
+
+                // slice onto the coded data record.
+                slice = ((Leaf) node).data();
 
                 btreeCounters.leavesWritten++;
 
             } else {
 
-                buf = nodeSer.putNode((Node) node);
+                // code data record and _replace_ the data ref.
+                ((Node) node).data = nodeSer.encodeLive(((Node) node).data);
+
+                // slice onto the coded data record.
+                slice = ((Node) node).data();
 
                 btreeCounters.nodesWritten++;
 
             }
             
             btreeCounters.serializeNanos += System.nanoTime() - begin;
+            
+        }
+
+        if (store == null) {
+
+            /*
+             * This is a transient B+Tree so we do not actually write anything
+             * on the backing store.
+             */
+
+            // No longer dirty (prevents re-coding on re-eviction).
+            node.setDirty(false);
+
+            return 0L;
             
         }
         
@@ -3154,7 +3301,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             final long begin = System.nanoTime();
             
-            addr = store.write(buf);
+            // wrap as ByteBuffer and write on the store.
+            addr = store.write(slice.asByteBuffer());
 
             btreeCounters.writeNanos += System.nanoTime() - begin;
     
@@ -3164,8 +3312,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         /*
          * The node or leaf now has a persistent identity and is marked as
-         * clean. At this point is MUST be treated as being immutable. Any
-         * changes directed to this node or leaf MUST trigger copy-on-write.
+         * clean. At this point it's data record is read-only. Any changes
+         * directed to this node or leaf MUST trigger copy-on-write and convert
+         * the data record to a mutable instance before proceeding.
          */
 
         node.setIdentity(addr);
@@ -3175,13 +3324,43 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (parent != null) {
 
             // Set the persistent identity of the child on the parent.
-            parent.setChildKey(node);
+            parent.setChildAddr(node);
 
             // // Remove from the dirty list on the parent.
             // parent.dirtyChildren.remove(node);
 
         }
 
+        if (storeCache != null) {
+
+            /*
+             * Put the data record (the delegate) into the cache, touching it on
+             * the backing LRU.
+             * 
+             * Note: This provides an unfair retention for recently written
+             * nodes or leaves equal to that of recently read nodes or leaves. I
+             * do not know what to do about that. However, the total size across
+             * all per-store caches is (SHOULD BE) MUCH larger than the write
+             * retention queue so that bias may not matter that much.
+             */
+            if (null != storeCache.putIfAbsent(addr, node.getDelegate())) {
+
+                /*
+                 * Note: For a WORM store, the address is always new so there
+                 * will not be an entry in the cache for that address.
+                 * 
+                 * Note: For a RW store, the addresses can be reused and the
+                 * delete of the old address MUST have cleared the entry for
+                 * that address from the store's cache.
+                 */
+                
+                throw new AssertionError("addr already in cache: " + addr
+                        + " for " + store.getFile());
+                
+            }
+            
+        }
+        
         return addr;
 
     }
@@ -3200,21 +3379,48 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @return The node or leaf.
      */
-    protected AbstractNode readNodeOrLeaf(long addr) {
+    protected AbstractNode<?> readNodeOrLeaf(final long addr) {
 
+        final Long addr2 = Long.valueOf(addr); 
+
+        if (storeCache != null) {
+
+            // test cache : will touch global LRU iff found.
+            final IAbstractNodeData data = (IAbstractNodeData) storeCache
+                    .get(addr);
+
+            if (data != null) {
+
+                // Node and Leaf MUST NOT make it into the global LRU or store
+                // cache!
+                assert !(data instanceof AbstractNode<?>);
+                
+                final AbstractNode<?> node;
+                
+                if (data.isLeaf()) {
+
+                    node = nodeSer.nodeFactory.allocLeaf(this, addr,
+                            (ILeafData) data);
+
+                } else {
+
+                    node = nodeSer.nodeFactory.allocNode(this, addr,
+                            (INodeData) data);
+
+                }
+
+                // cache hit.
+                return node;
+                
+            }
+            
+        }
+        
         final ByteBuffer tmp;
         {
 
             final long begin = System.nanoTime();
             
-        // /*
-        // * offer the node serializer's buffer to the IRawStore. it will be
-        // used
-        // * iff it is large enough and the store does not prefer to return a
-        // * read-only slice.
-        // */
-        // ByteBuffer tmp = store.read(addr, nodeSer._buf);
-
             tmp = store.read(addr);
             
             assert tmp.position() == 0;
@@ -3240,46 +3446,64 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         /* 
          * Extract the node from the buffer.
          */
-        final AbstractNode node;
-        {
+        try {
 
-            final long begin = System.nanoTime();
-            
-            try {
+            IAbstractNodeData data;
+            {
 
-                node = (AbstractNode) nodeSer.getNodeOrLeaf(this, addr, tmp);
-                
-            } catch(Throwable t) {
-                
-                throw new RuntimeException("De-serialization problem: addr="
-                        + store.toString(addr) + " from store="
-                        + store.getFile() + " : cause=" + t
-//                        + ", data=\n" + toString(store, addr, tmp)
-                        , t);
+                final long begin = System.nanoTime();
+
+                // decode the record.
+                data = nodeSer.decode(tmp);
+
+                btreeCounters.deserializeNanos += System.nanoTime() - begin;
+
+                if (data.isLeaf()) {
+
+                    btreeCounters.leavesRead++;
+
+                } else {
+
+                    btreeCounters.nodesRead++;
+
+                }
+
+            }
+
+            if (storeCache != null) {
+             
+                // update cache : will touch global LRU iff cache is modified.
+                final IAbstractNodeData data2 = (IAbstractNodeData) storeCache
+                        .putIfAbsent(addr2, data);
+
+                if (data2 != null) {
+
+                    // concurrent insert, use winner's value.
+                    data = data2;
+
+                }
                 
             }
 
-            btreeCounters.deserializeNanos += System.nanoTime() - begin;
-            
+            // wrap as Node or Leaf.
+            final AbstractNode<?> node = nodeSer.wrap(this, addr, data);
+
+            // Note: The de-serialization ctor already does this.
+//            node.setDirty(false);
+
+            // Note: The de-serialization ctor already does this.
+//            touch(node);
+
+            // return Node or Leaf.
+            return node;
+
+        } catch (Throwable t) {
+
+            throw new RuntimeException("De-serialization problem: addr="
+                    + store.toString(addr) + " from store=" + store.getFile()
+                    + " : cause=" + t, t);
+
         }
-
-        // Note: The de-serialization ctor already does this.
-//        node.setDirty(false);
-
-        if (node instanceof Leaf) {
-
-            btreeCounters.leavesRead++;
-
-        } else {
-
-            btreeCounters.nodesRead++;
-
-        }
-
-        // Note: The de-serialization ctor already does this.
-//        touch(node);
-
-        return node;
 
     }
 
@@ -3296,7 +3520,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * @see SoftReference
      * @see WeakReference
      */
-    final Reference<AbstractNode> newRef(final AbstractNode child) {
+    final <T extends AbstractNode<T>> Reference<AbstractNode<T>> newRef(
+            final AbstractNode<T> child) {
         
         /*
          * Note: If the parent refers to its children using soft references the
@@ -3320,11 +3545,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
              * Note: Used for transient BTrees.
              */
             
-            return new HardReference<AbstractNode>(child);
+            return new HardReference<AbstractNode<T>>(child);
             
         } else {
         
-            return new WeakReference<AbstractNode>( child );
+            return new WeakReference<AbstractNode<T>>( child );
 //        return new SoftReference<AbstractNode>( child ); // causes significant GC "hesitations".
         }
         

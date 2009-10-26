@@ -96,6 +96,7 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
+import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.LocalDataServiceClient;
 import com.bigdata.service.jini.util.JiniServicesHelper;
@@ -351,7 +352,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                     + p.getProperty(Options.QUERY_TIME_EXPANDER));
             
             System.err.println("bloomFilterFactory="
-                    + tripleStore.getSPORelation().getSPOIndex()
+                    + tripleStore.getSPORelation().getPrimaryIndex()
                             .getIndexMetadata().getBloomFilterFactory());
 
     }
@@ -373,16 +374,18 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     }
     
     /**
-     * Shows some interesting details about the SPO index.
+     * Shows some interesting details about the primary index for the
+     * {@link SPORelation}.
      * 
      * @param sail
      */
-    public static void showSPOIndexDetails(BigdataSail sail) {
+    public static void showSPOIndexDetails(final BigdataSail sail) {
         
-        IIndex ndx = sail.getDatabase().getSPORelation().getSPOIndex();
-        IndexMetadata md = ndx.getIndexMetadata();
+        final IIndex ndx = sail.getDatabase().getSPORelation().getPrimaryIndex();
         
-        System.out.println("SPO:");
+        final IndexMetadata md = ndx.getIndexMetadata();
+        
+        System.out.println(md.getName()+":");
         System.out.println(md.toString());
         System.out.println(md.getTupleSerializer().toString());
         
@@ -391,7 +394,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     /**
      * Return various interesting metadata about the KB state.
      */
-    protected StringBuilder getKBInfo(AbstractTripleStore tripleStore) {
+    protected StringBuilder getKBInfo(final AbstractTripleStore tripleStore) {
         
         final StringBuilder sb = new StringBuilder();
 
@@ -410,10 +413,14 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         sb.append("indexManager\t"+tripleStore.getIndexManager().getClass().getName()+"\n");
         
-        sb.append("exactStatementCount\t" + tripleStore.getExactStatementCount()+"\n");
+        sb.append("exactStatementCount\t"
+                + tripleStore.getStatementCount(null/* c */, true/* exact */)
+                + "\n");
 
-        sb.append("statementCount\t" + tripleStore.getStatementCount()+"\n");
-        
+        sb.append("statementCount\t"
+                + tripleStore.getStatementCount(null/* c */, false/* exact */)
+                + "\n");
+
         sb.append("termCount\t" + tripleStore.getTermCount()+"\n");
         
         sb.append("uriCount\t" + tripleStore.getURICount()+"\n");
@@ -547,6 +554,10 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                     com.bigdata.service.EmbeddedClient.Options.DATA_DIR, file
                             .toString());
             
+            // disable platform statistics collection.
+            properties.setProperty(
+                    EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+            
             /*
              * Delete the temp file before running since EDS will create a
              * directory by that name.
@@ -572,7 +583,9 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
              * everything in the data directory before running the test.
              */
 
-            jiniServicesHelper = new JiniServicesHelper(file.toString());
+            jiniServicesHelper = new JiniServicesHelper(new String[] { //
+                    file.toString() //
+                    });
 
             jiniServicesHelper.start();
 
@@ -1979,7 +1992,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
                  * federations since the joins are performed using the index
                  * partitions not the scale-out indices.
                  */
-                final IIndex ndx = conn.getTripleStore().getSPOIndex();
+                final IIndex ndx = conn.getTripleStore().getSPORelation()
+                        .getPrimaryIndex();
 
                 if (ndx instanceof ILocalBTreeView) {
 
@@ -2149,7 +2163,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          * owl:inverseOf, owl:TransitiveProperty), but not owl:sameAs.
          */
         properties.setProperty(Options.FORWARD_CHAIN_OWL_INVERSE_OF, "true");
-        properties.setProperty(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY, "true");
+        properties.setProperty(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY, "true");
 
         // Note: FastClosure is the default.
 //        properties.setProperty(Options.CLOSURE_CLASS, FullClosure.class.getName());
@@ -2370,6 +2384,11 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
              */
 
             final Map<String, String> defaultProperties = new HashMap<String, String>();
+
+            // disable platform statistics collection.
+            defaultProperties
+                    .put(IBigdataClient.Options.COLLECT_PLATFORM_STATISTICS,
+                            "false");
 
             defaultProperties.putAll(PropertyUtil
                     .flatten(getDefaultProperties()));

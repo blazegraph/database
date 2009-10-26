@@ -30,6 +30,7 @@ package com.bigdata.service.jini;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -55,6 +56,9 @@ import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 import net.jini.export.Exporter;
+import net.jini.jeri.BasicILFactory;
+import net.jini.jeri.BasicJeriExporter;
+import net.jini.jeri.tcp.TcpServerEndpoint;
 import net.jini.lease.LeaseListener;
 import net.jini.lease.LeaseRenewalEvent;
 import net.jini.lease.LeaseRenewalManager;
@@ -84,6 +88,7 @@ import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.AbstractService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
 import com.bigdata.service.mapred.jini.MapServer;
@@ -108,6 +113,10 @@ import com.sun.jini.start.ServiceStarter;
  * java -Djava.security.policy=policy.all ....
  * </pre>
  * 
+ * You must specify the JVM property
+ * <code>-Dcom.sun.jini.jeri.tcp.useNIO=true</code> to enable NIO.
+ * <p>
+ * 
  * Other command line options MAY be recommended depending on the JVM and the
  * service that you are starting, e.g., <code>-server</code>.
  * <p>
@@ -115,26 +124,27 @@ import com.sun.jini.start.ServiceStarter;
  * Termination implies that the server stops execution but that it MAY be
  * restarted. A {@link Runtime#addShutdownHook(Thread) shutdown hook} is
  * installed by the server so that you can also stop the server using ^C
- * (Windows) and <code>kill</code> <i>pid</i> (Un*x). You can record the PID
- * of the process running the server when you start it under Un*x using a shell
+ * (Windows) and <code>kill</code> <i>pid</i> (Un*x). You can record the PID of
+ * the process running the server when you start it under Un*x using a shell
  * script. Note that if you are starting multiple services at once with the
  * {@link ServiceStarter} then these methods (^C or kill <i>pid</i>) will take
  * down all servers running in the same VM.
  * <p>
- * Services may be <em>destroyed</em> using {@link DestroyAdmin}, e.g.,
- * through the Jini service browser. Note that all persistent data associated
- * with that service is also destroyed!
+ * Services may be <em>destroyed</em> using {@link DestroyAdmin}, e.g., through
+ * the Jini service browser. Note that all persistent data associated with that
+ * service is also destroyed!
  * 
  * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6380355, which
  *      describes a bug in the service browser that will display a
  *      "NullPointerException" dialog box if you destroy a service which
  *      implements {@link DestroyAdmin} but not {@link JoinAdmin}.
  * 
- * @see http://java.sun.com/products/jini/2.0/doc/api/com/sun/jini/start/ServiceStarter.html
- *      for documentation on how to use the ServiceStarter.
+ * @see http 
+ *      ://java.sun.com/products/jini/2.0/doc/api/com/sun/jini/start/ServiceStarter
+ *      .html for documentation on how to use the ServiceStarter.
  * 
  * @todo delete the lock file, config file, etc. and the service directory if
- * the service is destroyed.
+ *       the service is destroyed.
  * 
  * @todo document exit status codes and unify their use in this and derived
  *       classes.
@@ -162,6 +172,29 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 //     */
 //    final static protected boolean DEBUG = log.isDebugEnabled();
 
+    public interface ConfigurationOptions {
+
+        /**
+         * The pathname of the service directory as a {@link File}.
+         */
+        String SERVICE_DIR = "serviceDir";
+        
+        /**
+         * @todo javadoc.
+         */
+        String LOGICAL_SERVICE_ZPATH = "logicalServiceZPath";
+
+        /**
+         * This object is used to export the service proxy. The choice here
+         * effects the protocol that will be used for communications between the
+         * clients and the service. The default {@link Exporter} if none is
+         * specified is a {@link BasicJeriExporter} using a
+         * {@link TcpServerEndpoint}.
+         */
+        String EXPORTER = "exporter";
+        
+    }
+
     /**
      * The {@link ServiceID} for this server is either read from a local file,
      * assigned by the registrar (if this is a new service instance), or given
@@ -186,6 +219,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     private File serviceIdFile;
 
     /**
+     * The file on which the PID was written.
+     */
+    private File pidFile;
+
+    /**
      * An attempt is made to obtain an exclusive lock on a file in the same
      * directory as the {@link #serviceIdFile}. If the {@link FileLock} can be
      * obtained then the reference for that {@link RandomAccessFile} is set on
@@ -198,6 +236,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     private RandomAccessFile lockFileRAF = null;
     private FileLock fileLock;
+    private File lockFile;
     
     /**
      * The zpath (zookeeper path) to the znode for the logical service of which
@@ -217,7 +256,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * The {@link JiniClient} is used to locate the other services in the
      * {@link IBigdataFederation}.
      */
-    private JiniClient client;
+    private JiniClient<?> client;
 
     /**
      * Used to manage the join/leave of the service hosted by this server with
@@ -332,7 +371,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * The object used to connect to and access the other services in the
      * {@link IBigdataFederation}.
      */
-    protected JiniClient getClient() {
+    public JiniClient getClient() {
         
         return client;
         
@@ -373,7 +412,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * resources, wraps the throwable as a runtime exception and rethrows the
      * wrapped exception.
      * <p>
-     * This implementation MAY be overriden to invoke {@link System#exit(int)}
+     * This implementation MAY be overridden to invoke {@link System#exit(int)}
      * IFF it is known that the server is being invoked from a command line
      * context. However in no case should execution be allowed to return to the
      * caller.
@@ -384,8 +423,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
         try {
 
-            shutdownNow();
-            
+            shutdownNow(false/* destroy */);
+
         } catch (Throwable t2) {
             
             log.error(this, t2);
@@ -460,12 +499,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * need to use the ServicesManager to start any service since the
              * zookeeper configuration needs to be established as well.
              */
-            logicalServiceZPath = (String) config.getEntry(getClass().getName(),
-                    "logicalServiceZPath", String.class, null/* default */);
-            
-            // The file on which the ServiceID will be written. 
-            serviceIdFile = (File) config.getEntry(getClass().getName(),
-                    "serviceIdFile", File.class);
+            logicalServiceZPath = (String) config.getEntry(
+                    getClass().getName(),
+                    ConfigurationOptions.LOGICAL_SERVICE_ZPATH, String.class,
+                    null/* default */);
 
             /*
              * Make sure that the parent directory exists.
@@ -477,7 +514,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * always exists in the former - and in both of those cases we do
              * not have to create the parent directory.
              */
-            serviceDir = serviceIdFile.getAbsoluteFile().getParentFile();
+            serviceDir = (File) config.getEntry(getClass().getName(),
+                    ConfigurationOptions.SERVICE_DIR, File.class); 
 
             if (serviceDir != null && !serviceDir.exists()) {
 
@@ -487,13 +525,19 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             }
 
+            // The file on which the ServiceID will be written.
+            serviceIdFile = new File(serviceDir, "service.id");
+
+            // The lock file.
+            lockFile = new File(serviceDir, ".lock");
+
             /*
              * Attempt to acquire an exclusive lock on a file in the same
              * directory as the serviceIdFile.
              */
             acquireFileLock();
             
-            writePIDFile();
+            writePIDFile(pidFile = new File(serviceDir, "pid"));
             
             // convert Entry[] to a mutable list.
             entries = new LinkedList<Entry>(Arrays
@@ -616,8 +660,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             // The exporter used to expose the service proxy.
             exporter = (Exporter) config.getEntry(//
                     getClass().getName(), // component
-                    "exporter", // name
-                    Exporter.class // type (of the return object)
+                    ConfigurationOptions.EXPORTER, // name
+                    Exporter.class, // type (of the return object)
+                    /*
+                     * The default exporter is a BasicJeriExporter using a
+                     * TcpServerEnpoint.
+                     */
+                    new BasicJeriExporter(TcpServerEndpoint.getInstance(0),
+                            new BasicILFactory())
                     );
 
             if(serviceIdFile.exists()) {
@@ -698,7 +748,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         /*
          * Create the service object.
          */
-        JiniFederation fed = null;
+        JiniFederation<?> fed = null;
         try {
             
             /*
@@ -729,7 +779,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 log.info("Service impl is " + impl);
 
             // Connect to the federation (starts service discovery for client).
-            final JiniFederation f = fed = client.connect();
+            final JiniFederation<?> f = fed = client.connect();
             
             /*
              * Add a watcher that will create the ephemeral znode for the
@@ -918,11 +968,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     private void acquireFileLock() {
 
-        final File file = new File(serviceDir, ".lock");
-
         try {
 
-            lockFileRAF = new RandomAccessFile(file, "rw");
+            lockFileRAF = new RandomAccessFile(lockFile, "rw");
 
         } catch (IOException ex) {
 
@@ -930,7 +978,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * E.g., due to permissions, etc.
              */
 
-            throw new RuntimeException("Could not open: file=" + file, ex);
+            throw new RuntimeException("Could not open: file=" + lockFile, ex);
 
         }
 
@@ -954,7 +1002,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 }
 
                 throw new RuntimeException("Service already running: file="
-                        + file);
+                        + lockFile);
 
             }
 
@@ -964,7 +1012,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
              * Note: This is true of NFS volumes.
              */
 
-            log.warn("FileLock not supported: file=" + file, ex);
+            log.warn("FileLock not supported: file=" + lockFile, ex);
 
         }
 
@@ -976,9 +1024,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * be the pid of the server. If you are running multiple servers inside of
      * the same JVM, then the pid will be the same for each of those servers.
      */
-    private void writePIDFile() {
-
-        final File file = new File(serviceDir, "pid");
+    private void writePIDFile(final File file) {
 
         try {
 
@@ -1623,16 +1669,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * Note: Normally, extended shutdown behavior is handled by the service
      * implementation, not the server. However, subclasses MAY extend this
      * method to terminate any additional processing and release any additional
-     * resources, taking care to (a) declare the method as <strong>synchronized</strong>,
-     * conditionally halt any asynchonrous processing not already halted,
-     * conditionally release any resources not already released, and trap, log,
-     * and ignored all errors.
+     * resources, taking care to (a) declare the method as
+     * <strong>synchronized</strong>, conditionally halt any asynchonrous
+     * processing not already halted, conditionally release any resources not
+     * already released, and trap, log, and ignored all errors.
      * <p>
      * Note: This is run from within the {@link ShutdownThread} in response to a
      * request to destroy the service.
+     * 
+     * @param destroy
+     *            When <code>true</code> the persistent state associated with
+     *            the service is also destroyed.
      */
-    synchronized public void shutdownNow() {
-
+    synchronized public void shutdownNow(final boolean destroy) {
+     
         if (shuttingDown) {
             
             // break recursion.
@@ -1700,11 +1750,33 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 //
 //        }
 
+        if (destroy && impl != null && impl instanceof IService) {
+
+            final IService tmp = (IService) impl;
+
+            /*
+             * Delegate to the service to destroy its persistent state.
+             */
+
+            try {
+
+                ((IService) tmp).destroy();
+
+            } catch (Throwable ex) {
+
+                log.error("Problem with service destroy: " + this, ex);
+
+                // ignore.
+
+            }
+
+        }
+        
         /*
          * Invoke the service's own logic to shutdown its processing.
          */
         if (impl != null && impl instanceof IServiceShutdown) {
-            
+
             try {
                 
                 final IServiceShutdown tmp = (IServiceShutdown) impl;
@@ -1730,13 +1802,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 
                 // ignore.
                 
-            } finally {
-                
-                impl = null;
-                
-            }
+            } 
             
         }
+        
+        // discard reference to the service implementation object.
+        impl = null;
         
         /*
          * Terminate manager threads.
@@ -1778,6 +1849,32 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
         }
         
+        if(destroy) {
+
+            // Delete any files that we recognize in the service directory.
+            recursiveDelete(serviceDir);
+
+            /*
+             * Delete files created by this class.
+             */
+            
+            // delete the serviceId file.
+            if (serviceIdFile.exists() && !serviceIdFile.delete()) {
+
+                log.warn("Could not delete: " + serviceIdFile);
+
+            }
+
+            // delete the pid file.
+            if (pidFile.exists() && !pidFile.delete()) {
+
+                log.warn("Could not delete: " + pidFile);
+
+            }
+
+        }
+        
+        // release the file lock.
         if (lockFileRAF != null && lockFileRAF.getChannel().isOpen()) {
 
             /*
@@ -1796,7 +1893,32 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             }
             
         }
+
+        if (destroy && lockFile.exists()) {
+
+            /*
+             * Note: This will succeed if no one has a lock on the file. You can
+             * not delete the file while you are holding the lock. If another
+             * process gets the file lock after we release it (immediately
+             * above) but before we delete the lock file here, then the delete
+             * will fail and the service directory delete will also fail.
+             */
+ 
+            if(!lockFile.delete()) {
+                
+                log.warn("Could not delete: " + serviceDir);
+                
+            }
+            
+        }
         
+        // delete the service directory after we have released the lock.
+        if (destroy && serviceDir.exists() && !serviceDir.delete()) {
+
+            log.warn("Could not delete: " + serviceDir);
+
+        }
+
         // wake up so that run() will exit.
         synchronized(keepAlive) {
             
@@ -1805,7 +1927,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         }
         
     }
-    private boolean shuttingDown = false;
+    private volatile boolean shuttingDown = false;
+
+    /**
+     * Return <code>true</code> iff the service is shutting down.
+     */
+    public boolean isShuttingDown() {
+
+        return shuttingDown;
+        
+    }
 
     /**
      * Terminates service management threads.
@@ -1943,24 +2074,25 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 
                 // terminate.
                 
-                shutdownNow();
+                shutdownNow(false/* destroy */);
                 
             }
             
         }
         
-        log.fatal("Service is down: class=" + getClass().getName() + ", name="
-                + serviceName);
+        System.out.println("Service is down: class=" + getClass().getName()
+                + ", name=" + serviceName);
         
     }
 
     private Object keepAlive = new Object();
-    
+
     /**
      * Runs {@link AbstractServer#shutdownNow()} and terminates all asynchronous
-     * processing, including discovery.
+     * processing, including discovery. This is used for the shutdown hook (^C).
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     static class ShutdownThread extends Thread {
@@ -1993,7 +2125,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                  * service and termination of jini processing.
                  */
                 
-                server.shutdownNow();
+                server.shutdownNow(false/* destroy */);
                 
             } catch (Exception ex) {
 
@@ -2006,36 +2138,70 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     }
 
     /**
-     * Contract is to shutdown the services and <em>destroy</em> its
-     * persistent state. This implementation calls {@link #shutdownNow()} and
-     * then deletes the {@link #serviceIdFile}. {@link #shutdownNow()} will
-     * invoke {@link IServiceShutdown} if the service implements that interface.
-     * <p>
-     * Concrete subclasses MUST extend this method to destroy their persistent
-     * state.
+     * Contract is to shutdown the services and <em>destroy</em> its persistent
+     * state. This implementation calls {@link #shutdownNow(boolean)} with
+     * <code>destroy := true</code>.
      */
-    synchronized public void destroy() {
+    final synchronized public void destroy() {
 
-        shutdownNow();
-        
-        if (log.isInfoEnabled())
-            log.info("Deleting: " + serviceIdFile);
-
-        if (!serviceIdFile.delete()) {
-
-            log.warn("Could not delete file: " + serviceIdFile);
-
-        }
-        
-        // wake up so that run() will exit. 
-        synchronized(keepAlive) {
-            
-            keepAlive.notify();
-            
-        }
+        shutdownNow(true/*destroy*/);
         
     }
 
+    /**
+     * Recursively removes any files and subdirectories and then removes the
+     * file (or directory) itself. Only files recognized by
+     * {@link #getFileFilter()} will be deleted.
+     * 
+     * @param f
+     *            A file or directory.
+     */
+    private void recursiveDelete(final File f) {
+
+        if (f.isDirectory()) {
+
+            final File[] children = f.listFiles(getFileFilter());
+
+            for (int i = 0; i < children.length; i++) {
+
+                recursiveDelete(children[i]);
+
+            }
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("Removing: " + f);
+
+        if (f.exists() && !f.delete()) {
+
+            log.warn("Could not remove: " + f);
+
+        }
+
+    }
+
+    /**
+     * Method may be overriden to recognize files in the service directory so
+     * they may be automatically deleted by {@link #destroy()} after the
+     * {@link IService#destroy()} has been invoked to destroy any files claimed
+     * by the service implementation. The default implementation of this method
+     * does not recognize any files.
+     */
+    protected FileFilter getFileFilter() {
+        
+        return new FileFilter() {
+
+            public boolean accept(File pathname) {
+
+                return false;
+                
+            }
+            
+        };
+        
+    }
+    
     /**
      * Runs {@link #destroy()} and logs start and end events.
      */
@@ -2047,12 +2213,20 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 // format log message.
                 final String msg = AbstractServer.this.toString();
-                
+
                 log.warn("Will destroy service: " + msg);
 
-                AbstractServer.this.destroy();
+                try {
 
-                log.warn("Service destroyed: " + msg);
+                    AbstractServer.this.destroy();
+
+                    log.warn("Service destroyed: " + msg);
+
+                } catch (Throwable t) {
+
+                    log.error("Problem destroying service: " + msg, t);
+
+                }
 
             }
 

@@ -1,0 +1,91 @@
+<project name="lgpl-utils" default="all" basedir=".">
+
+    <property file="build.properties"/>
+
+    <path id="build.classpath">
+        <fileset dir="${build.lib.unimi.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <path id="runtime.classpath">
+        <pathelement location="${build.dir}/classes"/>
+        <path refid="build.classpath"/>
+    </path>
+
+	<target name="clean" description="cleans everything in [build.dir], but not the releases.">
+        <delete dir="${build.dir}"/>
+    </target>
+
+	<target name="prepare">
+		<!-- setup ${version} for regular or snapshot. -->
+		<tstamp>
+			<format property="today" pattern="ddMMyy" locale="en,US" />
+		</tstamp>
+		<condition property="version" value="lgpl-utils-${build.ver}-${today}" else="lgpl-utils-${build.ver}">
+			<istrue value="${snapshot}" />
+		</condition>
+		<!--<echo message="today=${today}"/>-->
+		<echo message="version=${version}" />
+		<!-- create directories. -->
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${build.dir}/classes" />
+		<mkdir dir="${build.dir}/docs" />
+		<mkdir dir="${build.dir}/lib" />
+	</target>
+
+	<target name="compile" depends="prepare">
+		<mkdir dir="${build.dir}" />
+		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
+		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+	     encoding="${javac.encoding}"
+	     	>
+			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
+			<!-- target="${javac.target}" source="${javac.source}" -->
+			<src path="${lgpl-utils.dir}/src/java" />
+			<!-- Do not include the unit tests @todo conditionally include?
+            <src path="${lgpl-utils.dir}/src/test"/>
+            -->
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/classes">
+			<fileset dir="${lgpl-utils.dir}/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="jar" depends="compile" description="Generates the jar.">
+		<jar destfile="${build.dir}/${version}.jar">
+			<fileset dir="${build.dir}/classes" />
+			<manifest>
+			</manifest>
+		</jar>
+	</target>
+
+	<target name="javadoc" depends="prepare" if="javadoc">
+		<mkdir dir="${build.dir}/docs/api" />
+		<!-- overview="....overview.html"  -->
+		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" windowtitle="lgpl-utils&#174;" classpathref="build.classpath">
+			<arg value="-J-Xmx1000m"/>
+			<packageset dir="${lgpl-utils.dir}/src/java" />
+			<doctitle>
+				<![CDATA[<h1>lgpl-utils&#174;</h1>]]></doctitle>
+		<bottom>
+			<![CDATA[
+<i>
+Portions copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.<br>
+Portions copyright &#169; 2005-2009 Sebastiano Vigna
+</i>]]></bottom>
+			<tag name="todo" scope="all" description="TODO:" />
+			<tag name="issue" scope="all" description="ISSUE:" />
+			<!--tag name="FIXME" scope="all" description="FIXME:"/-->
+			<link href="http://java.sun.com/j2se/1.5.0/docs/api/" />
+			<link href="http://openrdf.org/doc/sesame/api/" />
+		</javadoc>
+	</target>
+
+	<target name="all" depends="clean, jar, javadoc"/>
+	
+</project>

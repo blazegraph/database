@@ -57,7 +57,7 @@ public class RingBuffer<T> implements Queue<T> {
     /**
      * The capacity of the buffer.
      */
-    private final int capacity;
+    protected final int capacity;
 
     /**
      * The internal fixed capacity buffer.
@@ -97,8 +97,11 @@ public class RingBuffer<T> implements Queue<T> {
     /**
      * The #of elements in the buffer. The buffer is empty when this field is
      * zero. The buffer is full when this field equals the {@link #capacity}.
+     * <p>
+     * Note: Exposed to {@link HardReferenceQueue} as an optimization for
+     * {@link #isFull()}.
      */
-    private int size = 0;
+    protected int size = 0;
 
     /**
      * Ctor.
@@ -150,10 +153,25 @@ public class RingBuffer<T> implements Queue<T> {
     
     public boolean add(final T ref) throws IllegalStateException {
 
-        if (!offer(ref))
+        if (ref == null)
+            throw new IllegalArgumentException();
+
+        beforeOffer( ref );
+
+        if (size == capacity/* isFull() inlined */)
             throw new IllegalStateException();
 
+        refs[head] = ref;
+
+        head = (head + 1) % capacity;
+
+        size++;
+
         return true;
+//        if (!offer(ref))
+//            throw new IllegalStateException();
+//
+//        return true;
         
     }
 
@@ -184,10 +202,10 @@ public class RingBuffer<T> implements Queue<T> {
      * This hook provides an opportunity to realize an eviction protocol and is
      * used for that purpose by {@link HardReferenceQueue}. It is also used to
      * realize the the stale reference protocol in
-     * {@link SynchronizedHardReferenceQueue}.
+     * {@link SynchronizedHardReferenceQueueWithTimeout}.
      * 
      * @todo it can be used to realize the chunk combiner on add protocol as
-     * well.
+     *       well.
      */
     protected void beforeOffer(final T ref) {
         
@@ -290,7 +308,7 @@ public class RingBuffer<T> implements Queue<T> {
      * Return the buffer elements in MRU (head) to LRU (tail) order.
      */
     @SuppressWarnings("unchecked")
-    public <TX> TX[] toArray(TX[] a) {
+    public <TX> TX[] toArray(final TX[] a) {
 
         final TX[] r = a.length >= size ? a : (TX[]) java.lang.reflect.Array
                 .newInstance(a.getClass().getComponentType(), size);
@@ -418,7 +436,7 @@ public class RingBuffer<T> implements Queue<T> {
         
     }
     
-    public T element() throws NoSuchElementException {
+    final public T element() throws NoSuchElementException {
 
         if (size == 0)
             throw new NoSuchElementException();
@@ -444,7 +462,7 @@ public class RingBuffer<T> implements Queue<T> {
         
     }
 
-    public T poll() {
+    final public T poll() {
 
         // The buffer must not be empty.
         if (size <= 0)
@@ -472,10 +490,11 @@ public class RingBuffer<T> implements Queue<T> {
      * @return True iff we found <i>ref</i> in the scanned queue positions.
      */
     final public boolean scanHead(final int nscan, final T ref) {
-        
-        if (nscan <= 0)
-            throw new IllegalArgumentException();
-        
+
+        assert nscan > 0;
+//        if (nscan <= 0)
+//            throw new IllegalArgumentException();
+//        
         if (ref == null)
             throw new IllegalArgumentException();
         
@@ -488,31 +507,28 @@ public class RingBuffer<T> implements Queue<T> {
          * Note: This uses local variables to shadow the instance variables
          * so that we do not modify the state of the cache as a side effect.
          */
-        {
 
-            int head = this.head;
+        int head = this.head;
 
-            int count = this.size;
+        int count = this.size;
 
-            for (int i = 0; i < nscan && count > 0; i++) {
+        for (int i = 0; i < nscan && count > 0; i++) {
 
-                head = (head == 0 ? capacity-1 : head - 1); // update head.
+            head = (head == 0 ? capacity - 1 : head - 1); // update head.
 
-                count--; // update #of references.
+            count--; // update #of references.
 
-                if( refs[head] == ref ) {
-                
-                    // Found a match.
+            if (refs[head] == ref) {
 
-                    return true;
+                // Found a match.
 
-                }
+                return true;
 
             }
 
-            return false;
-
         }
+
+        return false;
         
     }
     

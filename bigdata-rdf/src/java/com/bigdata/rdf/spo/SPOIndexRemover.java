@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
@@ -28,14 +27,12 @@ public class SPOIndexRemover implements Callable<Long> {
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final static protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
+    final static protected boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final static protected boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
+    final static protected boolean DEBUG = log.isDebugEnabled();
 
 //    final AbstractTripleStore db;
 
@@ -137,7 +134,7 @@ public class SPOIndexRemover implements Callable<Long> {
 
             }
 
-            final byte[] key = tupleSer.statement2Key(keyOrder, spo);
+            final byte[] key = tupleSer.serializeKey(spo);
 
             // if (ndx.remove(key) == null) {
             //
@@ -161,11 +158,11 @@ public class SPOIndexRemover implements Callable<Long> {
                 null // handler
                 );
 
-        final long endWrite = System.currentTimeMillis();
+        final long elapsed = System.currentTimeMillis() - beginWrite;
 
-        writeTime.addAndGet(endWrite - beginWrite);
+        writeTime.addAndGet(elapsed);
 
-        return endWrite - begin;
+        return elapsed;
 
     }
 

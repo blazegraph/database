@@ -70,7 +70,7 @@ public class TestAll extends TestCase {
          */
         {
 
-            Logger log = Logger.getRootLogger();
+            final Logger log = Logger.getRootLogger();
 
             if (log.getLevel().equals(Level.DEBUG)) {
 
@@ -84,6 +84,10 @@ public class TestAll extends TestCase {
         
         final TestSuite suite = new TestSuite("bigdata");
 
+        // modified dsiutil classes.
+        suite.addTest( it.unimi.dsi.TestAll.suite() );
+
+        // core bigdata packages.
         suite.addTest( com.bigdata.cache.TestAll.suite() );
         suite.addTest( com.bigdata.io.TestAll.suite() );
         suite.addTest( com.bigdata.net.TestAll.suite() );
@@ -94,7 +98,6 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.counters.TestAll.suite() );
         suite.addTest( com.bigdata.rawstore.TestAll.suite() );
         suite.addTest( com.bigdata.btree.TestAll.suite() );
-        suite.addTest( com.bigdata.isolation.TestAll.suite() );
         suite.addTest( com.bigdata.concurrent.TestAll.suite() );
         suite.addTest( com.bigdata.journal.TestAll.suite() );
         suite.addTest( com.bigdata.resources.TestAll.suite() );

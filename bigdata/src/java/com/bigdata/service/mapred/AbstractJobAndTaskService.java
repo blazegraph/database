@@ -369,6 +369,12 @@ abstract public class AbstractJobAndTaskService<M extends IJobMetadata, T extend
 
     }
 
+    synchronized public void destroy() {
+        
+        shutdownNow();
+        
+    }
+
     /**
      * @todo The {@link IBigdataClient} should be initialized from the
      *       {@link IJobMetadata} a per job basis. This will let us: (a) reuse

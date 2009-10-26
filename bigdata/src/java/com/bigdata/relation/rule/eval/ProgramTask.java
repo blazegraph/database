@@ -341,7 +341,7 @@ public class ProgramTask extends DataServiceCallable<Object> implements IProgram
              * Note: We do NOT get() this Future. This task will run
              * asynchronously.
              * 
-             * The Future is cancelled IF (hopefully WHEN) the iterator is
+             * The Future is canceled IF (hopefully WHEN) the iterator is
              * closed.
              * 
              * If the task itself throws an error, then it will use

@@ -284,7 +284,7 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
 
             }
             
-            // The actual service directory (choosen at runtime).
+            // The actual service directory (chosen at runtime).
             serviceDir = new File(new File(new File(
                     ManagedServiceConfiguration.this.serviceDir, cls
                             .getSimpleName()), logicalServiceZNode),

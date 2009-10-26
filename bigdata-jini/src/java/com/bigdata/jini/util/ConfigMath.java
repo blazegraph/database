@@ -30,6 +30,8 @@ package com.bigdata.jini.util;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
+import com.sun.jini.config.ConfigUtil;
+
 import net.jini.config.Configuration;
 
 /**
@@ -167,11 +169,52 @@ public class ConfigMath {
      * @param file
      *            The file.
      *            
-     * @return The respresentation of the corresponding absolute URI.
+     * @return The representation of the corresponding absolute URI.
      */
     public static String getURIString(final File file) {
         
         return file.getAbsoluteFile().toURI().toString();
+        
+    }
+
+    /**
+     * Quote a string value.
+     * 
+     * @param v
+     *            The value.
+     * 
+     * @return The quoted value.
+     * 
+     * @todo Use {@link ConfigUtil#stringLiteral(String)} instead?
+     */
+    static public String q(final String v) {
+        
+        final int len = v.length();
+        
+        final StringBuilder sb = new StringBuilder(len + 10);
+        
+        sb.append("\"");
+        
+        for(int i=0; i<len; i++) {
+            
+            char c = v.charAt(i);
+            
+            switch(c) {
+            
+            case '\\':
+                sb.append("\\\\");
+                break;
+    
+            default:
+                sb.append(c);
+                
+            }
+            
+        }
+        
+        sb.append("\"");
+        
+        return sb.toString(); 
         
     }
 

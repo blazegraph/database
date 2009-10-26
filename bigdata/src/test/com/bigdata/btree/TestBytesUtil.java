@@ -27,10 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-
-import junit.framework.TestCase2;
 
 /**
  * Test suite for low-level operations on variable length byte[]s.
@@ -57,6 +57,62 @@ public class TestBytesUtil extends TestCase2 {
         super(name);
     }
 
+    public void test_getByteCount() {
+
+        try {
+            BytesUtil.getByteCount(null);
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+
+        try {
+            BytesUtil.getByteCount("");
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+        
+        try {
+            BytesUtil.getByteCount("3x");
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+
+        try {
+            BytesUtil.getByteCount("x2");
+            fail("Expecting: "+IllegalArgumentException.class);
+        } catch(IllegalArgumentException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+
+        assertEquals(3, BytesUtil.getByteCount("3"));
+
+        assertEquals(3 * 1024L, BytesUtil.getByteCount("3k"));
+        assertEquals(3 * 1024L, BytesUtil.getByteCount("3kb"));
+        assertEquals(3 * 1024L, BytesUtil.getByteCount("3K"));
+        assertEquals(3 * 1024L, BytesUtil.getByteCount("3KB"));
+        assertEquals(3 * 1024L, BytesUtil.getByteCount("3Kb"));
+
+        assertEquals(3 * 1024 * 1024L, BytesUtil.getByteCount("3m"));
+        assertEquals(3 * 1024 * 1024L, BytesUtil.getByteCount("3mb"));
+        assertEquals(3 * 1024 * 1024L, BytesUtil.getByteCount("3M"));
+        assertEquals(3 * 1024 * 1024L, BytesUtil.getByteCount("3MB"));
+        assertEquals(3 * 1024 * 1024L, BytesUtil.getByteCount("3Mb"));
+
+        assertEquals(3 * 1024 * 1024 * 1024L, BytesUtil.getByteCount("3g"));
+        assertEquals(3 * 1024 * 1024 * 1024L, BytesUtil.getByteCount("3gb"));
+        assertEquals(3 * 1024 * 1024 * 1024L, BytesUtil.getByteCount("3G"));
+        assertEquals(3 * 1024 * 1024 * 1024L, BytesUtil.getByteCount("3GB"));
+        assertEquals(3 * 1024 * 1024 * 1024L, BytesUtil.getByteCount("3Gb"));
+
+    }
+    
     /**
      * A byte has a signed value between -128 and 127.
      * 
@@ -126,10 +182,7 @@ public class TestBytesUtil extends TestCase2 {
 
     /**
      * Test of unsigned byte[] comparison with explicit offset into each array
-     * and #of bytes to consider from that offset for each array. This version
-     * is used for comparison of keys in {@link IKeyBuffer} implementations
-     * since it allows a proven shared prefix to be skipped and also supports
-     * search on the compact representation used by {@link ImmutableKeyBuffer}.
+     * and #of bytes to consider from that offset for each array.
      */
     public void test_compareBytesWithOffsetAndLength() {
 
@@ -748,6 +801,57 @@ public class TestBytesUtil extends TestCase2 {
           ( keys, base, nmem, new byte[]{ 12 }
         )
           );
+
+    }
+
+    /*
+     * Bit operations
+     */
+    
+    public void test_bitFlagByteLength() {
+        
+        assertEquals(0,BytesUtil.bitFlagByteLength(0));
+        assertEquals(1,BytesUtil.bitFlagByteLength(1));
+        assertEquals(1,BytesUtil.bitFlagByteLength(2));
+        assertEquals(1,BytesUtil.bitFlagByteLength(3));
+        assertEquals(1,BytesUtil.bitFlagByteLength(4));
+        assertEquals(1,BytesUtil.bitFlagByteLength(5));
+        assertEquals(1,BytesUtil.bitFlagByteLength(6));
+        assertEquals(1,BytesUtil.bitFlagByteLength(7));
+        assertEquals(1,BytesUtil.bitFlagByteLength(8));
+        assertEquals(2,BytesUtil.bitFlagByteLength(9));
+        
+    }
+    
+    public void test_bitSetTest() {
+        
+        final int nbits = 12;
+
+        for (long bitIndex = 0; bitIndex < nbits; bitIndex++) {
+
+            final byte[] buf = new byte[BytesUtil.bitFlagByteLength(nbits)];
+
+            // should be clear
+            assertEquals("get(" + bitIndex + ")", false, BytesUtil.getBit(buf,
+                    bitIndex));
+
+            // set
+            assertEquals("set(" + bitIndex + ")", false, BytesUtil.setBit(buf,
+                    bitIndex, true));
+
+            // should be set.
+            assertEquals("get(" + bitIndex + ")", true, BytesUtil.getBit(buf,
+                    bitIndex));
+
+            // clear
+            assertEquals("set(" + bitIndex + ")", true, BytesUtil.setBit(buf,
+                    bitIndex, false));
+
+            // should be clear
+            assertEquals("get(" + bitIndex + ")", false, BytesUtil.getBit(buf,
+                    bitIndex));
+
+        }
 
     }
 

@@ -203,13 +203,13 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
     
-    public BigdataBNodeImpl createBNode(String id) {
+    public BigdataBNodeImpl createBNode(final String id) {
 
         return new BigdataBNodeImpl(this, id);
 
     }
 
-    public BigdataLiteralImpl createLiteral(String label) {
+    public BigdataLiteralImpl createLiteral(final String label) {
 
         return new BigdataLiteralImpl(this, label, null, null);
         
@@ -291,20 +291,20 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
-    public BigdataLiteralImpl createLiteral(XMLGregorianCalendar arg0) {
+    public BigdataLiteralImpl createLiteral(final XMLGregorianCalendar arg0) {
 
         return new BigdataLiteralImpl(this, arg0.toString(),
                 null/* languageCode */, createURI(arg0.getXMLSchemaType()
                         .toString()));
     }
 
-    public BigdataLiteralImpl createLiteral(String label, String language) {
+    public BigdataLiteralImpl createLiteral(final String label, final String language) {
 
         return new BigdataLiteralImpl(this, label, language, null/* datatype */);
 
     }
 
-    public BigdataLiteralImpl createLiteral(String label, URI datatype) {
+    public BigdataLiteralImpl createLiteral(final String label, URI datatype) {
 
         if (!(datatype instanceof BigdataURIImpl)) {
 
@@ -355,7 +355,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
-    final public BigdataValue asValue(Value v) {
+    final public BigdataValue asValue(final Value v) {
 
         if (v == null)
             return null;

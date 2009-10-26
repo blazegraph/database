@@ -35,11 +35,15 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.LRUNexus;
+import com.bigdata.cache.IGlobalLRU;
+import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -53,7 +57,6 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
-import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
@@ -67,7 +70,7 @@ import com.bigdata.service.ResourceService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
+public class IndexSegmentStore extends AbstractRawStore {
 
     /**
      * Logger.
@@ -101,6 +104,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * #of index entries that we would always like to have on hand.
      */
     private final IndexSegmentAddressManager addressManager;
+
+    /**
+     * Optional store cache for the bloom filter, index metadata, and the B+Tree
+     * nodes and leaves (MAY be <code>null</code>).
+     */
+    private final ILRUCache<Long, Object> storeCache;
     
     /**
      * An optional <strong>direct</strong> {@link ByteBuffer} containing a disk
@@ -221,7 +230,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
      * decoded by this class. The {@link IndexSegment} itself knows nothing
      * about this entire slight of hand.
      */
-    protected final IndexSegmentAddressManager getAddressManager() {
+    public final IndexSegmentAddressManager getAddressManager() {
         
         return addressManager;
         
@@ -236,6 +245,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         
     }
 
+    public final UUID getUUID() {
+        
+        return segmentMetadata.getUUID();
+        
+    }
+    
     /**
      * The {@link IndexMetadata} record for the {@link IndexSegment}.
      * <p>
@@ -261,7 +276,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     /**
      * Optional.  When defined, {@link Event}s are reported out.
      */
-    protected final IBigdataFederation fed;
+    protected final IBigdataFederation<?> fed;
     private volatile Event openCloseEvent;
     
     /**
@@ -291,13 +306,13 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     }
 
     /**
-     * Ctor variant that accepts an {@link IBigdataFederation} reference and
-     * will report out {@link Event}s.
+     * Constructor variant that accepts an {@link IBigdataFederation} reference
+     * and will report out {@link Event}s.
      * 
      * @param file
      * @param fed
      */
-    public IndexSegmentStore(final File file, final IBigdataFederation fed) {
+    public IndexSegmentStore(final File file, final IBigdataFederation<?> fed) {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -328,6 +343,9 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             // handles transparent decoding of offsets within regions.
             this.addressManager = new IndexSegmentAddressManager(checkpoint);
 
+            // optional store cache (set before reading metadata/bloomfilter).
+            this.storeCache = LRUNexus.getCache(this);
+            
             // Read the metadata record.
             this.indexMetadata = readMetadata();
 
@@ -506,6 +524,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
                 try {
 
+                    @SuppressWarnings("unchecked")
                     final Class cl = Class.forName(indexMetadata
                             .getBTreeClassName());
 
@@ -620,7 +639,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
     
     /**
      * Closes the file and releases the internal buffers. This operation will
-     * quitely succeed if the {@link IndexSegmentStore} is already closed. This
+     * quietly succeed if the {@link IndexSegmentStore} is already closed. This
      * operation may be reversed by {@link #reopen()} as long as the backing
      * file remains available. A read on a closed {@link IndexSegmentStore} will
      * transparently {@link #reopen()} the store as long as the backing file
@@ -738,6 +757,20 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             if (open)
                 throw new IllegalStateException();
 
+            try {
+                
+                if (LRUNexus.INSTANCE != null) {
+
+                    LRUNexus.INSTANCE.deleteCache(getUUID());
+
+                }
+                
+            } catch (Throwable t) {
+                
+                log.error(t, t);
+                
+            }
+            
             if (!file.delete()) {
 
                 throw new RuntimeException("Could not delete: "
@@ -755,6 +788,7 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
 
     /**
      * Atomically closes the store (iff open) and then deletes the backing file.
+     * Any records for the store are cleared from the {@link IGlobalLRU}.
      */
     synchronized public void destroy() {
 
@@ -1277,6 +1311,11 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
              * purpose. [make sure to replace all references to the default
              * INSTANCE with the specialized pool and make sure that we have the
              * chance to configure the pool before it is placed into service.]
+             * 
+             * Actually, we can probably do just as well using a Java heap
+             * byte[]. It is only the disk IO which is improved by the direct
+             * NIO buffer. All in-memory access to the data is better for a Java
+             * heap byte[].
              */
             
             buf_nodes = DirectBufferPool.INSTANCE.acquire(100/* ms */,
@@ -1349,6 +1388,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
             
         }
         
+        if (storeCache != null) {
+
+            // Try the cache first.
+            final BloomFilter bloomFilter = (BloomFilter) storeCache.get(addr);
+            
+            if (bloomFilter != null) {
+
+                return bloomFilter;
+
+            }
+
+        }
+        
         if (log.isInfoEnabled())
             log.info("reading bloom filter: "+addressManager.toString(addr));
         
@@ -1383,6 +1435,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         if (log.isInfoEnabled())
             log.info("Read bloom filter: bytesOnDisk=" + len );
 
+        if (storeCache != null) {
+
+            storeCache.putIfAbsent(addr, bloomFilter);
+
+        }
+
         return bloomFilter;
 
     }
@@ -1396,6 +1454,19 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         final long addr = checkpoint.addrMetadata;
         
         assert addr != 0L;
+        
+        if (storeCache != null) {
+
+            // Try the cache first.
+            final IndexMetadata md = (IndexMetadata) storeCache.get(addr);
+            
+            if (md != null) {
+
+                return md;
+
+            }
+
+        }
         
         if (log.isInfoEnabled())
             log.info("reading metadata: "+addressManager.toString(addr));
@@ -1432,6 +1503,12 @@ public class IndexSegmentStore extends AbstractRawStore implements IRawStore {
         if (log.isInfoEnabled())
             log.info("Read metadata: " + md);
 
+        if (storeCache != null) {
+
+            storeCache.putIfAbsent(addr, md);
+
+        }
+        
         return md;
 
     }

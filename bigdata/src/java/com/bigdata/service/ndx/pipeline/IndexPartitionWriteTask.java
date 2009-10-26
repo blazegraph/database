@@ -31,14 +31,12 @@ package com.bigdata.service.ndx.pipeline;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.proc.IAsyncResultHandler;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
@@ -209,7 +207,7 @@ A//
             R result = null;
             boolean done = false;
             final int maxtries = 3;
-            final long retryDelayNanos = TimeUnit.MILLISECONDS.toNanos(1000);
+//            final long retryDelayNanos = TimeUnit.MILLISECONDS.toNanos(1000);
             for (int ntries = 0; ntries < maxtries; ntries++) {
 
                 // submit and await Future

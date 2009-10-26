@@ -107,7 +107,7 @@ public class TestReopen extends AbstractBTreeTestCase {
          */
         final BTree btree;
         {
-            IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+            final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
             
             md.setBranchingFactor(3);
             
@@ -179,10 +179,13 @@ public class TestReopen extends AbstractBTreeTestCase {
 //        final BTree btree = new BTree(store, 3, indexUUID);
         final BTree btree;
         {
-            IndexMetadata md = new IndexMetadata(indexUUID);
+            
+            final IndexMetadata md = new IndexMetadata(indexUUID);
+            
             md.setBranchingFactor(3);
             
             btree = BTree.create(store, md);
+            
         }
 
         /*
@@ -195,10 +198,13 @@ public class TestReopen extends AbstractBTreeTestCase {
 //        final BTree groundTruth = new BTree(store, 3, indexUUID);
         final BTree groundTruth;
         {
-            IndexMetadata md = new IndexMetadata(indexUUID);
+            
+            final IndexMetadata md = new IndexMetadata(indexUUID);
+            
             md.setBranchingFactor(3);
             
             groundTruth = BTree.create(store, md);
+            
         }
 
         final int limit = 10000;
@@ -206,27 +212,31 @@ public class TestReopen extends AbstractBTreeTestCase {
 
         for (int i = 0; i < limit; i++) {
 
-            int n = r.nextInt(100);
+            final int n = r.nextInt(100);
 
             if (n < 5) {
                 /* periodically force a checkpoint + close of the btree. */
-                if(btree.isOpen()) {
+                if (btree.isOpen()) {
+//                    System.err.println("checkpoint+close");
                     btree.writeCheckpoint();
                     btree.close();
+//                    assertSameBTree(groundTruth, btree);
                 }
             } else if (n < 20) {
                 // remove an entry.
-                byte[] key = new byte[keylen];
+                final byte[] key = new byte[keylen];
                 r.nextBytes(key);
                 btree.remove(key);
                 groundTruth.remove(key);
+//                assertSameBTree(groundTruth, btree);
             } else {
                 // add an entry.
-                byte[] key = new byte[keylen];
+                final byte[] key = new byte[keylen];
                 r.nextBytes(key);
-                SimpleEntry value = new SimpleEntry(i);
+                final SimpleEntry value = new SimpleEntry(i);
                 btree.insert(key, value);
                 groundTruth.insert(key, value);
+//                assertSameBTree(groundTruth, btree);
             }
 
         }

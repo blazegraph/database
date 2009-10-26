@@ -521,21 +521,22 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
         
     }
     
-    private final String path = "src/resources/config/standalone/";
-    private JiniServicesHelper services;
+//    private final String path = "src/resources/config/standalone/";
+    private JiniServicesHelper helper;
     private JiniFederation fed; 
 
-    public void setUpComparisonTest(Properties properties) throws Exception {
+    public void setUpComparisonTest(final Properties properties)
+            throws Exception {
 
-        services = new JiniServicesHelper(path);
+        helper = new JiniServicesHelper();
         
         try {
         
-            services.start();
+            helper.start();
 
             System.err.println("Services are up.");
             
-            fed = services.client.connect();
+            fed = helper.client.connect();
 
             System.err.println("Client is connected.");
 
@@ -543,7 +544,7 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
             
             log.error("Could not start: " + t);
             
-            services.destroy();
+            helper.destroy();
             
             throw new RuntimeException("Could not start", t);
                         
@@ -564,7 +565,7 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
         
         try {
 
-            services.destroy();
+            helper.destroy();
             
         } catch (Throwable t) {
             

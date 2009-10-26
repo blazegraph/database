@@ -31,7 +31,6 @@
 
 package com.bigdata.rdf.sail;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -41,8 +40,6 @@ import org.apache.log4j.Logger;
 
 /**
  * Test suite.
- * 
- * FIXME integrate the Sesame 2 TCK (technology compatibility kit).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -87,7 +84,7 @@ public class TestAll extends TestCase {
             
         }
         
-        TestSuite suite = new TestSuite("Sesame 2.x integration");
+        final TestSuite suite = new TestSuite("Sesame 2.x integration");
        
         // bootstrap tests for the BigdataSail
         suite.addTestSuite(TestBootstrapBigdataSail.class);
@@ -98,107 +95,14 @@ public class TestAll extends TestCase {
         // run the test suite without statement identifiers enabled.
         suite.addTest(TestBigdataSailWithoutSids.suite());
         
+        // quad store test suite w/ nested subquery joins.
+        suite.addTest(TestBigdataSailWithQuads.suite());
         
-// Restore the following tests after adapting to Sesame 2.x
-//        
-//        /*
-//         * Pickup the Sesame 1.x test suite.
-//         * 
-//         * Note: This test suite requires access to the Sesame 1.x test suite
-//         * classes, not just the Sesame JARs.
-//         * 
-//         * @todo bundle that test suite.
-//         */
-//        try {
-//
-//            Class.forName("org.openrdf.sesame.sail.RdfRepositoryTest");
-//
-//            suite.addTestSuite(TestRdfRepository.class);
-//
-//        } catch (ClassNotFoundException ex) {
-//
-//            System.err.println("Will not run the Sesame 1.x integration test suite.");
-//
-//        }
-//
-//        try {
-//
-//            Class.forName("org.openrdf.sesame.sail.RdfSchemaRepositoryTest");
-//
-//            suite.addTestSuite(TestSchemaRdfRepository.class);
-//
-//        } catch (ClassNotFoundException ex) {
-//
-//            System.err.println("Will not run the Sesame 1.x integration test suite.");
-//
-//        }
-
+        // quad store test suite w/ pipeline joins.
+        suite.addTest(TestBigdataSailWithQuadsAndPipelineJoins.suite());
+        
         return suite;
 
     }
-
-//    /**
-//     * Integration for the Sesame 1.x repository test suite.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class TestRdfRepository extends TestBigdataRdfRepository {
-//
-//        public TestRdfRepository(String arg0) {
-//            super(arg0);
-//        }
-//
-//        public Properties getProperties() {
-//            
-//            Properties properties = new Properties();
-//            
-//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-//
-//            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//
-//            properties.setProperty(Options.DELETE_ON_EXIT,"true");
-//
-//            properties.setProperty(com.bigdata.rdf.store.LocalTripleStore.Options.ISOLATABLE_INDICES,"false");
-//
-//            properties.setProperty(com.bigdata.rdf.sail.BigdataSail.Options.STORE_CLASS,LocalTripleStore.class.getName());
-//            
-//            return properties;
-//            
-//        }
-//
-//    }
-//
-//    /**
-//     * Integration for the Sesame 1.x repository test suite.
-//     * 
-//     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-//     * @version $Id$
-//     */
-//    public static class TestSchemaRdfRepository extends TestBigdataRdfSchemaRepository {
-//
-//        public TestSchemaRdfRepository(String arg0) {
-//            super(arg0);
-//        }
-//
-//        public Properties getProperties() {
-//            
-//            Properties properties = new Properties();
-//            
-//            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
-//
-//            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
-//
-//            properties.setProperty(Options.DELETE_ON_EXIT,"true");
-//
-//            properties.setProperty(com.bigdata.rdf.store.LocalTripleStore.Options.ISOLATABLE_INDICES,"false");
-//
-//            properties.setProperty(com.bigdata.rdf.sail.BigdataSail.Options.STORE_CLASS,LocalTripleStore.class.getName());
-//            
-//            return properties;
-//            
-//        }
-//
-//    }
 
 }

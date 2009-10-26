@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -430,7 +431,7 @@ abstract public class DataService extends AbstractService
                     
                     // the lock manager is a direct child of this node.
                     final CounterSet tmp = (CounterSet) serviceRoot
-                            .getPath(IDataServiceCounters.concurrencyManager
+                            .makePath(IDataServiceCounters.concurrencyManager
                                     + ICounterSet.pathSeparator
                                     + IConcurrencyManagerCounters.writeService);
 
@@ -551,7 +552,7 @@ abstract public class DataService extends AbstractService
 
             setupCounters();
 
-            logHttpdURL(service.getResourceManager().getDataDir());
+            logHttpdURL(service.getHTTPDURLFile());
 
         }
 
@@ -649,17 +650,17 @@ abstract public class DataService extends AbstractService
 
         if (concurrencyManager != null) {
             concurrencyManager.shutdown();
-            concurrencyManager = null;
+//            concurrencyManager = null;
         }
 
         if (localTransactionManager != null) {
             localTransactionManager.shutdown();
-            localTransactionManager = null;
+//            localTransactionManager = null;
         }
 
         if (resourceManager != null) {
             resourceManager.shutdown();
-            resourceManager = null;
+//            resourceManager = null;
         }
 
         super.shutdown();
@@ -677,20 +678,47 @@ abstract public class DataService extends AbstractService
 
         if (concurrencyManager != null) {
             concurrencyManager.shutdownNow();
-            concurrencyManager = null;
+//            concurrencyManager = null;
         }
 
         if (localTransactionManager != null) {
             localTransactionManager.shutdownNow();
-            localTransactionManager = null;
+//            localTransactionManager = null;
         }
 
         if (resourceManager != null) {
             resourceManager.shutdownNow();
-            resourceManager = null;
+//            resourceManager = null;
         }
 
         super.shutdownNow();
+
+    }
+    
+    synchronized public void destroy() {
+        
+        super.destroy();
+        
+        resourceManager.deleteResources();
+        
+        final File file = getHTTPDURLFile();
+        
+        if(file.exists()) {
+            
+            file.delete();
+            
+        }
+        
+//        super.destroy();
+        
+    }
+
+    /**
+     * The file on which the URL of the embedded httpd service is written.
+     */
+    protected File getHTTPDURLFile() {
+
+        return new File(getResourceManager().getDataDir(), "httpd.url");
 
     }
 

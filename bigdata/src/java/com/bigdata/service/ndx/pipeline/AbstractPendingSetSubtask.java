@@ -64,7 +64,7 @@ L> //
     private final ReentrantLock lock = new ReentrantLock();
 
     /**
-     * Condition signalled when the {@link #pendingSet} is empty.
+     * Condition signaled when the {@link #pendingSet} is empty.
      */
     private final Condition pendingSetEmpty = lock.newCondition();
 
@@ -210,8 +210,30 @@ L> //
 
             /*
              * Submit (blocks until chunk is queued by the client task).
+             * 
+             * @todo hold lock while adding the elements in the chunk to the
+             * pending set.
              */
-            clientTask.accept(chunk);
+            for(E e : chunk) {
+            
+                master.addPending(e, this, locator);
+                
+            }
+
+            // @todo retry any errors here?  E.g., RMI transient failures?
+            try {
+
+                // Task the client with a chunk of resources.
+                clientTask.accept(chunk);
+                
+            } catch(Throwable t) {
+                
+                // Halt the master.
+                master.halt(t);
+             
+                throw new RuntimeException(t);
+                
+            }
             // done = true;
             // break;
             //

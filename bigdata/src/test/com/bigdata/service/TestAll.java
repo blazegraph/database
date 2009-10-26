@@ -83,20 +83,11 @@ public class TestAll extends TestCase {
         // tests of the metadata index.
         suite.addTestSuite(TestMetadataIndex.class);
 
-        // client basics, including static partitioning of indices.
-        suite.addTestSuite(TestEmbeddedClient.class);
-
-        // test basic index operations.
-        suite.addTestSuite(TestBasicIndexStuff.class);
-
-        // test range iterators (within and across index partitions).
-        suite.addTestSuite(TestRangeQuery.class);
-
+        // tests of the client's view of a scale-out index.
+        suite.addTest(com.bigdata.service.ndx.TestAll.suite());
+        
         // test ability to re-open an embedded federation.
         suite.addTestSuite(TestRestartSafe.class);
-
-        // unit tests for the streaming index write API.
-        suite.addTest(com.bigdata.service.ndx.TestAll.suite());
 
         // unit tests for the distributed transaction service's snapshots.
         suite.addTestSuite(TestSnapshotHelper.class);

@@ -14,6 +14,8 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
 
+import com.bigdata.jini.util.ConfigMath;
+
 
 /**
  * Helper class for the {@link ZooKeeper} client configuration.
@@ -169,9 +171,9 @@ public class ZookeeperClientConfig {
         
         w.write(Options.NAMESPACE + " {\n");
 
-        w.write(Options.ZROOT + "=" + ServiceConfiguration.q(zroot) + ";\n");
+        w.write(Options.ZROOT + "=" + ConfigMath.q(zroot) + ";\n");
 
-        w.write(Options.SERVERS + "=" + ServiceConfiguration.q(servers) + ";\n");
+        w.write(Options.SERVERS + "=" + ConfigMath.q(servers) + ";\n");
 
         w.write(Options.SESSION_TIMEOUT + "=" + sessionTimeout + ";\n");
 
@@ -187,11 +189,11 @@ public class ZookeeperClientConfig {
 
             w.write("new " + Id.class.getName() + "(");
 
-            w.write(ServiceConfiguration.q(x.getId().getScheme()));
+            w.write(ConfigMath.q(x.getId().getScheme()));
 
             w.write(",");
 
-            w.write(ServiceConfiguration.q(x.getId().getId()));
+            w.write(ConfigMath.q(x.getId().getId()));
 
             w.write(")),\n");
 

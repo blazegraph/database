@@ -31,7 +31,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-
 /**
  * An abstract base class for {@link IRawStore} implementations that use an
  * append only (Write Once, Read Many) strategy. The {@link IAddressManager}
@@ -56,7 +55,7 @@ abstract public class AbstractRawWormStore extends AbstractRawStore implements I
      * The object that knows how to encode, decode, and (de-)serialize
      * addresses.
      */
-    public final WormAddressManager getAddressManger() {
+    public final WormAddressManager getAddressManager() {
         
         return am;
         
@@ -79,7 +78,7 @@ abstract public class AbstractRawWormStore extends AbstractRawStore implements I
      *            the 64-bit long integer addresses for the store. See
      *            {@link WormAddressManager}.
      */
-    public AbstractRawWormStore(int offsetBits) {
+    public AbstractRawWormStore(final int offsetBits) {
         
         super();
         
@@ -91,40 +90,41 @@ abstract public class AbstractRawWormStore extends AbstractRawStore implements I
      * IAddressManager
      */
     
-    final public long toAddr(int nbytes, long offset) {
+    final public long toAddr(final int nbytes, final long offset) {
         
         return am.toAddr(nbytes, offset);
         
     }
 
-    final public long getOffset(long addr) {
+    final public long getOffset(final long addr) {
         
         return am.getOffset(addr);
         
     }
 
-    final public int getByteCount(long addr) {
+    final public int getByteCount(final long addr) {
 
         return am.getByteCount(addr);
         
     }
 
-    final public void packAddr(DataOutput out, long addr) throws IOException {
+    final public void packAddr(final DataOutput out, final long addr)
+            throws IOException {
 
         am.packAddr(out, addr);
-        
+
     }
 
-    final public long unpackAddr(DataInput in) throws IOException {
+    final public long unpackAddr(final DataInput in) throws IOException {
 
         return am.unpackAddr(in);
-        
+
     }
 
-    final public String toString(long addr) {
+    final public String toString(final long addr) {
 
         return am.toString(addr);
-        
+
     }
 
 }

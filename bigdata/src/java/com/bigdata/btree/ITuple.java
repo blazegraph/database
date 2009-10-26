@@ -28,9 +28,9 @@
 
 package com.bigdata.btree;
 
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 
@@ -164,9 +164,11 @@ public interface ITuple<E extends Object> {
      *             if the index entry is <code>deleted</code>.
      */
     public ByteArrayBuffer getValueBuffer();
-    
+
     /**
-     * Return a stream from which the value may be read.
+     * Return a stream from which the value may be read. Callers SHOULD prefer
+     * {@link #getValueStream()} to {@link #getValue()} as it can avoid some
+     * heap churn.
      * 
      * @throws UnsupportedOperationException
      *             if the values were not requested.
@@ -174,15 +176,6 @@ public interface ITuple<E extends Object> {
      *             if the value is <code>null</code>.
      * @throws UnsupportedOperationException
      *             if the index entry is <code>deleted</code>.
-     * 
-     * FIXME There is a problem, presumably with {@link DataOutputBuffer} or
-     * perhaps {@link DataInputBuffer}, that causes reading from this stream to
-     * occasionally throw either an EOF or a UTF exception. I added a
-     * "readLimit" to the {@link DataOutputBuffer} and some more unit tests but
-     * the problem still shows up from time to time, especially when running the
-     * scale-out architecture as it does all of that (de-)serialization for RMI.
-     * Once this issue is fixed callers SHOULD prefer {@link #getValueStream()}
-     * to {@link #getValue()}.
      */
     public DataInputBuffer getValueStream();
 

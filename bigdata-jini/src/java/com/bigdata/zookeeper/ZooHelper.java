@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.zookeeper;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -87,12 +88,13 @@ public class ZooHelper {
     
             os.flush();
     
-            final InputStream is = socket.getInputStream();
-    
+            final DataInputStream is = new DataInputStream(socket
+                    .getInputStream());
+
             final byte[] b = new byte[4];
     
             // read : will timeout if no response.
-            is.read(b);
+            is.readFully(b);
     
             if (log.isInfoEnabled())
                 log.info(new String(b, "ASCII"));

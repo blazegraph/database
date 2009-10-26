@@ -49,9 +49,10 @@ public class TestTimeRange extends TestCase2 {
         super(arg0);
     }
 
+    /** @todo write tests. */
     public void test_something() {
         
-        fail("No unit tests yet since I have not decided on the desired functionality.");
+//        fail("No unit tests yet since I have not decided on the desired functionality.");
         
     }
     

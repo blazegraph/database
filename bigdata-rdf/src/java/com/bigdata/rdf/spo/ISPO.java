@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.spo;
 
+import org.openrdf.model.Value;
+
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.inf.Justification;
 import com.bigdata.rdf.inf.TruthMaintenance;
@@ -38,8 +40,26 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 
 /**
- * A interface representing an RDF triple where the slots are 64-bit
- * <code>long</code> term identifiers assigned by a lexicon.
+ * A interface representing an RDF triple, an RDF triple with a statement
+ * identifier, or an RDF quad. The slots are 64-bit <code>long</code> term
+ * identifiers assigned by a lexicon. The 4th position is either unused
+ * (triples), the statement identifier (triples with the provenance mode
+ * enabled), or the context/named graph position of a quad. This interface
+ * treats all four positions as "data" and requires the caller to be aware of
+ * the database mode (triples, triples+SIDs, or quads). The (s,p,o) of the
+ * interface are immutable. The (c) position is mutable because its value is not
+ * knowable until after the other three values have been bound in the
+ * triples+SIDs database mode. When using this interface for a quads mode
+ * database, the context position SHOULD be set by the appropriate constructor
+ * and NOT modified thereafter.
+ * <p>
+ * Two additional data are carried by this interface for use with inference and
+ * truth maintenance. First, this interface may also carry an indication of
+ * whether the triple/quad is an explicit statement, an inferred statement or an
+ * axiom. Second, the {@link #isOverride()} flag is used during truth
+ * maintenance when an explicit statement is retracted and we need to downgrade
+ * the statement in the database to an inference because it is still provable by
+ * other statements in the knowledge base.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -52,27 +72,56 @@ public interface ISPO {
      * @see IRawTripleStore#NULL
      */
     long NULL = IRawTripleStore.NULL;
-    
-    /** The term identifier for the subject position -or- {@link #NULL}. */
+
+    /**
+     * The term identifier for the subject position (slot 0) -or- {@link #NULL}.
+     */
     long s();
 
-    /** The term identifier for the predicate position -or- {@link #NULL}. */
+    /**
+     * The term identifier for the predicate position (slot 1) -or-
+     * {@link #NULL}.
+     */
     long p();
 
-    /** The term identifier for the object position -or- {@link #NULL}. */
+    /** The term identifier for the object position (slot 2) -or- {@link #NULL}. */
     long o();
+
+    /**
+     * The term identifier for the SID/context position (slot 3) -or-
+     * {@link #NULL}. The semantics of the returned value depend on the database
+     * mode. For triples, it is unused. For triples+SIDs, it is the statement
+     * identifier as assigned by the lexicon. For quads, it is the context (aka
+     * named graph) and {@link #NULL} iff the context was not bound.
+     * 
+     * @see AbstractTripleStore.Options#STATEMENT_IDENTIFIERS
+     * @see AbstractTripleStore.Options#QUADS
+     */
+    long c();
+
+    /**
+     * Return the s,p,o, or c value corresponding to the given index.
+     * 
+     * @param index
+     *            The legal values are: s=0, p=1, o=2, c=3.
+     */
+    long get(int index);
 
     /**
      * Return true iff all position (s,p,o) are non-{@link #NULL}.
      * <p>
-     * Note: {@link SPO}s are sometimes used to represent triple patterns,
-     * e.g., in the tail of a {@link Justification}. This method will return
+     * Note: {@link SPO}s are sometimes used to represent triple patterns, e.g.,
+     * in the tail of a {@link Justification}. This method will return
      * <code>true</code> if the "triple pattern" is fully bound and
      * <code>false</code> if there are any unbound positions.
      * <p>
      * Note: {@link BigdataStatement}s are not fully bound when they are
      * instantiated during parsing until their term identifiers have been
      * resolved against a database's lexicon.
+     * 
+     * FIXME quads : this method might need to be aware of the database mode,
+     * e.g., pass in [boolean quads]. if its semantics are restricted to whether
+     * the triple pattern is fully bound, then clarify that here.
      */
     boolean isFullyBound();
 
@@ -84,7 +133,7 @@ public interface ISPO {
      *         statement type has not been specified.
      */
     StatementEnum getStatementType();
-    
+
     /**
      * Set the statement type for this statement.
      * 
@@ -94,8 +143,8 @@ public interface ISPO {
      * @throws IllegalArgumentException
      *             if <i>type</i> is <code>null</code>.
      * @throws IllegalStateException
-     *             if the statement type is already set to a different non-<code>null</code>
-     *             value.
+     *             if the statement type is already set to a different non-
+     *             <code>null</code> value.
      */
     void setStatementType(StatementEnum type);
 
@@ -105,24 +154,28 @@ public interface ISPO {
      * <code>true</code> iff the statement type is known for this statement.
      */
     boolean hasStatementType();
-    
+
     /**
-     * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Explicit}. 
+     * Return <code>true</code> IFF the {@link SPO} is marked as
+     * {@link StatementEnum#Explicit}.
      */
     boolean isExplicit();
-    
+
     /**
-     * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Inferred}. 
+     * Return <code>true</code> IFF the {@link SPO} is marked as
+     * {@link StatementEnum#Inferred}.
      */
     boolean isInferred();
-    
+
     /**
-     * Return <code>true</code> IFF the {@link SPO} is marked as {@link StatementEnum#Axiom}. 
+     * Return <code>true</code> IFF the {@link SPO} is marked as
+     * {@link StatementEnum#Axiom}.
      */
     boolean isAxiom();
-    
+
     /**
-     * Set the statement identifier.
+     * Set the statement identifier. This sets the 4th position of the quad, but
+     * some constraints are imposed on its argument.
      * 
      * @param sid
      *            The statement identifier.
@@ -133,11 +186,14 @@ public interface ISPO {
      *             if the statement identifier is already set.
      */
     void setStatementIdentifier(final long sid);
-    
+
     /**
-     * The statement identifier (optional). Statement identifiers are a unique
-     * per-triple identifier assigned when a statement is first asserted against
-     * the database and are are defined iff
+     * The statement identifier (optional). This has nearly identical semantics
+     * to {@link #c()}, but will throw an exception if the 4th position is not
+     * bound.
+     * <p>
+     * Statement identifiers are a unique per-triple identifier assigned when a
+     * statement is first asserted against the database and are are defined iff
      * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} was specified.
      * 
      * @throws IllegalStateException
@@ -145,10 +201,10 @@ public interface ISPO {
      *             {@link ISPO}.
      */
     long getStatementIdentifier();
-    
+
     /**
-     * <code>true</code> iff this {@link ISPO} has an assigned statement
-     * identifier.
+     * <code>true</code> IFF {@link AbstractTripleStore#isStatement(long)}
+     * returns <code>true</code> for {@link #c()}.
      */
     boolean hasStatementIdentifier();
 
@@ -173,12 +229,16 @@ public interface ISPO {
      * statement (which would also delete its justifications).
      */
     public boolean isOverride();
-    
+
     /**
      * Return the byte[] that would be written into a statement index for this
      * {@link ISPO}, including the optional {@link StatementEnum#MASK_OVERRIDE}
-     * bit. If the {@link #getStatementIdentifier()} is non-{@link #NULL} then
-     * it will be included in the returned byte[].
+     * bit. If the {@link #hasStatementIdentifier()} would return
+     * <code>true</code>, then the SID will be included in the returned byte[].
+     * Note that {@link #hasStatementIdentifier()} is defined in terms of the
+     * bit pattern of the SID identifiers and therefore will be
+     * <code>true</code> ONLY for a statement identifier and NOT for an RDF
+     * {@link Value} identifier.
      * 
      * @param buf
      *            A buffer supplied by the caller. The buffer will be reset
@@ -188,7 +248,7 @@ public interface ISPO {
      *         {@link ISPO}.
      */
     public byte[] serializeValue(ByteArrayBuffer buf);
-    
+
     /**
      * Method may be used to externalize the {@link BigdataValue}s in the
      * {@link ISPO}.
@@ -197,5 +257,5 @@ public interface ISPO {
      *            The database whose lexicon will be used.
      */
     public String toString(IRawTripleStore db);
-    
+
 }

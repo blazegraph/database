@@ -32,9 +32,8 @@ import com.bigdata.relation.IDatabase;
 import com.bigdata.relation.IRelation;
 import com.bigdata.service.IBigdataFederation;
 
-
 /**
- * An object that knows how to resolve a resource identifer (aka namespace) to
+ * An object that knows how to resolve a resource identifier (aka namespace) to
  * an {@link ILocatableResource} instance. "Locating" a relation means (a)
  * resolving the namespace for the resource to the resource declaration as of
  * some timestamp; and (b) materializing (often from cache) an

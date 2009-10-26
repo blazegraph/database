@@ -14,6 +14,9 @@ import com.bigdata.striterator.IKeyOrder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo define a BigdataValuePredicate that interoperates with this class to
+ *       support joins against the lexicon.
  */
 public class LexiconKeyOrder implements IKeyOrder<BigdataValue> {
 
@@ -29,23 +32,34 @@ public class LexiconKeyOrder implements IKeyOrder<BigdataValue> {
      * The index whose keys are formed from the terms (RDF {@link Value}s).
      */
     public static final transient LexiconKeyOrder TERM2ID = new LexiconKeyOrder(
-            _TERM2ID, "TERM2ID");
+            _TERM2ID);
 
     /**
      * The index whose keys are formed from the term identifiers.
      */
     public static final transient LexiconKeyOrder ID2TERM = new LexiconKeyOrder(
-            _ID2TERM, "ID2TERM");
+            _ID2TERM);
 
+    /**
+     * The positional index corresponding to the RDF Value in a
+     * "lexicon predicate".
+     */
+    private final static transient int SLOT_TERM = 0;
+
+    /**
+     * The positional index corresponding to the term identifier in a
+     * "lexicon predicate".
+     */
+    private final static transient int SLOT_ID = 1;
+    
+    /**
+     * This is the only piece of serializable state for this class.
+     */
     private final int index;
 
-    private final String name;
-
-    private LexiconKeyOrder(final int index, final String name) {
+    private LexiconKeyOrder(final int index) {
 
         this.index = index;
-
-        this.name = name;
 
     }
 
@@ -60,7 +74,7 @@ public class LexiconKeyOrder implements IKeyOrder<BigdataValue> {
      * @throws IllegalArgumentException
      *             if the <i>index</i> is not valid.
      */
-    static public LexiconKeyOrder valueOf(int index) {
+    static public LexiconKeyOrder valueOf(final int index) {
 
         switch (index) {
         case _TERM2ID:
@@ -78,7 +92,14 @@ public class LexiconKeyOrder implements IKeyOrder<BigdataValue> {
      */
     public String getIndexName() {
 
-        return name;
+        switch (index) {
+        case _TERM2ID:
+            return "TERM2ID";
+        case _ID2TERM:
+            return "ID2TERM";
+        default:
+            throw new AssertionError();
+        }
 
     }
 
@@ -87,7 +108,7 @@ public class LexiconKeyOrder implements IKeyOrder<BigdataValue> {
      */
     public String toString() {
 
-        return name;
+        return getIndexName();
 
     }
 
@@ -102,6 +123,31 @@ public class LexiconKeyOrder implements IKeyOrder<BigdataValue> {
 
     }
 
+    final public int getKeyArity() {
+        switch(index) {
+        case _TERM2ID: return 1;
+        case _ID2TERM: return 1;
+        default: throw new AssertionError();
+        }
+    }
+
+    /*
+     * Note: The TERM2ID and ID2TERM indices each have a single component to the
+     * key. Therefore keyPos MUST be ZERO (0).
+     */
+    final public int getKeyOrder(final int keyPos) {
+
+        if (keyPos != 0)
+            throw new IllegalArgumentException();
+        
+        switch(index) {
+        case _TERM2ID: return SLOT_TERM;
+        case _ID2TERM: return SLOT_ID;
+        default: throw new AssertionError();
+        }
+        
+    }
+    
     /**
      * Return the comparator that places {@link BigdataValue}s into the
      * natural order for the associated index.

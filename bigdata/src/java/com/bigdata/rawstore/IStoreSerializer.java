@@ -68,7 +68,7 @@ public interface IStoreSerializer {
     public byte[] serialize(Object obj);
     
     /**
-     * De-serialize an object using the Java serialization mechansisms.
+     * De-serialize an object using the Java serialization mechanisms.
      * 
      * @param b
      *            A byte[] containing a serialized object.
@@ -78,7 +78,7 @@ public interface IStoreSerializer {
     public Object deserialize(byte[] b);
 
     /**
-     * De-serialize an object using the Java serialization mechansisms.
+     * De-serialize an object using the Java serialization mechanisms.
      * 
      * @param b
      *            A byte[] containing a serialized object.
@@ -92,7 +92,7 @@ public interface IStoreSerializer {
     public Object deserialize(byte[] b, int off, int len);
 
     /**
-     * De-serialize an object using the Java serialization mechansisms.
+     * De-serialize an object using the Java serialization mechanisms.
      * 
      * @param buf
      *            A buffer containing a serialized object. The bytes from

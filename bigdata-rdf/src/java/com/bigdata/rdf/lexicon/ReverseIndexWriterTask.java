@@ -24,7 +24,7 @@ import com.bigdata.rdf.spo.ISPO;
  * <p>
  * Note: Every term asserted against the forward mapping [terms] MUST be
  * asserted against the reverse mapping [ids] EVERY time. This is required in
- * order to guarentee that the reverse index remains complete and consistent.
+ * order to guarantee that the reverse index remains complete and consistent.
  * Otherwise a client that writes on the terms index and fails before writing on
  * the ids index would cause those terms to remain undefined in the reverse
  * index.
@@ -86,7 +86,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
         /*
          * Create a key buffer to hold the keys generated from the term
-         * identifers and then generate those keys.
+         * identifiers and then generate those keys.
          * 
          * Note: We DO NOT write BNodes on the reverse index.
          */

@@ -8,6 +8,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
@@ -108,7 +109,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
          */
         final private AbstractTuple returnValue;
         
-        public Filterator(ITupleIterator<E> src) {
+        public Filterator(final ITupleIterator<E> src) {
 
             this.src = src;
 
@@ -232,7 +233,7 @@ abstract public class TupleFilter<E> implements ITupleFilter<E> {
                 
                 if(log.isInfoEnabled()) {
                     
-                    log.info("key="+key);
+                    log.info("key=" + BytesUtil.toString(key));
                     
                 }
                 

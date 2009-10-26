@@ -73,9 +73,7 @@ public class JMXLog4jMBeanUtil {
     protected static final Logger log = Logger.getLogger(JMXLog4jMBeanUtil.class);
     
     /**
-     * Register the log4j JMX mbeans. Set environment variable
-     * <code>com.bigdata.jmx.log4j.disable</code> to true to disable
-     * registration.
+     * Register the log4j JMX mbeans. 
      * 
      * @throws JMException
      *             if registration fails
@@ -84,12 +82,6 @@ public class JMXLog4jMBeanUtil {
      *      jmx/package-summary.html
      */
     public static void registerLog4jMBeans() throws JMException {
-
-        if (Boolean.getBoolean("com.bigdata.jmx.log4j.disable") == true) {
-
-            return;
-
-        }
 
         // Log4J MBean
         final HierarchyDynamicMBean hdm = new HierarchyDynamicMBean();

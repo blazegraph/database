@@ -57,7 +57,6 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -105,10 +104,12 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
     public void test_statementIdentifiers() {
 
         final Properties properties = super.getProperties();
-        
+
         // override the default axiom model.
-        properties.setProperty(com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
         AbstractTripleStore store = getStore(properties);
 
         try {
@@ -318,11 +319,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             } finally {
                 
-                try {
-                    itr.close();
-                } catch (SailException e) {
-                    throw new RuntimeException(e);
-                }
+                itr.close();
                 
             }
             
@@ -396,7 +393,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -513,7 +510,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -657,7 +654,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -774,7 +771,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -838,7 +835,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -894,7 +891,7 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         

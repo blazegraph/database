@@ -228,7 +228,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
     /**
      * Strengthen the return type.
      */
-    abstract public JiniFederation getFederation();
+    abstract public JiniFederation<?> getFederation();
 
     @Override
     public AbstractServicesManagerService start() {
@@ -253,7 +253,7 @@ public abstract class AbstractServicesManagerService extends AbstractService
      */
     protected void setup() throws Exception {
         
-        final JiniFederation fed = getFederation();
+        final JiniFederation<?> fed = getFederation();
 
         final Configuration config = fed.getClient().getConfiguration();
         

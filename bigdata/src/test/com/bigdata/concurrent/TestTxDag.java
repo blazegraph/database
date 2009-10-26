@@ -495,14 +495,14 @@ public class TestTxDag extends TestCase
         final int len = expected.length;
         Set values = new HashSet();
         for( int i=0; i<len; i++ ) {
-            values.add( new Integer( expected[ i ] ) );
+            values.add( Integer.valueOf( expected[ i ] ) );
         }
         if( values.size() != expected.length ) {
             throw new AssertionError("duplicate values in 'expected'.");
         }
         for( int i=0; i<len; i++ ) {
             int value = actual[ i ];
-            if( ! values.remove( new Integer( value ) ) ) {
+            if( ! values.remove( Integer.valueOf( value ) ) ) {
                 fail( "actual["+i+"]="+value+", but that value is not in expected[].");
             }
         }

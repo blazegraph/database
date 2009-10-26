@@ -182,7 +182,7 @@ abstract public class AbstractSPOBuffer implements ISPOBuffer {
      */
     private int nwritten = 0;
     
-    public boolean add( ISPO stmt ) {
+    public boolean add( final ISPO stmt ) {
         
         assert stmt != null;
 

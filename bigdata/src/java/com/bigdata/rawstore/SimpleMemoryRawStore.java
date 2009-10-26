@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
@@ -57,6 +58,8 @@ import com.bigdata.mdi.IResourceMetadata;
 public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
     private boolean open = true;
+    
+    private final UUID uuid = UUID.randomUUID();
     
     /**
      * The #of bytes written so far. This is used to generate the address values
@@ -140,9 +143,15 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
     }
     
+    public UUID getUUID() {
+        
+        return uuid;
+        
+    }
+    
     public IResourceMetadata getResourceMetadata() {
 
-        return new ResourceMetadata();
+        return new ResourceMetadata(uuid);
         
     }
 
@@ -159,6 +168,14 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
          */
         private static final long serialVersionUID = -8333003625527191826L;
 
+        private final UUID uuid;
+        
+        public ResourceMetadata(UUID uuid) {
+            
+            this.uuid = uuid;
+            
+        }
+        
         public boolean equals(IResourceMetadata o) {
 
             return this == o;
@@ -181,8 +198,7 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
         public UUID getUUID() {
 
-            // no UUID.
-            return null;
+            return uuid;
 
         }
 
@@ -233,9 +249,11 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
         
         if(open) throw new IllegalStateException();
         
-        /*
-         * NOP.
-         */
+        if (LRUNexus.INSTANCE != null) {
+
+            LRUNexus.INSTANCE.deleteCache(getUUID());
+
+        }
         
     }
     

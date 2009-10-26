@@ -30,12 +30,15 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.UUID;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NOPTupleSerializer;
+import com.bigdata.btree.TestTuple;
 import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
@@ -178,7 +181,7 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
             // look for the first matching index entry (there are none).
             assertFalse("hasNext", itr.hasNext());
 
-            // nothing was visisted.
+            // nothing was visited.
             assertEquals("nvisited", 0, itr.getVisitedCount());
 
             // we queried two index partitions.
@@ -983,4 +986,315 @@ public class TestRangeQuery extends AbstractEmbeddedFederationTestCase {
 
     }
 
+    /**
+     * Basic unit tests for the parallel range iterator.
+     * 
+     * FIXME write unit tests for the parallel range iterator running across
+     * one, one or multiple index partitions, with all of its various flags
+     * (including REMOVEALL), when a stale locator exception must be handled,
+     * when the iterator is closed early, and when it is closed early with a
+     * read consistent tx created on the caller's behalf.
+     */
+    @SuppressWarnings("unchecked")
+    public void test_parallelRangeIterator() {
+
+        final String name = "testIndex";
+
+        final IndexMetadata metadata = new IndexMetadata(name, UUID
+                .randomUUID());
+
+        // the keys and values at the application level are just byte[]s.
+        metadata.setTupleSerializer(NOPTupleSerializer.INSTANCE);
+
+        /*
+         * Note: Run with the {7} partition defined but empty to verify that the
+         * iterator is robust to empty partitions!
+         */
+        
+        fed.registerIndex(metadata, new byte[][]{//
+                new byte[]{},
+                new byte[]{4},
+                new byte[]{7},
+                new byte[]{10},
+        }, null/* dataServiceUUIDs */
+        );
+        
+        final IIndex ndx = fed.getIndex(name,ITx.UNISOLATED);
+
+        /*
+         * Insert entries into the first partition.
+         */
+        ndx.insert(new byte[] { 1 }, new byte[] { 1 });
+        ndx.insert(new byte[] { 2 }, new byte[] { 2 });
+        ndx.insert(new byte[] { 3 }, new byte[] { 3 });
+        
+        /*
+         * Insert entries into the 2nd partition.
+         */
+        ndx.insert(new byte[] { 4 }, new byte[] { 4 });
+        ndx.insert(new byte[] { 5 }, new byte[] { 5 });
+        ndx.insert(new byte[] { 6 }, new byte[] { 6 });
+
+        /*
+         * The 3rd partition is left empty to check for fence posts.
+         */
+        
+        /*
+         * Insert entries into the 4th partition.
+         */
+        ndx.insert(new byte[] { 10 }, new byte[] { 10 });
+        ndx.insert(new byte[] { 11 }, new byte[] { 11 });
+        ndx.insert(new byte[] { 12 }, new byte[] { 12 });
+
+        final int capacity = 0; // default capacity.
+
+        final int flags = IRangeQuery.DEFAULT|IRangeQuery.PARALLEL;
+        
+        final long timestamp = 0L;
+
+        final ITupleSerializer tupleSer = ndx.getIndexMetadata()
+                .getTupleSerializer();
+        
+        {
+
+            /*
+             * Query the key range on a single index partition which corresponds
+             * to all of the data on that index partition.
+             */
+            final ITupleIterator itr = ndx
+                    .rangeIterator(new byte[] { 10 }/* fromKey */,
+                            new byte[] { 13 }/* toKey */, capacity, flags, null/* filter */);
+
+            assertSameIteratorAnyOrder(new ITuple[] {//
+                            new TestTuple(flags, tupleSer, new byte[] { 10 },
+                                    new byte[] { 10 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 11 },
+                                    new byte[] { 11 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 12 },
+                                    new byte[] { 12 }, false/* deleted */,
+                                    timestamp), }, itr);
+        }
+
+        {
+
+            /*
+             * Query only a subrange of the data on one index partition.
+             */
+            final ITupleIterator itr = ndx
+                    .rangeIterator(new byte[] { 11 }/* fromKey */,
+                            new byte[] { 12 }/* toKey */, capacity, flags, null/* filter */);
+
+            assertSameIteratorAnyOrder(new ITuple[] {//
+                            new TestTuple(flags, tupleSer, new byte[] { 11 },
+                                    new byte[] { 11 }, false/* deleted */,
+                                    timestamp),
+                                    }, itr);
+            
+        }
+
+        {
+            /*
+             * Query the entire key range (forward scan).
+             */
+
+            final ITupleIterator itr = ndx.rangeIterator(null/* fromKey */,
+                    null/* toKey */, capacity, flags, null/* filter */);
+
+            assertSameIteratorAnyOrder(new ITuple[] {//
+                            new TestTuple(flags, tupleSer, new byte[] { 1 },
+                                    new byte[] { 1 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 2 },
+                                    new byte[] { 2 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 3 },
+                                    new byte[] { 3 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 4 },
+                                    new byte[] { 4 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 5 },
+                                    new byte[] { 5 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 6 },
+                                    new byte[] { 6 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 10 },
+                                    new byte[] { 10 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 11 },
+                                    new byte[] { 11 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 12 },
+                                    new byte[] { 12 }, false/* deleted */,
+                                    timestamp), }, itr);
+        }
+
+        {
+
+            /*
+             * Query a subrange of the data on the first and last index
+             * partitions.
+             */
+            final ITupleIterator itr = ndx
+                    .rangeIterator(new byte[] { 2 }/* fromKey */,
+                            new byte[] { 12 }/* toKey */, capacity, flags, null/* filter */);
+
+            assertSameIteratorAnyOrder(new ITuple[] {//
+                            new TestTuple(flags, tupleSer, new byte[] { 2 },
+                                    new byte[] { 2 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 3 },
+                                    new byte[] { 3 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 4 },
+                                    new byte[] { 4 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 5 },
+                                    new byte[] { 5 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 6 },
+                                    new byte[] { 6 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 10 },
+                                    new byte[] { 10 }, false/* deleted */,
+                                    timestamp),
+                            new TestTuple(flags, tupleSer, new byte[] { 11 },
+                                    new byte[] { 11 }, false/* deleted */,
+                                    timestamp), }, itr);
+        }
+
+    }
+
+    /**
+     * Verifies that the iterator visits the specified objects in some arbitrary
+     * ordering and that the iterator is exhausted once all expected objects
+     * have been visited. The implementation uses a selection without
+     * replacement "pattern".
+     */
+    static public <E> void assertSameIteratorAnyOrder(
+            final ITuple<E>[] expected,            final ITupleIterator<E> actual) {
+
+        assertSameIteratorAnyOrder("", expected, actual);
+
+    }
+
+    /**
+     * Verifies that the iterator visits the specified objects in some arbitrary
+     * ordering and that the iterator is exhausted once all expected objects
+     * have been visited. The implementation uses a selection without
+     * replacement "pattern".
+     */
+    static public <E> void assertSameIteratorAnyOrder(final String msg,
+            final ITuple<E>[] expected, final ITupleIterator<E> actual) {
+
+        /*
+         * scan of list, testing for equals using custom code since ITuple does
+         * not necessarily implement hashCode() and equals() correctly.
+         */
+
+        int nfound = 0;
+
+        while (nfound < expected.length) {
+
+            if (!actual.hasNext()) {
+
+                fail(msg + ": Index exhausted while expecting more object(s)"
+                        + ": nfound=" + nfound + ", nexpected="
+                        + expected.length);
+
+            }
+
+            final ITuple<E> actualTuple = actual.next();
+
+            System.err.println("nvisited=" + (nfound + 1) + ", actualTuple="
+                    + actualTuple);
+
+            boolean found = false;
+
+            for (int k = 0; k < expected.length && !found; k++) {
+
+                final ITuple<E> expectedTuple = expected[k];
+
+                if (expectedTuple == null)
+                    continue;
+
+                if (sameTuple(expectedTuple, actualTuple)) {
+
+                    expected[k] = null;
+
+                    found = true;
+
+                    nfound++;
+
+                    break;
+
+                }
+
+            }
+
+            if (!found)
+                fail("Tuple not expected" + ": nvisited=" + (nfound + 1)
+                        + ", tuple=" + actualTuple);
+
+        }
+
+        if (actual.hasNext()) {
+
+            fail("Iterator will deliver too many tuples: next="+actual.next());
+
+        }
+
+    }
+
+    /**
+     * Compares two tuples for equality based on their data (flags, keys,
+     * values, deleted marker, and version timestamp).
+     * <p>
+     * Note: This will fail if you apply it to tuples reported by
+     * {@link ITupleIterator}s whose DELETE flag was different since it verifies
+     * the DELETE flag state and that is a property of the iterator NOT the
+     * tuple. Whether or not a tuple is deleted is detected using
+     * {@link ITuple#isDeletedVersion()}.
+     * 
+     * @param expected
+     * @param actual
+     */
+    public static boolean sameTuple(final ITuple<?> expected,
+            final ITuple<?> actual) {
+
+        if (expected == null)
+            throw new IllegalArgumentException();
+
+        if (actual == null)
+            throw new IllegalArgumentException();
+
+        if (!BytesUtil.bytesEqual(expected.getKey(), actual.getKey()))
+            return false;
+
+        if (expected.isNull() != actual.isNull())
+            return false;
+
+        if (!expected.isNull()) {
+
+            if (!BytesUtil.bytesEqual(expected.getValue(), actual.getValue()))
+                return false;
+
+        }
+        
+        if (expected.flags() != actual.flags())
+            return false;
+
+        if (expected.isDeletedVersion() != actual.isDeletedVersion())
+            return false;
+
+        if (expected.getVersionTimestamp() != actual.getVersionTimestamp())
+            return false;
+
+        return true;
+
+    }
+    
 }

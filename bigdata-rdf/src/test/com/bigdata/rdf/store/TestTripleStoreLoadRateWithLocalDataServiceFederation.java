@@ -104,6 +104,11 @@ public class TestTripleStoreLoadRateWithLocalDataServiceFederation extends
 
         // turn off statement identifiers.
         properties.setProperty(Options.STATEMENT_IDENTIFIERS,"false");
+        
+        // triples only.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.QUADS,
+                "false");
 
         // turn off text indexing.
         properties.setProperty(Options.TEXT_INDEX,"false");

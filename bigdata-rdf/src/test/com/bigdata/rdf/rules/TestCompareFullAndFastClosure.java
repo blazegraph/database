@@ -52,10 +52,11 @@ import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.TripleStoreUtility;
 import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.rdf.store.TripleStoreUtility;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
@@ -104,8 +105,8 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
      * @param format
      * @throws IOException
      */
-    protected void doCompareEntailments(String resource[], String baseURL[],
-            RDFFormat[] format) throws Exception {
+    protected void doCompareEntailments(final String resource[],
+            final String baseURL[], final RDFFormat[] format) throws Exception {
 
         final AbstractTripleStore store1;
         final AbstractTripleStore store2;
@@ -158,9 +159,9 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
             
             {
 
-                LoadStats loadStats = store2.getDataLoader().loadData(resource,
-                        baseURL, format);
-                
+                final LoadStats loadStats = store2.getDataLoader().loadData(
+                        resource, baseURL, format);
+
                 // store2.getInferenceEngine().computeClosure(null);
                 
                 System.err.println("Fast forward closure: " + loadStats);
@@ -178,9 +179,20 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
 
         } finally {
 
-            store1.closeAndDelete();
-            store2.closeAndDelete();
+//            store1.__tearDownUnitTest();
+//            store2.__tearDownUnitTest();
             
+            // both stores are using the same index manager.
+            final IIndexManager indexManager = store1.getIndexManager();
+
+            if(store1.isOpen())
+                store1.destroy();
+            
+            if(store2.isOpen())
+                store2.destroy();
+            
+            indexManager.destroy();
+
         }
         
     }

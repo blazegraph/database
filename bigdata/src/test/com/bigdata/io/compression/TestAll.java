@@ -59,6 +59,9 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite(TestNOPRecordCompressor.class);
 
+        // tests some assumptions for Deflate and Inflate.
+        suite.addTestSuite(TestHuffmanEncoder.class);
+
         suite.addTestSuite(TestRecordCompressor_BestSpeed.class);
 
         suite.addTestSuite(TestRecordCompressor_BestCompression.class);

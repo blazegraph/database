@@ -89,30 +89,25 @@ public class BulkFilterConverter implements IChunkConverter<ISPO,ISPO> {
 
     }
 
-    public ISPO[] convert(IChunkedOrderedIterator<ISPO> src) {
+    public ISPO[] convert(final IChunkedOrderedIterator<ISPO> src) {
 
         if (src == null)
             throw new IllegalArgumentException();
         
         final ISPO[] chunk = src.nextChunk();
         
-        if (!SPOKeyOrder.SPO.equals(src.getKeyOrder())) {
+        if (!tupleSer.getKeyOrder().equals(src.getKeyOrder())) {
             
-            // Sort unless already in SPO order.
-            
-            Arrays.sort(chunk, SPOComparator.INSTANCE);
+            Arrays.sort(chunk, tupleSer.getKeyOrder().getComparator());
             
         }
                 
-//        // Thread-local key builder.
-//        final RdfKeyBuilder keyBuilder = getKeyBuilder();
-        
         // create an array of keys for the chunk
         final byte[][] keys = new byte[chunk.length][];
         
         for (int i = 0; i < chunk.length; i++) {
         
-            keys[i] = tupleSer.statement2Key(SPOKeyOrder.SPO, chunk[i]);
+            keys[i] = tupleSer.serializeKey(chunk[i]);
             
         }
 

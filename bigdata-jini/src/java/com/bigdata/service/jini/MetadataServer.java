@@ -120,6 +120,14 @@ public class MetadataServer extends DataServer {
 
     protected MetadataService newService(Properties properties) {
 
+        properties = new Properties(properties);
+
+        /*
+         * Note: the MDS does not support overflow at this time so this
+         * option is explicitly disabled. 
+         */
+        properties.setProperty(MetadataService.Options.OVERFLOW_ENABLED, "false");
+        
         final MetadataService service = new AdministrableMetadataService(
                 this, properties);
         
@@ -142,7 +150,7 @@ public class MetadataServer extends DataServer {
     public static class AdministrableMetadataService extends MetadataService
             implements Remote, RemoteAdministrable, RemoteDestroyAdmin {
         
-        protected MetadataServer server;
+        protected final MetadataServer server;
 
         /**
          * @param properties
@@ -182,6 +190,7 @@ public class MetadataServer extends DataServer {
          *       authenticated identity of the client (if any) for an incoming
          *       remote call.
          */
+        @Override
         protected void setupLoggingContext() {
             
             super.setupLoggingContext();
@@ -205,6 +214,7 @@ public class MetadataServer extends DataServer {
             
         }
 
+        @Override
         protected void clearLoggingContext() {
             
             MDC.remove("clientname");
@@ -214,7 +224,7 @@ public class MetadataServer extends DataServer {
         }
 
         @Override
-        public JiniFederation getFederation() {
+        public JiniFederation<?> getFederation() {
 
             return server.getClient().getFederation();
             
@@ -224,47 +234,65 @@ public class MetadataServer extends DataServer {
          * DestroyAdmin
          */
 
-        /**
-         * Destroy the service and deletes any files containing resources (<em>application data</em>)
-         * that was in use by that service.
-         * 
-         * @throws RemoteException
-         */
-        public void destroy() throws RemoteException {
+        @Override
+        synchronized public void destroy() {
 
-            server.runDestroy();
+            if (!server.isShuttingDown()) {
+
+                /*
+                 * Run thread which will destroy the service (asynchronous).
+                 * 
+                 * Note: By running this is a thread, we avoid closing the
+                 * service end point during the method call.
+                 */
+
+                server.runDestroy();
+
+            } else if (isOpen()) {
+
+                /*
+                 * The server is already shutting down, so invoke our super
+                 * class behavior to destroy the persistent state.
+                 */
+
+                super.destroy();
+
+            }
 
         }
 
+        @Override
         synchronized public void shutdown() {
             
             // normal service shutdown (blocks).
             super.shutdown();
             
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/*destroy*/);
             
         }
-        
+
+        @Override
         synchronized public void shutdownNow() {
             
             // immediate service shutdown (blocks).
             super.shutdownNow();
             
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/*destroy*/);
             
         }
 
-        public IMetadataService getMetadataService() {
-
-            return this;
-            
-        }
+//        public IMetadataService getMetadataService() {
+//
+//            return this;
+//            
+//        }
         
         /**
          * Extends the base behavior to return an RMI compatible proxy.
          */
+        @Override
         public Future<? extends Object> submit(Callable<? extends Object> task) {
 
             return getFederation().getProxy(super.submit(task));
@@ -277,6 +305,7 @@ public class MetadataServer extends DataServer {
          * {@link Configuration} then the value returned by the base class is
          * returned instead.
          */
+        @Override
         public String getServiceName() {
 
             String s = server.getServiceName();

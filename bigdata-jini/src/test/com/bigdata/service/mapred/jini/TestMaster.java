@@ -110,8 +110,6 @@ public class TestMaster extends AbstractServerTestCase {
         super(arg0);
     }
 
-    private String path = "bigdata-jini/src/resources/config/standalone/";
-
     protected MapReduceServiceDiscoveryManager serviceDiscoveryManager;
     
     protected JiniServicesHelper helper;
@@ -124,9 +122,10 @@ public class TestMaster extends AbstractServerTestCase {
 
         super.setUp();
 
-        helper = new JiniServicesHelper(path);
+        helper = new JiniServicesHelper();
         
-        serviceDiscoveryManager = new MapReduceServiceDiscoveryManager(helper.client);
+        serviceDiscoveryManager = new MapReduceServiceDiscoveryManager(
+                helper.client);
         
     }
     

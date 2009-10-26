@@ -57,8 +57,11 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("Inference and truth maintenance");
+        final TestSuite suite = new TestSuite("Inference and truth maintenance");
 
+        // test suite for the axiom models and their persistence.
+        suite.addTest( com.bigdata.rdf.axioms.TestAll.suite() );
+        
         /*
          * test ability to insert, update, or remove elements from a relation
          * and the ability to select the right access path given a predicate for
@@ -174,7 +177,7 @@ public class TestAll extends TestCase {
          * Test entailments that are computed at query time rather than when the
          * data are loaded into the store.
          * 
-         * Note: These are sometimes refered to as "backchained" rules, but in
+         * Note: These are sometimes referred to as "backchained" rules, but in
          * fact they are either highly specialized code, e.g., for the (x
          * rdf:Type: rdfs:Resource) entailments, or an application of the
          * relevant rules using the forward chainer once the rules have been
@@ -197,7 +200,7 @@ public class TestAll extends TestCase {
          * database.  Database-at-once closure is tested above.
          */
         
-        // test suite for basic TM mechansism encapsulated by this class.
+        // test suite for basic TM mechanism encapsulated by this class.
         suite.addTestSuite(TestTruthMaintenance.class);
         
         return suite;

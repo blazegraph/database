@@ -1,0 +1,89 @@
+<html>
+<head>
+<title>B+-Tree Transaction Isolation Support</title>
+</head>
+<body>
+
+<!-- $Id$ -->
+
+<p>
+Support for transactional isolation builds on the basic features of the 
+{@link com.bigdata.btree} package, including copy-on-write semantics, per-tuple
+delete markers, and per-tuple revision timestamps, and on the characteristics
+of the {@link com.bigdata.journal.AbstractJournal}, which guarantees that valid
+data are never overwritten (it is an immortal database aka temporal store aka
+WORM store).  In order to support transactional isolation, the B+Tree MUST be
+provisioned to maintain both per-tuple delete markers and per-tuple revision
+timestamps.  The per-tuple delete marker is used to mark keys for tuples which
+have been deleted.  Delete markers remain in place unless the tuple is updated
+to a non-deleted tuple.  (In the scale-out architecture, delete markers are purged
+by a compacting merge.)  The per-tuple revision timestamp is used to detect
+write-write conflicts between transactions as described below.  This is an 
+<em>MVCC</em> (Multiple Version Concurrency Control) design.
+</p>
+
+<p>
+The basic design for isolation requires that reads are performed
+against a historical committed state of the store (the ground state,
+which is typically the last committed state of the store at the time
+that the transaction begins) while writes are isolated (they are not
+visible outside of the transaction). The basic mechanism for isolation
+is an {@link com.bigdata.btree.isolated.IsolatedFusedView} which reads through
+to a read-only btree loaded from a historical metadata record while writes
+go into the isolated {@link com.bigdata.btree.BTree} (aka the transaction
+write set).  
+</p>
+
+<p>
+In order to commit, the transaction must validate the write set on the
+isolated btree against the then current committed state of the unisolated
+btree. If there have been no intervening commits then validation is a
+NOP since the read-only btree that the isolated btree reads through to
+is the current committed state. If there have been intervening
+commits, then validation may identify write-write conflicts
+(read-write conflicts can not occur in MVCC). A write-write
+conflict exists when a concurrent transaction wrote data for the
+same key as the transaction that is being validated and has already
+committed (conflicts are not visible until a writer has committed).
+</p>
+
+<p>
+Once a transaction has validated it is merged down onto the globally
+visible state of the btree. This process consists simply of applying
+the changes to the globally visible btree, including both inserts of
+key-value pairs and removal of keys that were deleted during the
+transaction.  A <em>revision timestamp</em> is assigned when the
+transaction begins to validate its write set.  The revision timestamp
+is used to annotate each tuple updated by the transaction.  This is
+the basis for detecting write-write conflicts.
+</p>
+
+<p>
+If a transaction is reading from or writing on more than one btree,
+then it must validate the write set for each btree during its
+validation stage and merge down the write set for each btree during
+its merge stage. Once this merge process is complete, the btree is
+flushed to the backing store which results in a new checkpoint
+record. The mapping from the btree name to checkpoint record is
+then updated on the backing store. Finally, an atomic commit is then
+performed on the backing store. At this point the transaction has
+successfully completed.
+</p>
+
+<h2>Conflict Resolution</h2>
+
+<p>
+Write-write conflicts may be reconciled using application specific
+logic.  To do this you must register an {@link IConflictResolver}
+when the B+-Tree is provisioned.  This interface will offer you an
+opportunity to inspect each tuple for which a write-write conflict
+was detected.  If the conflicts are reconciled, then the transaction
+will commit.  Otherwise it will abort. 
+</p>
+
+<h2>Extended commit processing</h2>
+
+<p>Support for this has not been specified yet.</p>
+
+</body>
+</html>

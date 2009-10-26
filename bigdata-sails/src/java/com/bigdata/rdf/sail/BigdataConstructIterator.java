@@ -6,14 +6,12 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
-import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.ICloseableIterator;
 
@@ -28,6 +26,11 @@ public class BigdataConstructIterator implements
             final CloseableIteration<? extends BindingSet, QueryEvaluationException> src) {
         assert db != null && src != null;
         this.db = db;
+        /*
+         * FIXME This must reuse the reverse blank nodes mapping for the
+         * SailConnection to resolve blank node term identifiers to blank node
+         * objects across the scope of the SailConnection.
+         */
         stmtIt = db.asStatementIterator(db
                 .bulkCompleteStatements(new ChunkedWrappedIterator<ISPO>(
                         new SPOConverter(src))));
@@ -54,11 +57,9 @@ public class BigdataConstructIterator implements
     }
 
     public void close() throws QueryEvaluationException {
-        try {
-            stmtIt.close();
-        } catch (SailException ex) {
-            throw new QueryEvaluationException(ex);
-        }
+        
+        stmtIt.close();
+        
     }
 
     private class SPOConverter implements ICloseableIterator<ISPO> {

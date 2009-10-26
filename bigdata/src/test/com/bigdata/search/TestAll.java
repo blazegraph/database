@@ -99,7 +99,8 @@ public class TestAll extends TestCase {
      * @return The {@link ProxyTestSuite} populated with the unit tests.
      */
     protected static ProxyTestSuite proxySuite(
-            AbstractIndexManagerTestCase<? extends IIndexManager> delegate, String name) {
+            final AbstractIndexManagerTestCase<? extends IIndexManager> delegate,
+            final String name) {
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate, name);
         

@@ -40,7 +40,7 @@ import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexSegment;
-import com.bigdata.isolation.IsolatedFusedView;
+import com.bigdata.btree.isolation.IsolatedFusedView;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;

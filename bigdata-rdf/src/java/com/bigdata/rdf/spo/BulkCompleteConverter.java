@@ -50,9 +50,9 @@ package com.bigdata.rdf.spo;
 import java.util.Arrays;
 
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.striterator.IChunkConverter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -81,21 +81,20 @@ public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
         
         tupleSer = (SPOTupleSerializer) ndx.getIndexMetadata()
                 .getTupleSerializer();
-
+        
     }
 
-    public ISPO[] convert(IChunkedOrderedIterator<ISPO> src) {
+    public ISPO[] convert(final IChunkedOrderedIterator<ISPO> src) {
 
         if (src == null)
             throw new IllegalArgumentException();
         
         final ISPO[] chunk = src.nextChunk();
         
-        if (!SPOKeyOrder.SPO.equals(src.getKeyOrder())) {
+        if (!tupleSer.getKeyOrder().equals(src.getKeyOrder())) {
             
-            // Sort unless already in SPO order.
-            
-            Arrays.sort(chunk, SPOComparator.INSTANCE);
+            // Sort unless already in the correct order.
+            Arrays.sort(chunk, tupleSer.getKeyOrder().getComparator());
             
         }
         
@@ -103,17 +102,14 @@ public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
         
     }
     
-    public ISPO[] convert(ISPO[] chunk) {
+    public ISPO[] convert(final ISPO[] chunk) {
 
-//        // Thread-local key builder.
-//        final RdfKeyBuilder keyBuilder = getKeyBuilder();
-        
         // create an array of keys for the chunk
         final byte[][] keys = new byte[chunk.length][];
         
         for (int i = 0; i < chunk.length; i++) {
             
-            keys[i] = tupleSer.statement2Key(SPOKeyOrder.SPO, chunk[i]);
+            keys[i] = tupleSer.serializeKey(chunk[i]);
             
         }
 
@@ -122,7 +118,7 @@ public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
                 new ResultBufferHandler(keys.length, ndx
                         .getIndexMetadata()
                         .getTupleSerializer()
-                        .getLeafValueSerializer());
+                        .getLeafValuesCoder());
         
         // submit the batch contains procedure to the SPO index
         ndx.submit(
@@ -132,11 +128,11 @@ public class BulkCompleteConverter implements IChunkConverter<ISPO,ISPO> {
         
         // get the values from lookup
         
-        final ResultBuffer vals = resultHandler.getResult();
+        final IRaba vals = resultHandler.getResult().getValues();
         
         for (int i = 0; i < chunk.length; i++) {
             
-            final byte[] val = vals.getResult(i);
+            final byte[] val = vals.get(i);
             
             if (val != null) {
                 

@@ -41,9 +41,14 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IIndex;
@@ -229,23 +234,79 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * journal).
      */
     private final ChecksumUtility checker = new ChecksumUtility();
-    
+
+    /**
+     * This lock is used to prevent clearing or setting of critical fields while
+     * a concurrent thread is seeking to operate on the referenced objects. A
+     * read-write lock was chosen because nearly all operations are "reads" (the
+     * read the field reference). For this purpose the "writer" is a thread
+     * which causes the value of either of these fields to be changed. The
+     * "writers" are {@link #abort()}, {@link #closeForWrites(long)}, etc. These
+     * methods are invoked relatively infrequently in comparison with "read"
+     * access to these fields.
+     */
+    private final ReentrantReadWriteLock _fieldReadWriteLock = new ReentrantReadWriteLock(
+            false/* fair */);
+
+//    /**
+//     * Return the lock which must be used by a thread which will dereference any
+//     * of {@link #_name2Addr}, {@link #_rootBlock}, {@link #_committers},
+//     * {@link #_commitRecordIndex} to avoid an {@link NullPointerException} or
+//     * concurrent update of that field's value.
+//     * <p>
+//     * The {@link #_name2Addr} and {@link #_commitRecordIndex} fields hold
+//     * references to "live" mutable {@link BTree} objects. If a thread will read
+//     * or write on these objects, it must additionally synchronize on the
+//     * corresponding {@link BTree} reference.
+//     * <p>
+//     * DO NOT attempt to synchronize on these references until you have obtained
+//     * and locked the {@link #getFieldReadLock()}. Doing so can expose you to an
+//     * NPE if there is a concurrent {@link #abort()} and can lead to deadlock
+//     * since the nested locks are acquired out of sequence.
+//     * <p>
+//     * The paired {@link WriteLock} is used internally by {@link #abort()},
+//     * {@link #commit()}, {@link #closeForWrites(long)}, and {@link #rollback()}.
+//     * 
+//     * @return The read lock.
+//     */
+//    protected ReadLock getFieldReadLock() {
+//
+//        return _fieldReadWriteLock.readLock();
+//
+//    }
+
     /**
      * The current root block. This is updated each time a new root block is
      * written.
      */
-    private IRootBlockView _rootBlock;
+    private volatile IRootBlockView _rootBlock;
 
     /**
      * The registered committers for each slot in the root block.
      */
-    private ICommitter[] _committers = new ICommitter[ICommitRecord.MAX_ROOT_ADDRS];
+    private volatile ICommitter[] _committers = new ICommitter[ICommitRecord.MAX_ROOT_ADDRS];
 
     /**
      * Used to cache the most recent {@link ICommitRecord} -- discarded on
-     * {@link #abort()}.
+     * {@link #abort()}; set by {@link #commitNow(long)}.
      */
-    private ICommitRecord _commitRecord;
+    private volatile ICommitRecord _commitRecord;
+
+    /**
+     * BTree mapping commit timestamps to the address of the corresponding
+     * {@link ICommitRecord}. The keys are timestamps (long integers). The
+     * values are the address of the {@link ICommitRecord} with that commit
+     * timestamp.
+     * <p>
+     * Note: The {@link CommitRecordIndex} object is NOT systematically
+     * protected by <code>synchronized</code> within this class. Therefore it
+     * is NOT safe for use by outside classes and CAN NOT be made safe simply by
+     * synchronizing their access on the {@link CommitRecordIndex} object
+     * itself. This is mainly for historical reasons and it may be possible to
+     * systematically protect access to this index within a synchronized block
+     * and then expose it to other classes.
+     */
+    private volatile CommitRecordIndex _commitRecordIndex;
 
     /**
      * The configured capacity for the {@link HardReferenceQueue} backing the
@@ -256,7 +317,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     private final int liveIndexCacheCapacity;
 
     /**
-     * The configured timeout for stale entries in the
+     * The configured timeout in milliseconds for stale entries in the
      * {@link HardReferenceQueue} backing the index cache maintained by the
      * "live" {@link Name2Addr} object.
      * 
@@ -319,12 +380,52 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * {@link ICommitRecord}. See {@link #getIndex(String, ICommitRecord)}.
      * <p>
      * Note: access to the "live" {@link Name2Addr} index MUST be bracketed with
-     * <code>synchronized({@link #name2Addr})</code>.
+     * <code>synchronized({@link #_name2Addr})</code>.
      * 
      * @see #getName2Addr()
      */
-    /*private*/Name2Addr name2Addr; // Note: used by some unit tests.
+    private volatile Name2Addr _name2Addr;
 
+    /**
+     * Return the "live" BTree mapping index names to the last metadata record
+     * committed for the named index. The keys are index names (unicode
+     * strings). The values are the names and the last known address of the
+     * named btree.
+     * <p>
+     * The "live" name2addr index is required for unisolated writers regardless
+     * whether they are adding an index, dropping an index, or just recovering
+     * the "live" version of an existing named index.
+     * <p>
+     * Operations that read on historical {@link Name2Addr} objects can of
+     * course be concurrent. Those objects are loaded from an
+     * {@link ICommitRecord}. See {@link #getIndex(String, ICommitRecord)}.
+     * <p>
+     * Note: the "live" {@link Name2Addr} index is a mutable {@link BTree}. All
+     * access to the object MUST be synchronized on that object.
+     */
+    protected Name2Addr _getName2Addr() {
+
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+
+        lock.lock();
+
+        try {
+
+            final Name2Addr tmp = _name2Addr;
+
+            if (tmp == null)
+                throw new AssertionError();
+
+            return tmp;
+
+        } finally {
+
+            lock.unlock();
+            
+        }
+        
+    }
+    
     /**
      * A read-only view of the {@link Name2Addr} object mapping index names to
      * the most recent committed {@link Entry} for the named index. The keys are
@@ -334,29 +435,42 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public IIndex getName2Addr() {
 
-        final long checkpointAddr;
-        if (name2Addr == null) {
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+        
+        lock.lock();
 
-            checkpointAddr = getRootAddr(ROOT_NAME2ADDR);
-            
-        } else {
+        try {
 
-            checkpointAddr = name2Addr.getCheckpoint().getCheckpointAddr();
-            
+            final long checkpointAddr;
+
+            if (_name2Addr == null) {
+
+                checkpointAddr = getRootAddr(ROOT_NAME2ADDR);
+
+            } else {
+
+                checkpointAddr = _name2Addr.getCheckpoint().getCheckpointAddr();
+
+            }
+
+            /*
+             * Note: This uses the canonicalizing mapping to get an instance
+             * that is distinct from the live #name2Addr object while not
+             * allowing more than a single such distinct instance to exist for
+             * the current name2Addr object.
+             */
+            final BTree btree = getIndex(checkpointAddr);
+
+            /*
+             * Wrap up in a read-only view since writes MUST NOT be allowed.
+             */
+            return new ReadOnlyIndex(btree);
+
+        } finally {
+
+            lock.unlock();
+
         }
-        
-        /*
-         * Note: This uses the canonicalizing mapping to get an instance that is
-         * distinct from the live #name2Addr object while not allowing more than
-         * a single such distinct instance to exist for the current name2Addr
-         * object.
-         */ 
-        final BTree btree = getIndex(checkpointAddr);
-        
-        /*
-         * Wrap up in a read-only view since writes MUST NOT be allowed.
-         */
-        return new ReadOnlyIndex(btree);
         
     }
     
@@ -387,23 +501,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return new ReadOnlyIndex( getIndex(checkpointAddr) );
         
     }
-
-    /**
-     * BTree mapping commit timestamps to the address of the corresponding
-     * {@link ICommitRecord}. The keys are timestamps (long integers). The
-     * values are the address of the {@link ICommitRecord} with that commit
-     * timestamp.
-     * <p>
-     * Note: The {@link CommitRecordIndex} object is NOT systematically
-     * protected by <code>synchronized</code> within this class. Therefore it
-     * is NOT safe for use by outside classes and CAN NOT be made safe simply by
-     * synchronizing their access on the {@link CommitRecordIndex} object
-     * itself. This is mainly for historical reasons and it may be possible to
-     * systematically protect access to this index within a synchronized block
-     * and then expose it to other classes.
-     */
-    private volatile CommitRecordIndex _commitRecordIndex;
-
+    
     /**
      * True iff the journal was opened in a read-only mode
      */
@@ -556,7 +654,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * 
      * @see Options
      */
-    protected AbstractJournal(Properties properties) {
+    protected AbstractJournal(final Properties properties) {
         
         this(properties, getWriteCache(properties));
         
@@ -653,9 +751,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 Options.DEFAULT_MAXIMUM_EXTENT, new LongRangeValidator(
                         initialExtent, Long.MAX_VALUE));
         
-        final int offsetBits = getProperty(Options.OFFSET_BITS,
-                Options.DEFAULT_OFFSET_BITS, new IntegerRangeValidator(
-                        WormAddressManager.MIN_OFFSET_BITS,
+        /*
+         * Note: The default depends on the AbstractJournal implementation.
+         */
+        final int offsetBits = getProperty(
+                Options.OFFSET_BITS,
+                Integer
+                        .toString((this instanceof Journal ? WormAddressManager.SCALE_UP_OFFSET_BITS
+                                : WormAddressManager.SCALE_OUT_OFFSET_BITS)),
+                new IntegerRangeValidator(WormAddressManager.MIN_OFFSET_BITS,
                         WormAddressManager.MAX_OFFSET_BITS));
 
         final int readCacheCapacity = getProperty(Options.READ_CACHE_CAPACITY,
@@ -832,6 +936,17 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 "" + System.currentTimeMillis()));
         
         assert createTime != 0L;
+
+        /*
+         * Note: the WriteLock is obtained here because various methods such as
+         * _getCommitRecord() assert that the caller is holding the write lock
+         * in order to provide runtime safety checks.
+         */
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
+        
+        lock.lock();
+        
+        try {
         
         /*
          * Create the appropriate IBufferStrategy object.
@@ -869,11 +984,11 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             final long commitRecordIndexAddr = 0L;
             final UUID uuid = UUID.randomUUID(); // Journal's UUID.
             final long closedTime = 0L;
-            IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
+            final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, commitCounter,
                     commitRecordAddr, commitRecordIndexAddr, uuid, createTime,
                     closedTime, checker);
-            IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits,
+            final IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, commitCounter,
                     commitRecordAddr, commitRecordIndexAddr, uuid, createTime,
                     closedTime, checker);
@@ -1023,29 +1138,34 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
-        /*
-         * Create or re-load the index of commit records.
-         */
-        this._commitRecordIndex = getCommitRecordIndex();
+        // Save resource description (sets value returned by getUUID()).
+        this.journalMetadata = new JournalMetadata(this);
 
-        /*
-         * Give the store a chance to set any committers that it defines.
-         */
+        // new or reload from the store root block.
+        this._commitRecord = _getCommitRecord();
+        
+        // new or re-load commit record index from store via root block.
+        this._commitRecordIndex = _getCommitRecordIndex();
+
+        // Give the store a chance to set any committers that it defines.
         setupCommitters();
 
-        // save resource description.
-        this.journalMetadata = new JournalMetadata(this);
-        
         // report event.
         ResourceManager.openJournal(getFile() == null ? null : getFile()
                 .toString(), size(), getBufferStrategy().getBufferMode());
 
+        } finally {
+            
+            lock.unlock();
+            
+        }
+        
     }
 
     /**
      * @todo consider making the properties restart safe so that they can be
      *       read from the journal. This will let some properties be specified
-     *       on initialization while letting others default or be overriden on
+     *       on initialization while letting others default or be overridden on
      *       restart. This is trivially accomplished by dedicating a root slot
      *       to a Properties object, or a flattened Properties object serialized
      *       as key-value pairs, in which case the data could just be loaded
@@ -1105,7 +1225,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
 
     /**
-     * Immediate shutdown (running tasks are cancelled rather than being
+     * Immediate shutdown (running tasks are canceled rather than being
      * permitted to complete).
      * 
      * @see #shutdown()
@@ -1145,21 +1265,11 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * Return counters reporting on various aspects of the journal.
      */
-//    synchronized 
     public CounterSet getCounters() {
         
         return CountersFactory.getCounters(this);
         
-//        if (counters == null) {
-//
-//            counters = CountersFactory.getCounters(this);
-//            
-//        }
-
-//        return counters;
-        
     }
-//    private CounterSet counters;
 
     /**
      * Note: A combination of a static inner class and a weak reference to the
@@ -1244,7 +1354,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                         public void sample() {
                             final AbstractJournal jnl = ref.get();
                             if (jnl != null) {
-                                final Name2Addr name2Addr = jnl.name2Addr;
+                                final Name2Addr name2Addr = jnl._name2Addr;
                                 if (name2Addr != null) {
                                     setValue(name2Addr.getIndexCacheSize());
                                 }
@@ -1302,6 +1412,20 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         // report event.
         ResourceManager.closeJournal(getFile() == null ? null : getFile()
                 .toString());
+
+        if (LRUNexus.INSTANCE != null) {
+
+            try {
+
+                LRUNexus.INSTANCE.deleteCache(getUUID());
+
+            } catch (Throwable t) {
+
+                log.error(t, t);
+
+            }
+
+        }
         
         if (deleteOnClose) {
 
@@ -1333,6 +1457,20 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             log.info("");
         
         _bufferStrategy.deleteResources();
+
+        if (LRUNexus.INSTANCE != null) {
+
+            try {
+
+                LRUNexus.INSTANCE.deleteCache(getUUID());
+
+            } catch (Throwable t) {
+
+                log.error(t, t);
+
+            }
+
+        }
 
         ResourceManager.deleteJournal(getFile() == null ? null : getFile()
                 .toString());
@@ -1431,159 +1569,172 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public void closeForWrites(final long closeTime) {
         
-        final long lastCommitTime = _rootBlock.getLastCommitTime();
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
         
-        if (log.isInfoEnabled())
-            log.info("Closing journal for further writes: closeTime="
-                    + closeTime + ", lastCommitTime="
-                    + lastCommitTime);
-
-        if (log.isDebugEnabled())
-            log.debug("before: " + _rootBlock);
+        lock.lock();
         
-        final IRootBlockView old = _rootBlock;
+        try {
 
-        if (old.getCommitCounter() == 0L) {
+            final long lastCommitTime = _rootBlock.getLastCommitTime();
 
-            throw new IllegalStateException("No commits on journal");
+            if (log.isInfoEnabled())
+                log.info("Closing journal for further writes: closeTime="
+                        + closeTime + ", lastCommitTime=" + lastCommitTime);
 
-        }
+            if (log.isDebugEnabled())
+                log.debug("before: " + _rootBlock);
 
-        // release any unused space.
-        truncate();
-        
-        /*
-         * Create the final root block.
-         * 
-         * Note: We MUST bump the commitCounter in order to have the new root
-         * block be selected over the old one!
-         * 
-         * Note: This will throw an error if nothing has ever been committed on
-         * the journal. The problem is that the root block does not permit a
-         * non-zero commitCounter unless the commitRecordAddr and perhaps some
-         * other stuff are non-zero as well.
-         */
-        final IRootBlockView newRootBlock = new RootBlockView(//
-                !old.isRootBlock0(), old.getOffsetBits(), old.getNextOffset(),
-                old.getFirstCommitTime(), old.getLastCommitTime(), //
-                old.getCommitCounter() + 1, //
-                old.getCommitRecordAddr(), //
-                old.getCommitRecordIndexAddr(), //
-                old.getUUID(), //
-                old.getCreateTime(), closeTime, //
-                checker);
+            final IRootBlockView old = _rootBlock;
 
-        /*
-         * Write it on the store.
-         * 
-         * Note: We request that the write is forced to disk to ensure that all
-         * buffered writes are forced to the disk. This is necessary in order to
-         * make sure that the updated root block (and anything left in the write
-         * cache for the disk buffer) get forced through onto the disk. We do
-         * not need to specify ForceMetadata here since the file size is
-         * unchanged by this operation.
-         */
-        _bufferStrategy.writeRootBlock(newRootBlock, ForceEnum.Force);
+            if (old.getCommitCounter() == 0L) {
 
-        // discard write cache and make store read-only.
-        _bufferStrategy.closeForWrites();
-        
-        // replace the root block reference.
-        _rootBlock = newRootBlock;
+                throw new IllegalStateException("No commits on journal");
 
-        if (log.isDebugEnabled())
-            log.debug("after: " + _rootBlock);
+            }
 
-        // discard current commit record - can be re-read from the store.
-        _commitRecord = null;
-        
-        /*
-         * Convert all of the unisolated BTree objects into read-historical
-         * BTrees as of the lastCommitTime on the journal. This is done in order
-         * to benefit from any data buffered by those BTrees since buffered data
-         * is data that we don't need to read from disk and we don't need to
-         * de-serialize. This is especially important for asynchronous overflow
-         * processing which performs full index scans of the BTree's shortly
-         * after synchronous overflow process (and which is the main reason why
-         * closeForWrites() exists).
-         * 
-         * Note: The caller already promises that they hold the exclusive write
-         * lock so we don't really need to synchronize on [name2Addr].
-         * 
-         * Note: If we find a dirty mutable BTree then we ignore it rather than
-         * repurposing it. This allows the possibility that there are
-         * uncommitted writes.
-         */
-        synchronized (name2Addr) {
+            // release any unused space.
+            truncate();
 
-            final Iterator<Map.Entry<String, WeakReference<BTree>>> itr = name2Addr
-                    .indexCacheEntryIterator();
+            /*
+             * Create the final root block.
+             * 
+             * Note: We MUST bump the commitCounter in order to have the new
+             * root block be selected over the old one!
+             * 
+             * Note: This will throw an error if nothing has ever been committed
+             * on the journal. The problem is that the root block does not
+             * permit a non-zero commitCounter unless the commitRecordAddr and
+             * perhaps some other stuff are non-zero as well.
+             */
+            final IRootBlockView newRootBlock = new RootBlockView(//
+                    !old.isRootBlock0(), old.getOffsetBits(), old
+                            .getNextOffset(), old.getFirstCommitTime(), old
+                            .getLastCommitTime(), //
+                    old.getCommitCounter() + 1, //
+                    old.getCommitRecordAddr(), //
+                    old.getCommitRecordIndexAddr(), //
+                    old.getUUID(), //
+                    old.getCreateTime(), closeTime, //
+                    checker);
 
-            while (itr.hasNext()) {
+            /*
+             * Write it on the store.
+             * 
+             * Note: We request that the write is forced to disk to ensure that
+             * all buffered writes are forced to the disk. This is necessary in
+             * order to make sure that the updated root block (and anything left
+             * in the write cache for the disk buffer) get forced through onto
+             * the disk. We do not need to specify ForceMetadata here since the
+             * file size is unchanged by this operation.
+             */
+            _bufferStrategy.writeRootBlock(newRootBlock, ForceEnum.Force);
 
-                final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr
-                        .next();
+            // discard write cache and make store read-only.
+            _bufferStrategy.closeForWrites();
 
-                final String name = entry.getKey();
+            // replace the root block reference.
+            _rootBlock = newRootBlock;
 
-                final BTree btree = entry.getValue().get();
+            if (log.isDebugEnabled())
+                log.debug("after: " + _rootBlock);
 
-                if (btree == null) {
+            // discard current commit record and re-read from the store.
+            _commitRecord = _getCommitRecord();
 
-                    // Note: Weak reference was cleared.
-                    continue;
-                    
-                }
-                
-                if(btree.needsCheckpoint()) {
-                    
-                    // Note: Don't convert a dirty BTree.
-                    continue;
-                    
-                }
-                
-                // Recover the Entry which has the last checkpointAddr.
-                final Name2Addr.Entry _entry = name2Addr.getEntry(name);
-                
-                if (_entry == null) {
+            /*
+             * Convert all of the unisolated BTree objects into read-historical
+             * BTrees as of the lastCommitTime on the journal. This is done in
+             * order to benefit from any data buffered by those BTrees since
+             * buffered data is data that we don't need to read from disk and we
+             * don't need to de-serialize. This is especially important for
+             * asynchronous overflow processing which performs full index scans
+             * of the BTree's shortly after synchronous overflow process (and
+             * which is the main reason why closeForWrites() exists).
+             * 
+             * Note: The caller already promises that they hold the exclusive
+             * write lock so we don't really need to synchronize on [name2Addr].
+             * 
+             * Note: If we find a dirty mutable BTree then we ignore it rather
+             * than repurposing it. This allows the possibility that there are
+             * uncommitted writes.
+             */
+            synchronized (_name2Addr) {
+
+                final Iterator<Map.Entry<String, WeakReference<BTree>>> itr = _name2Addr
+                        .indexCacheEntryIterator();
+
+                while (itr.hasNext()) {
+
+                    final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr
+                            .next();
+
+                    final String name = entry.getKey();
+
+                    final BTree btree = entry.getValue().get();
+
+                    if (btree == null) {
+
+                        // Note: Weak reference was cleared.
+                        continue;
+
+                    }
+
+                    if (btree.needsCheckpoint()) {
+
+                        // Note: Don't convert a dirty BTree.
+                        continue;
+
+                    }
+
+                    // Recover the Entry which has the last checkpointAddr.
+                    final Name2Addr.Entry _entry = _name2Addr.getEntry(name);
+
+                    if (_entry == null) {
+
+                        /*
+                         * There must be an Entry for each index in Name2Addr's
+                         * cache.
+                         */
+
+                        throw new AssertionError("No entry: name=" + name);
+
+                    }
 
                     /*
-                     * There must be an Entry for each index in Name2Addr's
-                     * cache.
+                     * Mark the index as read-only (the whole journal no longer
+                     * accepts writes) before placing it in the historical index
+                     * cache (we don't want concurrent requests to be able to
+                     * obtain a BTree that is not marked as read-only from the
+                     * historical index cache).
                      */
-                    
-                    throw new AssertionError("No entry: name=" + name);
-                    
-                }
-                
-                /*
-                 * Mark the index as read-only (the whole journal no longer
-                 * accepts writes) before placing it in the historical index
-                 * cache (we don't want concurrent requests to be able to obtain
-                 * a BTree that is not marked as read-only from the historical
-                 * index cache).
-                 */
-                
-                btree.setReadOnly(true);
-                
-                /*
-                 * Put the BTree into the historical index cache under that
-                 * checkpointAddr.
-                 * 
-                 * Note: putIfAbsent() avoids the potential problem of having
-                 * more than one object for the same checkpointAddr.
-                 */
 
-                historicalIndexCache.putIfAbsent(_entry.checkpointAddr, btree);
-            
-            } // next index.
-            
-            // discard since no writers are allowed.
-            name2Addr = null;
-            
+                    btree.setReadOnly(true);
+
+                    /*
+                     * Put the BTree into the historical index cache under that
+                     * checkpointAddr.
+                     * 
+                     * Note: putIfAbsent() avoids the potential problem of
+                     * having more than one object for the same checkpointAddr.
+                     */
+
+                    historicalIndexCache.putIfAbsent(_entry.checkpointAddr,
+                            btree);
+
+                } // next index.
+
+                // discard since no writers are allowed.
+                _name2Addr = null;
+
+            }
+
+            // close();
+
+        } finally {
+
+            lock.unlock();
+
         }
-       
-//        close();
         
     }
     
@@ -1604,13 +1755,11 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     synchronized public void destroy() {
 
-        // Note: per contract for close().
-        if(!isOpen()) throw new IllegalStateException();
-
         if (log.isInfoEnabled())
             log.info("");
         
-        shutdownNow();
+        if(isOpen()) 
+            shutdownNow();
         
         if (!deleteOnClose) {
 
@@ -1647,7 +1796,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    public IResourceMetadata getResourceMetadata() {
+    final public UUID getUUID() {
+        
+        return journalMetadata.getUUID();
+        
+    }
+    
+    final public IResourceMetadata getResourceMetadata() {
         
         return journalMetadata;
         
@@ -1688,13 +1843,37 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     
     final public IRootBlockView getRootBlockView() {
 
-        return _rootBlock;
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+        
+        lock.lock();
+        
+        try {
+        
+            return _rootBlock;
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
 
     }
     
     final public long getLastCommitTime() {
         
-        return _rootBlock.getLastCommitTime();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+        
+        lock.lock();
+        
+        try {
+
+            return _rootBlock.getLastCommitTime();
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
         
     }
 
@@ -1713,7 +1892,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * @param committer
      *            The commiter.
      */
-    final public void setCommitter(final int rootSlot, final ICommitter committer) {
+    final public void setCommitter(final int rootSlot,
+            final ICommitter committer) {
 
         assertOpen();
 
@@ -1737,7 +1917,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         int ncommitters = 0;
 
-        long[] rootAddrs = new long[_committers.length];
+        final long[] rootAddrs = new long[_committers.length];
 
         for (int i = 0; i < _committers.length; i++) {
 
@@ -1745,7 +1925,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 continue;
 
             final long addr = _committers[i].handleCommit(commitTime);
-            
+
             rootAddrs[i] = addr;
 
             ncommitters++;
@@ -1773,61 +1953,102 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * JDK. Since some {@link IBufferStrategy}s use a {@link FileChannel} to
      * access the backing store, this means that we need to re-open the backing
      * store transparently so that we can continue operations after the commit
-     * group was aborted. This is done automatially when we re-load the current
+     * group was aborted. This is done automatically when we re-load the current
      * {@link ICommitRecord} from the root blocks of the store.
      */
     public void abort() {
 
-        if (log.isInfoEnabled())
-            log.info("start");
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
         
-        /*
-         * Discard hard references to any indices. The Name2Addr reference will
-         * also be discarded below. This should be sufficient to ensure that any
-         * index requested by the methods on the AbstractJournal will be re-read
-         * from disk using the commit record which we re-load below. This is
-         * necessary in order to discard any checkpoints that may have been
-         * written on indices since the last commit.
-         */
-    
-        historicalIndexCache.clear();
+        lock.lock();
         
-        // clear the root addresses - they will be reloaded.
-        _commitRecord = null;
+        try {
 
-        // clear the array of committers.
-        _committers = new ICommitter[_committers.length];
+            if (log.isInfoEnabled())
+                log.info("start");
 
-        /*
-         * Re-load the commit record index from the address in the current root
-         * block.
-         * 
-         * Note: This may not be strictly necessary since the only time we write
-         * on this index is a single record during each commit. So, it should be
-         * valid to simply catch an error during a commit and discard this index
-         * forcing its reload. However, doing this here is definately safer.
-         * 
-         * Note: This reads on the store. If the backing channel for a stable
-         * store was closed by an interrupt, e.g., during an abort, then this
-         * will cause the backing channel to be transparent re-opened. At that
-         * point both readers and writers will be able to access the channel
-         * again.
-         */
-        
-        // clear reference.
-        _commitRecordIndex = null;
-        
-        // load from the store.
-        _commitRecordIndex = getCommitRecordIndex();
+            if (LRUNexus.INSTANCE != null) {
 
-        // discard any hard references that might be cached.
-        discardCommitters();
+                /*
+                 * Discard the LRU for this store. It may contain writes which
+                 * have been discarded. The same addresses may be reissued by
+                 * the WORM store after an abort, which could lead to incorrect
+                 * reads from a dirty cache.
+                 * 
+                 * FIXME An optimization would essentially isolate the writes on
+                 * the cache per BTree or between commits. At the commit point,
+                 * the written records would be migrated into the "committed"
+                 * cache for the store. The caller would read on the uncommitted
+                 * cache, which would read through to the "committed" cache.
+                 * This would prevent incorrect reads without requiring us to
+                 * throw away valid records in the cache. This could be a
+                 * significant performance gain if aborts are common on a
+                 * machine with a lot of RAM.
+                 */
 
-        // setup new committers, e.g., by reloading from their last root addr.
-        setupCommitters();
-        
-        if (log.isInfoEnabled())
-            log.info("done");
+                LRUNexus.getCache(this).clear();
+
+            }
+
+            /*
+             * Discard hard references to any indices. The Name2Addr reference
+             * will also be discarded below. This should be sufficient to ensure
+             * that any index requested by the methods on the AbstractJournal
+             * will be re-read from disk using the commit record which we
+             * re-load below. This is necessary in order to discard any
+             * checkpoints that may have been written on indices since the last
+             * commit.
+             * 
+             * FIXME Verify this is not required. Historical index references
+             * should not be discard on abort as they remain valid. Discarding
+             * them admits the possibility of a non-canonicalizing cache for the
+             * historical indices since an existing historical index reference
+             * will continue to be held but a new copy of the index will be
+             * loaded on the next request if we clear the cache here.
+             */ 
+//            historicalIndexCache.clear();
+
+            // discard the commit record and re-read from the store.
+            _commitRecord = _getCommitRecord();
+
+            /*
+             * Re-load the commit record index from the address in the current
+             * root block.
+             * 
+             * Note: This may not be strictly necessary since the only time we
+             * write on this index is a single record during each commit. So, it
+             * should be valid to simply catch an error during a commit and
+             * discard this index forcing its reload. However, doing this here
+             * is definitely safer.
+             * 
+             * Note: This reads on the store. If the backing channel for a
+             * stable store was closed by an interrupt, e.g., during an abort,
+             * then this will cause the backing channel to be transparent
+             * re-opened. At that point both readers and writers will be able to
+             * access the channel again.
+             */
+
+            // clear reference and reload from the store.
+            _commitRecordIndex = _getCommitRecordIndex();
+
+            // clear the array of committers.
+            _committers = new ICommitter[_committers.length];
+
+            // discard any hard references that might be cached.
+            discardCommitters();
+
+            // setup new committers, e.g., by reloading from their last root
+            // addr.
+            setupCommitters();
+
+            if (log.isInfoEnabled())
+                log.info("done");
+
+        } finally {
+
+            lock.unlock();
+            
+        }
         
     }
     
@@ -1842,41 +2063,53 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public void rollback() {
 
-        assertOpen();
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
 
-        if(isReadOnly())
-            throw new IllegalStateException();
+        lock.lock();
 
-        log.warn("");
-        
-        /*
-         * Read the alternate root block (NOT the current one!).
-         */
-        final ByteBuffer buf = _bufferStrategy.readRootBlock(!_rootBlock
-                .isRootBlock0());
+        try {
 
-        /*
-         * Create a view from the alternate root block, but using the SAME
-         * [rootBlock0] flag state as the current root block so that this will
-         * overwrite the current root block.
-         */
-        final IRootBlockView newRootBlock = new RootBlockView(_rootBlock
-                .isRootBlock0(), buf, checker);
-        
-        /*
-         * Overwrite the current root block on the backing store with the
-         * state of the alternate root block.
-         */
-        _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+            assertOpen();
 
-        // Use the new root block. 
-        _rootBlock = newRootBlock;
-        
-        /*
-         * Discard all in-memory state - it will need be re-loaded from the
-         * restored root block.
-         */
-        abort();
+            if (isReadOnly())
+                throw new IllegalStateException();
+
+            log.warn("");
+
+            /*
+             * Read the alternate root block (NOT the current one!).
+             */
+            final ByteBuffer buf = _bufferStrategy.readRootBlock(!_rootBlock
+                    .isRootBlock0());
+
+            /*
+             * Create a view from the alternate root block, but using the SAME
+             * [rootBlock0] flag state as the current root block so that this
+             * will overwrite the current root block.
+             */
+            final IRootBlockView newRootBlock = new RootBlockView(_rootBlock
+                    .isRootBlock0(), buf, checker);
+
+            /*
+             * Overwrite the current root block on the backing store with the
+             * state of the alternate root block.
+             */
+            _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+
+            // Use the new root block.
+            _rootBlock = newRootBlock;
+
+            /*
+             * Discard all in-memory state - it will need be re-loaded from the
+             * restored root block.
+             */
+            abort();
+
+        } finally {
+
+            lock.unlock();
+
+        }
         
     }
         
@@ -1946,166 +2179,203 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected long commitNow(final long commitTime) {
 
-        assertOpen();
-
-        if (log.isInfoEnabled())
-            log.info("commitTime=" + commitTime);
-
-        if (commitTime <= _rootBlock.getLastCommitTime()) {
-
-            /*
-             * The commit times must strictly advance.
-             */
-
-            throw new IllegalArgumentException();
-
-        }
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
         
-        /*
-         * First, run each of the committers accumulating the updated root
-         * addresses in an array. In general, these are btrees and they may have
-         * dirty nodes or leaves that needs to be evicted onto the store. The
-         * first time through, any newly created btrees will have dirty empty
-         * roots (the btree code does not optimize away an empty root at this
-         * time). However, subsequent commits without intervening data written
-         * on the store should not cause any committers to update their root
-         * address.
-         */
-        final long[] rootAddrs = notifyCommitters(commitTime);
-
-        /*
-         * See if anything has been written on the store since the last commit.
-         */
-        if (_bufferStrategy.getNextOffset() == _rootBlock.getNextOffset()) {
-
-            /*
-             * No data was written onto the store so the commit can not achieve
-             * any useful purpose.
-             */
-            
-            if(log.isInfoEnabled())
-                log.info("Nothing to commit");
-
-            return 0L;
-
-        }
+        lock.lock();
         
-        /*
-         * Write the commit record onto the store.
-         */
+        try {
 
-        final IRootBlockView old = _rootBlock;
+            assertOpen();
 
-        final long newCommitCounter = old.getCommitCounter() + 1;
+            final long beginNanos = System.nanoTime();
 
-        final ICommitRecord commitRecord = new CommitRecord(commitTime,
-                newCommitCounter, rootAddrs);
+            // #of bytes on the journal as of the previous commit point.
+            final long byteCountBefore = _rootBlock.getNextOffset();
 
-        final long commitRecordAddr = write(ByteBuffer
-                .wrap(CommitRecordSerializer.INSTANCE.serialize(commitRecord)));
+            if (log.isInfoEnabled())
+                log.info("commitTime=" + commitTime);
 
-        /*
-         * Add the commit record to an index so that we can recover historical
-         * states efficiently.
-         */
-        _commitRecordIndex.add(commitRecordAddr, commitRecord);
+            if (commitTime <= _rootBlock.getLastCommitTime()) {
 
-        /*
-         * Flush the commit record index to the store and stash the address of
-         * its metadata record in the root block.
-         * 
-         * Note: The address of the root of the CommitRecordIndex itself needs
-         * to go right into the root block. We are unable to place it into the
-         * commit record since we need to serialize the commit record, get its
-         * address, and add the entry to the CommitRecordIndex before we can
-         * flush the CommitRecordIndex to the store.
-         */
-        final long commitRecordIndexAddr = _commitRecordIndex.writeCheckpoint();
-
-        /*
-         * Force application data to stable storage _before_ we update the root
-         * blocks. This option guarentees that the application data is stable on
-         * the disk before the atomic commit. Some operating systems and/or file
-         * systems may otherwise choose an ordered write with the consequence
-         * that the root blocks are laid down on the disk before the application
-         * data and a hard failure could result in the loss of application data
-         * addressed by the new root blocks (data loss on restart).
-         * 
-         * Note: We do not force the file metadata to disk
-         */
-        if (doubleSync) {
-
-            _bufferStrategy.force(false);
-
-        }
-
-        // next offset at which user data would be written.
-        final long nextOffset = _bufferStrategy.getNextOffset();
-
-        /*
-         * update the root block.
-         */
-        {
-
-            /*
-             * Update the firstCommitTime the first time a transaction commits
-             * and the lastCommitTime each time a transaction commits (these are
-             * commit timestamps of isolated or unisolated transactions).
-             */
-
-            final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime
-                    : old.getFirstCommitTime());
-
-            final long priorCommitTime = old.getLastCommitTime();
-            
-            if(priorCommitTime != 0L) {
-                
                 /*
-                 * This is a local sanity check to make sure that the commit
-                 * timestamps are strictly increasing. An error will be reported
-                 * if the commit time for the current (un)isolated transaction
-                 * is not strictly greater than the last commit time on the
-                 * store as read back from the current root block.
+                 * The commit times must strictly advance.
                  */
 
-                if (commitTime <= priorCommitTime) {
-                    
-                    throw new RuntimeException(
-                            "Time goes backwards: commitTime=" + commitTime
-                                    + ", but lastCommitTime=" + priorCommitTime
-                                    + " on the current root block");
-                    
-                }
-                
+                throw new IllegalArgumentException();
+
             }
-            
-            final long lastCommitTime = commitTime;
 
-            // Create the new root block.
-            final IRootBlockView newRootBlock = new RootBlockView(
-                    !old.isRootBlock0(), old.getOffsetBits(), nextOffset,
-                    firstCommitTime, lastCommitTime, newCommitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
-                    old.getCreateTime(), old.getCloseTime(),
-                    checker);
+            /*
+             * First, run each of the committers accumulating the updated root
+             * addresses in an array. In general, these are btrees and they may
+             * have dirty nodes or leaves that needs to be evicted onto the
+             * store. The first time through, any newly created btrees will have
+             * dirty empty roots (the btree code does not optimize away an empty
+             * root at this time). However, subsequent commits without
+             * intervening data written on the store should not cause any
+             * committers to update their root address.
+             */
+            final long[] rootAddrs = notifyCommitters(commitTime);
 
-            _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+            /*
+             * See if anything has been written on the store since the last
+             * commit.
+             */
+            if (_bufferStrategy.getNextOffset() == _rootBlock.getNextOffset()) {
 
-            _rootBlock = newRootBlock;
+                /*
+                 * No data was written onto the store so the commit can not
+                 * achieve any useful purpose.
+                 */
 
-            _commitRecord = commitRecord;
+                if (log.isInfoEnabled())
+                    log.info("Nothing to commit");
+
+                return 0L;
+
+            }
+
+            /*
+             * Write the commit record onto the store.
+             */
+
+            final IRootBlockView old = _rootBlock;
+
+            final long newCommitCounter = old.getCommitCounter() + 1;
+
+            final ICommitRecord commitRecord = new CommitRecord(commitTime,
+                    newCommitCounter, rootAddrs);
+
+            final long commitRecordAddr = write(ByteBuffer
+                    .wrap(CommitRecordSerializer.INSTANCE
+                            .serialize(commitRecord)));
+
+            /*
+             * Add the commit record to an index so that we can recover
+             * historical states efficiently.
+             */
+            _commitRecordIndex.add(commitRecordAddr, commitRecord);
+
+            /*
+             * Flush the commit record index to the store and stash the address
+             * of its metadata record in the root block.
+             * 
+             * Note: The address of the root of the CommitRecordIndex itself
+             * needs to go right into the root block. We are unable to place it
+             * into the commit record since we need to serialize the commit
+             * record, get its address, and add the entry to the
+             * CommitRecordIndex before we can flush the CommitRecordIndex to
+             * the store.
+             */
+            final long commitRecordIndexAddr = _commitRecordIndex
+                    .writeCheckpoint();
+
+            /*
+             * Force application data to stable storage _before_ we update the
+             * root blocks. This option guarantees that the application data is
+             * stable on the disk before the atomic commit. Some operating
+             * systems and/or file systems may otherwise choose an ordered write
+             * with the consequence that the root blocks are laid down on the
+             * disk before the application data and a hard failure could result
+             * in the loss of application data addressed by the new root blocks
+             * (data loss on restart).
+             * 
+             * Note: We do not force the file metadata to disk
+             */
+            if (doubleSync) {
+
+                _bufferStrategy.force(false);
+
+            }
+
+            // next offset at which user data would be written.
+            final long nextOffset = _bufferStrategy.getNextOffset();
+
+            /*
+             * update the root block.
+             */
+            {
+
+                /*
+                 * Update the firstCommitTime the first time a transaction
+                 * commits and the lastCommitTime each time a transaction
+                 * commits (these are commit timestamps of isolated or
+                 * unisolated transactions).
+                 */
+
+                final long firstCommitTime = (old.getFirstCommitTime() == 0L ? commitTime
+                        : old.getFirstCommitTime());
+
+                final long priorCommitTime = old.getLastCommitTime();
+
+                if (priorCommitTime != 0L) {
+
+                    /*
+                     * This is a local sanity check to make sure that the commit
+                     * timestamps are strictly increasing. An error will be
+                     * reported if the commit time for the current (un)isolated
+                     * transaction is not strictly greater than the last commit
+                     * time on the store as read back from the current root
+                     * block.
+                     */
+
+                    if (commitTime <= priorCommitTime) {
+
+                        throw new RuntimeException(
+                                "Time goes backwards: commitTime=" + commitTime
+                                        + ", but lastCommitTime="
+                                        + priorCommitTime
+                                        + " on the current root block");
+
+                    }
+
+                }
+
+                final long lastCommitTime = commitTime;
+
+                // Create the new root block.
+                final IRootBlockView newRootBlock = new RootBlockView(!old
+                        .isRootBlock0(), old.getOffsetBits(), nextOffset,
+                        firstCommitTime, lastCommitTime, newCommitCounter,
+                        commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
+                        old.getCreateTime(), old.getCloseTime(), checker);
+
+                _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+
+                _rootBlock = newRootBlock;
+
+                _commitRecord = commitRecord;
+
+            }
+
+            final long elapsedNanos = System.nanoTime() - beginNanos;
+
+            if (BigdataStatics.debug || log.isInfoEnabled()) {
+                final String msg = "commit: commitTime=" + commitTime
+                        + ", latency="
+                        + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+                        + ", nextOffset=" + nextOffset + ", byteCount="
+                        + (nextOffset - byteCountBefore);
+                if (BigdataStatics.debug)
+                    System.err.println(msg);
+                else if (log.isInfoEnabled())
+                    log.info(msg);
+                if (BigdataStatics.debug && LRUNexus.INSTANCE != null) {
+                    System.err.println(LRUNexus.INSTANCE.toString());
+                }
+            }
+
+            return commitTime;
+
+        } finally {
+
+            lock.unlock();
 
         }
-
-        if (log.isInfoEnabled())
-            log.info("Done: commitTime=" + commitTime + ", nextOffset="
-                    + nextOffset);
-
-        return commitTime;
 
     }
 
-    public void force(boolean metadata) {
+    public void force(final boolean metadata) {
 
         assertOpen();
 
@@ -2119,7 +2389,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
     
-    public long write(ByteBuffer data) {
+    public long write(final ByteBuffer data) {
 
         assertOpen();
 
@@ -2133,7 +2403,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    public ByteBuffer read(long addr) {
+    public ByteBuffer read(final long addr) {
 
         assertOpen();
 
@@ -2141,18 +2411,27 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    final public long getRootAddr(int index) {
+    final public long getRootAddr(final int index) {
 
-        assertOpen();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+        
+        lock.lock();
 
-        if (_commitRecord == null) {
+        try {
 
-            return getCommitRecord().getRootAddr(index);
+            assertOpen();
 
-        } else {
+            final ICommitRecord commitRecord = _commitRecord;
 
-            return _commitRecord.getRootAddr(index);
+            if (commitRecord == null)
+                throw new AssertionError();
 
+            return commitRecord.getRootAddr(index);
+
+        } finally {
+
+            lock.unlock();
+            
         }
 
     }
@@ -2160,46 +2439,62 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * Returns a read-only view of the most recently committed
      * {@link ICommitRecord} containing the root addresses.
-     * <p>
-     * Note: Synchronization was added to this method since the
-     * {@link StatusThread} and {@link AbstractTask}s may all invoke this
-     * concurrently. The synchronization could be removed if we made sure that
-     * this was never null outside of initialization or commit.
      * 
      * @return The current {@link ICommitRecord} and never <code>null</code>.
      */
-    synchronized public ICommitRecord getCommitRecord() {
+    public ICommitRecord getCommitRecord() {
 
-        assertOpen();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
 
-        if (_commitRecord == null) {
+        lock.lock();
 
-            // the address of the current commit record from the root block.
-            final long commitRecordAddr = _rootBlock.getCommitRecordAddr();
+        try {
 
-            if (commitRecordAddr == 0L) {
+            assertOpen();
 
-                // No commit record on the store yet.
-                _commitRecord = new CommitRecord();
+            final ICommitRecord commitRecord = _commitRecord;
 
-            } else {
+            if (commitRecord == null)
+                throw new AssertionError();
 
-                // Read the commit record from the store.
-                _commitRecord = CommitRecordSerializer.INSTANCE
-                        .deserialize(_bufferStrategy.read(commitRecordAddr));
+            return commitRecord;
 
-            }
+        } finally {
+
+            lock.unlock();
 
         }
 
-        return _commitRecord;
+    }
+    
+    /**
+     * Return the commit record, either new or read from the root block.
+     */
+    private ICommitRecord _getCommitRecord() {
+        
+        assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+
+        // the address of the current commit record from the root block.
+        final long commitRecordAddr = _rootBlock.getCommitRecordAddr();
+
+        if (commitRecordAddr == NULL) {
+
+            // No commit record on the store yet.
+            return new CommitRecord();
+
+        } else {
+
+            // Read the commit record from the store.
+            return CommitRecordSerializer.INSTANCE.deserialize(_bufferStrategy
+                    .read(commitRecordAddr));
+
+        }
 
     }
 
-
     /**
-     * This method is invoked whenever the store must discard any hard
-     * references that it may be holding to objects registered as
+     * This method is invoked by {@link #abort()} when the store must discard
+     * any hard references that it may be holding to objects registered as
      * {@link ICommitter}s.
      * <p>
      * The default implementation discards the btree mapping names to named
@@ -2210,8 +2505,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected void discardCommitters() {
 
+        assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+        
         // discard.
-        name2Addr = null;
+        _name2Addr = null;
         
     }
 
@@ -2226,6 +2523,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected void setupCommitters() {
 
+        assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+        
         setupName2AddrBTree(getRootAddr(ROOT_NAME2ADDR));
 
     }
@@ -2235,7 +2534,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
 
     /**
-     * Setup the btree that resolves named indices.
+     * Setup the btree that resolves named indices. This is invoke when the
+     * journal is opened and by {@link #abort()} .
      * 
      * @param addr
      *            The root address of the btree -or- 0L iff the btree has not
@@ -2245,7 +2545,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     Name2Addr setupName2AddrBTree(final long addr) {
 
-        assert name2Addr == null;
+        assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+        
+        assert _name2Addr == null;
 
         if (addr == 0L) {
 
@@ -2264,7 +2566,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             if (log.isInfoEnabled())
                 log.info("New " + Name2Addr.class.getName());
             
-            name2Addr = Name2Addr
+            _name2Addr = Name2Addr
                     .create((isReadOnly() ? new SimpleMemoryRawStore() : this));
 
         } else {
@@ -2281,22 +2583,22 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 log.info("Loading " + Name2Addr.class.getName() + " from "
                         + addr);
 
-            name2Addr = (Name2Addr) BTree.load(this, addr);
+            _name2Addr = (Name2Addr) BTree.load(this, addr);
 
         }
 
-        name2Addr.setupCache(liveIndexCacheCapacity, liveIndexCacheTimeout);
+        _name2Addr.setupCache(liveIndexCacheCapacity, liveIndexCacheTimeout);
         
         // register for commit notices.
-        setCommitter(ROOT_NAME2ADDR, name2Addr);
+        setCommitter(ROOT_NAME2ADDR, _name2Addr);
 
-        return name2Addr;
+        return _name2Addr;
         
     }
 
     /**
      * Return the current state of the index that resolves timestamps to
-     * {@link ICommitRecord}s and create it if the index does not exist.
+     * {@link ICommitRecord}s.
      * <p>
      * Note: The returned object is NOT safe for concurrent operations and is
      * NOT systematically protected by the use of synchronized blocks within
@@ -2312,42 +2614,61 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     protected CommitRecordIndex getCommitRecordIndex() {
 
-        assertOpen();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
         
-        if (_commitRecordIndex == null) {
+        lock.lock();
 
-            synchronized (this) {
+        try {
 
-                if (_commitRecordIndex == null) {
+            assertOpen();
 
-                    final long addr = _rootBlock.getCommitRecordIndexAddr();
+            final CommitRecordIndex commitRecordIndex = _commitRecordIndex;
 
-                    try {
+            if (commitRecordIndex == null)
+                throw new AssertionError();
 
-                        _commitRecordIndex = getCommitRecordIndex(addr);
+            return commitRecordIndex;
 
-                    } catch (RuntimeException ex) {
+        } finally {
 
-                        /*
-                         * Log the root block for post-mortem.
-                         */
-                        log.fatal("Could not read the commit record index:\n"
-                                + _rootBlock, ex);
-
-                        throw ex;
-
-                    }
-
-                }
-
-            }
+            lock.unlock();
 
         }
 
-        return _commitRecordIndex;
-        
     }
-    
+
+    /**
+     * Read and return the {@link CommitRecordIndex} from the current root
+     * block.
+     * 
+     * @return The {@link CommitRecordIndex} and never <code>null</code>.
+     */
+    private CommitRecordIndex _getCommitRecordIndex() {
+
+        assert _fieldReadWriteLock.writeLock().isHeldByCurrentThread();
+
+        assert _rootBlock != null;
+        
+        final long addr = _rootBlock.getCommitRecordIndexAddr();
+
+        try {
+
+            return getCommitRecordIndex(addr);
+
+        } catch (RuntimeException ex) {
+
+            /*
+             * Log the root block for post-mortem.
+             */
+            log.fatal("Could not read the commit record index:\n" + _rootBlock,
+                    ex);
+
+            throw ex;
+
+        }
+
+    }
+
     /**
      * Create or re-load the index that resolves timestamps to
      * {@link ICommitRecord}s.
@@ -2407,6 +2728,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
+        assert ndx != null;
+        
         return ndx;
 
     }
@@ -2420,9 +2743,26 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public ICommitRecord getCommitRecord(final long commitTime) {
 
-        assertOpen();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+        
+        lock.lock();
 
-        return _commitRecordIndex.find(commitTime);
+        try {
+
+            assertOpen();
+
+            final CommitRecordIndex commitRecordIndex = _commitRecordIndex;
+
+            if (commitRecordIndex == null)
+                throw new AssertionError();
+            
+            return commitRecordIndex.find(commitTime);
+
+        } finally {
+
+            lock.unlock();
+            
+        }
 
     }
 
@@ -2438,9 +2778,26 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public ICommitRecord getCommitRecordStrictlyGreaterThan(final long commitTime) {
 
-        assertOpen();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+        
+        lock.lock();
 
-        return _commitRecordIndex.findNext(commitTime);
+        try {
+
+            assertOpen();
+
+            final CommitRecordIndex commitRecordIndex = _commitRecordIndex;
+
+            if (commitRecordIndex == null)
+                throw new AssertionError();
+            
+            return commitRecordIndex.findNext(commitTime);
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
 
     }
 
@@ -2457,30 +2814,43 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public IIndex getIndex(final String name, final long commitTime) {
 
-        assertOpen();
-
-        if (commitTime == ITx.UNISOLATED || commitTime == ITx.READ_COMMITTED
-                || TimestampUtility.isReadWriteTx(commitTime)) {
-            
-            throw new UnsupportedOperationException();
-            
-        }
+        final ReadLock lock = _fieldReadWriteLock.readLock();
         
-        final ICommitRecord commitRecord = getCommitRecord(commitTime);
+        lock.lock();
 
-        if (commitRecord == null) {
+        try {
 
-            if (log.isInfoEnabled())
-                log.info("No commit record for timestamp=" + commitTime);
+            assertOpen();
 
-            return null;
+            if (commitTime == ITx.UNISOLATED
+                    || commitTime == ITx.READ_COMMITTED
+                    || TimestampUtility.isReadWriteTx(commitTime)) {
+
+                throw new UnsupportedOperationException();
+
+            }
+
+            final ICommitRecord commitRecord = getCommitRecord(commitTime);
+
+            if (commitRecord == null) {
+
+                if (log.isInfoEnabled())
+                    log.info("No commit record for timestamp=" + commitTime);
+
+                return null;
+
+            }
+
+            return getIndex(name, commitRecord);
+
+        } finally {
+
+            lock.unlock();
 
         }
-
-        return getIndex(name, commitRecord);
         
     }
-    
+
     /**
      * Returns a read-only named index loaded from a {@link ICommitRecord}. The
      * {@link BTree} will be marked as read-only, it will NOT permit writes, and
@@ -2491,83 +2861,97 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * @return The named index -or- <code>null</code> iff the named index did
      *         not exist as of that commit record.
      */
-    public BTree getIndex(String name, ICommitRecord commitRecord) {
+    public BTree getIndex(final String name, final ICommitRecord commitRecord) {
 
-        assertOpen();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
 
-        if (name == null)
-            throw new IllegalArgumentException();
+        lock.lock();
 
-        if (commitRecord == null)
-            throw new IllegalArgumentException();
+        try {
 
-        /*
-         * The address of an historical Name2Addr mapping used to resolve named
-         * indices for the historical state associated with this commit record.
-         */
-        final long checkpointAddr = commitRecord.getRootAddr(ROOT_NAME2ADDR);
+            assertOpen();
 
-        if (checkpointAddr == 0L) {
+            if (name == null)
+                throw new IllegalArgumentException();
 
-            log.warn("No name2addr entry in this commit record: "
-                    + commitRecord);
+            if (commitRecord == null)
+                throw new IllegalArgumentException();
 
-            return null;
-            
+            /*
+             * The address of an historical Name2Addr mapping used to resolve
+             * named indices for the historical state associated with this
+             * commit record.
+             */
+            final long checkpointAddr = commitRecord
+                    .getRootAddr(ROOT_NAME2ADDR);
+
+            if (checkpointAddr == 0L) {
+
+                log.warn("No name2addr entry in this commit record: "
+                        + commitRecord);
+
+                return null;
+
+            }
+
+            /*
+             * Resolve the address of the historical Name2Addr object using the
+             * canonicalizing object cache. This prevents multiple historical
+             * Name2Addr objects springing into existance for the same commit
+             * record.
+             */
+            final Name2Addr name2Addr = (Name2Addr) getIndex(checkpointAddr);
+
+            /*
+             * The address at which the named index was written for that
+             * historical state.
+             */
+            final Name2Addr.Entry entry = name2Addr.getEntry(name);
+
+            if (entry == null) {
+
+                // No such index by name for that historical state.
+
+                return null;
+
+            }
+
+            /*
+             * Resolve the named index using the object cache to impose a
+             * canonicalizing mapping on the historical named indices based on
+             * the address on which it was written in the store.
+             */
+
+            final BTree btree = getIndex(entry.checkpointAddr);
+
+            assert entry.commitTime != 0L : "Entry=" + entry;
+
+            // Set the last commit time on the btree.
+            btree.setLastCommitTime(entry.commitTime);
+
+            return btree;
+
+        } finally {
+
+            lock.unlock();
+
         }
-
-        /*
-         * Resolve the address of the historical Name2Addr object using the
-         * canonicalizing object cache. This prevents multiple historical
-         * Name2Addr objects springing into existance for the same commit
-         * record.
-         */
-        final Name2Addr name2Addr = (Name2Addr)getIndex(checkpointAddr);
         
-        /*
-         * The address at which the named index was written for that historical
-         * state.
-         */
-        final Name2Addr.Entry entry = name2Addr.getEntry(name);
-        
-        if (entry == null) {
-
-            // No such index by name for that historical state.
-
-            return null;
-            
-        }
-        
-        /*
-         * Resolve the named index using the object cache to impose a
-         * canonicalizing mapping on the historical named indices based on the
-         * address on which it was written in the store.
-         */
-
-        final BTree btree = getIndex(entry.checkpointAddr);
-        
-        assert entry.commitTime != 0L : "Entry="+entry;
-        
-        // Set the last commit time on the btree.
-        btree.setLastCommitTime(entry.commitTime);
-        
-        return btree;
-
     }
-    
+
     /**
      * A canonicalizing mapping for <em>historical</em> {@link BTree}s.
      * <p>
      * Note: This method imposes a canonicalizing mapping and ensures that there
      * will be at most one instance of the historical index at a time. This
-     * guarentee is used to facilitate buffer management. Writes on the index
-     * are NOT allowed.
+     * guarentee is used to facilitate buffer management. Writes on indices
+     * returned by this method are NOT allowed.
      * <p>
      * Note: This method marks the {@link BTree} as read-only but does not set
      * {@link BTree#setLastCommitTime(long)} since it does not have access to
-     * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr.
-     * See {@link #getIndex(String, ICommitRecord)} which does set
-     * {@link BTree#setLastCommitTime(long)}.
+     * the {@link Entry#commitTime}, only the {@link BTree}s checkpointAddr and
+     * {@link Checkpoint} record. See {@link #getIndex(String, ICommitRecord)}
+     * which does set {@link BTree#setLastCommitTime(long)}.
      * <p>
      * Note: The canonicalizing mapping for unisolated {@link BTree}s is
      * maintained by the {@link ITx#UNISOLATED} {@link Name2Addr} instance.
@@ -2603,6 +2987,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * 
              * Note: Does not set lastCommitTime.
              */
+
             btree = BTree.load(this, checkpointAddr, true/* readOnly */);
                 
         }
@@ -2625,7 +3010,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return btree;
 
 //        }
-        
+
     }
 
     /**
@@ -2726,16 +3111,28 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public BTree registerIndex(final String name, final BTree ndx) {
 
-        assertOpen();
-        
-        synchronized (name2Addr) {
-                
-            // add to the persistent name map.
-            name2Addr.registerIndex(name, ndx);
+        final ReadLock lock = _fieldReadWriteLock.readLock();
 
+        lock.lock();
+
+        try {
+
+            assertOpen();
+
+            synchronized (_name2Addr) {
+
+                // add to the persistent name map.
+                _name2Addr.registerIndex(name, ndx);
+
+            }
+
+            return ndx;
+
+        } finally {
+
+            lock.unlock();
+            
         }
-
-        return ndx;
         
     }
 
@@ -2746,13 +3143,25 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * historical states of the index will continue to be accessible.
      */
     public void dropIndex(final String name) {
+
+        final ReadLock lock = _fieldReadWriteLock.readLock();
+
+        lock.lock();
         
-        assertOpen();
-        
-        synchronized(name2Addr) {
-                
-            // drop from the persistent name map.
-            name2Addr.dropIndex(name);
+        try {
+
+            assertOpen();
+
+            synchronized (_name2Addr) {
+
+                // drop from the persistent name map.
+                _name2Addr.dropIndex(name);
+
+            }
+
+        } finally {
+
+            lock.unlock();
 
         }
 
@@ -2771,22 +3180,35 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     public BTree getIndex(final String name) {
 
-        assertOpen();
+        final ReadLock lock = _fieldReadWriteLock.readLock();
 
-        if (name == null)
-            throw new IllegalArgumentException();
+        lock.lock();
 
-        if (Thread.interrupted()) {
+        try {
 
-            throw new RuntimeException(new InterruptedException());
+            assertOpen();
+
+            if (name == null)
+                throw new IllegalArgumentException();
+
+            if (Thread.interrupted()) {
+
+                throw new RuntimeException(new InterruptedException());
+
+            }
+
+            // Note: NullPointerException can be thrown here if asynchronously
+            // closed (should be fixed by the ReadLock).
+            synchronized (_name2Addr) {
+
+                return _name2Addr.getIndex(name);
+
+            }
+
+        } finally {
+
+            lock.unlock();
             
-        }
-        
-        // Note: NullPointerException can be thrown here if asynchronously closed.
-        synchronized (name2Addr) {
-
-            return name2Addr.getIndex(name);
-
         }
 
     }
@@ -2850,7 +3272,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
     final public int getMaxRecordSize() {
 
-        return ((AbstractRawWormStore) _bufferStrategy).getAddressManger()
+        return ((AbstractRawWormStore) _bufferStrategy).getAddressManager()
                 .getMaxByteCount();
 
     }

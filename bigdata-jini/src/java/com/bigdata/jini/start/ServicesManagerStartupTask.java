@@ -300,75 +300,76 @@ public class ServicesManagerStartupTask implements Callable<Void> {
         final String zconfig = zroot + BigdataZooDefs.ZSLASH
                 + BigdataZooDefs.CONFIG;
 
-        // ACL for the zroot, etc.
-        final List<ACL> acl = fed.getClient().zooConfig.acl;
+//        // ACL for the zroot, etc.
+//        final List<ACL> acl = fed.getClient().zooConfig.acl;
 
         // create critical nodes used by the federation.
-        createKeyZNodes(zookeeper, zroot, acl);
+        fed.createKeyZNodes(zookeeper);//, zroot, acl);
 
         // push the service configurations into zookeeper (create/update).
-        pushConfiguration(zookeeper, zconfig, acl, serviceConfigurations);
+        pushConfiguration(zookeeper, zconfig, fed.getZooConfig().acl,
+                serviceConfigurations);
 
         return true;
 
     }
 
-    /**
-     * Create key znodes used by the federation.
-     * 
-     * @param zookeeper
-     * @param zroot
-     * @param acl
-     * 
-     * @throws KeeperException
-     * @throws InterruptedException
-     */
-    protected void createKeyZNodes(final ZooKeeper zookeeper,
-            final String zroot, final List<ACL> acl) throws KeeperException,
-            InterruptedException {
-
-        final String[] a = new String[] {
-
-        // znode for the federation root.
-                zroot,
-
-                // znode for configuration metadata.
-                zroot + "/" + BigdataZooDefs.CONFIG,
-
-                // znode dominating most locks.
-                zroot + "/" + BigdataZooDefs.LOCKS,
-
-                // znode dominating lock nodes for creating new physical services.
-                zroot + "/" + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
-
-                // znode whose children are the per-service type service configurations.
-                zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
-
-                // znode for the resource locks (IResourceLockManager)
-                zroot + "/" + BigdataZooDefs.LOCKS_RESOURCES,
-
-        };
-
-        for (String zpath : a) {
-
-            try {
-
-                zookeeper.create(zpath, new byte[] {}/* data */, acl,
-                        CreateMode.PERSISTENT);
-
-            } catch (NodeExistsException ex) {
-
-                // that's fine - the configuration already exists.
-                if (log.isDebugEnabled())
-                    log.debug("exists: " + zpath);
-
-                return;
-
-            }
-
-        }
-
-    }
+//    /**
+//     * Create key znodes used by the federation.
+//     * 
+//     * @param zookeeper
+//     * @param zroot
+//     * @param acl
+//     * 
+//     * @throws KeeperException
+//     * @throws InterruptedException
+//     */
+//    protected void createKeyZNodes(final ZooKeeper zookeeper,
+//            final String zroot, final List<ACL> acl) throws KeeperException,
+//            InterruptedException {
+//
+//        final String[] a = new String[] {
+//
+//        // znode for the federation root.
+//                zroot,
+//
+//                // znode for configuration metadata.
+//                zroot + "/" + BigdataZooDefs.CONFIG,
+//
+//                // znode dominating most locks.
+//                zroot + "/" + BigdataZooDefs.LOCKS,
+//
+//                // znode dominating lock nodes for creating new physical services.
+//                zroot + "/" + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
+//
+//                // znode whose children are the per-service type service configurations.
+//                zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
+//
+//                // znode for the resource locks (IResourceLockManager)
+//                zroot + "/" + BigdataZooDefs.LOCKS_RESOURCES,
+//
+//        };
+//
+//        for (String zpath : a) {
+//
+//            try {
+//
+//                zookeeper.create(zpath, new byte[] {}/* data */, acl,
+//                        CreateMode.PERSISTENT);
+//
+//            } catch (NodeExistsException ex) {
+//
+//                // that's fine - the configuration already exists.
+//                if (log.isDebugEnabled())
+//                    log.debug("exists: " + zpath);
+//
+//                return;
+//
+//            }
+//
+//        }
+//
+//    }
 
     /**
      * Pushs the {@link ServiceConfiguration}s for the federation into

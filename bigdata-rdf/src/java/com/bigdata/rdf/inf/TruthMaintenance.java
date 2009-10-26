@@ -154,7 +154,7 @@ public class TruthMaintenance {
      * {@link #retractAll(TempTripleStore)} to update the closure of the
      * database.
      * <p>
-     * Note: DO NOT use {@link TempTripleStore#closeAndDelete()} since the
+     * Note: DO NOT use {@link TempTripleStore#__tearDownUnitTest()} since the
      * backing store is shared!
      */
     public TempTripleStore newTempTripleStore() {
@@ -292,7 +292,7 @@ public class TruthMaintenance {
                     final SPO spo = (SPO)chunk[i];
 
                     // Lookup the statement in the database.
-                    final SPO tmp = database.getStatement(spo.s, spo.p, spo.o);
+                    final ISPO tmp = database.getStatement(spo.s, spo.p, spo.o);
                     
                     if (tmp != null) {
 
@@ -590,9 +590,10 @@ public class TruthMaintenance {
      *            called. At depth ZERO(0) the tempStore MUST contain only the
      *            explicit statements to be retracted.
      */
-    private void retractAll(final ClosureStats stats, final TempTripleStore tempStore, int depth) {
+    private void retractAll(final ClosureStats stats,
+            final TempTripleStore tempStore, final int depth) {
 
-        MDC.put("depth", "depth="+depth);
+        MDC.put("depth", "depth=" + depth);
         
         final long tempStoreCount = tempStore.getStatementCount();
 
@@ -617,6 +618,7 @@ public class TruthMaintenance {
         final IChunkedOrderedIterator<ISPO> itr = tempStore.getAccessPath(SPOKeyOrder.SPO).iterator();
 
         final long nretracted;
+        final long ndowngraded;
         try {
 
             /*
@@ -634,8 +636,12 @@ public class TruthMaintenance {
              * inferred then this will NOT write on the statement index.
              */
             final SPOAssertionBuffer downgradeBuffer = new SPOAssertionBuffer(
-                    focusStore, database, inferenceEngine.doNotAddFilter,
-                    capacity, false/* justify */);
+                    focusStore, // 
+                    database, // the persistent db. 
+                    null, //filter @todo was inferenceEngine.doNotAddFilter,
+                    capacity,//
+                    false // justify 
+                    );
 
             /*
              * Buffer used to retract statements from the database after we have
@@ -750,9 +756,9 @@ public class TruthMaintenance {
                          * written onto the database.
                          * 
                          * @todo consider returning the grounded justification
-                         * and then writing it onto the database where. This
-                         * will essentially "memoize" grounded justifications.
-                         * Of course, you still have to verify that there is
+                         * and then writing it onto the database. This will
+                         * essentially "memoize" grounded justifications. Of
+                         * course, you still have to verify that there is
                          * support for the justification (the statements in the
                          * tail of the justification still exist in the
                          * database).
@@ -832,7 +838,7 @@ public class TruthMaintenance {
             }
 
             // flush buffers, logging counters.
-            final int ndowngraded = downgradeBuffer.flush();
+                       ndowngraded = downgradeBuffer.flush();
                        nretracted = retractionBuffer.flush();
             final int nungrounded = ungroundedBuffer.flush();
 
@@ -849,7 +855,7 @@ public class TruthMaintenance {
         // close the tempStore.
         tempStore.close();
 
-        if (nretracted == 0) {
+        if (nretracted == 0) {// @todo continue if ndowngraded>0?
             
             log.info("Done - nothing was retracted from the database");
             
@@ -869,7 +875,7 @@ public class TruthMaintenance {
             
         }
         
-        long focusStoreCount = focusStore.getStatementCount();
+        final long focusStoreCount = focusStore.getStatementCount();
 
         if (focusStoreCount == 0) {
 

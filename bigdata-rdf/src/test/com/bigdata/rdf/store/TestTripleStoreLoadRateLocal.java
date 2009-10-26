@@ -34,7 +34,11 @@ import java.util.Properties;
 
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 
 /**
@@ -63,7 +67,7 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
     public Properties getProperties() {
 
-        Properties properties = new Properties(super.getProperties());
+        final Properties properties = new Properties(super.getProperties());
 
         // turn off incremental truth maintenance.
         properties.setProperty(DataLoader.Options.CLOSURE, ClosureEnum.None.toString());
@@ -77,7 +81,30 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
         // turn off statement identifiers.
         properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
+
+        // 8000 is much faster; 500 is the default.
+        properties.setProperty(
+                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "8000");
+
+        // triples vs quads.
+        final boolean quads = false;
+
+        if (quads) {
         
+            properties.setProperty(
+                    com.bigdata.rdf.store.AbstractTripleStore.Options.QUADS,
+                    "true");
+            
+            properties
+                    .setProperty(
+                            com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                            NoAxioms.class.getName());
+            
+        }
+
+        if (log.isInfoEnabled())
+            log.info("quads=" + quads);
+
         return properties;
 
     }
@@ -198,7 +225,11 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
+            
+            if (BigdataStatics.debug)
+                System.err.println("\n-------LRUNexus after test:" + getName()
+                        + "--------" + LRUNexus.INSTANCE.toString());
 
         }
 
@@ -227,8 +258,12 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
+            if (BigdataStatics.debug)
+                System.err.println("\n-------LRUNexus after test:" + getName()
+                        + "--------" + LRUNexus.INSTANCE.toString());
+            
         }
 
     }

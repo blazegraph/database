@@ -72,6 +72,11 @@ public interface Axioms {
     Iterator<SPO> axioms();
 
     /**
+     * <code>true</code> iff there are NO axioms.
+     */
+    boolean isNone();
+    
+    /**
      * <code>true</code> iff this set of axioms includes those for RDF Schema.
      */
     boolean isRdfSchema();

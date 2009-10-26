@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
@@ -386,7 +385,7 @@ public class TripleStoreUtility {
         
         final TempTripleStore tmp = new TempTripleStore(properties);
     
-        final StatementBuffer sb = new StatementBuffer(tmp, 100000/* capacity */);
+        final StatementBuffer<Statement> sb = new StatementBuffer<Statement>(tmp, 100000/* capacity */);
     
         final IChunkedOrderedIterator<ISPO> itr1 = new BackchainAccessPath(db,
                 db.getAccessPath(NULL, NULL, NULL)).iterator();
@@ -405,15 +404,8 @@ public class TripleStoreUtility {
     
         } finally {
     
-            try {
-                itr2.close();
-                
-            } catch (SailException ex) {
-                
-                throw new RuntimeException(ex);
-                
-            }
-    
+            itr2.close();
+            
         }
     
         sb.flush();

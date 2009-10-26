@@ -31,6 +31,7 @@ package com.bigdata.relation.rule;
 import java.util.Arrays;
 
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * A generic implementation of an immutable {@link IPredicate}.
@@ -40,11 +41,11 @@ import com.bigdata.relation.accesspath.IElementFilter;
  */
 public class Predicate<E> implements IPredicate<E> {
 
-    public Predicate<E> copy() {
-        
-        return new Predicate(this, relationName);
-        
-    }
+//    public Predicate<E> copy() {
+//        
+//        return new Predicate(this, relationName);
+//        
+//    }
     
     /**
      * 
@@ -323,10 +324,20 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
 
-    public IVariableOrConstant get(int index) {
+    public IVariableOrConstant<?> get(final int index) {
         
         return values[index];
         
+    }
+
+    /**
+     * @todo there is no general means available to implement this method of an
+     *       awareness of the internal structure of the element type.
+     */
+    public IConstant<?> get(final E e, final int index) {
+
+        throw new UnsupportedOperationException();
+
     }
 
     final public boolean isOptional() {
@@ -353,12 +364,36 @@ public class Predicate<E> implements IPredicate<E> {
         
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * @deprecated by {@link #isFullyBound()}
+     */
     final public boolean isFullyBound() {
 
-        return false;
+        return nvars == 0;
+
+    }
+
+    public boolean isFullyBound(final IKeyOrder<E> keyOrder) {
+        
+        return getVariableCount(keyOrder) == 0;
         
     }
 
+    public int getVariableCount(final IKeyOrder<E> keyOrder) {
+        int nunbound = 0;
+        final int keyArity = keyOrder.getKeyArity();
+        for (int keyPos = 0; keyPos < keyArity; keyPos++) {
+            final int index = keyOrder.getKeyOrder(keyPos);
+            final IVariableOrConstant<?> t = get(index);
+            if (t == null || t.isVar()) {
+                nunbound++;
+            }
+        }
+        return nunbound;
+    }
+    
     /**
      * Returns an ordered array of the values for this predicate with the given
      * bindings overriding any unbound variables.

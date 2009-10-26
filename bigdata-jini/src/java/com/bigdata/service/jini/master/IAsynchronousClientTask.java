@@ -59,7 +59,7 @@ public interface IAsynchronousClientTask<U, V> extends Remote {
 //     * {@inheritDoc}
 //     */
 //    public U call() throws Exception;
-    
+
     /**
      * Accept a chunk of resources for processing. The client may block while it
      * is accepting the chunk, but SHOULD NOT process the resources within this

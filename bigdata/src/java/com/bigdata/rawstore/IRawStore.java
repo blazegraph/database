@@ -29,8 +29,11 @@ package com.bigdata.rawstore;
 
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
+import com.bigdata.cache.IGlobalLRU;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.IResourceMetadata;
@@ -44,23 +47,22 @@ import com.bigdata.mdi.IResourceMetadata;
  * identifiers.
  * </p>
  * <p>
- * The {@link AbstractJournal} is the principle implementation of this interface
+ * The {@link AbstractJournal} is the principal implementation of this interface
  * and provides both transient and durable options and the facilities for atomic
  * commit. {@link BTree} provides a higher level interface for operations on an
  * {@link IRawStore} and uses a copy-on-write policy designed to support
  * transactional semantics by making it possible to read from a consistent
  * historical state. The {@link AbstractJournal} provides the necessary
- * mechansims to support transactions based on the copy-on-write semantics of
+ * mechanisms to support transactions based on the copy-on-write semantics of
  * the {@link BTree}.
  * </p>
  * <p>
  * The {@link IRawStore} supports write and read back on immutable addresses and
  * does NOT directly support update of data for an immutable address once that
  * data has been written. Applications seeking Create, Read, Update, Delete
- * (CRUD) semantics should use a {@link BTree} to map from persistent object
- * identifiers to their application data objects. Unlike this interface, the
- * {@link BTree} can correctly support update and delete of application data
- * using a persistent identifier.
+ * (CRUD) semantics should use a {@link BTree} to store their application data.
+ * Unlike this interface, the {@link BTree} can correctly support update and
+ * delete of application data using a persistent identifier (the key).
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -76,7 +78,7 @@ import com.bigdata.mdi.IResourceMetadata;
  *       possible and will require a means to allocate, release, and reallocate
  *       chunks of varying sizes within the store. Those chunks may either be
  *       drawn from a set of fixed sized allocation pools spanning a variety of
- *       useful record sizes or can use a stategy where records are allocated on
+ *       useful record sizes or can use a strategy where records are allocated on
  *       an exact fit basis the first time and reallocated on a best/good fit
  *       basis. A free list can offer fast best-fit or good fit access to chunks
  *       in the store that are available for reuse. Any such approach must
@@ -87,14 +89,15 @@ import com.bigdata.mdi.IResourceMetadata;
  *       current transaction (a gc strategy). This would make it possible for us
  *       to implement a scale up store based on a single monolithic file.
  * 
- * FIXME The use of the {@link ByteBuffer} in this API has become limiting. It
- * would be nicer to specify a byte[] with optional offset and length
- * parameters. This would make it easier to wrap the byte[] in different ways
- * for reading and writing. The {@link ByteBuffer} has an advantage when reading
- * since it allows us to return a read-only view of the record, but in practice
- * that is only effective for an in-memory store (with or without a backing
- * file). The byte[] is more flexible.  The caller is free to reuse the byte[]
- * and the store always copies the data.
+ *       FIXME The use of the {@link ByteBuffer} in this API has become
+ *       limiting. It would be nicer to specify a byte[] with optional offset
+ *       and length parameters. This would make it easier to wrap the byte[] in
+ *       different ways for reading and writing. The {@link ByteBuffer} has an
+ *       advantage when reading since it allows us to return a read-only view of
+ *       the record, but in practice that is only effective for an in-memory
+ *       store (with or without a backing file). The byte[] is more flexible.
+ *       The caller is free to reuse the byte[] and the store always copies the
+ *       data.
  */
 public interface IRawStore extends IAddressManager, IStoreSerializer {
     
@@ -224,17 +227,19 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      *             if the store is not open.
      */
     public boolean isReadOnly();
-    
+
     /**
-     * Close the store immediately.
+     * Close the store immediately, but does not clear any records for the store
+     * from the {@link IGlobalLRU}.
      * 
      * @exception IllegalStateException
      *                if the store is not open.
      */
     public void close();
-    
+
     /**
-     * Deletes the backing file(s) (if any).
+     * Deletes the backing file(s) (if any) and clears any records for the store
+     * from the {@link IGlobalLRU}.
      * 
      * @exception IllegalStateException
      *                if the store is open.
@@ -243,9 +248,10 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      *                if the backing file exists and could not be deleted.
      */
     public void deleteResources();
-    
+
     /**
-     * Closes the store immediately and deletes its persistent resources.
+     * Closes the store immediately, deletes its persistent resources, and
+     * clears any records for the store from the {@link IGlobalLRU}.
      * 
      * @see #deleteResources()
      */
@@ -256,7 +262,13 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      * for the store.
      */
     public File getFile();
-    
+
+    /**
+     * Return the {@link UUID} which identifies this {@link IRawStore}. This
+     * supports both {@link #getResourceMetadata()} and the {@link LRUNexus}.
+     */
+    public UUID getUUID();
+
     /**
      * A description of this store in support of the scale-out architecture.
      */
@@ -276,7 +288,7 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      * life cycle of the store, e.g., to conserve memory a store may drop or
      * decrease its buffer if it is backed by disk.
      * <p>
-     * Note: This does not guarentee that the OS will not swap the buffer onto
+     * Note: This does not guarantee that the OS will not swap the buffer onto
      * disk.
      * 
      * @exception IllegalStateException
@@ -286,7 +298,7 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
     
     /**
      * Force the data to stable storage. While this is NOT sufficient to
-     * guarentee an atomic commit, the data must be forced to disk as part of an
+     * guarantee an atomic commit, the data must be forced to disk as part of an
      * atomic commit protocol.
      * 
      * @param metadata

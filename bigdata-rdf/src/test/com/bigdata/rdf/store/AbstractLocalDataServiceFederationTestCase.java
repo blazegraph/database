@@ -35,6 +35,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -85,6 +86,10 @@ abstract public class AbstractLocalDataServiceFederationTestCase extends TestCas
         // disable moves.
         properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"0");
         
+        // disable platform statistics collection.
+        properties.setProperty(
+                EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+
         return properties;
         
     }

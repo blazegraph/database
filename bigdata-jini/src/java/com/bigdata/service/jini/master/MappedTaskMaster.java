@@ -43,7 +43,6 @@ import com.bigdata.btree.BigdataMap;
 import com.bigdata.btree.BigdataSet;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.rdf.load.RDFDataLoadMaster;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniFederation;
@@ -122,12 +121,16 @@ V extends Serializable//
          */
         String PENDING_SET_MASTER_INITIAL_CAPACITY = "pendingSetMasterInitialCapacity";
 
+        int DEFAULT_PENDING_SET_MASTER_INITIAL_CAPACITY = 16;
+
         /**
          * The initial capacity of the pending {@link Set} for each client -or-
          * {@link Integer#MAX_VALUE} to use a {@link BigdataSet}.
          */
         String PENDING_SET_SUBTASK_INITIAL_CAPACITY = "pendingSetSubtaskInitialCapacity";
    
+        int DEFAULT_PENDING_SET_SUBTASK_INITIAL_CAPACITY = 16;
+
         /**
          * The hash function used to assign resources to client tasks.
          */
@@ -253,15 +256,19 @@ V extends Serializable//
                     component, ConfigurationOptions.RESOURCE_SCANNER_FACTORY,
                     IResourceScannerFactory.class);
 
-            pendingSetMasterInitialCapacity = (Integer) config.getEntry(
-                    component,
-                    ConfigurationOptions.PENDING_SET_MASTER_INITIAL_CAPACITY,
-                    Integer.TYPE, Integer.MAX_VALUE);
+            pendingSetMasterInitialCapacity = (Integer) config
+                    .getEntry(
+                            component,
+                            ConfigurationOptions.PENDING_SET_MASTER_INITIAL_CAPACITY,
+                            Integer.TYPE,
+                            ConfigurationOptions.DEFAULT_PENDING_SET_MASTER_INITIAL_CAPACITY);
 
-            pendingSetSubtaskInitialCapacity = (Integer) config.getEntry(
-                    component,
-                    ConfigurationOptions.PENDING_SET_SUBTASK_INITIAL_CAPACITY,
-                    Integer.TYPE, Integer.MAX_VALUE);
+            pendingSetSubtaskInitialCapacity = (Integer) config
+                    .getEntry(
+                            component,
+                            ConfigurationOptions.PENDING_SET_SUBTASK_INITIAL_CAPACITY,
+                            Integer.TYPE,
+                            ConfigurationOptions.DEFAULT_PENDING_SET_SUBTASK_INITIAL_CAPACITY);
 
             clientHashFunction = (IHashFunction) config.getEntry(component,
                     ConfigurationOptions.CLIENT_HASH_FUNCTION,
@@ -278,7 +285,7 @@ V extends Serializable//
     /**
      * {@inheritDoc}
      */
-    public MappedTaskMaster(JiniFederation fed) throws ConfigurationException {
+    public MappedTaskMaster(JiniFederation<?> fed) throws ConfigurationException {
 
         super(fed);
 
@@ -315,7 +322,7 @@ V extends Serializable//
             // await scanner future.
             final Long acceptCount = scannerFuture.get();
 
-            System.err.println("Master accepted " + acceptCount
+            System.out.println("Master accepted " + acceptCount
                     + " resources for processing.");
 
             // close the buffer - no more resources will be queued.
@@ -376,13 +383,26 @@ V extends Serializable//
             @Override
             public void didSucceed(final V resource) {
                 super.didSucceed(resource);
-                if(getJobState().deleteAfter) {
-                    if(resource instanceof File) {
-                        ((File)resource).delete();
+                if (getJobState().deleteAfter) {
+                    if (resource instanceof File) {
+                        final File file = (File) resource;
+                        if (!file.delete() && file.exists()) {
+                            log.warn("Could not delete file: " + resource);
+                        }
                     }
                 }
             }
-            
+
+            /*
+             * Overridden to log the error here rather than on the
+             * AbstractPendingSetMaster's log.
+             */
+            @Override
+            public void didFail(final V resource,final Throwable t) {
+                log.error(resource,t);
+//                super.didFail(resource,t);
+            }
+
         };
 
         final Future<? extends ResourceBufferStatistics> future = getFederation()

@@ -232,7 +232,10 @@ public class Concurrency {
             cxn.setAutoCommit(false);
             
             try {
-                long stmtsBefore = cxn.size();
+                // fast range count!
+                long stmtsBefore = ((BigdataSailRepository)repo).getDatabase().getStatementCount();
+//                // full index scan!
+//                long stmtsBefore = cxn.size();
                 log.info("statements before: " + stmtsBefore);
                 long start = System.currentTimeMillis();
                 
@@ -276,7 +279,9 @@ public class Concurrency {
                 
                 // gather statistics
                 long elapsed = System.currentTimeMillis() - start;
-                long stmtsAfter = cxn.size();
+                // fast range count!
+                long stmtsAfter = ((BigdataSailRepository)repo).getDatabase().getStatementCount();
+//                long stmtsAfter = cxn.size();
                 long stmtsAdded = stmtsAfter - stmtsBefore;
                 int throughput =
                         (int) ((double) stmtsAdded / (double) elapsed * 1000d);

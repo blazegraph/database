@@ -124,38 +124,6 @@ public interface IAddressManager {
      */
     public long unpackAddr(DataInput in) throws IOException;
 
-//    /**
-//     * Pack a vector of addresses onto the output stream.
-//     * 
-//     * @param out
-//     *            The output stream.
-//     * @param addrs
-//     *            The vector of addresses.
-//     * @param off
-//     *            The index of the first address to pack.
-//     * @param len
-//     *            The #of addresses to pack.
-//     */
-//    public void packAddr(DataOutput out, long[] addrs, int off, int len)
-//            throws IOException;
-//    
-//    /**
-//     * Unpack a vector of addresses from the input stream onto the provided
-//     * array.
-//     * 
-//     * @param out
-//     *            The input stream.
-//     * @param addrs
-//     *            The array onto which the unpacked addresses will be written.
-//     * @param off
-//     *            The index into the array at which the first address will be
-//     *            written.
-//     * @param len
-//     *            The #of addresses to unpack.
-//     */
-//    public void unpackAddr(DataInput in, long[] addrs, int off, int len)
-//            throws IOException;
-    
     /**
      * A human readable representation of the address.
      * 

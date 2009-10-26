@@ -305,7 +305,7 @@ public class TestIRIS extends AbstractInferenceEngineTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         

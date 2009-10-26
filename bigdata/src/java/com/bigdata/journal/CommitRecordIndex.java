@@ -580,7 +580,7 @@ public class CommitRecordIndex extends BTree {
         /**
          * Used to (de-)serialize {@link Entry}s (NOT thread-safe).
          */
-        private final Entry.EntrySerializer ser;
+        private final transient Entry.EntrySerializer ser;
         
         /**
          * De-serialization ctor.

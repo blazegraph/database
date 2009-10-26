@@ -108,7 +108,7 @@ public class LeafTupleIterator implements ITupleIterator {
 
             if (fromKey != null) {
 
-                fromIndex = leaf.keys.search(fromKey);
+                fromIndex = leaf.getKeys().search(fromKey);
 
                 if (fromIndex < 0) {
 
@@ -132,7 +132,7 @@ public class LeafTupleIterator implements ITupleIterator {
 
             if (toKey != null) {
 
-                toIndex = leaf.keys.search(toKey);
+                toIndex = leaf.getKeys().search(toKey);
 
                 if (toIndex < 0) {
 
@@ -142,7 +142,7 @@ public class LeafTupleIterator implements ITupleIterator {
 
             } else {
 
-                toIndex = leaf.nkeys;
+                toIndex = leaf.getKeyCount();
 
             }
 
@@ -182,7 +182,7 @@ public class LeafTupleIterator implements ITupleIterator {
              */
             if (leaf.hasDeleteMarkers()
                     && ((tuple.flags() & IRangeQuery.DELETED) == 0)
-                    && leaf.deleteMarkers[index]) {
+                    && leaf.getDeleteMarker(index)) {
                 
                 // skipping a deleted version.
                 

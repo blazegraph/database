@@ -79,7 +79,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
             assertEquals(store, buffer.getDatabase());
             assertTrue(buffer.distinct);
             assertEquals(capacity, buffer.capacity);
-            assertEquals(capacity * IRawTripleStore.N, buffer.values.length);
+            assertEquals(capacity * store.getSPOKeyArity(), buffer.values.length);
             assertEquals(capacity, buffer.stmts.length);
             assertEquals(0, buffer.numURIs);
             assertEquals(0, buffer.numLiterals);
@@ -88,7 +88,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -173,7 +173,7 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 

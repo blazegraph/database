@@ -26,21 +26,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.magic;
 
-import java.io.IOException;
-
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -94,7 +88,7 @@ public class MagicIndexWriteProc extends AbstractKeyArrayIndexProcedure implemen
      * @param keys
      * @param vals
      */
-    protected MagicIndexWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+    protected MagicIndexWriteProc(IRabaCoder keySer, IRabaCoder valSer,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, vals);
@@ -120,8 +114,8 @@ public class MagicIndexWriteProc extends AbstractKeyArrayIndexProcedure implemen
             
         }
         
-        public MagicIndexWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
+        public MagicIndexWriteProc newInstance(IRabaCoder keySer,
+                IRabaCoder valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
 
             return new MagicIndexWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);

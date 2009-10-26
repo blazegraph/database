@@ -27,10 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import info.aduna.iteration.CloseableIteration;
+
 import java.util.Properties;
 
 import junit.extensions.proxy.IProxyTest;
 import junit.framework.Test;
+
+import org.openrdf.model.Resource;
 
 
 /**
@@ -179,6 +183,77 @@ public abstract class ProxyBigdataSailTestCase
      */
     protected BigdataSail reopenSail(BigdataSail sail) {
         return getOurDelegate().reopenSail(sail);
+    }
+
+    /**
+     * Verifies that the iterator visits the specified objects in some arbitrary
+     * ordering and that the iterator is exhausted once all expected objects
+     * have been visited. The implementation uses a selection without
+     * replacement "pattern".
+     */
+    static public void assertSameIterationAnyOrder(
+            final Resource[] expected,
+            final CloseableIteration<?, ? extends Exception> actual)
+            throws Exception {
+
+        assertSameIterationAnyOrder("", expected, actual);
+
+    }
+
+    /**
+     * Verifies that the iterator visits the specified objects in some arbitrary
+     * ordering and that the iterator is exhausted once all expected objects
+     * have been visited. The implementation uses a selection without
+     * replacement "pattern".
+     */
+    @SuppressWarnings("unchecked")
+    static public void assertSameIterationAnyOrder(String msg,
+            final Resource[] expected,
+            final CloseableIteration<?, ? extends Exception> actual)
+            throws Exception {
+
+        // Populate a map that we will use to realize the match and
+        // selection without replacement logic.
+
+        final int nrange = expected.length;
+
+        final java.util.Map range = new java.util.HashMap();
+
+        for (int j = 0; j < nrange; j++) {
+
+            range.put(expected[j], expected[j]);
+
+        }
+
+        // Do selection without replacement for the objects visited by
+        // iterator.
+
+        for (int j = 0; j < nrange; j++) {
+
+            if (!actual.hasNext()) {
+
+                fail(msg + ": Index exhausted while expecting more object(s)"
+                        + ": index=" + j);
+
+            }
+
+            final Object actualObject = actual.next();
+
+            if (range.remove(actualObject) == null) {
+
+                fail("Object not expected" + ": index=" + j + ", object="
+                        + actualObject);
+
+            }
+
+        }
+
+        if (actual.hasNext()) {
+
+            fail("Iterator will deliver too many objects.");
+
+        }
+
     }
 
 }

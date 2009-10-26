@@ -159,12 +159,10 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
      * Writes the URL of the local httpd service for the {@link DataService}
      * onto a file named <code>httpd.url</code> in the specified directory.
      */
-    protected void logHttpdURL(final File dir) {
-
-        final File httpdURLFile = new File(dir, "httpd.url");
+    protected void logHttpdURL(final File file) {
 
         // delete in case old version exists.
-        httpdURLFile.delete();
+        file.delete();
 
         final String httpdURL = service.getFederation().getHttpdURL();
 
@@ -172,8 +170,7 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
 
             try {
 
-                final Writer w = new BufferedWriter(
-                        new FileWriter(httpdURLFile));
+                final Writer w = new BufferedWriter(new FileWriter(file));
 
                 try {
 
@@ -187,7 +184,7 @@ public class DefaultServiceFederationDelegate<T extends AbstractService>
 
             } catch (IOException ex) {
 
-                log.warn("Problem writing httpdURL on file: " + httpdURLFile);
+                log.warn("Problem writing httpdURL on file: " + file);
 
             }
 

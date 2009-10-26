@@ -134,7 +134,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
     protected static transient final int DEFAULT_CACHE_CAPACITY = 10;
 
     /**
-     * The default timeout for stale entries.
+     * The default timeout for stale entries in milliseconds.
      */
     protected static transient final long DEFAULT_CACHE_TIMEOUT = (60 * 1000);
 
@@ -164,7 +164,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      * @param cacheCapacity
      *            The capacity of the internal weak value cache.
      * @param cacheTimeout
-     *            The timeout for stale entries in that cache.
+     *            The timeout in milliseconds for stale entries in that cache.
      */
     public DefaultResourceLocator(final IIndexManager indexManager,
             final IResourceLocator<T> delegate, final int cacheCapacity,
@@ -181,6 +181,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
     }
 
+    // @todo hotspot 2% total query time.
     public T locate(final String namespace, final long timestamp) {
 
         if (namespace == null)
@@ -192,7 +193,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
 
         }
 
-        // test cache.
+        // test cache: hotspot 93% of method time.
         T resource = get(namespace, timestamp);
 
         if (resource != null) {
@@ -473,7 +474,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> extends
      *       historical views as any changes would only apply to views whose
      *       commit time was after the change to the global row store.
      */
-    protected Properties locateResourceOn(IIndexManager indexManager,
+    protected Properties locateResourceOn(final IIndexManager indexManager,
             final String namespace, final long timestampIsIgnored) {
 
         if (INFO) {

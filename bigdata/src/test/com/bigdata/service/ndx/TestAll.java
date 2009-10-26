@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.ndx;
 
+import com.bigdata.service.TestBasicIndexStuff;
+import com.bigdata.service.TestEmbeddedClient;
+import com.bigdata.service.TestRangeQuery;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -61,8 +65,19 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("scale-out indices");
 
+        // test splitting client requests against index partition locators.
         suite.addTestSuite(TestSplitter.class);
 
+        // client basics, including static partitioning of indices.
+        suite.addTestSuite(TestEmbeddedClient.class);
+
+        // test basic index operations.
+        suite.addTestSuite(TestBasicIndexStuff.class);
+
+        // test range iterators (within and across index partitions).
+        suite.addTestSuite(TestRangeQuery.class);
+
+        // unit tests for the streaming index write API.
         suite.addTest(com.bigdata.service.ndx.pipeline.TestAll.suite());
 
         return suite;

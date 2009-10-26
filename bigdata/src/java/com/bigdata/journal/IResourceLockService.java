@@ -28,7 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import com.bigdata.concurrent.TimeoutException;
+import java.util.concurrent.TimeoutException;
+
 import com.bigdata.relation.AbstractResource;
 
 /**
@@ -93,11 +94,10 @@ public interface IResourceLockService {
      * 
      * @return The lock.
      * 
-     * @throws RuntimeException
-     *             wrapping {@link InterruptedException} or
-     *             {@link TimeoutException}
+     * @throws TimeoutException
+     * @throws InterruptedException
      */
     public IResourceLock acquireLock(String namespace, long timeout)
-            throws InterruptedException;
+            throws InterruptedException, TimeoutException;
 
 }

@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.zookeeper;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.jini.start.BigdataZooDefs;
@@ -46,13 +49,9 @@ final public class ZooResourceLockService implements IResourceLockService {
 
     final static protected Logger log = Logger.getLogger(ZooResourceLockService.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
+    private final JiniFederation<?> fed;
 
-    final static protected boolean DEBUG = log.isDebugEnabled();
-    
-    private final JiniFederation fed;
-
-    public ZooResourceLockService(final JiniFederation fed) {
+    public ZooResourceLockService(final JiniFederation<?> fed) {
 
         if (fed == null)
             throw new IllegalArgumentException();
@@ -71,12 +70,21 @@ final public class ZooResourceLockService implements IResourceLockService {
             
             throw new RuntimeException(t);
             
+        } catch (TimeoutException t) {
+
+            /*
+             * Note: TimeoutException should not be thrown with
+             * timeout=MAX_LONG.
+             */
+
+            throw new RuntimeException(t);
+            
         }
         
     }
 
     public IResourceLock acquireLock(final String namespace,
-            final long timeout) throws InterruptedException {
+            final long timeout) throws InterruptedException, TimeoutException {
     
         try {
             
@@ -86,12 +94,12 @@ final public class ZooResourceLockService implements IResourceLockService {
             final ZLock zlock = ZLockImpl.getLock(fed.getZookeeper(), zpath,
                     fed.getZooConfig().acl);
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Acquiring zlock: " + zlock);
             
-            zlock.lock();
+            zlock.lock(timeout, TimeUnit.MILLISECONDS);
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Granted zlock: " + zlock);
             
             return new IResourceLock() {
@@ -113,6 +121,10 @@ final public class ZooResourceLockService implements IResourceLockService {
             };
             
         } catch (InterruptedException t) {
+            
+            throw t;
+
+        } catch (TimeoutException t) {
             
             throw t;
             

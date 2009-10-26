@@ -347,7 +347,7 @@ public class TestRuleExpansion extends AbstractInferenceEngineTestCase {
 
         } finally {
             
-            db.closeAndDelete();
+            db.__tearDownUnitTest();
             
         }
         

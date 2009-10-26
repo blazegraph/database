@@ -58,7 +58,7 @@ public class TestTempTripleStore extends AbstractTestCase {
          * Use a proxy test suite and specify the delegate.
          */
 
-        ProxyTestSuite suite = new ProxyTestSuite(delegate,
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
                 "Temporary Triple Store Test Suite");
 
         /*
@@ -71,7 +71,11 @@ public class TestTempTripleStore extends AbstractTestCase {
          * this test class and its optional .properties file.
          */
         
+        // basic test suite.
         suite.addTest(TestTripleStoreBasics.suite());
+        
+        // rules, inference, and truth maintenance test suite.
+        suite.addTest( com.bigdata.rdf.rules.TestAll.suite() );
 
         return suite;
 

@@ -24,9 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.rules;
 
-import java.io.Serializable;
-
-import org.apache.log4j.Logger;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
@@ -36,7 +33,6 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.Vocabulary;
-import com.bigdata.relation.accesspath.IElementFilter;
 
 /**
  * Filter keeps matched triple patterns generated OUT of the database.
@@ -53,13 +49,11 @@ import com.bigdata.relation.accesspath.IElementFilter;
  */
 public class DoNotAddFilter extends SPOFilter {
 
-    protected static final Logger log = Logger.getLogger(DoNotAddFilter.class);
-    
-    protected static final boolean INFO = log.isInfoEnabled();
-    
-    protected static final boolean DEBUG = log.isDebugEnabled();
-    
-    
+//    protected static final Logger log = Logger.getLogger(DoNotAddFilter.class);
+//    
+//    protected static final boolean INFO = log.isInfoEnabled();
+//    
+//    protected static final boolean DEBUG = log.isDebugEnabled();
     
     /**
      * 
@@ -123,7 +117,15 @@ public class DoNotAddFilter extends SPOFilter {
             return true;
             
         }
-        
+
+//        if (spo.isOverride()) {
+//            
+//            // Accept all statements with the override flag set.
+//            
+//            return true;
+//            
+//        }
+
         if( axioms.isAxiom(spo.s(), spo.p(), spo.o())) {
             
             /*

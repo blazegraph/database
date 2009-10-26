@@ -50,7 +50,7 @@ public class ScaleOut {
     /**
      * The name of the triple store instance inside the scale-out database.
      */
-    private static final String namespace = "kb";
+    private static final String namespace = "kb2";
     
     /**
      * A query asking for the full professors instances.
@@ -302,7 +302,10 @@ public class ScaleOut {
             cxn.setAutoCommit(false);
             
             try {
-                long stmtsBefore = cxn.size();
+                // fast range count!
+                long stmtsBefore = ((BigdataSailRepository)repo).getDatabase().getStatementCount();
+                // full index scan!
+//                long stmtsBefore = cxn.size();
                 log.info("statements before: " + stmtsBefore);
                 long start = System.currentTimeMillis();
                 
@@ -346,7 +349,10 @@ public class ScaleOut {
                 
                 // gather statistics
                 long elapsed = System.currentTimeMillis() - start;
-                long stmtsAfter = cxn.size();
+                // fast range count!
+                long stmtsAfter = ((BigdataSailRepository)repo).getDatabase().getStatementCount();
+//                // full index scan!
+//                long stmtsAfter = cxn.size();
                 long stmtsAdded = stmtsAfter - stmtsBefore;
                 int throughput =
                         (int) ((double) stmtsAdded / (double) elapsed * 1000d);

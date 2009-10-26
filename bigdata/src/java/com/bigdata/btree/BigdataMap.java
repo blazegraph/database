@@ -158,7 +158,7 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
         this.toKey = toKey;
         
     }
-    
+
     /**
      * This method imposes an optional key-range restriction on sub-map
      * operations.
@@ -167,11 +167,11 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
      *            The key.
      * 
      * @param allowUpperBound
-     *            <code>true</code> iff the <i>key</i> represents an
-     *            inclusive upper bound and thus must be allowed to be LTE to
-     *            the right separator key for the index partition. For example,
-     *            this would be <code>true</code> for the <i>toKey</i>
-     *            parameter on rangeCount or rangeIterator methods.
+     *            <code>true</code> iff the <i>key</i> represents an inclusive
+     *            upper bound and thus must be allowed to be LTE to the right
+     *            separator key for the index partition. For example, this would
+     *            be <code>true</code> for the <i>toKey</i> parameter on
+     *            rangeCount or rangeIterator methods.
      * 
      * @return <code>true</code> always.
      * 
@@ -179,6 +179,11 @@ public class BigdataMap<K, V> extends AbstractMap<K, V> implements SortedMap<K, 
      *             if the <i>key</i> is <code>null</code>
      * @throws RuntimeException
      *             if the <i>key</i> does not lie within the legal key range.
+     * 
+     * @deprecated for greater efficiency, the key should be encoded first, then
+     *             invoke {@link #rangeCheck(byte[], boolean)} instead of this
+     *             method and finally pass along the encoded key/val pair to the
+     *             backing {@link IIndex} implementation.
      */
     private boolean rangeCheck(final Object key, boolean allowUpperBound) {
 

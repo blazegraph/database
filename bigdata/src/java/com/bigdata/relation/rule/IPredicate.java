@@ -42,6 +42,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.DataService;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * An immutable constraint on the elements visited using an {@link IAccessPath}.
@@ -172,17 +173,41 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      * An optional constraint on the visitable elements.
      */
     public IElementFilter<E> getConstraint();
-    
+
     /**
-     * Return true iff all arguments of the predicate are bound (vs
-     * variables).
+     * Return true iff all arguments of the predicate are bound (vs variables).
+     * 
+     * @deprecated by {@link #isFullyBound(IKeyOrder)}
      */
     public boolean isFullyBound();
-    
+
     /**
-     * The #of arguments in the predicate that are variables (vs constants).
+     * Figure out if all positions in the predicate which are required to form
+     * the key for this access path are bound in the predicate.
+     * <p>
+     * Note: This is more correct than {@link IPredicate#isFullyBound()} since
+     * the latter does not know which the slots in the predicate are required
+     * for the specified key order.
+     */
+    public boolean isFullyBound(IKeyOrder<E> keyOrder);
+
+    /**
+     * The #of arguments in the predicate that are variables.
+     * 
+     * @see #getVariableCount(IKeyOrder)
      */
     public int getVariableCount();
+
+    /**
+     * The #of arguments in the predicate required for the specified
+     * {@link IKeyOrder} which are unbound.
+     * 
+     * @param keyOrder
+     *            The key order.
+     *            
+     * @return The #of unbound arguments for that {@link IKeyOrder}.
+     */
+    public int getVariableCount(IKeyOrder<E> keyOrder);
     
     /** The #of slots in the predicate. */
     public int arity();
@@ -200,6 +225,28 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      *             the {@link IPredicate}.
      */
     public IVariableOrConstant get(int index);
+
+    /**
+     * Return the asBound value at the specified index for the given element.
+     * This method does not consider the bindings of the predicate instance.
+     * <p>
+     * Note: there is no general means available to implement this method of an
+     * awareness of the internal structure of the element type. General purpose
+     * record types, such as GOM or relation records, can generally implement
+     * this method in the context of the "schema" imposed by the predicate.
+     * 
+     * @param e
+     *            The element.
+     * @param index
+     *            The index.
+     * 
+     * @return The value.
+     * 
+     * @throws UnsupportedOperationException
+     *             If this operation is not supported by the {@link IPredicate}
+     *             implementation or for the given element type.
+     */
+    public IConstant<?> get(E e, int index);
     
     /**
      * A copy of this {@link IPredicate} in which zero or more variables have
@@ -263,12 +310,12 @@ public interface IPredicate<E> extends Cloneable, Serializable {
      */
     public int hashCode();
     
-    /**
-     * Make a copy.
-     * 
-     * @return the copy
-     */
-    public IPredicate<E> copy();
-    
+//    /**
+//     * Make a copy.
+//     * 
+//     * @return the copy
+//     */
+//    public IPredicate<E> copy();
+//    
     
 }

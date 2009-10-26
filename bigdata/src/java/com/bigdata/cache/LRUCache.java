@@ -170,7 +170,7 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
      * <p>
      * The returned iterator is NOT thread safe. It supports removal but does
      * NOT support concurrent modification of the cache state. Normally the
-     * iterator is used during a commit and the framework guarentees that
+     * iterator is used during a commit and the framework guarantees that
      * concurrent
      * </p>
      */
@@ -187,7 +187,7 @@ public class LRUCache<K,T> implements ICachePolicy<K,T>
      * <p>
      * The returned iterator is NOT thread safe. It supports removal but does
      * NOT support concurrent modification of the cache state. Normally the
-     * iterator is used during a commit and the framework guarentees that
+     * iterator is used during a commit and the framework guarantees that
      * concurrent
      * </p>
      */

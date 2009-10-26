@@ -110,7 +110,7 @@ public class TestRuleOwlEquivalentProperty extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         

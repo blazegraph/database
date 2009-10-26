@@ -151,7 +151,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      * on your expectations for the #of index partitions on a journal or
      * federation.
      * <p>
-     * Note: The likelyhood of deadlock increases as (a) more locks are
+     * Note: The likelihood of deadlock increases as (a) more locks are
      * requested per task; and (b) fewer resources are available to be locked.
      * When minLocks==maxLocks==nresources then tasks will be serialized since
      * each task requires all resources in order to proceed.

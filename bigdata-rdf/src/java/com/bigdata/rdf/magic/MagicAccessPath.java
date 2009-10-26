@@ -1,6 +1,7 @@
 package com.bigdata.rdf.magic;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOAccessPath;
@@ -95,69 +96,70 @@ public class MagicAccessPath extends AbstractAccessPath<IMagicTuple> {
     
     public MagicAccessPath init() {
 
-        final MagicTupleSerializer tupleSer = getTupleSerializer();
-        
         /*
          * The minimum value that a term identifier may take on.
          */
         long MIN = Long.MIN_VALUE;
-        
         final int arity = predicate.arity();
-        
-        final long[] fromTerms = new long[arity];
-        
-        final long[] toTerms = new long[arity];
-        
         MagicKeyOrder keyOrder = (MagicKeyOrder) this.keyOrder;
-        
         int[] keyMap = keyOrder.getKeyMap();
         
-        boolean noneBound = true;
-        
-        for (int i = 0; i < arity; i++) {
+        { // do the from key
             
-            IVariableOrConstant<Long> term = predicate.get(keyMap[i]);
-            
-            if (term.isVar()) {
-                
-                fromTerms[i] = toTerms[i] = MIN;
-                
-            } else {
-                
-                fromTerms[i] = toTerms[i] = term.get();
-                
-                noneBound = false;
-                
-            }
-            
-        }
-        
-        for (int i = 0; i < arity; i++) {
-            
-            if (fromTerms[i] == MIN) {
-                
-                if (i > 0) {
-                    
-                    toTerms[i-1] = fromTerms[i-1] + 1;
-                    
-                    break;
-                    
+            IKeyBuilder keyBuilder =
+                    getTupleSerializer().getKeyBuilder().reset();
+            boolean noneBound = true;
+            for (int i = 0; i < arity; i++) {
+                IVariableOrConstant<Long> term = predicate.get(keyMap[i]);
+                long l;
+                if (term.isVar()) {
+                    l = MIN;
+                } else {
+                    l = term.get();
+                    noneBound = false;
                 }
-                
+                keyBuilder.append(l);
             }
+            final byte[] fromKey = noneBound ? null : keyBuilder.getKey();
+            setFromKey(fromKey);
             
         }
 
-        final byte[] fromKey = 
-            noneBound ? null : tupleSer.magicTuple2Key(fromTerms);
-
-        final byte[] toKey = 
-            noneBound ? null : tupleSer.magicTuple2Key(toTerms);
+        { // do the to key
+            
+            IKeyBuilder keyBuilder =
+                    getTupleSerializer().getKeyBuilder().reset();
+            boolean noneBound = true;
+            boolean foundLastBound = false;
+            for (int i = 0; i < arity; i++) {
+                IVariableOrConstant<Long> term = predicate.get(keyMap[i]);
+                long l;
+                if (term.isVar()) {
+                    l = MIN;
+                } else {
+                    l = term.get();
+                    noneBound = false;
+                    if (!foundLastBound) {
+                        if (i == arity-1) {
+                            l++;
+                            foundLastBound = true;
+                        } else {
+                            IVariableOrConstant<Long> next = 
+                                predicate.get(keyMap[i+1]);
+                            if (next.isVar()) {
+                                l++;
+                                foundLastBound = true;
+                            }
+                        }
+                    }
+                }
+                keyBuilder.append(l);
+            }
+            final byte[] toKey = noneBound ? null : keyBuilder.getKey();
+            setToKey(toKey);
+            
+        }
         
-        setFromKey(fromKey);
-
-        setToKey(toKey);
-
         super.init();
     
         return this;

@@ -175,7 +175,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
         
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 
@@ -267,7 +267,7 @@ public class TestBulkFilter extends AbstractTripleStoreTestCase {
         
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 

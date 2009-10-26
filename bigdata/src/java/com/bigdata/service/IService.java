@@ -30,7 +30,10 @@ package com.bigdata.service;
 
 import java.io.IOException;
 import java.rmi.Remote;
+import java.rmi.RemoteException;
 import java.util.UUID;
+
+import com.sun.jini.admin.DestroyAdmin;
 
 /**
  * Common service interface.
@@ -78,5 +81,14 @@ public interface IService extends Remote {
      *             since you can use this method with RMI.
      */
     String getServiceName() throws IOException;
+
+    /**
+     * Destroy the service. If the service is running, it is shutdown
+     * immediately and then destroyed. This method has the same signature as
+     * {@link DestroyAdmin#destroy()}.
+     * 
+     * @throws RemoteException
+     */
+    void destroy() throws RemoteException;
     
 }

@@ -118,7 +118,7 @@ public class TestRuleOwlInverseOf extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         
@@ -181,7 +181,7 @@ public class TestRuleOwlInverseOf extends AbstractRuleTestCase {
 
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
         

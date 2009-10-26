@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -48,8 +47,8 @@ import com.bigdata.util.InnerCause;
 /**
  * Integration provides a view of a local {@link DataService} as if it were a
  * federation. The {@link LocalDataServiceFederation} runs its own embedded
- * {@link AbstractTransactionService} and {@link LoadBalancerService} to support its
- * embedded {@link DataService}. Since there is no {@link MetadataService},
+ * {@link AbstractTransactionService} and {@link LoadBalancerService} to support
+ * its embedded {@link DataService}. Since there is no {@link MetadataService},
  * overflow processing is disabled.
  * 
  * @see LocalDataServiceClient
@@ -58,13 +57,22 @@ import com.bigdata.util.InnerCause;
  * @version $Id$
  * @param <T>
  *            The generic type of the client or service.
+ * @todo The EDS/LDS should use their own options in their own namespace to
+ *       specify the data directory for the federation. Ditto for the
+ *       "transient" or "createTempFile" properties. Everything is namespaced
+ *       now and the overridden semantics of
+ *       com.bigdata.journal.Options.CREATE_TEMP_FILE and StoreManager#DATA_DIR
+ *       are just getting us into trouble. Look at all uses of these options in
+ *       the unit tests and decouple them from the journal's options.
  */
 public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
-    private AbstractTransactionService abstractTransactionService;
-    final private ResourceLockService resourceLockManager = new ResourceLockService();
-    private LoadBalancerService loadBalancerService;
-    private LocalDataServiceImpl dataService;
+    /** The top-level directory spanning the persistent state of each service. */
+    private final File dataDir;
+    private final AbstractTransactionService abstractTransactionService;
+    private final ResourceLockService resourceLockManager = new ResourceLockService();
+    private final LoadBalancerService loadBalancerService;
+    private final LocalDataServiceImpl dataService;
 
 //    /**
 //     * There are no preconditions for a service start.
@@ -82,63 +90,84 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
         super(client);
 
         final Properties properties = client.getProperties();
-        
+
+        if (properties.getProperty(Options.DATA_DIR) == null)
+            throw new IllegalArgumentException("Required: " + Options.DATA_DIR);
+
+        dataDir = new File(properties.getProperty(Options.DATA_DIR));
+
         // indexCache
         indexCache = new DataServiceIndexCache(this, client
                 .getIndexCacheCapacity(), client.getIndexCacheTimeout());
 
-        // specify the data directory for the txService.
-        properties.setProperty(EmbeddedTransactionServiceImpl.Options.DATA_DIR,
-                new File(properties.getProperty(Options.DATA_DIR), "txService")
-                        .toString());
+        {
 
-        abstractTransactionService = new AbstractEmbeddedTransactionService(UUID.randomUUID(),
-                properties) {
-            
-            public LocalDataServiceFederation getFederation() {
-                
-                return LocalDataServiceFederation.this;
-                
-            }
-            
-//            @Override
-//            protected void setReleaseTime(final long releaseTime) {
-//                
-//                dataService.setReleaseTime(releaseTime);
-//                
-//            }
-            
-        }.start();
-        
-        /*
-         * Note: This will expose the counters for the local data service.
-         */
-        loadBalancerService = new AbstractEmbeddedLoadBalancerService(
-                UUID.randomUUID(), properties) {
-            
-            public LocalDataServiceFederation getFederation() {
-                
-                return LocalDataServiceFederation.this;
-                
-            }
-            
-        }.start();
-        
-        /*
-         * Note: The embedded data service does not support scale-out indices.
-         * Use an embedded or distributed federation for that.
-         * 
-         * @todo the UUID of the data service might be best persisted with the
-         * data service in case anything comes to rely on it, but as far as I
-         * can tell nothing does or should.
-         */
+            final Properties p = new Properties(properties);
 
-        // Disable overflow.
-        properties.setProperty(Options.OVERFLOW_ENABLED,"false");
-        
-        // create the embedded data service.
-        dataService = new LocalDataServiceImpl(properties).start();
-        
+            // specify the data directory for the txService.
+            p.setProperty(EmbeddedTransactionServiceImpl.Options.DATA_DIR,
+                    new File(dataDir, "txService").toString());
+
+            abstractTransactionService = new AbstractEmbeddedTransactionService(
+                    UUID.randomUUID(), p) {
+
+                public LocalDataServiceFederation getFederation() {
+
+                    return LocalDataServiceFederation.this;
+
+                }
+            }.start();
+
+        }
+
+        {
+            
+            final Properties p = new Properties(properties);
+
+            // set the directory for the log files.
+            p.setProperty(LoadBalancerService.Options.LOG_DIR, new File(
+                    dataDir, "lbs").toString());
+
+            /*
+             * Note: This will expose the counters for the local data service.
+             */
+            loadBalancerService = new AbstractEmbeddedLoadBalancerService(UUID
+                    .randomUUID(), p) {
+
+                public LocalDataServiceFederation getFederation() {
+
+                    return LocalDataServiceFederation.this;
+
+                }
+
+            }.start();
+
+        }
+
+        {
+            
+            final Properties p = new Properties(properties);
+
+            // set the directory for the data service.
+            p.setProperty(Options.DATA_DIR, new File(dataDir, "ds").toString());
+
+            /*
+             * Note: The embedded data service does not support scale-out
+             * indices. Use an embedded or distributed federation for that.
+             * 
+             * @todo the UUID of the data service might be best persisted with
+             * the data service in case anything comes to rely on it, but as far
+             * as I can tell nothing does or should.
+             */
+
+            // Disable overflow.
+            p.setProperty(Options.OVERFLOW_ENABLED, "false");
+
+            // create the embedded data service.
+            dataService = new LocalDataServiceImpl(p).start();
+
+        }
+
         // notify service joins.
         {
 
@@ -377,7 +406,7 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
      * the UUID for the embedded data service and <code>null</code>
      * otherwise.
      */
-    public IDataService getDataService(UUID serviceUUID) {
+    public IDataService getDataService(final UUID serviceUUID) {
 
         assertOpen();
         
@@ -433,7 +462,7 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
             dataService.shutdown();
 
-            dataService = null;
+//            dataService = null;
 
         }
 
@@ -441,7 +470,7 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
             loadBalancerService.shutdown();
 
-            loadBalancerService = null;
+//            loadBalancerService = null;
 
         }
 
@@ -449,7 +478,7 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
             abstractTransactionService.shutdown();
 
-            abstractTransactionService = null;
+//            abstractTransactionService = null;
 
         }
         
@@ -468,7 +497,7 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
             dataService.shutdownNow();
 
-            dataService = null;
+//            dataService = null;
 
         }
 
@@ -476,7 +505,7 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
             loadBalancerService.shutdownNow();
 
-            loadBalancerService = null;
+//            loadBalancerService = null;
 
         }
 
@@ -484,7 +513,7 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
 
             abstractTransactionService.shutdownNow();
 
-            abstractTransactionService = null;
+//            abstractTransactionService = null;
 
         }
         
@@ -495,38 +524,38 @@ public class LocalDataServiceFederation<T> extends AbstractFederation<T> {
      */
     public void destroy() {
 
-        assertOpen();
-
-        indexCache.shutdown();
+        super.destroy();
         
-        try {
-            
+        indexCache.shutdown();
+
+        if (dataService != null) {
+
             dataService.destroy();
-
-            dataService = null;
-            
-        } catch (IOException e) {
-
-            throw new RuntimeException(e);
             
         }
         
         if (loadBalancerService != null) {
 
-            loadBalancerService.shutdownNow();
+            loadBalancerService.destroy();
 
-            loadBalancerService = null;
+//            loadBalancerService = null;
 
         }
 
-        if(abstractTransactionService!=null) {
+        if (abstractTransactionService != null) {
 
-            abstractTransactionService.shutdownNow();
+            abstractTransactionService.destroy();
         
-            abstractTransactionService = null;
+//            abstractTransactionService = null;
             
         }
-     
+
+        if (dataDir.exists() && !dataDir.delete()) {
+
+            log.warn("Could not delete: " + dataDir);
+            
+        }
+
     }
 
     public long getLastCommitTime() {

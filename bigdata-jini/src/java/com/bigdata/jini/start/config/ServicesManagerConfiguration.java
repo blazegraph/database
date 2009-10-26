@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
-import org.apache.log4j.net.SimpleSocketServer;
 import org.apache.zookeeper.server.quorum.QuorumPeerMain;
 
 import cern.colt.Arrays;
@@ -47,7 +46,6 @@ import com.bigdata.service.jini.MetadataServer;
 import com.bigdata.service.jini.TransactionServer;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.ServiceStarter;
-import com.sun.jini.tool.ClassServer;
 
 /**
  * For the {@link ServicesManagerServer}.
@@ -106,11 +104,11 @@ public class ServicesManagerConfiguration extends BigdataServiceConfiguration {
          * {@link JavaServiceConfiguration.Options#CLASS_NAME} property is
          * explicitly specified. This makes it possible to create more than one
          * configuration of the same component. However, this only works for
-         * generic java services. The {@link SimpleSocketServer} can be started
-         * in this manner. You can also use this to run the
-         * {@link ServiceStarter} and specify the
-         * {@link NonActivatableServiceDescriptor} in the component
-         * configuration.</dd>
+         * generic java services. The
+         * {@link org.apache.log4j.net.SimpleSocketServer} can be started in
+         * this manner. You can also use this to run the {@link ServiceStarter}
+         * and specify the {@link NonActivatableServiceDescriptor} in the
+         * component configuration.</dd>
          * </dl>
          * 
          * @see ServicesManagerConfiguration#getServiceConfigurations(Configuration)

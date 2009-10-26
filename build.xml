@@ -2,6 +2,7 @@
 <!-- @todo trim fastutils using a tool to chase the actual class files that we use. -->
 <!-- @todo change the release target to put release notes into the root of the archives. -->
 <!-- @todo maven2 setup so we can run and publish unit tests results. -->
+<!-- $Id$ -->
 <project name="bigdata" default="jar" basedir=".">
 
 	<property file="build.properties" />
@@ -68,6 +69,7 @@
 	     	>
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
+			<src path="${bigdata.dir}/lgpl-utils/src/java" />
 			<src path="${bigdata.dir}/bigdata/src/java" />
 			<src path="${bigdata.dir}/bigdata-jini/src/java" />
 			<src path="${bigdata.dir}/bigdata-rdf/src/java" />
@@ -78,6 +80,7 @@
             <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
             <src path="${bigdata.dir}/bigdata-sails/src/test"/>
             -->
+			<compilerarg value="-version"/>
 		</javac>
 		<!-- copy resources. -->
 		<copy toDir="${build.dir}/classes">
@@ -105,6 +108,8 @@
 	<target name="bundleJar" depends="bundle, jar"
 		description="Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory.">
 		<copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib"/>
+		<!--<property name="myclasspath" refid="runtime.classpath" />
+		<echo message="${myclasspath}"/>-->
 	</target>
 
 	<!-- This generates the jar, but does not bundled the dependencies.
@@ -657,6 +662,20 @@ ${postInstallMessage}</echo>
 	<chmod perm="u+x,g+rx,o-rwx">
 		<fileset refid="lubm-scripts" />
 	</chmod>
+	<!-- Make sure that it is all accessible to the install group (ant 1.6+ plus extension module required). 
+	<chown file="${NAS}" type="both" owner="${install.user}.${install.group}" verbose="true"/>
+	-->
+	<!-- Works for earlier versions of ant LT 1.6 which do not bundle "chown". -->
+	<apply executable="chown" description="set owner on NAS files" osfamily="unix">
+	        <arg value="-R"/>
+	        <arg value="${install.user}.${install.group}"/>
+	        <dirset dir="${install.bin.dir}"/>
+	</apply>
+	<apply executable="chown" description="set owner on NAS files" osfamily="unix">
+	        <arg value="-R"/>
+	        <arg value="${install.user}.${install.group}"/>
+	        <dirset dir="${install.lubm.dir}"/>
+	</apply>
 </target>
 
 <target name="scale-out-sample" description="Run the scale-out sample code.">

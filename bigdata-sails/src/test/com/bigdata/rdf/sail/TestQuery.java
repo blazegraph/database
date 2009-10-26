@@ -46,7 +46,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Join;
-import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
@@ -207,14 +206,15 @@ public class TestQuery extends ProxyBigdataSailTestCase {
              * Note: a [null] DataSet will cause context to be ignored when the
              * query is processed.
              */
-            DatasetImpl dataSet = null; //new DatasetImpl();
+            final DatasetImpl dataSet = null; //new DatasetImpl();
             
-            BindingSet bindingSet = new QueryBindingSet();
+            final BindingSet bindingSet = new QueryBindingSet();
             
-            CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
+            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
                     .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
 
-            log.info("Verifying query.");
+            if (log.isInfoEnabled())
+                log.info("Verifying query.");
             
             /*
              * These are the expected results for the query (the bindings for X).
@@ -277,7 +277,7 @@ public class TestQuery extends ProxyBigdataSailTestCase {
         
         } finally {
             
-            sail.shutdownAndDelete();
+            sail.__tearDownUnitTest();
             
         }
 

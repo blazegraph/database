@@ -34,10 +34,7 @@ import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
-import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -300,7 +297,7 @@ public interface IBigdataClient<T> {
         String DEFAULT_CLIENT_MAX_PARALLEL_TASKS_PER_REQUEST = "100";
 
         /**
-         * The timeout in millseconds for a task submitting to an
+         * The timeout in milliseconds for a task submitting to an
          * {@link IDataService} (default {@value #DEFAULT_CLIENT_TASK_TIMEOUT}).
          * <p>
          * Note: Use {@value Long#MAX_VALUE} for NO timeout (the maximum value
@@ -353,7 +350,7 @@ public interface IBigdataClient<T> {
          * weak references and the control of the JVM over when they are
          * cleared. Once an {@link ILocatableResource} becomes weakly reachable,
          * the JVM will eventually GC the object. Since objects which are
-         * strongly reachable are never cleared, this provides our guarentee
+         * strongly reachable are never cleared, this provides our guarantee
          * that resources are never closed if they are in use.
          * 
          * @see #DEFAULT_LOCATOR_CACHE_CAPACITY
@@ -413,16 +410,17 @@ public interface IBigdataClient<T> {
 
         String DEFAULT_CLIENT_INDEX_CACHE_TIMEOUT = ""+(60*1000); // One minute.
 
-        /**
-         * The maximum extent for a {@link TemporaryStore} before a new
-         * {@link TemporaryStore} will be created by
-         * {@link IIndexStore#getTempStore()} for an {@link IBigdataClient}
-         * (default {@value #DEFAULT_TEMP_STORE_MAXIMUM_EXTENT}).
-         */
-        String TEMP_STORE_MAXIMUM_EXTENT = IBigdataClient.class.getName()
-                + ".tempStore.maximumExtent";
-
-        String DEFAULT_TEMP_STORE_MAXIMUM_EXTENT = "" + (5 * Bytes.gigabyte);
+        // Now handled by TemporaryStoreFactory.Options.
+//        /**
+//         * The maximum extent for a {@link TemporaryStore} before a new
+//         * {@link TemporaryStore} will be created by
+//         * {@link IIndexStore#getTempStore()} for an {@link IBigdataClient}
+//         * (default {@value #DEFAULT_TEMP_STORE_MAXIMUM_EXTENT}).
+//         */
+//        String TEMP_STORE_MAXIMUM_EXTENT = IBigdataClient.class.getName()
+//                + ".tempStore.maximumExtent";
+//
+//        String DEFAULT_TEMP_STORE_MAXIMUM_EXTENT = "" + (5 * Bytes.gigabyte);
         
         /**
          * Boolean option for the collection of statistics from the underlying
@@ -470,7 +468,7 @@ public interface IBigdataClient<T> {
          * <p>
          * Note: The httpd service for the {@link LoadBalancerService} is
          * normally run on a known port in order to make it easy to locate that
-         * service, e.g., port 80, 8000 or 8080, etc. This MUST be overriden for
+         * service, e.g., port 80, 8000 or 8080, etc. This MUST be overridden for
          * the {@link LoadBalancerService} it its configuration since
          * {@link #DEFAULT_HTTPD_PORT} will otherwise cause a random port to be
          * assigned.
@@ -479,7 +477,7 @@ public interface IBigdataClient<T> {
 
         /**
          * The default http service port is ZERO (0), which means that a random
-         * port will be choosen.
+         * port will be chosen.
          */
         String DEFAULT_HTTPD_PORT = "0";
         

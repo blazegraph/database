@@ -88,9 +88,7 @@ public class StatementWriter implements Callable<Long>{
         nwritten.addAndGet(database.addStatements(statementStore, copyOnly,
                 itr, null/* filter */));
 
-        final long elapsed = System.currentTimeMillis() - begin;
-
-        return elapsed;
+        return System.currentTimeMillis() - begin;
 
     }
 

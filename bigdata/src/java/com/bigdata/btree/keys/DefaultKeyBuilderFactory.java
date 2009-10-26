@@ -62,7 +62,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
      */
     private static final long serialVersionUID = -3285057306742134508L;
 
-    private final transient boolean icu_avail;
+//    private final transient boolean icu_avail;
     
     /**
      * The initial buffer capacity (grows as needed).
@@ -258,7 +258,7 @@ public class DefaultKeyBuilderFactory implements IKeyBuilderFactory, Serializabl
         // default capacity : @todo config by property.
         this.initialCapacity = 0;
         
-        icu_avail = isICUAvailable();
+        final boolean icu_avail = isICUAvailable();
 
         if(log.isInfoEnabled()) {
 

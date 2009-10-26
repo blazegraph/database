@@ -288,6 +288,8 @@ public class JoinStats implements Serializable {
         
     }
 
+    static private final transient String sep = ", ";
+    
     /**
      * Formats the array of {@link JoinStats} into a CSV table view.
      * 
@@ -327,28 +329,30 @@ public class JoinStats implements Serializable {
 
             final int tailIndex = order[i++];
 
-            sb.append(dateFormat.format(s.startTime).replace(",", "")+", ");
-            sb.append(rule.getName().replace(',', ' ')+", ");
-            sb.append(Integer.toString(s.orderIndex)+", ");
-//            sb.append(Integer.toString(s.partitionId)+", "); // always -1 when aggregated.
-            // keyOrder aka evaluation order.
-            sb.append(ruleState.getKeyOrder()[tailIndex].toString().replace(",", ""));
-            sb.append(ruleState.getNVars()[tailIndex]);
-            sb.append(ruleState.getPlan().rangeCount(tailIndex));
-            sb.append(Integer.toString(s.fanIn)+", ");
-            sb.append(Integer.toString(s.fanOut)+", ");
-            sb.append(Integer.toString(s.partitionCount)+", ");
-            sb.append(Long.toString(s.bindingSetChunksIn)+", ");
-            sb.append(Long.toString(s.bindingSetsIn)+", ");
-            sb.append(Long.toString(s.accessPathCount)+", ");
-            sb.append(Long.toString(s.accessPathDups)+", ");
-            sb.append(Long.toString(s.chunkCount)+", ");
-            sb.append(Long.toString(s.elementCount)+", ");
-            sb.append(Long.toString(s.bindingSetsOut)+", ");
-            sb.append(Long.toString(s.bindingSetChunksOut)+", ");
-            sb.append(Long.toString(s.mutationCount.get())+", ");
-            sb.append(Integer.toString(tailIndex)+", ");
-            sb.append(rule.getTail(tailIndex).toString().replace(",", "")+"\n");
+            final String ruleNameStr = "\"" + rule.getName().replace(',', ' ')
+                    + "\"";
+
+            sb.append(dateFormat.format(s.startTime).replace(sep, " ")+sep);
+            sb.append(ruleNameStr + sep);
+            sb.append(Integer.toString(s.orderIndex)+sep);
+//            sb.append(Integer.toString(s.partitionId)+sep); // always -1 when aggregated.
+            sb.append(ruleState.getKeyOrder()[tailIndex].toString().replace(sep, " ")+sep);
+            sb.append(ruleState.getNVars()[tailIndex]+sep);
+            sb.append(ruleState.getPlan().rangeCount(tailIndex)+sep);
+            sb.append(Integer.toString(s.fanIn)+sep);
+            sb.append(Integer.toString(s.fanOut)+sep);
+            sb.append(Integer.toString(s.partitionCount)+sep);
+            sb.append(Long.toString(s.bindingSetChunksIn)+sep);
+            sb.append(Long.toString(s.bindingSetsIn)+sep);
+            sb.append(Long.toString(s.accessPathCount)+sep);
+            sb.append(Long.toString(s.accessPathDups)+sep);
+            sb.append(Long.toString(s.chunkCount)+sep);
+            sb.append(Long.toString(s.elementCount)+sep);
+            sb.append(Long.toString(s.bindingSetsOut)+sep);
+            sb.append(Long.toString(s.bindingSetChunksOut)+sep);
+            sb.append(Long.toString(s.mutationCount.get())+sep);
+            sb.append(Integer.toString(tailIndex)+sep);
+            sb.append(rule.getTail(tailIndex).toString().replace(sep, "")+"\n\n");
             
         }
         

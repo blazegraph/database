@@ -41,7 +41,7 @@ abstract public class AbstractSolutionBuffer<R> extends
     protected AbstractSolutionBuffer(final int capacity,
             final IMutableRelation<R> relation) {
 
-        super(capacity, null/*filter*/);
+        super(capacity, ISolution[].class, null/*filter*/);
 
         if (relation == null)
             throw new IllegalArgumentException();

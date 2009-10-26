@@ -272,13 +272,13 @@ public class SPOAssertionBuffer extends AbstractSPOBuffer implements ISPOAsserti
      * @see #nearCapacity()
      * @see #flush()
      */
-    public boolean add( SPO stmt, Justification justification) {
+    public boolean add( final SPO stmt, final Justification justification) {
         
         if (!super.add(stmt)) {
 
             /*
-             * Note: Do not focusStore statements (or justifications) matched by the
-             * filter.
+             * Note: Do not add focusStore statements (or justifications)
+             * matched by the filter.
              */
 
             if(DEBUG) {

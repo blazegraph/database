@@ -294,10 +294,10 @@ public class ZooKeeperAccessor {
 
             lock.lock();
 
-            if(!open) return;
-            
             try {
             
+                if(!open) return;
+                
                 switch (e.getState()) {
                 
                 case Unknown:

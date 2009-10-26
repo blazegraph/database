@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.zookeeper;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 
 import junit.framework.AssertionFailedError;
@@ -332,9 +330,6 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
                 zroot + "/" + "green" + "/" + "green",
         };
         
-        // put into a set.
-        final HashSet<String> set = new HashSet<String>(Arrays.asList(nodes));
-        
         // verify new watched size.
         assertEquals(nodes.length, watcher.getWatchedSize());
         
@@ -350,6 +345,9 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
             
         }
         
+//        // put into a set.
+//        final HashSet<String> set = new HashSet<String>(Arrays.asList(nodes));
+//        
 //        for (int i = 0; i < nodes.length; i++) {
 //
 //            log.info("mockEvent: "+e);

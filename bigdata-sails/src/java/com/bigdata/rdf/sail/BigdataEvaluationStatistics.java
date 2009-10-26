@@ -1,7 +1,6 @@
 package com.bigdata.rdf.sail;
 
 import java.util.List;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
@@ -27,11 +26,12 @@ import com.bigdata.relation.rule.IRule;
  * own evaluation plan and that evaluation plan will be informed by the range
  * counts.
  * 
- * See {@link BigdataSailConnection#evaluate(TupleExpr, Dataset, BindingSet, boolean)}
+ * See
+ * {@link BigdataSailConnection#evaluate(TupleExpr, Dataset, BindingSet, boolean)}
  * 
- * @todo if a {@link StatementPattern} is to read against the default context
- *       and that is a merge of pre-defined contexts then we need to use the
- *       union of the range counts for those contexts.
+ * FIXME quads : if a {@link StatementPattern} is to read against the default
+ * context and that is a merge of pre-defined contexts then we need to use the
+ * union of the range counts for those contexts.
  */
 public class BigdataEvaluationStatistics extends EvaluationStatistics {
 
@@ -100,11 +100,10 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
             final BigdataResource context = (BigdataResource) getConstantValue(sp
                     .getContextVar());
 
-            if (subj != null && subj.getTermId() == BigdataSail.NULL
-                    || pred != null && pred.getTermId() == BigdataSail.NULL
-                    || obj != null && obj.getTermId() == BigdataSail.NULL
-                    || context != null
-                    && context.getTermId() == BigdataSail.NULL) {
+            if ((subj != null && subj.getTermId() == BigdataSail.NULL)
+                    || (pred != null && pred.getTermId() == BigdataSail.NULL)
+                    || (obj != null && obj.getTermId() == BigdataSail.NULL)
+                    || (context != null && context.getTermId() == BigdataSail.NULL)) {
 
                 // non-existent subject, predicate, object or context
 
@@ -126,10 +125,12 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
                  * Get the most efficient access path.
                  */
 
-                final IAccessPath accessPath = conn.database.getAccessPath(
-                        (subj == null ? BigdataSail.NULL : subj.getTermId()),
-                        (pred == null ? BigdataSail.NULL : pred.getTermId()),
-                        (obj == null ? BigdataSail.NULL : obj.getTermId()));
+                final IAccessPath<?> accessPath = conn.database.getSPORelation().getAccessPath(
+                        (subj == null ? BigdataSail.NULL : subj.getTermId()),//
+                        (pred == null ? BigdataSail.NULL : pred.getTermId()),//
+                        (obj == null ? BigdataSail.NULL : obj.getTermId()),//
+                        (context == null ? BigdataSail.NULL : context.getTermId())//
+                        );
 
                 /*
                  * The range count for that access path based on the data. The
@@ -187,7 +188,7 @@ public class BigdataEvaluationStatistics extends EvaluationStatistics {
          * 
          * @return Its constant value -or- <code>null</code>.
          */
-        protected Value getConstantValue(Var var) {
+        protected Value getConstantValue(final Var var) {
 
             if (var != null) {
 

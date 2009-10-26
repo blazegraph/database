@@ -38,6 +38,8 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipInputStream;
 
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
@@ -460,8 +462,8 @@ public class DataLoader {
         if (INFO)
             log.info(Options.COMMIT + "=" + commitEnum);
 
-        closureEnum = ClosureEnum.valueOf(properties.getProperty(
-                Options.CLOSURE, Options.DEFAULT_CLOSURE));
+        closureEnum = database.getAxioms().isNone()?ClosureEnum.None:(ClosureEnum.valueOf(properties.getProperty(
+                Options.CLOSURE, Options.DEFAULT_CLOSURE)));
 
         if (INFO)
             log.info(Options.CLOSURE + "=" + closureEnum);
@@ -807,10 +809,10 @@ public class DataLoader {
 
                 final File f = files[i];
 
-                final RDFFormat fmt = RDFFormat.forFileName(f.toString(),
-                        rdfFormat);
+//                final RDFFormat fmt = RDFFormat.forFileName(f.toString(),
+//                        rdfFormat);
 
-                loadStats.add(loadFiles(depth + 1, f, baseURI, fmt, filter,
+                loadStats.add(loadFiles(depth + 1, f, baseURI, rdfFormat, filter,
                         (depth == 0 && i < files.length ? false : endOfBatch)));
                 
             }
@@ -819,35 +821,68 @@ public class DataLoader {
             
         }
         
-        final InputStream rdfStream = new FileInputStream(file);
-
-        /* 
-         * Obtain a buffered reader on the input stream.
-         */
-
-        // @todo reuse the backing buffer to minimize heap churn. 
-        final Reader reader = new BufferedReader(
-                new InputStreamReader(rdfStream)
-//               , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
-                );
+        final String n = file.getName();
         
+        RDFFormat fmt = RDFFormat.forFileName(n);
+
+        if (fmt == null && n.endsWith(".zip")) {
+            fmt = rdfFormat.forFileName(n.substring(0, n.length() - 4));
+        }
+
+        if (fmt == null && n.endsWith(".gz")) {
+            fmt = rdfFormat.forFileName(n.substring(0, n.length() - 3));
+        }
+
+        if (fmt == null) // fallback
+            fmt = rdfFormat;
+
+        InputStream is = null;
+
         try {
 
-            // baseURI for this file.
-            final String s = baseURI != null ? baseURI : file.toURI()
-                    .toString();
+            is = new FileInputStream(file);
 
-            return loadData3(reader, s, rdfFormat, endOfBatch);
+            if (n.endsWith(".gz")) {
 
-        } catch (Exception ex) {
+                is = new GZIPInputStream(is);
 
-            throw new RuntimeException("While loading: " + file, ex);
+            } else if (n.endsWith(".zip")) {
+
+                is = new ZipInputStream(is);
+
+            }
+
+            /*
+             * Obtain a buffered reader on the input stream.
+             */
+
+            // @todo reuse the backing buffer to minimize heap churn.
+            final Reader reader = new BufferedReader(new InputStreamReader(is)
+            // , 20*Bytes.kilobyte32 // use a large buffer (default is 8k)
+            );
+
+            try {
+
+                // baseURI for this file.
+                final String s = baseURI != null ? baseURI : file.toURI()
+                        .toString();
+
+                return loadData3(reader, s, fmt, endOfBatch);
+
+            } catch (Exception ex) {
+
+                throw new RuntimeException("While loading: " + file, ex);
+
+            } finally {
+
+                reader.close();
+
+            }
 
         } finally {
-
-            reader.close();
-
-            rdfStream.close();
+            
+            if (is != null)
+                is.close();
 
         }
 

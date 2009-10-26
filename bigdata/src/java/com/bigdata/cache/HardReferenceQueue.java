@@ -27,10 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
-import java.util.NoSuchElementException;
-
-import org.apache.log4j.Logger;
-
 /**
  * <p>
  * A cache for hard references using an LRU policy. References are simply
@@ -187,8 +183,9 @@ public class HardReferenceQueue<T> extends RingBuffer<T> implements IHardReferen
     @Override
     public boolean add(final T ref) {
         
-        if (ref == null)
-            throw new IllegalArgumentException();
+        // note: tested by the base class in offer().
+//        if (ref == null)
+//            throw new IllegalArgumentException();
         
         /*
          * Scan the last nscan references for this reference. If found, return
@@ -211,11 +208,13 @@ public class HardReferenceQueue<T> extends RingBuffer<T> implements IHardReferen
      * full.
      * <p>
      * Note: This hook is further extended to realize the stale reference
-     * protocol in {@link SynchronizedHardReferenceQueue}.
+     * protocol in {@link SynchronizedHardReferenceQueueWithTimeout}.
      */
     protected void beforeOffer(final T ref) {
 
-        if (isFull()) {
+//        super.beforeOffer(ref);  // base class is NOP.
+        
+        if (size == capacity/* isFull() inline */) {
 
             /*
              * If at capacity, evict the LRU reference.

@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import com.bigdata.btree.data.ILeafData;
+import com.bigdata.btree.data.INodeData;
+
 /**
  * Interface for creating nodes or leaves.
  * 
@@ -32,68 +35,31 @@ package com.bigdata.btree;
 public interface INodeFactory {
 
     /**
-     * Create a node. The implementation is encouraged to steal the <i>keys</i>
-     * and <i>childAddr</i> references rather than cloning them.
+     * Create a node.
      * 
      * @param btree
-     *            The owning btree.
+     *            The owning B+Tree.
      * @param addr
      *            The address from which the node was read.
-     * @param branchingFactor
-     *            The branching factor for the node.
-     * @param nentries
-     *            The #of entries spanned by this node.
-     * @param keys
-     *            A representation of the defined keys in the node.
-     * @param childAddr
-     *            An array of the persistent addresses for the children of this
-     *            node.
-     * @param childEntryCount
-     *            An of the #of entries spanned by each direct child.
-     * 
+     * @param data
+     *            The node data record.
+     *            
      * @return A node initialized from those data.
      */
-    public INodeData allocNode(IIndex btree, long addr, int branchingFactor,
-            int nentries, IKeyBuffer keys, long[] childAddr,
-            int[] childEntryCount);
+    public Node allocNode(AbstractBTree btree, long addr, INodeData data);
 
     /**
-     * Create a leaf. The implementation is encouraged to steal the <i>keys</i>
-     * and <i>values</i> references rather than cloning them.
+     * Create a leaf.
      * 
      * @param btree
-     *            The owning btree.
+     *            The owning B+Tree.
      * @param addr
      *            The address from which the leaf was read.
-     * @param branchingFactor
-     *            The branching factor for the leaf.
-     * @param keys
-     *            A representation of the defined keys in the node.
-     * @param values
-     *            An array containing the values found in the leaf.
-     * @param versionTimestamps
-     *            An array of the version timestamps (iff the version metadata
-     *            is being maintained).
-     * @param deleteMarkers
-     *            An array of the delete markers (iff the version metadata is
-     *            being maintained).
-     * @param priorAddr
-     *            The address of the previous leaf in key order, <code>0L</code>
-     *            if it is known that there is no previous leaf, and
-     *            <code>-1L</code> if either: (a) it was not known whether
-     *            there is a previous leaf; or (b) it was known that there was a
-     *            previous leaf but the address of that leaf was not known.
-     * @param nextAddr
-     *            The address of the next leaf in key order, <code>0L</code>
-     *            if it is known that there is no next leaf, and
-     *            <code>-1L</code> if either: (a) it was not known whether
-     *            there is a next leaf; or (b) it was known that there was a
-     *            next leaf but the address of that leaf was not known.
+     * @param data
+     *            The leaf data record.
      * 
      * @return A leaf initialized from those data.
      */
-    public ILeafData allocLeaf(IIndex btree, long addr, int branchingFactor,
-            IKeyBuffer keys, byte[][] values, long[] versionTimestamps,
-            boolean[] deleteMarkers, long priorAddr, long nextAddr);
+    public Leaf allocLeaf(AbstractBTree btree, long addr, ILeafData data);
 
 }

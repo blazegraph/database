@@ -158,34 +158,12 @@ public class DumpFederation {
 
         }
 
-        final JiniClient client;
+        /*
+         * Connect to an existing jini federation.
+         */
+        final JiniClient<?> client = JiniClient.newInstance(args);
 
-        JiniServicesHelper helper = null;
-        if (false) {// @todo command line option for this.
-
-            /*
-             * Use the services helper to (re-)start an embedded jini
-             * federation.
-             */
-            helper = new JiniServicesHelper(new File(args[0]).getParent()
-                    .toString()
-                    + File.separator);
-
-            helper.start();
-
-            client = helper.client;
-
-        } else {
-            
-            /*
-             * Connect to an existing jini federation.
-             */
-
-            client = JiniClient.newInstance(args);
-
-        }
-
-        final JiniFederation fed = client.connect();
+        final JiniFederation<?> fed = client.connect();
 
         final long discoveryDelay = (Long) fed.getClient().getConfiguration()
                 .getEntry(COMPONENT, ConfigurationOptions.DISCOVERY_DELAY,
@@ -234,15 +212,7 @@ public class DumpFederation {
 
         } finally {
 
-            if (helper != null) {
-
-                helper.shutdown();
-
-            } else {
-
-                client.disconnect(false/* immediateShutdown */);
-
-            }
+            client.disconnect(false/* immediateShutdown */);
 
         }
         
@@ -269,7 +239,7 @@ public class DumpFederation {
      */
     public static class ScheduledDumpTask implements Runnable {
        
-        final JiniFederation fed;
+        final JiniFederation<?> fed;
         final String namespace;
         final File path;
         final String basename;
@@ -302,9 +272,9 @@ public class DumpFederation {
          * @param unit
          *            The reporting period. Use {@link TimeUnit#MINUTES},
          *            {@link TimeUnit#HOURS} or {@link TimeUnit#DAYS} to have
-         *            the dumped files labelled with the appropriate unit.
+         *            the dumped files labeled with the appropriate unit.
          */
-        public ScheduledDumpTask(final JiniFederation fed,
+        public ScheduledDumpTask(final JiniFederation<?> fed,
                 final String namespace, final int nruns, final File path,
                 final String basename, final TimeUnit unit) {
 
@@ -433,7 +403,7 @@ public class DumpFederation {
     /**
      * The connected federation.
      */
-    private final JiniFederation fed;
+    private final JiniFederation<?> fed;
 
     /**
      * The read-historical transaction that will be used to dump the database.
@@ -673,7 +643,7 @@ public class DumpFederation {
      * @param formatter
      *            Object used to format the output.
      */
-    public DumpFederation(final JiniFederation fed, final long tx,
+    public DumpFederation(final JiniFederation<?> fed, final long tx,
             final FormatRecord formatter) {
 
         if (fed == null)
@@ -806,7 +776,7 @@ public class DumpFederation {
      */
     static public class IndexPartitionRecord {
 
-        public IndexPartitionRecord(final JiniFederation fed, final long ts,
+        public IndexPartitionRecord(final JiniFederation<?> fed, final long ts,
                 final String indexName, final PartitionLocator locator)
                 throws InterruptedException {
 
@@ -1579,7 +1549,7 @@ public class DumpFederation {
          * Extract some useful metadata for an {@link IDataService}.
          */
         static public ServiceMetadata getServiceMetadata(
-                final JiniFederation fed, final UUID uuid) {
+                final JiniFederation<?> fed, final UUID uuid) {
 
             if (fed == null)
                 throw new IllegalArgumentException();
@@ -1645,7 +1615,7 @@ public class DumpFederation {
 
                 if (code == null) {
 
-                    code = new Integer(codes.size());
+                    code = Integer.valueOf(codes.size());
 
                     codes.put(uuid, code);
 

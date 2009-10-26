@@ -7,7 +7,6 @@ import org.openrdf.model.Statement;
 
 import com.bigdata.counters.CounterSet;
 import com.bigdata.rdf.load.IStatementBufferFactory;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.relation.accesspath.IBuffer;
 
 /**

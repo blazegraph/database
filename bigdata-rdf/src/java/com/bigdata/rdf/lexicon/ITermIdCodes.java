@@ -55,6 +55,12 @@ public interface ITermIdCodes {
     static final public long TERMID_CODE_MASK = 0x03L;
     
     /**
+     * The #of bits in the {@link #TERMID_CODE_MASK} (
+     * {@value #TERMID_CODE_MASK_BITS}).
+     */
+    static final public long TERMID_CODE_MASK_BITS = 2L;
+    
+    /**
      * The bit value used to indicate that a term identifier stands for a
      * {@link URI}.
      */

@@ -34,11 +34,11 @@ import org.apache.log4j.Level;
 import com.bigdata.btree.keys.KeyBuilder;
 
 /**
- * Test suite using {@link IIndex#insert(int, Object)} to split a tree to height
- * two (2) (three levels) and then using {@link IIndex#remove(int)} to reduce
- * the tree back to a single, empty root leaf. This test suite is focused on m :=
- * 3 since we are capable of excercising all split() and join() code paths with
- * that branching factor.
+ * Test suite using {@link BTree#insert(Object, Object)} to split a tree to
+ * height two (2) (three levels) and then using {@link BTree#remove(Object)} to
+ * reduce the tree back to a single, empty root leaf. This test suite is focused
+ * on m := 3 since we are capable of exercising all split() and join() code 
+ * paths with that branching factor.
  * <p>
  * Note: This also tests the {@link AbstractNode#isLeftMostNode()} and
  * {@link AbstractNode#isRightMostNode()} methods. In order to test those
@@ -75,7 +75,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
      * postconditions for that operation. In particular, testing at m == 3 helps
      * to check for fenceposts in the split/join logic.
      * 
-     * Note: a branching factor of three (3) is equivilent to a 2-3 tree, where
+     * Note: a branching factor of three (3) is equivalent to a 2-3 tree, where
      * the minimum #of children (for a node) or values (for a leaf) is two (2)
      * and the maximum #of children (for a node) or values (for a leaf) is three
      * (3). This makes it very easy to provoke splits and joins.
@@ -84,7 +84,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
      * a different sequence of keys during removal. This provokes some code
      * paths in {@link Node#merge(AbstractNode, boolean)} and
      * {@link Node#redistributeKeys(AbstractNode, boolean)} that are not
-     * excercised by this test.
+     * exercised by this test.
      * 
      * @see #test_removeOrder3a()
      */
@@ -215,7 +215,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertKeys(new int[]{7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.getChild(1));
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             b = (Leaf)c.getChild(1);
             assertEntryCounts(new int[]{2,2}, c);
             
@@ -285,7 +285,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             // validate root (c).
             assertKeys(new int[]{5,7},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             d = (Leaf) c.getChild(1);
             assertEquals(b,c.getChild(2));
             assertEntryCounts(new int[]{2,2,2}, c);
@@ -351,7 +351,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         {
             
             final int ikey = keys[n];
-            SimpleEntry val = vals[n++];
+            final SimpleEntry val = vals[n++];
             assert ikey == 1 && val.id() == ikey;
             final byte[] key = KeyBuilder.asSortKey(ikey);
             assertNull(btree.remove(key)); // not found / no change.
@@ -365,24 +365,24 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             g = (Node)btree.getRoot();
             assertKeys(new int[]{5},g);
             assertEquals(c,g.getChild(0));
-            assertNotNull(g.childRefs[1]);
+            assertNotNull(g.getChildRef(1));
             f = (Node) g.getChild(1);
-            assertNull(g.childRefs[2]);
+            assertNull(g.getChildRef(2));
             assertEntryCounts(new int[]{4,4}, g);
             
             // validate old root (c).
             assertKeys(new int[]{3},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             e = (Leaf) c.getChild(1);
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, c);
             
             // validate node(f) split from the old root split(c)->(c,f).
             assertKeys(new int[]{7},f);
             assertEquals(d,f.getChild(0));
             assertEquals(b,f.getChild(1));
-            assertNull(f.childRefs[2]);
+            assertNull(f.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, f);
             
             // validate original leaf (a), which was re-split into (a,e).
@@ -531,7 +531,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals(c,btree.root);
         assertEquals(a,c.getChild(0));
         assertEquals(b,c.getChild(1));
-        assertNull(c.childRefs[2]);
+        assertNull(c.getChildRef(2));
         assertEntryCounts(new int[]{3,2}, c);
         // verify deleted nodes and leaves.
         assertTrue(d.isDeleted());
@@ -553,7 +553,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals(c,btree.root);
         assertEquals(a,c.getChild(0));
         assertEquals(b,c.getChild(1));
-        assertNull(c.childRefs[2]);
+        assertNull(c.getChildRef(2));
         assertEntryCounts(new int[]{2,2}, c);
 
         /*
@@ -727,7 +727,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertKeys(new int[]{7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.getChild(1));
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             b = (Leaf)c.getChild(1);
             assertEntryCounts(new int[]{2,2}, c);
             
@@ -798,7 +798,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             // validate root (c).
             assertKeys(new int[]{5,7},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             d = (Leaf) c.getChild(1);
             assertEquals(b,c.getChild(2));
             assertEntryCounts(new int[]{2,2,2}, c);
@@ -880,24 +880,24 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             g = (Node)btree.getRoot();
             assertKeys(new int[]{5},g);
             assertEquals(c,g.getChild(0));
-            assertNotNull(g.childRefs[1]);
+            assertNotNull(g.getChildRef(1));
             f = (Node) g.getChild(1);
-            assertNull(g.childRefs[2]);
+            assertNull(g.getChildRef(2));
             assertEntryCounts(new int[]{4,4}, g);
             
             // validate old root (c).
             assertKeys(new int[]{3},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             e = (Leaf) c.getChild(1);
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, c);
             
             // validate node(f) split from the old root split(c)->(c,f).
             assertKeys(new int[]{7},f);
             assertEquals(d,f.getChild(0));
             assertEquals(b,f.getChild(1));
-            assertNull(f.childRefs[2]);
+            assertNull(f.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, f);
             
             // validate original leaf (a), which was re-split into (a,e).
@@ -1037,7 +1037,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals(f,btree.root);
         assertEquals(a,f.getChild(0));
         assertEquals(b,f.getChild(1));
-        assertNull(f.childRefs[2]);
+        assertNull(f.getChildRef(2));
         assertTrue(e.isDeleted());
         assertEntryCounts(new int[]{2,3}, f);
 
@@ -1066,7 +1066,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
         assertEquals(f,btree.root);
         assertEquals(a,f.getChild(0));
         assertEquals(b,f.getChild(1));
-        assertNull(f.childRefs[2]);
+        assertNull(f.getChildRef(2));
         assertEntryCounts(new int[]{2,2}, f);
         
         /*
@@ -1250,7 +1250,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertKeys(new int[]{7},c);
             assertEquals(a,c.getChild(0));
             assertNotNull(c.getChild(1));
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             b = (Leaf)c.getChild(1);
             assertEntryCounts(new int[]{2,2}, c);
             
@@ -1321,7 +1321,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             // validate root (c).
             assertKeys(new int[]{5,7},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             d = (Leaf) c.getChild(1);
             assertEquals(b,c.getChild(2));
             assertEntryCounts(new int[]{2,2,2}, c);
@@ -1403,24 +1403,24 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             g = (Node)btree.getRoot();
             assertKeys(new int[]{5},g);
             assertEquals(c,g.getChild(0));
-            assertNotNull(g.childRefs[1]);
+            assertNotNull(g.getChildRef(1));
             f = (Node) g.getChild(1);
-            assertNull(g.childRefs[2]);
+            assertNull(g.getChildRef(2));
             assertEntryCounts(new int[]{4,4}, g);
             
             // validate old root (c).
             assertKeys(new int[]{3},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             e = (Leaf) c.getChild(1);
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, c);
             
             // validate node(f) split from the old root split(c)->(c,f).
             assertKeys(new int[]{7},f);
             assertEquals(d,f.getChild(0));
             assertEquals(b,f.getChild(1));
-            assertNull(f.childRefs[2]);
+            assertNull(f.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, f);
             
             // validate original leaf (a), which was re-split into (a,e).
@@ -1538,7 +1538,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertKeys(new int[]{7,9},f);
             assertEquals(d,f.getChild(0));
             assertEquals(b,f.getChild(1));
-            assertNotNull(f.childRefs[2]);
+            assertNotNull(f.getChildRef(2));
             h = (Leaf) f.getChild(2);
             assertEntryCounts(new int[]{2,2,2}, f);
             
@@ -1684,7 +1684,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             // validate node(c).
             assertKeys(new int[]{3,5},c);
             assertEquals(a,c.getChild(0));
-            assertNotNull(c.childRefs[1]);
+            assertNotNull(c.getChildRef(1));
             i = (Leaf) c.getChild(1);
             assertEquals(d,c.getChild(2));
             assertEntryCounts(new int[]{2,2,2}, c);
@@ -1762,7 +1762,7 @@ public class TestSplitJoinThreeLevels extends AbstractBTreeTestCase {
             assertKeys(new int[]{3},c);
             assertEquals(a,c.getChild(0));
             assertEquals(i,c.getChild(1));
-            assertNull(c.childRefs[2]);
+            assertNull(c.getChildRef(2));
             assertEntryCounts(new int[]{2,2}, c);
             
             // validate node(f).

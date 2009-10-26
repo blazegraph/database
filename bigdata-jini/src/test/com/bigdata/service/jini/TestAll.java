@@ -26,15 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.jini;
 
-import com.bigdata.service.jini.util.JiniServicesHelper;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Aggregates tests in dependency order - see {@link AbstractServerTestCase} for
- * <strong>required</strong> system properties in order to run this test suite.
+ * Aggregates tests in dependency order.
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -48,70 +45,43 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        // Optional boolean property may be used to force skip of these tests.
-        final boolean forceSkip;
-        {
-            String val = System
-                    .getProperty("maven.test.services.skip", "false");
-
-            if (val != null) {
-                
-                forceSkip = Boolean.parseBoolean(val);
-                
-            } else {
-                
-                forceSkip = false;
-                
-            }
-            
-        }
-        
-        final boolean willRun = !forceSkip && JiniServicesHelper.isJiniRunning();
-
         final TestSuite suite = new TestSuite("jini-based services");
 
-        if(willRun) {
+        // Note: Does not implement TestCase.
+        // suite.addTestSuite( TestServer.class );
 
-            /*
-             * Note: The service tests require that Jini is running, that you
-             * have specified a suitable security policy, and that the codebase
-             * parameter is set correctly. See the test suites for more detail
-             * on how to setup to run these tests.
-             */
+        /*
+         * Test of a single client talking to a bigdata federation.
+         */
+        suite.addTestSuite(TestBigdataClient.class);
 
-            //        suite.addTestSuite( TestServer.class ); // Does not implement TestCase.
-
-            /*
-             * Test of a single client talking to a bigdata federation.
-             */
-            suite.addTestSuite( TestBigdataClient.class );
-            
-            /*
-             * @todo test data replication at the service level.
-             * 
-             * work through the setup of the test cases. each of the remote stores
-             * needs to be a service, most likely an extension of the data service
-             * where read committed operations are allowed but writes are refused
-             * except via the data transfers used to support replication. the
-             * "local" store is, of course, just another data service.
-             * 
-             * work through startup when the remote store services need to be
-             * discovered, failover when a remote service dies, and restart. on
-             * restart, should we wait until the historical replicas can be
-             * re-discovered or deemed "lost"? it may not matter since we can
-             * re-synchronize a "lost" replica once it comes back online simply be
-             * transferring the missing delta from the tail of the local store.
-             * 
-             * @todo test service failover and restart-safety.
-             */
-            
-            /*
-             * The map/reduce test suite.
-             */
-            suite.addTest(com.bigdata.service.mapReduce.TestAll.suite());
-
-        }
+        // test execution of jobs on a federation.
+        suite.addTest(com.bigdata.service.jini.master.TestAll.suite());
         
+        /*
+         * @todo test data replication at the service level.
+         * 
+         * work through the setup of the test cases. each of the remote stores
+         * needs to be a service, most likely an extension of the data service
+         * where read committed operations are allowed but writes are refused
+         * except via the data transfers used to support replication. the
+         * "local" store is, of course, just another data service.
+         * 
+         * work through startup when the remote store services need to be
+         * discovered, failover when a remote service dies, and restart. on
+         * restart, should we wait until the historical replicas can be
+         * re-discovered or deemed "lost"? it may not matter since we can
+         * re-synchronize a "lost" replica once it comes back online simply be
+         * transferring the missing delta from the tail of the local store.
+         * 
+         * @todo test service failover and restart-safety.
+         */
+
+        /*
+         * The map/reduce test suite.
+         */
+        suite.addTest(com.bigdata.service.mapReduce.TestAll.suite());
+
         return suite;
         
     }

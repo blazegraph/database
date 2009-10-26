@@ -31,7 +31,9 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.service.AbstractClient;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.EmbeddedClient.Options;
@@ -72,8 +74,11 @@ public class TestEmbeddedMaster extends TestCase {
         
         super.setUp();
 
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
         // inherit system properties.
-        Properties properties = new Properties(System.getProperties());
+        final Properties properties = new Properties(System.getProperties());
 
         // Note: when using disk use temp files so that the reduce stores
         // do not survive restart.
@@ -82,6 +87,10 @@ public class TestEmbeddedMaster extends TestCase {
 
         // Note: Option does not buffer data in RAM.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+
+        // disable platform statistics collection.
+        properties.setProperty(
+                EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
 
         // Note: No disk at all, but consumes more RAM to buffer the data.
 //        properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
@@ -116,8 +125,11 @@ public class TestEmbeddedMaster extends TestCase {
         if (client != null)
             client.disconnect(true/* immediateShutdown */);
         
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
         super.tearDown();
-        
+
     }
     
     /**

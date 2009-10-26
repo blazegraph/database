@@ -40,7 +40,6 @@ public class QueryEvaluationIterator<T> implements
         
     }
 
-    @SuppressWarnings("unchecked")
     public T next() throws QueryEvaluationException {
 
         try {

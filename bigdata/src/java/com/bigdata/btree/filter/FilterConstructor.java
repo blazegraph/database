@@ -12,19 +12,33 @@ import cutthecrap.utils.striterators.IStriterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
- * Implemenation allows you to append {@link IFilter}s to an internal
+ * Implementation allows you to append {@link IFilter}s to an internal
  * ordered list. The corresponding stacked filter is then assembled by
  * {@link #newInstance(Iterator)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class FilterConstructor<E> implements IFilterConstructor<E> {
+public class FilterConstructor<E> implements IFilterConstructor<E>, Cloneable {
 
     private final List<IFilter> filters = new LinkedList<IFilter>();
     
     private static final long serialVersionUID = 8095075575678192516L;
 
+    public FilterConstructor<E> clone() {
+        
+        final FilterConstructor<E> inst = new FilterConstructor<E>();
+        
+        for(IFilter filter : filters) {
+            
+            inst.addFilter(filter);
+            
+        }
+        
+        return inst;
+        
+    }
+    
     /**
      * Add a(nother) filter to the filter stack. The filters are applied
      * in the order in which they are declared to this method.
@@ -33,7 +47,7 @@ public class FilterConstructor<E> implements IFilterConstructor<E> {
      * 
      * @return <i>this</i>
      */
-    public FilterConstructor<E> addFilter(IFilter filter) {
+    public FilterConstructor<E> addFilter(final IFilter filter) {
         
         if (filter == null)
             throw new IllegalArgumentException();
@@ -48,7 +62,7 @@ public class FilterConstructor<E> implements IFilterConstructor<E> {
      * Create a filter stack.
      */
     @SuppressWarnings("unchecked")
-    public ITupleIterator<E> newInstance(ITupleIterator<E> src) {
+    public ITupleIterator<E> newInstance(final ITupleIterator<E> src) {
 
         if (filters.isEmpty())
             return src;
@@ -78,7 +92,7 @@ public class FilterConstructor<E> implements IFilterConstructor<E> {
 
         final private Iterator src;
 
-        public WrappedTupleIterator(Iterator src) {
+        public WrappedTupleIterator(final Iterator src) {
 
             if (src == null)
                 throw new IllegalArgumentException();

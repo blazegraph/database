@@ -5,7 +5,9 @@ import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -18,8 +20,8 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
+import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.Or;
-import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
@@ -31,19 +33,20 @@ import org.openrdf.query.algebra.Compare.CompareOp;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.rules.RuleContextEnum;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.spo.SPOAccessPath;
+import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
-import com.bigdata.rdf.store.FullTextIndexAccessPath;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBuffer;
@@ -87,9 +90,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * enabled, then by translation of Sesame 2 query expressions into native
  * {@link IRule}s and native evaluation of those {@link IRule}s.
  * 
- * <h2>Query options</h2>
- * The following summarizes how various high-level query language feature are
- * mapped onto native {@link IRule}s.
+ * <h2>Query options</h2> The following summarizes how various high-level query
+ * language feature are mapped onto native {@link IRule}s.
  * <dl>
  * <dt>DISTINCT</dt>
  * <dd>{@link IQueryOptions#isDistinct()}, which is realized using
@@ -97,24 +99,24 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * <dt>ORDER BY</dt>
  * <dd>{@link IQueryOptions#getOrderBy()} is effected by a custom
  * {@link IKeyBuilderFactory} which generates sort keys that capture the desired
- * sort order from the bindings in an {@link ISolution}. Unless DISTINCT is
- * also specified, the generated sort keys are made unique by appending a one up
- * long integer to the key - this prevents sort keys that otherwise compare as
- * equals from dropping solutions. Note that the SORT is actually imposed by the
+ * sort order from the bindings in an {@link ISolution}. Unless DISTINCT is also
+ * specified, the generated sort keys are made unique by appending a one up long
+ * integer to the key - this prevents sort keys that otherwise compare as equals
+ * from dropping solutions. Note that the SORT is actually imposed by the
  * {@link DistinctFilter} using an {@link IKeyBuilderFactory} assembled from the
  * ORDER BY constraints.
  * 
  * FIXME BryanT - implement the {@link IKeyBuilderFactory}.
  * 
- * FIXME MikeP - assemble the {@link ISortOrder}[] from the query and set on
- * the {@link IQueryOptions}. </dd>
+ * FIXME MikeP - assemble the {@link ISortOrder}[] from the query and set on the
+ * {@link IQueryOptions}.</dd>
  * <dt>OFFSET and LIMIT</dt>
  * <dd>
  * <p>
  * {@link IQueryOptions#getSlice()}, which is effected as a conditional in
  * {@link NestedSubqueryWithJoinThreadsTask} based on the
- * {@link RuleStats#solutionCount}. Query {@link ISolution}s are counted as
- * they are generated, but they are only entered into the {@link ISolution}
+ * {@link RuleStats#solutionCount}. Query {@link ISolution}s are counted as they
+ * are generated, but they are only entered into the {@link ISolution}
  * {@link IBuffer} when the solutionCount is GE the OFFSET and LT the LIMIT.
  * Query evaluation halts once the LIMIT is reached.
  * </p>
@@ -122,10 +124,9 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * Note that when DISTINCT and either LIMIT and/or OFFSET are specified
  * together, then the LIMIT and OFFSET <strong>MUST</strong> be applied after
  * the solutions have been generated since we may have to generate more than
- * LIMIT solutions in order to have LIMIT <em>DISTINCT</em> solutions. We
- * handle this for now by NOT translating the LIMIT and OFFSET onto the
- * {@link IRule} and instead let Sesame close the iterator once it has enough
- * solutions.
+ * LIMIT solutions in order to have LIMIT <em>DISTINCT</em> solutions. We handle
+ * this for now by NOT translating the LIMIT and OFFSET onto the {@link IRule}
+ * and instead let Sesame close the iterator once it has enough solutions.
  * </p>
  * <p>
  * Note that LIMIT and SLICE requires an evaluation plan that provides stable
@@ -133,20 +134,20 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * {@link IQueryOptions#isStable()} to <code>true</code>.
  * <p>
  * For a UNION query, you must also set {@link IProgram#isParallel()} to
- * <code>false</code> to prevent parallelized execution of the {@link IRule}s
- * in the {@link IProgram}.
+ * <code>false</code> to prevent parallelized execution of the {@link IRule}s in
+ * the {@link IProgram}.
  * </p>
  * </dd>
  * <dt>UNION</dt>
  * <dd>A UNION is translated into an {@link IProgram} consisting of one
  * {@link IRule} for each clause in the UNION.
  * 
- * FIXME MikeP - implement. </dd>
+ * FIXME MikeP - implement.</dd>
  * </dl>
- * <h2>Filters</h2>
- * The following provides a summary of how various kinds of FILTER are handled.
- * A filter that is not explicitly handled is left untranslated and will be
- * applied by Sesame against the generated {@link ISolution}s.
+ * <h2>Filters</h2> The following provides a summary of how various kinds of
+ * FILTER are handled. A filter that is not explicitly handled is left
+ * untranslated and will be applied by Sesame against the generated
+ * {@link ISolution}s.
  * <p>
  * Whenever possible, a FILTER is translated into an {@link IConstraint} on an
  * {@link IPredicate} in the generated native {@link IRule}. Some filters are
@@ -172,20 +173,8 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * position is bound to a constant, the magic predicate is evaluated once and
  * the result is used to generate a set of term identifiers that are matches for
  * the token(s) extracted from the {@link Literal} in the object position. Those
- * term identifiers are then used to populate an {@link IN} constraint.
- * 
- * FIXME MikeP - integrate. I have written {@link FullTextIndexAccessPath}. It
- * needs to be imposed on the magic predicate as an {@link ISolutionExpander}
- * (just replaces the normal {@link SPOAccessPath}).
- * </p>
- * <p>
- * When the object position is an unbound variable, then the magic predicate is
- * translated as an additional {@link IPredicate} and is evaluated for each
- * {@link ISolution}. This is essentially a JOIN against a custom
- * {@link IAccessPath} for the {@link FullTextIndex}.
- * 
- * FIXME This is NOT implemented. For now the object position in the
- * {@link BNS#SEARCH} MUST be bound to a constant.
+ * term identifiers are then used to populate an {@link IN} constraint. The
+ * object position in the {@link BNS#SEARCH} MUST be bound to a constant.
  * </p>
  * 
  * FIXME We are not in fact rewriting the query operation at all, simply
@@ -196,7 +185,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * directly, e.g., an n-ary IProgram, n-ary IRule operator, an IPredicate
  * operator, etc. Then we can handle evaluation using their model with anything
  * re-written to our custom operators being caught by our custom evaluate()
- * methods and everything else running their default methods.  Definately the
+ * methods and everything else running their default methods. Definitely the
  * right approach, and much easier to write unit tests.
  * 
  * @todo REGEX : if there is a &quot;&circ;&quot; literal followed by a wildcard
@@ -237,7 +226,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     protected static final boolean INFO = log.isInfoEnabled();
 
     protected static final boolean DEBUG = log.isDebugEnabled();
-    
+
     /**
      * The magic predicate for text search.
      * 
@@ -246,101 +235,104 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     static private final URI MAGIC_SEARCH = new URIImpl(BNS.SEARCH);
 
     private final long NULL = IRawTripleStore.NULL;
-    
+
     protected final BigdataTripleSource tripleSource;
 
     protected final Dataset dataset;
 
     private final AbstractTripleStore database;
-    
+
     private final boolean nativeJoins;
-    
-//    private boolean slice = false, distinct = false, union = false;
-//    
-//    // Note: defaults are illegal values.
-//    private long offset = -1L, limit = 0L;
 
-    /**
-     * @param tripleSource
-     */
-    public BigdataEvaluationStrategyImpl(BigdataTripleSource tripleSource) {
+    // private boolean slice = false, distinct = false, union = false;
+    //    
+    // // Note: defaults are illegal values.
+    // private long offset = -1L, limit = 0L;
 
-        this(tripleSource, null, false);
-
-    }
+    // /**
+    // * @param tripleSource
+    // */
+    // public BigdataEvaluationStrategyImpl(final BigdataTripleSource
+    // tripleSource) {
+    //
+    // this(tripleSource, null/* dataset */, false WHY FALSE? /* nativeJoins
+    // */);
+    //
+    // }
 
     /**
      * @param tripleSource
      * @param dataset
      */
-    public BigdataEvaluationStrategyImpl(BigdataTripleSource tripleSource,
-            Dataset dataset, boolean nativeJoins) {
+    public BigdataEvaluationStrategyImpl(
+            final BigdataTripleSource tripleSource, final Dataset dataset,
+            final boolean nativeJoins) {
 
         super(tripleSource, dataset);
 
         this.tripleSource = tripleSource;
 
-        this.dataset = null;
+        this.dataset = dataset;
 
         this.database = tripleSource.getDatabase();
-        
+
         this.nativeJoins = nativeJoins;
-//        this.nativeJoins = false;
+        // this.nativeJoins = false;
 
     }
 
-//    @Override
-//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-//            org.openrdf.query.algebra.Slice slice, BindingSet bindings)
-//            throws QueryEvaluationException {
-//        /*
-//         * Note: Sesame has somewhat different semantics for offset and limit.
-//         * They are [int]s. -1 is used to indicate the the offset or limit was
-//         * not specified. you use hasFoo() to see if there is an offset or a
-//         * limit and then assign the value. For bigdata, the NOP offset is 0L
-//         * and the NOP limit is Long.MAX_VALUE.
-//         * 
-//         * Note: We can't process the offset natively unless we remove the slice
-//         * from the Sesame operator tree. If we did then we would skip over the
-//         * first OFFSET solutions and Sesame would skip over the first OFFSET
-//         * solutions that we passed on, essentially doubling the offset.
-//         * 
-//         * FIXME native rule slices work, but they can not be applied if there
-//         * is a non-native filter outside of the join. This code could be
-//         * modified to test for that using tuplExpr.visit(...), but really we
-//         * just need to do a proper rewrite of the query expressions that is
-//         * distinct from their evaluation!
-//         */
-//////        if (!slice.hasOffset()) {
-////            this.slice = true;
-////            this.offset = slice.hasOffset() ? slice.getOffset() : 0L;
-////            this.limit = slice.hasLimit() ? slice.getLimit() : Long.MAX_VALUE;
-//////            return evaluate(slice.getArg(), bindings);
-//////        }
-//        return super.evaluate(slice, bindings);
-//    }
-//    
-//    @Override
-//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-//            Union union, BindingSet bindings) throws QueryEvaluationException {
-//        this.union = true;
-//        return super.evaluate(union, bindings);
-//    }
-//
-//    @Override
-//    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-//            Distinct distinct, BindingSet bindings)
-//            throws QueryEvaluationException {
-//        this.distinct = true;
-//        return super.evaluate(distinct, bindings);
-//    }
-    
+    // @Override
+    // public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+    // org.openrdf.query.algebra.Slice slice, BindingSet bindings)
+    // throws QueryEvaluationException {
+    // /*
+    // * Note: Sesame has somewhat different semantics for offset and limit.
+    // * They are [int]s. -1 is used to indicate the the offset or limit was
+    // * not specified. you use hasFoo() to see if there is an offset or a
+    // * limit and then assign the value. For bigdata, the NOP offset is 0L
+    // * and the NOP limit is Long.MAX_VALUE.
+    // *
+    // * Note: We can't process the offset natively unless we remove the slice
+    // * from the Sesame operator tree. If we did then we would skip over the
+    // * first OFFSET solutions and Sesame would skip over the first OFFSET
+    // * solutions that we passed on, essentially doubling the offset.
+    // *
+    // * FIXME native rule slices work, but they can not be applied if there
+    // * is a non-native filter outside of the join. This code could be
+    // * modified to test for that using tuplExpr.visit(...), but really we
+    // * just need to do a proper rewrite of the query expressions that is
+    // * distinct from their evaluation!
+    // */
+    // //// if (!slice.hasOffset()) {
+    // // this.slice = true;
+    // // this.offset = slice.hasOffset() ? slice.getOffset() : 0L;
+    // // this.limit = slice.hasLimit() ? slice.getLimit() : Long.MAX_VALUE;
+    // //// return evaluate(slice.getArg(), bindings);
+    // //// }
+    // return super.evaluate(slice, bindings);
+    // }
+    //    
+    // @Override
+    // public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+    // Union union, BindingSet bindings) throws QueryEvaluationException {
+    // this.union = true;
+    // return super.evaluate(union, bindings);
+    // }
+    //
+    // @Override
+    // public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+    // Distinct distinct, BindingSet bindings)
+    // throws QueryEvaluationException {
+    // this.distinct = true;
+    // return super.evaluate(distinct, bindings);
+    // }
+
     /**
-     * Overriden to recognize magic predicates.
+     * Overridden to recognize magic predicates.
      */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-            StatementPattern sp, BindingSet bindings)
+            final StatementPattern sp, final BindingSet bindings)
             throws QueryEvaluationException {
 
         final Var predVar = sp.getPredicateVar();
@@ -386,28 +378,27 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     }
 
     /**
-     * Evaluates the {@link BNS#SEARCH} magic predicate as a full-text
-     * search against the index literal in the database, binding <i>svar</i>
-     * to each matched literal in turn.
+     * Evaluates the {@link BNS#SEARCH} magic predicate as a full-text search
+     * against the index literal in the database, binding <i>svar</i> to each
+     * matched literal in turn.
      * <p>
-     * Note: The minimum cosine (relevance score) is set to ZERO (0d) in
-     * order to make sure that any match within a literal qualifies that
-     * literal for inclusion within the set of bindings that are
-     * materialized. This is in contrast to a standard search engine, where
-     * a minimum relevance score is used to filter out less likely matches.
-     * However, it is my sense that query against the KB is often used to
-     * find ALL matches. Regardless, the matches will be materialized in
-     * order of decreasing relevance and an upper bound of 10000 matches is
-     * imposed by the search implementation. See
+     * Note: The minimum cosine (relevance score) is set to ZERO (0d) in order
+     * to make sure that any match within a literal qualifies that literal for
+     * inclusion within the set of bindings that are materialized. This is in
+     * contrast to a standard search engine, where a minimum relevance score is
+     * used to filter out less likely matches. However, it is my sense that
+     * query against the KB is often used to find ALL matches. Regardless, the
+     * matches will be materialized in order of decreasing relevance and an
+     * upper bound of 10000 matches is imposed by the search implementation. See
      * {@link FullTextIndex#search(String, String, double, int)}.
      * 
      * @param svar
      *            The variable from the subject position of the
-     *            {@link StatementPattern} in which the {@link BNS#SEARCH}
-     *            magic predicate appears.
+     *            {@link StatementPattern} in which the {@link BNS#SEARCH} magic
+     *            predicate appears.
      * @param languageCode
-     *            An optional language code from the bound literal appearing
-     *            in the object position of that {@link StatementPattern}.
+     *            An optional language code from the bound literal appearing in
+     *            the object position of that {@link StatementPattern}.
      * @param label
      *            The required label from the bound literal appearing in the
      *            object position of that {@link StatementPattern}.
@@ -418,21 +409,20 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * 
      * @throws QueryEvaluationException
      * 
-     * @todo consider options for term weights and normalization. Search on
-     *       the KB is probably all terms with anything matching, stopwords
-     *       are excluded, and term weights can be without normalization
-     *       since ranking does not matter. And maxRank should probably be
-     *       defeated (Integer.MAX_VALUE or ZERO - whichever does the
-     *       trick).
+     * @todo consider options for term weights and normalization. Search on the
+     *       KB is probably all terms with anything matching, stopwords are
+     *       excluded, and term weights can be without normalization since
+     *       ranking does not matter. And maxRank should probably be defeated
+     *       (Integer.MAX_VALUE or ZERO - whichever does the trick).
      * 
-     * @todo it would be nice if there were a way for the caller to express
-     *       more parameters for the search, e.g., to give the minCosine and
-     *       maxRank values directly as a tuple-based function call. I'm not
-     *       sure if that is supported within Sesame/SPARQL.
+     * @todo it would be nice if there were a way for the caller to express more
+     *       parameters for the search, e.g., to give the minCosine and maxRank
+     *       values directly as a tuple-based function call. I'm not sure if
+     *       that is supported within Sesame/SPARQL.
      */
     protected CloseableIteration<BindingSet, QueryEvaluationException> search(
-            Var svar, String languageCode, String label, BindingSet bindings)
-            throws QueryEvaluationException {
+            final Var svar, final String languageCode, final String label,
+            final BindingSet bindings) throws QueryEvaluationException {
 
         if (INFO)
             log.info("languageCode=" + languageCode + ", label=" + label);
@@ -445,32 +435,32 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
     }
 
-    /** @issue make protected in openrdf. */
-    protected Value getVarValue(Var var, BindingSet bindings) {
-
-        if (var == null) {
-
-            return null;
-
-        } else if (var.hasValue()) {
-
-            return var.getValue();
-
-        } else {
-
-            return bindings.getValue(var.getName());
-
-        }
-
-    }
+    // /** @issue make protected in openrdf. */
+    // protected Value getVarValue(final Var var, final BindingSet bindings) {
+    //
+    // if (var == null) {
+    //
+    // return null;
+    //
+    // } else if (var.hasValue()) {
+    //
+    // return var.getValue();
+    //
+    // } else {
+    //
+    // return bindings.getValue(var.getName());
+    //
+    // }
+    //
+    // }
 
     /**
      * Uses native joins iff {@link BigdataSail.Options#NATIVE_JOINS} is
      * specified.
      * <p>
-     * Note: As a pre-condition, the {@link Value}s in the query expression
-     * MUST have been rewritten as {@link BigdataValue}s and their term
-     * identifiers MUST have been resolved. Any term identifier that remains
+     * Note: As a pre-condition, the {@link Value}s in the query expression MUST
+     * have been rewritten as {@link BigdataValue}s and their term identifiers
+     * MUST have been resolved. Any term identifier that remains
      * {@link IRawTripleStore#NULL} is an indication that there is no entry for
      * that {@link Value} in the database. Since the JOINs are required (vs
      * OPTIONALs), that means that there is no solution for the JOINs and an
@@ -478,54 +468,67 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      */
     @Override
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
-            Join join, BindingSet bindings) throws QueryEvaluationException
-    {
+            final Join join, final BindingSet bindings)
+            throws QueryEvaluationException {
 
         if (!nativeJoins) {
+
             // Use Sesame 2 evaluation for JOINs.
             return super.evaluate(join, bindings);
+
         }
-       
+
         if (INFO)
             log.info("evaluating native join:\n" + join);
-        
-        Collection<StatementPattern> stmtPatterns = 
-            new LinkedList<StatementPattern>();
-        Collection<Filter> filters = new LinkedList<Filter>();
-        
+
+        final Map<StatementPattern, Boolean> stmtPatterns = new LinkedHashMap<StatementPattern, Boolean>();
+
+        final Collection<Filter> filters = new LinkedList<Filter>();
+
         try {
+
             collectStatementPatterns(join, stmtPatterns, filters);
-        } catch (EncounteredUnionException ex) {
-            // Use Sesame 2 evaluation for JOINs with unions.
-            log.warn("we should really implement native Unions");
+
+        } catch (EncounteredUnknownTupleExprException ex) {
+
+            /*
+             * Use Sesame 2 evaluation for JOINs with unions.
+             * 
+             * FIXME We should really implement native Unions. All it requires
+             * is running the rules as part of a parallel program writing on the
+             * same query buffer.
+             */
+            log.warn("need to implement native TupleExpr: " + ex.getTupleExpr());
+
             return super.evaluate(join, bindings);
+
         }
-        
+
         if (INFO) {
-            for (StatementPattern stmtPattern : stmtPatterns) {
-                log.info(stmtPattern);
+            for (Map.Entry<StatementPattern, Boolean> entry : stmtPatterns.entrySet()) {
+                log.info(entry.getKey() + ", optional=" + entry.getValue());
             }
             for (Filter filter : filters) {
                 log.info(filter.getCondition());
             }
         }
-        
+
         // generate tails
         final Collection<IPredicate> tails = new LinkedList<IPredicate>();
-        for (StatementPattern stmtPattern : stmtPatterns) {
-            IPredicate tail = generateTail(stmtPattern);
+        for (Map.Entry<StatementPattern, Boolean> entry : stmtPatterns.entrySet()) {
+            IPredicate tail = generateTail(entry.getKey(), entry.getValue());
             if (tail == null) {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
             tails.add(tail);
         }
-        
+
         // generate constraints
         final Collection<IConstraint> constraints = new LinkedList<IConstraint>();
         final Iterator<Filter> filterIt = filters.iterator();
         while (filterIt.hasNext()) {
-            Filter filter = filterIt.next();
-            IConstraint constraint = generateConstraint(filter);
+            final Filter filter = filterIt.next();
+            final IConstraint constraint = generateConstraint(filter);
             if (constraint != null) {
                 // remove if we are able to generate a native constraint for it
                 if (INFO) {
@@ -543,102 +546,123 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
          * and its evaluation in order to properly handle this stuff.
          */
         IQueryOptions queryOptions = QueryOptions.NONE;
-        
-//        if (slice) {
-//            if (!distinct && !union) {
-//                final ISlice slice = new Slice(offset, limit);
-//                queryOptions = new QueryOptions(false/* distinct */,
-//                        true/* stable */, null/* orderBy */, slice);
-//            }
-//        } else {
-//            if (distinct && !union) {
-//                queryOptions = QueryOptions.DISTINCT;
-//            }
-//        }
-        
+
+        // if (slice) {
+        // if (!distinct && !union) {
+        // final ISlice slice = new Slice(offset, limit);
+        // queryOptions = new QueryOptions(false/* distinct */,
+        // true/* stable */, null/* orderBy */, slice);
+        // }
+        // } else {
+        // if (distinct && !union) {
+        // queryOptions = QueryOptions.DISTINCT;
+        // }
+        // }
+
         if (DEBUG) {
             for (IPredicate<ISPO> tail : tails) {
                 ISolutionExpander<ISPO> expander = tail.getSolutionExpander();
                 if (expander != null) {
-                    IAccessPath<ISPO> accessPath = 
-                        database.getSPORelation().getAccessPath(tail);
+                    IAccessPath<ISPO> accessPath = database.getSPORelation()
+                            .getAccessPath(tail);
                     accessPath = expander.getAccessPath(accessPath);
                     IChunkedOrderedIterator<ISPO> it = accessPath.iterator();
-                    while(it.hasNext()) {
+                    while (it.hasNext()) {
                         log.debug(it.next().toString(database));
                     }
                 }
             }
         }
-        
-        // generate native rule
-        final IRule rule = new Rule(
-                "nativeJoin", // @todo should serialize the query string here for the logs.
-                null, // head
-                tails.toArray(new IPredicate[tails.size()]),
-                queryOptions,//
-                // constraints on the rule.
-                constraints.size() > 0 ? 
-                constraints.toArray(new IConstraint[constraints.size()]) : null
-        );
 
-        CloseableIteration<BindingSet, QueryEvaluationException> result = 
-            runQuery(join, rule);
+        // generate native rule
+        final IRule rule = new Rule("nativeJoin", // @todo should serialize the
+                                                  // query string here for the
+                                                  // logs.
+                null, // head
+                tails.toArray(new IPredicate[tails.size()]), queryOptions,//
+                // constraints on the rule.
+                constraints.size() > 0 ? constraints
+                        .toArray(new IConstraint[constraints.size()]) : null);
+
+        if (BigdataStatics.debug) {
+            System.err.println(join.toString());
+            System.err.println(rule.toString());
+        }
+
+        CloseableIteration<BindingSet, QueryEvaluationException> result = runQuery(
+                join, rule);
 
         // use the basic filter iterator for remaining filters
         if (INFO && filters.size() > 0) {
-            log.info("could not translate " + filters.size() + " filters into native constraints:");
+            log.info("could not translate " + filters.size()
+                    + " filters into native constraints:");
         }
         for (Filter filter : filters) {
-            if (INFO) log.info("\n"+filter.getCondition());
+            if (INFO)
+                log.info("\n" + filter.getCondition());
             result = new FilterIterator(filter, result, this);
         }
 
         return result;
 
     }
-    
-    private void collectStatementPatterns(TupleExpr tupleExpr, 
-            Collection<StatementPattern> stmtPatterns,
-            Collection<Filter> filters) {
+
+    private void collectStatementPatterns(final TupleExpr tupleExpr,
+            final Map<StatementPattern, Boolean> stmtPatterns,
+            final Collection<Filter> filters) {
         if (tupleExpr instanceof StatementPattern) {
-            stmtPatterns.add((StatementPattern) tupleExpr);
+            stmtPatterns.put((StatementPattern) tupleExpr, Boolean.FALSE);
         } else if (tupleExpr instanceof Filter) {
-            Filter filter = (Filter) tupleExpr;
+            final Filter filter = (Filter) tupleExpr;
             filters.add(filter);
-            TupleExpr arg = filter.getArg();
+            final TupleExpr arg = filter.getArg();
             collectStatementPatterns(arg, stmtPatterns, filters);
         } else if (tupleExpr instanceof Join) {
-            Join join = (Join) tupleExpr;
-            TupleExpr left = join.getLeftArg();
-            TupleExpr right = join.getRightArg();
+            final Join join = (Join) tupleExpr;
+            final TupleExpr left = join.getLeftArg();
+            final TupleExpr right = join.getRightArg();
             collectStatementPatterns(left, stmtPatterns, filters);
             collectStatementPatterns(right, stmtPatterns, filters);
         } else if (tupleExpr instanceof Union) {
-            throw new EncounteredUnionException();
+            throw new EncounteredUnknownTupleExprException(tupleExpr);
+        } else if (tupleExpr instanceof LeftJoin) {
+            //throw new EncounteredUnknownTupleExprException(tupleExpr);
+            final LeftJoin leftJoin = (LeftJoin) tupleExpr;
+            final StatementPattern left = (StatementPattern) leftJoin.getLeftArg();
+            final StatementPattern right = (StatementPattern) leftJoin.getRightArg();
+            final ValueExpr condition = leftJoin.getCondition();
+            if (condition != null) {
+                // fake a filter, we just need the value expr later
+                filters.add(new Filter(right, condition));
+            }
+            stmtPatterns.put(left, Boolean.FALSE);
+            stmtPatterns.put(right, Boolean.TRUE);
         } else {
-            throw new RuntimeException("encountered unexpected TupleExpr: "
-                    + tupleExpr.getClass());
+            throw new EncounteredUnknownTupleExprException(tupleExpr);
         }
     }
 
-    private IPredicate generateTail(StatementPattern stmtPattern) 
+    private IPredicate generateTail(final StatementPattern stmtPattern, final boolean optional) 
         throws QueryEvaluationException {
 
         // create a solution expander for free text search if necessary
         ISolutionExpander<ISPO> expander = null;
         final Value predValue = stmtPattern.getPredicateVar().getValue();
-        if (DEBUG) log.debug(predValue);
+        if (DEBUG)
+            log.debug(predValue);
         if (predValue != null && MAGIC_SEARCH.equals(predValue)) {
             final Value objValue = stmtPattern.getObjectVar().getValue();
-            if (DEBUG) log.debug(objValue);
+            if (DEBUG)
+                log.debug(objValue);
             if (objValue != null && objValue instanceof Literal) {
-                expander = new FreeTextSearchExpander(database, (Literal) objValue);
+                expander = new FreeTextSearchExpander(database,
+                        (Literal) objValue);
             }
         }
-        
-        IVariableOrConstant<Long> s = 
-            generateVariableOrConstant(stmtPattern.getSubjectVar());
+
+        // @todo why is [s] handled differently?
+        final IVariableOrConstant<Long> s = generateVariableOrConstant(stmtPattern
+                .getSubjectVar());
         if (s == null) {
             return null;
         }
@@ -646,37 +670,39 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         if (expander == null) {
             p = generateVariableOrConstant(stmtPattern.getPredicateVar());
         } else {
-            p = new Constant<Long>(database.NULL);
+            p = new Constant<Long>(IRawTripleStore.NULL);
         }
         if (p == null) {
             return null;
         }
-        final IVariableOrConstant<Long> o; 
+        final IVariableOrConstant<Long> o;
         if (expander == null) {
             o = generateVariableOrConstant(stmtPattern.getObjectVar());
         } else {
-            o = new Constant<Long>(database.NULL);
+            o = new Constant<Long>(IRawTripleStore.NULL);
         }
         if (o == null) {
             return null;
         }
         final IVariableOrConstant<Long> c;
-        {
+        if (!database.isQuads()) {
+            /*
+             * Either triple store mode or provenance mode.
+             */
             final Var var = stmtPattern.getContextVar();
             if (var == null) {
                 // context position is not used.
                 c = null;
             } else {
                 final Value val = var.getValue();
-                if (val != null) {
+                if (val != null && database.isStatementIdentifiers()) {
                     /*
                      * Note: The context position is used as a statement
-                     * identifier (SID). SIDs may be used to retrieve
-                     * provenance statements (statements about statement)
-                     * using high-level query. SIDs are represented as blank
-                     * nodes and is not possible to have them bound in the
-                     * original query. They only become bound during query
-                     * evaluation.
+                     * identifier (SID). SIDs may be used to retrieve provenance
+                     * statements (statements about statement) using high-level
+                     * query. SIDs are represented as blank nodes and is not
+                     * possible to have them bound in the original query. They
+                     * only become bound during query evaluation.
                      */
                     throw new QueryEvaluationException(
                             "Context position is a statement identifier and may not be bound in the original query: "
@@ -685,8 +711,109 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                 final String name = var.getName();
                 c = com.bigdata.relation.rule.Var.var(name);
             }
+        } else {
+            /*
+             * Quad store mode.
+             * 
+             * FIXME Scale-out joins depend on knowledge of the best access path
+             * and the index partitions (aka shards) which it will traverse.
+             * Review all of the new expanders and make sure that they do not
+             * violate this principle. Expanders tend to lazily determine the
+             * access path, and I believe that RDFJoinNexus#getTailAccessPath()
+             * may even refuse to operate with expanders. If this is the case,
+             * then the choice of the access path needs to be completely coded
+             * into the predicate as a combination of binding or clearing the
+             * context variable and setting an appropriate constraint (filter).
+             */
+            if (BigdataStatics.debug) {
+                if (dataset == null) {
+                    System.err.println("No dataset.");
+                } else {
+                    final int defaultGraphSize = dataset.getDefaultGraphs()
+                            .size();
+                    final int namedGraphSize = dataset.getNamedGraphs().size();
+                    if (defaultGraphSize > 10 || namedGraphSize > 10) {
+                        System.err.println("large dataset: defaultGraphs="
+                                + defaultGraphSize + ", namedGraphs="
+                                + namedGraphSize);
+                    } else {
+                        System.err.println(dataset.toString());
+                    }
+                }
+                System.err.println(stmtPattern.toString());
+            }
+            if (expander != null) {
+                /*
+                 * @todo can this happen? If it does then we need to look at how
+                 * to layer the expanders.
+                 */
+                throw new AssertionError("expander already set");
+            }
+            final Var cvar = stmtPattern.getContextVar();
+            if (dataset == null) {
+                if (cvar == null) {
+                    /*
+                     * There is no dataset and there is no graph variable, so
+                     * the default graph will be the RDF Merge of ALL graphs in
+                     * the quad store.
+                     * 
+                     * This code path uses an "expander" which strips off the
+                     * context information and filters for the distinct (s,p,o)
+                     * triples to realize the RDF Merge of the source graphs for
+                     * the default graph.
+                     */
+                    c = null;
+                    expander = new DefaultGraphSolutionExpander(null/* ALL */);
+                } else {
+                    /*
+                     * There is no data set and there is a graph variable, so
+                     * the query will run against all named graphs and [cvar]
+                     * will be to the context of each (s,p,o,c) in turn. This
+                     * handles constructions such as:
+                     * 
+                     * "SELECT * WHERE {graph ?g {?g :p :o } }"
+                     */
+                    expander = new NamedGraphSolutionExpander(null/* ALL */);
+                    c = generateVariableOrConstant(cvar);
+                }
+            } else { // dataset != null
+                switch (stmtPattern.getScope()) {
+                case DEFAULT_CONTEXTS: {
+                    /*
+                     * Query against the RDF merge of zero or more source
+                     * graphs.
+                     */
+                    expander = new DefaultGraphSolutionExpander(dataset
+                            .getDefaultGraphs());
+                    /*
+                     * Note: cvar can not become bound since context is stripped
+                     * for the default graph.
+                     */
+                    if (cvar == null)
+                        c = null;
+                    else
+                        c = generateVariableOrConstant(cvar);
+                    break;
+                }
+                case NAMED_CONTEXTS: {
+                    /*
+                     * Query against zero or more named graphs.
+                     */
+                    expander = new NamedGraphSolutionExpander(dataset
+                            .getNamedGraphs());
+                    if (cvar == null) {// || !cvar.hasValue()) {
+                        c = null;
+                    } else {
+                        c = generateVariableOrConstant(cvar);
+                    }
+                    break;
+                }
+                default:
+                    throw new AssertionError();
+                }
+            }
         }
-        
+
         /*
          * This applies a filter to the access path to remove any inferred
          * triples when [includeInferred] is false.
@@ -698,21 +825,20 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
          */
         final IElementFilter<ISPO> filter = !tripleSource.includeInferred ? ExplicitSPOFilter.INSTANCE
                 : null;
-        
-        return new SPOPredicate(
-                new String[] { database.getSPORelation().getNamespace() },//
+
+        return new SPOPredicate(new String[] { database.getSPORelation()
+                .getNamespace() },//
                 -1, // partitionId
                 s, p, o, c, //
-                false, // optional
+                optional, // optional
                 filter, // filter on elements visited by the access path.
-                expander
-                );
+                expander);
     }
 
-    private IVariableOrConstant<Long> generateVariableOrConstant(Var var) {
+    private IVariableOrConstant<Long> generateVariableOrConstant(final Var var) {
         final IVariableOrConstant<Long> result;
-        Value val = var.getValue();
-        String name = var.getName();
+        final Value val = var.getValue();
+        final String name = var.getName();
         if (val == null) {
             result = com.bigdata.relation.rule.Var.var(name);
         } else {
@@ -723,12 +849,12 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         }
         return result;
     }
-    
-    private IConstraint generateConstraint(Filter filter) {
+
+    private IConstraint generateConstraint(final Filter filter) {
         return generateConstraint(filter.getCondition());
     }
-    
-    private IConstraint generateConstraint(ValueExpr valueExpr) {
+
+    private IConstraint generateConstraint(final ValueExpr valueExpr) {
         if (valueExpr instanceof Or) {
             return generateConstraint((Or) valueExpr);
         } else if (valueExpr instanceof SameTerm) {
@@ -738,7 +864,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         }
         return null;
     }
-    
+
     private IConstraint generateConstraint(Or or) {
         IConstraint left = generateConstraint(or.getLeftArg());
         IConstraint right = generateConstraint(or.getRightArg());
@@ -749,26 +875,24 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     }
 
     private IConstraint generateConstraint(SameTerm sameTerm) {
-        return generateConstraint
-            ( sameTerm.getLeftArg(), sameTerm.getRightArg(), CompareOp.EQ
-              );
+        return generateConstraint(sameTerm.getLeftArg(),
+                sameTerm.getRightArg(), CompareOp.EQ);
     }
 
     private IConstraint generateConstraint(Compare compare) {
-        return generateConstraint
-            ( compare.getLeftArg(), compare.getRightArg(), compare.getOperator()
-              );
+        return generateConstraint(compare.getLeftArg(), compare.getRightArg(),
+                compare.getOperator());
     }
-    
-    private IConstraint generateConstraint(ValueExpr left, ValueExpr right, 
+
+    private IConstraint generateConstraint(ValueExpr left, ValueExpr right,
             CompareOp operator) {
         IVariable<Long> var = null;
         IConstant<Long> constant = null;
-        
+
         if (left instanceof Var) {
-            var = com.bigdata.relation.rule.Var.var(((Var)left).getName());
+            var = com.bigdata.relation.rule.Var.var(((Var) left).getName());
         } else if (left instanceof ValueConstant) {
-            Value value = ((ValueConstant)left).getValue();
+            Value value = ((ValueConstant) left).getValue();
             final Long id = database.getTermId(value);
             if (id.longValue() == NULL)
                 return null;
@@ -776,11 +900,11 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         } else {
             return null;
         }
-        
+
         if (right instanceof Var) {
-            var = com.bigdata.relation.rule.Var.var(((Var)right).getName());
+            var = com.bigdata.relation.rule.Var.var(((Var) right).getName());
         } else if (right instanceof ValueConstant) {
-            Value value = ((ValueConstant)right).getValue();
+            Value value = ((ValueConstant) right).getValue();
             final Long id = database.getTermId(value);
             if (id.longValue() == NULL)
                 return null;
@@ -788,12 +912,12 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         } else {
             return null;
         }
-        
+
         if (INFO) {
             log.info("var: " + var);
             log.info("constant: " + constant);
         }
-        
+
         if (var == null || constant == null) {
             if (INFO) {
                 log.info("left: " + left);
@@ -801,16 +925,16 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             }
             return null;
         }
-        
+
         // we can do equals, not equals
         if (operator == CompareOp.EQ) {
             return new EQConstant(var, constant);
         } else if (operator == CompareOp.NE) {
             return new NEConstant(var, constant);
-        } else { 
+        } else {
             return null;
         }
-        
+
     }
 
     /**
@@ -829,7 +953,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             throws QueryEvaluationException {
 
         final boolean backchain = //
-                   tripleSource.getDatabase().getAxioms().isRdfSchema() 
+        tripleSource.getDatabase().getAxioms().isRdfSchema()
                 && tripleSource.includeInferred
                 && tripleSource.conn.isQueryTimeExpander();
 
@@ -839,7 +963,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                     + rule);
 
             log.info("backchain: " + backchain);
-            
+
         }
 
         // run the query as a native rule.
@@ -850,35 +974,35 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             /*
              * alternative evaluation orders for LUBM Q9 (default is 1 4, 2, 3,
-             * 0, 5).  All three evaluation orders are roughly as good as one 
-             * another.  Note that tail[2] (z rdf:type ...) is entailed by the
+             * 0, 5). All three evaluation orders are roughly as good as one
+             * another. Note that tail[2] (z rdf:type ...) is entailed by the
              * ontology and could be dropped from evaluation.
              */
-//            final IEvaluationPlanFactory planFactory = new FixedEvaluationPlanFactory(
-////                    new int[] { 1, 4, 3, 0, 5, 2 } good
-////                    new int[] { 1,  3, 0, 4, 5, 2 } good
-//                    );
+            // final IEvaluationPlanFactory planFactory = new
+            // FixedEvaluationPlanFactory(
+            // // new int[] { 1, 4, 3, 0, 5, 2 } good
+            // // new int[] { 1, 3, 0, 4, 5, 2 } good
+            // );
 
             final IJoinNexusFactory joinNexusFactory = database
                     .newJoinNexusFactory(RuleContextEnum.HighLevelQuery,
-                            ActionEnum.Query, IJoinNexus.BINDINGS,
-                            null, // filter
-                            false, // justify 
+                            ActionEnum.Query, IJoinNexus.BINDINGS, null, // filter
+                            false, // justify
                             backchain, //
                             planFactory//
-                            );
+                    );
 
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
                     .getIndexManager());
-    
+
             itr1 = joinNexus.runQuery(rule);
 
         } catch (Exception ex) {
-            
+
             throw new QueryEvaluationException(ex);
-            
+
         }
-        
+
         /*
          * Efficiently resolve term identifiers in Bigdata ISolutions to RDF
          * Values in Sesame 2 BindingSets and align the resulting iterator with
@@ -887,11 +1011,20 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         return new Bigdata2Sesame2BindingSetIterator<QueryEvaluationException>(
                 new BigdataSolutionResolverator(database, itr1).start(database
                         .getExecutorService()));
-        
+
     }
-    
+
     @SuppressWarnings("serial")
-    private class EncounteredUnionException extends RuntimeException {
+    private class EncounteredUnknownTupleExprException extends RuntimeException {
+        private TupleExpr tupleExpr;
+        
+        public EncounteredUnknownTupleExprException(TupleExpr tupleExpr) {
+            this.tupleExpr = tupleExpr;
+        }
+        
+        public TupleExpr getTupleExpr() {
+            return tupleExpr;
+        }
     }
 
 }

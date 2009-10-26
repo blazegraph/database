@@ -32,6 +32,9 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BigdataMap;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.jini.JiniFederation;
@@ -62,6 +65,13 @@ implements INotifyOutcome<E, L>
 {
 
     /**
+     * Log may be used to see just success/error reporting for the master
+     * without the log information from the base class.
+     */
+    static protected transient final Logger log = Logger
+            .getLogger(AbstractPendingSetMasterTask.class);
+
+    /**
      * Lock used to serialize operations on the {@link #pendingMap}.
      */
     private final ReentrantLock lock = new ReentrantLock();
@@ -78,7 +88,7 @@ implements INotifyOutcome<E, L>
      * A proxy for this class which is used by the client task to send
      * asynchronous notifications.
      */
-    protected final INotifyOutcome<E,L> masterProxy;
+    protected final INotifyOutcome<E, L> masterProxy;
 
     /**
      * Return the pending map. The pending map reflects the resources which are
@@ -147,11 +157,14 @@ implements INotifyOutcome<E, L>
      *         for a work item, a <code>true</code> return does not
      *         conclusively indicate a new work item.
      */
-    protected boolean addPending(final E e, final L locator) {
+    protected boolean addPending(final E e, final AbstractPendingSetSubtask sink, final L locator) {
         if (e == null)
+            throw new IllegalArgumentException();
+        if (sink == null)
             throw new IllegalArgumentException();
         if (locator == null)
             throw new IllegalArgumentException();
+        final boolean modifiedMap;
         lock.lock();
         try {
             Collection<L> locators = getPendingMap().remove(e);
@@ -159,14 +172,26 @@ implements INotifyOutcome<E, L>
                 locators = new LinkedHashSet<L>();
                 locators.add(locator);
                 getPendingMap().put(e, locators);
+                sink.getPendingSet().add(e);
                 // added to the map.
-                return true;
+                modifiedMap = true;
             } else {
                 // already in the map.
                 locators.add(locator);
                 getPendingMap().put(e, locators);
-                return false;
+                sink.getPendingSet().add(e);
+                modifiedMap = false;
             }
+            if (BigdataStatics.debug || log.isDebugEnabled()) {
+                String msg = "Added pending: size=" + getPendingSetSize()
+                        + ", resource=" + e + ", locator=" + locator
+                        + ", sinkSize=" + sink.getPendingSetSize();
+                if (BigdataStatics.debug)
+                    System.err.println(msg);
+                if (log.isDebugEnabled())
+                    log.debug(msg);
+            }
+            return modifiedMap; 
         } finally {
             lock.unlock();
         }
@@ -198,9 +223,10 @@ implements INotifyOutcome<E, L>
             throw new IllegalArgumentException();
         if (locator == null)
             throw new IllegalArgumentException();
-        if (cause == null)
-            throw new IllegalArgumentException();
+//        if (cause == null)
+//            throw new IllegalArgumentException();
         boolean notify = false;
+        final int sizeUnderLock;
         lock.lock();
         try {
             if (cause == null) {
@@ -261,7 +287,7 @@ implements INotifyOutcome<E, L>
                 getPendingMap().remove(e);
                 // will notify.
                 notify = true;
-                // no more rquests for that work item.
+                // no more requests for that work item.
                 return true;
             } else {
                 // otherwise outstanding requests remain, so update map.
@@ -270,7 +296,11 @@ implements INotifyOutcome<E, L>
                 return false;
             }
         } finally {
-            lock.unlock();
+            try {
+                sizeUnderLock = getPendingMap().size();
+            } finally {
+                lock.unlock();
+            }
             // notify once we have released the lock.
             if (notify) {
                 if (cause == null) {
@@ -278,6 +308,15 @@ implements INotifyOutcome<E, L>
                 } else {
                     didFail(e, cause);
                 }
+            }
+            if (BigdataStatics.debug || log.isDebugEnabled()) {
+                final String msg = "resource=" + e + ", notify=" + notify
+                        + ", pendingSetSize=" + sizeUnderLock + ", locator="
+                        + locator + (cause == null ? "" : "cause=" + cause);
+                if (BigdataStatics.debug)
+                    System.err.println(msg);
+                if (log.isDebugEnabled())
+                    log.debug(msg);
             }
         }
     }
@@ -292,7 +331,8 @@ implements INotifyOutcome<E, L>
     /**
      * The resource is removed from the {@link #pendingMap} and the pending set
      * for each sink for which there is an outstanding request for that
-     * resource.
+     * resource.  {@link #didSucceed(Object)} will be invoked the first time
+     * a request succeeds for that resource.
      */
     final public void success(final E e, final L locator) {
 
@@ -304,16 +344,18 @@ implements INotifyOutcome<E, L>
      * The resource is removed from the pending set for the sink associated with
      * that locator. If there are no more outstanding requests for that resource
      * in the {@link #pendingMap} then the resource is removed from the pending
-     * map as well.
+     * map as well.  {@link #didFail(Object, Throwable)} will be invoked if no
+     * requests remain for that resource in the {@link #pendingMap}.
      */
     final public void error(final E resource, final L locator, final Throwable cause) {
 
-        if (removePending(resource, locator, null/* cause */)) {
-
-            // all pending operations have failed for this resource.
-            log.error(resource, cause);
-
-        }
+        removePending(resource, locator, null/* cause */);
+//        if (removePending(resource, locator, null/* cause */)) {
+//
+//            // all pending operations have failed for this resource.
+//            log.error(resource, cause);
+//
+//        }
 
     }
     
@@ -331,7 +373,7 @@ implements INotifyOutcome<E, L>
         if (log.isInfoEnabled()) {
 
             // an asynchronous operation has succeeded for this resource.
-            log.info("resource=" + e);
+            log.info(e.toString());
 
         }
 

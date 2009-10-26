@@ -53,24 +53,23 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
         super(name);
     }
 
-    protected JiniServicesHelper services = new JiniServicesHelper(
-            "src/resources/config/standalone/");
+    private JiniServicesHelper helper = new JiniServicesHelper();
     
     protected JiniClient client;
     
     protected void setUp() throws Exception {
         
         // start services.
-        services.start();
+        helper.start();
         
         // expose to subclasses.
-        client = services.client;
+        client = helper.client;
         
     }
 
     protected void tearDown() throws Exception {
         
-        services.destroy();
+        helper.destroy();
         
     }
     

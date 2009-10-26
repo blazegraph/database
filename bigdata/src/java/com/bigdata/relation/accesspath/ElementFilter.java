@@ -40,7 +40,7 @@ abstract public class ElementFilter<E> extends Filter implements
         IElementFilter<E> {
 
     @SuppressWarnings("unchecked")
-    public final boolean isValid(Object obj) {
+    public final boolean isValid(final Object obj) {
 
         return accept((E) obj);
 

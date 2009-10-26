@@ -42,7 +42,8 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for {@link AbstractChunkedTupleIterator} and its concrete
- * {@link ChunkedLocalRangeIterator} implementation.
+ * {@link ChunkedLocalRangeIterator} implementation which depends on the
+ * {@link ResultSet}.
  * <p>
  * Note: There are other implementations derived from the same abstract base
  * class so they have a dependency on this test suite to get it right for the
@@ -626,16 +627,34 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
      * Unit test for (de-)serialization of {@link ResultSet}s used by the
      * chunked iterators.
      */
-    public void test_deserialization() {
+    public void test_chunkedIteratorResultSets() {
 
-        doDeserializationTest(1000/* N */, true/* deleteMarkers */);
+        doChunkedIteratorResultSetTest(1000/* N */, true/* deleteMarkers */,
+                true/* versionTimestamps */);
 
-        doDeserializationTest(1000/* N */, false/* deleteMarkers */);
-        
+        doChunkedIteratorResultSetTest(1000/* N */, true/* deleteMarkers */,
+                false/* versionTimestamps */);
+
+        doChunkedIteratorResultSetTest(1000/* N */, false/* deleteMarkers */,
+                true/* versionTimestamps */);
+
+        doChunkedIteratorResultSetTest(1000/* N */, false/* deleteMarkers */,
+                false/* versionTimestamps */);
+
     }
-    
-    protected void doDeserializationTest(int N, boolean deleteMarkers) {
-        
+
+    /**
+     * 
+     * @param N
+     *            The #of tuples for the test.
+     * @param deleteMarkers
+     *            if delete markers should be tested.
+     * @param versionTimestamps
+     *            if version timestamps should be tested.
+     */
+    protected void doChunkedIteratorResultSetTest(final int N,
+            final boolean deleteMarkers, final boolean versionTimestamps) {
+
         final String name = "testIndex";
 
         final IndexMetadata metadata = new IndexMetadata(name, UUID
@@ -643,6 +662,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         
         // optionally enable delete markers.
         metadata.setDeleteMarkers(deleteMarkers);
+
+        // optionally enable version timestamps.
+        metadata.setVersionTimestamps(versionTimestamps);
 
         // the default serializer will work fine for this.
         final ITupleSerializer<Long, String> tupleSer = new DefaultTupleSerializer<Long, String>(
@@ -662,7 +684,9 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         }
         
         final TupleData<Long, String>[] data = new TupleData[N];
-        
+
+        // the #of original tuples which are deleted (delete flag is set).
+        int ndeleted = 0;
         for (int i = 0; i < N; i++) {
             
             /*
@@ -671,12 +695,37 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
              */ 
             data[i] = new TupleData<Long, String>(i * 2L, getRandomString(
                     100/* len */, i/* id */), tupleSer); 
-        
-            // add to the tree as we go.
-            ndx.insert(data[i].k, data[i].v);
+
+            boolean delete = false;
+            if (deleteMarkers && r.nextInt(100) < 5) {
+                delete = true;
+            }
             
+            long timestamp = 0L;
+            if(versionTimestamps) {
+                timestamp = System.currentTimeMillis() + r.nextInt(10) * 5000;
+            }
+
+            final byte[] key = tupleSer.serializeKey(data[i].k);
+
+            final byte[] val = tupleSer.serializeVal(data[i].v);
+
+            // insert first
+            ndx.insert(key, val, false/* delete */, timestamp, ndx
+                    .getWriteTuple());
+
+            if (delete) {
+
+                // then convert to a delete marker.
+                ndx.insert(key, null/* val */, true/* delete */, timestamp, ndx
+                        .getWriteTuple());
+                
+                ndeleted++;
+                
+            }
+
         }
-        
+
         /*
          * Verify a full index scan.
          */
@@ -700,7 +749,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
                 IRangeQuery.DEFAULT/* flags */, null/* filter */);
         
         /*
-         * Verify with overriden capacity.
+         * Verify with overridden capacity.
          */
 
         doDeserializationTest(ndx, null/* fromKey */, null/* toKey */,
@@ -732,7 +781,7 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
         /*
          * Force all tuples to be removed.
          */
-        final int n1;
+        final int n1; // the #of tuples that were deleted.
         {
 
             final ITupleIterator itr = ndx
@@ -753,8 +802,12 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
 
         }
 
-        // visited all elements
-        assertNotSame(N, n1);
+        /*
+         * The #of tuples deleted in this pass plus the original tuples which
+         * have their delete flag set should be the same as the #of tuples that
+         * we were told to generate for the unit test.
+         */
+        assertEquals(N, n1 + ndeleted);
 
         /*
          * Visit again - both iterators should be empty now.
@@ -775,10 +828,12 @@ public class TestChunkedIterators extends AbstractBTreeTestCase {
 
         if (ndx.getIndexMetadata().getDeleteMarkers()) {
             /*
-             * If delete markers are enabled, then should visit the same #of
-             * tuples as the iterator before we deleted those tuples.
+             * If delete markers are enabled, then should visit all tuples that
+             * were originally generated (N) since they will all have their
+             * delete flag set now, including those which were originally
+             * generated with their delete flag set.
              */
-            assertEquals(n1, n2);
+            assertEquals(N, n2);
         } else {
             /*
              * Otherwise should visit NO tuples.

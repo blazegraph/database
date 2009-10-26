@@ -29,6 +29,8 @@ package com.bigdata.rdf.spo;
 
 import junit.framework.TestCase;
 
+import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.model.StatementEnum;
 
 /**
@@ -67,5 +69,5 @@ public class TestStatementEnum extends TestCase {
                 StatementEnum.Inferred, StatementEnum.Inferred));
         
     }
-    
+
 }

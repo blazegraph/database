@@ -52,11 +52,28 @@ public class TestTuple<E> implements ITuple<E> {
 
         this.flags = flags;
 
-        this.tupleSer = DefaultTupleSerializer.newInstance();
+        this.tupleSer = tupleSer;
         
         this.key = tupleSer.serializeKey(key);
 
         this.val = tupleSer.serializeVal(val);
+
+        this.deleted = deleted;
+
+        this.timestamp = timestamp;
+
+    }
+
+    public TestTuple(int flags, ITupleSerializer<Object, E> tupleSer,
+            byte[] key, byte[] val, boolean deleted, long timestamp) {
+
+        this.flags = flags;
+
+        this.tupleSer = tupleSer;
+        
+        this.key = key;
+
+        this.val = val;
 
         this.deleted = deleted;
 

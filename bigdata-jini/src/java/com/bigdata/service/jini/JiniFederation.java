@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.rmi.Remote;
 import java.rmi.server.ExportException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -58,12 +59,17 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.ConnectionLossException;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
+import org.apache.zookeeper.data.ACL;
 
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.io.IStreamSerializer;
+import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IResourceLockService;
@@ -159,11 +165,13 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
      * from the {@link ZooKeeperAccessor}. If the session associated with the
      * current {@link ZooKeeper} client is expired, then a distinct
      * {@link ZooKeeper} client associated with a distinct session will be
-     * returned. See {@link #getZookeeperAccessor()} which lets you explictly
+     * returned. See {@link #getZookeeperAccessor()} which lets you explicitly
      * handle a {@link SessionExpiredException} or the {@link ZooKeeper}
      * {@link ZooKeeper.States#CLOSED} state.
      * 
      * @see #getZookeeperAccessor()
+     * 
+     * @todo timeout variant w/ unit?
      */
     public ZooKeeper getZookeeper() {
 
@@ -177,6 +185,63 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
             
         }
         
+    }
+
+    /**
+     * Create key znodes used by the federation.
+     * 
+     * @throws KeeperException
+     * @throws InterruptedException
+     * 
+     * @todo probably better written using a timeout than the caller's zk inst.
+     */
+    public void createKeyZNodes(final ZooKeeper zookeeper)
+            throws KeeperException, InterruptedException {
+
+        final String zroot = zooConfig.zroot;
+        final List<ACL> acl = zooConfig.acl;
+        
+        final String[] a = new String[] {
+
+                // znode for the federation root.
+                zroot,
+
+                // znode for configuration metadata.
+                zroot + "/" + BigdataZooDefs.CONFIG,
+
+                // znode dominating most locks.
+                zroot + "/" + BigdataZooDefs.LOCKS,
+
+                // znode dominating lock nodes for creating new physical services.
+                zroot + "/" + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE,
+
+                // znode whose children are the per-service type service configurations.
+                zroot + "/" + BigdataZooDefs.LOCKS_SERVICE_CONFIG_MONITOR,
+
+                // znode for the resource locks (IResourceLockManager)
+                zroot + "/" + BigdataZooDefs.LOCKS_RESOURCES,
+
+        };
+
+        for (String zpath : a) {
+
+            try {
+
+                zookeeper.create(zpath, new byte[] {}/* data */, acl,
+                        CreateMode.PERSISTENT);
+
+            } catch (NodeExistsException ex) {
+
+                // that's fine - the configuration already exists.
+                if (log.isDebugEnabled())
+                    log.debug("exists: " + zpath);
+
+                return;
+
+            }
+
+        }
+
     }
     
     /**
@@ -224,7 +289,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
     }
     
     /**
-	 * Initiaties discovery for one or more service registrars and establishes a
+	 * Initiates discovery for one or more service registrars and establishes a
 	 * lookup caches for various bigdata services.
 	 * 
 	 * @param client
@@ -782,7 +847,7 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
 
     public void destroy() {
 
-        assertOpen();
+        super.destroy();
 
         try {
 

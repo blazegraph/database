@@ -80,7 +80,7 @@ public class UnsynchronizedArrayBuffer<E> extends
     }
 
     /** Add the chunk to the target buffer. */
-    final protected void handleChunk(E[] chunk) {
+    final protected void handleChunk(final E[] chunk) {
 
         target.add(chunk);
 

@@ -221,18 +221,18 @@ public class InferenceEngine {
 
         /**
          * When <code>true</code> (default
-         * {@value #DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY}) the
+         * {@value #DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY}) the
          * entailments for <code>owl:TransitiveProperty</code> are computed by
          * forward chaining and stored in the database. When <code>false</code>,
          * rules that produce those entailments are turned off such that they
          * are neither computed NOR stored and a backward chainer or magic sets
          * technique must be used to generate the entailments at query time.
          */
-        String FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = InferenceEngine.class
+        String FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY = InferenceEngine.class
                 .getName()
                 + ".forwardChainOwlTransitiveProperty";
 
-        String DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY = "true";
+        String DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY = "true";
 
         /**
          * When <code>true</code> (default
@@ -347,11 +347,11 @@ public class InferenceEngine {
 
             this.forwardChainOwlTransitiveProperty = Boolean
                     .parseBoolean(properties.getProperty(
-                            Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY,
-                            Options.DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY));
+                            Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY,
+                            Options.DEFAULT_FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY));
             
             if(INFO)
-            log.info(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERY + "="
+            log.info(Options.FORWARD_CHAIN_OWL_TRANSITIVE_PROPERTY + "="
                     + forwardChainOwlTransitiveProperty);
 
             this.forwardChainOwlHasValue = Boolean

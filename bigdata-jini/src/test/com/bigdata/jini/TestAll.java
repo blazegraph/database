@@ -36,8 +36,10 @@ import org.apache.log4j.Logger;
 import com.bigdata.service.jini.AbstractServerTestCase;
 
 /**
- * Aggregates tests in dependency order - see {@link AbstractServerTestCase} for
- * <strong>required</strong> system properties in order to run this test suite.
+ * Aggregates tests in dependency order. The service tests require that Jini is
+ * running, that you have specified a suitable security policy, etc. See
+ * {@link AbstractServerTestCase} for <strong>required</strong> system
+ * properties in order to run this test suite
  * 
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -62,7 +64,7 @@ public class TestAll extends TestCase {
          */
         {
 
-            Logger log = Logger.getRootLogger();
+            final Logger log = Logger.getRootLogger();
 
             if (log.getLevel().equals(Level.DEBUG)) {
 

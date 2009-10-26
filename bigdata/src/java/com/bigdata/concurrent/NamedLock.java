@@ -31,6 +31,7 @@ package com.bigdata.concurrent;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -64,7 +65,7 @@ public class NamedLock<T> {
      * 
      * @return The canonical instance of the lock for that name.
      */
-    protected Lock lockFactory(T name) {
+    protected Lock lockFactory(final T name) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -98,7 +99,7 @@ public class NamedLock<T> {
      * 
      * @return The {@link Lock}. It will have already been {@link Lock#lock()}ed.
      */
-    public Lock acquireLock(T name) {
+    public Lock acquireLock(final T name) {
 
         final Lock lock = lockFactory(name);
 
@@ -108,12 +109,13 @@ public class NamedLock<T> {
 
     }
 
-    public Lock acquireLock(T name, long timeout, TimeUnit unit)
-            throws InterruptedException {
+    public Lock acquireLock(final T name, final long timeout, final TimeUnit unit)
+            throws InterruptedException, TimeoutException {
 
         final Lock lock = lockFactory(name);
 
-        lock.tryLock(timeout, unit);
+        if(!lock.tryLock(timeout, unit))
+            throw new TimeoutException();
 
         return lock;
 

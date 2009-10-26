@@ -32,8 +32,8 @@ package com.bigdata.btree;
 /**
  * Interface for bloom filter implementations using an unsigned byte[] key.
  * <p>
- * Bloom filters give a 100% guarentee when reporting that a key was NOT found
- * but only a statistical guarentee when reporting that a key was found.
+ * Bloom filters give a 100% guarantee when reporting that a key was NOT found
+ * but only a statistical guarantee when reporting that a key was found.
  * Therefore if either {@link #add(byte[])} or {@link #contains(byte[])} reports
  * <code>true</code> then you MUST also test the data into order to determine
  * whether the response is a <em>false positive</em>.
@@ -61,8 +61,8 @@ public interface IBloomFilter {
 
     /**
      * Test the filter for the key <strong>a <code>true</code> return DOES NOT
-     * guarentee that the key has been added to the filter while a
-     * <code>false</code> return guarentees that the key HAS NOT been added to
+     * guarantee that the key has been added to the filter while a
+     * <code>false</code> return guarantees that the key HAS NOT been added to
      * the filter</strong>.
      * 
      * @param key
@@ -71,7 +71,7 @@ public interface IBloomFilter {
      * @return <code>true</code> if the filter has either that key or some key
      *         that is hash equivalent to that key using the hashing function
      *         imposed by the filter; <code>false</code> iff the filter can
-     *         guarentee that the key has not been added to the filter.
+     *         guarantee that the key has not been added to the filter.
      * 
      * @throws IllegalArgumentException
      *             if <i>key</i> is <code>null</code>.

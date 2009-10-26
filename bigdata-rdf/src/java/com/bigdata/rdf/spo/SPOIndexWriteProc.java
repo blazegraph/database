@@ -32,10 +32,11 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.StatementEnum;
@@ -101,7 +102,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @param keys
      * @param vals
      */
-    protected SPOIndexWriteProc(IDataSerializer keySer, IDataSerializer valSer,
+    protected SPOIndexWriteProc(IRabaCoder keySer, IRabaCoder valSer,
             int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, vals);
@@ -127,11 +128,12 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
         
-        public SPOIndexWriteProc newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public SPOIndexWriteProc newInstance(IRabaCoder keySer,
+                IRabaCoder valSer, int fromIndex, int toIndex, byte[][] keys,
+                byte[][] vals) {
 
-            return new SPOIndexWriteProc(keySer,valSer,fromIndex, toIndex, keys, vals);
+            return new SPOIndexWriteProc(keySer, valSer, fromIndex, toIndex,
+                    keys, vals);
 
         }
         
@@ -147,19 +149,24 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         // #of statements actually written on the index partition.
         long writeCount = 0;
 
-        final int n = getKeyCount();
+        final IRaba keys = getKeys();
+        
+        final int n = keys.size();//getKeyCount();
 
         // used to generate the values that we write on the index.
         final ByteArrayBuffer tmp = new ByteArrayBuffer(1 + 8/* max size */);
 
-        // true iff logging is enabled and this is the SPO index.
-        final boolean isSPO = INFO ? ndx.getIndexMetadata().getName().endsWith(
-                SPOKeyOrder.SPO.getIndexName()) : false;
-        
+        // true iff logging is enabled and this is the primary (SPO/SPOC) index.
+        final boolean isPrimaryIndex = INFO ? ((SPOTupleSerializer) ndx
+                .getIndexMetadata().getTupleSerializer()).getKeyOrder()
+                .isPrimaryIndex() : false;
+//        final boolean isPrimaryIndex = INFO ? ndx.getIndexMetadata().getName()
+//                .endsWith(SPOKeyOrder.SPO.getIndexName()) : false;
+
         for (int i = 0; i < n; i++) {
 
             // the key encodes the {s:p:o} of the statement.
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);//getKey(i);
             assert key != null;
 
             /*
@@ -184,11 +191,13 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             /*
              * Decode the new (proposed) statement identifier.
              */
-            final long new_sid = decodeStatementIdentifier(newType,val);
-            
+            final long new_sid = decodeStatementIdentifier(newType, val);
+
             /*
              * The current value for the statement in this index partition (or
              * null iff the stmt is not asserted).
+             * 
+             * @todo reuse Tuple for lookup to reduce byte[] allocation.
              */
             final byte[] oldval = ndx.lookup(key);
             
@@ -207,7 +216,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                 ndx.insert(key, SPO.serializeValue(tmp, false/* override */,
                         newType, new_sid/* MAY be NULL */));
 
-                if (isSPO && DEBUG) {
+                if (isPrimaryIndex && DEBUG) {
                     log.debug("new SPO: key=" + BytesUtil.toString(key)
                             + ", sid=" + new_sid);
                 }
@@ -239,7 +248,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         ndx.insert(key, SPO.serializeValue(tmp,
                                 false/* override */, newType, NULL/* sid */));
 
-                        if (isSPO && DEBUG) {
+                        if (isPrimaryIndex && DEBUG) {
                             log.debug("Downgrading SPO: key="
                                     + BytesUtil.toString(key) + ", oldType="
                                     + oldType + ", newType=" + newType);
@@ -281,7 +290,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         ndx.insert(key, SPO.serializeValue(tmp,
                                 false/* override */, maxType, sid));
 
-                        if (isSPO && DEBUG) {
+                        if (isPrimaryIndex && DEBUG) {
                             log.debug("Changing statement type: key="
                                     + BytesUtil.toString(key) + ", oldType="
                                     + oldType + ", newType=" + newType
@@ -298,7 +307,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        if (isSPO && INFO)
+        if (isPrimaryIndex && INFO)
             log.info("Wrote " + writeCount + " SPOs on ndx="
                     + ndx.getIndexMetadata().getName());
 

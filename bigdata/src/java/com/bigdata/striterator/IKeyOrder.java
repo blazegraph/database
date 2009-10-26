@@ -29,6 +29,8 @@ package com.bigdata.striterator;
 
 import java.util.Comparator;
 
+import com.bigdata.relation.rule.IPredicate;
+
 /**
  * An interface representing the natural traversal orders for the different
  * indices for some class of relation.
@@ -41,6 +43,11 @@ import java.util.Comparator;
 public interface IKeyOrder<E> {
 
     /**
+     * Return the #of elements in the key for this natural order.
+     */
+    public int getKeyArity();
+    
+    /**
      * Return the comparator that places elements into the natural order for the
      * associated index.
      */
@@ -50,5 +57,16 @@ public interface IKeyOrder<E> {
      * The base name for the index.
      */
     public String getIndexName();
-    
+
+    /**
+     * Return the index of the slot in the {@link IPredicate} which appears at
+     * the specified position in the key.
+     * 
+     * @param keyPos
+     *            The index into the key that is being generated.
+     * 
+     * @return The index of the slot in the {@link IPredicate}.
+     */
+    public int getKeyOrder(final int keyPos);
+
 }

@@ -39,6 +39,7 @@ import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.MetadataIndex.MetadataIndexMetadata;
+import com.bigdata.service.ndx.RawDataServiceTupleIterator;
 
 /**
  * Implementation caches all locators but does not allow stale locators. This is

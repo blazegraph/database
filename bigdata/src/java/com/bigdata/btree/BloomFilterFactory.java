@@ -117,9 +117,9 @@ public class BloomFilterFactory implements Serializable {
     public static final transient double DEFAULT_MAX_ERROR_RATE = 0.15;
 
     /**
-     * The recommened default factory configuration. This configuration is
+     * The recommenced default factory configuration. This configuration is
      * designed to provide a bloom filter with good performance up to ~2M index
-     * entries and then shutoff automatically. This works for both the scale-up
+     * entries and then shut off automatically. This works for both the scale-up
      * case (good for small indices and turns off for large indices) and for
      * scale-out (just about right sized for scale-out, depending on the split
      * handler).

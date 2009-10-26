@@ -27,13 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.BindException;
 import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
@@ -133,163 +128,168 @@ public abstract class AbstractServerTestCase extends TestCase2 {
 //        return port;
 //    }
 
-    /**
-     * This may be used to verify that a specific port is available. The method
-     * will return iff the port is available at the time that this method was
-     * called. The method will retry a few times since sometimes it takes a bit
-     * for a socket to get released and we are reusing the same socket for the
-     * {@link ClassServer} for each test.
-     * 
-     * @param port
-     *            The port to try.
-     * 
-     * @exception AssertionFailedError
-     *                if the port is not available.
-     */
-    protected static void assertOpenPort(final int port) throws IOException {
-        
-        ServerSocket openSocket;
+//    /**
+//     * This may be used to verify that a specific port is available. The method
+//     * will return iff the port is available at the time that this method was
+//     * called. The method will retry a few times since sometimes it takes a bit
+//     * for a socket to get released and we are reusing the same socket for the
+//     * {@link ClassServer} for each test.
+//     * 
+//     * @param port
+//     *            The port to try.
+//     * 
+//     * @exception AssertionFailedError
+//     *                if the port is not available.
+//     */
+//    protected static void assertOpenPort(final int port) throws IOException {
+//        
+//        ServerSocket openSocket;
+//
+//        int i = 0;
+//        
+//        final int maxTries = 3;
+//        
+//        while (i < maxTries) {
+//        
+//            try {
+//
+//                // try to open a server socket on that port.
+//                openSocket = new ServerSocket(port);
+//
+//                // close the socket - it is available for the moment.
+//                openSocket.close();
+//
+//                return;
+//
+//            } catch (BindException ex) {
+//
+//                if (i++ < maxTries) {
+//
+//                    log.warn("Port " + port + " is busy - retrying: " + ex);
+//
+//                    try {
+//                        Thread.sleep(100/* ms */);
+//                    } catch (InterruptedException t) {
+//                        /* ignore */
+//                    }
+//
+//                } else {
+//
+//                    fail("Port is busy: " + ex + " - use " + PORT_OPTION
+//                            + " to specify another port?");
+//
+//                }
+//
+//            }
+//
+//        }
+//        
+//    }
 
-        int i = 0;
-        
-        final int maxTries = 3;
-        
-        while (i < maxTries) {
-        
-            try {
+//    private ClassServer classServer;
+//    
+//    /**
+//     * The name of the System property that may be used to change the port on which
+//     * the {@link ClassServer} will be started.
+//     */
+//    public static final String PORT_OPTION = "bigdata.test.port";
+//    
+//    /**
+//     * The default port on which the {@link ClassServer} will be started.
+//     * <p>
+//     * Note: Outlook appears to conflict with 8081.
+//     */
+//    public static final String DEFAULT_PORT = "8082";
+//    
+//    /**
+//     * Starts a {@link ClassServer} that supports downloadable code for the unit
+//     * test. The {@link ClassServer} will start on the port named by the System
+//     * property {@link #PORT_OPTION} and on port {@link #DEFAULT_PORT} if that
+//     * system property is not set.
+//     * 
+//     * @throws IOException 
+//     */
+//    protected void startClassServer() throws IOException {
+//
+//        // Note: See below.
+////        if(true) return;
+//        
+//        Logger.getLogger("com.sun.jini.tool.ClassServer").setLevel(Level.ALL);
+//        
+//        /*
+//         * Obtain port from System.getProperties() so that other ports may be
+//         * used.
+//         */
+//        final int port = Integer.parseInt(System.getProperty(PORT_OPTION,DEFAULT_PORT));
+//        
+//        /*
+//         * The directories containing the JARs and the compiled classes for the
+//         * bigdata project.
+//         */
+//        String dirlist = 
+//            "lib"+File.pathSeparatorChar+
+//            "lib"+File.separatorChar+"icu"+File.pathSeparatorChar+
+//            "lib"+File.separatorChar+"jini"+File.pathSeparatorChar
+//            /*
+//             * FIXME This does not seem to be resolving the bigdata classes
+//             * necessitating that we list that jar explicitly below (and that it
+//             * be up to date). The problem can be seen in the Jini Service
+//             * Browser and the console for the Service Browser.  In fact, the
+//             * test suite executes just fine if you do NOT use the ClassServer!
+//             * 
+//             * I can only get this working right now by placing bigdata.jar into
+//             * the lib directory (or some other directory below the current
+//             * working directory, but not ant-build since that gives the ant
+//             * script fits).
+//             * 
+//             * I still see a ClassNotFound problem in the Jini console complaining
+//             * that it can not find IDataService, but only when I select the 
+//             * registrar on which the services are running!
+//             */
+////            +
+////            "bin"
+//            //+File.pathSeparatorChar+
+////            "ant-build"
+//            ;
+//        
+//        assertOpenPort(port);
+//        
+//        classServer = new ClassServer(
+//                port,
+//                dirlist,
+//                true, // trees - serve up files inside of JARs,
+//                true // verbose
+//                );
+//        
+//        classServer.start();
+//
+//    }
 
-                // try to open a server socket on that port.
-                openSocket = new ServerSocket(port);
-
-                // close the socket - it is available for the moment.
-                openSocket.close();
-
-                return;
-
-            } catch (BindException ex) {
-
-                if(i++<maxTries) {
-
-                    log.warn("Port "+port+" is busy - retrying: " + ex);
-                    
-                    try {
-                        Thread.sleep(100/*ms*/);
-                    } catch(InterruptedException t) {
-                        /* ignore */
-                    }
-                    
-                } else {
-                    
-                    fail("Port is busy: "+ex+" - use "+PORT_OPTION+" to specify another port?");
-
-                }
-
-            }
-
-        }
-        
-    }
-
-    private ClassServer classServer;
-    
-    /**
-     * The name of the System property that may be used to change the port on which
-     * the {@link ClassServer} will be started.
-     */
-    public static final String PORT_OPTION = "bigdata.test.port";
-    
-    /**
-     * The default port on which the {@link ClassServer} will be started.
-     */
-    public static final String DEFAULT_PORT = "8081";
-    
-    /**
-     * Starts a {@link ClassServer} that supports downloadable code for the unit
-     * test. The {@link ClassServer} will start on the port named by the System
-     * property {@link #PORT_OPTION} and on port {@link #DEFAULT_PORT} if that
-     * system property is not set.
-     * 
-     * @throws IOException 
-     */
-    protected void startClassServer() throws IOException {
-
-        // Note: See below.
-//        if(true) return;
-        
-        Logger.getLogger("com.sun.jini.tool.ClassServer").setLevel(Level.ALL);
-        
-        /*
-         * Obtain port from System.getProperties() so that other ports may be
-         * used.
-         */
-        final int port = Integer.parseInt(System.getProperty(PORT_OPTION,DEFAULT_PORT));
-        
-        /*
-         * The directories containing the JARs and the compiled classes for the
-         * bigdata project.
-         */
-        String dirlist = 
-            "lib"+File.pathSeparatorChar+
-            "lib"+File.separatorChar+"icu"+File.pathSeparatorChar+
-            "lib"+File.separatorChar+"jini"+File.pathSeparatorChar
-            /*
-             * FIXME This does not seem to be resolving the bigdata classes
-             * necessitating that we list that jar explictly below (and that it
-             * be up to date). The problem can be seen in the Jini Service
-             * Browser and the console for the Service Browser.  In fact, the
-             * test suite executes just fine if you do NOT use the ClassServer!
-             * 
-             * I can only get this working right now by placing bigdata.jar into
-             * the lib directory (or some other directory below the current
-             * working directory, but not ant-build since that gives the ant
-             * script fits).
-             * 
-             * I still see a ClassNotFound problem in the Jini console complaining
-             * that it can not find IDataService, but only when I select the 
-             * registrar on which the services are running!
-             */
-//            +
-//            "bin"
-            //+File.pathSeparatorChar+
-//            "ant-build"
-            ;
-        
-        assertOpenPort(port);
-        
-        classServer = new ClassServer(
-                port,
-                dirlist,
-                true, // trees - serve up files inside of JARs,
-                true // verbose
-                );
-        
-        classServer.start();
-
-    }
-    
     public void setUp() throws Exception {
 
-        log.info(getName());
-        
-        startClassServer();
-        
+        if (log.isInfoEnabled())
+            log.info(getName());
+
+//        startClassServer();
+
     }
 
     /**
      * Stops the {@link ClassServer}.
      */
     public void tearDown() throws Exception {
-        
-        if(classServer!=null) {
 
-            classServer.terminate();
-            
-        }
-        
+//        if (classServer != null) {
+//
+//            classServer.terminate();
+//
+//        }
+
         super.tearDown();
 
-        log.info(getName());
-        
+        if (log.isInfoEnabled())
+            log.info(getName());
+
     }
     
     /**
@@ -303,7 +303,8 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      * @exception InterruptedException
      *                if the thread is interrupted while it is waiting to retry.
      */
-    static public ServiceID getServiceID(AbstractServer server) throws AssertionFailedError, InterruptedException {
+    static public ServiceID getServiceID(final AbstractServer server)
+            throws AssertionFailedError, InterruptedException {
 
         ServiceID serviceID = null;
 
@@ -311,7 +312,7 @@ public abstract class AbstractServerTestCase extends TestCase2 {
 
             /*
              * Note: This can be null since the serviceID is not assigned
-             * synchonously by the registrar.
+             * synchronously by the registrar.
              */
 
             serviceID = server.getServiceID();
@@ -402,7 +403,7 @@ public abstract class AbstractServerTestCase extends TestCase2 {
          * finished processing the service registration. If it does, you can
          * generally just retry the test and it will succeed. However this
          * points out that the client may need to wait and retry a few times if
-         * you are starting everthing up at once (or just register for
+         * you are starting everything up at once (or just register for
          * notification events for the service if it is not found and enter a
          * wait state).
          */
@@ -424,12 +425,12 @@ public abstract class AbstractServerTestCase extends TestCase2 {
             
         }
 
-        if(service!=null) {
+        if (service != null) {
 
             System.err.println("Service found.");
-            
+
         }
-        
+
         return service;
         
     }

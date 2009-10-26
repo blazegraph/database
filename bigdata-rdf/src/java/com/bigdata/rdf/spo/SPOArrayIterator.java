@@ -110,7 +110,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
      * @param numStmts
      *            The #of entries in <i>stmts</i> that are valid.
      */
-    public SPOArrayIterator(ISPO[] stmts, int numStmts) {
+    public SPOArrayIterator(final ISPO[] stmts, final int numStmts) {
 
         this.db = null; // not available (remove is disabled).
 
@@ -179,8 +179,9 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
      *            An optional filter. When non-<code>null</code>, only
      *            matching statements will be visited.
      */
-    public SPOArrayIterator(AbstractTripleStore db, IAccessPath<ISPO> accessPath,
-            int limit, IElementFilter<ISPO> filter) {
+    public SPOArrayIterator(final AbstractTripleStore db,
+            final IAccessPath<ISPO> accessPath, final int limit,
+            final IElementFilter<ISPO> filter) {
 
         if (accessPath == null)
             throw new IllegalArgumentException();
@@ -210,7 +211,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
         final int n = (int) (limit > 0 ? Math.min(rangeCount, limit)
                 : rangeCount);
         
-        this.stmts = new SPO[ n ];
+        this.stmts = new ISPO[ n ];
 
         /*
          * Materialize the matching statements.
@@ -224,7 +225,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
 
         while (itr.hasNext() && i < n) {
 
-            SPO spo = (SPO)itr.next().getObject();
+            final ISPO spo = (SPO) itr.next().getObject();
             
             if (filter != null && !filter.accept(spo)) {
 
@@ -356,7 +357,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
             
             final int remaining = numStmts - i;
             
-            ret = new SPO[remaining];
+            ret = new ISPO[remaining];
             
             System.arraycopy(stmts, i, ret, 0, remaining);
             
@@ -370,7 +371,7 @@ public class SPOArrayIterator implements IChunkedOrderedIterator<ISPO> {
         
     }
     
-    public ISPO[] nextChunk(IKeyOrder<ISPO> keyOrder) {
+    public ISPO[] nextChunk(final IKeyOrder<ISPO> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();

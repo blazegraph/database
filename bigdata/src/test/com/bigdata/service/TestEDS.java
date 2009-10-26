@@ -159,13 +159,13 @@ public class TestEDS extends
     }
     
     @Override
-    protected EmbeddedFederation getStore(Properties properties) {
+    protected EmbeddedFederation getStore(final Properties properties) {
 
         return new EmbeddedClient(properties).connect();
     }
 
     @Override
-    protected EmbeddedFederation reopenStore(EmbeddedFederation fed) {
+    protected EmbeddedFederation reopenStore(final EmbeddedFederation fed) {
         
         final Properties properties = fed.getClient().getProperties();
         

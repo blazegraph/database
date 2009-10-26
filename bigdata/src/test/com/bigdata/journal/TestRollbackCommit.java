@@ -68,36 +68,42 @@ public class TestRollbackCommit extends ProxyTestCase<Journal> {
             final IRootBlockView rootBlockView0 = new RootBlockView(
                     true/* rootBlock0 */, rootBlock0, checker);
 
-            System.err.println("rootBlock0="+rootBlockView0);
-            
+            if (log.isInfoEnabled())
+                log.info("rootBlock0=" + rootBlockView0);
+
             final ByteBuffer rootBlock1 = journal.getBufferStrategy()
                     .readRootBlock(false/* rootBlock0 */);
 
             final IRootBlockView rootBlockView1 = new RootBlockView(
                     false/* rootBlock0 */, rootBlock1, checker);
 
-            System.err.println("rootBlock1="+rootBlockView1);
+            if (log.isInfoEnabled())
+                log.info("rootBlock1=" + rootBlockView1);
 
             // true iff rootBlock0 is the current root block.
-            final boolean isRootBlock0 = journal.getRootBlockView().isRootBlock0();
+            final boolean isRootBlock0 = journal.getRootBlockView()
+                    .isRootBlock0();
 
-            System.err.println("Using rootBlock=" + (isRootBlock0 ? 0 : 1));
-            
+            if (log.isInfoEnabled())
+                log.info("Using rootBlock=" + (isRootBlock0 ? 0 : 1));
+
             // write a record.
             journal.write(getRandomData());
 
             // commit the journal.
             journal.commit();
-            
-            System.err.println("After commit   ="+journal.getRootBlockView());
-            
+
+            if (log.isInfoEnabled())
+                log.info("After commit   =" + journal.getRootBlockView());
+
             // verify that the other root block is now the current one.
             assertNotSame(isRootBlock0, journal.getRootBlockView()
                     .isRootBlock0());
-            
+
             journal.rollback();
 
-            System.err.println("After rollback ="+journal.getRootBlockView());
+            if (log.isInfoEnabled())
+                log.info("After rollback =" + journal.getRootBlockView());
 
             // verify that the state of rootBlock0 is as before the commit.
             assertEquals(rootBlock0, journal.getBufferStrategy().readRootBlock(

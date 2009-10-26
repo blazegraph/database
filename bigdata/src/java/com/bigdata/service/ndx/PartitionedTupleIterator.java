@@ -42,7 +42,6 @@ import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
-import com.bigdata.service.DataServiceTupleIterator;
 import com.bigdata.service.IDataService;
 import com.bigdata.util.InnerCause;
 
@@ -52,7 +51,12 @@ import com.bigdata.util.InnerCause;
  * turn, the {@link DataServiceTupleIterator} may make several queries to the
  * data service per partition. The actual #of queries made to the data service
  * depends on the #of index entries that are visited per partition and the
- * capacity specified to the ctor.
+ * capacity specified to the ctor. {@link StaleLocatorException}s are handled
+ * transparently by restarting the locator scan and continuing the range query
+ * request from the successor (or predecessor for a reverse scan) of the last
+ * key visited. When the operation is unisolated, this class will correctly
+ * complete the range iterator request even if the index partition is split,
+ * joined or moved during traversal.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -458,7 +462,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
     }
 
     /**
-     * Issues a new range query against the next index partititon.
+     * Issues a new range query against the next index partition.
      */
     private boolean nextPartition() {
 
@@ -562,7 +566,7 @@ public class PartitionedTupleIterator<E> implements ITupleIterator<E> {
                     ts, _fromKey, _toKey, capacity, flags, filter) {
                 
                 /**
-                 * Overriden so that we observe each distinct result set
+                 * Overridden so that we observe each distinct result set
                  * obtained from the DataService.
                  */
                 protected ResultSet getResultSet(final long timestamp,

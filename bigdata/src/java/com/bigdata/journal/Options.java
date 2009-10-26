@@ -37,6 +37,7 @@ import com.bigdata.io.FileLockUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.resources.StoreManager.ManagedJournal;
 
 /**
  * Options for the {@link Journal}. Options are specified as property values to
@@ -261,15 +262,11 @@ public interface Options {
 
     /**
      * The #of bits in a 64-bit long integer identifier that are used to encode
-     * the byte offset of a record in the store as an unsigned integer (default
-     * is {@value #DEFAULT_OFFSET_BITS}).
-     * <p>
-     * The default supports scale-out deployments (distributed federation). If
-     * you are using a scale-up deployment (single data service or journal) then
-     * you SHOULD explicitly specify a different value in order to allow larger
-     * files.
+     * the byte offset of a record in the store as an unsigned integer. The
+     * default is {@link WormAddressManager#SCALE_UP_OFFSET_BITS} for a
+     * {@link Journal} and {@link WormAddressManager#SCALE_OUT_OFFSET_BITS} for
+     * a {@link ManagedJournal}.
      * 
-     * @see #DEFAULT_OFFSET_BITS
      * @see WormAddressManager#SCALE_UP_OFFSET_BITS
      * @see WormAddressManager#SCALE_OUT_OFFSET_BITS
      */
@@ -279,7 +276,7 @@ public interface Options {
      * An optional boolean property (default {@value #DEFAULT_VALIDATE_CHECKSUM}).
      * When <code>true</code>, the checksum stored in the root blocks of an
      * existing store will be validated when the store file is opened. This
-     * property may be set to false if you are engaged in a desparate attempt to
+     * property may be set to false if you are engaged in a desperate attempt to
      * use a bad root block or to patch a bad root block using a hex editor.
      * 
      * @see #DEFAULT_VALIDATE_CHECKSUM
@@ -355,7 +352,7 @@ public interface Options {
      * <dt>Force</dt>
      * <dd>Force the journal contents, but not the file metadata, to stable
      * storage. The precise semantics of this option are dependent on the OS and
-     * hardware platform (some hardware platforms may guarentee that the file
+     * hardware platform (some hardware platforms may guarantee that the file
      * metadata is stable using a battery powered disk cache). If there is a
      * crash, the information lost can range from the last modified timestamp on
      * the file to the file length (which can make it impossible to re-open the
@@ -384,7 +381,7 @@ public interface Options {
     /**
      * This boolean option causes application data to be forced to stable
      * storage <em>before</em> we update the root blocks. This option seeks to
-     * guarentee that the application data is stable on the disk before the
+     * guarantee that the application data is stable on the disk before the
      * atomic commit. Some operating systems and/or file systems may otherwise
      * choose an ordered write or otherwise process the writes in a different
      * order. This could have the consequence that the root blocks are laid down
@@ -393,7 +390,7 @@ public interface Options {
      * updated root blocks represent the atomic commit point but not all
      * application data was successfully made stable on disk.
      * 
-     * @deprecated This option does NOT provide a sufficient guarentee when a
+     * @deprecated This option does NOT provide a sufficient guarantee when a
      *             write cache is in use by the operating system or the disk if
      *             the layered write caches return before all data is safely on
      *             disk (or in a battery powered cache). In order to protect
@@ -418,7 +415,7 @@ public interface Options {
      * <p>
      * Note: This option is often used when preparing a journal for a unit test.
      * <p>
-     * Note: The default temporary directory is used unless it is overriden by
+     * Note: The default temporary directory is used unless it is overridden by
      * the {@link #TMP_DIR} option.
      * <p>
      * Note: In order to re-open a journal that was created with this option you
@@ -510,14 +507,14 @@ public interface Options {
      */
     String DEFAULT_MAXIMUM_EXTENT = ""+(200 * Bytes.megabyte);
     
-    /**
-     * The default #of bits ({@value WormAddressManager#SCALE_OUT_OFFSET_BITS})
-     * used to encode the byte offset of a record in the store as an unsigned
-     * integer.
-     * 
-     * @see #OFFSET_BITS
-     */
-    String DEFAULT_OFFSET_BITS = ""+WormAddressManager.SCALE_OUT_OFFSET_BITS;
+//    /**
+//     * The default #of bits ({@value WormAddressManager#SCALE_OUT_OFFSET_BITS})
+//     * used to encode the byte offset of a record in the store as an unsigned
+//     * integer.
+//     * 
+//     * @see #OFFSET_BITS
+//     */
+//    String DEFAULT_OFFSET_BITS = ""+WormAddressManager.SCALE_OUT_OFFSET_BITS;
 
     String DEFAULT_VALIDATE_CHECKSUM = "true";
     

@@ -73,8 +73,34 @@ abstract public class ClientService extends AbstractService implements
         return session;
         
     }
-    
-    /**
+
+    public synchronized void shutdown() {
+
+        if (!isOpen())
+            return;
+
+        open = false;
+
+    }
+
+    public synchronized void shutdownNow() {
+
+        if (!isOpen())
+            return;
+
+        open = false;
+
+    }
+
+    final public boolean isOpen() {
+
+        return open;
+
+    }
+
+    private boolean open = true;
+
+     /**
      * 
      */
     public ClientService(final Properties properties) {

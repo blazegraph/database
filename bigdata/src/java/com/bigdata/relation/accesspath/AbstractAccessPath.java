@@ -52,8 +52,11 @@ import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IVariable;
+import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
@@ -113,9 +116,39 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     /** Iterator flags. */
     protected final int flags;
-    private final int chunkOfChunksCapacity;
-    private final int chunkCapacity;
-    private final int fullyBufferedReadThreshold;
+    protected final int chunkOfChunksCapacity;
+    protected final int chunkCapacity;
+    protected final int fullyBufferedReadThreshold;
+
+    private final boolean isFullyBoundForKey;
+    
+    /**
+     * <code>true</code> iff all elements in the predicate which are required
+     * to generate the key are bound to constants.
+     */
+    public boolean isFullyBoundForKey() {
+        
+        return isFullyBoundForKey;
+        
+    }
+    
+    /**
+     * @see AbstractResource#getChunkCapacity()
+     */
+    public int getChunkCapacity() {
+        
+        return chunkCapacity;
+        
+    }
+
+    /**
+     * @see AbstractResource#getChunkOfChunksCapacity()
+     */
+    public int getChunkOfChunksCapacity() {
+        
+        return chunkOfChunksCapacity;
+        
+    }
     
     /**
      * The maximum <em>limit</em> that is allowed for a fully-buffered read.
@@ -154,6 +187,18 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      */
     final protected FilterConstructor<R> filter;
 
+//    /**
+//     * A copy of the filter derived from the {@link IElementFilter}.
+//     */
+//    public FilterConstructor<R> getFilter() {
+//
+//        if (filter == null)
+//            return null;
+//
+//        return filter.clone();
+//        
+//    }
+    
     /**
      * Used to detect failure to call {@link #init()}.
      */
@@ -347,18 +392,38 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
         
         this.historicalRead = TimestampUtility.isReadOnly(timestamp);
+
+        this.isFullyBoundForKey = predicate.isFullyBound(keyOrder);
         
         final IElementFilter<R> constraint = predicate.getConstraint();
 
-        if (constraint == null) {
+        /*
+         * Optional constraint enforces the "same variable" constraint. The
+         * constraint will be null unless at least one variable appears in more
+         * than one position in the predicate.
+         */
+        final SameVariableConstraint<R> sameVarConstraint = SameVariableConstraint
+                .newInstance(predicate);
+       
+        if (constraint == null && sameVarConstraint == null) {
 
-            this.filter = null;
+            filter = null;
 
         } else {
 
-            this.filter = new FilterConstructor<R>();
-            
-            this.filter.addFilter(new ElementFilter<R>(constraint));
+            filter = new FilterConstructor<R>();
+
+            if (constraint != null) {
+
+                filter.addFilter(new ElementFilter<R>(constraint));
+
+            }
+
+            if (sameVarConstraint != null) {
+
+                filter.addFilter(new ElementFilter<R>(sameVarConstraint));
+
+            }
 
         }
         
@@ -389,7 +454,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             
         }
         
-        @SuppressWarnings("unchecked")
         public boolean isValid(final ITuple<R> tuple) {
             
             final R obj = (R) tuple.getObject();
@@ -447,6 +511,16 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
         if(log.isDebugEnabled()) {
             
+            if (fromKey != null && toKey != null) {
+                
+                if (BytesUtil.compareBytes(fromKey, toKey) >= 0) {
+
+                    throw new AssertionError("keys are out of order: " + toString());
+
+                }
+                
+            }
+
             log.debug(toString());
             
         }
@@ -481,6 +555,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
+    /**
+     * @todo for scale-out, it may be better to implement {@link #isEmpty()}
+     *       without specifying a capacity of ONE (1) and then caching the
+     *       returned iterator. This could avoid an expensive RMI test if we
+     *       invoke {@link #iterator()} shortly after {@link #isEmpty()} returns
+     *       <code>false</code>.
+     */
     public boolean isEmpty() {
 
         assertInitialized();
@@ -532,42 +613,49 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         
     }
 
-    final public IChunkedOrderedIterator<R> iterator(int limit, int capacity) {
-    
+    final public IChunkedOrderedIterator<R> iterator(final int limit,
+            final int capacity) {
+
         return iterator(0L/* offset */, limit, capacity);
-        
+
     }
-    
+
     /**
      * @throws RejectedExecutionException
      *             if the iterator is run asynchronously and the
      *             {@link ExecutorService} is shutdown or has a maximum capacity
      *             and is saturated.
      * 
-     * FIXME Support both offset and limit for asynchronous iterators. right now
-     * this will force the use of the
-     * {@link #synchronousIterator(long, long, Iterator)} when the offset or
-     * limit are non-zero, but that is only permitted up to a limit of
-     * {@link #MAX_FULLY_BUFFERED_READ_LIMIT}.
+     *             FIXME Support both offset and limit for asynchronous
+     *             iterators. right now this will force the use of the
+     *             {@link #synchronousIterator(long, long, Iterator)} when the
+     *             offset or limit are non-zero, but that is only permitted up
+     *             to a limit of {@link #MAX_FULLY_BUFFERED_READ_LIMIT}.
      * 
-     * FIXME in order to support large limits we need to verify that the
-     * asynchonous iterator can correctly handle REMOVEALL and that incremental
-     * materialization up to the [limit] will not effect the semantics for
-     * REMOVEALL or the other iterator flags (per above). (In fact, the
-     * asynchronous iterator does not support either [offset] or [limit] at this
-     * time).
+     *             FIXME in order to support large limits we need to verify that
+     *             the asynchronous iterator can correctly handle REMOVEALL and
+     *             that incremental materialization up to the [limit] will not
+     *             effect the semantics for REMOVEALL or the other iterator
+     *             flags (per above). (In fact, the asynchronous iterator does
+     *             not support either [offset] or [limit] at this time).
      * 
-     * FIXME write unit tests for slice handling by this method and modify the
-     * SAIL integration to use it for SLICE on an {@link IAccessPath} scan. Note
-     * that there are several {@link IAccessPath} implementations and they all
-     * need to be tested with SLICE.
+     *             FIXME write unit tests for slice handling by this method and
+     *             modify the SAIL integration to use it for SLICE on an
+     *             {@link IAccessPath} scan. Note that there are several
+     *             {@link IAccessPath} implementations and they all need to be
+     *             tested with SLICE.
      * 
-     * Those tests should be located in
-     * {@link com.bigdata.rdf.store.TestAccessPath}.
+     *             Those tests should be located in
+     *             {@link com.bigdata.rdf.spo.TestSPOAccessPath}.
+     * 
+     *             FIXME The offset and limit should probably be rolled into the
+     *             predicate and removed from the {@link IAccessPath}. This way
+     *             they will be correctly applied when {@link #isEmpty()} is
+     *             implemented using the {@link #iterator()} to determine if any
      */
     @SuppressWarnings("unchecked")
-    final public IChunkedOrderedIterator<R> iterator(long offset, long limit,
-            int capacity) {
+    final public IChunkedOrderedIterator<R> iterator(final long offset,
+            long limit, int capacity) {
 
         if (offset < 0)
             throw new IllegalArgumentException();
@@ -596,7 +684,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
             /*
              * The access path has already been proven to be empty.
              */
-            
+
+            if (log.isDebugEnabled())
+                log.debug("Proven empty by historical range count");
+
             return new EmptyChunkedIterator<R>(keyOrder);
             
         }
@@ -610,10 +701,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         // true iff a point test is a hit on the bloom filter.
         boolean bloomHit = false;
         
-        if(predicate.isFullyBound()) {
+        if(isFullyBoundForKey) {
 
             if (log.isDebugEnabled())
-                log.debug("Predicate is fully bound.");
+                log.debug("Predicate is fully bound for the key.");
             
             /*
              * If the predicate is fully bound then there can be at most one
@@ -827,7 +918,6 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
      * 
      * @param accessPath
      *            The access path (including the triple pattern).
-     * 
      * @param offset
      *            The first element that will be materialized (non-negative).
      * @param limit
@@ -861,31 +951,30 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         int nread = 0;
         int nused = 0;
 
-        R[] buffer = null;
-
         // skip past the offset elements.
         while (nread < offset && src.hasNext()) {
 
             src.next();
-            
+
             nread++;
-            
+
         }
-        
-        // read up to [limit] elements.
-        while (src.hasNext() && nused < limit) {
+
+        // read up to [limit] elements into the buffer.
+        R[] buffer = null;
+        while (nused < limit && src.hasNext()) {
 
             final R e = src.next();
 
             if (buffer == null) {
 
                 buffer = (R[]) java.lang.reflect.Array.newInstance(
-                        e.getClass(), (int)limit);
+                        e.getClass(), (int) limit);
 
             }
 
             buffer[nused] = e;
-            
+
             nused++;
             nread++;
 
@@ -897,7 +986,10 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
                     + ", offset=" + offset + ", limit=" + limit);
 
         }
-        
+
+//        if (limit == 1)
+//            System.err.println("Fully buffered: used=" + nused + ", limit=" + limit);
+
         if (nread == 0) {
 
             return new EmptyChunkedIterator<R>(keyOrder);
@@ -1054,15 +1146,54 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
     }
 
+    /**
+     * Note: When there is a {@link IPredicate#getConstraint()} on the
+     * {@link IPredicate} the exact range count will apply that constraint as a
+     * filter during traversal. However, the constraint is ignored for the fast
+     * range count.
+     */
     final public long rangeCount(final boolean exact) {
 
         assertInitialized();
 
-        final long n;
+        long n = 0L;
         
         if(exact) {
-        
-            n = ndx.rangeCountExact(fromKey, toKey);
+
+            /*
+             * @todo we can cache exact range counts also, but we can not return
+             * a cached estimated range count when an exact range count is
+             * requested.
+             */
+            
+            if (filter != null) {
+
+                /*
+                 * If there is a filter, then we need to visit the elements and
+                 * apply the filter to those elements.
+                 * 
+                 * FIXME If the filter is properly driven through to the indices
+                 * then the index should be able to enable the (KEYS,VALS) flags
+                 * locally and we can avoid sending back the full tuple when
+                 * just doing a range count. This could be done using a
+                 * rangeCount(exact,filter) method on IIndex.
+                 */
+                
+                final IChunkedOrderedIterator<R> itr = iterator();
+
+                while (itr.hasNext()) {
+
+                    itr.next();
+
+                    n++;
+
+                }
+
+            } else {
+            
+                n = ndx.rangeCountExact(fromKey, toKey);
+            
+            }
 
         } else {
 
@@ -1082,7 +1213,8 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
 
         if (log.isDebugEnabled()) {
 
-            log.debug("exact=" + exact + ", n=" + n + " : " + toString());
+            log.debug("exact=" + exact + ", filter=" + (filter != null)
+                    + ", n=" + n + " : " + toString());
 
         }
 
@@ -1152,10 +1284,13 @@ abstract public class AbstractAccessPath<R> implements IAccessPath<R> {
         }
 
         /*
-         * Remove everything in the key range. Do not materialize keys or
-         * values.
+         * Remove everything in the key range which satisfies the filter. Do
+         * not materialize keys or values.
+         * 
+         * @todo if offset and limit are rolled into the access path then
+         * they would also belong here.
          */
-        final ITupleIterator itr = rangeIterator(0/* capacity */,
+        final ITupleIterator<?> itr = rangeIterator(0/* capacity */,
                 IRangeQuery.REMOVEALL, filter);
 
         long n = 0;

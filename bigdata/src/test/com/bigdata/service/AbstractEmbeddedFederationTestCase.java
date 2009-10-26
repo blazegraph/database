@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.AbstractBTreeTestCase;
@@ -46,6 +47,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.search.FullTextIndex;
+import com.bigdata.service.ndx.RawDataServiceTupleIterator;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data
@@ -84,7 +86,7 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
 
     public Properties getProperties() {
         
-        Properties properties = new Properties( super.getProperties() );
+        final Properties properties = new Properties(super.getProperties());
         
         // Note: uses transient mode for tests.
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient
@@ -104,11 +106,13 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
          * statistics or if you are testing index partition moves, since moves
          * rely on the per-host counters collected from the o/s.
          */
-        properties.setProperty(EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS,"false");
+        properties.setProperty(
+                AbstractClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
 
         // disable moves.
-        properties.setProperty(ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET,"0");
-        
+        properties.setProperty(
+                ResourceManager.Options.MAXIMUM_MOVES_PER_TARGET, "0");
+
         return properties;
         
     }
@@ -121,6 +125,11 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      */
     public void setUp() throws Exception {
       
+        super.setUp();
+        
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
         dataDir = new File( getName() );
         
         if(dataDir.exists() && dataDir.isDirectory()) {
@@ -134,22 +143,26 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
         fed = client.connect();
 
         metadataService = fed.getMetadataService();
-        log.info("metadataService: "+metadataService.getServiceUUID());
+        if (log.isInfoEnabled())
+            log.info("metadataService: " + metadataService.getServiceUUID());
 
-        dataService0 = ((EmbeddedFederation)fed).getDataService(0);
-        log.info("dataService0   : "+dataService0.getServiceUUID());
+        dataService0 = ((EmbeddedFederation) fed).getDataService(0);
+        if (log.isInfoEnabled())
+            log.info("dataService0   : " + dataService0.getServiceUUID());
 
         if (((EmbeddedFederation) fed).getDataServiceCount() > 1) {
-        
-            dataService1 = ((EmbeddedFederation)fed).getDataService(1);
-            log.info("dataService1   : "+dataService1.getServiceUUID());
+
+            dataService1 = ((EmbeddedFederation) fed).getDataService(1);
+            if (log.isInfoEnabled())
+                log.info("dataService1   : " + dataService1.getServiceUUID());
             
         }
         
+
     }
     
     public void tearDown() throws Exception {
-        
+
         client.disconnect(true/*immediateShutdown*/);
 
         /*
@@ -157,12 +170,17 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
          * able to see what was created in the file system.
          */
         
-        if(false && dataDir.exists() && dataDir.isDirectory()) {
+        if (true && dataDir.exists() && dataDir.isDirectory()) {
 
             recursiveDelete( dataDir );
             
         }
         
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
+        super.tearDown();
+
     }
     
     /**
@@ -172,24 +190,26 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
      * @param f
      *            A file or directory.
      */
-    private void recursiveDelete(File f) {
+    private void recursiveDelete(final File f) {
         
         if(f.isDirectory()) {
             
-            File[] children = f.listFiles();
-            
-            for(int i=0; i<children.length; i++) {
-                
-                recursiveDelete( children[i] );
-                
+            final File[] children = f.listFiles();
+
+            for (int i = 0; i < children.length; i++) {
+
+                recursiveDelete(children[i]);
+
             }
             
         }
         
-        log.info("Removing: "+f);
+        if(log.isInfoEnabled())
+            log.info("Removing: "+f);
         
         if (!f.delete())
             throw new RuntimeException("Could not remove: " + f);
+//            log.error("Could not remove: " + f);
 
     }
     

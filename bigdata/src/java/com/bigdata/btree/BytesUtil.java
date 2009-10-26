@@ -23,9 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import it.unimi.dsi.fastutil.bytes.CustomByteArrayFrontCodedList;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.io.OutputBitStream;
+
 import java.util.Comparator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
+
+import com.bigdata.rawstore.Bytes;
 
 /**
  * Class supporting operations on variable length byte[] keys.
@@ -58,12 +66,17 @@ import org.apache.log4j.Logger;
  */
 public class BytesUtil {
 
-    protected static final Logger log = Logger.getLogger(BytesUtil.class);
+    protected static final transient Logger log = Logger.getLogger(BytesUtil.class);
 
     /**
-     * An empty byte array.
+     * An empty <code>byte[]</code>.
      */
-    public static final byte[] EMPTY = new byte[]{};
+    public static final byte[] EMPTY = new byte[0];
+
+    /**
+     * An empty <code>byte[][]</code>.
+     */
+    public static final byte[][] EMPTY2 = new byte[0][];
 
     /**
      * Flag set iff JNI linking succeeds.  When this flag is false we run with
@@ -131,7 +144,8 @@ public class BytesUtil {
 
                 System.loadLibrary("BytesUtil");
 
-                if(log.isInfoEnabled()) log.info("BytesUtil JNI linked");
+                if (log.isInfoEnabled())
+                    log.info("BytesUtil JNI linked");
 
                 linked = true;
 
@@ -147,7 +161,7 @@ public class BytesUtil {
         return linked;
 
     }
-    
+
     /**
      * True iff the two arrays compare as equal. This is somewhat optimized in
      * that it tests the array lengths first, assumes that it is being used on
@@ -164,23 +178,25 @@ public class BytesUtil {
      */
     final public static boolean bytesEqual(final byte[] a, final byte[] b) {
 
-        if(a == b ) return true;
-        
+        if (a == b)
+            return true;
+
         final int alen = a.length;
 
         final int blen = b.length;
 
         if (alen != blen)
             return false;
-        
-        int i = alen-1;
 
-        while(i>=0) {
-        
-            if( a[i] != b[i] ) return false;
-            
+        int i = alen - 1;
+
+        while (i >= 0) {
+
+            if (a[i] != b[i])
+                return false;
+
             i--;
-            
+    
         }
 
 //        for (int i = 0; i < alen; i++) {
@@ -192,7 +208,7 @@ public class BytesUtil {
         return true;
         
     }
-    
+
     /**
      * Byte-wise comparison of byte[]s (the arrays are treated as arrays of
      * unsigned bytes).
@@ -206,10 +222,17 @@ public class BytesUtil {
      * @return a negative integer, zero, or a positive integer if the first
      *         argument is less than, equal to, or greater than the second.
      * 
-     * @todo consider returning the index of the byte at which the difference
-     *       was detected rather than the difference of the bytes at that index.
-     *       the index would be negative or positive depending on which way the
-     *       comparison went.
+     * @todo Return the index of the byte at which the difference with the sign
+     *       adjusted to indicate the relative order of the data rather than the
+     *       difference of the bytes at that index. The index would be negative
+     *       or positive depending on which way the comparison went. See
+     *       {@link CustomByteArrayFrontCodedList} for an implementation
+     *       guideline.
+     *       <p>
+     *       Change all implementations in this class and also BytesUtil.c,
+     *       which needs to be recompiled for Windows. Also makes sure that it
+     *       gets compiled and linked for Un*x. That should be tested from the
+     *       ant installer and the result reported. Do the same for ICU4JNI.
      */
     final public static int compareBytes(final byte[] a, final byte[] b) {
         if(a==b) return 0;
@@ -225,14 +248,43 @@ public class BytesUtil {
             return _compareBytes(alen,a, blen,b);
         }
         for (int i = 0; i < alen && i < blen; i++) {
-            // promotes to signed integers in [0:255] for comaprison.
-            int ret = (a[i] & 0xff) - (b[i] & 0xff);
+            // promotes to signed integers in [0:255] for comparison.
+            final int ret = (a[i] & 0xff) - (b[i] & 0xff);
             //                int ret = a[i] - b[i];
             if (ret != 0)
                 return ret;
         }
         return alen - blen;
     }
+
+//    /**
+//     * Byte-wise comparison of a {@link ByteBuffer} and a byte[]. The data are
+//     * treated as arrays of unsigned bytes. The {@link ByteBuffer} position,
+//     * limit and mark are unchanged by this procedure.
+//     * 
+//     * @param a
+//     *            A {@link ByteBuffer}.
+//     * @param aoff
+//     *            The offset of the starting byte in the buffer.
+//     * @param blen
+//     *            The number of bytes to be compared.
+//     * @param b
+//     *            A byte[].
+//     * 
+//     * @return a negative integer, zero, or a positive integer if the first
+//     *         argument is less than, equal to, or greater than the second.
+//     */
+//    final public static int compareBytes(final ByteBuffer a, final int aoff,
+//            final int alen, final byte[] b) {
+//        final int blen = b.length;
+//        for (int i = 0; i < alen && i < blen; i++) {
+//            // promotes to signed integers in [0:255] for comparison.
+//            final int ret = (a.get(aoff + i) & 0xff) - (b[i] & 0xff);
+//            if (ret != 0)
+//                return ret;
+//        }
+//        return alen - blen;
+//    }
 
 //    /**
 //     * Byte-wise comparison of byte[]s (the arrays are treated as arrays of
@@ -334,7 +386,7 @@ public class BytesUtil {
      *         in which the two arrays differ, although that index could lie
      *         beyond the end of one of the arrays).
      */
-    public final static int getPrefixLength(byte[] a, byte[] b) {
+    public final static int getPrefixLength(final byte[] a, final byte[] b) {
 
         final int alen = a.length;
 
@@ -365,11 +417,11 @@ public class BytesUtil {
      * @return A new byte[] containing the leading bytes in common between the
      *         two arrays.
      */
-    public final static byte[] getPrefix(byte[] a, byte[] b) {
+    public final static byte[] getPrefix(final byte[] a, final byte[] b) {
 
         final int len = getPrefixLength(a, b);
 
-        byte[] prefix = new byte[len];
+        final byte[] prefix = new byte[len];
         
         System.arraycopy(a, 0, prefix, 0, len);
         
@@ -386,11 +438,11 @@ public class BytesUtil {
      * 
      * @return A new unsigned byte[] that is the successor of the key.
      */
-    public final static byte[] successor(byte[] key) {
+    public final static byte[] successor(final byte[] key) {
 
         final int keylen = key.length;
 
-        byte[] tmp = new byte[keylen + 1];
+        final byte[] tmp = new byte[keylen + 1];
 
         System.arraycopy(key, 0, tmp, 0, keylen);
 
@@ -459,7 +511,8 @@ public class BytesUtil {
 //    *             if the keys are equal.
 //    * @throws IllegalArgumentException
 //    *             if the keys are out of order.
-    final public static byte[] getSeparatorKey(byte[] givenKey, byte[] priorKey) {
+    final public static byte[] getSeparatorKey(final byte[] givenKey,
+            final byte[] priorKey) {
 
         if (givenKey == null)
             throw new IllegalArgumentException();
@@ -501,7 +554,7 @@ public class BytesUtil {
          */
 
         // allocate to right size.
-        byte[] tmp = new byte[prefixLen+1];
+        final byte[] tmp = new byte[prefixLen+1];
         
         // copy shared prefix plus the following byte.
         System.arraycopy(givenKey, 0, tmp, 0, prefixLen+1);
@@ -518,17 +571,41 @@ public class BytesUtil {
      * 
      * @return The string representation of the array as unsigned bytes.
      */
-    final public static String toString(byte[] key) {
+    final public static String toString(final byte[] key) {
+        
+        if (key == null)
+            return NULL;
+        
+        return toString(key, 0, key.length);
+        
+    }
 
-        if(key==null) return NULL;
-        
-        StringBuilder sb = new StringBuilder(key.length*4+2);
-        
+    /**
+     * Formats a key as a series of comma delimited unsigned bytes.
+     * 
+     * @param key
+     *            The key.
+     * @param off
+     *            The index of the first byte that will be visited.
+     * @param len
+     *            The #of bytes to visit.
+     * 
+     * @return The string representation of the array as unsigned bytes.
+     */
+    final public static String toString(final byte[] key, final int off,
+            final int len) {
+
+        if (key == null)
+            return NULL;
+
+        final StringBuilder sb = new StringBuilder(len * 4 + 2);
+
         sb.append("[");
         
-        for( int i=0; i<key.length; i++) {
+        for (int i = off; i < off + len; i++) {
             
-            if( i>0 ) sb.append(", ");
+            if (i > 0)
+                sb.append(", ");
             
             // as an unsigned integer.
 //            sb.append(Integer.toHexString(key[i] & 0xff));
@@ -550,9 +627,9 @@ public class BytesUtil {
      * @param data
      *            An array of unsigned byte arrays.
      */
-    static public String toString(byte[][] data) {
+    static public String toString(final byte[][] data) {
        
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         final int n = data.length;
         
@@ -614,19 +691,22 @@ public class BytesUtil {
 
             final byte[] midVal = keys[offset];
 
-            int tmp = BytesUtil.compareBytes(midVal, key);
+            // compare actual vs probe
+            final int tmp = BytesUtil.compareBytes(midVal, key);
 
             if (tmp < 0) {
 
+                // Actual LT probe, restrict lower bound and try again.
                 low = mid + 1;
 
             } else if (tmp > 0) {
 
+                // Actual GT probe, restrict upper bound and try again.
                 high = mid - 1;
 
             } else {
 
-                // Found: return offset.
+                // Actual EQ probe. Found : return offset.
 
                 return offset;
 
@@ -651,11 +731,11 @@ public class BytesUtil {
     public static class UnsignedByteArrayComparator implements Comparator<byte[]> {
 
         public static transient final Comparator<byte[]> INSTANCE = new UnsignedByteArrayComparator();
-        
-        public int compare(byte[] o1, byte[] o2) {
-            
+
+        public int compare(final byte[] o1, final byte[] o2) {
+
             return BytesUtil.compareBytes(o1, o2);
-            
+
         }
         
     }
@@ -688,7 +768,7 @@ public class BytesUtil {
      * @exception AssertionError
      *                if the JNI methods do not produce the expected answers.
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
  
         // Force load of the JNI library.
         loadJNILibrary();
@@ -705,8 +785,172 @@ public class BytesUtil {
             
         }
 
-        System.err.println("JNI library routines Ok.");
+        System.out.println("JNI library routines Ok.");
+        
+    }
+
+    /**
+     * Return the #of bytes required to bit code the specified #of bits.
+     * 
+     * @param nbits
+     *            The #of bit flags.
+     * 
+     * @return The #of bytes required. This will be zero iff <i>nbits</i> is
+     *         zero.
+     */
+    final public static int bitFlagByteLength(final int nbits) {
+
+        return nbits / 8 + (nbits % 8 == 0 ? 0 : 1);
+        
+//        return nbits>>>3;
+        
+//        if (nbits == 0)
+//            return 0;
+//        
+//        return ((int) ((nbits / 8) + 1));
         
     }
     
+    /**
+     * Return the index of the byte in which the bit with the given index is
+     * encoded.
+     * 
+     * @param bitIndex
+     *            The bit index.
+     *            
+     * @return The byte index.
+     */
+    final public static int byteIndexForBit(final long bitIndex) {
+        
+        return ((int) (bitIndex / 8));
+        
+    }
+
+    /**
+     * Return the offset within the byte in which the bit is coded of the bit
+     * (this is just the remainder <code>bitIndex % 8</code>).
+     * <p>
+     * Note, the computation of the bit offset is intentionally aligned with
+     * {@link OutputBitStream} and {@link InputBitStream}.
+     * 
+     * @param bitIndex
+     *            The bit index into the byte[].
+     * 
+     * @return The offset of the bit in the appropriate byte.
+     */
+    final public static int withinByteIndexForBit(final long bitIndex) {
+        
+        return 7 - ((int) bitIndex) % 8;
+        
+    }
+
+    /**
+     * Get the value of a bit.
+     * <p>
+     * Note, the computation of the bit offset is intentionally aligned with
+     * {@link OutputBitStream} and {@link InputBitStream}.
+     * 
+     * @param bitIndex
+     *            The index of the bit.
+     * 
+     * @return The value of the bit.
+     */
+    final public static boolean getBit(final byte[] buf, final long bitIndex) {
+
+        final int mask = (1 << withinByteIndexForBit(bitIndex));
+
+        final int off = byteIndexForBit(bitIndex);
+
+        final byte b = buf[off];
+
+        return (b & mask) != 0;
+
+    }
+
+    /**
+     * Set the value of a bit - this is NOT thread-safe (contention for the byte
+     * in the backing buffer can cause lost updates).
+     * <p>
+     * Note, the computation of the bit offset is intentionally aligned with
+     * {@link OutputBitStream} and {@link InputBitStream}.
+     * 
+     * @param bitIndex
+     *            The index of the bit.
+     * 
+     * @return The old value of the bit.
+     */
+    final public static boolean setBit(final byte[] buf, final long bitIndex,
+            final boolean value) {
+
+        final int mask = (1 << withinByteIndexForBit(bitIndex));
+
+        final int off = byteIndexForBit(bitIndex);
+
+        // current byte at that index.
+        byte b = buf[off];
+
+        final boolean oldValue = (b & mask) != 0;
+
+        if (value)
+            b |= mask;
+        else
+            b &= ~mask;
+
+        buf[off] = b;
+        
+        return oldValue;
+
+    }
+    
+    /**
+     * Decode a string of the form <code>[0-9]+(k|kb|m|mb|g|gb)?</code>,
+     * returning the number of bytes. When a suffix indicates kilobytes,
+     * megabytes, or gigabytes then the returned value is scaled accordingly.
+     * The suffix is NOT case sensitive.
+     * 
+     * @param s
+     *            The string value.
+     * 
+     * @return The byte count.
+     * 
+     * @throws IllegalArgumentException
+     *             if there is a problem with the argument (<code>null</code>,
+     *             ill-formed, etc).
+     */
+    static public long getByteCount(final String s) {
+
+        if (s == null)
+            throw new IllegalArgumentException();
+
+        final Matcher m = PATTERN_BYTE_COUNT.matcher(s);
+
+        if (!m.matches())
+            throw new IllegalArgumentException(s);
+
+        // the numeric component.
+        final String g1 = m.group(1);
+
+        final long c = Long.valueOf(g1);
+
+        // the units (null if not given).
+        final String g2 = m.group(2);
+
+        final long count;
+        if (g2 == null) {
+            count = c;
+        } else if (g2.equalsIgnoreCase("k") || g2.equalsIgnoreCase("kb")) {
+            count = c * Bytes.kilobyte;
+        } else if (g2.equalsIgnoreCase("m") || g2.equalsIgnoreCase("mb")) {
+            count = c * Bytes.megabyte;
+        } else if (g2.equalsIgnoreCase("g") || g2.equalsIgnoreCase("gb")) {
+            count = c * Bytes.gigabyte;
+        } else {
+            throw new AssertionError();
+        }
+        return count;
+    }
+
+    static final private Pattern PATTERN_BYTE_COUNT = Pattern.compile(
+            "([0-9]+)(k|kb|m|mb|g|gb)?", Pattern.CASE_INSENSITIVE);
+
 }

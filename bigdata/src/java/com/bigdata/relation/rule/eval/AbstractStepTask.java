@@ -888,7 +888,7 @@ abstract public class AbstractStepTask extends DataServiceCallable<RuleStats>
      * @return The names of the indices maintained by those relations.
      */
     @SuppressWarnings("unchecked")
-    protected Set<String> getIndexNames(Collection<IRelation> c) {
+    protected Set<String> getIndexNames(final Collection<IRelation> c) {
 
         if (c == null)
             throw new IllegalArgumentException();

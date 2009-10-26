@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import com.bigdata.btree.data.IAbstractNodeData;
+
 /**
  * A persistent object.
  * 
@@ -44,7 +46,23 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * True iff the object is deleted.
      */
     transient protected boolean deleted = false;
-    
+
+    /**
+     * @todo Historically, a mutable node was always non-persistent. With the
+     *       introduction of coding of nodes and leaves for transient B+Trees on
+     *       eviction from the write retention queue, those nodes and leaves
+     *       become read-only when they are coded without becoming persistent.
+     *       While {@link IAbstractNodeData#isCoded()} currently reflects the
+     *       same distinction as {@link IAbstractNodeData#isReadOnly()}, that
+     *       might not always be the case. For example, it is possible to have
+     *       mutable coded node/leaf impls.
+     *       <p>
+     *       There are a number of asserts for this which are violated by the
+     *       change to support coding of nodes and leaves for the transient
+     *       B+Tree. Often, those asserts need to test
+     *       {@link IAbstractNodeData#isReadOnly()} instead, since that reflects
+     *       the concern that the node/leaf is not mutable.
+     */
     final public boolean isPersistent() {
 
         return identity != NULL;
@@ -80,7 +98,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * @throws IllegalStateException
      *             If the identity is already defined.
      */
-    void setIdentity(long key) throws IllegalStateException {
+    void setIdentity(final long key) throws IllegalStateException {
 
         if (key == NULL) {
 
@@ -117,7 +135,7 @@ abstract public class PO implements IIdentityAccess, IDirty {
 
     }
 
-    public void setDirty(boolean dirty) {
+    public void setDirty(final boolean dirty) {
 
         this.dirty = dirty;
 
@@ -129,6 +147,16 @@ abstract public class PO implements IIdentityAccess, IDirty {
      * deleted.
      */
     public String toString() {
+
+        return toShortString();
+        
+    }
+
+    /**
+     * Returns a short representation of the class, identity (if assigned), the
+     * object instance, and whether or not the {@link PO} is deleted.
+     */
+    public String toShortString() {
 
         final String s;
         
@@ -153,5 +181,4 @@ abstract public class PO implements IIdentityAccess, IDirty {
         }
 
     }
-
 }

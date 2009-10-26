@@ -41,7 +41,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
 
     }
 
-    public byte[] handle(ITuple tuple, IRawStore target) {
+    public byte[] handle(final ITuple tuple, final IRawStore target) {
 
         if (buf == null) {
 
@@ -108,7 +108,7 @@ public class BlobOverflowHandler implements IOverflowHandler {
             }
 
             // write on the target store.
-            addr2 = target.write(buf.wrap());
+            addr2 = target.write(buf.asByteBuffer());
 
             //                    // write buffer onto sink.
             //                    bout.write(buf, 0, nread);

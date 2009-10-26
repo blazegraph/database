@@ -16,6 +16,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.jini.start.IServiceListener;
 
 /**
@@ -44,7 +45,7 @@ public class ProcessHelper {
     private final ReentrantLock lock = new ReentrantLock();
     
     /**
-     * Signalled if we notice that the process has died by the thread which is
+     * Signaled if we notice that the process has died by the thread which is
      * monitoring its output.
      */
     private final Condition dead = lock.newCondition();
@@ -92,11 +93,21 @@ public class ProcessHelper {
 
         try {
 
-            log.warn("Waiting on exitValue: " + this);
+            if(log.isInfoEnabled())
+                log.info("Waiting on exitValue: " + this);
 
             final int exitValue = exitValue(Long.MAX_VALUE, TimeUnit.SECONDS);
 
-            log.warn("Process is dead: " + this + ", exitValue=" + exitValue);
+            final String msg = "Process is dead: " + this + ", exitValue="
+                    + exitValue;
+
+            if (exitValue != 0) {
+                // log as error w/ stack trace for abnormal exit.
+                log.error(msg, new RuntimeException(msg));
+            } else {
+                // just log a warning for a normal exit.
+                log.warn(msg);
+            }
 
             return exitValue;
             
@@ -364,9 +375,12 @@ public class ProcessHelper {
      */
     protected void consumeOutput() {
 
+        long nlines = 0;
+        
+        BufferedReader is = null; 
         try {
 
-            final BufferedReader is = new BufferedReader(new InputStreamReader(
+            is = new BufferedReader(new InputStreamReader(
                     process.getInputStream()));
 
             String s;
@@ -377,6 +391,12 @@ public class ProcessHelper {
              */
             while ((s = is.readLine()) != null) {
 
+                if (nlines++ < BigdataStatics.echoProcessStartupLineCount) {
+
+                    System.out.println(name + " : " + s);
+
+                }
+                
                 if (log.isInfoEnabled())
                     log.info(s);
 
@@ -386,6 +406,16 @@ public class ProcessHelper {
 
             log.error(ex, ex);
 
+        } finally {
+
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException ex2) {
+                    log.error(ex2, ex2);
+                }
+            }
+            
         }
 
     }

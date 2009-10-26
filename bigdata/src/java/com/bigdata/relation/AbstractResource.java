@@ -47,6 +47,11 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.rdf.rules.FastClosure;
+import com.bigdata.rdf.rules.FullClosure;
+import com.bigdata.rdf.rules.RuleFastClosure5;
+import com.bigdata.rdf.rules.RuleFastClosure6;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -62,7 +67,6 @@ import com.bigdata.relation.rule.eval.ProgramTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinMasterTask;
 import com.bigdata.relation.rule.eval.pipeline.JoinTask;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.concurrent.ParallelismLimitedExecutorService;
 
 /**
  * Base class for locatable resources.
@@ -177,6 +181,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      */
     public boolean isNestedSubquery() {
 
+//        return false;
         return nestedSubquery;
         
     }
@@ -341,8 +346,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          *       dimension. The {@link JoinMasterTask} interprets this as a
          *       per-join dimension parallelism (the parallelism limit is
          *       currently imposed by a per {@link JoinTask}
-         *       {@link ExecutorService} since there is a problem with the
-         *       {@link ParallelismLimitedExecutorService}).
+         *       {@link ExecutorService}, which must be explicitly enabled in
+         *       the code).
          */
         String MAX_PARALLEL_SUBQUERIES = ProgramTask.class.getName()
                 + ".maxParallelSubqueries";

@@ -181,7 +181,7 @@ public class TransactionServer extends AbstractServer {
     }
 
     @Override
-    protected AbstractTransactionService newService(Properties properties) {
+    protected AbstractTransactionService newService(final Properties properties) {
 
         final DistributedTransactionService service = new AdministrableTransactionService(
                 this, properties);
@@ -211,10 +211,10 @@ public class TransactionServer extends AbstractServer {
             DistributedTransactionService implements RemoteAdministrable,
             RemoteDestroyAdmin {
         
-        protected TransactionServer server;
+        final protected TransactionServer server;
 
-        public AdministrableTransactionService(TransactionServer server,
-                Properties properties) {
+        public AdministrableTransactionService(final TransactionServer server,
+                final Properties properties) {
             
             super(properties);
             
@@ -223,7 +223,7 @@ public class TransactionServer extends AbstractServer {
         }
         
         @Override
-        public JiniFederation getFederation() {
+        public JiniFederation<?> getFederation() {
 
             return server.getClient().getFederation();
             
@@ -256,6 +256,7 @@ public class TransactionServer extends AbstractServer {
          *       authenticated identity of the client (if any) for an incoming
          *       remote call.
          */
+        @Override
         protected void setupLoggingContext() {
             
             super.setupLoggingContext();
@@ -279,6 +280,7 @@ public class TransactionServer extends AbstractServer {
             
         }
 
+        @Override
         protected void clearLoggingContext() {
 
             MDC.remove("clientname");
@@ -294,29 +296,52 @@ public class TransactionServer extends AbstractServer {
         /**
          * Destroy the service.
          */
-        public void destroy() {
+        @Override
+        synchronized public void destroy() {
 
-            server.runDestroy();
+            if (!server.isShuttingDown()) {
+
+                /*
+                 * Run thread which will destroy the service (asynchronous).
+                 * 
+                 * Note: By running this is a thread, we avoid closing the
+                 * service end point during the method call.
+                 */
+
+                server.runDestroy();
+
+            } else if (isOpen()) {
+
+                /*
+                 * The server is already shutting down, so invoke our super
+                 * class behavior to destroy the persistent state.
+                 */
+
+                super.destroy();
+
+            }
 
         }
 
-        public void shutdown() {
+        @Override
+        synchronized public void shutdown() {
 
             // normal shutdown for the transaction service (blocks).
             super.shutdown();
 
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/*destroy*/);
 
         }
 
-        public void shutdownNow() {
+        @Override
+        synchronized public void shutdownNow() {
 
             // immediate service shutdown (blocks).
             super.shutdownNow();
 
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/*destroy*/);
 
         }
 
@@ -326,6 +351,7 @@ public class TransactionServer extends AbstractServer {
          * {@link Configuration} then the value returned by the base class is
          * returned instead.
          */
+        @Override
         public String getServiceName() {
 
             String s = server.getServiceName();

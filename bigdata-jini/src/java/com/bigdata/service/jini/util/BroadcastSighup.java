@@ -42,6 +42,11 @@ import com.bigdata.service.jini.JiniFederation;
  * connects. Each discovered {@link IServicesManagerService} will push the
  * service configuration to zookeeper and then restart any processes for which
  * it has responsibility which are not currently running.
+ * <p>
+ * Note: If you are running a federation on a cluster, you can achieve the same
+ * effect by changing the federation run state to <code>hup</code> and then
+ * changing it back to <code>status</code> after the bigdata controller script
+ * has been executed at least once by each machine.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

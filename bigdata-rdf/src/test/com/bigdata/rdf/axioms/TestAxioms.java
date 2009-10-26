@@ -146,7 +146,7 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
 
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
 
@@ -225,7 +225,7 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
         
@@ -318,7 +318,7 @@ public class TestAxioms extends AbstractTripleStoreTestCase {
             
         } finally {
             
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
             
         }
 

@@ -80,15 +80,20 @@ public class TestSPOPredicate extends TestCase2 {
             final Var<Long> u = Var.var("u");
 
             final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf,
-                    rdfsResource);
-            
-            log.info(p1.toString());
+ rdfsResource);
 
-            assertEquals("arity",3,p1.arity());
-            
-            assertEquals("variableCount", 1, p1.getVariableCount());
+            if (log.isInfoEnabled())
+                log.info(p1.toString());
 
-            assertEquals(u,p1.get(0));
+            assertEquals("arity", 3, p1.arity());
+
+            assertEquals("variableCount", 1, p1
+                    .getVariableCount(SPOKeyOrder.SPO));
+
+            assertEquals("variableCount", 2, p1
+                    .getVariableCount(SPOKeyOrder.SPOC));
+
+            assertEquals(u, p1.get(0));
 
             assertEquals(rdfsSubClassOf,p1.get(1));
             
@@ -102,13 +107,19 @@ public class TestSPOPredicate extends TestCase2 {
 
             final Var<Long> v = Var.var("v");
 
-            final SPOPredicate p1 = new SPOPredicate(relation,u, rdfsSubClassOf, v);
+            final SPOPredicate p1 = new SPOPredicate(relation, u,
+                    rdfsSubClassOf, v);
 
-            log.info(p1.toString());
+            if (log.isInfoEnabled())
+                log.info(p1.toString());
 
             assertEquals("arity", 3, p1.arity());
 
-            assertEquals("variableCount", 2, p1.getVariableCount());
+            assertEquals("variableCount", 2, p1
+                    .getVariableCount(SPOKeyOrder.SPO));
+
+            assertEquals("variableCount", 3, p1
+                    .getVariableCount(SPOKeyOrder.SPOC));
 
             assertEquals(u, p1.get(0));
 

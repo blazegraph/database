@@ -332,7 +332,7 @@ public class Latch {
                 
                 nanos -= now - lastTime;
                 
-                lastTime = now;
+//                lastTime = now;
 
                 if (counter.get() == 0) {
 

@@ -35,9 +35,9 @@ import net.jini.config.Configuration;
 import net.jini.config.ConfigurationProvider;
 
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
-import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.Options;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
+import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.JiniServicesHelper;
 
@@ -103,7 +103,7 @@ public class TestJiniCoreServicesProcessHelper extends TestCase2 {
                         configFile,
                         JiniCoreServicesConfiguration.Options.NAMESPACE + "."
                                 + Options.SERVICE_DIR + "="
-                                + ServiceConfiguration.q(home) };
+                                + ConfigMath.q(home) };
 
             }
             

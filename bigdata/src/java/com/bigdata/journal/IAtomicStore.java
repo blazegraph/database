@@ -70,7 +70,7 @@ public interface IAtomicStore extends IRawStore {
      *            {@link ICommitter} will be recorded.
      * 
      * @param committer
-     *            The commiter.
+     *            The committer.
      */
     public void setCommitter(int index, ICommitter committer);
 
@@ -107,7 +107,7 @@ public interface IAtomicStore extends IRawStore {
      * @return The {@link ICommitRecord} for the most recent committed state
      *         whose commit timestamp is less than or equal to <i>timestamp</i>
      *         -or- <code>null</code> iff there are no {@link ICommitRecord}s
-     *         that satisify the probe.
+     *         that satisfy the probe.
      */
     public ICommitRecord getCommitRecord(long timestamp);
 

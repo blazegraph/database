@@ -188,6 +188,11 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     protected final AbstractTripleStore database;
     
     /**
+     * The arity of the SPORelation for the {@link #getDatabase()}.
+     */
+    private final int arity;
+    
+    /**
      * The database that will be used to resolve terms.  When {@link #getStatementStore()}
      * is <code>null</code>, statements will be written into this store as well.
      */
@@ -350,13 +355,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         this.database = database;
 
+        this.arity = database.getSPOKeyArity();
+        
         this.valueFactory = database.getValueFactory();
         
         this.capacity = capacity;
 
         this.writeBuffer = writeBuffer;
         
-        values = new BigdataValue[capacity * database.N];
+        values = new BigdataValue[capacity * arity];
         
         stmts = new BigdataStatement[capacity];
 
@@ -372,7 +379,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
              * hash map.
              */
             
-            distinctTermMap = new HashMap<Value, BigdataValue>(capacity * database.N);
+            distinctTermMap = new HashMap<Value, BigdataValue>(capacity * arity);
             
         } else {
             
@@ -646,7 +653,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     /**
      * @todo could be replaced with {@link BigdataValueFactory
      */
-    public void setBNodeMap(Map<String, BigdataBNodeImpl> bnodes) {
+    public void setBNodeMap(final Map<String, BigdataBNodeImpl> bnodes) {
     
         if (bnodes == null)
             throw new IllegalArgumentException();
@@ -697,8 +704,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected void incrementalWrite() {
 
-        if (INFO) {
-            log.info("numValues=" + numValues + ", numStmts=" + numStmts);
+        final long begin = System.currentTimeMillis();
+
+        if (log.isInfoEnabled()) {
+        
+            log.info("numValues=" + numValues + " (uris=" + numURIs + ", lits="
+                    + numLiterals + ", bnodes=" + numBNodes + ")"
+                    + ", numStmts=" + numStmts);
+            
         }
 
         // Insert terms (batch operation).
@@ -747,6 +760,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             }
         }
         
+        if (log.isInfoEnabled()) {
+            
+            final long elapsed = System.currentTimeMillis() - begin;
+            
+            log.info("numValues=" + numValues + ", numStmts=" + numStmts
+                    + ", elapsed=" + elapsed + "ms");
+            
+        }
+
         // Reset the state of the buffer (but not the bnodes nor deferred stmts).
         _clear();
 
@@ -754,6 +776,12 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
     protected void addTerms(final BigdataValue[] terms, final int numTerms) {
 
+        if (log.isInfoEnabled()) {
+
+            log.info("writing " + numTerms);
+
+        }
+        
         database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
         
     }
@@ -766,7 +794,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param p
      * @param o
      */
-    public void add(Resource s, URI p, Value o) {
+    public void add(final Resource s, final URI p, final Value o) {
         
         add(s, p, o, null, StatementEnum.Explicit);
         
@@ -780,7 +808,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param o
      * @param c
      */
-    public void add(Resource s, URI p, Value o, Resource c) {
+    public void add(final Resource s, final URI p, final Value o, final Resource c) {
         
         add(s, p, o, c, StatementEnum.Explicit);
         
@@ -978,8 +1006,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (log.isInfoEnabled()) {
 
             log.info("writing " + numStmts + " on "
-                    + (statementStore != null ? "statementStore" : "databasse")
-                    + ": " + statementStore);
+                    + (statementStore != null ? "statementStore" : "database")
+//                    + ": " + statementStore
+                    );
 
         }
 
@@ -1064,7 +1093,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (numStmts + 1 > capacity)
             return true;
 
-        if (numValues + database.N > values.length)
+        if (numValues + arity > values.length)
             return true;
 
         return false;
@@ -1261,8 +1290,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
                 deferredStmts.add(stmt);
 
-                if (INFO)
-                    log.info("deferred: "+stmt);
+                if (DEBUG)
+                    log.debug("deferred: "+stmt);
                 
             } else {
 
@@ -1335,7 +1364,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             
         }
 
-        if (c != null && !duplicateC && ((BigdataValue) s).getTermId() == NULL) {
+        if (c != null && !duplicateC && ((BigdataValue) c).getTermId() == NULL) {
 
             if (c instanceof URI) {
 

@@ -46,7 +46,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
-import com.bigdata.btree.FusedView;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ITuple;
@@ -57,6 +56,7 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.btree.IndexSegmentCheckpoint;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.btree.ReadCommittedView;
+import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
@@ -528,6 +528,7 @@ abstract public class IndexManager extends StoreManager {
          * Overridden to clear the {@link #retentionTime} if the map entry
          * corresponding to that timestamp is being removed from the map.
          */
+        @Override
         protected WeakReference<ILocalBTreeView> removeMapEntry(final NT k) {
             
             synchronized(retentionTime) {
@@ -655,61 +656,61 @@ abstract public class IndexManager extends StoreManager {
 
     }
 
-    /**
-     * The approximate #of {@link IndexSegment} leaves in memory.
-     */
-    public int getIndexSegmentOpenLeafCount() {
-
-        final Iterator<WeakReference<IndexSegment>> itr = indexSegmentCache
-                .iterator();
-
-        int leafCount = 0;
-        
-        while (itr.hasNext()) {
-
-            final IndexSegment seg = itr.next().get();
-
-            if (seg != null) {
-
-                leafCount += seg.getOpenLeafCount();
-                
-            }
-            
-        }
-        
-        return leafCount;
-        
-    }
-
-    /**
-     * The #of bytes on disk occupied by the {@link IndexSegment} leaves which
-     * are currently loaded into memory (their in-memory profile can not be
-     * directly captured by the java runtime, but you can get it from a heap
-     * dump). Likewise, you can directly obtain the #of bytes on disk per leaf
-     * from the {@link IndexSegmentCheckpoint} or from {@link DumpFederation}.
-     */
-    public long getIndexSegmentOpenLeafByteCount() {
-
-        final Iterator<WeakReference<IndexSegment>> itr = indexSegmentCache
-                .iterator();
-
-        long leafByteCount = 0;
-        
-        while (itr.hasNext()) {
-
-            final IndexSegment seg = itr.next().get();
-
-            if (seg != null) {
-
-                leafByteCount += seg.getOpenLeafByteCount();
-                
-            }
-            
-        }
-        
-        return leafByteCount;
-        
-    }
+//    /**
+//     * The approximate #of {@link IndexSegment} leaves in memory.
+//     */
+//    public int getIndexSegmentOpenLeafCount() {
+//
+//        final Iterator<WeakReference<IndexSegment>> itr = indexSegmentCache
+//                .iterator();
+//
+//        int leafCount = 0;
+//        
+//        while (itr.hasNext()) {
+//
+//            final IndexSegment seg = itr.next().get();
+//
+//            if (seg != null) {
+//
+//                leafCount += seg.getOpenLeafCount();
+//                
+//            }
+//            
+//        }
+//        
+//        return leafCount;
+//        
+//    }
+//
+//    /**
+//     * The #of bytes on disk occupied by the {@link IndexSegment} leaves which
+//     * are currently loaded into memory (their in-memory profile can not be
+//     * directly captured by the java runtime, but you can get it from a heap
+//     * dump). Likewise, you can directly obtain the #of bytes on disk per leaf
+//     * from the {@link IndexSegmentCheckpoint} or from {@link DumpFederation}.
+//     */
+//    public long getIndexSegmentOpenLeafByteCount() {
+//
+//        final Iterator<WeakReference<IndexSegment>> itr = indexSegmentCache
+//                .iterator();
+//
+//        long leafByteCount = 0;
+//        
+//        while (itr.hasNext()) {
+//
+//            final IndexSegment seg = itr.next().get();
+//
+//            if (seg != null) {
+//
+//                leafByteCount += seg.getOpenLeafByteCount();
+//                
+//            }
+//            
+//        }
+//        
+//        return leafByteCount;
+//        
+//    }
     
     /**
      * This cache is used to provide remote clients with an unambiguous

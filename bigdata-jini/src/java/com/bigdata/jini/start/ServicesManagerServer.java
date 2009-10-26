@@ -500,7 +500,7 @@ public class ServicesManagerServer extends AbstractServer {
             AbstractServicesManagerService implements
             RemoteAdministrable, RemoteDestroyAdmin {
         
-        protected ServicesManagerServer server;
+        protected final ServicesManagerServer server;
         
         public AdministrableServicesManagerService(ServicesManagerServer server,
                 Properties properties) {
@@ -538,8 +538,10 @@ public class ServicesManagerServer extends AbstractServer {
          *       authenticated identity of the client (if any) for an incoming
          *       remote call.
          */
+        @Override
         protected void setupLoggingContext() {
             
+            // @todo why not invoked?
 //            super.setupLoggingContext();
             
             try {
@@ -561,6 +563,7 @@ public class ServicesManagerServer extends AbstractServer {
 
         }
 
+        @Override
         protected void clearLoggingContext() {
 
             MDC.remove("clientname");
@@ -573,34 +576,57 @@ public class ServicesManagerServer extends AbstractServer {
          * DestroyAdmin
          */
 
-        public void destroy() throws RemoteException {
+        @Override
+        synchronized public void destroy() {
 
-            server.runDestroy();
+            if (!server.isShuttingDown()) {
+
+                /*
+                 * Run thread which will destroy the service (asynchronous).
+                 * 
+                 * Note: By running this is a thread, we avoid closing the
+                 * service end point during the method call.
+                 */
+
+                server.runDestroy();
+
+            } else if (isOpen()) {
+
+                /*
+                 * The server is already shutting down, so invoke our super
+                 * class behavior to destroy the persistent state.
+                 */
+
+                super.destroy();
+
+            }
 
         }
 
+        @Override
         synchronized public void shutdown() {
             
             // normal service shutdown (blocks).
             super.shutdown();
 
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/*destroy*/);
             
         }
         
+        @Override
         synchronized public void shutdownNow() {
             
             // immediate service shutdown (blocks).
             super.shutdownNow();
             
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/*destroy*/);
             
         }
 
         @Override
-        public JiniFederation getFederation() {
+        public JiniFederation<?> getFederation() {
 
             return server.getClient().getFederation();
 
@@ -612,6 +638,7 @@ public class ServicesManagerServer extends AbstractServer {
          * {@link Configuration} then the value returned by the base class is
          * returned instead.
          */
+        @Override
         public String getServiceName() {
 
             String s = server.getServiceName();
@@ -645,7 +672,7 @@ public class ServicesManagerServer extends AbstractServer {
                 log.warn("pushConfig=" + pushConfig + ", restartServices="
                         + restartServices);
 
-                final JiniFederation fed = getFederation();
+                final JiniFederation<?> fed = getFederation();
 
                 // Obtain the configuration object (re-read it).
                 final ConfigurationFile config = (ConfigurationFile) ConfigurationProvider

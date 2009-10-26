@@ -35,7 +35,6 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.deri.iris.api.IProgramOptimisation.Result;
-import org.deri.iris.api.basics.IAtom;
 import org.deri.iris.api.basics.ILiteral;
 import org.deri.iris.api.basics.IQuery;
 import org.deri.iris.api.basics.ITuple;
@@ -51,7 +50,6 @@ import org.deri.iris.terms.TermFactory;
 import com.bigdata.rdf.rules.MappedProgram;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOPredicate;
-import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.Constant;
@@ -482,7 +480,7 @@ type (triple vs. NOT_EQUAL for example).
             
             // the datalog program has facts that need to be asserted
             if (tails.size() == 0) {
-                if (head.isFullyBound() == false) {
+                if (head.getVariableCount() > 0) {
                     throw new RuntimeException(
                             "iris rule with unbound variables in the " +
                             "head and no tails: does not compute");

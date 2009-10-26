@@ -26,8 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
@@ -36,8 +34,10 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexMetadata.Options;
+import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.btree.filter.EmptyTupleIterator;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.cache.HardReferenceQueue;
 
 import cutthecrap.utils.striterators.Expander;
@@ -50,8 +50,12 @@ import cutthecrap.utils.striterators.Striterator;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public abstract class AbstractNode<T extends AbstractNode> extends PO implements IAbstractNode,
-        IAbstractNodeData {
+public abstract class AbstractNode<T extends AbstractNode
+/*
+ * DO-NOT-USE-GENERIC-HERE. The compiler will fail under Linux (JDK 1.6.0_14,
+ * _16).
+ */
+> extends PO implements IAbstractNode, IAbstractNodeData {
 
     /**
      * Log for node and leaf operations.
@@ -79,11 +83,6 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
     final protected static boolean INFO = log.isInfoEnabled();
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * The BTree.
      * 
      * Note: This field MUST be patched when the node is read from the store.
@@ -93,72 +92,20 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
     final transient protected AbstractBTree btree;
 
     /**
-     * The branching factor (#of slots for keys or values).
-     */
-    final transient protected int branchingFactor;
-    
-    /**
-     * The minimum #of keys. For a {@link Node}, the minimum #of children is
-     * <code>minKeys + 1</code>. For a {@link Leaf}, the minimum #of values
-     * is <code>minKeys</code>.
-     */
-    final transient protected int minKeys;
-    
-    /**
-     * The maximum #of keys.  For a {@link Node}, the maximum #of children is
-     * <code>maxKeys + 1</code>.  For a {@link Leaf}, the maximum #of values is
-     * <code>maxKeys</code>.
-     */
-    final transient protected int maxKeys;
-
-    /**
-     * The #of valid keys for this node or leaf.  For a {@link Node}, the #of
-     * children is always <code>nkeys+1</code>.  For a {@link Leaf}, the #of
-     * values is always the same as the #of keys.
-     * 
-     * FIXME deprecate since also maintained by {@link IKeyBuffer}.
-     */
-    protected int nkeys = 0;
-    
-    /**
-     * A representation of each key in the node or leaf. Each key is as a
-     * variable length unsigned byte[]. There are various implementations of
-     * {@link IKeyBuffer} that are optimized for mutable and immutable nodes.
-     * 
-     * The #of keys depends on whether this is a {@link Node} or a {@link Leaf}.
-     * A leaf has one key per value - that is, the maximum #of keys for a leaf
-     * is specified by the branching factor. In contrast a node has m-1 keys
-     * where m is the maximum #of children (aka the branching factor). Therefore
-     * this field is initialized by the {@link Leaf} or {@link Node} - NOT by
-     * the {@link AbstractNode}.
-     * 
-     * For both a {@link Node} and a {@link Leaf}, this array is dimensioned to
-     * accept one more key than the maximum capacity so that the key that causes
-     * overflow and forces the split may be inserted. This greatly simplifies
-     * the logic for computing the split point and performing the split.
-     * Therefore you always allocate this object with a capacity <code>m</code>
-     * keys for a {@link Node} and <code>m+1</code> keys for a {@link Leaf}.
-     * 
-     * @see Node#findChild(int searchKeyOffset, byte[] searchKey)
-     * @see IKeyBuffer#search(int searchKeyOffset, byte[] searchKey)
-     */
-    protected IKeyBuffer keys;
-    
-    /**
      * The parent of this node. This is null for the root node. The parent is
      * required in order to set the persistent identity of a newly persisted
      * child node on its parent. The reference to the parent will remain
      * strongly reachable as long as the parent is either a root (held by the
      * {@link BTree}) or a dirty child (held by the {@link Node}). The parent
      * reference is set when a node is attached as the child of another node.
-     * 
+     * <p>
      * Note: When a node is cloned by {@link #copyOnWrite()} the parent
-     * references for its <em>clean</em> children are set to the new copy of
-     * the node. This is refered to in several places as "stealing" the children
+     * references for its <em>clean</em> children are set to the new copy of the
+     * node. This is referred to in several places as "stealing" the children
      * since they are no longer linked back to their old parents via their
      * parent reference.
      */
-    protected Reference<Node> parent = null;
+    transient protected Reference<Node> parent = null;
 
     /**
      * <p>
@@ -169,7 +116,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * {@link Reference} object for any given {@link Node}.
      * </p>
      */
-    protected final Reference<? extends AbstractNode> self;
+    transient protected final Reference<? extends AbstractNode<T>> self;
     
     /**
      * The #of times that this node is present on the {@link HardReferenceQueue} .
@@ -179,7 +126,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * on the store. This mechanism is critical because it prevents a node
      * entering the queue from forcing IO for the same node in the edge case
      * where the node is also on the tail on the queue. Since the counter is
-     * incremented before it is added to the queue, it is guarenteed to be
+     * incremented before it is added to the queue, it is guaranteed to be
      * non-zero when the node forces its own eviction from the tail of the
      * queue. Preventing this edge case is important since the node can
      * otherwise become immutable at the very moment that it is touched to
@@ -193,8 +140,28 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * synchronization or an AtomicInteger for the {@link #referenceCount}
      * field.
      */
-    protected int referenceCount = 0;
+    transient protected int referenceCount = 0;
 
+    /**
+     * The minimum #of keys. For a {@link Node}, the minimum #of children is
+     * <code>minKeys + 1</code>. For a {@link Leaf}, the minimum #of values
+     * is <code>minKeys</code>.
+     */
+    abstract protected int minKeys();
+
+    /**
+     * The maximum #of keys. This is <code>branchingFactor - 1</code> for a
+     * {@link Node} and <code>branchingFactor</code> for a {@link Leaf}. For a
+     * {@link Node}, the maximum #of children is <code>maxKeys + 1</code>. For a
+     * {@link Leaf}, the maximum #of values is <code>maxKeys</code>.
+     */
+    abstract protected int maxKeys();
+
+    /**
+     * Return the delegate {@link IAbstractNodeData} object.
+     */
+    abstract IAbstractNodeData getDelegate();
+    
     public void delete() {
         
         if( deleted ) {
@@ -212,7 +179,11 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
          */
         
         parent = null; // Note: probably already null.
-        nkeys = 0; keys = null; // release the key buffer.
+        
+        // release the key buffer.
+        /*nkeys = 0; */
+//        keys = null;
+
         // Note: do NOT clear the referenceCount.
         
         if( identity != NULL ) {
@@ -302,31 +273,15 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            a copy-on-write will create a mutable node or leaf from the
      *            immutable one and that node or leaf will be dirty.
      */
-    protected AbstractNode(final AbstractBTree btree,
-            final int branchingFactor, final boolean dirty) {
+    protected AbstractNode(final AbstractBTree btree, final boolean dirty) {
 
         assert btree != null;
 
-        assert branchingFactor>=Options.MIN_BRANCHING_FACTOR;
-        
         this.btree = btree;
-
-        this.branchingFactor = branchingFactor;
 
         // reference to self: reused to link parents and children.
         this.self = btree.newRef(this);
         
-        /*
-         * Compute the minimum #of children/values. this is the same whether
-         * this is a Node or a Leaf.
-         */
-        final int minChildren = (branchingFactor + 1) >> 1;
-        
-        this.minKeys = isLeaf() ? minChildren : minChildren - 1;
-        
-        // The maximum #of keys is easy to compute.
-        this.maxKeys = isLeaf() ? branchingFactor : branchingFactor - 1;
-
         if (!dirty) {
 
             /*
@@ -368,14 +323,14 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * @param src
      *            The source node.
      */
-    protected AbstractNode(AbstractNode<T> src) {
+    protected AbstractNode(final AbstractNode<T> src) {
 
         /*
-         * Note: We do NOT clone the base class since this is a new
-         * persistence capable object, but it is not yet persistent and we
-         * do not want to copy the persistent identity of the source object.
+         * Note: We do NOT clone the base class since this is a new persistence
+         * capable object, but it is not yet persistent and we do not want to
+         * copy the persistent identity of the source object.
          */
-        this(src.btree,src.branchingFactor,true/*dirty*/);
+        this(src.btree, true/* dirty */);
 
         // This node must be mutable (it is a new node).
         assert isDirty();
@@ -384,9 +339,10 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         /* The source must not be dirty.  We are cloning it so that we can
          * make changes on it.
          */
-        assert src != null;
+//        assert src != null;
         assert !src.isDirty();
-        assert src.isPersistent();
+//        assert src.isPersistent();
+        assert src.isReadOnly();
 
         /*
          * Copy the parent reference. The parent must be defined unless the
@@ -400,34 +356,35 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
                 || (src.parent != null && src.parent.get() != null);
         
         // copy the parent reference.
-        this.parent = src.parent;
+        this.parent = src.parent; // @todo clear src.parent (disconnect it)?
         
-        /*
-         * Steal/copy the keys.
-         * 
-         * Note: The copy constructor is invoked when we need to begin mutation
-         * operations on an immutable node or leaf, so make sure that the keys
-         * are mutable.
-         */
-        {
-
-            nkeys = src.nkeys;
-
-            if (src.keys instanceof MutableKeyBuffer) {
-
-                keys = src.keys;
-
-            } else {
-
-                keys = new MutableKeyBuffer((ImmutableKeyBuffer) src.keys);
-
-            }
-
-            // release reference on the source node.
-            src.nkeys = 0;
-            src.keys = null;
-            
-        }
+//        /*
+//         * Steal/copy the keys.
+//         * 
+//         * Note: The copy constructor is invoked when we need to begin mutation
+//         * operations on an immutable node or leaf, so make sure that the keys
+//         * are mutable.
+//         */
+//        {
+//
+////            nkeys = src.nkeys;
+//
+//            if (src.getKeys() instanceof MutableKeyBuffer) {
+//
+//                keys = src.getKeys();
+//
+//            } else {
+//
+//                keys = new MutableKeyBuffer(src.getBranchingFactor(), src
+//                        .getKeys());
+//
+//            }
+//
+//            // release reference on the source node.
+////            src.nkeys = 0;
+//            src.keys = null;
+//            
+//        }
 
     }
 
@@ -452,7 +409,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * 
      * @return Either this leaf or a copy of this leaf.
      */
-    protected IAbstractNode copyOnWrite() {
+    protected AbstractNode<?> copyOnWrite() {
         
         // Always invoked first for a leaf and thereafter in its other form.
         assert isLeaf();
@@ -460,7 +417,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         return copyOnWrite(NULL);
         
     }
-    
+
     /**
      * <p>
      * Return this node or leaf iff it is dirty (aka mutable) and otherwise
@@ -477,8 +434,8 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * root to be dirty and transient. This method handles that cloning process,
      * but the caller MUST test whether or not the node was copied by this
      * method, MUST delegate the mutation operation to the copy iff a copy was
-     * made, and MUST result in an awareness in the caller that the copy exists
-     * and needs to be used in place of the immutable version of the node.
+     * made, and MUST be aware that the copy exists and needs to be used in
+     * place of the immutable version of the node.
      * </p>
      * 
      * @param triggeredByChildId
@@ -487,98 +444,10 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * 
      * @return Either this node or a copy of this node.
      */
-    protected AbstractNode copyOnWrite(long triggeredByChildId) {
+    protected AbstractNode<T> copyOnWrite(final long triggeredByChildId) {
 
-        if (isPersistent()) {
-
-            if(INFO) {
-                log.info("this="+this+", trigger="+triggeredByChildId);
-//                if( DEBUG ) {
-//                    System.err.println("this"); dump(Level.DEBUG,System.err);
-//                }
-            }
-
-            // cast to mutable implementation class.
-            final BTree btree = (BTree) this.btree;
-            
-            // identify of the node that is being copied and deleted.
-            final long oldId = this.identity;
-
-            // parent of the node that is being cloned (null iff it is the root).
-            Node parent = this.getParent();
-
-            // the new node (mutable copy of the old node).
-            final AbstractNode newNode;
-
-            if (this instanceof Node) {
-
-                newNode = new Node((Node) this, triggeredByChildId );
-                
-                btree.getBtreeCounters().nodesCopyOnWrite++;
-
-            } else {
-
-                newNode = new Leaf((Leaf) this);
-
-                btree.getBtreeCounters().leavesCopyOnWrite++;
-
-            }
-
-            // delete this node now that it has been cloned.
-            this.delete();
-            
-            if (btree.root == this) {
-
-                assert parent == null;
-
-                // Update the root node on the btree.
-                if(INFO)
-                    log.info("Copy-on-write : replaced root node on btree.");
-
-                final boolean wasDirty = btree.root.dirty;
-                
-                assert newNode != null;
-                
-                btree.root = newNode;
-                
-                if (!wasDirty) {
-                    
-                    btree.fireDirtyEvent();
-                    
-                }
-
-            } else {
-
-                /*
-                 * Recursive copy-on-write up the tree. This operations stops as
-                 * soon as we reach a parent node that is already dirty and
-                 * grounds out at the root in any case.
-                 */
-                assert parent != null;
-
-                if (!parent.isDirty()) {
-
-                    /*
-                     * Note: pass up the identity of the old child since we want
-                     * to avoid having its parent reference reset.
-                     */
-                    parent = (Node) parent.copyOnWrite(oldId);
-
-                }
-
-                /*
-                 * Replace the reference to this child with the reference to the
-                 * new child. This makes the old child inaccessible via
-                 * navigation. It will be GCd once it falls off of the hard
-                 * reference queue.
-                 */
-                parent.replaceChildRef(oldId, newNode);
-
-            }
-
-            return newNode;
-
-        } else {
+//        if (isPersistent()) {
+        if (!isReadOnly()) {
 
             /*
              * Since a clone was not required, we use this as an opportunity to
@@ -586,11 +455,99 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
              * nodes which have been touched recently will remain strongly
              * reachable.
              */
+            
             btree.touch(this);
             
             return this;
 
         }
+
+        if (INFO) {
+            log.info("this=" + this + ", trigger=" + triggeredByChildId);
+//                if( DEBUG ) {
+//                    System.err.println("this"); dump(Level.DEBUG,System.err);
+//                }
+        }
+
+        // cast to mutable implementation class.
+        final BTree btree = (BTree) this.btree;
+        
+        // identify of the node that is being copied and deleted.
+        final long oldId = this.identity;
+
+        // parent of the node that is being cloned (null iff it is the root).
+        Node parent = this.getParent();
+
+        // the new node (mutable copy of the old node).
+        final AbstractNode newNode;
+
+        if (this instanceof Node) {
+
+            newNode = new Node((Node) this, triggeredByChildId);
+            
+            btree.getBtreeCounters().nodesCopyOnWrite++;
+
+        } else {
+
+            newNode = new Leaf((Leaf) this);
+
+            btree.getBtreeCounters().leavesCopyOnWrite++;
+
+        }
+
+        // delete this node now that it has been cloned.
+        this.delete();
+        
+        if (btree.root == this) {
+
+            assert parent == null;
+
+            // Update the root node on the btree.
+            if(INFO)
+                log.info("Copy-on-write : replaced root node on btree.");
+
+            final boolean wasDirty = btree.root.dirty;
+            
+            assert newNode != null;
+            
+            btree.root = newNode;
+            
+            if (!wasDirty) {
+                
+                btree.fireDirtyEvent();
+                
+            }
+
+        } else {
+
+            /*
+             * Recursive copy-on-write up the tree. This operations stops as
+             * soon as we reach a parent node that is already dirty and
+             * grounds out at the root in any case.
+             */
+            assert parent != null;
+
+            if (!parent.isDirty()) {
+
+                /*
+                 * Note: pass up the identity of the old child since we want
+                 * to avoid having its parent reference reset.
+                 */
+                parent = (Node) parent.copyOnWrite(oldId);
+
+            }
+
+            /*
+             * Replace the reference to this child with the reference to the
+             * new child. This makes the old child inaccessible via
+             * navigation. It will be GCd once it falls off of the hard
+             * reference queue.
+             */
+            parent.replaceChildRef(oldId, newNode);
+
+        }
+
+        return newNode;
 
     }
 
@@ -634,8 +591,8 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            indicating whether the keys and/or values will be
      *            materialized.
      */
-    public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
-            int flags) {
+    public ITupleIterator rangeIterator(final byte[] fromKey,
+            final byte[] toKey, final int flags) {
 
         return new PostOrderEntryIterator(btree, postOrderIterator(fromKey,
                 toKey), fromKey, toKey, flags);
@@ -643,10 +600,10 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
     }
 
     /**
-     * Post-order traveral of nodes and leaves in the tree with a key range
+     * Post-order traversal of nodes and leaves in the tree with a key range
      * constraint. For any given node, its children are always visited before
      * the node itself (hence the node occurs in the post-order position in the
-     * traveral). The iterator is NOT safe for concurrent modification.
+     * traversal). The iterator is NOT safe for concurrent modification.
      * 
      * @param fromKey
      *            The first key that will be visited (inclusive). When
@@ -709,16 +666,16 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
                  * Expand the value objects for each leaf visited in the
                  * post-order traversal.
                  */
-                protected Iterator expand(Object childObj) {
+                protected Iterator expand(final Object childObj) {
                     
                     // A child of this node.
-                    AbstractNode child = (AbstractNode) childObj;
+                    final AbstractNode<?> child = (AbstractNode<?>) childObj;
 
                     if (child instanceof Leaf) {
 
-                        Leaf leaf = (Leaf) child;
-                        
-                        if (leaf.nkeys == 0) {
+                        final Leaf leaf = (Leaf) child;
+
+                        if (leaf.getKeys().isEmpty()) {
 
                             return EmptyTupleIterator.INSTANCE;
 
@@ -768,7 +725,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
             /*
              * either the root or the parent is reachable.
              */
-            IAbstractNode root = btree.root;
+            final IAbstractNode root = btree.root;
             
             assert root == this
                     || (this.parent != null && this.parent.get() != null);
@@ -776,12 +733,12 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
             if (root != this) {
 
                 // not the root, so the min #of keys must be observed.
-                assert nkeys >= minKeys;
+                assert getKeyCount() >= minKeys();
 
             }
 
             // max #of keys.
-            assert nkeys <= maxKeys;
+            assert getKeyCount() <= maxKeys();
 
 //        } catch (AssertionError ex) {
 //
@@ -801,15 +758,15 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      */
     protected final void assertKeysMonotonic() {
 
-        if(keys instanceof MutableKeyBuffer) {
+        if (getKeys() instanceof MutableKeyBuffer) {
 
             /*
              * iff mutable keys - immutable keys should be checked during
              * de-serialization or construction.
              */
-            
-            ((MutableKeyBuffer)keys).assertKeysMonotonic();
-            
+
+            ((MutableKeyBuffer) getKeys()).assertKeysMonotonic();
+
         }
 
     }
@@ -822,7 +779,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * @param key
      *            The key.
      */
-    final static protected String keyAsString(byte[] key) {
+    final static protected String keyAsString(final byte[] key) {
         
         return BytesUtil.toString(key);
         
@@ -844,14 +801,13 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            The source keys.
      * @param srcpos
      *            The index position from which the key will be copied.
-     * 
-     * @todo move to {@link MutableKeyBuffer}
      */
-    final protected void copyKey(int dstpos, IKeyBuffer srckeys, int srcpos) {
+    final protected void copyKey(final int dstpos,
+            final IRaba srckeys, final int srcpos) {
 
         assert dirty;
         
-        ((MutableKeyBuffer)keys).keys[dstpos] = srckeys.getKey(srcpos);
+        ((MutableKeyBuffer) getKeys()).keys[dstpos] = srckeys.get(srcpos);
         
     }
 
@@ -859,34 +815,8 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
 
     final public int getBranchingFactor() {
         
-        return branchingFactor;
+        return btree.branchingFactor;
         
-    }
-    
-    final public int getKeyCount() {
-        
-        return nkeys;
-        
-    }
-    
-    final public IKeyBuffer getKeys() {
-        
-        return keys;
-        
-    }
-    
-    final public void copyKey(final int index, final OutputStream os) {
-        
-        try {
-            
-            os.write(keys.getKey(index));
-            
-        } catch(IOException ex) {
-            
-            throw new RuntimeException(ex);
-            
-        }
-
     }
     
     /**
@@ -951,9 +881,9 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         final long triggeredByChildId = NULL;
 
         // verify that this node is deficient.
-        assert nkeys < minKeys;
+        assert getKeyCount() < minKeys();
         // verify that this leaf is under minimum capacity by one key.
-        assert nkeys == minKeys - 1;
+        assert getKeyCount() == minKeys() - 1;
         // verify that the node is mutable.
         assert isDirty();
         assert !isPersistent();
@@ -969,7 +899,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
 //            }
         }
         
-        if( this instanceof Leaf ) {
+        if( isLeaf() ) {
 
             btree.getBtreeCounters().leavesJoined++;
 
@@ -986,16 +916,16 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
          * until we are sure which sibling we will use.
          */
         
-        AbstractNode rightSibling = (AbstractNode) parent.getRightSibling(this,
-                false);
+        AbstractNode<?> rightSibling = parent.getRightSibling(this, false);
 
-        AbstractNode leftSibling = (AbstractNode) parent.getLeftSibling(this,
-                false);
-        
+        AbstractNode<?> leftSibling = parent.getLeftSibling(this, false);
+
         /*
-         * prefer a sibling that is already materialized.
+         * Prefer a sibling that is already materialized with enough keys to
+         * share.
          */
-        if (rightSibling != null && rightSibling.nkeys > rightSibling.minKeys) {
+        if (rightSibling != null
+                && rightSibling.getKeyCount() > rightSibling.minKeys()) {
 
             redistributeKeys(rightSibling.copyOnWrite(triggeredByChildId), true);
 
@@ -1003,37 +933,41 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
 
         }
 
-        if (leftSibling != null && leftSibling.nkeys > leftSibling.minKeys) {
+        if (leftSibling != null
+                && leftSibling.getKeyCount() > leftSibling.minKeys()) {
 
             redistributeKeys(leftSibling.copyOnWrite(triggeredByChildId), false);
 
             return;
 
         }
-        
+
         /*
-         * if either sibling was not materialized, then materialize and test
+         * If either sibling was not materialized, then materialize and test
          * that sibling.
          */
-        if( rightSibling == null ) {
-            
-            rightSibling = parent.getRightSibling(this,true);
-            
-            if( rightSibling != null && rightSibling.nkeys>rightSibling.minKeys  ) {
+        if (rightSibling == null) {
 
-                redistributeKeys(rightSibling.copyOnWrite(triggeredByChildId),true);
-                
+            rightSibling = parent.getRightSibling(this, true);
+
+            if (rightSibling != null
+                    && rightSibling.getKeyCount() > rightSibling.minKeys()) {
+
+                redistributeKeys(rightSibling.copyOnWrite(triggeredByChildId),
+                        true);
+
                 return;
-                
+
             }
 
         }
 
-        if( leftSibling == null ) {
-            
-            leftSibling = parent.getLeftSibling(this,true);
-            
-            if( leftSibling != null && leftSibling.nkeys>leftSibling.minKeys ) {
+        if (leftSibling == null) {
+
+            leftSibling = parent.getLeftSibling(this, true);
+
+            if (leftSibling != null
+                    && leftSibling.getKeyCount() > leftSibling.minKeys()) {
 
                 redistributeKeys(leftSibling.copyOnWrite(triggeredByChildId),false);
                 
@@ -1050,8 +984,8 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
          * separator key from the parent.
          */
         
-        if( rightSibling != null ) {
-            
+        if (rightSibling != null) {
+
             merge(rightSibling, true);
 
             return;
@@ -1133,7 +1067,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
         
         final int i = p.getIndexOf(this);
 
-        if (i == p.nkeys) {
+        if (i == p.getKeyCount()) {
 
             /*
              * We are the right-most child of our parent node. Now recursively
@@ -1301,7 +1235,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      * 
      * @return True unless an inconsistency was detected.
      */
-    public boolean dump(PrintStream out) {
+    public boolean dump(final PrintStream out) {
 
         return dump(BTree.dumpLog.getEffectiveLevel(), out);
 
@@ -1317,7 +1251,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            
      * @return True unless an inconsistency was detected.
      */
-    public boolean dump(Level level,PrintStream out) {
+    public boolean dump(final Level level, final PrintStream out) {
 
         return dump(level, out, -1, false);
 
@@ -1351,7 +1285,7 @@ public abstract class AbstractNode<T extends AbstractNode> extends PO implements
      *            
      * @return A string suitable for indent at that height.
      */
-    protected static String indent(int height) {
+    protected static String indent(final int height) {
 
         if( height == -1 ) {
         

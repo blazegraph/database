@@ -60,6 +60,7 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.ExecutionExceptions;
 import com.bigdata.util.concurrent.ExecutionHelper;
 
 /**
@@ -855,7 +856,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
             /*
              * Then bind this statement, which propagates bindings to the next
              * predicate (if the bindings are rejected then the solution would
-             * violate the constaints on the JOIN).
+             * violate the constraints on the JOIN).
              */
 
             // clone the binding set.
@@ -885,7 +886,10 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
                     try {
                         joinHelper.submitTasks(tasks);
-                    } catch(ExecutionException ex) {
+                    } catch(ExecutionExceptions ex) {
+                        for(Throwable cause : ex.causes()) {
+                            log.error(cause, cause);
+                        }
                         throw new RuntimeException(ex);
                     }
 
@@ -954,7 +958,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     }
 
     /**
-     * Consider each element in the chunk in turn. If the element satisifies the
+     * Consider each element in the chunk in turn. If the element satisfies the
      * JOIN criteria, then emit an {@link ISolution} for the {@link IRule}.
      * 
      * @param orderIndex

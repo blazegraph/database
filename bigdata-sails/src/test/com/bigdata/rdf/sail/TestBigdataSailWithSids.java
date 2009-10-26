@@ -94,6 +94,8 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
 
         properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
         
+        properties.setProperty(Options.QUADS, "false");
+        
         return properties;
         
     }

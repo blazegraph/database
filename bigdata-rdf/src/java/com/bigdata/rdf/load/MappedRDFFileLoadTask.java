@@ -14,7 +14,6 @@ import com.bigdata.rdf.load.MappedRDFDataLoadMaster.JobState;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.rio.AsynchronousStatementBufferFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
@@ -73,14 +72,14 @@ implements Serializable {
     private transient ReentrantLock lock;
 
     /**
-     * Condition signalled when done.
+     * Condition signaled when done.
      * <p>
      * Note: transient field set by {@link #call()}.
      */
     private transient Condition allDone;
     
     /**
-     * Condition signalled when ready.
+     * Condition signaled when ready.
      * <p>
      * Note: transient field set by {@link #call()}.
      */
@@ -119,9 +118,9 @@ implements Serializable {
      * The federation object used by the {@link IRemoteExecutor} on which this
      * task is executing.
      */
-    public JiniFederation getFederation() {
+    public JiniFederation<?> getFederation() {
 
-        return (JiniFederation) super.getFederation();
+        return (JiniFederation<?>) super.getFederation();
 
     }
 
@@ -165,6 +164,9 @@ implements Serializable {
                 /*
                  * Override the "notifyService" to do asynchronous RMI back to
                  * this class indicating success or failure for each resource.
+                 * 
+                 * Note: It is very important to log ANY errors thrown back from
+                 * the master!
                  */
                 @Override
                 protected Runnable newSuccessTask(final V resource) {
@@ -172,7 +174,7 @@ implements Serializable {
                         public void run() {
                             try {
                                 getNotifyProxy().success(resource, locator);
-                            } catch (RemoteException ex) {
+                            } catch (Throwable ex) {
                                 log.error(resource, ex);
                             }
                         }
@@ -187,7 +189,7 @@ implements Serializable {
                             try {
                                 getNotifyProxy()
                                         .error(resource, locator, cause);
-                            } catch (RemoteException ex) {
+                            } catch (Throwable ex) {
                                 log.error(resource, ex);
                             }
                         }
@@ -237,7 +239,7 @@ implements Serializable {
                 tmp
                         .attach(statementBufferFactory.getCounters(), true/* replace */);
             }
-
+            
             /*
              * Wait until either (a) interrupted by the master using
              * Future#cancel(); or (b) the master invokes close(), indicating
@@ -339,8 +341,32 @@ implements Serializable {
 
         for (V resource : chunk) {
 
-            statementBufferFactory.submitOne(resource,
-                    jobState.rejectedExecutionDelay);
+            try {
+                
+                /*
+                 * Try to submit the resource for processing.
+                 */
+                
+                statementBufferFactory.submitOne(resource,
+                        jobState.rejectedExecutionDelay);
+                
+            } catch (InterruptedException ex) {
+                
+                /*
+                 * The client was interrupted.
+                 */
+                
+                throw ex;
+                
+            } catch (Exception ex) {
+                
+                /*
+                 * The client was not able to process this resource.
+                 */
+                
+                getNotifyProxy().error(resource, locator, ex);
+                
+            }
 
         }
 

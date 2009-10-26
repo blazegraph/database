@@ -190,7 +190,7 @@ abstract public class AbstractJournalTestCase
         
     }
 
-    final protected Journal getStore(Properties properties) {
+    final protected Journal getStore(final Properties properties) {
         
         return new Journal(properties);
         
@@ -208,7 +208,7 @@ abstract public class AbstractJournalTestCase
      *                if the existing store is closed or if the store can not be
      *                re-opened, e.g., from failure to obtain a file lock, etc.
      */
-    protected Journal reopenStore(Journal store) {
+    protected Journal reopenStore(final Journal store) {
         
         // close the store.
         store.close();

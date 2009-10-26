@@ -34,10 +34,10 @@ import java.io.ObjectOutput;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.compression.NoDataSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
@@ -95,8 +95,8 @@ public class JustificationTupleSerializer extends
     public JustificationTupleSerializer(int N) {
         
         super(new ASCIIKeyBuilderFactory(N * Bytes.SIZEOF_LONG),
-                getDefaultLeafKeySerializer(), //
-                NoDataSerializer.INSTANCE // no values
+                getDefaultLeafKeysCoder(), //
+                EmptyRabaValueCoder.INSTANCE // no values
         );
 
         if (N != 3 && N != 4)
@@ -109,7 +109,7 @@ public class JustificationTupleSerializer extends
 
     }
 
-    public Justification deserialize(ITuple tuple) {
+    public Justification deserialize(final ITuple tuple) {
 
         if (tuple == null)
             throw new IllegalArgumentException();
@@ -137,18 +137,18 @@ public class JustificationTupleSerializer extends
             
         }
 
-        return new Justification(ids);
+        return new Justification(N,ids);
         
     }
 
-    public Justification deserializeKey(ITuple tuple) {
+    public Justification deserializeKey(final ITuple tuple) {
         
         // just de-serialize the whole tuple.
         return deserialize(tuple);
         
     }
 
-    public byte[] serializeKey(Object obj) {
+    public byte[] serializeKey(final Object obj) {
 
         if (obj == null)
             throw new IllegalArgumentException();

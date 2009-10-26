@@ -92,8 +92,7 @@ public abstract class AbstractScaleOutFederation<T> extends AbstractFederation<T
         if (log.isInfoEnabled())
             log.info(Options.METADATA_INDEX_CACHE_POLICY + "="
                     + metadataIndexCachePolicy);
-       
-        
+               
     }
     
     protected final MetadataIndexCachePolicy metadataIndexCachePolicy;

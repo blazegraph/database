@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 
-import com.bigdata.isolation.IConflictResolver;
+import com.bigdata.btree.isolation.IConflictResolver;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ITxCommitProtocol;

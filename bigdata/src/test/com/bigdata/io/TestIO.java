@@ -260,29 +260,31 @@ public class TestIO extends TestCase {
         // when true, the data will be forced to disk after it is all written.
         final boolean synchAfterTest = true;
 
-        Random r = new Random();
+        final Random r = new Random();
 
         /*
          * Create a temporary file for the test. You can specify the directory
          * using an optional argument as a means of choosing which disk drive or
          * partition to use for the test.
          */
-        File file = File.createTempFile("test", ".dbCache", new File("D:/"));
+        final File file = File.createTempFile("test", ".dbCache" 
+//                , new File("D:/")
+        );
         
         file.deleteOnExit();
         System.err.println("file=" + file);
 
-        RandomAccessFile raf = new RandomAccessFile(file,
+        final RandomAccessFile raf = new RandomAccessFile(file,
                 (writeThrough ? "rwd" : "rw"));
         
         try {
 
-            FileChannel fileChannel = raf.getChannel();
+            final FileChannel fileChannel = raf.getChannel();
             
             /*
              * Allocate direct buffer.
              */
-            ByteBuffer buf = ByteBuffer.allocateDirect(pageSize);
+            final ByteBuffer buf = ByteBuffer.allocateDirect(pageSize);
 
             /*
              * Extend the file to its maximum size. We set the limit to one
@@ -302,7 +304,7 @@ public class TestIO extends TestCase {
             for (int i = 0; i < pagesToWrite; i++) {
 
                 // offset of page.
-                long pos = r.nextInt(maxPages) * (long) pageSize;
+                final long pos = r.nextInt(maxPages) * (long) pageSize;
                 assert pos <= maxOffset;
                 
                 /*
@@ -315,7 +317,7 @@ public class TestIO extends TestCase {
                 // buf.limit(pageSize);
                 buf.position(0);
 
-                int nwritten;
+                final int nwritten;
                 try {
                     nwritten = fileChannel.write(buf, pos);
                 } catch (IllegalArgumentException ex) {
@@ -333,9 +335,9 @@ public class TestIO extends TestCase {
                 fileChannel.force(false);
             }
 
-            long endNanos = System.nanoTime();
+            final long endNanos = System.nanoTime();
 
-            long elapsedNanos = endNanos - startNanos;
+            final long elapsedNanos = endNanos - startNanos;
 
             // System.err.println("startNanos="+nf.format(startNanos));
             // System.err.println("endNanos="+nf.format(endNanos));
@@ -345,7 +347,7 @@ public class TestIO extends TestCase {
                     + " secs" );
             System.err.println(""+nf.format(getUnitsPerSecond(pagesToWrite, elapsedNanos))
                     + " pages per second");
-            long megabytesWritten = pagesToWrite * pageSize / MegaByte;
+            final long megabytesWritten = pagesToWrite * pageSize / MegaByte;
             System.err.println(""+fpf.format(megabytesWritten)+" megabytes written");
             System.err.println(""
                     + fpf.format(getUnitsPerSecond(megabytesWritten,

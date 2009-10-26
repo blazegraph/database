@@ -100,7 +100,12 @@ public class TestBasicIndexStuff extends
             
         } catch (Exception ex) {
 
-            assertTrue( isInnerCause(ex, StaleLocatorException.class));
+            if (!isInnerCause(ex, StaleLocatorException.class)) {
+
+                fail("Expecting: " + StaleLocatorException.class + ", not "
+                        + ex, ex);
+
+            }
 
             System.err.print("Ignoring expected exception: ");
             getInnerCause(ex, StaleLocatorException.class).printStackTrace(System.err);

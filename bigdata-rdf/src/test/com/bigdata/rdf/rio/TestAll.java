@@ -77,12 +77,10 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestRDFXMLInterchangeWithStatementIdentifiers.class);
 
         /*
-         * Correctness tests for the asynchronous bulk data loader variant
-         * which does not support SIDs.
+         * Correctness tests for the asynchronous bulk data loader. This
+         * requires the scale-out architecture. SIDs are not supported yet.
          */
-        suite.addTestSuite(TestAsynchronousStatementBufferWithoutSids.class);
-        // and for a variant that should fix the blocking parser problems.
-        suite.addTestSuite(TestAsynchronousStatementBufferWithoutSids2.class);
+        suite.addTestSuite(TestAsynchronousStatementBufferFactory.class);
         
         return suite;
         

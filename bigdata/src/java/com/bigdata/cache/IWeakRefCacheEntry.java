@@ -41,7 +41,7 @@ public interface IWeakRefCacheEntry<K,T> {
     
     /**
      * The object in the cache. If the entry belongs to a weak reference cache,
-     * then this method returns the weak referant or null iff the weak reference
+     * then this method returns the weak referent or null iff the weak reference
      * has been cleared.
      */
     public T getObject();

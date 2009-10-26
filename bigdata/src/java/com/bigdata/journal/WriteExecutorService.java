@@ -216,6 +216,57 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     protected final long overflowLockRequestTimeout;
     
+    private static class MyLockManager<R extends Comparable<R>> extends
+            NonBlockingLockManagerWithNewDesign<R> {
+
+        private final WriteExecutorService service;
+
+        public MyLockManager(final int capacity, final int maxLockTries,
+                final boolean predeclareLocks,
+                final WriteExecutorService service) {
+
+            super(capacity, maxLockTries, predeclareLocks);
+
+            this.service = service;
+
+        }
+
+        protected void ready(final Runnable r) {
+
+            service.execute(r);
+
+        }
+
+    }
+
+    /**
+     * Tracks the #of rejected execution exceptions on the caller's counter.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    private static class MyRejectedExecutionHandler implements
+            RejectedExecutionHandler {
+
+        private final AtomicLong rejectedExecutionCount;
+        
+        public MyRejectedExecutionHandler(final AtomicLong rejectedExecutionCount) {
+            
+            this.rejectedExecutionCount = rejectedExecutionCount;
+            
+        }
+        
+        public void rejectedExecution(Runnable arg0, ThreadPoolExecutor arg1) {
+
+            rejectedExecutionCount.incrementAndGet();
+
+            throw new RejectedExecutionException();
+
+        }
+
+    }
+    
     /**
      * 
      * @param resourceManager
@@ -276,19 +327,25 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * AbstractTask API.
              */
 
-            lockManager = new NonBlockingLockManagerWithNewDesign<String>(//
-                    maximumPoolSize, // capacity
-                    3, // @todo config maxLockTries
-                    true // predeclareLocks
-            ) {
-                
-                protected void ready(Runnable r) {
-                    
-                    WriteExecutorService.this.execute(r);
-                    
-                }
-                
-            };
+            lockManager = new MyLockManager<String>(//
+                  maximumPoolSize, // capacity
+                  3, // @todo config maxLockTries
+                  true, // predeclareLocks
+                  this);
+
+//            lockManager = new NonBlockingLockManagerWithNewDesign<String>(//
+//                    maximumPoolSize, // capacity
+//                    3, // @todo config maxLockTries
+//                    true // predeclareLocks
+//            ) {
+//                
+//                protected void ready(Runnable r) {
+//                    
+//                    WriteExecutorService.this.execute(r);
+//                    
+//                }
+//                
+//            };
             
         }
 
@@ -297,17 +354,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         /*
          * Tracks rejected executions on a counter.
          */
-        setRejectedExecutionHandler(new RejectedExecutionHandler(){
-
-            public void rejectedExecution(Runnable arg0, ThreadPoolExecutor arg1) {
-                
-                rejectedExecutionCount.incrementAndGet();
-                
-                throw new RejectedExecutionException();
-                
-            }
-            
-        });
+        setRejectedExecutionHandler(new MyRejectedExecutionHandler(
+                rejectedExecutionCount));
 
         /*
          * Extract the name of the service if we are running inside of one.

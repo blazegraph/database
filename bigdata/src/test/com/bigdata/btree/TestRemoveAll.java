@@ -118,9 +118,10 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 
         final BTree btree;
         {
-            IRawStore store = new SimpleMemoryRawStore();
 
-            IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            final IRawStore store = new SimpleMemoryRawStore();
+
+            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
 
             metadata.setBranchingFactor(3);
 
@@ -128,24 +129,26 @@ public class TestRemoveAll extends AbstractBTreeTestCase {
 
         }
 
-        KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
-        
+        final KeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_INT);
+
         final int NTRIALS = 100;
-        
+
         final int NINSERTS = 1000;
-        
+
         final double removeAllRate = 0.02;
-        
-        for(int i=0; i<NTRIALS; i++) {
-            
-            for(int j=0; j<NINSERTS; j++) {
+
+        for (int i = 0; i < NTRIALS; i++) {
+
+            for (int j = 0; j < NINSERTS; j++) {
 
                 if (r.nextDouble() < removeAllRate) {
-                    
-                    log.info("removeAll with "+btree.getEntryCount()+" entries");
-                    
+
+                    if (log.isInfoEnabled())
+                        log.info("removeAll with " + btree.getEntryCount()
+                                + " entries");
+
                     btree.removeAll();
-                    
+
                 }
                 
                 final int tmp = r.nextInt(10000);

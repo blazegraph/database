@@ -38,8 +38,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -57,6 +55,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.Checkpoint;
@@ -68,8 +67,8 @@ import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithTimeout;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.concurrent.NamedLock;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractLocalTransactionManager;
@@ -90,8 +89,6 @@ import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
-import com.bigdata.journal.Name2Addr.Entry;
-import com.bigdata.journal.Name2Addr.EntrySerializer;
 import com.bigdata.mdi.IPartitionMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.IndexPartitionCause;
@@ -106,7 +103,6 @@ import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.IDataService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ResourceService;
 import com.bigdata.sparse.SparseRowStore;
@@ -192,7 +188,7 @@ abstract public class StoreManager extends ResourceEvents implements
          * cleared. Once an index becomes weakly reachable, the JVM will
          * eventually GC the index object, thereby releasing its object graph.
          * Since stores which are strongly reachable never have their weak
-         * reference cleared this provides our guarentee that stores are never
+         * reference cleared this provides our guarantee that stores are never
          * closed if they are in use.
          * <p>
          * Stores have non-transient resources and MUST explicitly be closed.
@@ -2376,11 +2372,17 @@ abstract public class StoreManager extends ResourceEvents implements
     public abstract IConcurrencyManager getConcurrencyManager();
 
     public abstract void setConcurrencyManager(IConcurrencyManager concurrencyManager);
-    
+
     /**
-     * Implementation designed to use a shared {@link ConcurrencyManager}.
+     * The {@link ManagedJournal} provides the backing store used to absorb
+     * writes and retain history for the scale-out architecture.
+     * <p>
+     * Note: This implementation is designed to use a shared
+     * {@link ConcurrencyManager} across all open journal instances for a
+     * {@link DataService}.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      * @version $Id$
      */
     public class ManagedJournal extends AbstractJournal {
@@ -2971,7 +2973,8 @@ abstract public class StoreManager extends ResourceEvents implements
         if (isTransient())
             return;
 
-        log.warn("Deleting all resources: " + dataDir);
+        if (log.isInfoEnabled())
+            log.info("Deleting all resources: " + dataDir);
 
         recursiveDelete(dataDir);
 
@@ -2995,12 +2998,19 @@ abstract public class StoreManager extends ResourceEvents implements
      * @param f
      *            A file or directory.
      */
-    private void recursiveDelete(File f) {
+    private void recursiveDelete(final File f) {
 
         if (f.isDirectory()) {
 
             final File[] children = f.listFiles(newFileFilter());
 
+            if (children == null) {
+
+                // No such file or directory exists.
+                return;
+                
+            }
+            
             for (int i = 0; i < children.length; i++) {
 
                 recursiveDelete(children[i]);
@@ -3451,6 +3461,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * <ol>
      * <li>close iff open</li>
      * <li>remove from lists of known resources</li>
+     * <li>clear the associated {@link ILRUCache}</li>
      * <li>delete in the file system</li>
      * </ol>
      * Note: {@link IndexSegment}s pose a special case. Their create time is
@@ -3924,6 +3935,7 @@ abstract public class StoreManager extends ResourceEvents implements
      * <li>The resource is closed if it was open and is no longer found in the
      * {@link #storeCache}.</li>
      * <li>The resource is no longer found in {@link #resourceFiles}. </li>
+     * <li>The {@link ILRUCache} for that resource has been cleared. </li>
      * <li>The backing file for the resource has been deleted (the backing file
      * is obtain from {@link #resourceFiles}).</li>
      * <li>Various counters maintained by the {@link StoreManager} have been
@@ -4029,6 +4041,16 @@ abstract public class StoreManager extends ResourceEvents implements
 
             }
 
+        }
+
+        /*
+         * Clear record for that store from the LRUNexus and remove the entry
+         * for the store itself from the LRUNexus.
+         */
+        if (LRUNexus.INSTANCE != null) {
+
+            LRUNexus.INSTANCE.deleteCache(uuid);
+            
         }
         
         /*

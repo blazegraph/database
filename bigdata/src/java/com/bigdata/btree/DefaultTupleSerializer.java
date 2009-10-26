@@ -34,14 +34,14 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Properties;
 
-import com.bigdata.btree.compression.DefaultDataSerializer;
-import com.bigdata.btree.compression.IDataSerializer;
-import com.bigdata.btree.compression.PrefixSerializer;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.ThreadLocalKeyBuilderFactory;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
+import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.io.SerializerUtil;
 
 /**
@@ -74,82 +74,84 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
     }
     
     /**
-     * The default for {@link #getLeafKeySerializer()} (compression for the keys
+     * The default for {@link #getLeafKeysCoder()} (compression for the keys
      * stored in a leaf).
      * 
-     * @deprecated by {@link IndexMetadata.Options#LEAF_KEY_SERIALIZER}
+     * @deprecated by {@link IndexMetadata.Options#LEAF_KEYS_CODER}
      */
-    static public final IDataSerializer getDefaultLeafKeySerializer() {
+    static public final IRabaCoder getDefaultLeafKeysCoder() {
         
-        return PrefixSerializer.INSTANCE;
+        return DefaultFrontCodedRabaCoder.INSTANCE;
+//        return PrefixSerializer.INSTANCE;
         
     }
     
     /**
-     * The default for {@link #getLeafValueSerializer()} (compression for
+     * The default for {@link #getLeafValuesCoder()} (compression for
      * the values stored in a leaf).
      * 
-     * @deprecated by {@link IndexMetadata.Options#LEAF_VALUE_SERIALIZER}
+     * @deprecated by {@link IndexMetadata.Options#LEAF_VALUES_CODER}
      */
-    static public final IDataSerializer getDefaultValueKeySerializer() {
+    static public final IRabaCoder getDefaultValuesCoder() {
         
-        return DefaultDataSerializer.INSTANCE;
+        return CanonicalHuffmanRabaCoder.INSTANCE;
+//        return DefaultDataSerializer.INSTANCE;
         
     }
     
-    private IDataSerializer leafKeySer;
-    private IDataSerializer leafValSer;
+    private IRabaCoder leafKeysCoder;
+    private IRabaCoder leafValsCoder;
 
-    final public IDataSerializer getLeafKeySerializer() {
+    final public IRabaCoder getLeafKeysCoder() {
         
-        return leafKeySer;
-        
-    }
-
-    final public IDataSerializer getLeafValueSerializer() {
-
-        return leafValSer;
+        return leafKeysCoder;
         
     }
 
-    /**
-     * Override the {@link #getLeafKeySerializer()}. It is NOT safe to change
-     * this value once data have been stored in an {@link IIndex} using another
-     * value as existing data MAY become unreadable.
-     * 
-     * @param leafKeySer
-     *            The new value.
-     */
-    final public void setLeafKeySerializer(final IDataSerializer leafKeySer) {
+    final public IRabaCoder getLeafValuesCoder() {
 
-        if (leafKeySer == null)
-            throw new IllegalArgumentException();
-
-        this.leafKeySer = leafKeySer;
+        return leafValsCoder;
         
     }
 
     /**
-     * Override the {@link #getLeafValueSerializer()}. It is NOT safe to change
+     * Override the {@link #getLeafKeysCoder()}. It is NOT safe to change
      * this value once data have been stored in an {@link IIndex} using another
      * value as existing data MAY become unreadable.
      * 
-     * @param valueSer
+     * @param leafKeysCoder
      *            The new value.
      */
-    final public void setLeafValueSerializer(final IDataSerializer valueSer) {
-        
-        if (valueSer == null)
+    final public void setLeafKeysCoder(final IRabaCoder leafKeysCoder) {
+
+        if (leafKeysCoder == null)
             throw new IllegalArgumentException();
 
-        this.leafValSer = valueSer;
+        this.leafKeysCoder = leafKeysCoder;
+        
+    }
+
+    /**
+     * Override the {@link #getLeafValuesCoder()}. It is NOT safe to change
+     * this value once data have been stored in an {@link IIndex} using another
+     * value as existing data MAY become unreadable.
+     * 
+     * @param valuesCoder
+     *            The new value.
+     */
+    final public void setLeafValuesCoder(final IRabaCoder valuesCoder) {
+        
+        if (valuesCoder == null)
+            throw new IllegalArgumentException();
+
+        this.leafValsCoder = valuesCoder;
         
     }
 
     /**
      * Factory for a new instance using default values for the
-     * {@link #getKeyBuilder()}, the {@link #getLeafKeySerializer()}, and the
-     * {@link #getLeafValueSerializer()}.
+     * {@link #getKeyBuilder()}, the {@link #getLeafKeysCoder()}, and the
+     * {@link #getLeafValuesCoder()}.
      */
     public static ITupleSerializer newInstance() {
 
@@ -181,23 +183,23 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      *            The {@link IKeyBuilderFactory}, which will be automatically
      *            wrapped up by a {@link ThreadLocalKeyBuilderFactory}.
      */
-    public DefaultTupleSerializer(IKeyBuilderFactory keyBuilderFactory) {
-        
-        this(keyBuilderFactory, getDefaultLeafKeySerializer(),
-                getDefaultValueKeySerializer());
-        
+    public DefaultTupleSerializer(final IKeyBuilderFactory keyBuilderFactory) {
+
+        this(keyBuilderFactory, getDefaultLeafKeysCoder(),
+                getDefaultValuesCoder());
+
     }
 
-    public DefaultTupleSerializer(IKeyBuilderFactory keyBuilderFactory,
-            IDataSerializer leafKeySer, IDataSerializer leafValSer) {
+    public DefaultTupleSerializer(final IKeyBuilderFactory keyBuilderFactory,
+            final IRabaCoder leafKeysCoder, final IRabaCoder leafValsCoder) {
 
         if (keyBuilderFactory == null)
             throw new IllegalArgumentException();
 
-        if (leafKeySer == null)
+        if (leafKeysCoder == null)
             throw new IllegalArgumentException();
 
-        if (leafValSer == null)
+        if (leafValsCoder == null)
             throw new IllegalArgumentException();
         
         threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(
@@ -205,24 +207,20 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
         
         this.delegateKeyBuilderFactory = keyBuilderFactory;
 
-        this.leafKeySer = leafKeySer;
+        this.leafKeysCoder = leafKeysCoder;
         
-        this.leafValSer = leafValSer;
-        
-//        this.leafKeySer = SimplePrefixSerializer.INSTANCE;
-//        
-//        this.leafValSer = DefaultDataSerializer.INSTANCE;
+        this.leafValsCoder = leafValsCoder;
         
     }
 
     public String toString() {
 
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
 
         sb.append(getClass().getName()+"{");
         sb.append(", keyBuilderFactory="+delegateKeyBuilderFactory);
-        sb.append(", leafKeySerializer=" + leafKeySer.getClass().getName());
-        sb.append(", leafValueSerializer=" + leafValSer.getClass().getName());
+        sb.append(", leafKeysCoder=" + leafKeysCoder.getClass().getName());
+        sb.append(", leafValuesCoder=" + leafValsCoder.getClass().getName());
         sb.append("}");
         
         return sb.toString();
@@ -255,11 +253,11 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
     }
     
-    public byte[] serializeKey(Object obj) {
+    public byte[] serializeKey(final Object obj) {
 
         if (obj == null)
             throw new IllegalArgumentException();
-        
+
         return getKeyBuilder().reset().append(obj).getKey();
         
     }
@@ -273,7 +271,7 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
      * @return The serialized representation of the object as a byte[] -or-
      *         <code>null</code> if the reference is <code>null</code>.
      */
-    public byte[] serializeVal(Object obj) {
+    public byte[] serializeVal(final Object obj) {
 
         return SerializerUtil.serialize(obj);
         
@@ -316,9 +314,9 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
         
         threadLocalKeyBuilderFactory = new ThreadLocalKeyBuilderFactory(delegateKeyBuilderFactory);
         
-        leafKeySer = (IDataSerializer)in.readObject();
+        leafKeysCoder = (IRabaCoder) in.readObject();
 
-        leafValSer = (IDataSerializer)in.readObject();
+        leafValsCoder = (IRabaCoder) in.readObject();
 
     }
 
@@ -326,9 +324,9 @@ public class DefaultTupleSerializer<K extends Object, V extends Object>
 
         out.writeObject(delegateKeyBuilderFactory);
         
-        out.writeObject(leafKeySer);
+        out.writeObject(leafKeysCoder);
 
-        out.writeObject(leafValSer);
+        out.writeObject(leafValsCoder);
         
     }
 

@@ -106,12 +106,12 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
      * @return The upper bound estimate of the #of key-value pairs in the key
      *         range of the named index.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
 
         /*
          * Constrain the (fromKey, toKey) so that they address only the current
          * index partition. This allows the same instance of the procedure to be
-         * mapped across a range of index partitions while constaining the query
+         * mapped across a range of index partitions while constraining the query
          * to lie within the index partition.
          * 
          * Note: This uses a local variable to prevent side effects.
@@ -135,7 +135,7 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
             rangeCount = ndx.rangeCount(fromKey, toKey);
         }
                 
-        return new Long(rangeCount);
+        return Long.valueOf(rangeCount);
 
     }
 

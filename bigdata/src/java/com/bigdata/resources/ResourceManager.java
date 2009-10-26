@@ -544,19 +544,19 @@ abstract public class ResourceManager extends OverflowManager implements
                             }
                         });
 
-                tmp.addCounter(IIndexManagerCounters.IndexSegmentOpenLeafCount,
-                        new Instrument<Integer>() {
-                            public void sample() {
-                                setValue(getIndexSegmentOpenLeafCount());
-                            }
-                        });
-
-                tmp.addCounter(IIndexManagerCounters.IndexSegmentOpenLeafByteCount,
-                        new Instrument<Long>() {
-                            public void sample() {
-                                setValue(getIndexSegmentOpenLeafByteCount());
-                            }
-                        });
+//                tmp.addCounter(IIndexManagerCounters.IndexSegmentOpenLeafCount,
+//                        new Instrument<Integer>() {
+//                            public void sample() {
+//                                setValue(getIndexSegmentOpenLeafCount());
+//                            }
+//                        });
+//
+//                tmp.addCounter(IIndexManagerCounters.IndexSegmentOpenLeafByteCount,
+//                        new Instrument<Long>() {
+//                            public void sample() {
+//                                setValue(getIndexSegmentOpenLeafByteCount());
+//                            }
+//                        });
 
             }
 

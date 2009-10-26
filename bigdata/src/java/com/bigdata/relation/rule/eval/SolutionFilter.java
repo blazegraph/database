@@ -18,7 +18,7 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
     
     private final IElementFilter<E> delegate;
 
-    public SolutionFilter(IElementFilter<E> delegate) {
+    public SolutionFilter(final IElementFilter<E> delegate) {
         
         if (delegate == null)
             throw new IllegalArgumentException();
@@ -27,14 +27,14 @@ public class SolutionFilter<E> implements IElementFilter<ISolution<E>> {
         
     }
     
-    public boolean accept(ISolution<E> solution) {
+    public boolean accept(final ISolution<E> solution) {
 
         final E e = solution.get();
         
         return delegate.accept( e );
     }
     
-    public boolean canAccept(Object o) {
+    public boolean canAccept(final Object o) {
 
         if (o instanceof ISolution == false) {
             return false;

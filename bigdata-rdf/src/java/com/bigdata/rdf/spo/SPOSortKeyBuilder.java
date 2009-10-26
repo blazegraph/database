@@ -15,20 +15,26 @@ import com.bigdata.rdf.store.IRawTripleStore;
  */
 public class SPOSortKeyBuilder implements ISortKeyBuilder<ISPO> {
 
-    final IKeyBuilder keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG
-            * IRawTripleStore.N);
+    final private int arity;
+    final private IKeyBuilder keyBuilder;
 
-    public SPOSortKeyBuilder() {
-
+    public SPOSortKeyBuilder(final int arity) {
+        assert arity == 3 || arity == 4;
+        this.arity = arity;
+        this.keyBuilder = new KeyBuilder(Bytes.SIZEOF_LONG * arity);
     }
 
     /**
      * Distinct iff the {s:p:o} are distinct.
      */
-    public byte[] getSortKey(ISPO spo) {
+    public byte[] getSortKey(final ISPO spo) {
 
-        return keyBuilder.reset().append(spo.s()).append(spo.p()).append(
-                spo.o()).getKey();
+        keyBuilder.reset().append(spo.s()).append(spo.p()).append(spo.o());
+
+        if (arity == 4)
+            keyBuilder.append(spo.c());
+
+        return keyBuilder.getKey();
 
     }
 

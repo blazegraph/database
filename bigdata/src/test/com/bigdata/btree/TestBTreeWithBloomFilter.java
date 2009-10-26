@@ -598,7 +598,7 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
 
         for (int i = 0; i < maxN; i++) {
          
-            btree.insert(new Integer(i), null);
+            btree.insert(Integer.valueOf(i), null);
 
             assertTrue(btree.bloomFilter.isDirty());
             
@@ -607,7 +607,7 @@ public class TestBTreeWithBloomFilter extends AbstractBTreeTestCase {
         }
 
         // the straw the breaks the filters back.
-        btree.insert(new Integer(maxN), null);
+        btree.insert(Integer.valueOf(maxN), null);
         
         // the filter was disabled.
         assertFalse(btree.bloomFilter.isEnabled());

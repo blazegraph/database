@@ -139,58 +139,21 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
          * this test class and its optional .properties file.
          */
         
+        // basic test suite.
         suite.addTest(TestTripleStoreBasics.suite());
+        
+        // rules, inference, and truth maintenance test suite.
+        suite.addTest(com.bigdata.rdf.rules.TestAll.suite());
 
         return suite;
 
     }
-
-//    /**
-//     * Starts in {@link #setUpFederation()}.
-//     */
-//    protected MetadataServer metadataServer0;
-//    /**
-//     * Starts in {@link #setUpFederation()}.
-//     */
-//    protected DataServer dataServer1;
-//    /**
-//     * Starts in {@link #setUpFederation()}.
-//     */
-//    protected DataServer dataServer0;
-//    /**
-//     * Starts in {@link #setUpFederation()}.
-//     */
-//    protected TransactionServer timestampServer0;
-//    /**
-//     * Starts in {@link #setUpFederation()}.
-//     */
-//    protected ResourceLockServer resourceLockServer0;
-//    /**
-//     * Starts in {@link #setUpFederation()}.
-//     */
-//    protected LoadBalancerServer loadBalancerServer0;
-//    /**
-//     * Starts in {@link #setUpFederation()}.
-//     */
-//    protected JiniClient client;
     
     private JiniServicesHelper helper;
     
     public void setUp() throws Exception {
         
         super.setUp();
-
-//        /*
-//         * Note: This is the data directory configured in the various .config
-//         * and .properties files in src/resources/config/standlone.
-//         */
-//        File dataDir = new File("standalone");
-//        
-//        if(dataDir.exists() && dataDir.isDirectory()) {
-//
-//            recursiveDelete( dataDir );
-//            
-//        }
 
         System.setSecurityManager(new SecurityManager());
         
@@ -201,263 +164,47 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
         super.tearDown();
         
     }
-
-    /**
-     * This starts each of the services in the federartion, all of which will
-     * run in the local process of this JVM. Since jini is used for service
-     * discovery, all service requests will in fact use RMI.
-     * 
-     * @throws Exception
-     */
-    public void setUpFederation() throws Exception {
-
-        helper = new JiniServicesHelper("src/resources/config/standlone");
-        
-        helper.start();
-
-////      final String groups = ".groups = new String[]{\"" + getName() + "\"}";
-//
-//        log.warn("Starting services.");
-//        
-//        /*
-//         * Start up a resource lock server.
-//         */
-//        resourceLockServer0 = new ResourceLockServer(new String[] {
-//                "src/resources/config/standalone/ResourceLockServer0.config"
-////                , AbstractServer.ADVERT_LABEL+groups 
-//                });
-//
-//        new Thread() {
-//
-//            public void run() {
-//                
-//                resourceLockServer0.run();
-//                
-//            }
-//            
-//        }.start();
-//
-//        /*
-//         * Start up a timestamp server.
-//         */
-//        timestampServer0 = new TransactionServer(new String[] {
-//                "src/resources/config/standalone/TimestampServer0.config"
-////                , AbstractServer.ADVERT_LABEL+groups 
-//                });
-//
-//        new Thread() {
-//
-//            public void run() {
-//                
-//                timestampServer0.run();
-//                
-//            }
-//            
-//        }.start();
-//
-//        /*
-//         * Start up a data server before the metadata server so that we can make
-//         * sure that it is detected by the metadata server once it starts up.
-//         */
-//        dataServer1 = new DataServer(new String[] {
-//                "src/resources/config/standalone/DataServer1.config"
-////                , AbstractServer.ADVERT_LABEL+groups 
-//                });
-//
-//        new Thread() {
-//
-//            public void run() {
-//                
-//                dataServer1.run();
-//                
-//            }
-//            
-//        }.start();
-//
-//      /*
-//       * Start up a load balancer server.
-//       */
-//      loadBalancerServer0 = new LoadBalancerServer(new String[] {
-//              "src/resources/config/standalone/LoadBalancerServer0.config"
-////              , AbstractServer.ADVERT_LABEL+groups 
-//              });
-//
-//      new Thread() {
-//
-//          public void run() {
-//              
-//              loadBalancerServer0.run();
-//              
-//          }
-//          
-//      }.start();
-//
-//      /*
-//       * Start the metadata server.
-//       */
-//      metadataServer0 = new MetadataServer(
-//              new String[] { "src/resources/config/standalone/MetadataServer0.config"
-////                      , AbstractServer.ADVERT_LABEL+groups
-//                      });
-//      
-//      new Thread() {
-//
-//          public void run() {
-//              
-//              metadataServer0.run();
-//              
-//          }
-//          
-//      }.start();
-//
-//      /*
-//       * Start up a data server after the metadata server so that we can make
-//       * sure that it is detected by the metadata server once it starts up.
-//       */
-//      dataServer0 = new DataServer(
-//              new String[] { "src/resources/config/standalone/DataServer0.config"
-////                      , AbstractServer.ADVERT_LABEL+groups
-//                      });
-//
-//      new Thread() {
-//
-//          public void run() {
-//              
-//              dataServer0.run();
-//              
-//          }
-//          
-//      }.start();
-//
-//      log.warn("Starting client.");
-//
-//      client = JiniClient.newInstance(
-//              new String[] { "src/resources/config/standalone/Client.config"
-////                      , BigdataClient.CLIENT_LABEL+groups
-//                      });
-//
-//      // Wait until all the services are up.
-//      AbstractServerTestCase.getServiceID(resourceLockServer0);
-//      AbstractServerTestCase.getServiceID(timestampServer0);
-//      AbstractServerTestCase.getServiceID(metadataServer0);
-//      AbstractServerTestCase.getServiceID(dataServer0);
-//      AbstractServerTestCase.getServiceID(dataServer1);
-//      AbstractServerTestCase.getServiceID(loadBalancerServer0);
-//      
-//      IBigdataFederation fed = client.connect();
-//      
-//      // verify that the client has/can get the metadata service.
-//      assertNotNull("metadataService", fed.getMetadataService());
-//
-//      log.warn("Federation is running.");
-      
-    }
-
-    /**
-     * This terminates client processing and destroys each of the services
-     * (their persistent state is also destroyed).
-     * 
-     * @throws Exception
-     */
-    public void tearDownFederation() throws Exception {
-
-//        log.warn("Destroying federation.");
-//
-//        if (client != null && client.isConnected()) {
-//
-//            client.disconnect(true/*immediateShutdown*/);
-//
-//            client = null;
-//
-//        }
-//
-//        if (metadataServer0 != null) {
-//
-//            metadataServer0.destroy();
-//
-//            metadataServer0 = null;
-//
-//        }
-//
-//        if (dataServer0 != null) {
-//
-//            dataServer0.destroy();
-//
-//            dataServer0 = null;
-//
-//        }
-//
-//        if (dataServer1 != null) {
-//
-//            dataServer1.destroy();
-//
-//            dataServer1 = null;
-//
-//        }
-//
-//        if (loadBalancerServer0 != null) {
-//            
-//            loadBalancerServer0.destroy();
-//
-//            loadBalancerServer0 = null;
-//            
-//        }
-//
-//        if (timestampServer0 != null) {
-//            
-//            timestampServer0.destroy();
-//
-//            timestampServer0 = null;
-//            
-//        }
-//
-//        if (resourceLockServer0 != null) {
-//            
-//            resourceLockServer0.destroy();
-//            
-//            resourceLockServer0 = null;
-//            
-//        }
-
-        if (helper != null) {
-
-            helper.destroy();
-            
-        }
-        
-    }
     
     /**
      * Data files are placed into a directory named by the test. If the
      * directory exists, then it is removed before the federation is set up.
      */
-    public void setUp(ProxyTestCase testCase) throws Exception {
+    public void setUp(final ProxyTestCase testCase) throws Exception {
 
-        setUpFederation();
-        
         super.setUp(testCase);
+        
+        helper = new JiniServicesHelper();
+        
+        helper.start();
         
     }
     
-    public void tearDown(ProxyTestCase testCase) throws Exception {
+    public void tearDown(final ProxyTestCase testCase) throws Exception {
 
-        super.tearDown();
+        if (helper != null) {
+
+            helper.destroy();
+
+            // Note: must clear reference or junit will hold onto it.
+            helper = null;
+            
+        }
         
-        tearDownFederation();
+        super.tearDown();
         
     }
     
     private AtomicInteger inc = new AtomicInteger();
 
-    protected AbstractTripleStore getStore(Properties properties) {
+    protected AbstractTripleStore getStore(final Properties properties) {
         
         // Note: distinct namespace for each triple store created on the federation.
         final String namespace = "test"+inc.incrementAndGet();
    
         // Connect to the triple store.
-        AbstractTripleStore store = new ScaleOutTripleStore(helper.client
+        final AbstractTripleStore store = new ScaleOutTripleStore(helper.client
                 .getFederation(), namespace, ITx.UNISOLATED, properties);
-        
+
         store.create();
         
         return store;
@@ -479,24 +226,22 @@ public class TestScaleOutTripleStoreWithJiniFederation extends AbstractTestCase 
      *                be re-opened, e.g., from failure to obtain a file lock,
      *                etc.
      */
-    protected AbstractTripleStore reopenStore(AbstractTripleStore store) {
+    protected AbstractTripleStore reopenStore(final AbstractTripleStore store) {
 
         final String namespace = store.getNamespace();
-        
+
         store.close();
 
-//        final Properties properties = store.getProperties();
-        
         // close the client connection to the federation.
-        helper.client.disconnect(true/*immediateShutdown*/);
-        
+        helper.client.disconnect(true/* immediateShutdown */);
+
         // re-connect to the federation.
         helper.client.connect();
-        
+
         // obtain view of the triple store.
         return new ScaleOutTripleStore(helper.client.getFederation(),
                 namespace, ITx.UNISOLATED, store.getProperties());
-        
+
     }
 
 }

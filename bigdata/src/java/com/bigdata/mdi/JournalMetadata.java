@@ -66,7 +66,7 @@ public class JournalMetadata extends AbstractResourceMetadata {
      */
     private static String getFileString(IJournal journal) {
     
-        File file = journal.getFile();
+        final File file = journal.getFile();
 
         if (file == null)
             return "";
@@ -90,7 +90,7 @@ public class JournalMetadata extends AbstractResourceMetadata {
      * @param journal
      *            The journal.
      */
-    public JournalMetadata(AbstractJournal journal) {
+    public JournalMetadata(final AbstractJournal journal) {
 
         this(getFileString(journal), //journal.getBufferStrategy().getExtent(),
                 journal.getRootBlockView().getUUID(), journal

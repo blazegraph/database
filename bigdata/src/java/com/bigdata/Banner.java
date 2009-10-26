@@ -28,12 +28,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
+import java.lang.reflect.Method;
 import java.util.Date;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 
-import com.bigdata.jmx.JMXLog4jMBeanUtil;
+import com.bigdata.counters.AbstractStatisticsCollector;
 
 /**
  * Class has a static method which writes a copyright banner on stdout once per
@@ -46,13 +48,33 @@ import com.bigdata.jmx.JMXLog4jMBeanUtil;
 public class Banner {
 
     private static boolean didBanner;
+
+    /**
+     * Environment variables understood by the {@link Banner} class.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    public interface Options {
+
+        /**
+         * This may be used to suppress the banner text. 
+         */
+        String QUIET = "com.bigdata.Banner.quiet";
+
+        /**
+         * This may be used to disable JMX MBeans which self-report on the log4j
+         * properties.
+         */
+        String LOG4J_MBEANS_DISABLE = "com.bigdata.jmx.log4j.disable";
+
+    }
     
     synchronized static public void banner() {
         
         if(!didBanner) {
         
-            final boolean quiet = Boolean.parseBoolean(System.getProperty(
-                    "com.bigdata.Banner.quiet", "false"));
+            final boolean quiet = Boolean.getBoolean(Options.QUIET);
 
             if (!quiet) {
 
@@ -77,15 +99,32 @@ public class Banner {
 
             }
 
-            try {
+            /*
+             * Note: I have modified this to test for disabled registration and
+             * to use reflection in order to decouple the JMX dependency for
+             * anzo.
+             */
+            if (!Boolean.getBoolean(Options.LOG4J_MBEANS_DISABLE)) {
 
-                // Optionally register a log4j MBean.
-                JMXLog4jMBeanUtil.registerLog4jMBeans();
-                
-            } catch (Throwable t) {
-                
-                log.error("Problem registering log4j mbean?", t);
-                
+                try {
+
+                    final Class<?> cls = Class
+                            .forName("com.bigdata.jmx.JMXLog4jMBeanUtil");
+
+                    final Method m = cls.getMethod("registerLog4jMBeans",
+                            new Class[] {});
+
+                    // Optionally register a log4j MBean.
+                    m.invoke(null/* obj */);
+
+                    // JMXLog4jMBeanUtil.registerLog4jMBeans();
+
+                } catch (Throwable t) {
+
+                    log.error("Problem registering log4j mbean?", t);
+
+                }
+
             }
             
         }
@@ -104,17 +143,22 @@ public class Banner {
 
     }
     
-    private static final String banner =
-        "\nBIGDATA(R)"+
-        "\n"+
-        "\n                   Flexible"+
-        "\n                   Reliable"+
-        "\n                  Affordable"+
-        "\n      Web-Scale Computing for the Enterprise"+
-        "\n"+
-        "\nCopyright SYSTAP, LLC 2006-2009.  All rights reserved."+
-        "\n"+
-        "\n"+new Date()
+    private static final String banner =//
+        "\nBIGDATA(R)"+//
+        "\n"+//
+        "\n                   Flexible"+//
+        "\n                   Reliable"+//
+        "\n                  Affordable"+//
+        "\n      Web-Scale Computing for the Enterprise"+//
+        "\n"+//
+        "\nCopyright SYSTAP, LLC 2006-2009.  All rights reserved."+//
+        "\n"+//
+        "\n"+AbstractStatisticsCollector.fullyQualifiedHostName+//
+        "\n"+new Date()+//
+        "\n"+SystemUtil.operatingSystem() + "/" + SystemUtil.osVersion()
+                + " " + SystemUtil.architecture() + //
+        "\n"+SystemUtil.cpuInfo() + " #CPU="+SystemUtil.numProcessors() +//
+        "\n"
         ;
     
 }

@@ -39,15 +39,12 @@ import org.apache.zookeeper.KeeperException;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.rules.InferenceEngine;
-import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.service.IBigdataClient;
@@ -107,7 +104,7 @@ V extends Serializable//
          * <p>
          * Note: This is intended for the one-time load of ontologies pertaining
          * to the data to be loaded. If you need to do additional non-bulk data
-         * loads you can always use the {@link BigdataSail}.
+         * loads you can always use the {@link com.bigdata.rdf.sail.BigdataSail}.
          */
         String ONTOLOGY = "ontology";
 
@@ -214,13 +211,13 @@ V extends Serializable//
         String LOAD_DATA = "loadData";
 
         /**
-         * When <code>true</code>, the closure of the data set will be
-         * computed. The writes are performed on the RDF database below the
-         * level of the {@link BigdataSail} so incremental truth maintenance
-         * WILL NOT be performed even if the sail was configured with that
-         * option.
+         * When <code>true</code>, the closure of the data set will be computed.
+         * The writes are performed on the RDF database below the level of the
+         * {@link com.bigdata.rdf.sail.BigdataSail} so incremental truth
+         * maintenance WILL NOT be performed even if the sail was configured
+         * with that option.
          * 
-         * @see BigdataSail.Options#TRUTH_MAINTENANCE
+         * @see com.bigdata.rdf.sail.BigdataSail.Options#TRUTH_MAINTENANCE
          */
         String COMPUTE_CLOSURE = "computeClosure";
 
@@ -936,10 +933,7 @@ V extends Serializable//
         log.info(Options.NESTED_SUBQUERY + "="
                 + p.getProperty(Options.NESTED_SUBQUERY));
 
-        log.info(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY
-                        + "="
-                        + p
-                                .getProperty(IndexMetadata.Options.DEFAULT_BTREE_READ_RETENTION_QUEUE_CAPACITY));
+//        log.info(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY + "=" + p.getProperty(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY));
 
         log.info(Options.CHUNK_CAPACITY + "="
                 + p.getProperty(Options.CHUNK_CAPACITY));
@@ -964,8 +958,8 @@ V extends Serializable//
         log.info(Options.MAX_PARALLEL_SUBQUERIES + "="
                 + p.getProperty(Options.MAX_PARALLEL_SUBQUERIES));
 
-        // log.info(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
-        // + p.getProperty(BigdataSail.Options.QUERY_TIME_EXPANDER));
+        // log.info(com.bigdata.rdf.sail.BigdataSail.Options.QUERY_TIME_EXPANDER + "="
+        // + p.getProperty(com.bigdata.rdf.sail.BigdataSail.Options.QUERY_TIME_EXPANDER));
 
 //        log.info("bloomFilterFactory="
 //                + tripleStore.getSPORelation().getSPOIndex().getIndexMetadata()

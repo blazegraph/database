@@ -82,7 +82,7 @@ public class TestCompactJournal extends AbstractJournalTestCase {
             
             try {
                 // create task.
-                Future<Journal> f = src.compact(out);
+                final Future<Journal> f = src.compact(out);
                 // obtain new journal (expected to fail).
                 final Journal newJournal = f.get();
                 try {
@@ -131,9 +131,9 @@ public class TestCompactJournal extends AbstractJournalTestCase {
         
         try {
 
-            Future<Journal> f = src.compact(out);
+            final Future<Journal> f = src.compact(out);
 
-            Journal newJournal = f.get();
+            final Journal newJournal = f.get();
 
             // verify state
             try {
@@ -142,11 +142,14 @@ public class TestCompactJournal extends AbstractJournalTestCase {
                 assertNotNull(newJournal.getIndex(NAME));
 
                 // verify data is the same.
-                AbstractBTreeTestCase.assertSameBTree(src.getIndex(NAME), newJournal.getIndex(NAME));
-                
+                AbstractBTreeTestCase.assertSameBTree(src.getIndex(NAME),
+                        newJournal.getIndex(NAME));
+
             } finally {
+
                 newJournal.destroy();
-            }
+
+           }
 
         } finally {
 

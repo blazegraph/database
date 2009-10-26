@@ -39,9 +39,6 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 
 public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,MagicTuple> {
 
@@ -66,9 +63,9 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
     public MagicTupleSerializer(MagicKeyOrder keyOrder) {
 
         super(new ASCIIKeyBuilderFactory(
-                keyOrder.getArity() * Bytes.SIZEOF_LONG), 
-                getDefaultLeafKeySerializer(),
-                getDefaultValueKeySerializer());
+                keyOrder.getKeyArity() * Bytes.SIZEOF_LONG), 
+                getDefaultLeafKeysCoder(),
+                getDefaultValuesCoder());
         
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -85,7 +82,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
         // copy of the key in a reused buffer.
         final byte[] key = tuple.getKeyBuffer().array(); 
 
-        final int arity = keyOrder.getArity();
+        final int arity = keyOrder.getKeyArity();
         
         final int[] keyMap = keyOrder.getKeyMap();
         
@@ -153,7 +150,7 @@ public class MagicTupleSerializer extends DefaultTupleSerializer<MagicTuple,Magi
     public byte[] magicTuple2Key(final MagicKeyOrder keyOrder, 
             final IMagicTuple magicTuple) {
         
-        final int arity = keyOrder.getArity();
+        final int arity = keyOrder.getKeyArity();
         
         final int[] keyMap = keyOrder.getKeyMap();
         

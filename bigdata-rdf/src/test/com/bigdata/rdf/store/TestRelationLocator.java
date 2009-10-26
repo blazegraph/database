@@ -124,7 +124,7 @@ public class TestRelationLocator extends AbstractTripleStoreTestCase {
 
         } finally {
 
-            store.close();
+            store.__tearDownUnitTest();
             
         }
         

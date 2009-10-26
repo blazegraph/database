@@ -70,55 +70,62 @@ public class TestNamedIndices extends ProxyTestCase<Journal> {
     public void test_registerAndUse() {
 
         Journal journal = new Journal(getProperties());
-        
-        final String name = "abc";
-        
-        final UUID indexUUID = UUID.randomUUID();
 
-        BTree btree;
-        {
-            
-            IndexMetadata metadata = new IndexMetadata(indexUUID);
-            
-            metadata.setBranchingFactor( 3 );
-            
-            btree = BTree.create(journal, metadata);
-            
-        }
-        
-        assertNull(journal.getIndex(name));
-        
-        journal.registerIndex(name, btree);
-        
-        assertTrue(btree==journal.getIndex(name));
-        
-        final byte[] k0 = new byte[]{0};
-        final Object v0 = new SimpleEntry(0);
-        
-        btree.insert( k0, v0);
+        try {
 
-        /*
-         * commit and close the journal
-         */
-        journal.commit();
-        
-        if (journal.isStable()) {
-            
+            final String name = "abc";
+
+            final UUID indexUUID = UUID.randomUUID();
+
+            BTree btree;
+            {
+
+                IndexMetadata metadata = new IndexMetadata(indexUUID);
+
+                metadata.setBranchingFactor(3);
+
+                btree = BTree.create(journal, metadata);
+
+            }
+
+            assertNull(journal.getIndex(name));
+
+            journal.registerIndex(name, btree);
+
+            assertTrue(btree == journal.getIndex(name));
+
+            final byte[] k0 = new byte[] { 0 };
+            final Object v0 = new SimpleEntry(0);
+
+            btree.insert(k0, v0);
+
             /*
-             * re-open the journal and test restart safety.
+             * commit and close the journal
              */
-            journal = reopenStore(journal);
+            journal.commit();
 
-            btree = (BTree) journal.getIndex(name);
+            if (journal.isStable()) {
 
-            assertNotNull("btree", btree);
-            assertEquals("indexUUID", indexUUID, btree.getIndexMetadata().getIndexUUID() );
-            assertEquals("entryCount", 1, btree.getEntryCount());
-            assertEquals(v0, btree.lookup(k0));
+                /*
+                 * re-open the journal and test restart safety.
+                 */
+                journal = reopenStore(journal);
+
+                btree = (BTree) journal.getIndex(name);
+
+                assertNotNull("btree", btree);
+                assertEquals("indexUUID", indexUUID, btree.getIndexMetadata()
+                        .getIndexUUID());
+                assertEquals("entryCount", 1, btree.getEntryCount());
+                assertEquals(v0, btree.lookup(k0));
+
+            }
+
+        } finally {
+
+            journal.destroy();
 
         }
-
-        journal.destroy();
 
     }
 

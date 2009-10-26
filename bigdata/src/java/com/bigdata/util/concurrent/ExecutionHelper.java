@@ -60,7 +60,7 @@ public class ExecutionHelper<T> {
      * @param service
      *            The service on which the tasks will be executed.
      */
-    public ExecutionHelper(ExecutorService service) {
+    public ExecutionHelper(final ExecutorService service) {
 
         this(service, Long.MAX_VALUE, TimeUnit.MILLISECONDS);
 
@@ -76,7 +76,8 @@ public class ExecutionHelper<T> {
      * @param unit
      *            The unit in which that timeout is expressed.
      */
-    public ExecutionHelper(ExecutorService service, long timeout, TimeUnit unit) {
+    public ExecutionHelper(final ExecutorService service, final long timeout,
+            final TimeUnit unit) {
 
         if (service == null) {
 
@@ -107,18 +108,18 @@ public class ExecutionHelper<T> {
     /**
      * Submit subquery tasks, wait until they are done, and verify that all
      * tasks were executed without error. A variety of steps are taken to
-     * normalize handling interrupts, cancelled execution due to timeout, and
+     * normalize handling interrupts, canceled execution due to timeout, and
      * rejected execution when the {@link ExecutorService} has been shutdown.
      * 
      * @param tasks
      *            The tasks.
      * 
      * @throws InterruptedException
-     *             Tasks that are interrupted and tasks that are cancelled due
+     *             Tasks that are interrupted and tasks that are canceled due
      *             to timeout result in a logged warning and a thrown
      *             {@link InterruptedException}. Likewise, if a
      *             {@link RejectedExecutionException} is thrown and the service
-     *             is shutdown, then that execition is converted into an
+     *             is shutdown, then that exception is converted into an
      *             {@link InterruptedException}.
      * @throws RejectedExecutionException
      *             If a {@link RejectedExecutionException} is thrown and the

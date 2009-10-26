@@ -34,7 +34,9 @@ import java.util.UUID;
 
 import junit.framework.TestCase;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.service.AbstractClient;
 import com.bigdata.service.EmbeddedClient;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.mapred.AbstractJobAndTaskService;
@@ -100,8 +102,15 @@ public class TestRemoteTaskRunner extends TestCase {
     
     public void setUp() throws Exception {
         
-        Properties properties = new Properties();
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
+        final Properties properties = new Properties();
         
+        // disable platform statistics collection.
+        properties.setProperty(
+                EmbeddedClient.Options.COLLECT_PLATFORM_STATISTICS, "false");
+
         properties
                 .setProperty(
                         com.bigdata.service.EmbeddedClient.Options.BUFFER_MODE,
@@ -118,7 +127,10 @@ public class TestRemoteTaskRunner extends TestCase {
             bigdataClient.disconnect(true/* immediateShutdown */);
                         
         }
-        
+     
+        // flush everything before/after a unit test.
+        LRUNexus.INSTANCE.discardAllCaches();
+
     }
     
     /**

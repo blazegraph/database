@@ -113,7 +113,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      * 
      * @see #getBaseCaseBTree()
      */
-    protected void doBaseCaseTest(AbstractBTree btree) {
+    protected void doBaseCaseTest(final AbstractBTree btree) {
 
         // test first()
         {
@@ -1065,15 +1065,15 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
         }
         
     }
-    
+
     /**
      * Compares two tuples for equality based on their data (flags, keys,
      * values, deleted marker, and version timestamp).
      * <p>
      * Note: This will fail if you apply it to tuples reported by
-     * {@link ITupleIterator}s whose DELETE flag was difference since it
-     * verifies the DELETE flag state and that is a property of the iterator NOT
-     * the tuple. Whether or not a tuple is deleted is detected using
+     * {@link ITupleIterator}s whose DELETE flag was different since it verifies
+     * the DELETE flag state and that is a property of the iterator NOT the
+     * tuple. Whether or not a tuple is deleted is detected using
      * {@link ITuple#isDeletedVersion()}.
      * 
      * @param expected
@@ -1121,6 +1121,10 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
                 ((expected.flags() & IRangeQuery.READONLY) != 0),//
                 ((actual.flags() & IRangeQuery.READONLY) != 0));
         
+        assertEquals("flags.PARALLEL",//
+                ((expected.flags() & IRangeQuery.PARALLEL) != 0),//
+                ((actual.flags() & IRangeQuery.PARALLEL) != 0));
+
         assertEquals("flags", expected.flags(), actual.flags());
 
         assertEquals("key", expected.getKey(), actual.getKey());

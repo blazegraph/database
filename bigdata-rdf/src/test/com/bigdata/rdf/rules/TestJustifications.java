@@ -228,20 +228,20 @@ public class TestJustifications extends AbstractRuleTestCase {
 //            assertTrue(buf.add(head, jst));
 
             // no justifications before hand.
-            assertEquals(0L, store.getJustificationIndex().rangeCount());
+            assertEquals(0L, store.getSPORelation().getJustificationIndex().rangeCount());
 
             // flush the buffer.
             assertEquals(1L, insertBuffer.flush());
 
             // one justification afterwards.
-            assertEquals(1L, store.getJustificationIndex().rangeCount());
+            assertEquals(1L, store.getSPORelation().getJustificationIndex().rangeCount());
 
             /*
              * verify read back from the index.
              */
             {
 
-                final ITupleIterator itr = store.getJustificationIndex()
+                final ITupleIterator itr = store.getSPORelation().getJustificationIndex()
                         .rangeIterator();
 
                 while (itr.hasNext()) {
@@ -314,7 +314,7 @@ public class TestJustifications extends AbstractRuleTestCase {
              */
             {
                 
-                final ITupleIterator itr = store.getJustificationIndex()
+                final ITupleIterator itr = store.getSPORelation().getJustificationIndex()
                         .rangeIterator(null, null);
                 
                 assertFalse(itr.hasNext());
@@ -323,7 +323,7 @@ public class TestJustifications extends AbstractRuleTestCase {
             
         } finally {
 
-            store.closeAndDelete();
+            store.__tearDownUnitTest();
 
         }
 

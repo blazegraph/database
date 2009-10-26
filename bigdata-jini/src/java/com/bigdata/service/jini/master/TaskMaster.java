@@ -794,27 +794,6 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
             innerMain().get();
 
-        } catch (CancellationException ex) {
-
-            // cancel any running clients.
-            cancelAll(true/* mayInterruptIfRunning */);
-
-            throw ex;
-
-        } catch (InterruptedException ex) {
-
-            // cancel any running clients.
-            cancelAll(true/* mayInterruptIfRunning */);
-
-            throw ex;
-
-        } catch (ExecutionException ex) {
-
-            // cancel any running clients.
-            cancelAll(true/* mayInterruptIfRunning */);
-
-            throw ex;
-
         } finally {
 
             // always write the date when the master terminates.
@@ -858,26 +837,42 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
             // callback for overrides.
             beginJob(getJobState());
 
-            // run the clients and wait for them to complete.
-            runJob();
+            try {
+                
+                // run the clients and wait for them to complete.
+                runJob();
 
-            if (jobState.forceOverflow) {
+            } catch (CancellationException ex) {
 
-                forceOverflow();
+                error(jobState, ex);
+                
+                throw ex;
 
+            } catch (InterruptedException ex) {
+
+                error(jobState, ex);
+                
+                throw ex;
+
+            } catch (ExecutionException ex) {
+
+                error(jobState, ex);
+                
+                throw ex;
+        
             }
-
+        
             success(jobState);
 
         } finally {
 
-            // timestamp after the job is done.
-            jobState.endMillis = System.currentTimeMillis();
-
-            if (log.isInfoEnabled())
-                log.info("All done: elapsed=" + jobState.getElapsedMillis());
-
             tearDownJob(jobState, zlock);
+
+        }
+
+        if (jobState.forceOverflow) {
+
+            forceOverflow();
 
         }
 
@@ -1008,7 +1003,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
     /**
      * Await the completion of the {@link Future}. If any client fails then the
-     * remaining clients will be cancelled.
+     * remaining clients will be canceled.
      * 
      * @throws IllegalStateException
      *             if {@link JobState#futures} is <code>null</code>.
@@ -1092,6 +1087,12 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
      */
     protected void success(final S jobState) throws Exception {
 
+        // timestamp after the job is done.
+        jobState.endMillis = System.currentTimeMillis();
+
+        if (log.isInfoEnabled())
+            log.info("Clients done: elapsed=" + jobState.getElapsedMillis());
+
         /*
          * This is the commit point corresponding to the end of the job.
          */
@@ -1106,6 +1107,54 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
     }
 
+    /**
+     * Callback invoked if an exception is thrown during the job execution. The
+     * {@link JobState#endMillis} is set by this method, the client tasks are
+     * canceled, and an error message is logged. By default, the znode for the
+     * job is not destroyed. You can destroy a terminated job using zookeeper or
+     * automatically destroy a pre-existing job when re-submitting the job using
+     * {@link ConfigurationOptions#DELETE_JOB}.
+     * <p>
+     * Note: This method should not throw anything since that could cause the
+     * root cause of the job error to be masked.
+     * 
+     * @param jobState
+     *            The {@link JobState}.
+     * @param t
+     *            The exception.
+     */
+    protected void error(final S jobState, final Throwable t) {
+
+        /*
+         * Defensive implementation designed to be safe(r) if there is a log
+         * configuration issue, etc.
+         */
+        
+        try {
+
+            // timestamp after the job is done.
+            jobState.endMillis = System.currentTimeMillis();
+
+            log.error("Abort: elapsed=" + jobState.getElapsedMillis()
+                    + " : cause=" + t, t);
+            
+        } finally {
+
+            try {
+
+                // cancel any running clients.
+                cancelAll(true/* mayInterruptIfRunning */);
+
+            } catch (Throwable t2) {
+
+                t2.printStackTrace(System.err);
+
+            }
+
+        }
+
+    }
+    
     /**
      * Callback invoked when the job is done executing (any completion) but has
      * not yet release the {@link ZLock} for the {@link JobState}. The default
@@ -1684,7 +1733,7 @@ abstract public class TaskMaster<S extends TaskMaster.JobState, T extends Callab
 
         while (itr.hasNext()) {
 
-            final Future f = itr.next();
+            final Future<?/* U */> f = itr.next();
 
             if (!f.isDone()) {
 

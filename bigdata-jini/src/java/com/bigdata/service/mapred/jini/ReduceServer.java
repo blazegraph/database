@@ -40,6 +40,7 @@ import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.FakeLifeCycle;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.RemoteAdministrable;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.service.mapred.ReduceService;
@@ -96,7 +97,7 @@ public class ReduceServer extends AbstractServer {
 
     }
 
-    protected Remote newService(Properties properties) {
+    protected Remote newService(final Properties properties) {
 
         return new AdministrableReduceService(this, properties);
 
@@ -114,12 +115,12 @@ public class ReduceServer extends AbstractServer {
     public static class AdministrableReduceService extends ReduceService
             implements RemoteAdministrable, RemoteDestroyAdmin {
 
-        protected AbstractServer server;
+        protected final AbstractServer server;
 
         private UUID serviceUUID;
 
-        public AdministrableReduceService(AbstractServer server,
-                Properties properties) {
+        public AdministrableReduceService(final AbstractServer server,
+                final Properties properties) {
 
             super(properties);
 
@@ -129,7 +130,8 @@ public class ReduceServer extends AbstractServer {
 
         public Object getAdmin() throws RemoteException {
 
-            log.info("" + getServiceUUID());
+            if (log.isInfoEnabled())
+                log.info("" + getServiceUUID());
 
             return server.getProxy();
 
@@ -139,35 +141,51 @@ public class ReduceServer extends AbstractServer {
          * DestroyAdmin
          */
 
-        /**
-         * Destroy the service and deletes any files containing resources (<em>application data</em>)
-         * that was in use by that service.
-         * 
-         * @throws RemoteException
-         */
-        public void destroy() throws RemoteException {
+        @Override
+        synchronized public void destroy() {
 
-            server.runDestroy();
+            if (!server.isShuttingDown()) {
 
+                /*
+                 * Run thread which will destroy the service (asynchronous).
+                 * 
+                 * Note: By running this is a thread, we avoid closing the
+                 * service end point during the method call.
+                 */
+
+                server.runDestroy();
+
+            } else if (isOpen()) {
+
+                /*
+                 * The server is already shutting down, so invoke our super
+                 * class behavior to destroy the persistent state.
+                 */
+
+                super.destroy();
+
+            }
         }
 
+        @Override
         synchronized public void shutdown() {
 
             // normal service shutdown.
             super.shutdown();
 
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/* destroy */);
 
         }
 
+        @Override
         synchronized public void shutdownNow() {
 
             // immediate service shutdown.
             super.shutdownNow();
 
             // jini service and server shutdown.
-            server.shutdownNow();
+            server.shutdownNow(false/* destroy */);
 
         }
 
@@ -183,9 +201,16 @@ public class ReduceServer extends AbstractServer {
 
         }
 
-        public JiniClient getBigdataClient() {
+        public JiniClient<?> getBigdataClient() {
+            
+            return server.getClient();
+//            return JiniClient.newInstance(new String[]{});
+            
+        }
 
-            return JiniClient.newInstance(new String[] {});
+        public JiniFederation<?> getFederation() {
+
+            return server.getClient().getFederation();
 
         }
 

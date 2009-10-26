@@ -123,11 +123,11 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         };
         
         String[] obj = new String[] {
-                new String("o1"),
-                new String("o2"),
-                new String("o3"),
-                new String("o4"),
-                new String("o5")
+                "o1",
+                "o2",
+                "o3",
+                "o4",
+                "o5"
         };
 
         /*
@@ -178,11 +178,11 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         };
         
         String[] obj = new String[] {
-                new String("o1"),
-                new String("o2"),
-                new String("o3"),
-                new String("o4"),
-                new String("o5")
+                "o1",
+                "o2",
+                "o3",
+                "o4",
+                "o5"
         };
 
         boolean[] dirty = new boolean[] {
@@ -307,11 +307,11 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         };
         
         String[] obj = new String[] {
-                new String("o1"),
-                new String("o2"),
-                new String("o3"),
-                new String("o4"),
-                new String("o5")
+                "o1",
+                "o2",
+                "o3",
+                "o4",
+                "o5"
         };
 
         assertNull(cache.get(oid[0]));
@@ -382,12 +382,12 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         };
         
         String[] obj = new String[] {
-                new String("o10"),
-                new String("o11"),
-                new String("o12"),
-                new String("o13"),
-                new String("o14"),
-                new String("o15")
+                "o10",
+                "o11",
+                "o12",
+                "o13",
+                "o14",
+                "o15"
         };
 
         /*
@@ -465,11 +465,11 @@ public class TestLRUCache extends AbstractCachePolicyTest {
         };
         
         String[] obj = new String[] {
-                new String("o0"),
-                new String("o1"),
-                new String("o2"),
-                new String("o3"),
-                new String("o4")
+                "o0",
+                "o1",
+                "o2",
+                "o3",
+                "o4"
         };
 
         /*

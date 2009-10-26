@@ -37,7 +37,11 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * and the internal term identifiers for the subject, predicate, object, the
  * context bound on that statement (when present). When statement identifiers
  * are enabled, the context position (if bound) will be a blank node that
- * represents the statement having that subject, predicate, and object.
+ * represents the statement having that subject, predicate, and object and its
+ * term identifier, when assigned, will report <code>true</code> for
+ * {@link AbstractTripleStore#isStatement(long)}. When used to model a quad, the
+ * 4th position will be a {@link BigdataValue} but its term identifier will
+ * report <code>false</code> for {@link AbstractTripleStore#isStatement(long)}.
  * <p>
  * Note: The ctors are intentionally protected. Use the
  * {@link BigdataValueFactory} to create instances of this class - it will
@@ -64,8 +68,9 @@ public class BigdataStatementImpl implements BigdataStatement {
     /**
      * Used by {@link BigdataValueFactory}
      */
-    protected BigdataStatementImpl(BigdataResource subject, BigdataURI predicate,
-            BigdataValue object, BigdataResource context, StatementEnum type) {
+    protected BigdataStatementImpl(final BigdataResource subject,
+            final BigdataURI predicate, final BigdataValue object,
+            final BigdataResource context, final StatementEnum type) {
 
         if (subject == null)
             throw new IllegalArgumentException();
@@ -76,8 +81,9 @@ public class BigdataStatementImpl implements BigdataStatement {
         if (object == null)
             throw new IllegalArgumentException();
         
-//        if (type == null)
-//            throw new IllegalArgumentException();
+        // Note: context MAY be null
+        
+        // Note: type MAY be null.
         
         this.s = subject;
 
@@ -127,7 +133,7 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
  
-    final public void setStatementType(StatementEnum type) {
+    final public void setStatementType(final StatementEnum type) {
         
         if (type == null) {
         
@@ -163,16 +169,17 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
 
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
     
         return equals((Statement)o);
         
     }
 
     /**
-     * Note: implementation per {@link Statement} interface.
+     * Note: implementation per {@link Statement} interface, which specifies
+     * that only the (s,p,o) positions are to be considered.
      */
-    final public boolean equals(Statement stmt) {
+    final public boolean equals(final Statement stmt) {
 
         return s.equals(stmt.getSubject()) && //
                p.equals(stmt.getPredicate()) && //
@@ -180,9 +187,10 @@ public class BigdataStatementImpl implements BigdataStatement {
         ;
         
     }
-    
-    /*
-     * Note: implementation per Statement interface.
+
+    /**
+     * Note: implementation per Statement interface, which does not consider the
+     * context position.
      */
     final public int hashCode() {
         
@@ -199,7 +207,8 @@ public class BigdataStatementImpl implements BigdataStatement {
     
     public String toString() {
         
-        return "<"+s+", "+p+", "+o+(c==null?"":", "+c)+">"+(type==null?"":" : "+type);
+        return "<" + s + ", " + p + ", " + o + (c == null ? "" : ", " + c)
+                + ">" + (type == null ? "" : " : " + type);
         
     }
 
@@ -221,6 +230,32 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
     
+    final public long c() {
+
+        if (c == null)
+            return NULL;
+        
+        return c.getTermId();
+        
+    }
+
+    public long get(final int index) {
+
+        switch (index) {
+        case 0:
+            return s.getTermId();
+        case 1:
+            return p.getTermId();
+        case 2:
+            return o.getTermId();
+        case 3: // 4th position MAY be unbound.
+            return (c == null) ? NULL : c.getTermId();
+        default:
+            throw new IllegalArgumentException();
+        }
+
+    }
+    
     final public boolean isFullyBound() {
         
         return s() != NULL && p() != NULL && o() != NULL;
@@ -232,21 +267,21 @@ public class BigdataStatementImpl implements BigdataStatement {
         if (sid == NULL)
             throw new IllegalArgumentException();
 
-        if (c == null && c.getTermId() != sid)
-            throw new IllegalStateException(
-                    "Different statement identifier already defined: "
-                            + toString() + ", new=" + sid);
-
-        if( type != StatementEnum.Explicit)  {
-
-            // Only allowed for explicit statements.
-            throw new IllegalStateException();
-            
-        }
-
         if (!AbstractTripleStore.isStatement(sid))
             throw new IllegalArgumentException("Not a statement identifier: "
                     + sid);
+
+        if (type != StatementEnum.Explicit) {
+
+            // Only allowed for explicit statements.
+            throw new IllegalStateException();
+
+        }
+
+        if (c != null && c.getTermId() != sid)
+            throw new IllegalStateException(
+                    "Different statement identifier already defined: "
+                            + toString() + ", new=" + sid);
 
         c.setTermId(sid);
 
@@ -254,7 +289,7 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     public final long getStatementIdentifier() {
 
-        if (c == null || c.getTermId() == NULL)
+        if (!hasStatementIdentifier())
             throw new IllegalStateException("No statement identifier: "
                     + toString());
 
@@ -264,7 +299,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     
     final public boolean hasStatementIdentifier() {
         
-        return c != null && c.getTermId() != NULL;
+        return c != null && AbstractTripleStore.isStatement(c.getTermId());
         
     }
 
@@ -274,24 +309,24 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
 
-    public final void setOverride(boolean override) {
+    public final void setOverride(final boolean override) {
         
         this.override = override;
         
     }
-    
-    public byte[] serializeValue(ByteArrayBuffer buf) {
 
-        return SPO.serializeValue(buf, isOverride(), type,
-                (hasStatementIdentifier() ? getStatementIdentifier() : NULL));
-        
+    public byte[] serializeValue(final ByteArrayBuffer buf) {
+
+        return SPO.serializeValue(buf, override, type, c != null ? c
+                .getTermId() : NULL);
+
     }
 
     /**
-     * Note: this implementation is equivilent to {@link #toString()} since the
+     * Note: this implementation is equivalent to {@link #toString()} since the
      * {@link Value}s are already resolved.
      */
-    public String toString(IRawTripleStore storeIsIgnored) {
+    public String toString(final IRawTripleStore storeIsIgnored) {
         
         return toString();
         

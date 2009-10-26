@@ -124,9 +124,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -159,9 +159,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -188,9 +188,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -223,9 +223,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -252,9 +252,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -281,9 +281,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -308,9 +308,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -341,9 +341,9 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
                 
                 IChunkedOrderedIterator<ISPO> itr = new BackchainOwlSameAsPropertiesIterator(//
                         accessPath.iterator(),//
-                        accessPath.s,
-                        accessPath.p,
-                        accessPath.o,
+                        accessPath.get(0/*S*/),
+                        accessPath.get(1/*P*/),
+                        accessPath.get(2/*O*/),
                         noClosure, //
                         same //
                         );
@@ -394,7 +394,7 @@ public class TestBackchainOwlSameAsPropertiesIterator extends AbstractInferenceE
           
         } finally {
             
-            noClosure.closeAndDelete();
+            noClosure.__tearDownUnitTest();
             
         }
         

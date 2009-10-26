@@ -26,7 +26,6 @@ import com.bigdata.jini.start.config.ManagedServiceConfiguration.ManagedServiceS
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.jini.IReplicatableService;
 import com.bigdata.service.jini.JiniFederation;
-import com.sun.jini.config.ConfigUtil;
 import com.sun.jini.resource.ServiceConfigurationError;
 import com.sun.jini.tool.ClassServer;
 
@@ -988,47 +987,6 @@ abstract public class ServiceConfiguration implements Serializable {
 
         return c;
 
-    }
-
-    /**
-     * Quote a string value.
-     * 
-     * @param v
-     *            The value.
-     * 
-     * @return The quoted value.
-     * 
-     * @todo Use {@link ConfigUtil#stringLiteral(String)} instead?
-     */
-    static public String q(String v) {
-        
-        final int len = v.length();
-        
-        final StringBuilder sb = new StringBuilder(len + 10);
-        
-        sb.append("\"");
-        
-        for(int i=0; i<len; i++) {
-            
-            char c = v.charAt(i);
-            
-            switch(c) {
-            
-            case '\\':
-                sb.append("\\\\");
-                break;
-
-            default:
-                sb.append(c);
-                
-            }
-            
-        }
-        
-        sb.append("\"");
-        
-        return sb.toString(); 
-        
     }
 
     /**

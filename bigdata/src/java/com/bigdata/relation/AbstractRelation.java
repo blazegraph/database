@@ -101,7 +101,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * construct to return the correct hard reference. This behavior should be
      * encapsulated.
      */
-    public IIndex getIndex(IKeyOrder<? extends E> keyOrder) {
+    public IIndex getIndex(final IKeyOrder<? extends E> keyOrder) {
 
         return getIndex(getFQN(keyOrder));
         
@@ -120,7 +120,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      * returned index view without regard to concurrency controls (it will
      * appear to be a thread-safe object).
      * 
-     * @param name
+     * @param fqn
      *            The fully qualified name of the index.
      * 
      * @return The named index -or- <code>null</code> iff the named index does
@@ -137,16 +137,16 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
      *       themselves invalid (this really only applies to the unisolated
      *       index and to indices isolated by a transaction).
      */
-    protected IIndex getIndex(String name) {
+    public IIndex getIndex(final String fqn) {
 
-        if (name == null)
+        if (fqn == null)
             throw new IllegalArgumentException();
 
         final IIndexManager indexManager = getIndexManager();
 
         final long timestamp = getTimestamp();
 
-        IIndex ndx = indexManager.getIndex(name, timestamp);
+        IIndex ndx = indexManager.getIndex(fqn, timestamp);
 
         if (ndx != null
                 && timestamp == ITx.UNISOLATED
@@ -155,7 +155,7 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
             if(log.isDebugEnabled()) {
                 
                 log.debug("Imposing read-write concurrency controls on index: name="
-                                + name);
+                                + fqn);
                 
             }
             

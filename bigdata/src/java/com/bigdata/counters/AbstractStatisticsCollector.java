@@ -42,6 +42,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
@@ -280,7 +281,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                             .makePath(ICounterHierarchy.Memory_GarbageCollectors));
             
             /*
-             * Add counters reporting on the various DirectBufferPool.
+             * Add counters reporting on the various DirectBufferPools.
              */
             {
 
@@ -292,6 +293,20 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
                 
             }
 
+            if (LRUNexus.INSTANCE != null) {
+
+                /*
+                 * Add counters reporting on the global LRU and the per-store
+                 * caches.
+                 */
+
+                serviceRoot.makePath(
+                        IProcessCounters.Memory + ICounterSet.pathSeparator
+                                + "LRUNexus").attach(
+                        LRUNexus.INSTANCE.getCounterSet());
+
+            }
+            
         }
                 
     }
@@ -311,7 +326,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
         final CounterSet ptmp = serviceInfoSet.makePath("Properties");
 
-        final Enumeration e = properties.propertyNames();
+        final Enumeration<?> e = properties.propertyNames();
 
         while (e.hasMoreElements()) {
 
@@ -530,10 +545,12 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * 
      * @see Options
      */
-    public static AbstractStatisticsCollector newInstance(Properties properties) {
-        
+    public static AbstractStatisticsCollector newInstance(
+            final Properties properties) {
+
         final int interval = Integer.parseInt(properties.getProperty(
-                Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL, Options.DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL));
+                Options.PERFORMANCE_COUNTERS_SAMPLE_INTERVAL,
+                Options.DEFAULT_PERFORMANCE_COUNTERS_SAMPLE_INTERVAL));
 
         if (interval <= 0)
             throw new IllegalArgumentException();
@@ -592,7 +609,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * @throws UnsupportedOperationException
      *             if no implementation is available for your operating system.
      */
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(final String[] args) throws InterruptedException {
 
         final int DEFAULT_COUNT = 10;
         final int nargs = args.length;
@@ -673,7 +690,8 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
         
         final long begin = System.currentTimeMillis();
         
-        while (count ==0 || n < count) {
+        // Note: runs until killed when count==0.
+        while (count == 0 || n < count) {
         
             Thread.sleep(client.interval * 1000/*ms*/);
 
@@ -706,11 +724,11 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      *            
      * @return The #of bytes.
      */
-    static public Double kb2b(String kb) {
+    static public Double kb2b(final String kb) {
 
-        double d = Double.parseDouble(kb);
+        final double d = Double.parseDouble(kb);
         
-        double x = d * Bytes.kilobyte32;
+        final double x = d * Bytes.kilobyte32;
         
         return x;
         

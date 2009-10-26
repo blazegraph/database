@@ -72,19 +72,18 @@ abstract public class AbstractEmbeddedBigdataFederationTestCase extends TestCase
      * directory exists, then it is removed before the federation is set up.
      */
     public void setUp() throws Exception {
-      
-        File dataDir = new File( getName() );
-        
-        if(dataDir.exists() && dataDir.isDirectory()) {
 
-            recursiveDelete( dataDir );
-            
+        final File dataDir = new File(getName());
+
+        if (dataDir.exists() && dataDir.isDirectory()) {
+
+            recursiveDelete(dataDir);
+
         }
-        
-        Properties properties = new Properties(getProperties());
-              
-        properties.setProperty(EmbeddedClient.Options.DATA_DIR,
-                getName());
+
+        final Properties properties = new Properties(getProperties());
+
+        properties.setProperty(EmbeddedClient.Options.DATA_DIR, getName());
         
         /*
          * Disable the o/s specific statistics collection for the test run.

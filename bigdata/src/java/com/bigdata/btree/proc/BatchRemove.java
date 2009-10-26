@@ -33,7 +33,7 @@ import java.io.ObjectOutput;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
-import com.bigdata.btree.compression.IDataSerializer;
+import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Batch removal of one or more tuples, optionally returning their existing
@@ -130,13 +130,14 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        public BatchRemove newInstance(IDataSerializer keySer,
-                IDataSerializer valSer, int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public BatchRemove newInstance(IRabaCoder keySer, IRabaCoder valSer,
+                int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
-            if(vals != null) throw new IllegalArgumentException("vals should be null");
+            if (vals != null)
+                throw new IllegalArgumentException("vals should be null");
 
-            return new BatchRemove(keySer,valSer,fromIndex, toIndex, keys, assertFound, returnOldValues);
+            return new BatchRemove(keySer, valSer, fromIndex, toIndex, keys,
+                    assertFound, returnOldValues);
 
         }
 
@@ -163,7 +164,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
      * 
      * @see BatchRemoveConstructor
      */
-    protected BatchRemove(IDataSerializer keySer, IDataSerializer valSer,
+    protected BatchRemove(IRabaCoder keySer, IRabaCoder valSer,
             int fromIndex, int toIndex, byte[][] keys, boolean assertFound,
             boolean returnOldValues) {
 
@@ -186,7 +187,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
      *             if {@link #getAssertFound()} is <code>true</code> and a
      *             given key was not found in the index.
      */
-    public Object apply(IIndex ndx) {
+    public Object apply(final IIndex ndx) {
 
         final int n = getKeyCount();
 
@@ -224,7 +225,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
         if (returnOldValues) {
 
             return new ResultBuffer(n, ret, ndx.getIndexMetadata()
-                    .getTupleSerializer().getLeafValueSerializer());
+                    .getTupleSerializer().getLeafValuesCoder());
 
         }
 

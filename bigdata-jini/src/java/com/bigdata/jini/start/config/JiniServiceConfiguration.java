@@ -72,6 +72,7 @@ import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.process.JiniServiceProcessHelper;
 import com.bigdata.jini.start.process.ProcessHelper;
+import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.jini.AbstractServer;
 import com.bigdata.service.jini.JiniClient;
@@ -155,7 +156,7 @@ abstract public class JiniServiceConfiguration extends
 
         super(className, config);
 
-        JiniClientConfig tmp = new JiniClientConfig(className, config);
+        final JiniClientConfig tmp = new JiniClientConfig(className, config);
 
         entries = tmp.entries;
 
@@ -524,25 +525,25 @@ abstract public class JiniServiceConfiguration extends
 
             if (Name.class.equals(cls)) {
                 
-                out.write(q(((Name) e).name));
+                out.write(ConfigMath.q(((Name) e).name));
 
             } else if (Comment.class.equals(cls)) {
                     
-                out.write(q(((Comment) e).comment));
+                out.write(ConfigMath.q(((Comment) e).comment));
                     
             } else if (Hostname.class.equals(cls)) {
 
-                out.write(q(((Hostname) e).hostname));
+                out.write(ConfigMath.q(((Hostname) e).hostname));
 
             } else if (ServiceDir.class.equals(cls)) {
 
                 out.write("new java.io.File("
-                        + q(((ServiceDir) e).serviceDir.toString()) + ")");
+                        + ConfigMath.q(((ServiceDir) e).serviceDir.toString()) + ")");
                 
             } else if (ServiceUUID.class.equals(cls)) {
                 
                 out.write("java.util.UUID.fromString("
-                        + q(((ServiceUUID) e).serviceUUID.toString()) + ")");
+                        + ConfigMath.q(((ServiceUUID) e).serviceUUID.toString()) + ")");
 
             } else {
              
@@ -555,7 +556,7 @@ abstract public class JiniServiceConfiguration extends
             
         }
         
-        protected void writeGroups(Writer out) throws IOException {
+        protected void writeGroups(final Writer out) throws IOException {
 
             if (groups == null) {
                 
@@ -568,7 +569,7 @@ abstract public class JiniServiceConfiguration extends
                 
                 for (String e : groups) {
 
-                    out.write(q(e) + "\n");
+                    out.write(ConfigMath.q(e) + "\n");
 
                 }
                 
@@ -578,7 +579,7 @@ abstract public class JiniServiceConfiguration extends
 
         }
 
-        protected void writeLocators(Writer out) throws IOException {
+        protected void writeLocators(final Writer out) throws IOException {
 
             out.write("\nlocators=new " + LookupLocator.class.getName()
                     + "[]{\n");
@@ -599,11 +600,12 @@ abstract public class JiniServiceConfiguration extends
          * <code>exporter</code>, <code>serviceIdFile</code>, and
          * <code>logicalServiceZPath</code> entries.
          */
-        protected void writeServiceDescription(Writer out) throws IOException {
+        protected void writeServiceDescription(final Writer out)
+                throws IOException {
 
             writeExporterEntry(out);
 
-            writeServiceIdFileEntry(out);
+            writeServiceDirEntry(out);
             
             writeLogicalServiceZPathEntry(out);
 
@@ -623,10 +625,10 @@ abstract public class JiniServiceConfiguration extends
 
             // extension hook.
             final Properties properties = getProperties(JiniServiceConfiguration.this.properties);
-            
+
             out.write("\nproperties = new NV[]{\n");
 
-            final Enumeration e = properties.propertyNames();
+            final Enumeration<?> e = properties.propertyNames();
 
             while(e.hasMoreElements()) {
 
@@ -634,7 +636,7 @@ abstract public class JiniServiceConfiguration extends
                 
                 final String v = properties.getProperty(k);
                 
-                out.write("new NV( " + q(k) + ", " + q(v) + "),\n");
+                out.write("new NV( " + ConfigMath.q(k) + ", " + ConfigMath.q(v) + "),\n");
                 
             }
             
@@ -651,70 +653,59 @@ abstract public class JiniServiceConfiguration extends
          * @return The properties that will be written using
          *         {@link #writeProperties(Writer)}
          */
-        protected Properties getProperties(Properties properties) {
+        protected Properties getProperties(final Properties properties) {
             
             return properties;
             
         }
-        
+
         /**
-         * Writes the <code>exporter</code> entry. This object is used to
-         * export the service proxy. The choice here effects the protocol that
-         * will be used for communications between the clients and the service.
-         * <p>
-         * Note: specify the JVM property [-Dcom.sun.jini.jeri.tcp.useNIO=true]
-         * to enable NIO.
+         * Writes the
+         * {@link AbstractServer.ConfigurationOptions#SERVICE_ID_FILE} entry.
+         * This value is used by the {@link AbstractServer} to export the proxy
+         * for the service. The choice here effects the protocol that will be
+         * used for communications between the clients and the service.
          * 
-         * FIXME the [exporter] is hardwired. Its value is used by the
-         * {@link AbstractServer} to export the proxy for the service.
-         * <p>
-         * Note: There are also hardwired exporters used by the
-         * {@link JiniFederation}. The whole issue needs to be resolved. The
-         * exported is a chunk of code, so it would have to be quoted to get
-         * passed along, which is why I am doing it this way.
+         * FIXME the [exporter] is hardwired. There are also hardwired exporters
+         * used by the {@link JiniFederation}. The whole issue needs to be
+         * resolved. The exported is a chunk of code, so it would have to be
+         * quoted to get passed along, which is why I am doing it this way.
          */
-        protected void writeExporterEntry(Writer out) throws IOException {
+        protected void writeExporterEntry(final Writer out) throws IOException {
             
-            out.write("\nexporter = new " + BasicJeriExporter.class.getName()
-                    + "(" + TcpServerEndpoint.class.getName()
-                    + ".getInstance(0)," + "new "
-                    + BasicILFactory.class.getName() + "());\n");
+            out.write("\n" + AbstractServer.ConfigurationOptions.EXPORTER
+                    + " = new " + BasicJeriExporter.class.getName() + "("
+                    + TcpServerEndpoint.class.getName() + ".getInstance(0),"
+                    + "new " + BasicILFactory.class.getName() + "());\n");
 
         }
-        
+
         /**
-         * Writes the <code>serviceIdFile</code> entry. The value of that
-         * entry is the {@link File} on which the {@link ServiceID} will be
-         * written by the service once it is assigned by jini.
-         * <p>
-         * Note: the serviceUUID (a conversion of the {@link ServiceID} to a
-         * normal {@link UUID}) is also put into the znode data for the service
-         * once it has been assigned by jini. That action is performed by the
-         * service itself.
+         * Writes the {@link AbstractServer.ConfigurationOptions#SERVICE_DIR}
+         * entry.
          */
-        protected void writeServiceIdFileEntry(Writer out) throws IOException {
+        protected void writeServiceDirEntry(Writer out) throws IOException {
 
-            final File serviceIdFile = new File(serviceDir, "service.id");
-
-            out.write("\nserviceIdFile = new File("
-                    + q(serviceIdFile.toString()) + ");\n");
+            out.write("\n" + AbstractServer.ConfigurationOptions.SERVICE_DIR
+                    + "= new File(" + ConfigMath.q(serviceDir.toString()) + ");\n");
 
         }
 
         /**
-         * Writes the <code>zpath</code> for the logical service. The service
-         * must use {@link CreateMode#EPHEMERAL_SEQUENTIAL} to create a child of
-         * this zpath to represent itself.
+         * Writes the
+         * {@link AbstractServer.ConfigurationOptions#LOGICAL_SERVICE_ZPATH}
+         * entry. The service must use {@link CreateMode#EPHEMERAL_SEQUENTIAL}
+         * to create a child of this zpath to represent itself.
          * 
          * @throws IOException
          */
         protected void writeLogicalServiceZPathEntry(Writer out)
                 throws IOException {
 
-            out
-                    .write("\nlogicalServiceZPath=" + q(logicalServiceZPath)
-                            + ";\n");
-               
+            out.write("\n"
+                    + AbstractServer.ConfigurationOptions.LOGICAL_SERVICE_ZPATH
+                    + "=" + ConfigMath.q(logicalServiceZPath) + ";\n");
+
         }
 
         /**
@@ -722,27 +713,28 @@ abstract public class JiniServiceConfiguration extends
          * 
          * @throws IOException
          */
-        protected void writeZookeeperClientConfigEntries(Writer out)
+        protected void writeZookeeperClientConfigEntries(final Writer out)
                 throws IOException {
 
             out.write("\n");
-            
+
             fed.getZooConfig().writeConfiguration(out);
-            
+
         }
-        
+
         @SuppressWarnings("unchecked")
         @Override
-        protected V newProcessHelper(String className,
-                ProcessBuilder processBuilder, IServiceListener listener)
-                throws IOException {
+        protected V newProcessHelper(final String className,
+                final ProcessBuilder processBuilder,
+                final IServiceListener listener) throws IOException {
 
-            return (V) new JiniServiceProcessHelper(className, processBuilder, listener);
+            return (V) new JiniServiceProcessHelper(className, processBuilder,
+                    listener);
 
         }
-        
+
         /**
-         * Overriden to monitor for the jini join of the service and the
+         * Overridden to monitor for the jini join of the service and the
          * creation of the znode corresponding to the physical service instance.
          * 
          * @todo we could also verify the service using its proxy, e.g., by

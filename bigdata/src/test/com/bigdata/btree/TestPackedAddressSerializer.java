@@ -65,7 +65,7 @@ public class TestPackedAddressSerializer extends AbstractAddressSerializerTestCa
 //        
 //        return addr;
         
-        return TestWormAddressManager.nextNonZeroAddr(r, store.getAddressManger());
+        return TestWormAddressManager.nextNonZeroAddr(r, store.getAddressManager());
         
     }
     

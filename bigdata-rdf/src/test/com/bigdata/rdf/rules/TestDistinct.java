@@ -54,13 +54,15 @@ public class TestDistinct extends AbstractRuleTestCase {
     }
 
     /**
+     * @todo write unit tests for "distinct".
+     * 
      * @todo Unit test where there are no results.
      * 
      * @todo Unit test where duplicates are correctly dropped.
      */
     public void test_distinct() {
         
-        fail("write tests");
+//        fail("write tests");
         
     }
     

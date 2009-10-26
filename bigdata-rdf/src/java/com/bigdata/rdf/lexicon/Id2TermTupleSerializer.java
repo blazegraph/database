@@ -55,10 +55,11 @@ import org.openrdf.model.Value;
 
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
-import com.bigdata.btree.compression.HuffmanSerializer;
-import com.bigdata.btree.compression.WrapSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.ConditionalRabaCoder;
+import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
+import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
@@ -116,22 +117,25 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
         
         super(//
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_LONG),//
-                getDefaultLeafKeySerializer(),//
-                new WrapSerializer(
-                        getDefaultValueKeySerializer(),
-                        HuffmanSerializer.INSTANCE,
-                        33/*btreeBranchingFactor+1*/
-                        )
-//                getDefaultValueKeySerializer()//
+                getDefaultLeafKeysCoder(),//
+//                getDefaultValuesCoder()
+                SimpleRabaCoder.INSTANCE
+//                CanonicalHuffmanRabaCoder.INSTANCE
+//                new ConditionalRabaCoder(//
+//                        SimpleRabaCoder.INSTANCE, // small
+//                        CanonicalHuffmanRabaCoder.INSTANCE, // large
+//                        33/*btreeBranchingFactor+1*/
+//                        )
         );
 
         if (namespace == null)
             throw new IllegalArgumentException();
         
         this.namespace = namespace;
-        
-        this.valueSer = BigdataValueFactoryImpl.getInstance(namespace).getValueSerializer();
-        
+
+        this.valueSer = BigdataValueFactoryImpl.getInstance(namespace)
+                .getValueSerializer();
+
     }
     
     /**
@@ -179,7 +183,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      * @param obj
      *            The term identifier as a {@link Long}.
      */
-    public byte[] serializeKey(Object obj) {
+    public byte[] serializeKey(final Object obj) {
 
         return id2key(((Long) obj).longValue());
         
@@ -192,7 +196,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      * @param obj
      *            An RDF {@link Value}.
      */
-    public byte[] serializeVal(BigdataValue obj) {
+    public byte[] serializeVal(final BigdataValue obj) {
         
         buf.reset();
         
@@ -205,7 +209,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      * the term identifier extracted from the unsigned byte[] key, and sets
      * the appropriate {@link BigdataValueFactoryImpl} reference on that object.
      */
-    public BigdataValue deserialize(ITuple tuple) {
+    public BigdataValue deserialize(final ITuple tuple) {
 
         final long id = deserializeKey(tuple);
 

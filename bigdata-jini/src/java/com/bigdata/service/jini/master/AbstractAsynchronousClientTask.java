@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini.master;
 
-import java.rmi.RemoteException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
@@ -45,8 +44,9 @@ import com.bigdata.service.jini.JiniFederation;
  *            The generic type of the client locator.
  */
 public abstract class AbstractAsynchronousClientTask<U, V, L> extends
-        FederationCallable<U> implements IAsynchronousClientTask<U, V>,
-        INotifyOutcome<V, L> {
+        FederationCallable<U> implements IAsynchronousClientTask<U, V>
+//        INotifyOutcome<V, L> 
+{
 
     private final INotifyOutcome<V, L> proxy;
 
@@ -108,24 +108,24 @@ public abstract class AbstractAsynchronousClientTask<U, V, L> extends
 
     }
 
-    /**
-     * Invokes the corresponding method on the proxy.
-     */
-    public void success(final V resource,final L locator) throws RemoteException {
-
-        proxy.success(resource, locator);
-
-    }
-
-    /**
-     * Invokes the corresponding method on the proxy.
-     */
-    public void error(final V resource, final L locator, final Throwable cause)
-            throws RemoteException {
-
-        proxy.error(resource, locator, cause);
-
-    }
+//    /**
+//     * Invokes the corresponding method on the proxy.
+//     */
+//    public void success(final V resource,final L locator) throws RemoteException {
+//
+//        proxy.success(resource, locator);
+//
+//    }
+//
+//    /**
+//     * Invokes the corresponding method on the proxy.
+//     */
+//    public void error(final V resource, final L locator, final Throwable cause)
+//            throws RemoteException {
+//
+//        proxy.error(resource, locator, cause);
+//
+//    }
 
 //    /**
 //     * Open an input stream reading from the resource identifier. This method is

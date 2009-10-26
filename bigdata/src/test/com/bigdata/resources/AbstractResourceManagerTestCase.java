@@ -339,7 +339,7 @@ public class AbstractResourceManagerTestCase extends
             
         }
 
-        public void destroy() throws IOException {
+        public void destroy() {
 
         }
 

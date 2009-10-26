@@ -61,7 +61,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
          * Use a proxy test suite and specify the delegate.
          */
 
-        ProxyTestSuite suite = new ProxyTestSuite(delegate,
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
                 "Disk Journal Test Suite");
 
         /*
@@ -78,7 +78,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
         suite.addTestSuite(TestInterrupts.class);
 
         // test suite for MROW correctness.
-        suite.addTestSuite( TestMROW.class );
+        suite.addTestSuite(TestMROW.class);
 
         // test suite for MRMW correctness.
         suite.addTestSuite(TestMRMW.class);
@@ -96,16 +96,17 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
     public Properties getProperties() {
 
-        Properties properties = super.getProperties();
+        final Properties properties = super.getProperties();
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
-        properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
-        properties.setProperty(Options.DELETE_ON_EXIT,"true");
+        properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
-        properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
-        
+        properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
+                + writeCacheCapacity);
+
         return properties;
 
     }
@@ -120,23 +121,32 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
         final Properties properties = getProperties();
 
-        Journal journal = new Journal(properties);
+        final Journal journal = new Journal(properties);
 
-        DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal.getBufferStrategy();
+        try {
 
-        assertTrue("isStable", bufferStrategy.isStable());
-        assertFalse("isFullyBuffered", bufferStrategy.isFullyBuffered());
-//        assertEquals(Options.FILE, properties.getProperty(Options.FILE),
-//                bufferStrategy.file.toString());
-        assertEquals(Options.INITIAL_EXTENT, Long.parseLong(Options.DEFAULT_INITIAL_EXTENT),
-                bufferStrategy.getInitialExtent());
-        assertEquals(Options.MAXIMUM_EXTENT, 0L/*soft limit for disk mode*/,
-                bufferStrategy.getMaximumExtent());
-        assertNotNull("raf", bufferStrategy.getRandomAccessFile());
-        assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy
-                .getBufferMode());
+            final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal
+                    .getBufferStrategy();
 
-        journal.destroy();
+            assertTrue("isStable", bufferStrategy.isStable());
+            assertFalse("isFullyBuffered", bufferStrategy.isFullyBuffered());
+            // assertEquals(Options.FILE, properties.getProperty(Options.FILE),
+            // bufferStrategy.file.toString());
+            assertEquals(Options.INITIAL_EXTENT, Long
+                    .parseLong(Options.DEFAULT_INITIAL_EXTENT), bufferStrategy
+                    .getInitialExtent());
+            assertEquals(Options.MAXIMUM_EXTENT,
+                    0L/* soft limit for disk mode */, bufferStrategy
+                            .getMaximumExtent());
+            assertNotNull("raf", bufferStrategy.getRandomAccessFile());
+            assertEquals(Options.BUFFER_MODE, BufferMode.Disk, bufferStrategy
+                    .getBufferMode());
+
+        } finally {
+
+            journal.destroy();
+
+        }
 
     }
     
@@ -178,7 +188,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
             try {
 
-                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
                         .getBufferStrategy();
 
                 final long nextOffset = store.getRootBlockView()
@@ -234,7 +244,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
             try {
 
-                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
                         .getBufferStrategy();
 
                 final int nbytes = 100;
@@ -282,7 +292,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
             try {
 
-                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
                         .getBufferStrategy();
 
                 final int nbytes = 60;
@@ -293,7 +303,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
                 assertEquals(nbytes, store.getByteCount(addr));
                 
                 // random data.
-                byte[] a = new byte[nbytes];
+                final byte[] a = new byte[nbytes];
                 r.nextBytes(a);
                 
                 /*
@@ -304,7 +314,7 @@ public class TestDiskJournal extends AbstractJournalTestCase {
                  */
                 {
                     
-                    ByteBuffer b = ByteBuffer.wrap(a);
+                    final ByteBuffer b = ByteBuffer.wrap(a);
                     
                     b.limit(40);
                     
@@ -509,19 +519,20 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
         protected IRawStore getStore() {
 
-            Properties properties = getProperties();
+            final Properties properties = getProperties();
             
-            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+            properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
-            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
-            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
-            
+            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
+                    + writeCacheCapacity);
+
             return new Journal(properties).getBufferStrategy();
-            
+
         }
 
     }
@@ -544,19 +555,20 @@ public class TestDiskJournal extends AbstractJournalTestCase {
         
         protected IRawStore getStore() {
 
-            Properties properties = getProperties();
-            
-            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+            final Properties properties = getProperties();
 
-            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+            properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
-            
-            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
+
+            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
+                    + writeCacheCapacity);
 
             return new Journal(properties).getBufferStrategy();
-            
+
         }
 
     }
@@ -579,21 +591,22 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
         protected IRawStore getStore() {
 
-            Properties properties = getProperties();
-            
-            properties.setProperty(Options.CREATE_TEMP_FILE,"true");
+            final Properties properties = getProperties();
 
-            properties.setProperty(Options.DELETE_ON_EXIT,"true");
+            properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+
+            properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
-            
-            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
-            
+
+            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
+                    + writeCacheCapacity);
+
             return new Journal(properties).getBufferStrategy();
-            
+
         }
-        
+
     }
 
     /**

@@ -79,4 +79,10 @@ public interface ITermIndexCodes {
      */
     final public static byte TERM_CODE_STMT = 0x06;
 
+    /**
+     * @deprecated This is a place holder for a namespace for an alternative
+     *             coding of datatype literal keys.
+     */
+    final public static byte TERM_CODE_DTL2 = 0x07;
+
 }

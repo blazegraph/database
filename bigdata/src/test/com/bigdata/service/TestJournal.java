@@ -56,7 +56,7 @@ public class TestJournal extends AbstractJournalTestCase {
 
     public Properties getProperties() {
 
-        Properties properties = super.getProperties();
+        final Properties properties = super.getProperties();
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
 
@@ -88,7 +88,7 @@ public class TestJournal extends AbstractJournalTestCase {
      * Otherwise those unit tests tend not to force a commit and hence
      * restart-safe tests tend to fail for one reason or another.
      */
-    protected Journal reopenStore(Journal store) {
+    protected Journal reopenStore(final Journal store) {
 
         store.commit();
         

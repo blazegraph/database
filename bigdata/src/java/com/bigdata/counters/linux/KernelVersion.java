@@ -76,23 +76,35 @@ public class KernelVersion {
         
         if (pr.exitValue() == 0) {
         
-            BufferedReader outReader = new BufferedReader(
+            final BufferedReader outReader = new BufferedReader(
                     new InputStreamReader(pr.getInputStream()));
             
             final String val;
             try {
             
-                val = outReader.readLine().trim();
+                val = outReader.readLine();
                 
             } catch (IOException ex) {
                 
                 throw new RuntimeException(ex);
                 
+            } finally {
+                
+                try {
+                    outReader.close();
+                } catch (IOException ex) {
+                    log.error(ex, ex);
+                }
+                
             }
-            
-            log.info("read: [" + val + "]");
 
-            return new KernelVersion(val);
+            if (val == null)
+                throw new RuntimeException("Nothing returned.");
+            
+            if(log.isInfoEnabled())
+                log.info("read: [" + val + "]");
+
+            return new KernelVersion(val.trim());
             
         } else {
             

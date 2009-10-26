@@ -26,7 +26,6 @@ import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.IHistoryEntry;
 import com.bigdata.counters.IServiceCounters;
 import com.bigdata.counters.PeriodEnum;
-import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.query.CSet;
 import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.HistoryTable;
@@ -1834,28 +1833,37 @@ public class XHTMLRenderer implements IRenderer {
 
         if (is == null)
             throw new IOException("Resource not on classpath: " + resource);
-        
-        try {
-            
-            final BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-            
-            String s = null;
-            
-            boolean first = true;
-            
-            // read each line (note: chops off newline).
-            while ((s = reader.readLine()) != null) {
-                
-                if(!first) {
 
-                    // write out the chopped off newline.
-                    w.write("\n");
-                    
+        try {
+
+            final BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(is));
+
+            try {
+
+                String s = null;
+
+                boolean first = true;
+
+                // read each line (note: chops off newline).
+                while ((s = reader.readLine()) != null) {
+
+                    if (!first) {
+
+                        // write out the chopped off newline.
+                        w.write("\n");
+
+                    }
+
+                    w.write(s);
+
+                    first = false;
+
                 }
-                
-                w.write(s);
-                
-                first = false;
+
+            } finally {
+
+                reader.close();
                 
             }
             
