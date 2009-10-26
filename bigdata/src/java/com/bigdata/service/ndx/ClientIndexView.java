@@ -867,7 +867,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             
         }
         
-        @Override
+        //@Override
         public boolean hasNext() {
 
             while (!exhausted
@@ -893,7 +893,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
         }
 
-        @Override
+        //@Override
         public ITuple<E> next() {
 
             if (!hasNext())
@@ -903,7 +903,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
             
         }
 
-        @Override
+        //@Override
         public void remove() {
 
             throw new UnsupportedOperationException();

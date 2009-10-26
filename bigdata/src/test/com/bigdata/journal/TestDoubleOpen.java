@@ -153,7 +153,7 @@ public class TestDoubleOpen extends ProxyTestCase<Journal> {
                 final Future<Void> future = journal.getExecutorService()
                         .submit(new Callable<Void>() {
 
-                            @Override
+                            //@Override
                             public Void call() throws Exception {
 
                                 try {
