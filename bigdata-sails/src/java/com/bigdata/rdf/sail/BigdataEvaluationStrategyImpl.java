@@ -747,69 +747,73 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                  * @todo can this happen? If it does then we need to look at how
                  * to layer the expanders.
                  */
-                throw new AssertionError("expander already set");
-            }
-            final Var cvar = stmtPattern.getContextVar();
-            if (dataset == null) {
-                if (cvar == null) {
-                    /*
-                     * There is no dataset and there is no graph variable, so
-                     * the default graph will be the RDF Merge of ALL graphs in
-                     * the quad store.
-                     * 
-                     * This code path uses an "expander" which strips off the
-                     * context information and filters for the distinct (s,p,o)
-                     * triples to realize the RDF Merge of the source graphs for
-                     * the default graph.
-                     */
-                    c = null;
-                    expander = new DefaultGraphSolutionExpander(null/* ALL */);
-                } else {
-                    /*
-                     * There is no data set and there is a graph variable, so
-                     * the query will run against all named graphs and [cvar]
-                     * will be to the context of each (s,p,o,c) in turn. This
-                     * handles constructions such as:
-                     * 
-                     * "SELECT * WHERE {graph ?g {?g :p :o } }"
-                     */
-                    expander = new NamedGraphSolutionExpander(null/* ALL */);
-                    c = generateVariableOrConstant(cvar);
-                }
-            } else { // dataset != null
-                switch (stmtPattern.getScope()) {
-                case DEFAULT_CONTEXTS: {
-                    /*
-                     * Query against the RDF merge of zero or more source
-                     * graphs.
-                     */
-                    expander = new DefaultGraphSolutionExpander(dataset
-                            .getDefaultGraphs());
-                    /*
-                     * Note: cvar can not become bound since context is stripped
-                     * for the default graph.
-                     */
-                    if (cvar == null)
+                // throw new AssertionError("expander already set");
+                // we are doing a free text search, no need to do any named or
+                // default graph expansion work
+                c = null;
+            } else {
+                final Var cvar = stmtPattern.getContextVar();
+                if (dataset == null) {
+                    if (cvar == null) {
+                        /*
+                         * There is no dataset and there is no graph variable, so
+                         * the default graph will be the RDF Merge of ALL graphs in
+                         * the quad store.
+                         * 
+                         * This code path uses an "expander" which strips off the
+                         * context information and filters for the distinct (s,p,o)
+                         * triples to realize the RDF Merge of the source graphs for
+                         * the default graph.
+                         */
                         c = null;
-                    else
-                        c = generateVariableOrConstant(cvar);
-                    break;
-                }
-                case NAMED_CONTEXTS: {
-                    /*
-                     * Query against zero or more named graphs.
-                     */
-                    expander = new NamedGraphSolutionExpander(dataset
-                            .getNamedGraphs());
-                    if (cvar == null) {// || !cvar.hasValue()) {
-                        c = null;
+                        expander = new DefaultGraphSolutionExpander(null/* ALL */);
                     } else {
+                        /*
+                         * There is no data set and there is a graph variable, so
+                         * the query will run against all named graphs and [cvar]
+                         * will be to the context of each (s,p,o,c) in turn. This
+                         * handles constructions such as:
+                         * 
+                         * "SELECT * WHERE {graph ?g {?g :p :o } }"
+                         */
+                        expander = new NamedGraphSolutionExpander(null/* ALL */);
                         c = generateVariableOrConstant(cvar);
                     }
-                    break;
-                }
-                default:
-                    throw new AssertionError();
+                } else { // dataset != null
+                    switch (stmtPattern.getScope()) {
+                    case DEFAULT_CONTEXTS: {
+                        /*
+                         * Query against the RDF merge of zero or more source
+                         * graphs.
+                         */
+                        expander = new DefaultGraphSolutionExpander(dataset
+                                .getDefaultGraphs());
+                        /*
+                         * Note: cvar can not become bound since context is stripped
+                         * for the default graph.
+                         */
+                        if (cvar == null)
+                            c = null;
+                        else
+                            c = generateVariableOrConstant(cvar);
+                        break;
+                    }
+                    case NAMED_CONTEXTS: {
+                        /*
+                         * Query against zero or more named graphs.
+                         */
+                        expander = new NamedGraphSolutionExpander(dataset
+                                .getNamedGraphs());
+                        if (cvar == null) {// || !cvar.hasValue()) {
+                            c = null;
+                        } else {
+                            c = generateVariableOrConstant(cvar);
+                        }
+                        break;
+                    }
+                    default:
+                        throw new AssertionError();
+                    }
                 }
             }
         }
