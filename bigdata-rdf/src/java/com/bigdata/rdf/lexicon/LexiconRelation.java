@@ -1183,10 +1183,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     /**
      * <p>
      * Add the terms to the full text index so that we can do fast lookup of the
-     * corresponding term identifiers. Literals that have a language code
-     * property are parsed using a tokenizer appropriate for the specified
-     * language family. Other literals and URIs are tokenized using the default
-     * {@link Locale}.
+     * corresponding term identifiers. Only literals are tokenized. Literals
+     * that have a language code property are parsed using a tokenizer
+     * appropriate for the specified language family. Other literals and URIs
+     * are tokenized using the default {@link Locale}.
      * </p>
      * 
      * @param itr
@@ -1210,8 +1210,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             final BigdataValue val = itr.next();
 
-            if (!(val instanceof Literal))
+            if (!(val instanceof Literal)) {
+
+                /*
+                 * Note: If you allow URIs to be indexed then the code which is
+                 * responsible for free text search for quads must impose a
+                 * filter on the subject and predicate positions to ensure that
+                 * free text search can not be used to materialize literals or
+                 * URIs from other graphs. This matters when the named graphs
+                 * are used as an ACL mechanism. This would also be an issue if
+                 * literals were allowed into the subject position.
+                 */
                 continue;
+                
+            }
 
             final Literal lit = (Literal) val;
 
