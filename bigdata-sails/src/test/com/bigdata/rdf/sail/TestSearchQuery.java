@@ -506,6 +506,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
     public void testWithNamedGraphs() throws Exception {
         
         final BigdataSail sail = getSail();
+        if (sail.getDatabase().isQuads() == false) {
+            return;
+        }
+        
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection cxn = 
@@ -513,10 +517,6 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         cxn.setAutoCommit(false);
         
         try {
-            
-            assertEquals(0, sail.database.getNamedGraphCount());
-            
-            assertFalse(cxn.getContextIDs().hasNext());
             
             final BNode a = new BNodeImpl("_:a");
             final BNode b = new BNodeImpl("_:b");
@@ -551,11 +551,6 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
              */
             cxn.flush();//commit();
             
-            assertEquals(2, sail.database.getNamedGraphCount());
-            
-            assertSameIterationAnyOrder(new Resource[] { graphA, graphB }, cxn
-                    .getContextIDs());
-
 /**/            
             if (log.isInfoEnabled()) {
                 log.info("\n" + sail.getDatabase().dumpStore());
