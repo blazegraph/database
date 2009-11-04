@@ -3,8 +3,11 @@ package com.bigdata.rdf.sail;
 import info.aduna.iteration.CloseableIteration;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.Var;
@@ -29,19 +32,32 @@ import cutthecrap.utils.striterators.Striterator;
 public class HitConvertor implements
         CloseableIteration<BindingSet, QueryEvaluationException> {
 
-//    final private AbstractTripleStore database;
+    final private AbstractTripleStore database;
 
     final private BigdataValueIterator src;
 
     final private Var svar;
 
     final private BindingSet bindings;
-
+    
+    final private Set<URI> graphs;
+    
+    private BigdataValue next;
+    
     @SuppressWarnings("unchecked")
     public HitConvertor(final AbstractTripleStore database,
             final Iterator<IHit> src, final Var svar, final BindingSet bindings) {
+        
+        this(database, src, svar, bindings, null);
+        
+    }
 
-//        this.database = database;
+    @SuppressWarnings("unchecked")
+    public HitConvertor(final AbstractTripleStore database,
+            final Iterator<IHit> src, final Var svar, final BindingSet bindings,
+            Set<URI> graphs) {
+
+        this.database = database;
 
         /*
          * Resolve the document identifier from the hit (the term identifers are
@@ -72,9 +88,36 @@ public class HitConvertor implements
         this.svar = svar;
 
         this.bindings = bindings;
+        
+        this.graphs = graphs;
 
     }
 
+    /**
+     * Return <code>true</code> iff the element should be visited.  If in 
+     * quads mode, the bigdata value must appear in a statement in the named
+     * graphs if there are any.
+     * 
+     * @param value
+     *            The value.
+     */
+    protected boolean isValid(BigdataValue value) {
+        
+        if (graphs != null) {
+            // check each graph to see if the literal appears in a statement
+            for (URI uri : graphs) {
+                if (database.getAccessPath(
+                        null, null, value, uri).rangeCount(true) > 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        return true;
+        
+    }
+    
     public void close() throws QueryEvaluationException {
 
         src.close();
@@ -83,10 +126,28 @@ public class HitConvertor implements
 
     public boolean hasNext() throws QueryEvaluationException {
 
-        return src.hasNext();
+        if (next != null)
+            return true;
+            
+        while(src.hasNext()) {
+            
+            final BigdataValue e = src.next();
+            
+            if(isValid(e)) {
+                
+                next = e;
+                
+                return true;
+                
+            }
+            
+        }
+        
+        return false;
 
     }
-
+    
+    
     /**
      * Binds the next {@link BigdataValue} (must be a Literal).
      * 
@@ -94,9 +155,14 @@ public class HitConvertor implements
      */
     public BindingSet next() throws QueryEvaluationException {
 
-        final QueryBindingSet result = new QueryBindingSet(bindings);
+        if (!hasNext())
+            throw new NoSuchElementException();
 
-        final BigdataValue val = src.next();
+        final BigdataValue val = next;
+
+        next = null;
+        
+        final QueryBindingSet result = new QueryBindingSet(bindings);
 
         if (!(val instanceof Literal)) {
 
