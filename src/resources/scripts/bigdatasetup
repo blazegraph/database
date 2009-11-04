@@ -12,7 +12,7 @@ source ./bigdataenv
 # Turn down swappiness on linux kernel (presumes that bigdata is a long
 # running process and the primary load on the servers).
 #
-echo $"`date` : `hostname` : `sysctl -w vm.swappiness=0`"
+#echo $"`date` : `hostname` : `sysctl -w vm.swappiness=0`"
 
 ##############################
 # Configure huge pages.
