@@ -1,14 +1,17 @@
 package com.bigdata.rdf.sail;
 
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.query.algebra.StatementPattern;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -23,7 +26,9 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
 import com.bigdata.striterator.ChunkedConvertingIterator;
+import com.bigdata.striterator.ChunkedOrderedStriterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.Filter;
 import com.bigdata.striterator.IChunkConverter;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
@@ -52,6 +57,8 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
     
     private final Literal query;
     
+    private Set<URI> graphs;
+    
     public FreeTextSearchExpander(final AbstractTripleStore database,
             final Literal query) {
 
@@ -79,6 +86,25 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
             final IAccessPath<ISPO> accessPath) {
 
         return new FreeTextSearchAccessPath(accessPath);
+        
+    }
+    
+    /**
+     * Add a set of named graphs to use to filter free text search results. We 
+     * are checking to see for each search hit whether that hit is used in a 
+     * statement in any of the named graphs. If not, we need to filter this hit
+     * out, otherwise it creates a security hole.  We only check the
+     * object position for now, because only literals can be hits
+     * (for now).
+     * 
+     * @todo fix if we ever start free text indexing URIs.
+     * 
+     * @param graphs
+     *          The set of named graphs to use in the filtering process.
+     */
+    public void addNamedGraphsFilter(Set<URI> graphs) {
+        
+        this.graphs = graphs;
         
     }
     
@@ -185,8 +211,30 @@ public class FreeTextSearchExpander implements ISolutionExpander<ISPO> {
                 new ChunkedConvertingIterator<IHit,ISPO>
                 ( itr2, new HitConverter(accessPath)
                   );
-            return itr3;
             
+            // if graphs is null we don't need to filter results for named graphs
+            if (graphs == null) {
+                return itr3;
+            }
+            
+            /* 
+             * Here we filter results for named graphs.
+             */
+            final IChunkedOrderedIterator<ISPO> itr4 = 
+                new ChunkedOrderedStriterator<IChunkedOrderedIterator<ISPO>, ISPO>(itr3).
+                addFilter(new Filter<IChunkedOrderedIterator<ISPO>, ISPO>() {
+                    protected boolean isValid(ISPO e) {
+                        BigdataValue val = database.getTerm(e.s());
+                        for (URI c : graphs) {
+                            if (database.getAccessPath(null, null, val, c).rangeCount(true) > 0) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                });
+            
+            return itr4;
 
         }
 

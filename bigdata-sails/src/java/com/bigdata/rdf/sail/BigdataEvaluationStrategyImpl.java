@@ -4,10 +4,13 @@ import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -30,6 +33,7 @@ import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 
@@ -43,6 +47,7 @@ import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
+import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BNS;
@@ -369,8 +374,8 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
             }
 
             return search(sp.getSubjectVar(), lit.getLanguage(),
-                    lit.getLabel(), bindings);
-
+                    lit.getLabel(), bindings, sp.getScope());
+            
         }
 
         return super.evaluate(sp, bindings);
@@ -404,6 +409,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      *            object position of that {@link StatementPattern}.
      * @param bindings
      *            The current bindings.
+     * @param scope
+     *            The scope of the statement pattern when in quads mode.  The
+     *            bound values for the text search must appear in a statement
+     *            in the scope of the statement pattern.
      * 
      * @return Iteration visiting the bindings obtained by the search.
      * 
@@ -422,7 +431,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      */
     protected CloseableIteration<BindingSet, QueryEvaluationException> search(
             final Var svar, final String languageCode, final String label,
-            final BindingSet bindings) throws QueryEvaluationException {
+            final BindingSet bindings, final Scope scope) throws QueryEvaluationException {
 
         if (INFO)
             log.info("languageCode=" + languageCode + ", label=" + label);
@@ -430,8 +439,31 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final Iterator<IHit> itr = database.getSearchEngine().search(label,
                 languageCode, 0d/* minCosine */, 10000/* maxRank */);
 
+        Set<URI> graphs = null;
+        if (database.isQuads() && dataset != null) {
+            switch (scope) {
+            case DEFAULT_CONTEXTS: {
+                /*
+                 * Query against the RDF merge of zero or more source
+                 * graphs.
+                 */
+                graphs = dataset.getDefaultGraphs();
+                break;
+            }
+            case NAMED_CONTEXTS: {
+                /*
+                 * Query against zero or more named graphs.
+                 */
+                graphs = dataset.getNamedGraphs();
+                break;
+            }
+            default:
+                throw new AssertionError();
+            }
+        }
+        
         // Return an iterator that converts the term identifiers to var bindings
-        return new HitConvertor(database, itr, svar, bindings);
+        return new HitConvertor(database, itr, svar, bindings, graphs);
 
     }
 
@@ -514,13 +546,100 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         }
 
         // generate tails
+        final Map<IPredicate, StatementPattern> searches = new HashMap<IPredicate, StatementPattern>();
         final Collection<IPredicate> tails = new LinkedList<IPredicate>();
         for (Map.Entry<StatementPattern, Boolean> entry : stmtPatterns.entrySet()) {
-            IPredicate tail = generateTail(entry.getKey(), entry.getValue());
+            StatementPattern sp = entry.getKey();
+            IPredicate tail = generateTail(sp, entry.getValue());
             if (tail == null) {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
+            if (tail.getSolutionExpander() instanceof FreeTextSearchExpander) {
+                searches.put(tail, sp);
+            }
             tails.add(tail);
+        }
+        /*
+         * When in quads mode, we need to go through the free text searches
+         * and make sure that they are properly filtered for the dataset where
+         * needed.  Joins will take care of this, so we only need to add a
+         * filter when a search variable does not appear in any other tails
+         * that are non-optional.
+         * 
+         * @todo Bryan seems to think this can be fixed with a DISTINCT JOIN
+         * mechanism in the rule evaluation.
+         */ 
+        if (database.isQuads() && dataset != null) {
+            for (IPredicate search : searches.keySet()) {
+                final Set<URI> graphs;
+                StatementPattern sp = searches.get(search);
+                switch (sp.getScope()) {
+                case DEFAULT_CONTEXTS: {
+                    /*
+                     * Query against the RDF merge of zero or more source
+                     * graphs.
+                     */
+                    graphs = dataset.getDefaultGraphs();
+                    break;
+                }
+                case NAMED_CONTEXTS: {
+                    /*
+                     * Query against zero or more named graphs.
+                     */
+                    graphs = dataset.getNamedGraphs();
+                    break;
+                }
+                default:
+                    throw new AssertionError();
+                }
+                if (graphs == null) {
+                    continue;
+                }
+                
+                // why would we use a constant with a free text search???
+                if (search.get(0).isConstant()) {
+                    throw new AssertionError();
+                }
+                // get ahold of the search variable
+                com.bigdata.relation.rule.Var searchVar = 
+                    (com.bigdata.relation.rule.Var) search.get(0);
+                if (INFO) log.info(searchVar);
+                // start by assuming it needs filtering, guilty until proven
+                // innocent
+                boolean needsFilter = true;
+                // check the other tails one by one
+                for (IPredicate<ISPO> tail : tails) {
+                    ISolutionExpander<ISPO> expander = tail.getSolutionExpander();
+                    // only concerned with non-optional tails that are not
+                    // themselves magic searches
+                    if (expander instanceof FreeTextSearchExpander || 
+                            tail.isOptional()) {
+                        continue;
+                    }
+                    // see if the search variable appears in this tail
+                    boolean appears = false;
+                    for (int i = 0; i < tail.arity(); i++) {
+                        IVariableOrConstant term = tail.get(i);
+                        if (INFO) log.info(term);
+                        if (term.equals(searchVar)) {
+                            appears = true;
+                            break;
+                        }
+                    }
+                    // if it appears, we don't need a filter
+                    if (appears) {
+                        needsFilter = false;
+                        break;
+                    }
+                }
+                // if it needs a filter, add it to the expander
+                if (needsFilter) {
+                    if (INFO) log.info("needs filter: " + searchVar);
+                    FreeTextSearchExpander expander = (FreeTextSearchExpander) 
+                        search.getSolutionExpander();
+                    expander.addNamedGraphsFilter(graphs);
+                }
+            }
         }
 
         // generate constraints

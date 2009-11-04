@@ -29,12 +29,20 @@ package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
 
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Properties;
 
 import junit.extensions.proxy.IProxyTest;
 import junit.framework.Test;
 
 import org.openrdf.model.Resource;
+import org.openrdf.query.Binding;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 
 
 /**
@@ -256,4 +264,65 @@ public abstract class ProxyBigdataSailTestCase
 
     }
 
+    protected BindingSet createBindingSet(final Binding... bindings) {
+        final QueryBindingSet bindingSet = new QueryBindingSet();
+        if (bindings != null) {
+            for (Binding b : bindings) {
+                bindingSet.addBinding(b);
+            }
+        }
+        return bindingSet;
+    }
+    
+    protected void compare(final TupleQueryResult result,
+            final Collection<BindingSet> answer)
+            throws QueryEvaluationException {
+
+        final Collection<BindingSet> extraResults = new LinkedList<BindingSet>();
+        Collection<BindingSet> missingResults = new LinkedList<BindingSet>();
+
+        int resultCount = 0;
+        int nmatched = 0;
+        while (result.hasNext()) {
+            BindingSet bindingSet = result.next();
+            resultCount++;
+            boolean match = false;
+            if(log.isInfoEnabled())
+                log.info(bindingSet);
+            Iterator<BindingSet> it = answer.iterator();
+            while (it.hasNext()) {
+                if (it.next().equals(bindingSet)) {
+                    it.remove();
+                    match = true;
+                    nmatched++;
+                    break;
+                }
+            }
+            if (match == false) {
+                extraResults.add(bindingSet);
+            }
+        }
+        missingResults = answer;
+
+        for (BindingSet bs : extraResults) {
+            if (log.isInfoEnabled()) {
+                log.info("extra result: " + bs);
+            }
+        }
+        
+        for (BindingSet bs : missingResults) {
+            if (log.isInfoEnabled()) {
+                log.info("missing result: " + bs);
+            }
+        }
+        
+        if (!extraResults.isEmpty() || !missingResults.isEmpty()) {
+            fail("matchedResults=" + nmatched + ", extraResults="
+                    + extraResults.size() + ", missingResults="
+                    + missingResults.size());
+        }
+        
+    }
+
+    
 }
