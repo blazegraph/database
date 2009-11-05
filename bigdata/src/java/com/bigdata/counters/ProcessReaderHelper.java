@@ -104,7 +104,7 @@ public abstract class ProcessReaderHelper extends
 
             final String s = r.readLine();
             
-            if(DEBUG) {
+            if(log.isDebugEnabled()) {
                 
                 log.debug(s);
                 
@@ -126,7 +126,7 @@ public abstract class ProcessReaderHelper extends
             
         } catch (InterruptedException e) {
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("Interrupted - will halt.");
             
         } catch (Exception e) {

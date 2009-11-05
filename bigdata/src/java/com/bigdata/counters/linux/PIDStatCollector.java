@@ -71,9 +71,9 @@ public class PIDStatCollector extends AbstractProcessCollector implements
 //    final protected static boolean DEBUG = log.isDebugEnabled();
 //
 //    /**
-//     * True iff the {@link #log} level is INFO or less.
+//     * True iff the {@link #log} level is log.isInfoEnabled() or less.
 //     */
-//    final protected static boolean INFO = log.isInfoEnabled();
+//    final protected static boolean log.isInfoEnabled() = log.isInfoEnabled();
 
     /** process to be monitored. */
     protected final int pid;
@@ -409,25 +409,25 @@ public class PIDStatCollector extends AbstractProcessCollector implements
          */
         protected void readProcess() throws IOException, InterruptedException {
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("begin");
             
             for(int i=0; i<10 && !getActiveProcess().isAlive(); i++) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("waiting for the readerFuture to be set.");
 
                 Thread.sleep(100/*ms*/);
                 
             }
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("running");
             
         // skip banner.
         final String banner = readLine();
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("banner: "+banner);
 
         // #of "events" read.  each event is three lines.
@@ -496,7 +496,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 final String system = fields[3];
                 final String cpu    = fields[4];
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                         log.info("\n%user=" + user + ", %system=" + system
                                 + ", %cpu=" + cpu + "\n" + header + "\n"
                                 + data);
@@ -533,7 +533,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 final String residentSetSize   = fields[5];
                 final String percentMemory     = fields[6];
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("\nminorFaultsPerSec="
                             + minorFaultsPerSec
                             + ", majorFaultsPerSec="
@@ -574,7 +574,7 @@ public class PIDStatCollector extends AbstractProcessCollector implements
                 final String kBrdS = fields[2];
                 final String kBwrS = fields[3];
 
-                if(INFO)
+                if(log.isInfoEnabled())
                 log.info("\nkB_rd/s=" + kBrdS + ", kB_wr/s="
                             + kBwrS + "\n" + header + "\n" + data);
 
