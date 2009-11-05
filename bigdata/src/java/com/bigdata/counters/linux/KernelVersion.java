@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
@@ -27,16 +29,23 @@ public class KernelVersion {
     public final int version;
     public final int major;
     public final int minor;
+
+    private static Pattern p = Pattern.compile("^([0-9]+).([0-9]+).([0-9]+).*");
     
     public KernelVersion(final String val) {
+
+        if (val == null)
+            throw new IllegalArgumentException();
         
-        final String[] x = val.split("[\\.]");
+        final Matcher m = p.matcher(val);
         
-        assert x.length >= 2 : "Not a kernel version? "+val;
+        if(!m.matches())
+            throw new IllegalArgumentException("Not a kernel version? [" + val
+                    + "]");
         
-        version = Integer.parseInt(x[0]);
-        major   = Integer.parseInt(x[1]);
-        minor   = Integer.parseInt(x[2]);
+        version = Integer.parseInt(m.group(1));
+        major   = Integer.parseInt(m.group(2));
+        minor   = Integer.parseInt(m.group(3));
         
     }
     
