@@ -59,9 +59,11 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("linux");
+        final TestSuite suite = new TestSuite("linux");
        
         suite.addTestSuite(TestParsing.class);
+        
+        suite.addTestSuite(TestKernelVersion.class);
         
         return suite;
         
