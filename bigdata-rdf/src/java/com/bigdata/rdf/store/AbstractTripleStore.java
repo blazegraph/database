@@ -98,6 +98,7 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -731,8 +732,104 @@ abstract public class AbstractTripleStore extends
         
         String DEFAULT_QUADS = "false";
         
+        /**
+         * Set up database in triples mode, no provenance.  This is equivalent
+         * to setting the following options:
+         * <p>
+         * <ul>
+         * <li>{@link AbstractTripleStore.Options#QUADS} 
+         *          = <code>false</code></li>
+         * <li>{@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} 
+         *          = <code>false</code></li>
+         * </ul> 
+         */
+        String TRIPLES_MODE = BigdataSail.class
+                .getPackage().getName()
+                + ".triplesMode";
+        
+        String DEFAULT_TRIPLES_MODE = "false";
+
+        /**
+         * Set up database in triples mode with provenance.  This is equivalent
+         * to setting the following options:
+         * <p>
+         * <ul>
+         * <li>{@link AbstractTripleStore.Options#QUADS} 
+         *          = <code>false</code></li>
+         * <li>{@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} 
+         *          = <code>true</code></li>
+         * </ul> 
+         */
+        String TRIPLES_MODE_WITH_PROVENANCE = BigdataSail.class
+                .getPackage().getName()
+                + ".triplesModeWithProvenance";
+        
+        String DEFAULT_TRIPLES_MODE_WITH_PROVENANCE = "false";
+
+        
+        /**
+         * Set up database in quads mode.  Quads mode means no provenance,
+         * no inference.  This is equivalent to setting the following options:
+         * <p>
+         * <ul>
+         * <li>{@link AbstractTripleStore.Options#QUADS} 
+         *          = <code>true</code></li>
+         * <li>{@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} 
+         *          = <code>false</code></li>
+         * <li>{@link AbstractTripleStore.Options#AXIOMS_CLASS} 
+         *          = <code>com.bigdata.rdf.store.AbstractTripleStore.NoAxioms</code></li>
+         * </ul> 
+         */
+        String QUADS_MODE = BigdataSail.class
+                .getPackage().getName()
+                + ".quadsMode";
+        
+        String DEFAULT_QUADS_MODE = "false";
+
+        
     }
 
+    protected Class determineAxiomClass() {
+        
+        // axiomsClass
+        {
+
+            /*
+             * Note: axioms may not be defined unless the lexicon is enabled
+             * since the axioms require the lexicon in order to resolve
+             * their expression as Statements into their expression as SPOs.
+             */
+
+            final String className = getProperty(Options.AXIOMS_CLASS,
+                    Options.DEFAULT_AXIOMS_CLASS);
+
+            final Class cls;
+            try {
+                cls = Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Bad option: "
+                        + Options.AXIOMS_CLASS, e);
+            }
+
+            if (!BaseAxioms.class.isAssignableFrom(cls)) {
+                throw new RuntimeException(Options.AXIOMS_CLASS
+                        + ": Must extend: " + BaseAxioms.class.getName());
+            }
+
+            if (cls != NoAxioms.class && quads) {
+
+                throw new UnsupportedOperationException(Options.QUADS
+                        + " does not support inference ("
+                        + Options.AXIOMS_CLASS + ")");
+
+            }
+
+            return cls;
+
+        }
+        
+    }
+    
     /**
      * Ctor specified by {@link DefaultResourceLocator}.
      * 
@@ -752,20 +849,90 @@ abstract public class AbstractTripleStore extends
          * corresponding statements is retracted.
          */
 
-        this.justify = Boolean.parseBoolean(getProperty(Options.JUSTIFY,
-                Options.DEFAULT_JUSTIFY));
-
         this.lexicon = Boolean.parseBoolean(getProperty(Options.LEXICON,
                 Options.DEFAULT_LEXICON));
 
-        this.quads = Boolean.valueOf(getProperty(Options.QUADS,
-                Options.DEFAULT_QUADS));
+        DatabaseMode mode = null;
+        if (Boolean.parseBoolean(getProperty(Options.TRIPLES_MODE,
+                Options.DEFAULT_TRIPLES_MODE))) {
+            mode = DatabaseMode.TRIPLES;
+        } else if (Boolean.parseBoolean(getProperty(Options.TRIPLES_MODE_WITH_PROVENANCE,
+                Options.DEFAULT_TRIPLES_MODE_WITH_PROVENANCE))) {
+            if (mode != null) {
+                throw new UnsupportedOperationException(
+                        "please select only one of triples, provenance, or quads modes");
+            }
+            mode = DatabaseMode.PROVENANCE;
+        } else if (Boolean.parseBoolean(getProperty(Options.QUADS_MODE,
+                Options.DEFAULT_QUADS_MODE))) {
+            if (mode != null) {
+                throw new UnsupportedOperationException(
+                        "please select only one of triples, provenance, or quads modes");
+            }
+            mode = DatabaseMode.QUADS;
+        } 
+        
+        if (mode != null) {
+            switch (mode) {
+            case TRIPLES: {
+                this.quads = false;
+                this.statementIdentifiers = false;
+                this.axiomClass = determineAxiomClass();
+                properties.setProperty(Options.QUADS, "false");
+                properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
+                break;
+            }
+            case PROVENANCE: {
+                this.quads = false;
+                this.statementIdentifiers = true;
+                this.axiomClass = determineAxiomClass();
+                properties.setProperty(Options.QUADS, "false");
+                properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
+                break;
+            }
+            case QUADS: {
+                this.quads = true;
+                this.statementIdentifiers = false;
+                this.axiomClass = NoAxioms.class;
+                properties.setProperty(Options.QUADS, "true");
+                properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
+                properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+                break;
+            }
+            default:
+                throw new AssertionError();
+            }
+        } else {
+            
+            this.quads = Boolean.valueOf(getProperty(Options.QUADS,
+                    Options.DEFAULT_QUADS));
+
+            this.statementIdentifiers = Boolean.parseBoolean(getProperty(
+                    Options.STATEMENT_IDENTIFIERS,
+                    Options.DEFAULT_STATEMENT_IDENTIFIERS));
+
+            if (lexicon) {
+                
+                this.axiomClass = determineAxiomClass();
+                
+            } else {
+                
+                /*
+                 * no axioms if no lexicon (the lexicon is required to write the
+                 * axioms).
+                 */
+
+                axiomClass = NoAxioms.class;
+
+            }
+            
+        }
+        
+        
+        this.justify = Boolean.parseBoolean(getProperty(Options.JUSTIFY,
+                Options.DEFAULT_JUSTIFY));
 
         this.spoKeyArity = quads ? 4 : 3;
-
-        this.statementIdentifiers = Boolean.parseBoolean(getProperty(
-                Options.STATEMENT_IDENTIFIERS,
-                Options.DEFAULT_STATEMENT_IDENTIFIERS));
 
         if (statementIdentifiers && quads) {
 
@@ -800,51 +967,7 @@ abstract public class AbstractTripleStore extends
 
             }
 
-            // axiomsClass
-            {
-
-                /*
-                 * Note: axioms may not be defined unless the lexicon is enabled
-                 * since the axioms require the lexicon in order to resolve
-                 * their expression as Statements into their expression as SPOs.
-                 */
-
-                final String className = getProperty(Options.AXIOMS_CLASS,
-                        Options.DEFAULT_AXIOMS_CLASS);
-
-                final Class cls;
-                try {
-                    cls = Class.forName(className);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException("Bad option: "
-                            + Options.AXIOMS_CLASS, e);
-                }
-
-                if (!BaseAxioms.class.isAssignableFrom(cls)) {
-                    throw new RuntimeException(Options.AXIOMS_CLASS
-                            + ": Must extend: " + BaseAxioms.class.getName());
-                }
-
-                if (cls != NoAxioms.class && quads) {
-
-                    throw new UnsupportedOperationException(Options.QUADS
-                            + " does not support inference ("
-                            + Options.AXIOMS_CLASS + ")");
-
-                }
-
-                axiomClass = cls;
-
-            }
-
         } else {
-
-            /*
-             * no axioms if no lexicon (the lexicon is required to write the
-             * axioms).
-             */
-
-            axiomClass = NoAxioms.class;
 
             vocabularyClass = NoVocabulary.class;
 

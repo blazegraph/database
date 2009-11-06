@@ -91,10 +91,12 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
     public Properties getProperties() {
 
         final Properties properties = new Properties(super.getProperties());
-
+/*
         properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
         
         properties.setProperty(Options.QUADS, "false");
+*/
+        properties.setProperty(Options.TRIPLES_MODE_WITH_PROVENANCE, "true");
         
         return properties;
         

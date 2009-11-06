@@ -132,12 +132,14 @@ public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSai
     public Properties getProperties() {
 
         final Properties properties = new Properties(super.getProperties());
-
+/*
         properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
 
         properties.setProperty(Options.QUADS, "true");
 
         properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+*/
+        properties.setProperty(Options.QUADS_MODE, "true");
 
         properties.setProperty(AbstractResource.Options.NESTED_SUBQUERY, "false");
 
