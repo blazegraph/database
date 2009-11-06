@@ -40,18 +40,22 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Note: auto-commit is an EXTREMELY bad idea. Performance will be terrible.
      * The database will swell to an outrageous size. TURN OFF AUTO COMMIT.
+     * 
+     * @see BigdataSail.Options#ALLOW_AUTO_COMMIT
      */
     @Override
     public void commit() throws RepositoryException {
         
         // auto-commit is heinously inefficient
-        if (isAutoCommit()) {
+        if (isAutoCommit() && 
+            !((BigdataSailConnection) getSailConnection()).getAllowAutoCommit()) {
             
-            log.warn("auto-commit is very inefficient, please setAutoCommit(false)");
+            throw new RepositoryException("please set autoCommit to false");
 
         }
         
         super.commit();
+        
     }
 
     /**
