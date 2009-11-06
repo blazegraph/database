@@ -168,6 +168,10 @@ public class BigdataStoreTest extends RDFStoreTest {
         
         props.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
         
+        props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
+        
+        props.setProperty(Options.EXACT_SIZE, "true");
+        
         return props;
         
     }
