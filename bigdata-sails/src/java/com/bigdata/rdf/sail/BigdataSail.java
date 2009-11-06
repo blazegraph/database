@@ -305,6 +305,29 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_QUERY_TIME_EXPANDER = "true";
         
+        
+        /**
+         * Option (default <code>false</code>) determines whether the {@link
+         * SailConnection#size(Resource[])} method returns an exact size or
+         * an upper bound.  Exact size is a very expensive operation.
+         */
+        public static final String EXACT_SIZE = BigdataSail.class
+                .getPackage().getName()
+                + ".exactSize";
+
+        public static final String DEFAULT_EXACT_SIZE = "false";
+        
+        /**
+         * Options (default <code>false</code>) added only to pass the Sesame
+         * test suites.  DO NOT EVER USE AUTO-COMMIT WITH BIGDATA!
+         */
+        public static final String ALLOW_AUTO_COMMIT = BigdataSail.class
+                .getPackage().getName()
+                + ".allowAutoCommit";
+        
+        public static final String DEFAULT_ALLOW_AUTO_COMMIT = "false";
+
+        
     }
 
     /**
@@ -404,6 +427,22 @@ public class BigdataSail extends SailBase implements Sail {
      * @see Options#QUERY_TIME_EXPANDER
      */
     final private boolean queryTimeExpander;
+    
+    /**
+     * When true, SAIL will compute an exact size in the {@link
+     * SailConnection#size(Resource[])} method.
+     * 
+     * @see Options#EXACT_SIZE
+     */
+    final private boolean exactSize;
+    
+    /**
+     * When true, auto-commit is allowed. Do not ever use auto-commit, this is
+     * purely used to pass the Sesame test suites.
+     * 
+     * @see Options#ALLOW_AUTO_COMMIT
+     */
+    final private boolean allowAutoCommit;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -627,6 +666,32 @@ public class BigdataSail extends SailBase implements Sail {
                 log.info(BigdataSail.Options.QUERY_TIME_EXPANDER + "="
                         + queryTimeExpander);
 
+        }
+        
+        // exactSize
+        {
+            
+            exactSize = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.EXACT_SIZE,
+                    BigdataSail.Options.DEFAULT_EXACT_SIZE));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.EXACT_SIZE + "="
+                        + exactSize);
+            
+        }
+
+        // allowAutoCommit
+        {
+            
+            allowAutoCommit = Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.ALLOW_AUTO_COMMIT,
+                    BigdataSail.Options.DEFAULT_ALLOW_AUTO_COMMIT));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.ALLOW_AUTO_COMMIT + "="
+                        + allowAutoCommit);
+            
         }
 
     }
@@ -1173,6 +1238,18 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
+        /**
+         * Used by the RepositoryConnection to determine whether or not to allow
+         * auto-commits.
+         * 
+         * @see Options#ALLOW_AUTO_COMMIT
+         */
+        public boolean getAllowAutoCommit() {
+            
+            return allowAutoCommit;
+            
+        }
+        
         /*
          * SailConnectionListener support.
          * 
@@ -1620,14 +1697,40 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
+         * Count the statements in the specified contexts.  Returns an exact
+         * size or an upper bound depending on the value of {@link
+         * Options#EXACT_SIZE}.  Exact size is an extremely expensive operation,
+         * which we turn off by default.  In default mode, an upper bound is
+         * given for the total number of statements in the database, explicit
+         * and inferred.  In exact size mode, the entire index will be visited
+         * and materialized and each explicit statement will be counted.
+         * 
+         * @see Options#EXACT_SIZE
+         */
+        public long size(final Resource... contexts) throws SailException {
+            
+            return size(exactSize, contexts);
+            
+        }
+        
+        /**
          * Note: This method is quite expensive since it must materialize all
          * statement in either the database or in the specified context(s) and
          * then filter for the explicit statements in order to obtain an exact
          * count. See {@link AbstractTripleStore#getStatementCount()} or
          * {@link IAccessPath#rangeCount()} for efficient methods for reporting
          * on the #of statements in the database or within a specific context.
+         * 
+         * @see Options#EXACT_SIZE
          */
-        public long size(final Resource... contexts) throws SailException {
+        public long exactSize(final Resource... contexts) throws SailException {
+            
+            return size(true, contexts);
+            
+        }
+        
+        private long size(final boolean exactSize,
+                final Resource... contexts) throws SailException {
 
             flushStatementBuffers(true/* assertions */, true/* retractions */);
 
@@ -1636,38 +1739,75 @@ public class BigdataSail extends SailBase implements Sail {
             if (log.isInfoEnabled())
                 log.info("contexts=" + Arrays.toString(contexts));
 
-            if (contexts.length == 0 ) {
+            if (exactSize) {
+            
+                if (contexts.length == 0 ) {
+                    
+                    // Operates on all contexts.
+                    
+                    return database.getExplicitStatementCount(null/* c */);
+    
+                }
+    
+                if (contexts.length == 1 && contexts[0] == null) {
+    
+                    /*
+                     * Operate on just the nullGraph (or on the sole graph if not in
+                     * quads mode).
+                     */
+    
+                    return database.getExplicitStatementCount(quads ? NULL_GRAPH
+                            : null/* c */);
+    
+                }
+    
+                // FIXME parallelize this in chunks as per getStatements()
+                long size = 0;
+    
+                for (Resource c : contexts) {
+    
+                    size += database.getExplicitStatementCount(
+                            (c == null && quads) ? NULL_GRAPH : c);
+    
+                }
+
+                return size;
                 
-                // Operates on all contexts.
+            } else { //exactSize == false
                 
-                return database.getExplicitStatementCount(null/* c */);
+                if (contexts.length == 0 ) {
+                    
+                    // Operates on all contexts.
+                    
+                    return database.getStatementCount(null/* c */, false/*exact*/);
+    
+                }
+    
+                if (contexts.length == 1 && contexts[0] == null) {
+    
+                    /*
+                     * Operate on just the nullGraph (or on the sole graph if not in
+                     * quads mode).
+                     */
+    
+                    return database.getStatementCount(quads ? NULL_GRAPH
+                            : null/* c */, false/*exact*/);
+    
+                }
+    
+                // FIXME parallelize this in chunks as per getStatements()
+                long size = 0;
+    
+                for (Resource c : contexts) {
+    
+                    size += database.getStatementCount(
+                            (c == null && quads) ? NULL_GRAPH : c, false/*exact*/);
+    
+                }
 
+                return size;
+                
             }
-
-            if (contexts.length == 1 && contexts[0] == null) {
-
-                /*
-                 * Operate on just the nullGraph (or on the sole graph if not in
-                 * quads mode).
-                 */
-
-                return database.getExplicitStatementCount(quads ? NULL_GRAPH
-                        : null/* c */);
-
-            }
-
-            // FIXME parallelize this in chunks as per getStatements()
-            long size = 0;
-
-            for (Resource c : contexts) {
-
-                size += database.getAccessPath(null/* s */, null/* p */,
-                        null/* o */, (c == null && quads) ? NULL_GRAPH : c)
-                        .rangeCount(true/* exact */);
-
-            }
-
-            return size;
             
         }
 
