@@ -327,7 +327,6 @@ public class BigdataSail extends SailBase implements Sail {
         
         public static final String DEFAULT_ALLOW_AUTO_COMMIT = "false";
 
-        
     }
 
     /**

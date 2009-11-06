@@ -176,13 +176,15 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         final File journal = BigdataStoreTest.createTempFile();
         
         props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-        
+/*        
         props.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
         
         props.setProperty(Options.QUADS, "true");
         
         props.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
-        
+*/
+        props.setProperty(Options.QUADS_MODE, "true");
+
         props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
         
         props.setProperty(Options.EXACT_SIZE, "true");
