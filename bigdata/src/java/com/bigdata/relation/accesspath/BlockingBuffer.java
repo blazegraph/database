@@ -63,9 +63,9 @@ import com.bigdata.striterator.ICloseableIterator;
  * <strong>You MUST make sure that the thread that sets up the
  * {@link BlockingBuffer} and which submits a task that writes on the buffer
  * also sets the {@link Future} on the {@link BlockingBuffer} so that the
- * iterator can monitor the {@link Future}, detect if it has been canceled,
- * and throw out the exception from the {@link Future} back to the client.
- * Failure to do this can lead to the iterator not terminating!</strong>
+ * iterator can monitor the {@link Future}, detect if it has been canceled, and
+ * throw out the exception from the {@link Future} back to the client. Failure
+ * to do this can lead to the iterator not terminating!</strong>
  * </p>
  * <p>
  * Note: {@link BlockingBuffer} is used (a) for {@link IAccessPath} iterators
@@ -78,6 +78,12 @@ import com.bigdata.striterator.ICloseableIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo This class has internal complexities which arise from the need to
+ *       coordinate elements being added to the buffer with elements being
+ *       drained by the iterator without access to the internal lock of the
+ *       backing queue. If we could use that internal lock then we could get rid
+ *       of the spin loops and related cruft.
  */
 public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
@@ -1004,7 +1010,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                      * acquire a lock internally. If we have spun enough times,
                      * then we will use staged timeouts for subsequent offer()s.
                      * This allows the consumer to catch up with less contention
-                     * for the queue.
+                     * for the queue. [@todo complexity imposed by non-access to queue's internal lock.]
                      */
 
                     final boolean added;
@@ -1701,7 +1707,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                  * continue to test the other conditions, specifically whether
                  * the buffer was closed asynchronously. Otherwise a client that
                  * writes nothing on the buffer will wind up hitting the timeout
-                 * inside of poll(timeout,unit).
+                 * inside of poll(timeout,unit) [@todo This could be fixed by a poison pill.]
                  */
 
                 if (ntries < NSPIN) {
