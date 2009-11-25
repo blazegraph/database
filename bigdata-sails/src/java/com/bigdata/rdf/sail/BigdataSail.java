@@ -975,6 +975,15 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
     
+    /**
+     * Return a read only transaction based on the supplied timestamp.
+     */
+    public BigdataSailConnection getQueryConnection(long timestamp) throws SailException {
+        
+        return getReadHistoricalView(timestamp);
+        
+    }
+    
     
     /**
      * Inner class implements the {@link SailConnection}. Some additional
