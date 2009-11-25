@@ -58,4 +58,20 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
+    public SailRepositoryConnection getQueryConnection(long timestamp) 
+        throws RepositoryException {
+        
+        try {
+            
+            return new BigdataSailRepositoryConnection(this, 
+                getBigdataSail().getQueryConnection(timestamp));
+            
+        } catch (SailException e) {
+            
+            throw new RepositoryException(e);
+            
+        }
+        
+    }
+    
 }
