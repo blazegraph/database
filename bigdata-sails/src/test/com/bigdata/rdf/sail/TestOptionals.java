@@ -49,10 +49,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
 
 /**
- * Unit tests the quads aspects of the {@link BigdataSail} implementation.
- * Specify
- * <code>-DtestClass=com.bigdata.rdf.sail.TestBigdataSailWithQuads</code> to run
- * this test suite.
+ * Unit tests the optionals aspects of the {@link BigdataSail} implementation.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$

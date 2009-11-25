@@ -17,7 +17,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IPredicate;
@@ -35,7 +35,7 @@ import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Class used to expand a {@link StatementPattern} involving a
- * {@link BNS#SEARCH} magic predicate into the set of subjects having any of the
+ * {@link BD#SEARCH} magic predicate into the set of subjects having any of the
  * tokens in the query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

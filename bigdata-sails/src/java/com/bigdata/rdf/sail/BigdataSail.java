@@ -130,7 +130,7 @@ import com.bigdata.rdf.spo.SPOAccessPath;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
@@ -354,7 +354,7 @@ public class BigdataSail extends SailBase implements Sail {
      * @see BigdataSailConnection#getStatements(Resource, URI, Value, boolean,
      *      Resource...)
      */
-    public static final transient URI NULL_GRAPH = new URIImpl(BNS.NULL_GRAPH);
+    public static final transient URI NULL_GRAPH = BD.NULL_GRAPH;
 
     /**
      * The equivalent of a null identifier for an internal RDF Value.
@@ -1964,7 +1964,7 @@ public class BigdataSail extends SailBase implements Sail {
                         return true;
                     while (itr2.hasNext()) {
                         next = (Resource) itr2.next();
-                        if (next.stringValue().equals(BNS.NULL_GRAPH)) {
+                        if (next.equals(BD.NULL_GRAPH)) {
                             next = null;
                             continue;
                         }

@@ -28,7 +28,6 @@
 package com.bigdata.rdf.store;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -46,7 +45,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -59,7 +57,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
-
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -98,7 +95,6 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
-import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -692,7 +688,7 @@ abstract public class AbstractTripleStore extends
          * <p>
          * bigdata supports an RDF/XML interchange extension for the interchange
          * of <em>triples</em> with statement identifiers that may be used as
-         * blank nodes to make statements about statements. See {@link BNS} and
+         * blank nodes to make statements about statements. See {@link BD} and
          * {@link RDFXMLParser}.
          * <p>
          * Statement identifiers add some latency when loading data since it
@@ -743,8 +739,7 @@ abstract public class AbstractTripleStore extends
          *          = <code>false</code></li>
          * </ul> 
          */
-        String TRIPLES_MODE = BigdataSail.class
-                .getPackage().getName()
+        String TRIPLES_MODE = AbstractTripleStore.class.getName()
                 + ".triplesMode";
         
         String DEFAULT_TRIPLES_MODE = "false";
@@ -760,8 +755,7 @@ abstract public class AbstractTripleStore extends
          *          = <code>true</code></li>
          * </ul> 
          */
-        String TRIPLES_MODE_WITH_PROVENANCE = BigdataSail.class
-                .getPackage().getName()
+        String TRIPLES_MODE_WITH_PROVENANCE = AbstractTripleStore.class.getName()
                 + ".triplesModeWithProvenance";
         
         String DEFAULT_TRIPLES_MODE_WITH_PROVENANCE = "false";
@@ -780,8 +774,7 @@ abstract public class AbstractTripleStore extends
          *          = <code>com.bigdata.rdf.store.AbstractTripleStore.NoAxioms</code></li>
          * </ul> 
          */
-        String QUADS_MODE = BigdataSail.class
-                .getPackage().getName()
+        String QUADS_MODE = AbstractTripleStore.class.getName()
                 + ".quadsMode";
         
         String DEFAULT_QUADS_MODE = "false";

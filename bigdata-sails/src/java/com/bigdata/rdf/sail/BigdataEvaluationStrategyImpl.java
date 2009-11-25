@@ -50,7 +50,7 @@ import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
 import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -174,12 +174,12 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * </dl>
  * <h2>Magic predicates</h2>
  * <p>
- * {@link BNS#SEARCH} is the only magic predicate at this time. When the object
+ * {@link BD#SEARCH} is the only magic predicate at this time. When the object
  * position is bound to a constant, the magic predicate is evaluated once and
  * the result is used to generate a set of term identifiers that are matches for
  * the token(s) extracted from the {@link Literal} in the object position. Those
  * term identifiers are then used to populate an {@link IN} constraint. The
- * object position in the {@link BNS#SEARCH} MUST be bound to a constant.
+ * object position in the {@link BD#SEARCH} MUST be bound to a constant.
  * </p>
  * 
  * FIXME We are not in fact rewriting the query operation at all, simply
@@ -232,13 +232,6 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
     protected static final boolean DEBUG = log.isDebugEnabled();
 
-    /**
-     * The magic predicate for text search.
-     * 
-     * @see BNS#SEARCH
-     */
-    static private final URI MAGIC_SEARCH = new URIImpl(BNS.SEARCH);
-
     private final long NULL = IRawTripleStore.NULL;
 
     protected final BigdataTripleSource tripleSource;
@@ -284,6 +277,24 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         this.nativeJoins = nativeJoins;
         // this.nativeJoins = false;
 
+    }
+
+    /**
+     * Eventually we will want to translate the entire operator tree into a
+     * native bigdata program. For now this is just a means of inspecting it.
+     */
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            TupleExpr expr, BindingSet bindings)
+            throws QueryEvaluationException {
+        
+        // spit out the whole operator tree
+        if (INFO) {
+            log.info("tuple expr:\n" + expr);
+        }
+        
+        return super.evaluate(expr, bindings);
+        
     }
 
     // @Override
@@ -344,7 +355,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
         final Value predValue = getVarValue(predVar, bindings);
 
-        if (MAGIC_SEARCH.equals(predValue)) {
+        if (BD.SEARCH.equals(predValue)) {
 
             final Var ovar = sp.getObjectVar();
 
@@ -352,14 +363,14 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             if (oval == null) {
 
-                throw new QueryEvaluationException(MAGIC_SEARCH
+                throw new QueryEvaluationException(BD.SEARCH
                         + " : object must be bound.");
 
             }
 
             if (!(oval instanceof Literal)) {
 
-                throw new QueryEvaluationException(MAGIC_SEARCH
+                throw new QueryEvaluationException(BD.SEARCH
                         + " : object must be literal.");
 
             }
@@ -368,7 +379,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             if (lit.getDatatype() != null) {
 
-                throw new QueryEvaluationException(MAGIC_SEARCH
+                throw new QueryEvaluationException(BD.SEARCH
                         + " : object is datatype literal.");
 
             }
@@ -383,7 +394,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     }
 
     /**
-     * Evaluates the {@link BNS#SEARCH} magic predicate as a full-text search
+     * Evaluates the {@link BD#SEARCH} magic predicate as a full-text search
      * against the index literal in the database, binding <i>svar</i> to each
      * matched literal in turn.
      * <p>
@@ -399,7 +410,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * 
      * @param svar
      *            The variable from the subject position of the
-     *            {@link StatementPattern} in which the {@link BNS#SEARCH} magic
+     *            {@link StatementPattern} in which the {@link BD#SEARCH} magic
      *            predicate appears.
      * @param languageCode
      *            An optional language code from the bound literal appearing in
@@ -769,7 +780,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final Value predValue = stmtPattern.getPredicateVar().getValue();
         if (DEBUG)
             log.debug(predValue);
-        if (predValue != null && MAGIC_SEARCH.equals(predValue)) {
+        if (predValue != null && BD.SEARCH.equals(predValue)) {
             final Value objValue = stmtPattern.getObjectVar().getValue();
             if (DEBUG)
                 log.debug(objValue);

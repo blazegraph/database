@@ -17,7 +17,6 @@
 	<classpathentry kind="lib" path="bigdata/lib/lgpl-utils-1.0-b5-dev-121009.jar"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/test"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/commons-io-1.4.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-3_6.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-2.2.0.jar"/>
@@ -25,7 +24,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/ctc_utils-5-4-2005.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-commons-1.1-b2-dev.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-extser-0.1-b2-dev.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/cweb-junit-ext-1.1-b3-dev.jar" sourcepath="/junit-ext/src"/>
+	<classpathentry exported="true" sourcepath="/junit-ext/src" kind="lib" path="bigdata/lib/cweb-junit-ext-1.1-b3-dev.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-3.8.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.15.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4jni.jar"/>
@@ -51,9 +50,10 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/sun-util.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/tools.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.2.4-onejar.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/dsiutils-1.0.10.jar" sourcepath="/dsiutils-1.0.10/src"/>
+	<classpathentry exported="true" sourcepath="/dsiutils-1.0.10/src" kind="lib" path="bigdata/lib/unimi/dsiutils-1.0.10.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-5.1.5.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.2.4.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.2.4.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk1.6.0_16"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

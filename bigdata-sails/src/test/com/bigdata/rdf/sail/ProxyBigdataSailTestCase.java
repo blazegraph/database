@@ -278,51 +278,58 @@ public abstract class ProxyBigdataSailTestCase
             final Collection<BindingSet> answer)
             throws QueryEvaluationException {
 
-        final Collection<BindingSet> extraResults = new LinkedList<BindingSet>();
-        Collection<BindingSet> missingResults = new LinkedList<BindingSet>();
-
-        int resultCount = 0;
-        int nmatched = 0;
-        while (result.hasNext()) {
-            BindingSet bindingSet = result.next();
-            resultCount++;
-            boolean match = false;
-            if(log.isInfoEnabled())
-                log.info(bindingSet);
-            Iterator<BindingSet> it = answer.iterator();
-            while (it.hasNext()) {
-                if (it.next().equals(bindingSet)) {
-                    it.remove();
-                    match = true;
-                    nmatched++;
-                    break;
+        try {
+            
+            final Collection<BindingSet> extraResults = new LinkedList<BindingSet>();
+            Collection<BindingSet> missingResults = new LinkedList<BindingSet>();
+    
+            int resultCount = 0;
+            int nmatched = 0;
+            while (result.hasNext()) {
+                BindingSet bindingSet = result.next();
+                resultCount++;
+                boolean match = false;
+                if(log.isInfoEnabled())
+                    log.info(bindingSet);
+                Iterator<BindingSet> it = answer.iterator();
+                while (it.hasNext()) {
+                    if (it.next().equals(bindingSet)) {
+                        it.remove();
+                        match = true;
+                        nmatched++;
+                        break;
+                    }
+                }
+                if (match == false) {
+                    extraResults.add(bindingSet);
                 }
             }
-            if (match == false) {
-                extraResults.add(bindingSet);
+            missingResults = answer;
+    
+            for (BindingSet bs : extraResults) {
+                if (log.isInfoEnabled()) {
+                    log.info("extra result: " + bs);
+                }
             }
-        }
-        missingResults = answer;
+            
+            for (BindingSet bs : missingResults) {
+                if (log.isInfoEnabled()) {
+                    log.info("missing result: " + bs);
+                }
+            }
+            
+            if (!extraResults.isEmpty() || !missingResults.isEmpty()) {
+                fail("matchedResults=" + nmatched + ", extraResults="
+                        + extraResults.size() + ", missingResults="
+                        + missingResults.size());
+            }
 
-        for (BindingSet bs : extraResults) {
-            if (log.isInfoEnabled()) {
-                log.info("extra result: " + bs);
-            }
-        }
-        
-        for (BindingSet bs : missingResults) {
-            if (log.isInfoEnabled()) {
-                log.info("missing result: " + bs);
-            }
-        }
-        
-        if (!extraResults.isEmpty() || !missingResults.isEmpty()) {
-            fail("matchedResults=" + nmatched + ", extraResults="
-                    + extraResults.size() + ", missingResults="
-                    + missingResults.size());
+        } finally {
+            
+            result.close();
+            
         }
         
     }
-
     
 }
