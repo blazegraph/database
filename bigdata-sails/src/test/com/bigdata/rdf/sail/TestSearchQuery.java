@@ -77,7 +77,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Test suite for high-level query against a graph containing statements about
@@ -234,7 +234,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
     /**
      * This runs a hand-coded query corresponding to a SPARQL query using the
-     * {@link BNS#SEARCH} magic predicate.
+     * {@link BD#SEARCH} magic predicate.
      * 
      * <pre>
      * select ?evidence
@@ -252,7 +252,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             final TupleExpr tupleExpr = new StatementPattern(//
                     new Var("X"),//
-                    new Var("1", new URIImpl(BNS.SEARCH)),//
+                    new Var("1", BD.SEARCH),//
                     new Var("2", new LiteralImpl("Yellow"))//
                     );
 
@@ -429,7 +429,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     final String query = "construct { ?s <" + RDF.TYPE + "> <"
                             + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
                             + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
-                            + BNS.SEARCH + "> \"systap\" . }";
+                            + BD.SEARCH + "> \"systap\" . }";
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         // silly construct queries, can't guarantee distinct
@@ -472,7 +472,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     final String query = "construct { ?s <" + RDF.TYPE + "> <"
                             + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
                             + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
-                            + BNS.SEARCH + "> \"systap\" . }";
+                            + BD.SEARCH + "> \"systap\" . }";
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         // silly construct queries, can't guarantee distinct
@@ -562,7 +562,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "from <"+graphA+"> " +
                     "where " +
                     "{ " +
-                    "    ?s <"+BNS.SEARCH+"> \"Alice\" . " +
+                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 
@@ -582,7 +582,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "from <"+graphA+"> " +
                     "where " +
                     "{ " +
-                    "    ?s <"+BNS.SEARCH+"> \"Alice\" . " +
+                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 
@@ -602,7 +602,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "from <"+graphB+"> " +
                     "where " +
                     "{ " +
-                    "    ?s <"+BNS.SEARCH+"> \"Alice\" . " +
+                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 
@@ -623,7 +623,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o . " +
-                    "    ?o <"+BNS.SEARCH+"> \"Alice\" . " +
+                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 
@@ -644,7 +644,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     "where " +
                     "{ " +
                     "    ?s <"+RDFS.LABEL+"> ?o1 . " +
-                    "    ?o <"+BNS.SEARCH+"> \"Alice\" . " +
+                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
                     "}";
                 
                 final TupleQuery tupleQuery = 

@@ -50,6 +50,7 @@ package com.bigdata.rdf.store;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.URIImpl;
 
 /**
  * A vocabulary for bigdata specific extensions.
@@ -57,7 +58,7 @@ import org.openrdf.model.Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface BNS {
+public interface BD {
 
     /**
      * The namespace used for bigdata specific extensions.
@@ -89,7 +90,7 @@ public interface BNS {
      * &lt;/rdf:Description&gt;
      * </pre>
      */
-    String SID = "sid";
+    URI SID = new URIImpl(NAMESPACE+"sid");
     
     /**
      * The name of a per-statement attribute whose indicates whether the
@@ -111,7 +112,7 @@ public interface BNS {
      * an inference or an axiom then then knowledge base will continue to report
      * it as either an axiom or an inference as appropriate.
      */
-    String STATEMENT_TYPE = "statementType";
+    URI STATEMENT_TYPE = new URIImpl(NAMESPACE+"statementType");
     
     /**
      * The name of a magic predicate recognized by the {@link com.bigdata.rdf.sail.BigdataSail} when
@@ -140,7 +141,7 @@ public interface BNS {
      * Note: The context position should be unbound when using statement
      * identifiers.
      */
-    String SEARCH = NAMESPACE+"search";
+    URI SEARCH = new URIImpl(NAMESPACE+"search");
 
     /**
      * Sesame has the notion of a "null" graph. Any time you insert a statement
@@ -155,6 +156,6 @@ public interface BNS {
      * @see com.bigdata.rdf.sail.BigdataSailConnection#addStatement(Resource, URI, Value, Resource...)
      * @see com.bigdata.rdf.sail.BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)
      */
-    String NULL_GRAPH = NAMESPACE + "nullGraph";
+    URI NULL_GRAPH = new URIImpl(NAMESPACE + "nullGraph");
 
 }

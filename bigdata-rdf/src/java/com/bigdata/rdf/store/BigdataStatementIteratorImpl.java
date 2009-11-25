@@ -192,7 +192,7 @@ public class BigdataStatementIteratorImpl
                  * BigdataSolutionResolverator.
                  */
                 final BigdataResource tmp = (BigdataResource) resolve(terms, _c);
-                if(tmp.stringValue().equals(BNS.NULL_GRAPH)) {
+                if(tmp.equals(BD.NULL_GRAPH)) {
                     /*
                      * Strip off the "nullGraph" context.
                      */

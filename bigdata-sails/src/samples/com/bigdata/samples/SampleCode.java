@@ -42,7 +42,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Demonstrate how to use bigdata.  You are free to use this code for whatever
@@ -294,7 +294,7 @@ public class SampleCode {
             cxn.close();
         }
         
-        String query = "select ?x where { ?x <"+BNS.SEARCH+"> \"Yell\" . }";
+        String query = "select ?x where { ?x <"+BD.SEARCH+"> \"Yell\" . }";
         executeSelectQuery(repo, query, QueryLanguage.SPARQL);
         // will match A, C, and D
         

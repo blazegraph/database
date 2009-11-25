@@ -32,16 +32,13 @@
 package com.bigdata.rdf.sail;
 
 import info.aduna.xml.XMLWriter;
-
-import java.io.File;
 import java.io.StringWriter;
-import java.util.Properties;
-
-import junit.framework.TestCase2;
-
+import java.util.Collection;
+import java.util.LinkedList;
+import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
+import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -51,12 +48,11 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
-
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Unit tests for high-level query.
@@ -64,7 +60,7 @@ import com.bigdata.rdf.store.BNS;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
+public class TestBigdataSailEvaluationStrategyImpl extends ProxyBigdataSailTestCase {
 
     /**
      * 
@@ -96,15 +92,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final Literal label = new LiteralImpl("The Label");
         
-        final File journal = File.createTempFile("bigdata", ".jnl");
-        
-        journal.deleteOnExit();
-        
-        final Properties props = new Properties();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-        
-        final BigdataSail sail = new BigdataSail(props);
+        final BigdataSail sail = getSail();
         
         try {
         
@@ -119,11 +107,8 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                 cxn.setAutoCommit(false);
                 
                 cxn.add(new StatementImpl(mike, RDF.TYPE, person));
-                
                 cxn.add(new StatementImpl(mike, property1, label));
-                
                 cxn.add(new StatementImpl(jane, RDF.TYPE, person));
-                
                 cxn.add(new StatementImpl(jane, property2, label));
                 
                 cxn.commit();
@@ -133,55 +118,33 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                     "where { " +
                     "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
                     "  ?s ?p \""+label.getLabel()+"\" . " +
-                    "  FILTER(?p = <"+RDFS.LABEL+"> || ?p = <"+RDFS.COMMENT+"> || ?p = <"+property1+">) " +
+                    "  FILTER(?p = <"+RDFS.LABEL+"> || " +
+                    "         ?p = <"+RDFS.COMMENT+"> || " +
+                    "         ?p = <"+property1+">) " +
                     "}";
                 
                 { // evalute it once so i can see it
                     
                     final StringWriter sw = new StringWriter();
-                    
-                    final SPARQLResultsXMLWriter handler = 
-                        new SPARQLResultsXMLWriter(new XMLWriter(sw));
-    
-                    final TupleQuery tupleQuery = 
-                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                    
+                    final SPARQLResultsXMLWriter handler = new SPARQLResultsXMLWriter(
+                            new XMLWriter(sw));
+                    final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                            QueryLanguage.SPARQL, query);
                     tupleQuery.evaluate(handler);
-                    
                     System.err.println(sw.toString());
 
                 }
                 
                 {
                     
-                    final TupleQuery tupleQuery = 
-                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-                    
+                    final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                            QueryLanguage.SPARQL, query);
                     final TupleQueryResult result = tupleQuery.evaluate();
-                    
-                    try {
-                        
-                        int numResults = 0;
-                        
-                        while (result.hasNext()) {
-                            
-                            BindingSet bindingSet = result.next();
-                           
-                            Value valueOfS = bindingSet.getValue("s");
-                           
-                            assertTrue(valueOfS.equals(mike));
-
-                            numResults++;
-                           
-                        }
-                        
-                        assertTrue(numResults == 1);
-                       
-                    } finally {
-                       
-                        result.close();
-                       
-                    }
+                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", mike),
+                            new BindingImpl("p", property1)));
+                    compare(result, answer);
                     
                 }
                 
@@ -219,15 +182,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final Literal label = new LiteralImpl("The Label");
         
-        final File journal = File.createTempFile("bigdata", ".jnl");
-        
-        journal.deleteOnExit();
-        
-        final Properties props = new Properties();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-        
-        final BigdataSail sail = new BigdataSail(props);
+        final BigdataSail sail = getSail();
         
         try {
         
@@ -283,29 +238,12 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                     
                     final TupleQueryResult result = tupleQuery.evaluate();
                     
-                    try {
-                        
-                        int numResults = 0;
-                        
-                        while (result.hasNext()) {
-                            
-                            BindingSet bindingSet = result.next();
-                           
-                            Value valueOfS = bindingSet.getValue("s");
-                           
-                            assertTrue(valueOfS.equals(mike));
-
-                            numResults++;
-                           
-                        }
-                        
-                        assertTrue(numResults == 1);
-                       
-                    } finally {
-                       
-                        result.close();
-                       
-                    }
+                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", mike),
+                            new BindingImpl("type", person)));
+                    
+                    compare(result, answer);
                     
                 }
                 
@@ -341,15 +279,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final URI thing = new URIImpl(ns+"Thing");
         
-        final File journal = File.createTempFile("bigdata", ".jnl");
-        
-        journal.deleteOnExit();
-        
-        final Properties props = new Properties();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-        
-        final BigdataSail sail = new BigdataSail(props);
+        final BigdataSail sail = getSail();
         
         try {
         
@@ -381,7 +311,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                 cxn.commit();
                 
                 String query = 
-                    "select ?s ?sco ?label "+
+                    "select ?s ?label "+
                     "where { " +
                     "  ?s <"+RDFS.SUBCLASSOF+"> <"+entity+"> . " +
                     // "  ?s <"+RDFS.SUBCLASSOF+"> ?sco . " +
@@ -412,29 +342,12 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                     
                     final TupleQueryResult result = tupleQuery.evaluate();
                     
-                    try {
-                        
-                        int numResults = 0;
-                        
-                        while (result.hasNext()) {
-                            
-                            BindingSet bindingSet = result.next();
-                           
-                            Value valueOfS = bindingSet.getValue("s");
-                           
-                            assertTrue(valueOfS.equals(thing));
-
-                            numResults++;
-                           
-                        }
-                        
-                        assertTrue(numResults == 1);
-                       
-                    } finally {
-                       
-                        result.close();
-                       
-                    }
+                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", thing),
+                            new BindingImpl("label", new LiteralImpl(thing.getLocalName()))));
+                    
+                    compare(result, answer);
                     
                 }
                 
@@ -474,15 +387,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final Literal label = new LiteralImpl("The Label");
         
-        final File journal = File.createTempFile("bigdata", ".jnl");
-        
-        journal.deleteOnExit();
-        
-        final Properties props = new Properties();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-        
-        final BigdataSail sail = new BigdataSail(props);
+        final BigdataSail sail = getSail();
         
         try {
         
@@ -537,29 +442,13 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                     
                     final TupleQueryResult result = tupleQuery.evaluate();
                     
-                    try {
-                        
-                        int numResults = 0;
-                        
-                        while (result.hasNext()) {
-                            
-                            BindingSet bindingSet = result.next();
-                           
-                            Value valueOfS = bindingSet.getValue("s");
-                           
-                            assertTrue(valueOfS.equals(mike) || valueOfS.equals(jane));
-
-                            numResults++;
-                           
-                        }
-                        
-                        assertTrue(numResults == 2);
-                       
-                    } finally {
-                       
-                        result.close();
-                       
-                    }
+                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", mike)));
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", jane)));
+                    
+                    compare(result, answer);
                     
                 }
                 
@@ -593,15 +482,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final URI person = new URIImpl(ns+"Person");
         
-        final File journal = File.createTempFile("bigdata", ".jnl");
-        
-        journal.deleteOnExit();
-        
-        final Properties props = new Properties();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-        
-        final BigdataSail sail = new BigdataSail(props);
+        final BigdataSail sail = getSail();
         
         try {
         
@@ -656,29 +537,11 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                     
                     final TupleQueryResult result = tupleQuery.evaluate();
                     
-                    try {
-                        
-                        int numResults = 0;
-                        
-                        while (result.hasNext()) {
-                            
-                            BindingSet bindingSet = result.next();
-                           
-                            Value valueOfS = bindingSet.getValue("s");
-                           
-                            assertTrue(valueOfS.equals(mike));
-
-                            numResults++;
-                           
-                        }
-                        
-                        assertTrue(numResults == 1);
-                       
-                    } finally {
-                       
-                        result.close();
-                       
-                    }
+                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", mike)));
+                    
+                    compare(result, answer);
                     
                 }
                 
@@ -712,15 +575,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final URI person = new URIImpl(ns+"Person");
         
-        final File journal = File.createTempFile("bigdata", ".jnl");
-        
-        journal.deleteOnExit();
-        
-        final Properties props = new Properties();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-        
-        final BigdataSail sail = new BigdataSail(props);
+        final BigdataSail sail = getSail();
         
         try {
         
@@ -779,29 +634,13 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                     
                     final TupleQueryResult result = tupleQuery.evaluate();
                     
-                    try {
-                        
-                        int numResults = 0;
-                        
-                        while (result.hasNext()) {
-                            
-                            BindingSet bindingSet = result.next();
-                           
-                            Value valueOfS = bindingSet.getValue("s");
-                           
-                            assertTrue(valueOfS.equals(mike) || valueOfS.equals(jane));
-
-                            numResults++;
-                           
-                        }
-                        
-                        assertTrue(numResults == 2);
-                       
-                    } finally {
-                       
-                        result.close();
-                       
-                    }
+                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", mike)));
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", jane)));
+                    
+                    compare(result, answer);
                     
                 }
                 
@@ -829,7 +668,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
 
         final String ns = "http://www.bigdata.com/rdf#";
         
-        final URI search = new URIImpl(BNS.SEARCH); 
+        final URI search = BD.SEARCH; 
         
         final URI mike = new URIImpl(ns+"Mike");
         
@@ -839,17 +678,7 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
         
         final URI person = new URIImpl(ns+"Person");
         
-        final File journal = File.createTempFile("bigdata", ".jnl");
-        
-        journal.deleteOnExit();
-        
-        final Properties props = new Properties();
-        
-        props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-
-        props.setProperty(AbstractTripleStore.Options.MAX_PARALLEL_SUBQUERIES,"0");
-        
-        final BigdataSail sail = new BigdataSail(props);
+        final BigdataSail sail = getSail();
         
         try {
         
@@ -913,29 +742,12 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
                     
                     final TupleQueryResult result = tupleQuery.evaluate();
                     
-                    try {
-                        
-                        int numResults = 0;
-                        
-                        while (result.hasNext()) {
-                            
-                            BindingSet bindingSet = result.next();
-                           
-                            Value valueOfS = bindingSet.getValue("s");
-                           
-                            assertTrue(valueOfS.equals(mike));
-
-                            numResults++;
-                           
-                        }
-                        
-                        assertTrue(numResults == 1);
-                       
-                    } finally {
-                       
-                        result.close();
-                       
-                    }
+                    Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                    answer.add(createBindingSet(
+                            new BindingImpl("s", mike),
+                            new BindingImpl("label", new LiteralImpl("Mike"))));
+                    
+                    compare(result, answer);
                     
                 }
                 
@@ -955,6 +767,239 @@ public class TestBigdataSailEvaluationStrategyImpl extends TestCase2 {
             
             sail.__tearDownUnitTest();
             
+        }
+
+    }
+    
+    public void test_nested_optionals() throws Exception {
+
+        // define the vocabulary
+        final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
+        final URI jane = new URIImpl(BD.NAMESPACE + "Jane");
+        final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
+        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+        final URI object = new URIImpl(BD.NAMESPACE + "Object");
+        final Literal mikeLabel = new LiteralImpl("mike label");
+        final Literal mikeComment = new LiteralImpl("mike comment");
+        final Literal janeLabel = new LiteralImpl("jane label");
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        graph.add(mike, RDF.TYPE, person);
+        graph.add(jane, RDF.TYPE, person);
+        graph.add(bryan, RDF.TYPE, person);
+        graph.add(mike, RDF.TYPE, object);
+        graph.add(jane, RDF.TYPE, object);
+        graph.add(bryan, RDF.TYPE, object);
+        graph.add(mike, RDFS.LABEL, mikeLabel);
+        graph.add(mike, RDFS.COMMENT, mikeComment);
+        graph.add(jane, RDFS.LABEL, janeLabel);
+        
+        // define the query
+        String query = 
+            "select ?s ?label ?comment " +
+            "where { " +
+            "  ?s <"+RDF.TYPE+"> <"+person+"> . " +
+            "  ?s <"+RDF.TYPE+"> <"+object+"> . " +
+            "  OPTIONAL { ?s <"+RDFS.LABEL+"> ?label . } " + 
+            "  OPTIONAL { ?s <"+RDFS.COMMENT+"> ?comment . } " + 
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        answer.add(createBindingSet(
+                new BindingImpl("s", mike),
+                new BindingImpl("label", mikeLabel),
+                new BindingImpl("comment", mikeComment)));
+        answer.add(createBindingSet(
+                new BindingImpl("s", jane),
+                new BindingImpl("label", janeLabel)));
+        answer.add(createBindingSet(
+                new BindingImpl("s", bryan)));
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
+    public void test_open_eq_12() throws Exception {
+
+        // define the vocabulary
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        
+        // define the query
+        String query = 
+            "PREFIX     :    <http://example/> " +
+            "PREFIX  xsd:    <http://www.w3.org/2001/XMLSchema#> " +
+            "SELECT ?x ?v1 ?y ?v2 " +
+            "{ " +
+            "    ?x :p ?v1 . " +
+            "    ?y :p ?v2 . " +
+            "    OPTIONAL { ?y :p ?v3 . FILTER( ?v1 != ?v3 || ?v1 = ?v3 )} " +
+            "    FILTER (!bound(?v3)) " +
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
+    public void test_join_combo_1() throws Exception {
+
+        // define the vocabulary
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        
+        // define the query
+        String query = 
+            "PREFIX :    <http://example/> " +
+            "SELECT ?a ?y ?d ?z " +
+            "{  " +
+            "    ?a :p ?c OPTIONAL { ?a :r ?d }. " + 
+            "    ?a ?p 1 { ?p a ?y } UNION { ?a ?z ?p } " + 
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
+    public void test_join_combo_2() throws Exception {
+
+        // define the vocabulary
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        
+        // define the query
+        String query = 
+            "PREFIX :    <http://example/> " +
+            "SELECT ?x ?y ?z " +
+            "{  " +
+            "    GRAPH ?g { ?x ?p 1 } { ?x :p ?y } UNION { ?p a ?z } " +
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
+    public void test_two_nested_opt() throws Exception {
+
+        // define the vocabulary
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        
+        // define the query
+        String query = 
+            "PREFIX :    <http://example/> " +
+            "SELECT * " +
+            "{  " +
+            "    :x1 :p ?v . " +
+            "    OPTIONAL " +
+            "    { " +
+            "      :x3 :q ?w . " +
+            "      OPTIONAL { :x2 :p ?v } " +
+            "    } " +
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
+    public void test_two_nested_opt_alt() throws Exception {
+
+        // define the vocabulary
+        
+        // define the graph
+        Graph graph = new GraphImpl();
+        
+        // define the query
+        String query = 
+            "PREFIX :    <http://example/> " +
+            "SELECT * " +
+            "{  " +
+            "    :x1 :p ?v . " +
+            "    OPTIONAL { :x3 :q ?w } " +
+            "    OPTIONAL { :x3 :q ?w  . :x2 :p ?v } " +
+            "}";
+        
+        // define the correct answer
+        Collection<BindingSet> answer = new LinkedList<BindingSet>();
+        
+        // run the test
+        runQuery(graph, query, answer);
+        
+    }
+    
+    
+    private void runQuery(final Graph data, final String query, 
+            final Collection<BindingSet> answer) throws Exception {
+        
+        final BigdataSail sail = getSail();
+        
+        try {
+        
+            // initialize the sail
+            sail.initialize();
+            final Repository repo = new BigdataSailRepository(sail);
+            final RepositoryConnection cxn = repo.getConnection();
+            
+            try {
+
+                // add the data
+                cxn.setAutoCommit(false);
+                cxn.add(data);
+                cxn.commit();
+
+                { // evalute it once to stderr
+                    
+                    final StringWriter sw = new StringWriter();
+                    final SPARQLResultsXMLWriter handler = new SPARQLResultsXMLWriter(
+                            new XMLWriter(sw));
+                    final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                            QueryLanguage.SPARQL, query);
+                    tupleQuery.evaluate(handler);
+                    System.err.println(sw.toString());
+
+                }
+                
+                { // evaluate for correctness
+
+                    // check the answer
+                    final TupleQuery tupleQuery = cxn.prepareTupleQuery(
+                            QueryLanguage.SPARQL, query);
+                    final TupleQueryResult result = tupleQuery.evaluate();
+                    compare(result, answer);
+                    
+                }
+                
+            } catch (Exception ex) {
+                cxn.rollback();
+                throw ex;
+            } finally {
+                cxn.close();
+            }
+        
+        } finally {
+            sail.__tearDownUnitTest();
         }
 
     }
