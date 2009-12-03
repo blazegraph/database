@@ -2491,7 +2491,7 @@ public class BigdataSail extends SailBase implements Sail {
                 final TripleSource tripleSource = new BigdataTripleSource(this,
                         includeInferred);
 
-                final EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl(
+                final EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl2(
                         (BigdataTripleSource) tripleSource, dataset,
                         nativeJoins);
 

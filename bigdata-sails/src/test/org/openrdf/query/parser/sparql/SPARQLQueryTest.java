@@ -54,6 +54,7 @@ import org.openrdf.query.resultio.TupleQueryResultParser;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.repository.util.RDFInserter;
 import org.openrdf.rio.RDFFormat;
@@ -62,6 +63,7 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.memory.MemoryStore;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 
 public abstract class SPARQLQueryTest extends TestCase {
 
@@ -204,23 +206,7 @@ public abstract class SPARQLQueryTest extends TestCase {
 			queryResultTable.beforeFirst();
 			expectedResultTable.beforeFirst();
 
-			/*
-			 * StringBuilder message = new StringBuilder(128);
-			 * message.append("\n============ "); message.append(getName());
-			 * message.append(" =======================\n");
-			 * message.append("Expected result: \n"); while
-			 * (expectedResultTable.hasNext()) {
-			 * message.append(expectedResultTable.next()); message.append("\n"); }
-			 * message.append("============="); StringUtil.appendN('=',
-			 * getName().length(), message);
-			 * message.append("========================\n"); message.append("Query
-			 * result: \n"); while (queryResultTable.hasNext()) {
-			 * message.append(queryResultTable.next()); message.append("\n"); }
-			 * message.append("============="); StringUtil.appendN('=',
-			 * getName().length(), message);
-			 * message.append("========================\n");
-			 */
-
+			
 			List<BindingSet> queryBindings = Iterations.asList(queryResultTable);
 			List<BindingSet> expectedBindings = Iterations.asList(expectedResultTable);
 
@@ -231,6 +217,8 @@ public abstract class SPARQLQueryTest extends TestCase {
 			unexpectedBindings.removeAll(expectedBindings);
 
 			StringBuilder message = new StringBuilder(128);
+            message.append("\n");
+            message.append(testURI);
 			message.append("\n============ ");
 			message.append(getName());
 			message.append(" =======================\n");
@@ -254,6 +242,54 @@ public abstract class SPARQLQueryTest extends TestCase {
                 message.append("resultFile: " + resultFileURL+"\n");
             }
 			
+            message.append("=============");
+            StringUtil.appendN('=', getName().length(), message);
+            message.append("========================\n");
+
+            message.append("query:\n");
+            message.append(readQueryString().trim());
+            message.append("\n");
+            
+            message.append("=============");
+            StringUtil.appendN('=', getName().length(), message);
+            message.append("========================\n");
+
+            message.append("data:\n");
+            RepositoryConnection cxn = ((BigdataSailRepository) dataRep).getQueryConnection();
+            try {
+                RepositoryResult<Statement> stmts = cxn.getStatements(null, null, null, true);
+                while (stmts.hasNext()) {
+                    Statement stmt = stmts.next();
+                    message.append(stmt+"\n");
+                }
+            } finally {
+                cxn.close();
+            }
+            
+            message.append("=============");
+            StringUtil.appendN('=', getName().length(), message);
+            message.append("========================\n");
+
+            message.append("Expected result: \n"); 
+            for (BindingSet bs : expectedBindings) {
+                message.append(bs);
+                message.append("\n");
+            }
+            
+            message.append("=============");
+            StringUtil.appendN('=', getName().length(), message);
+            message.append("========================\n");
+            
+            message.append("Query result: \n");
+            for (BindingSet bs : queryBindings) {
+                message.append(bs);
+                message.append("\n");
+            }
+            
+            message.append("=============");
+            StringUtil.appendN('=', getName().length(), message);
+            message.append("========================\n");
+
 			if (!missingBindings.isEmpty()) {
 				message.append("Missing bindings: \n");
 				for (BindingSet bs : missingBindings) {
