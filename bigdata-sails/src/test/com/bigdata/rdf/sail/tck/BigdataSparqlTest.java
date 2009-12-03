@@ -27,7 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.tck;
 
+import info.aduna.io.IOUtil;
 import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.Properties;
 
 import junit.framework.Test;
@@ -134,12 +138,16 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         super(testURI, name, queryFileURL, resultFileURL, dataSet);
         
     }
-
+    
+    public String getTestURI() {
+        return testURI;
+    }
+    
     /**
      * Overridden to destroy the backend database and its files on the disk.
      */
     @Override
-    protected void tearDown()
+    public void tearDown()
         throws Exception
     {
         
@@ -208,5 +216,35 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         repo.initialize();
         return repo;
     }
+    
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
+    }
+    
+    @Override
+    public void runTest() throws Exception {
+        super.runTest();
+    }
+    
+    public Repository getRepository() {
+        return dataRep;
+    }
+    
+    private String queryString = null;
+    public String getQueryString() throws Exception {
+        if (queryString == null) {
+            InputStream stream = new URL(queryFileURL).openStream();
+            try {
+                return IOUtil.readString(new InputStreamReader(stream, "UTF-8"));
+            }
+            finally {
+                stream.close();
+            }
+        }
+        return queryString;
+    }
+    
+    
 
 }

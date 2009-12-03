@@ -25,7 +25,7 @@ import org.openrdf.rio.ParseLocationListener;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 
 /**
  * A filter on SAX events to make life easier on the RDF parser itself. This
@@ -254,10 +254,10 @@ class SAXFilter implements ContentHandler {
 						}
 						else if ("xml:lang".equals(attQName)) {
 							elInfo.xmlLang = attributes.getValue(i);
-						} else if (BNS.NAMESPACE.equals(attributes.getURI(i))) {
-                                if(BNS.SID.equals(attributes.getLocalName(i))) {
+						} else if (BD.NAMESPACE.equals(attributes.getURI(i))) {
+                                if(BD.SID.getLocalName().equals(attributes.getLocalName(i))) {
                                     elInfo.context = attributes.getValue(i);
-                                } else if(BNS.STATEMENT_TYPE.equals(attributes.getLocalName(i))) {
+                                } else if(BD.STATEMENT_TYPE.getLocalName().equals(attributes.getLocalName(i))) {
                                     elInfo.stmtType= attributes.getValue(i);
                                 }
                         }
@@ -475,10 +475,10 @@ class SAXFilter implements ContentHandler {
 				String namespace = attributes.getURI(i);
 				String localName = attributes.getLocalName(i);
 
-                if(BNS.NAMESPACE.equals(namespace)) {
-                    if(BNS.SID.equals(localName)) {
+                if(BD.NAMESPACE.equals(namespace)) {
+                    if(BD.SID.getLocalName().equals(localName)) {
                         elInfo.context = value;
-                    } else if(BNS.STATEMENT_TYPE.equals(localName)) {
+                    } else if(BD.STATEMENT_TYPE.getLocalName().equals(localName)) {
                         elInfo.stmtType = value;
                     }
                 } else

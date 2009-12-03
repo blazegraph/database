@@ -363,7 +363,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
             Union union, BindingSet bindings) throws QueryEvaluationException {
         
-        if (!nativeJoins || true) {
+        if (true) {
+            // Use Sesame 2 evaluation
+            return super.evaluate(union, bindings);
+        }
+
+        if (!nativeJoins) {
             // Use Sesame 2 evaluation
             return super.evaluate(union, bindings);
         }
@@ -562,7 +567,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // contains something we don't handle yet
         collectStatementPatterns(join, stmtPatterns, filters);
         
-        if (INFO) {
+        if (false) {
             for (Map.Entry<StatementPattern, Boolean> entry : 
                     stmtPatterns.entrySet()) {
                 log.info(entry.getKey() + ", optional=" + entry.getValue());
@@ -892,13 +897,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             }
             final ValueExpr condition = join.getCondition();
             if (condition != null) {
+                /*
                 Filter filter = new Filter(right, condition);
                 // fake a filter, we just need the value expr later
                 filters.add(filter);
-                /*
-                // we have to punt on nested optional filters just to be safe
-                throw new UnknownOperatorException(filter);
                 */
+                // we have to punt on nested optional filters just to be safe
+                throw new UnknownOperatorException(join);
             }
             stmtPatterns.put((StatementPattern) right, Boolean.TRUE);
             collectStatementPatterns(left, stmtPatterns, filters);
