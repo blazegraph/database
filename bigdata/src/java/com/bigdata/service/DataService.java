@@ -48,11 +48,11 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.filter.IFilterConstructor;
 import com.bigdata.btree.proc.IIndexProcedure;
-import com.bigdata.concurrent.LockManager;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.io.ByteBufferInputStream;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractLocalTransactionManager;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
@@ -1436,6 +1436,32 @@ abstract public class DataService extends AbstractService
             if (task instanceof IDataServiceCallable) {
 
                 ((IDataServiceCallable) task).setDataService(this);
+
+            }
+            
+            if (timestamp == ITx.UNISOLATED) {
+
+                /*
+                 * Hack to slow down the clients when the data service is busy
+                 * servicing asynchronous overflow tasks. This only interferes
+                 * with unisolated write tasks since they are the ones which
+                 * drive the size of the journal.
+                 * 
+                 * FIXME Atomically test this condition and AWAIT the end of
+                 * asynchronous overflow.
+                 * 
+                 * @todo make this a configuration parameter.
+                 */
+
+                while (getConcurrencyManager().getJournalOverextended() > 1.5) {
+
+                    try {
+                        Thread.sleep(1000L/* ms */);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+
+                }
 
             }
             
