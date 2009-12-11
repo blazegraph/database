@@ -1204,7 +1204,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
              * 
              * @todo convert to WARN
              */
-            log.error("overextended=" + overextension + "x : "
+            log.error("overextended=" + (int)overextension + "x : "
                     + task.toString());
 
         }
