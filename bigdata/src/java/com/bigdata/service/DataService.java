@@ -1439,32 +1439,6 @@ abstract public class DataService extends AbstractService
 
             }
             
-            if (timestamp == ITx.UNISOLATED) {
-
-                /*
-                 * Hack to slow down the clients when the data service is busy
-                 * servicing asynchronous overflow tasks. This only interferes
-                 * with unisolated write tasks since they are the ones which
-                 * drive the size of the journal.
-                 * 
-                 * FIXME Atomically test this condition and AWAIT the end of
-                 * asynchronous overflow.
-                 * 
-                 * @todo make this a configuration parameter.
-                 */
-
-                while (getConcurrencyManager().getJournalOverextended() > 1.5) {
-
-                    try {
-                        Thread.sleep(1000L/* ms */);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-
-                }
-
-            }
-            
             // submit the procedure and await its completion.
             return concurrencyManager.submit(task);
         
