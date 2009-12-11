@@ -167,8 +167,6 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceS
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/IndexCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/IndexCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/IndexSegmentCacheSize
-http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/OpenLeafCount
-http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Byte%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/OpenLeafByteCount
 
 # UnisolatedWriteService
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Arrival%20Rate&depth=9&correlated=true&period=Minutes&file=service/ds/WriteService/AverageArrivalRate
