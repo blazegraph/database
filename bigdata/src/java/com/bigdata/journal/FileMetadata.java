@@ -244,7 +244,9 @@ public class FileMetadata {
      *            The #of bits out of a 64-bit long integer that are used to
      *            encode the byte offset as an unsigned integer. The remaining
      *            bits are used to encode the byte count (aka record length) as
-     *            an unsigned integer.
+     *            an unsigned integer.  This value is <em>ignored</em> if the
+     *            journal is being reopened, in which case the real offset bits
+     *            is read from the root block of the journal.
      * @param readCacheCapacity
      *            The capacity of an optional read cache. When ZERO(0) the read
      *            cache will be disabled. The capacity specifies the #of records
@@ -293,13 +295,14 @@ public class FileMetadata {
      *             if there is a problem preparing the file for use by the
      *             journal.
      */
-    FileMetadata(File file, BufferMode bufferMode, boolean useDirectBuffers,
-            long initialExtent, long maximumExtent, boolean create,
-            boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
-            ForceEnum forceWrites, int offsetBits, int readCacheCapacity,
-            int readCacheMaxRecordSize, ByteBuffer writeCache,
-            boolean validateChecksum, final long createTime,
-            ChecksumUtility checker, boolean alternateRootBlock) throws RuntimeException {
+    FileMetadata(final File file, final BufferMode bufferMode, final boolean useDirectBuffers,
+            final long initialExtent, final long maximumExtent, final boolean create,
+            final boolean isEmptyFile, boolean deleteOnExit, final boolean readOnly,
+            final ForceEnum forceWrites, final int offsetBits, int readCacheCapacity,
+            final int readCacheMaxRecordSize, final ByteBuffer writeCache,
+            final boolean validateChecksum, final long createTime,
+            final ChecksumUtility checker, final boolean alternateRootBlock)
+            throws RuntimeException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -330,11 +333,12 @@ public class FileMetadata {
 
         }
 
+        // check the argument.  the value is only used if we are creating a new journal.
         WormAddressManager.assertOffsetBits(offsetBits);
         
         this.bufferMode = bufferMode;
 
-        this.offsetBits = offsetBits;
+//        this.offsetBits = offsetBits;
 
         this.readCacheCapacity = readCacheCapacity;
         
@@ -518,6 +522,9 @@ public class FileMetadata {
                         ? (alternateRootBlock ?rootBlock1 :rootBlock0)
                         : (alternateRootBlock ?rootBlock0 :rootBlock1)
                         );
+
+                // use the offset bits from the root block.
+                this.offsetBits = rootBlock.getOffsetBits();
                 
                 /*
                  * The offset into the user extent at which the next record will be
@@ -675,9 +682,11 @@ public class FileMetadata {
 
                 /*
                  * Generate the root blocks. They are for all practical purposes
-                 * identical (in fact, their timestamps will be distict). The root
+                 * identical (in fact, their timestamps will be distinct). The root
                  * block are then written into their locations in the file.
                  */
+                // use the caller's value for offsetBits.
+                this.offsetBits = offsetBits;
                 final long commitCounter = 0L;
                 final long firstCommitTime = 0L;
                 final long lastCommitTime = 0L;
