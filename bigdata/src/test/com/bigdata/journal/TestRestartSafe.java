@@ -28,16 +28,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal;
 
 import java.io.IOException;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICounter;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.SimpleEntry;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.WormAddressManager;
 
 /**
  * Test suite for restart-safety of {@link BTree}s backed by an
@@ -206,6 +208,131 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
             final long addr2;
             {
                 journal = reopenStore(journal);
+
+                final BTree btree = BTree.load(journal, addr1);
+
+                assertTrue(btree.dump(Level.DEBUG, System.err));
+
+                // @todo verify in more detail.
+                assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7,
+                        v8 }, btree.rangeIterator());
+
+                // remove all entries by replacing the root node.
+
+                btree.removeAll();
+
+                assertTrue(btree.dump(Level.DEBUG, System.err));
+
+                assertSameIterator(new Object[] {}, btree.rangeIterator());
+
+                addr2 = btree.writeCheckpoint();
+
+                journal.commit();
+            }
+
+            /*
+             * restart, re-opening the same file.
+             */
+            {
+
+                journal = reopenStore(journal);
+
+                final BTree btree = BTree.load(journal, addr2);
+
+                assertTrue(btree.dump(Level.DEBUG, System.err));
+
+                assertSameIterator(new Object[] {}, btree.rangeIterator());
+
+            }
+
+        }
+        
+        }
+
+        finally {
+
+            journal.destroy();
+            
+        }
+
+    }
+
+    /**
+     * Test verifies that the journal can be correctly reopened when using a
+     * non-default value for <code>offsetBits</code>. The data on the
+     * {@link BTree} is verified in order to force reads from the last commit
+     * point on the journal after it is reopened.
+     * 
+     * @throws IOException
+     */
+    public void test_restartSafe_offsetBits() throws IOException {
+
+        final int offsetBits = WormAddressManager.SCALE_OUT_OFFSET_BITS;
+        Journal journal;
+        {
+
+            final Properties properties = getProperties();
+
+            // override offset bits to a non-default value.
+            properties.setProperty(Options.OFFSET_BITS, "" + offsetBits);
+
+            journal = new Journal(properties);
+
+            assertEquals("offsetBits", offsetBits, journal
+                    .getRootBlockView().getOffsetBits());
+
+        }
+
+        try {
+        
+        final int m = 3;
+
+        final long addr1;
+        
+        SimpleEntry v1 = new SimpleEntry(1);
+        SimpleEntry v2 = new SimpleEntry(2);
+        SimpleEntry v3 = new SimpleEntry(3);
+        SimpleEntry v4 = new SimpleEntry(4);
+        SimpleEntry v5 = new SimpleEntry(5);
+        SimpleEntry v6 = new SimpleEntry(6);
+        SimpleEntry v7 = new SimpleEntry(7);
+        SimpleEntry v8 = new SimpleEntry(8);
+        Object[] values = new Object[]{v5,v6,v7,v8,v3,v4,v2,v1};
+
+        {
+            
+            final BTree btree = getBTree(m,journal);
+    
+            byte[][] keys = new byte[][] { new byte[] { 5 }, new byte[] { 6 },
+                    new byte[] { 7 }, new byte[] { 8 }, new byte[] { 3 },
+                    new byte[] { 4 }, new byte[] { 2 }, new byte[] { 1 } };
+
+            for (int i = 0; i < values.length; i++) {
+            
+                btree.insert(keys[i], values[i]);
+                
+            }
+            
+            assertSameIterator(new Object[] { v1, v2, v3, v4, v5, v6, v7, v8 },
+                    btree.rangeIterator());
+    
+            addr1 = btree.writeCheckpoint();
+            
+            journal.commit();
+            
+        }
+        
+        /*
+         * restart, re-opening the same file.
+         */
+        if(journal.isStable()){
+
+            final long addr2;
+            {
+                journal = reopenStore(journal);
+                
+                assertEquals("offsetBits", offsetBits, journal
+                        .getRootBlockView().getOffsetBits());
 
                 final BTree btree = BTree.load(journal, addr1);
 
