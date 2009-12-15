@@ -104,22 +104,23 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
         
         if(f.isDirectory()) {
             
-            File[] children = f.listFiles();
-            
-            for(int i=0; i<children.length; i++) {
-                
-                recursiveDelete( children[i] );
-                
+            final File[] children = f.listFiles();
+
+            for (int i = 0; i < children.length; i++) {
+
+                recursiveDelete(children[i]);
+
             }
-            
+
         }
-        
-        log.info("Removing: " + f);
+
+        if(log.isInfoEnabled())
+            log.info("Removing: " + f);
 
         if (!f.delete()) {
 
             log.warn("Could not remove: " + f);
-            
+
         }
 
     }
@@ -211,11 +212,11 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             file.delete(); // remove temp file - will be re-created below.
             
-            Properties properties = new Properties();
+            final Properties properties = new Properties();
 
             properties.setProperty(Options.FILE, file.toString());
          
-            Journal journal = new Journal(properties);
+            final Journal journal = new Journal(properties);
 
             // wait for at least one distinct timestamp to go by.
             journal.nextTimestamp();
@@ -223,15 +224,36 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
             journalMetadata1 = journal.getResourceMetadata();
 
             // required to set the initial commitRecord before we can close out the journal for further writes.
-            journal.commit();
+            final long lastCommitTime = journal.commit();
             
             // close out for further writes.
-            journal.closeForWrites(journal.nextTimestamp());
+            final long closeTime = journal.nextTimestamp();
+            journal.closeForWrites(closeTime);
             
             assertTrue(journalMetadata1.getCreateTime() > 0L);
             
             // and close the journal.
             journal.close();
+         
+            // verify that we can re-open the journal.
+            {
+                
+                properties.setProperty(Journal.Options.READ_ONLY,"true");
+                
+                final Journal tmp = new Journal(properties);
+
+                // should be read only.
+                assertTrue(tmp.isReadOnly());
+                
+                // verify last commit time. 
+                assertEquals(lastCommitTime, tmp.getLastCommitTime());
+                
+                // verify journal closed for writes time.
+                assertEquals(closeTime, tmp.getRootBlockView().getCloseTime());
+                
+                tmp.close();
+                
+            }
             
         }
 
@@ -246,11 +268,11 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
             file.delete(); // remove temp file - will be re-created below.
 
-            Properties properties = new Properties();
+            final Properties properties = new Properties();
 
             properties.setProperty(Options.FILE, file.toString());
          
-            Journal journal = new Journal(properties);
+            final Journal journal = new Journal(properties);
             
             /*
              * Commit the journal - this causes the commitRecordIndex to become
@@ -258,7 +280,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
              * journal in read-only mode.
              */
 
-            journal.commit();
+            final long lastCommitTime = journal.commit();
 
             journalMetadata2 = journal.getResourceMetadata();
             
@@ -266,6 +288,18 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
             
             assertTrue(journalMetadata1.getCreateTime() < journalMetadata2
                     .getCreateTime());
+            
+            // verify that we can re-open the journal.
+            {
+                
+                final Journal tmp = new Journal(properties);
+                
+                // verify last commit time. 
+                assertEquals(lastCommitTime, tmp.getLastCommitTime());
+                
+                tmp.close();
+                
+            }
             
         }
 
