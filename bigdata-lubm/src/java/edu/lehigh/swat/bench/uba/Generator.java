@@ -535,7 +535,9 @@ public class Generator {
      *            Ontology url.
      * @param subdirs
      *            When true places the departments into a subdirectory for the
-     *            university.
+     *            university and aggregates each 10,000 universities into their
+     *            own intermediate directory (as a workaround for ext3 and other
+     *            file systems).
      * @param outDir
      *            The directory into which the generated files will be written.
      *            Each university will be written into a separate subdirectory.
@@ -718,9 +720,23 @@ public class Generator {
               // directory for this university.
              final File dir;
              if(subdirs) {
-                 // ensure subdirectory exists.
-                 dir = new File(outDir, _getName(CS_C_UNIV, k));
-                 dir.mkdir();
+                /*
+                 * Ensure subdirectory exists.
+                 * 
+                 * Note: for very large data sets the ext3 file system only
+                 * allows ~32000 subdirectories in a directory. Therefore we
+                 * have to break up the file system hierarchy a little bit
+                 * further to generate U32000, U50000, etc.
+                 */
+                 // The parent directory will advance every 10000 Universities,
+                 // so there will be up to 10000 subdirectories in each parent
+                 // directory.
+                 final File p = new File(outDir, _getName(CS_C_UNIV, 10000*(k/10000)));
+                 // The subdirectory is the specific University.  The departments
+                 // in that University will be the individual files in the subdir.
+                 dir = new File(p, _getName(CS_C_UNIV, k));
+                 // create parent (if necessary) and subdirectory.
+                 dir.mkdirs();
              } else {
                  // all files in the same directory
                  dir = outDir;
