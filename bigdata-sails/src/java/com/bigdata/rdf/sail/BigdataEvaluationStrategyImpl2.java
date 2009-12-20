@@ -24,6 +24,7 @@ import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
 import org.openrdf.query.algebra.Or;
+import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.QueryModelNodeBase;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
@@ -246,7 +247,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     private final AbstractTripleStore database;
 
     private final boolean nativeJoins;
-
+    
     // private boolean slice = false, distinct = false, union = false;
     //    
     // // Note: defaults are illegal values.
@@ -363,11 +364,6 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
             Union union, BindingSet bindings) throws QueryEvaluationException {
         
-        if (true) {
-            // Use Sesame 2 evaluation
-            return super.evaluate(union, bindings);
-        }
-
         if (!nativeJoins) {
             // Use Sesame 2 evaluation
             return super.evaluate(union, bindings);
@@ -376,6 +372,19 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (INFO) {
             log.info("union:\n" + union);
         }
+        
+        /*
+         * FIXME Another deficiency in the native rule model. We can only handle
+         * top-level UNIONs for now.
+         */
+        QueryModelNode operator = union;
+        while ((operator = operator.getParentNode()) != null) {
+            if (operator instanceof LeftJoin || operator instanceof Join) {
+                // Use Sesame 2 evaluation
+                return super.evaluate(union, bindings);
+            }
+        }
+        
         
         try {
             
@@ -449,6 +458,39 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             log.info("join:\n" + join);
         }
         
+        /*
+         * FIXME Another deficiency in the native rule model. If we are doing
+         * a join that is nested inside an optional, we don't have the
+         * appropriate variable bindings to arrive at the correct answer.
+         * Example:
+         * select * 
+         * { 
+         *    :x1 :p ?v .
+         *    OPTIONAL { :x3 :q ?w }
+         *    OPTIONAL { :x3 :q ?w . :x2 :p ?v }
+         * }
+         * 
+         * 1. LeftJoin 
+         *    2. LeftJoin 
+         *       3. StatementPattern
+         *       4. StatementPattern
+         *    5. Join 
+         *       6. StatementPattern
+         *       7. StatementPattern
+         *       
+         * (1) punts, because the right arg is a Join and we can't mark an
+         * entire Join as optional.  Then, (5) makes it here, to the evaluate
+         * method.  But we can't evaluate it in isolation, we need to pump
+         * the bindings in from the stuff above it.
+         */
+        QueryModelNode operator = join;
+        while ((operator = operator.getParentNode()) != null) {
+            if (operator instanceof LeftJoin) {
+                // Use Sesame 2 evaluation
+                return super.evaluate(join, bindings);
+            }
+        }
+        
         try {
             
             IStep query = createNativeQuery(join);
@@ -493,6 +535,40 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
         if (INFO) {
             log.info("left join:\n" + join);
+        }
+        
+        /*
+         * FIXME Another deficiency in the native rule model. If we are doing
+         * a left join that is nested inside an optional, we don't have the
+         * appropriate variable bindings to arrive at the correct answer.
+         * Example:
+         *  SELECT *
+         *  { 
+         *      :x1 :p ?v .
+         *      OPTIONAL
+         *      {
+         *        :x3 :q ?w .
+         *        OPTIONAL { :x2 :p ?v }
+         *      }
+         *  }         
+         * 
+         * 1. LeftJoin 
+         *    2. StatementPattern 
+         *    3. LeftJoin 
+         *       4. StatementPattern
+         *       5. StatementPattern
+         *       
+         * (1) punts, because the right arg is a LeftJoin and we can't mark an
+         * entire Join as optional.  Then, (3) makes it here, to the evaluate
+         * method.  But we can't evaluate it in isolation, we need to pump
+         * the bindings in from the LeftJoin above it.
+         */
+        QueryModelNode operator = join;
+        while ((operator = operator.getParentNode()) != null) {
+            if (operator instanceof LeftJoin) {
+                // Use Sesame 2 evaluation
+                return super.evaluate(join, bindings);
+            }
         }
         
         try {
@@ -886,7 +962,38 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             collectStatementPatterns(left, stmtPatterns, filters);
             collectStatementPatterns(right, stmtPatterns, filters);
         } else if (tupleExpr instanceof LeftJoin) {
+
             final LeftJoin join = (LeftJoin) tupleExpr;
+            
+            /*
+             * FIXME Another deficiency in the native rule model. Incorrect
+             * scoping of join.
+             * Example:
+             * SELECT *
+             * { 
+             *   ?X  :name "paul"
+             *   {?Y :name "george" . OPTIONAL { ?X :email ?Z } }
+             * }
+             * 
+             * 1. Join 
+             *    2. StatementPattern 
+             *    3. LeftJoin
+             *       4. StatementPattern
+             *       5. StatementPattern 
+             *       
+             * (1) starts collecting its child nodes and gets to (3), which
+             * puts us here in the code.  But this is not a case where we
+             * can just flatten the whole tree.  (3) needs to be evaluated
+             * independently, as a subprogram.
+             */
+            QueryModelNode operator = join;
+            while ((operator = operator.getParentNode()) != null) {
+                if (operator instanceof Join) {
+                    // Use Sesame 2 evaluation
+                    throw new UnknownOperatorException(join);
+                }
+            }
+            
             // FIXME is this right?  what about multiple optionals - do they nest?
             final TupleExpr left = join.getLeftArg();
             final TupleExpr right = join.getRightArg();
