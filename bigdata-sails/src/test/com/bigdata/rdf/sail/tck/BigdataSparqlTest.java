@@ -42,6 +42,8 @@ import org.openrdf.query.parser.sparql.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 
+import com.bigdata.btree.keys.CollatorEnum;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -196,6 +198,11 @@ public class BigdataSparqlTest extends SPARQLQueryTest {
         props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
         
         props.setProperty(Options.EXACT_SIZE, "true");
+        
+        props.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());
+        
+//      Force identical unicode comparisons (assuming default COLLATOR setting).
+        props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
         
         return props;
         
