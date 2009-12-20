@@ -5,6 +5,9 @@
  */
 package org.openrdf.query.parser.sparql;
 
+import info.aduna.io.IOUtil;
+import info.aduna.iteration.Iterations;
+import info.aduna.text.StringUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -14,17 +17,8 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import info.aduna.io.IOUtil;
-import info.aduna.iteration.Iterations;
-import info.aduna.text.StringUtil;
-
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -42,6 +36,7 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.QueryResultUtil;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.dawg.DAWGTestResultSetUtil;
 import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.query.impl.MutableTupleQueryResult;
@@ -55,7 +50,9 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
+import org.openrdf.repository.sail.SailQuery;
 import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.repository.util.RDFInserter;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
@@ -63,7 +60,11 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.memory.MemoryStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.bigdata.rdf.sail.BigdataNativeEvaluationLevel;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 
 public abstract class SPARQLQueryTest extends TestCase {
 
@@ -246,16 +247,36 @@ public abstract class SPARQLQueryTest extends TestCase {
             StringUtil.appendN('=', getName().length(), message);
             message.append("========================\n");
 
+            String query = readQueryString().trim();
             message.append("query:\n");
-            message.append(readQueryString().trim());
+            message.append(query);
             message.append("\n");
             
             message.append("=============");
             StringUtil.appendN('=', getName().length(), message);
             message.append("========================\n");
 
-            message.append("data:\n");
             RepositoryConnection cxn = ((BigdataSailRepository) dataRep).getQueryConnection();
+            
+            try {
+                final SailTupleQuery tupleQuery = (SailTupleQuery) 
+                cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleExpr tupleExpr = tupleQuery.getParsedQuery().getTupleExpr();
+                
+                message.append("operator tree:\n");
+                message.append(tupleExpr);
+                message.append("\n");
+            
+                message.append("=============");
+                StringUtil.appendN('=', getName().length(), message);
+                message.append("========================\n");
+            } catch (MalformedQueryException ex) {
+                // ignore
+            }
+
+            message.append("data:\n");
+
             try {
                 RepositoryResult<Statement> stmts = cxn.getStatements(null, null, null, true);
                 while (stmts.hasNext()) {
