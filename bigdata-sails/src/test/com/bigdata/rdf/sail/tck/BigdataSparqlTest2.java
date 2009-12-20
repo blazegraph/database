@@ -16,7 +16,7 @@ import org.openrdf.query.impl.DatasetImpl;
 
 public class BigdataSparqlTest2 extends TestCase {
     
-    protected static final Logger log = Logger.getLogger(BigdataSparqlTestSingleQuery.class);
+    protected static final Logger log = Logger.getLogger(BigdataSparqlTest2.class);
     
     static final private String failure = 
         "graph: file:/C:/DOCUME~1/mike/LOCALS~1/Temp/sparql5850/testcases-dawg/data-r2/optional/complex-data-1.ttl\n" +
@@ -28,9 +28,9 @@ public class BigdataSparqlTest2 extends TestCase {
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12";
     
     static final private Collection<String> testURIs = Arrays.asList(new String[] {
+/*
 //      busted with EvalStrategy1
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2"
-/*            
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#nested-opt-2",
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#filter-scope-1",
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#join-scope-1",
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-4",
@@ -42,8 +42,11 @@ public class BigdataSparqlTest2 extends TestCase {
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/algebra/manifest#opt-filter-2",
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional/manifest#dawg-optional-complex-3",
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-001",
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004"
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004",
 */        
+//      Dataset crap
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#dawg-dataset-01"
+        
     });
     
     protected static BigdataSparqlTest getSingleTest(String testURI) throws Exception {
