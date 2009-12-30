@@ -417,6 +417,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      *            The cursor position.
      * 
      * @return A clone of that cursor position.
+     * 
+     * @deprecated This is never used.
      */
     abstract protected AbstractCursorPosition<L, E> newTemporaryPosition(ICursorPosition<L, E> p);
     
@@ -1678,7 +1680,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         }
         
-        final public boolean forwardScan(boolean skipCurrent,boolean testOnly) {
+        final public boolean forwardScan(final boolean skipCurrent,
+                final boolean testOnly) {
 
             relocateLeaf();
 
@@ -1786,11 +1789,12 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
         }
         
-        final public boolean reverseScan(boolean skipCurrent,boolean testOnly) {
+        final public boolean reverseScan(final boolean skipCurrent,final boolean testOnly) {
 
             relocateLeaf();
             
-            final int nkeys = leafCursor.leaf().getKeyCount();
+            // Note: updated if we change to a prior leaf!
+            int nkeys = leafCursor.leaf().getKeyCount();
             
             if (nkeys == 0) {
 
@@ -1893,8 +1897,11 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                     
                 }
 
+                // set to the #of keys in the prior leaf.
+                nkeys = leafCursor.leaf().getKeyCount();
+                
                 // always reset the index to [nkeys-1] when moving to a prior leaf.
-                index = leafCursor.leaf().getKeyCount() - 1;
+                index = nkeys - 1;
 
             }
             
