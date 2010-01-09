@@ -398,11 +398,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
         } catch (UnknownOperatorException ex) {
             
-            /*
-             * Use Sesame 2 evaluation.
-             */
-            log.warn("need to implement native TupleExpr: "
-                        + ex.getOperator());
+            if (INFO) {
+                /*
+                 * Use Sesame 2 evaluation.
+                 */
+                log.info("need to implement native TupleExpr: "
+                            + ex.getOperator());
+            }
 
             return super.evaluate(union, bindings);
             
@@ -503,11 +505,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
         } catch (UnknownOperatorException ex) {
             
-            /*
-             * Use Sesame 2 evaluation.
-             */
-            log.warn("need to implement native TupleExpr: "
-                        + ex.getOperator());
+            if (INFO) {
+                /*
+                 * Use Sesame 2 evaluation.
+                 */
+                log.info("need to implement native TupleExpr: "
+                            + ex.getOperator());
+            }
 
             return super.evaluate(join, bindings);
             
@@ -583,11 +587,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
         } catch (UnknownOperatorException ex) {
             
-            /*
-             * Use Sesame 2 evaluation.
-             */
-            log.warn("need to implement native TupleExpr: "
-                        + ex.getOperator());
+            if (INFO) {
+                /*
+                 * Use Sesame 2 evaluation.
+                 */
+                log.info("need to implement native TupleExpr: "
+                            + ex.getOperator());
+            }
 
             return super.evaluate(join, bindings);
             
@@ -878,10 +884,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     // unfortunately I think we just have to punt to be super safe
                     Collection<Filter> filters = 
                         ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-                    log.warn("could not translate " + filters.size()
-                            + " filters into native constraints:");
-                    for (Filter filter : filters) {
-                        log.warn("\n" + filter.getCondition());
+                    if (INFO) {
+                        log.info("could not translate " + filters.size()
+                                + " filters into native constraints:");
+                        for (Filter filter : filters) {
+                            log.info("\n" + filter.getCondition());
+                        }
                     }
                     throw new UnknownOperatorException(filters.iterator().next());
                 }
@@ -906,10 +914,12 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     // unfortunately I think we just have to punt to be super safe
                     Collection<Filter> filters = 
                         ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-                    log.warn("could not translate " + filters.size()
-                            + " filters into native constraints:");
-                    for (Filter filter : filters) {
-                        log.warn("\n" + filter.getCondition());
+                    if (INFO) {
+                        log.info("could not translate " + filters.size()
+                                + " filters into native constraints:");
+                        for (Filter filter : filters) {
+                            log.info("\n" + filter.getCondition());
+                        }
                     }
                     throw new UnknownOperatorException(filters.iterator().next());
                 }
