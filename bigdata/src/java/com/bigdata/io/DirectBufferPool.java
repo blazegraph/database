@@ -43,17 +43,20 @@ import com.bigdata.rawstore.Bytes;
  * {@link DirectBufferPool} can only increase, but at least you get to (re-)use
  * the memory that you have allocated rather than leaking it to the native heap.
  * 
- * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
+ * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8f
+ *      ab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo It should be possible to define a method which attempts to release
+ *       direct buffers back to the JVM. The JVM can eventually GC them after a
+ *       full GC, but often not in time to avoid an OOM error on the Java heap.
  */
 public class DirectBufferPool {
 
     protected static final Logger log = Logger
             .getLogger(DirectBufferPool.class);
-
-    protected static final boolean INFO = log.isInfoEnabled();
 
     /**
      * Note: This is NOT a weak reference colletion since the JVM will leak
@@ -203,13 +206,13 @@ public class DirectBufferPool {
         final int poolCapacity = Integer.parseInt(System.getProperty(
                 Options.POOL_CAPACITY, Options.DEFAULT_POOL_CAPACITY));
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(Options.POOL_CAPACITY + "=" + poolCapacity);
 
         final int bufferCapacity = Integer.parseInt(System.getProperty(
                 Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.BUFFER_CAPACITY + "=" + bufferCapacity);
 
         INSTANCE = new DirectBufferPool(
@@ -279,31 +282,66 @@ public class DirectBufferPool {
 
     /**
      * Return a direct {@link ByteBuffer}. The capacity of the buffer is
-     * determined by the configuration of this pool. The position will be
-     * equal to zero, the limit will be equal to the capacity, and the mark
-     * will not be set.
+     * determined by the configuration of this pool. The position will be equal
+     * to zero, the limit will be equal to the capacity, and the mark will not
+     * be set.
      * <p>
-     * Note: This method will block if there are no free buffers in the pool
-     * and the pool was configured with a maximum capacity. In addition it
-     * MAY block if there is not enough free memory to fulfill the request.
+     * Note: This method will block if there are no free buffers in the pool and
+     * the pool was configured with a maximum capacity. In addition it MAY block
+     * if there is not enough free memory to fulfill the request. It WILL log an
+     * error if it blocks. While blocking is not very safe, using a heap
+     * ByteBuffer is not very safe either since Java NIO will allocate a
+     * temporary direct {@link ByteBuffer} for IOs and that can both run out of
+     * memory and leak memory.
      * 
      * @return A direct {@link ByteBuffer}.
      * 
      * @throws InterruptedException
      *             if the caller's {@link Thread} is interrupted awaiting a
      *             buffer.
-     * @throws TimeoutException 
+     * @throws TimeoutException
      */
-    public ByteBuffer acquire() throws InterruptedException, TimeoutException {
+    public ByteBuffer acquire() throws InterruptedException {
 
-        return acquire(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+        try {
+            
+            return acquire(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+            
+        } catch (TimeoutException e) {
+            
+            // The TimeoutException should not be thrown.
+            throw new AssertionError(e);
+            
+        }
 
     }
 
-    public ByteBuffer acquire(long timeout, TimeUnit unit)
+    /**
+     * Return a direct {@link ByteBuffer}. The capacity of the buffer is
+     * determined by the configuration of this pool. The position will be equal
+     * to zero, the limit will be equal to the capacity, and the mark will not
+     * be set.
+     * <p>
+     * Note: This method will block if there are no free buffers in the pool and
+     * the pool was configured with a maximum capacity. In addition it MAY block
+     * if there is not enough free memory to fulfill the request. It WILL log an
+     * error if it blocks. While blocking is not very safe, using a heap
+     * ByteBuffer is not very safe either since Java NIO will allocate a
+     * temporary direct {@link ByteBuffer} for IOs and that can both run out of
+     * memory and leak memory.
+     * 
+     * @param timeout
+     * @param unit
+     * 
+     * @return A direct {@link ByteBuffer}.
+     * 
+     * @throws InterruptedException
+     * @throws TimeoutException
+     */
+    public ByteBuffer acquire(final long timeout, final TimeUnit unit)
             throws InterruptedException, TimeoutException {
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("");
 
         lock.lock();
@@ -356,7 +394,7 @@ public class DirectBufferPool {
     public boolean release(final ByteBuffer b, long timeout, TimeUnit units)
             throws InterruptedException {
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("");
 
         if (b == null)
@@ -413,7 +451,7 @@ public class DirectBufferPool {
 
         assert lock.isHeldByCurrentThread();
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("");
 
         try {
@@ -424,7 +462,7 @@ public class DirectBufferPool {
                  * Wait for a free buffer since the pool is at its capacity.
                  */
 
-                log.warn("Pool is at capacity - waiting for a free buffer");
+                log.error("Pool is at capacity - waiting for a free buffer");
 
                 awaitFreeBuffer(timeout, unit);
 

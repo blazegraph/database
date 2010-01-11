@@ -82,8 +82,11 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
     }
 
     /**
-     * Build an {@link IndexSegment} from the compacting merge of an index
-     * partition.
+     * Build an {@link IndexSegment} from one or more sources for an index
+     * partition view. The sources are chosen in view order. New sources are
+     * incorporated until too much work would be performed for the lightweight
+     * semantics of "build". If all sources are incorporated by the build, then
+     * the result is identical a compacting merge.
      * 
      * @return The {@link BuildResult}.
      */
@@ -180,6 +183,26 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
             }
 
+            if (buildResult.compactingMerge
+                    && buildResult.builder.getCheckpoint().length >= resourceManager.nominalShardSize) {
+
+                /*
+                 * If a compacting merge was performed and sumSegBytes exceeds the
+                 * threshold, then do a split here just as if CompactingMerge was
+                 * run instead.
+                 * 
+                 * Note: This is unlikely since build does not accept sources if
+                 * they would cause a lot of work. The most likely reasons why this
+                 * would happen would be a single index partition on the journal
+                 * which receives all writes or the journal size is a healthy
+                 * multiple of the target shard size.
+                 */
+
+                // FIXME reconcile return type and enable post-merge split.
+//                return new SplitCompactViewTask(vmd.name, buildResult);
+
+            }            
+            
             try {
 
                 /*
@@ -370,9 +393,9 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                     /*
                      * Note: there is an expectation that this is not a simple
                      * BTree because this the build task is supposed to be
-                     * invoked after an overflow event, and that event should
-                     * have re-defined the view to include the BTree on the new
-                     * journal plus the historical view.
+                     * invoked after an overflow event (or a view checkpoint),
+                     * and that event should have re-defined the view to include
+                     * the BTree on the new journal plus the historical view.
                      * 
                      * One explanation for finding a simple view here is that
                      * the old index was deleted and a new one created in its
@@ -402,17 +425,17 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                 final LocalPartitionMetadata currentpmd = indexMetadata
                         .getPartitionMetadata();
 
+                if (currentpmd == null) {
+
+                    throw new IllegalStateException(
+                            "Not an index partition: " + getOnlyResource());
+
+                }
+
                 // Check pre-conditions.
                 final IResourceMetadata[] currentResources = currentpmd
                         .getResources();
                 {
-
-                    if (currentpmd == null) {
-
-                        throw new IllegalStateException(
-                                "Not an index partition: " + getOnlyResource());
-
-                    }
 
                     /*
                      * verify that there are at least two resources in the
@@ -421,9 +444,11 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
                      * 1. currentResources[0] is the mutable BTree on the live
                      * journal
                      * 
-                     * 2. currentResources[1] is the mutable BTree on the old
+                     * 2. currentResources[1] is either the BTree on the old
                      * journal (since closed out for writes so it is no longer
-                     * mutable).
+                     * mutable) or a previous snapshot of the mutable BTree
+                     * decoupled from the mutable BTree by a view checkpoint
+                     * operation.
                      */
 
                     if (currentResources.length < 2) {
@@ -439,34 +464,34 @@ public class IncrementalBuildTask extends AbstractPrepareTask<BuildResult> {
 
                         throw new IllegalStateException(
                                 "Expecting live journal to be the first resource: "
-                                        + currentResources);
+                                        + Arrays.toString(currentResources));
 
                     }
 
                     /*
-                     * verify that the 2nd resource in the view is the BTree on
-                     * the old journal [this only verifies that the 2nd resource
-                     * in the view is also on a journal].
+                     * verify that the 2nd resource in the view is also a BTree
+                     * on a journal.
                      */
                     if (!currentResources[1].isJournal()) {
 
                         throw new IllegalStateException(
                                 "Expecting live journal to be the first resource: "
-                                        + currentResources);
+                                        + Arrays.toString(currentResources));
 
                     }
 
-                    /*
-                     * verify that the new index segment was built from a view
-                     * that did not include data from the live journal.
-                     */
-                    if (segmentMetadata.getCreateTime() >= getJournal()
-                            .getRootBlockView().getFirstCommitTime()) {
-
-                        throw new AssertionError(
-                                "IndexSegment includes data from the live journal?");
-
-                    }
+// Note: This constraint does not apply when a view checkpoint was used.
+//                    /*
+//                     * Verify that the new index segment was built from a view
+//                     * that did not include data from the live journal.
+//                     */
+//                    if (segmentMetadata.getCreateTime() >= getJournal()
+//                            .getRootBlockView().getFirstCommitTime()) {
+//
+//                        throw new AssertionError(
+//                                "IndexSegment includes data from the live journal?");
+//
+//                    }
 
                 }
 

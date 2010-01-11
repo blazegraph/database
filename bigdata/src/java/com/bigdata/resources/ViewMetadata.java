@@ -17,14 +17,14 @@ import com.bigdata.service.Params;
 import com.bigdata.util.InnerCause;
 
 /**
- * Adds additional metadata to a {@link BTreeMetadata} that deals with the
- * index partition view, including its rangeCount, its {@link ISplitHandler},
+ * Adds additional metadata to a {@link BTreeMetadata} that deals with the index
+ * partition view, including its fast rangeCount, its {@link ISplitHandler},
  * etc.
  * <p>
  * Note: There is overhead in opening a view comprised of more than just the
  * mutable {@link BTree}. That is why there is a separation between the
- * {@link BTreeMetadata} class and the {@link ViewMetadata}. The latter
- * will force any {@link IndexSegment} in the view to be (re-)opened.
+ * {@link BTreeMetadata} class and the {@link ViewMetadata}. The latter will
+ * force any {@link IndexSegment} in the view to be (re-)opened.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -40,7 +40,7 @@ class ViewMetadata extends BTreeMetadata implements Params {
     private boolean initView = false;
     
     /**
-     * Cached range count once initialized from view.
+     * Cached fast range count once initialized from view.
      */
     private long rangeCount;
     
@@ -329,7 +329,7 @@ class ViewMetadata extends BTreeMetadata implements Params {
     }
 
     /**
-     * Return <code>true</code> if the index partition satisifies the criteria
+     * Return <code>true</code> if the index partition satisfies the criteria
      * for a tail split (heavy writes on the tail of the index partition and the
      * size of the index partition is large enough to warrant a tail split).
      * 
@@ -400,7 +400,11 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
         m.put("segmentSourceCount", sourceSegmentCount);
 
-        m.put("manditoryMerge", manditoryMerge);
+        m.put("mergePriority", mergePriority);
+
+        m.put("splitPriority", splitPriority);
+
+        m.put("manditoryMerge", mandatoryMerge);
 
         m.put("#leafSplit", btreeCounters.leavesSplit);
 

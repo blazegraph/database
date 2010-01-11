@@ -31,7 +31,6 @@ package com.bigdata.resources;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -596,22 +595,22 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private final boolean isTransient;
 
-    /**
-     * A direct {@link ByteBuffer} that will be used as the write cache for the
-     * live journal and which will be handed off from live journal to live
-     * journal during overflow processing which is allocated iff
-     * {@link BufferMode#Disk} is choosen.
-     * <p>
-     * Note: This design is motivated by by JVM bug <a
-     * href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
-     * 6210541</a> which describes a failure by
-     * <code>releaseTemporaryDirectBuffer()</code> to release temporary direct
-     * {@link ByteBuffer}s that are allocated for channel IO.
-     * 
-     * @see com.bigdata.journal.Options#WRITE_CACHE_CAPACITY
-     * @see DiskOnlyStrategy
-     */
-    private ByteBuffer writeCache;
+//    /**
+//     * A direct {@link ByteBuffer} that will be used as the write cache for the
+//     * live journal and which will be handed off from live journal to live
+//     * journal during overflow processing which is allocated iff
+//     * {@link BufferMode#Disk} is chosen.
+//     * <p>
+//     * Note: This design is motivated by by JVM bug <a
+//     * href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
+//     * 6210541</a> which describes a failure by
+//     * <code>releaseTemporaryDirectBuffer()</code> to release temporary direct
+//     * {@link ByteBuffer}s that are allocated for channel IO.
+//     * 
+//     * @see com.bigdata.journal.Options#WRITE_CACHE_CAPACITY
+//     * @see DiskOnlyStrategy
+//     */
+//    private ByteBuffer writeCache;
 
     /**
      * A atomic hard reference to the live journal.
@@ -1074,15 +1073,15 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
         
-        /*
-         * Allocate an optional write cache that will be passed from live
-         * journal to live journal during overflow.
-         */
-        {
-
-            writeCache = AbstractJournal.getWriteCache(properties);
-
-        }
+//        /*
+//         * Allocate an optional write cache that will be passed from live
+//         * journal to live journal during overflow.
+//         */
+//        {
+//
+//            writeCache = AbstractJournal.getWriteCache(properties);
+//
+//        }
 
         /*
          * Create the _transient_ index in which we will store the mapping from
@@ -1518,18 +1517,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 /*
                  * There are no existing journal files. Create new journal using
                  * a unique filename in the appropriate subdirectory of the data
-                 * directory.
-                 * 
-                 * @todo this is not using the temp filename mechanism in a
-                 * manner that truly guarantees an atomic file create. The
-                 * CREATE_TEMP_FILE option should probably be extended with a
-                 * CREATE_DIR option that allows you to override the directory
-                 * in which the journal is created. That will allow the atomic
-                 * creation of the journal in the desired directory without
-                 * changing the existing semantics for CREATE_TEMP_FILE.
-                 * 
-                 * See OverflowManager#doOverflow() which has very similar logic
-                 * with the same problem.
+                 * directory.  Since the file is empty, it will be initialized 
+                 * as a new Journal.
                  */
 
                 if (log.isInfoEnabled())
@@ -1554,9 +1543,6 @@ abstract public class StoreManager extends ResourceEvents implements
                         throw new RuntimeException(e);
 
                     }
-
-                    // delete temp file.
-                    file.delete();
 
                 }
 
@@ -1846,8 +1832,8 @@ abstract public class StoreManager extends ResourceEvents implements
 //            log.warn(ex.getMessage(), ex);
 //        }
 
-        // release the write cache.
-        writeCache = null;
+//        // release the write cache.
+//        writeCache = null;
         
     }
 
@@ -1889,8 +1875,8 @@ abstract public class StoreManager extends ResourceEvents implements
 //            log.warn(ex.getMessage(), ex);
 //        }
 
-        // release the write cache.
-        writeCache = null;
+//        // release the write cache.
+//        writeCache = null;
 
     }
 
@@ -2387,18 +2373,18 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     public class ManagedJournal extends AbstractJournal {
 
-        /**
-         * Note: Each instance of the {@link ManagedJournal} reuses the SAME
-         * {@link StoreManager#writeCache}. Therefore you MUST close out writes
-         * on the old journal BEFORE you may allocate a new journal.
-         * 
-         * @param properties
-         * 
-         * @see AbstractJournal#closeForWrites(long)
-         */
+//        /**
+//         * Note: Each instance of the {@link ManagedJournal} reuses the SAME
+//         * {@link StoreManager#writeCache}. Therefore you MUST close out writes
+//         * on the old journal BEFORE you may allocate a new journal.
+//         * 
+//         * @param properties
+//         * 
+//         * @see AbstractJournal#closeForWrites(long)
+//         */
         protected ManagedJournal(final Properties properties) {
 
-            super(properties, writeCache);
+            super(properties);//, writeCache);
 
             /*
              * Set the performance counters on the new store so that we have a

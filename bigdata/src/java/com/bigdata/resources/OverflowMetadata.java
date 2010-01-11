@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -276,12 +277,15 @@ public class OverflowMetadata {
         
     }
     private final Map<OverflowActionEnum, AtomicInteger> actionCounts = new HashMap<OverflowActionEnum, AtomicInteger>();
-    
+
     /**
+     * Captures various metadata about the live journal in preparation for a
+     * synchronous overflow operation.
+     * <p>
      * Note: This captures metadata which has low latency and does not force the
      * materialization of the fused view of an index partition but may force the
-     * loading of the BTree from the old journal, which it itself a very light
-     * weight operation.
+     * loading of the {@link BTree} from the old journal, which it itself a very
+     * light weight operation.
      * 
      * @param resourceManager
      */

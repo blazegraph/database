@@ -104,6 +104,17 @@ public class CompactingMergeTask extends AbstractPrepareTask<BuildResult> {
 
             }
 
+            if (buildResult.builder.getCheckpoint().length >= resourceManager.nominalShardSize) {
+
+                /*
+                 * If sumSegBytes exceeds the threshold, then do a split here.
+                 */
+
+                // FIXME reconcile return type and enable post-merge split.
+//                return new SplitCompactViewTask(vmd.name, buildResult);
+                
+            }
+            
             /*
              * @todo error handling should be inside of the atomic update task
              * since it has more visibility into the state changes and when we

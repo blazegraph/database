@@ -182,13 +182,12 @@ public class DataServer extends AbstractServer {
             return server.proxy;
             
         }
-        
+
         /**
          * Adds the following parameters to the {@link MDC}
          * <dl>
          * 
-         * <dt>clientname
-         * <dt>
+         * <dt>clientname</dt>
          * <dd>The hostname or IP address of the client making the request.</dd>
          * 
          * </dl>

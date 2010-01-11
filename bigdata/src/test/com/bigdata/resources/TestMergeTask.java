@@ -89,8 +89,10 @@ public class TestMergeTask extends AbstractResourceManagerTestCase {
      * @throws IOException
      * @throws ExecutionException
      * @throws InterruptedException
+     * 
+     * @todo test more complex merges.
      */
-    public void test_merge() throws IOException,
+    public void test_mergeWithOverflow() throws IOException,
             InterruptedException, ExecutionException {
 
         /*
@@ -244,10 +246,10 @@ public class TestMergeTask extends AbstractResourceManagerTestCase {
             // verify segment has all data in the groundTruth btree.
             {
 
-                IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
+                final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
                         .openStore(segmentMetadata.getUUID());
 
-                IndexSegment seg = segStore.loadIndexSegment();
+                final IndexSegment seg = segStore.loadIndexSegment();
 
                 AbstractBTreeTestCase.assertSameBTree(groundTruth, seg);
 

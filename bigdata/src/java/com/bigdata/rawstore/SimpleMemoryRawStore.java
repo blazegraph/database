@@ -189,6 +189,13 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
 
         }
 
+        public long getCommitTime() {
+
+            // does not support commit
+            return 0L;
+
+        }
+
         public String getFile() {
 
             // no backing file.

@@ -413,11 +413,27 @@ abstract public class AbstractTripleStore extends
         /**
          * Boolean option (default <code>true</code>) enables support for the
          * lexicon (the forward and backward term indices). When
-         * <code>false</code>, the lexicon indices are not registered. This
-         * can be safely turned off for the {@link TempTripleStore} when only
-         * the statement indices are to be used.
+         * <code>false</code>, the lexicon indices are not registered. This can
+         * be safely turned off for the {@link TempTripleStore} when only the
+         * statement indices are to be used.
+         * <p>
+         * You can control how the triple store will interpret the RDF URIs, and
+         * literals using the {@link KeyBuilder.Options}. For example:
+         * 
+         * <pre>
+         * // Force ASCII key comparisons.
+         * properties.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());
+         * </pre>
+         * 
+         * or
+         * 
+         * <pre>
+         * // Force identical unicode comparisons (assuming default COLLATOR setting).
+         * properties.setProperty(Options.STRENGTH, StrengthEnum.IDENTICAL.toString());
+         * </pre>
          * 
          * @see LexiconRelation
+         * @see KeyBuilder.Options
          */
         String LEXICON = AbstractTripleStore.class.getName() + ".lexicon";
 

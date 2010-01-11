@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Properties;
@@ -104,8 +105,8 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
         properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
-        properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
-                + writeCacheCapacity);
+        properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
+                + writeCacheEnabled);
 
         return properties;
 
@@ -150,6 +151,39 @@ public class TestDiskJournal extends AbstractJournalTestCase {
 
     }
     
+    /**
+     * Unit test verifies that {@link Options#CREATE} may be used to initialize
+     * a journal on a newly created empty file.
+     * 
+     * @throws IOException
+     */
+    public void test_create_emptyFile() throws IOException {
+        
+        final File file = File.createTempFile(getName(), Options.JNL);
+
+        final Properties properties = new Properties();
+
+        properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk.toString());
+
+        properties.setProperty(Options.FILE, file.toString());
+
+        properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
+                + writeCacheEnabled);
+
+        final Journal journal = new Journal(properties);
+
+        try {
+
+            assertEquals(file, journal.getFile());
+
+        } finally {
+
+            journal.destroy();
+
+        }
+
+    }
+
     /**
      * Test suite integration for {@link AbstractRestartSafeTestCase}.
      * 
@@ -528,8 +562,8 @@ public class TestDiskJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
-            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
-                    + writeCacheCapacity);
+            properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
+                    + writeCacheEnabled);
 
             return new Journal(properties).getBufferStrategy();
 
@@ -564,8 +598,8 @@ public class TestDiskJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
-            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
-                    + writeCacheCapacity);
+            properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
+                    + writeCacheEnabled);
 
             return new Journal(properties).getBufferStrategy();
 
@@ -600,8 +634,8 @@ public class TestDiskJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
                     .toString());
 
-            properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""
-                    + writeCacheCapacity);
+            properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
+                    + writeCacheEnabled);
 
             return new Journal(properties).getBufferStrategy();
 
@@ -617,6 +651,6 @@ public class TestDiskJournal extends AbstractJournalTestCase {
      * using a write cache. Since small write caches are disallowed, we wind up
      * testing with the write cache disabled!
      */
-    private static final int writeCacheCapacity = 0; // 512;
+    private static final boolean writeCacheEnabled = false; // 512;
     
 }

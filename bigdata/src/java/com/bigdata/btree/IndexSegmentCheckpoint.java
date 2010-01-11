@@ -155,22 +155,19 @@ public class IndexSegmentCheckpoint {
      * The #of leaves serialized in the file.
      */
     final public int nleaves;
-    
+
     /**
-     * The #of nodes serialized in the file. If zero, then
-     * {@link #nleaves} MUST be ONE (1) and the index consists solely of
-     * a root leaf.
+     * The #of nodes serialized in the file. If zero, then {@link #nleaves} MUST
+     * be ONE (1) and the index consists solely of a root leaf.
      */
     final public int nnodes;
-    
+
     /**
-     * The #of index entries serialized in the file. This must be a
-     * positive integer as an empty index is not permitted (this forces
-     * the application to check the btree and NOT build the index
-     * segment when it is empty).
+     * The #of index entries serialized in the file (non-negative and MAY be
+     * zero).
      */
     final public int nentries;
-    
+
     /**
      * The maximum #of bytes in any node or leaf stored on the
      * {@link IndexSegment}.

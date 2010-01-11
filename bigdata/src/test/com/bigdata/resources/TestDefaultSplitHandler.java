@@ -335,7 +335,8 @@ public class TestDefaultSplitHandler extends TestCase2 {
                 new IResourceMetadata[]{
                         // fake resource.
                         new JournalMetadata(new File("testFile.jnl"), UUID
-                                .randomUUID(), System.currentTimeMillis()/* createTime */)
+                                .randomUUID(),
+                                System.currentTimeMillis()/* createTime */, 0L/* commitTime */)
                 }, // resources (will be set by the journal).
                 // cause (fake data).
                 new IndexPartitionCause(

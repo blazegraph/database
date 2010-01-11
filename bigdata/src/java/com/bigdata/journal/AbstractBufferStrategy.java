@@ -452,14 +452,24 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         // the current file position on the output channel.
         final long outPosition = outChannel.position();
         
+//        final long outSize = outChannel.size();
+//        
+//        final long outRemaining = outSize - outPosition;
+
         /*
          * Transfer the user extent from the source channel onto the output
-         * channel starting at its current file position.
+         * channel starting at its current file position. The output channel
+         * will be transparently extended if necessary.
          * 
          * Note: this has a side-effect on the position for both the source and
          * output channels.
+         * 
+         * Note: If the last record on the source was allocated but not written
+         * then the data transfer operation will fail since the source channel
+         * will not have enough data.
          */
-        FileChannelUtility.transferAll(srcChannel, fromPosition, count, out, outPosition);
+        FileChannelUtility.transferAll(srcChannel, fromPosition, count, out,
+                outPosition);
         
         return count;
 

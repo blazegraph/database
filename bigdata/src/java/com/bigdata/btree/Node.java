@@ -2418,7 +2418,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 //        newChild.parent = oldChild.parent;
 //
 //    }
-    
+
     /**
      * Return the child node or leaf at the specified index in this node. If the
      * node is not in memory then it is read from the store.
@@ -2436,6 +2436,12 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *            The index in [0:nkeys].
      * 
      * @return The child node or leaf and never null.
+     * 
+     * @throws IndexOutOfBoundsException
+     *             if index is negative.
+     * @throws IndexOutOfBoundsException
+     *             if index is GT the #of keys in the node (there is one more
+     *             child than keys in a node).
      */
     final public AbstractNode getChild(final int index) {
 
@@ -2453,7 +2459,12 @@ public class Node extends AbstractNode<Node> implements INodeData {
 //            throw new RuntimeException(new InterruptedException());
 //        }
         
-        assert index >= 0 && index <= data.getKeyCount();
+        if (index < 0 || index > data.getKeyCount()) {
+
+            throw new IndexOutOfBoundsException("index=" + index + ", nkeys="
+                    + data.getKeyCount());
+            
+        }
 
         final Reference<AbstractNode<?>> childRef = childRefs[index];
 
@@ -2544,6 +2555,16 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final long addr = data.getChildAddr(index);
 
         if (addr == NULL) {
+
+            if (index == data.getKeyCount() && btree instanceof IndexSegment) {
+
+                final long priorAddr = data.getChildAddr(index - 1);
+
+                return new IndexSegment.ImmutableNodeFactory.ImmutableEmptyLastLeaf(
+                        btree, priorAddr);
+
+            }
+            
 //                dump(Level.DEBUG, System.err);
             /*
              * Note: It appears that this can be triggered by a full disk,
@@ -2927,7 +2948,16 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final int minKeys = this.minKeys();
         final int maxKeys = this.maxKeys();
         
-        if (parent != null && nkeys < minKeys) {
+        if (parent != null
+                && ((nkeys == 0) || (!(btree instanceof IndexSegment) && (nkeys < minKeys)))) {
+            /*
+             * Min keys failure.
+             * 
+             * Note: An IndexSegment may have leaves or nodes which underflow
+             * (nkeys < minKeys). This arises when the IndexSegmentPlan was
+             * generated based on an overestimate of the actual range count. See
+             * IndexSegmentBuilder for details.
+             */
             // min keys failure.
             out.println(indent(height) + "ERROR: too few keys: m="
                     + branchingFactor + ", minKeys=" + minKeys + ", nkeys="
