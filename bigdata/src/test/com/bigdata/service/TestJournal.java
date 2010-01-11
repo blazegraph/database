@@ -64,7 +64,7 @@ public class TestJournal extends AbstractJournalTestCase {
 
         properties.setProperty(Options.DELETE_ON_EXIT,"true");
 
-        properties.setProperty(Options.WRITE_CACHE_CAPACITY, ""+writeCacheCapacity);
+        properties.setProperty(Options.WRITE_CACHE_ENABLED, ""+writeCacheEnabled);
         
         return properties;
 
@@ -78,7 +78,7 @@ public class TestJournal extends AbstractJournalTestCase {
      * using a write cache. Since small write caches are disallowed, we wind up
      * testing with the write cache disabled!
      */
-    private static final int writeCacheCapacity = 0; // 512;
+    private static final boolean writeCacheEnabled = true; // 512;
 
     /**
      * Extends the basic behavior to force a commit of the {@link Journal}.

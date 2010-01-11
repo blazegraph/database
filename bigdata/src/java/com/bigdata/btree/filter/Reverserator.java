@@ -19,7 +19,7 @@ public class Reverserator<E> implements ITupleCursor<E> {
 
     private final ITupleCursor<E> src;
 
-    public Reverserator(ITupleCursor<E> src) {
+    public Reverserator(final ITupleCursor<E> src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -64,13 +64,13 @@ public class Reverserator<E> implements ITupleCursor<E> {
         
     }
 
-    public ITuple<E> seek(byte[] key) {
+    public ITuple<E> seek(final byte[] key) {
         
         return src.seek(key);
         
     }
 
-    public ITuple<E> seek(Object key) {
+    public ITuple<E> seek(final Object key) {
 
         return src.seek(key);
         

@@ -2,15 +2,13 @@ package com.bigdata.resources;
 
 import java.lang.ref.SoftReference;
 
-import javax.swing.text.View;
-
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 
@@ -119,18 +117,53 @@ class BTreeMetadata {
     
     public final LocalPartitionMetadata pmd;
     
+    /**
+     * The #of journals and index segments in the view.
+     */
     public final int sourceCount;
     
+    /**
+     * The #of journals in the view.
+     */
     public final int sourceJournalCount;
-    
+
+    /**
+     * The #of index segments in the view.
+     */
     public final int sourceSegmentCount;
 
+    /**
+     * The sum of the size on disk across the index segments in the view.
+     */
+    public final long sumSegBytes;
+
+    /**
+     * These constants are used to compute the {@link #mergePriority}.
+     * 
+     * See src/architecture/mergePriority.xls.
+     */
+    final private int A = 3, B = 1;//, C = 10;
+    
+    /**
+     * The computed merge priority is based on the complexity of the view.
+     */
+    public final double mergePriority;
+
+    /**
+     * The split priority is based solely on {@link #sumSegBytes} (it is the
+     * ratio of that value to the nominal shard size) and is zero until
+     * {@link #sumSegBytes} is GTE the {@link OverflowManager#nominalShardSize}.
+     */
+    public final double splitPriority;
+    
     /**
      * <code>true</code> iff this index partition meets the criteria for a
      * mandatory compacting merge (too many journals in the view, too many
      * index segments in the view, or too many sources in the view).
+     * 
+     * @deprecated by {@link #mergePriority}
      */
-    public final boolean manditoryMerge;
+    public final boolean mandatoryMerge;
     
     /**
      * The entry count for the {@link BTree} itself NOT the view.
@@ -159,7 +192,7 @@ class BTreeMetadata {
      * this local index.
      */
     public OverflowActionEnum action;
-    
+
     /**
      * 
      * @param resourceManager
@@ -169,9 +202,9 @@ class BTreeMetadata {
      * @param name
      *            The name of the {@link BTree}.
      * @param btreeCounters
-     *            The aggregated counters for the {@link BTree} or the index
-     *            partition {@link View} as reported by the
-     *            {@link ConcurrencyManager}
+     *            The aggregated counters for the {@link BTree} or the
+     *            {@link ILocalBTreeView index partition view} as reported by
+     *            the {@link IndexManager}
      */
     public BTreeMetadata(final ResourceManager resourceManager,
             final long commitTime, final String name,
@@ -206,6 +239,7 @@ class BTreeMetadata {
 
         // #of sources in the view (very fast).
         int sourceCount = 0, sourceJournalCount = 0, sourceSegmentCount = 0;
+        long sumSegBytes = 0L;
         if (pmd != null) {
             for (IResourceMetadata x : pmd.getResources()) {
                 sourceCount++;
@@ -213,14 +247,57 @@ class BTreeMetadata {
                     sourceJournalCount++;
                 } else {
                     sourceSegmentCount++;
+                    sumSegBytes += x.getFile().length();
                 }
             }
         }
         this.sourceCount = sourceCount;
         this.sourceJournalCount = sourceJournalCount;
         this.sourceSegmentCount = sourceSegmentCount;
+        this.sumSegBytes = sumSegBytes;
 
-        this.manditoryMerge //
+        if (sourceJournalCount + sourceSegmentCount < 2) {
+            // Nothing to merge.
+            this.mergePriority = 0d;
+        } else {
+            /*
+             * Compute a score that will be used to prioritize compacting merges
+             * vs builds for index partitions where either option is allowable.
+             * The higher the score, the more we want to make sure that we do a
+             * compacting merge for that index.
+             * 
+             * Note: The main purpose of an index partition build is to convert
+             * from a write-order to a read-order and permit the release of the
+             * old journal. However, applications which require frequent access
+             * to historical commit points on the old journals will continue to
+             * rely on the write-order journals.
+             * 
+             * Note: I have removed the sumSegBytes term from this formula since
+             * that would tend to cause the priority of merge to increase for a
+             * view until a split is performed, with the likelihood that
+             * repeated merges would be performed for the same view just when it
+             * is nearing its largest extent. Instead I have modified the
+             * formula to consider only the view complexity for merge.
+             * 
+             * @todo if the application requires access to modest amounts of
+             * history then consider a policy where the buffers are retained for
+             * old journals up to the minReleaseAge. Of course, this can run
+             * into memory constraints so that needs to be traded off against
+             * IOWAIT.
+             */
+            this.mergePriority = (sourceJournalCount - 1) * A
+                    + (sourceSegmentCount * B)
+                    //+ ((sumSegBytes / resourceManager.nominalShardSize) * C)
+                    ;
+        }
+
+        /*
+         * The splitPriority considers only sumSegBytes.
+         */
+        this.splitPriority = (sumSegBytes < resourceManager.nominalShardSize) ? 0
+                : (sumSegBytes / (double) resourceManager.nominalShardSize);
+
+        this.mandatoryMerge //
             =  sourceJournalCount >= resourceManager.maximumJournalsPerView //
             || sourceSegmentCount >= resourceManager.maximumSegmentsPerView //
         ;
@@ -230,23 +307,13 @@ class BTreeMetadata {
 
         this.btreeCounters = btreeCounters;
 
-        if (btreeCounters != null) {
+        // Note: +1 in the denominator to avoid divide by zero.
+        this.percentHeadSplits = btreeCounters.headSplit
+                / (btreeCounters.leavesSplit + 1d);
 
-            // Note: +1 in the denominator to avoid divide by zero.
-            this.percentHeadSplits = btreeCounters.headSplit
-                    / (btreeCounters.leavesSplit + 1d);
-
-            // Note: +1 in the denominator to avoid divide by zero.
-            this.percentTailSplits = btreeCounters.tailSplit
-                    / (btreeCounters.leavesSplit + 1d);
-
-        } else {
-            
-            this.percentHeadSplits = 0d;
-
-            this.percentTailSplits = 0d;
-            
-        }
+        // Note: +1 in the denominator to avoid divide by zero.
+        this.percentTailSplits = btreeCounters.tailSplit
+                / (btreeCounters.leavesSplit + 1d);
 
     }
     
@@ -262,8 +329,14 @@ class BTreeMetadata {
 
         sb.append(", sourceCounts=" + "{all=" + sourceCount + ",journals="
                 + sourceJournalCount + ",segments=" + sourceSegmentCount + "}");
+        
+        sb.append(", sumSegBytes=" + sumSegBytes);
 
-        sb.append(", manditoryMerge=" + manditoryMerge);
+        sb.append(", mergePriority=" + mergePriority);
+
+        sb.append(", splitPriority=" + splitPriority);
+
+        sb.append(", manditoryMerge=" + mandatoryMerge);
         
         sb.append(", #leafSplit=" + btreeCounters.leavesSplit);
         

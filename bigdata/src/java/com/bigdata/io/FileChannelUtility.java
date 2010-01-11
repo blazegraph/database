@@ -351,7 +351,7 @@ public class FileChannelUtility {
      * will be re-opened and the write will continue.
      * <p>
      * Note: I have seen count != remaining() for a single invocation of
-     * FileChannel#write(). This occured 5 hours into a run with the write cache
+     * FileChannel#write(). This occurred 5 hours into a run with the write cache
      * disabled (so lots of small record writes). All of a sudden, several
      * writes wound up reporting too few bytes written - this persisted until
      * the end of the run (Fedora core 6 with Sun JDK 1.6.0_03). I have since
@@ -560,6 +560,7 @@ public class FileChannelUtility {
                     + ", toPosition=" + toPosition);
 
         int nwrites = 0; // #of write operations.
+        long nwritten = 0;
 
         long n = count;
         
@@ -569,19 +570,35 @@ public class FileChannelUtility {
 
             while (n > 0) {
 
-                final long nbytes = outChannel.transferFrom(sourceChannel, to, n);
+                final long nbytes = outChannel.transferFrom(sourceChannel, to,
+                        n);
 
                 to += nbytes;
+
+                nwritten += nbytes;
 
                 n -= nbytes;
 
                 nwrites++;
 
-                if (n != 0 && DEBUG) {
+                if (nwrites == 100) {
 
-                    log.debug("to=" + toPosition + ", remaining=" + n
-                            + ", nwrites=" + nwrites);
-                    
+                    log.warn("writing on channel: remaining=" + n
+                            + ", nwrites=" + nwrites + ", written=" + nwritten
+                            + " of " + count + " bytes");
+
+                } else if (nwrites == 1000) {
+
+                    log.error("writing on channel: remaining=" + n
+                            + ", nwrites=" + nwrites + ", written=" + nwritten
+                            + " of " + count + " bytes");
+
+                } else if (nwrites > 10000) {
+
+                    throw new RuntimeException("writing on channel: remaining="
+                            + n + ", nwrites=" + nwrites + ", written="
+                            + nwritten + " of " + count + " bytes");
+
                 }
 
             }

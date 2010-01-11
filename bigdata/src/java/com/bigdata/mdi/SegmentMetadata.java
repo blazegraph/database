@@ -52,7 +52,7 @@ public class SegmentMetadata extends AbstractResourceMetadata {
         return false;
         
     }
-    
+
     /**
      * De-serialization constructor.
      */
@@ -60,15 +60,18 @@ public class SegmentMetadata extends AbstractResourceMetadata {
 
     }
 
-    public SegmentMetadata(File file, /*long nbytes,*/ UUID uuid, long commitTime) {
-        
-        this(file.getName(),/*nbytes,*/uuid,commitTime);
-        
+    public SegmentMetadata(final File file, /* long nbytes, */final UUID uuid,
+            final long commitTime) {
+
+        this(file.getName(),/* nbytes, */uuid, commitTime);
+
     }
 
-    SegmentMetadata(String filename, /*long nbytes,*/ UUID uuid, long commitTime) {
+    SegmentMetadata(final String filename, /* long nbytes, */final UUID uuid,
+            final long commitTime) {
 
-        super(filename, /*nbytes,*/ uuid, commitTime);
+        super(filename, /* nbytes, */uuid, commitTime/* createTime */,
+                commitTime/* commitTime */);
 
     }
 

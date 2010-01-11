@@ -1071,6 +1071,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         public long getCreateTime() {
             return 0L;
         }
+        
+        public long getCommitTime() {
+            return 0L;
+        }
 
         public String getFile() {
             return "";
@@ -1685,7 +1689,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
-        btreeCounters.ninserts++;
+        btreeCounters.ninserts.incrementAndGet();
         
         final Tuple oldTuple = getRootOrFinger(key).insert(key, value, delete,
                 timestamp, tuple);
@@ -1835,7 +1839,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
-        btreeCounters.nremoves++;
+        btreeCounters.nremoves.incrementAndGet();
 
         return getRootOrFinger(key).remove(key, tuple);
         
@@ -1936,7 +1940,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        btreeCounters.nfinds++;
+        btreeCounters.nfinds.incrementAndGet();
 
         tuple = getRootOrFinger(key).lookup(key, tuple);
         
@@ -2025,7 +2029,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         // conditional range check on the key.
         assert rangeCheck(key, false);
 
-        btreeCounters.nindexOf++;
+        btreeCounters.nindexOf.incrementAndGet();
 
         return getRootOrFinger(key).indexOf(key);
 
@@ -2039,7 +2043,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (index >= getEntryCount())
             throw new IndexOutOfBoundsException(ERROR_TOO_LARGE);
 
-        btreeCounters.ngetKey++;
+        btreeCounters.ngetKey.incrementAndGet();
 
         return getRoot().keyAt(index);
 
@@ -2066,7 +2070,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (tuple == null || !tuple.getValuesRequested())
             throw new IllegalArgumentException();
 
-        btreeCounters.ngetKey++;
+        btreeCounters.ngetKey.incrementAndGet();
 
         getRoot().valueAt(index, tuple);
 
@@ -2178,7 +2182,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         }
 
         // only count the expensive ones.
-        btreeCounters.nrangeCount++;
+        btreeCounters.nrangeCount.incrementAndGet();
         
         final AbstractNode root = getRoot();
 
@@ -2384,7 +2388,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final IFilterConstructor filter//
             ) {
 
-        btreeCounters.nrangeIterator++;
+        btreeCounters.nrangeIterator.incrementAndGet();
 
         /*
          * Does the iterator declare that it will not write back on the index?
@@ -2969,6 +2973,94 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *       new twist being that serialization and IO could be asynchronous in
      *       the zone of action available between those queues in order to keep
      *       the write reference queue at a minimium capacity).
+     *       <p>
+     *       AbstractBTree#touch(AbstractNode) is responsible for putting the
+     *       node or leaf onto the ring buffer which controls (a) how long we
+     *       retain a hard reference to the node or leaf; and (b) for writes,
+     *       when the node or leaf is evicted with a zero reference count and
+     *       made persistent (along with all dirty children).
+     *       <p>
+     *       For writes, the B+Tree is single-threaded so there is no
+     *       contention.
+     *       <p>
+     *       For reads, every touch on the B+Tree goes through this point, so we
+     *       are paying huge penalty even relatively little work is done in this
+     *       method.
+     *       <p>
+     *       There are some notes on AbstractBTree#touch(AbstractNode) which
+     *       talk about this problem and some possible ways of addressing it. In
+     *       addition to those notes, I would like to add the following, all of
+     *       which applies to only reads since mutation is single threaded:
+     *       <p>
+     *       - A wait free data structure could be used here, such as
+     *       LinkedBlockingQueue. We could also look at a wait free version of
+     *       the ring buffer, but that might be more algorithm work. The problem
+     *       with wait free data structures is that the CAS operations (compare
+     *       and swap) can wind up doing much more work than is necessary under
+     *       high concurrency since each thread winds up redoing part of the
+     *       work in order to have an eventually consistent data structure.
+     *       (Infinispan is currently wrestling with this issue in their cache.)
+     *       <p>
+     *       - Batching touch()s would help tremendously by reducing contention
+     *       for the lock. Here we could have a per-thread AbstractNode[] queue
+     *       which flushes to the backing ring buffer once the per-thread array
+     *       is full. This means using a thread-local and we would want to
+     *       ensure that the ThreadLocal AbstractNode[] queue was cleared when
+     *       the thread was recycled by the executor service. Access to thread
+     *       locals can be a bit slow, so passing this around on the stack might
+     *       also help. See [1], which describes a "batching" approach which is
+     *       a generalization of how we already handle evictions for the global
+     *       LRU. For example, with an AbstractNode[] queue having 64 entries we
+     *       would invoke tryLock() when it was half full and lock() when it was
+     *       full. This maximimizes the chance for barging (tryLock()) and
+     *       guarantees timely transfer from the per-thread queue to the backing
+     *       ring buffer. Having the per-thread-queue only for readers will not
+     *       hurt the semantics since the purpose of the backing ring buffer is
+     *       to ensure that recently touched nodes and leaves remain strongly
+     *       reachable for top-down navigation in the B+Tree.
+     *       <p>
+     *       The hard reference queue currently scans the MRU entries on the
+     *       ring for a matching reference, in which case the reference is not
+     *       added to the ring buffer to minimize churn. That test could be done
+     *       against the current batch when transferring references from the
+     *       pre-thread queue to the backing ring buffer, or even on a
+     *       pre-thread basis against the pre-thread queue to avoid the scan
+     *       while we hold the lock.
+     *       <p>
+     *       For the mutable B+Tree we also track the #of references to the
+     *       node/leaf on the ring buffer. When that reference count reaches
+     *       zero we do an eviction and the node/leaf is written onto the
+     *       backing store if it is dirty. Those reference counting games DO NOT
+     *       matter for read-only views so we can take a code path which does
+     *       not update the per-node/leaf reference count and we do not need to
+     *       use either synchronization or atomic counters to track the
+     *       reference counts.
+     *       <p>
+     *       I want to think some more about the specifics of the per-thread
+     *       queue. It's life cycle needs to be linked to the life cycle of the
+     *       B+Tree view against which the touch() was directed. That suggests
+     *       maybe a hash map on the BTree object whose key is the Thread and
+     *       whose value is the per-thread queue.
+     *       <p>
+     *       So, basically, I think that we need two code paths for touch(). One
+     *       for mutable B+Trees and one for read-only views. For the former, it
+     *       is exactly the code that we already have. For the latter, we need
+     *       to resolve the pre-thread queue on which we will accumulate a chunk
+     *       of hard references. When that queue reaches 1/2 of its capacity, we
+     *       do a tryLock() and batch the update to the hard reference queue if
+     *       we get the lock. When the queue reaches is capacity, we do a lock()
+     *       and batch the update to the hard reference queue. For the read-only
+     *       case, we do not maintain the reference counts since they are unused
+     *       and we probably want to change the eviction handler for the ring
+     *       buffer to be a NOP so it does not even bother checking the
+     *       reference count and whether or not the node or leaf is dirty on
+     *       eviction.
+     *       <p>
+     *       This might be abstract here and final in BTree and in IndexSegment.
+     *       For {@link IndexSegment}, we know it is read-only so we do not need
+     *       to test anything. For {@link BTree}, we can break encapsulation and
+     *       check whether or not the {@link BTree} is read-only more readily 
+     *       than we can in this class.
      */
     synchronized
 //    final 
@@ -3429,11 +3521,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                     + tmp.limit() + ", byteCount(addr)="
                     + store.getByteCount(addr)+", addr="+store.toString(addr);
 
-            btreeCounters.readNanos += System.nanoTime() - begin;
+            btreeCounters.readNanos.addAndGet( System.nanoTime() - begin );
             
             final int bytesRead = tmp.limit();
 
-            btreeCounters.bytesRead += bytesRead;
+            btreeCounters.bytesRead.addAndGet(bytesRead);
             
         }
 
@@ -3456,15 +3548,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                 // decode the record.
                 data = nodeSer.decode(tmp);
 
-                btreeCounters.deserializeNanos += System.nanoTime() - begin;
+                btreeCounters.deserializeNanos.addAndGet(System.nanoTime() - begin);
 
                 if (data.isLeaf()) {
 
-                    btreeCounters.leavesRead++;
+                    btreeCounters.leavesRead.incrementAndGet();
 
                 } else {
 
-                    btreeCounters.nodesRead++;
+                    btreeCounters.nodesRead.incrementAndGet();
 
                 }
 

@@ -71,9 +71,23 @@ public class TestAll extends TestCase {
         /*
          * unit tests for identifying separator keys for a split based on search
          * across the nodes of the sources in the view using the combined #of
-         * spanned tuples for each source.
+         * spanned tuples for each source (@todo this feature has not been
+         * implemented.)
          */ 
         suite.addTestSuite(TestViewSplitter.class);
+
+        /*
+         * unit tests for splitting an index segment based on its size on the
+         * disk, the nominal size of an index partition, and an optional
+         * application level constraint on the choice of the separator keys.
+         * This approach presumes a compacting merge has been performed such
+         * that all history other than the buffered writes is on a single index
+         * segment. The buffered writes are not considered when choosing the #of
+         * splits to make and the separator keys for those splits. They are
+         * simply copied afterwards onto the new index partition which covers
+         * their key-range.
+         */
+        suite.addTestSuite(TestSegSplitter.class);
         
         /*
          * Test management of local resources.
@@ -97,11 +111,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestResourceManagerBootstrap.class);
         // test overflow handling.
         suite.addTestSuite(TestOverflow.class);
-        // test compacting merge.
-        suite.addTestSuite(TestMergeTask.class);
         // test incremental builds.
         suite.addTestSuite(TestBuildTask.class);
         suite.addTestSuite(TestBuildTask2.class);
+        // test compacting merge.
+        suite.addTestSuite(TestMergeTask.class);
         // test index partition split.
         suite.addTestSuite(TestSplitTask.class);
         // Note: moves are tested in the com.bigdata.services package.

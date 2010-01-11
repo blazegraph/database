@@ -23,7 +23,7 @@ public enum OverflowActionEnum {
      * sources in the view. Builds are done both in order to improve read
      * performance and to release dependencies on older journals.
      * <p>
-     * The #of sources to use in a build is choosen in order to keep the build
+     * The #of sources to use in a build is chosen in order to keep the build
      * operation fast while also minimizing the #of sources that are accumulated
      * in the view over time and thereby reducing the frequency with which a
      * compacting merge must be performed.

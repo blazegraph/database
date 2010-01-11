@@ -39,6 +39,8 @@ import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
 
@@ -576,6 +578,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      *             if the B+Tree is already read-only and you pass
      *             <code>false</code>.
      */
+    // @todo synchronized here and on isReadOnly() to ensure that the state change is published or use an AtomicBoolean?
     final public void setReadOnly(final boolean readOnly) {
 
         if (this.readOnly && !readOnly) {
@@ -1108,6 +1111,18 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             }
             
         } else {
+            
+            replaceRootWithEmptyLeaf();
+
+        }
+        
+    }
+
+    /**
+     * Clears the hard reference cache and replaces the root node with an empty
+     * root leaf. This is a low level method.
+     */
+    private void replaceRootWithEmptyLeaf() {
 
             /*
              * Clear the hard reference cache (sets the head, tail and count to
@@ -1138,11 +1153,146 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
              */
 
             newRootLeaf();
-
-        }
-        
+   
     }
 
+    /**
+     * Create a new checkpoint for a mutable {@link BTree} in which the view is
+     * redefined to include the previous view of the {@link BTree} (the one from
+     * which this {@link BTree} instance was loaded) plus the current view of
+     * the {@link BTree}. The root of the {@link BTree} is replaced with an
+     * empty leaf as part of this operation. The {@link LocalPartitionMetadata}
+     * is updated to reflect the new view.
+     * <p>
+     * Note: This method is used by the scale-out architecture for which it
+     * performs a very specific function. It should not be used for any other
+     * purpose and should not be invoked by user code. This encapsulates all of
+     * the trickery for creating the necessary checkpoint without exposing any
+     * methods which could be used to replace the root node with an empty root
+     * leaf.
+     * 
+     * @return The timestamp associated with the checkpoint record from which
+     *         this {@link BTree} was loaded. This is the timestamp that was
+     *         placed on the 2nd element of the view. Any read-only build or
+     *         merge task will read from this timestamp.
+     * 
+     * @throws IllegalStateException
+     *             if the {@link BTree} is read only.
+     * @throws IllegalStateException
+     *             if the {@link BTree} is dirty.
+     * @throws IllegalStateException
+     *             if the {@link BTree} has never been committed.
+     */
+    public long createViewCheckpoint() {
+
+        if(isReadOnly()) {
+
+            /*
+             * This can only be done for the mutable BTree.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        if(needsCheckpoint()) {
+
+            /*
+             * It it an error if any writes are buffered when you call this
+             * method. While not strictly a problem, this is indicative that the
+             * caller does not understand what the method is supposed to do.
+             */
+            
+            throw new IllegalStateException(); 
+            
+            
+        }
+        
+        /*
+         * The commitTime associated with the commit point from which we loaded
+         * the BTree view.
+         */
+        final long priorCommitTime = getLastCommitTime();
+
+        if (priorCommitTime == 0L) {
+
+            /*
+             * The BTree has never been committed.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        /*
+         * Redefine the view.
+         */
+        {
+
+            // clone the current metadata record for the live index.
+            final IndexMetadata indexMetadata = getIndexMetadata().clone();
+
+            final LocalPartitionMetadata oldPmd = indexMetadata
+                    .getPartitionMetadata();
+
+            final IResourceMetadata[] oldResources = oldPmd.getResources();
+
+            /*
+             * The new view uses the current journal in both the 1st and 2nd
+             * positions.
+             */
+
+            final IResourceMetadata[] newResources = new IResourceMetadata[oldResources.length + 1];
+
+            // unchanged.
+            newResources[0] = oldResources[0];
+
+            // the same store, but reading from the same commit time as this
+            // view of this BTree.
+            newResources[1] = new JournalMetadata((AbstractJournal) getStore(),
+                    priorCommitTime);
+
+            // any other stores in the view are copied.
+            for (int i = 1; i < oldResources.length; i++) {
+
+                newResources[i + 1] = oldResources[i];
+
+            }
+
+            final LocalPartitionMetadata newPmd = new LocalPartitionMetadata(
+                    oldPmd.getPartitionId(), // partitionId
+                    -1, // sourcePartitionId
+                    oldPmd.getLeftSeparatorKey(), //
+                    oldPmd.getRightSeparatorKey(),//
+                    newResources,//
+                    oldPmd.getIndexPartitionCause(),//
+                    "" // history is deprecated.
+            );
+
+            // update the local partition metadata on our cloned IndexMetadata.
+            indexMetadata.setPartitionMetadata(newPmd);
+
+            // update the metadata associated with the btree so it will get written out.
+            setIndexMetadata(indexMetadata);
+
+            // verify BTree is now dirty.
+            assert needsCheckpoint();
+
+        }
+
+        /*
+         * Replace the root node with an empty root leaf.
+         */
+        {
+
+            replaceRootWithEmptyLeaf();
+            
+        }
+
+        return priorCommitTime;
+        
+    }
+    
     /**
      * Create a new {@link BTree} or derived class. This method works by writing
      * the {@link IndexMetadata} record on the store and then loading the

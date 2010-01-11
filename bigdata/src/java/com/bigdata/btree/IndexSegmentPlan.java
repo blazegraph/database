@@ -101,14 +101,15 @@ public class IndexSegmentPlan {
      * @see #nleaves, which is the #of leaves in the output tree.
      */
     final public int[] numInLevel;
-    
+
     /**
      * The #of children / values to place into each node in each level of the
-     * output tree. The first index is the level in the tree, start from level
-     * zero which is the root and increasing through level [height+1], which is
-     * the level containing the leaves of the output tree.
+     * output tree. The first index is the level in the tree, starting from
+     * level zero which is the root and increasing through level [height+1],
+     * which is the level containing the leaves of the output tree.
      * 
-     * @see numInLeaf, which is a reference to the last element of this array.
+     * @see #numInLeaf numInLeaf, which is a reference to the last element of
+     *      this array.
      */
     final public int[][] numInNode;
 
@@ -241,7 +242,7 @@ public class IndexSegmentPlan {
      *             factor and that many leaves without exceeding <i>maxHeight</i>
      *             (statically configured to <code>10</code>).
      */
-    public static int getMinimumHeight(int m, int nleaves) {
+    public static int getMinimumHeight(final int m, final int nleaves) {
         
         final int maxHeight = 10;
         
@@ -307,7 +308,8 @@ public class IndexSegmentPlan {
      * @see TestIndexSegmentPlan
      * @see TestIndexSegmentBuilderWithSmallTree#test_problem3_buildOrder3()
      */
-    public static int[] distributeKeys(int m, int m2, int nleaves, int nentries) {
+    public static int[] distributeKeys(final int m, final int m2,
+            final int nleaves, final int nentries) {
 
         assert m >= Options.MIN_BRANCHING_FACTOR;
         assert m2 >= (m + 1) / 2;
@@ -343,7 +345,7 @@ public class IndexSegmentPlan {
          * The #of entries that would be allocated to the last leaf if we filled
          * each proceeding leaf to capacity.
          */
-        int remaining = nentries - ((nleaves - 1) * m);
+        final int remaining = nentries - ((nleaves - 1) * m);
 
         /*
          * If the #of entries remaining would put the leaf under capacity then we

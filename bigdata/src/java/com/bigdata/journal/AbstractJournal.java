@@ -546,56 +546,56 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
 
-    /**
-     * Used to allocate the {@link ByteBuffer} for the {@link BufferMode#Disk}
-     * write cache.
-     * 
-     * @param properties
-     *            The properties that will be used to configure the journal.
-     * 
-     * @return The write cache buffer -or- <code>null</code> iff no buffer is
-     *         required (either because the selected {@link BufferMode} does not
-     *         support a write cache, because the journal would be opened in a
-     *         read-only mode, or because the configured write cache capacity
-     *         was ZERO(0)).
-     * 
-     * @see Options#BUFFER_MODE
-     * @see Options#READ_ONLY
-     * @see Options#WRITE_CACHE_CAPACITY
-     */
-    public static ByteBuffer getWriteCache(final Properties properties) {
-
-        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
-                properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
-
-        final boolean readOnly = Boolean.parseBoolean(getProperty(properties,
-                Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
-
-        if (bufferMode.equals(BufferMode.Disk) && !readOnly) {
-
-            final int capacity = Integer.parseInt(getProperty(properties,
-                    Options.WRITE_CACHE_CAPACITY,
-                    Options.DEFAULT_WRITE_CACHE_CAPACITY));
-
-            final int minWriteCacheCapacity = (int) Math.min(
-                    Options.minimumInitialExtent,
-                    Options.minimumWriteCacheCapacity);
-
-            if (capacity > 0 && capacity < minWriteCacheCapacity) {
-
-                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
-                        + " must be ZERO (0) or at least "
-                        + minWriteCacheCapacity + " bytes");
-
-            }
-
-           return ByteBuffer.allocateDirect(capacity);
-            
-        }
-        
-        return null;
-
-    }
+//    /**
+//     * Used to allocate the {@link ByteBuffer} for the {@link BufferMode#Disk}
+//     * write cache.
+//     * 
+//     * @param properties
+//     *            The properties that will be used to configure the journal.
+//     * 
+//     * @return The write cache buffer -or- <code>null</code> iff no buffer is
+//     *         required (either because the selected {@link BufferMode} does not
+//     *         support a write cache, because the journal would be opened in a
+//     *         read-only mode, or because the configured write cache capacity
+//     *         was ZERO(0)).
+//     * 
+//     * @see Options#BUFFER_MODE
+//     * @see Options#READ_ONLY
+//     * @see Options#WRITE_CACHE_CAPACITY
+//     */
+//    public static ByteBuffer getWriteCache(final Properties properties) {
+//
+//        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
+//                properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
+//
+//        final boolean readOnly = Boolean.parseBoolean(getProperty(properties,
+//                Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
+//
+//        if (bufferMode.equals(BufferMode.Disk) && !readOnly) {
+//
+//            final int capacity = Integer.parseInt(getProperty(properties,
+//                    Options.WRITE_CACHE_CAPACITY,
+//                    Options.DEFAULT_WRITE_CACHE_CAPACITY));
+//
+//            final int minWriteCacheCapacity = (int) Math.min(
+//                    Options.minimumInitialExtent,
+//                    Options.minimumWriteCacheCapacity);
+//
+//            if (capacity > 0 && capacity < minWriteCacheCapacity) {
+//
+//                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
+//                        + " must be ZERO (0) or at least "
+//                        + minWriteCacheCapacity + " bytes");
+//
+//            }
+//
+//           return ByteBuffer.allocateDirect(capacity);
+//            
+//        }
+//        
+//        return null;
+//
+//    }
     
     /**
      * Resolves the property value (static variant for ctor initialization).
@@ -654,41 +654,41 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * 
      * @see Options
      */
-    protected AbstractJournal(final Properties properties) {
+    protected AbstractJournal(Properties properties) {
         
-        this(properties, getWriteCache(properties));
-        
-    }
-    
-    /**
-     * Create or re-open a journal.
-     * <p>
-     * Note: Creating a new journal registers some internal indices but does NOT
-     * perform a commit. Those indices will become restart safe with the first
-     * commit.
-     * 
-     * @param properties
-     *            The properties as defined by {@link Options}.
-     * @param writeCache
-     *            When non-<code>null</code> and when {@link BufferMode#Disk}
-     *            is selected, this {@link ByteBuffer} will be used as the write
-     *            cache. This allows the same write cache to be used by the next
-     *            journal when the current journal overflows. This is
-     *            necessitated by JVM bug <a
-     *            href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
-     *            6210541</a>
-     *            which describes a failure by
-     *            <code>releaseTemporaryDirectBuffer()</code> to release
-     *            temporary direct {@link ByteBuffer}s that are allocated for
-     *            channel IO.
-     * 
-     * @throws RuntimeException
-     *             If there is a problem when creating, opening, or reading from
-     *             the journal file.
-     * 
-     * @see Options
-     */
-    protected AbstractJournal(Properties properties, final ByteBuffer writeCache) {
+//        this(properties, getWriteCache(properties));
+//        
+//    }
+//    
+//    /**
+//     * Create or re-open a journal.
+//     * <p>
+//     * Note: Creating a new journal registers some internal indices but does NOT
+//     * perform a commit. Those indices will become restart safe with the first
+//     * commit.
+//     * 
+//     * @param properties
+//     *            The properties as defined by {@link Options}.
+//     * @param writeCache
+//     *            When non-<code>null</code> and when {@link BufferMode#Disk}
+//     *            is selected, this {@link ByteBuffer} will be used as the write
+//     *            cache. This allows the same write cache to be used by the next
+//     *            journal when the current journal overflows. This is
+//     *            necessitated by JVM bug <a
+//     *            href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
+//     *            6210541</a>
+//     *            which describes a failure by
+//     *            <code>releaseTemporaryDirectBuffer()</code> to release
+//     *            temporary direct {@link ByteBuffer}s that are allocated for
+//     *            channel IO.
+//     * 
+//     * @throws RuntimeException
+//     *             If there is a problem when creating, opening, or reading from
+//     *             the journal file.
+//     * 
+//     * @see Options
+//     */
+//    protected AbstractJournal(Properties properties, final ByteBuffer writeCache) {
 
         boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
         boolean isEmptyFile = false;
@@ -762,13 +762,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 new IntegerRangeValidator(WormAddressManager.MIN_OFFSET_BITS,
                         WormAddressManager.MAX_OFFSET_BITS));
 
-        final int readCacheCapacity = getProperty(Options.READ_CACHE_CAPACITY,
-                Options.DEFAULT_READ_CACHE_CAPACITY, IntegerValidator.GTE_ZERO);
-
-        final int readCacheMaxRecordSize = getProperty(
-                Options.READ_CACHE_MAX_RECORD_SIZE,
-                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE,
-                IntegerValidator.GT_ZERO);
+//        final int readCacheCapacity = getProperty(Options.READ_CACHE_CAPACITY,
+//                Options.DEFAULT_READ_CACHE_CAPACITY, IntegerValidator.GTE_ZERO);
+//
+//        final int readCacheMaxRecordSize = getProperty(
+//                Options.READ_CACHE_MAX_RECORD_SIZE,
+//                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE,
+//                IntegerValidator.GT_ZERO);
 
         final boolean createTempFile = Boolean.parseBoolean(getProperty(
                 Options.CREATE_TEMP_FILE, Options.DEFAULT_CREATE_TEMP_FILE));
@@ -844,6 +844,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         final boolean deleteOnExit = Boolean.parseBoolean(getProperty(
                 Options.DELETE_ON_EXIT, Options.DEFAULT_DELETE_ON_EXIT));
 
+        final boolean writeCacheEnabled = Boolean.parseBoolean(getProperty(
+                Options.WRITE_CACHE_ENABLED, Options.DEFAULT_WRITE_CACHE_ENABLED));
+        
         /*
          * "file"
          */
@@ -1011,8 +1014,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     BufferMode.Direct,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, 0/* readCacheCapacity */,
-                    0/* readCacheMaxRecordSize */, null/* writeCache */,
+                    offsetBits, //0/* readCacheCapacity */,
+                    //0/* readCacheMaxRecordSize */,
+                    false, // writeCacheEnabled
+                    //null/* writeCache */,
                     validateChecksum, createTime, checker, alternateRootBlock);
 
             _bufferStrategy = new DirectBufferStrategy(
@@ -1034,8 +1039,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, 0/*readCacheCapacity*/,
-                    0/* readCacheMaxRecordSize */, null/* writeCache */,
+                    offsetBits, //0/*readCacheCapacity*/,
+                    //0/* readCacheMaxRecordSize */,
+                    false, // writeCacheEnabled
+                    //null/* writeCache */,
                     validateChecksum, createTime, checker, alternateRootBlock);
 
             /*
@@ -1061,8 +1068,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             fileMetadata = new FileMetadata(file, BufferMode.Disk,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
-                    readOnly ? null : writeCache, validateChecksum,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    //readOnly ? null : writeCache,
+                    writeCacheEnabled,
+                    validateChecksum,
                     createTime, checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
@@ -1087,8 +1096,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     useDirectBuffers, initialExtent, maximumExtent,
                     true/* create */, isEmptyFile, true/* deleteOnExit */,
                     false/* readOnly */, ForceEnum.No/* forceWrites */,
-                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
-                    writeCache, false/* validateChecksum */, createTime,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    writeCacheEnabled, // writeCacheEnabled
+                    //writeCache,
+                    false/* validateChecksum */, createTime,
                     checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
@@ -1100,38 +1111,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
 
-        case BufferedDisk: {
-
-            /*
-             * Setup the buffer strategy.
-             * 
-             * FIXME Must set the initial and maximumExtent from the supplied
-             * DirectBufferPool (or another static instance for that purpose in
-             * which case we just ignore these parameters), not the other way
-             * around. Always use direct buffers for this mode. NO readCache.
-             * 
-             * FIXME Modify FileMetadata to fully buffer the (user?) extent (up
-             * to the available bytes) on restart.
-             */
-
-            if(true)throw new UnsupportedOperationException();
-            
-            fileMetadata = new FileMetadata(file, BufferMode.BufferedDisk,
-                    useDirectBuffers, initialExtent, maximumExtent, create,
-                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
-                    readOnly ? null : writeCache, validateChecksum,
-                    createTime, checker, alternateRootBlock);
-
-            _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
-
-            this._rootBlock = fileMetadata.rootBlock;
-
-            break;
-
-        }
-        
         default:
 
             throw new AssertionError();

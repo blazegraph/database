@@ -117,7 +117,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      * join(partitionId,partitionId,timestamp), etc. This is truncated when
      * serialized to keep it from growing without bound.
      * 
-     * @deprecated See {@link #history}
+     * @deprecated See {@link #getHistory()}
      */
     private String history;
     
@@ -471,7 +471,7 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
         if (this == o)
             return true;
 
-        LocalPartitionMetadata o2 = (LocalPartitionMetadata) o;
+        final LocalPartitionMetadata o2 = (LocalPartitionMetadata) o;
 
         if (partitionId != o2.partitionId)
             return false;
@@ -531,17 +531,26 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
      */
     
     private static final transient short VERSION0 = 0x0;
-    
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-        
-        final short version = ShortPacker.unpackShort(in);
-        
-        if (version != VERSION0) {
-            
-            throw new IOException("Unknown version: "+version);
-            
-        }
 
+    /**
+     * This version adds support for {@link IResourceMetadata#getCommitTime()},
+     * but that field is only serialized for a journal.
+     */
+    private static final transient short VERSION1 = 0x1;
+    
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        final short version = ShortPacker.unpackShort(in);
+
+        switch (version) {
+        case VERSION0:
+        case VERSION1:
+            break;
+        default:
+            throw new IOException("Unknown version: " + version);
+        }
+        
         partitionId = (int) LongPacker.unpackLong(in);
 
         sourcePartitionId = in.readInt(); // MAY be -1.
@@ -584,20 +593,27 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
 
             final UUID uuid = new UUID(in.readLong()/*MSB*/,in.readLong()/*LSB*/);
 
-            final long commitTime = in.readLong();
+            final long createTime = in.readLong();
+            
+            long commitTime = 0L;
+            if (version >= VERSION1 && !isIndexSegment) {
+
+                commitTime = in.readLong();
+                
+            }
             
             resources[j] = (isIndexSegment //
-                    ? new SegmentMetadata(filename, /*nbytes,*/ uuid, commitTime) //
-                    : new JournalMetadata(filename, /*nbytes,*/ uuid, commitTime) //
+                    ? new SegmentMetadata(filename, /*nbytes,*/ uuid, createTime) //
+                    : new JournalMetadata(filename, /*nbytes,*/ uuid, createTime, commitTime) //
                     );
 
         }
                 
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
-        ShortPacker.packShort(out, VERSION0);
+        ShortPacker.packShort(out, VERSION1);
 
         LongPacker.packLong(out, partitionId);
         
@@ -635,22 +651,30 @@ public class LocalPartitionMetadata implements IPartitionMetadata,
          */
 
         for (int j = 0; j < nresources; j++) {
-
+            
             final IResourceMetadata rmd = resources[j];
 
-            out.writeBoolean(rmd.isIndexSegment());
+            final boolean isSegment = rmd.isIndexSegment();
+            
+            out.writeBoolean(isSegment);
             
             out.writeUTF(rmd.getFile());
 
 //            LongPacker.packLong(out,rmd.size());
 
             final UUID resourceUUID = rmd.getUUID();
-            
+
             out.writeLong(resourceUUID.getMostSignificantBits());
-            
+
             out.writeLong(resourceUUID.getLeastSignificantBits());
-            
+
             out.writeLong(rmd.getCreateTime());
+
+            if (!isSegment) {
+
+                out.writeLong(rmd.getCommitTime());
+
+            }
 
         }
 

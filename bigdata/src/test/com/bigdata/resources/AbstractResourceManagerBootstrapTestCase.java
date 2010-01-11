@@ -66,7 +66,7 @@ public class AbstractResourceManagerBootstrapTestCase extends TestCase2 {
                         .toString());
 
         // disable the write cache to avoid memory leak in the test suite.
-        properties.setProperty(Options.WRITE_CACHE_CAPACITY, "0");
+        properties.setProperty(Options.WRITE_CACHE_ENABLED, "false");
 
         return properties;
         

@@ -52,7 +52,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     }
     
     // all the builds in this test suite use this flag.
-    private final boolean compactingMerge = true;
+    static private final boolean compactingMerge = true;
 
     public Properties getProperties() {
 
@@ -76,24 +76,28 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     private Properties properties;
 
     /**
-     * Return a btree backed by a journal with the indicated branching factor.
-     * The serializer requires that values in leaves are {@link SimpleEntry}
-     * objects.
+     * Return a {@link BTree} backed by a journal with the indicated branching
+     * factor.
+     * <em>The caller MUST take responsibility for destroying the backing
+     * {@link Journal}</strong>.  For example, {@link #doBuildIndexSegmentAndCompare(BTree)}
+     * does this after running a series of builds based on the returned {@link BTree}. If
+     * you do not close and destroy the backing journal then the thread pool will grow during
+     * the test runs.
      * 
      * @param branchingFactor
      *            The branching factor.
      * 
      * @return The btree.
      */
-    public BTree getBTree(int branchingFactor) {
+    public BTree getBTree(final int branchingFactor) {
 
-        Journal journal = new Journal(getProperties());
+        final Journal journal = new Journal(getProperties());
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
-        
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+
         metadata.setBranchingFactor(branchingFactor);
-        
-        BTree btree = BTree.create(journal,metadata);
+
+        final BTree btree = BTree.create(journal, metadata);
 
         return btree;
 
@@ -182,7 +186,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 
         for(int i=0; i<branchingFactors.length; i++) {
             
-            int m = branchingFactors[i];
+            final int m = branchingFactors[i];
             
             doBuildIndexSegmentAndCompare( doSplitWithRandomDenseKeySequence( getBTree(m), m, m ) );
             
@@ -227,99 +231,388 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     }
 
     /**
+     * This stress test is designed to expose problems when most or all of the
+     * rangeCount given to the {@link IndexSegmentBuilder} represents an over
+     * count of the tuples actually in the source {@link BTree}. A series of
+     * source B+Trees are generated with random data. An {@link IndexSegment} is
+     * built for each source {@link BTree} and then compared against the source
+     * {@link BTree}. The {@link IndexSegment} is then destroyed, some tuples
+     * are removed from the source {@link BTree}, and a new {@link IndexSegment}
+     * is built from the source {@link BTree} giving the original rangeCount for
+     * the source {@link BTree}. This process continues until the source
+     * {@link BTree} is empty.
+     * 
+     * @todo This test fails due to an incomplete feature in the
+     *       {@link IndexSegmentBuilder} which currently does not support
+     *       overreporting of the range count for the build. I am working
+     *       on that right now.
+     */
+    public void test_overreportDuringBuild() throws Exception {
+
+        final int trace = 0;
+
+        /*
+         * This is the source branching factor. It does not have much impact on
+         * the build since the build runs from an iterator.
+         */
+        final int m = 3;
+        
+        final int[] ntuples = new int[] { 10, 100, 1000, 10000 };
+
+        for (int n : ntuples) {
+
+            doBuildIndexSegmentAndCompare2(doInsertRandomSparseKeySequenceTest(
+                    m, n, trace));
+
+        }
+
+    }
+
+    /**
      * Test helper builds an index segment from the btree using several
      * different branching factors and each time compares the resulting total
      * ordering to the original btree.
      * 
      * @param btree The source btree.
      */
-    public void doBuildIndexSegmentAndCompare(final BTree btree) throws Exception {
+    public void doBuildIndexSegmentAndCompare(final BTree btree)
+            throws Exception {
 
         try {
-        // branching factors used for the index segment.
-        final int branchingFactors[] = new int[] { 257, 512, 4196, 8196};
-        
-        for( int i=0; i<branchingFactors.length; i++ ) {
-        
-            int m = branchingFactors[i];
-
-            final File outFile = new File(getName()+"_m"+m+ ".seg");
-
-            if( outFile.exists() && ! outFile.delete() ) {
-                fail("Could not delete old index segment: "+outFile.getAbsoluteFile());
-            }
-            
-            final File tmpDir = outFile.getAbsoluteFile().getParentFile(); 
-            
+            // branching factors used for the index segment.
+            final int branchingFactors[] = new int[] {
             /*
-             * Build the index segment.
+             * This is the minimum branching factor (maximum depth, lots of edge
+             * conditions).
              */
-            System.err.println("Building index segment: in(m="
-                    + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
-                    + "), out(m=" + m + ")");
-
-            final long commitTime = System.currentTimeMillis();
-            
-            new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
-                    btree.rangeIterator(), m, btree.getIndexMetadata(),
-                    commitTime, compactingMerge).call();
-
+            3,
             /*
-             * Verify can load the index file and that the metadata associated
-             * with the index file is correct (we are only checking those
-             * aspects that are easily defined by the test case and not, for
-             * example, those aspects that depend on the specifics of the length
-             * of serialized nodes or leaves).
+             * This is the caller's branching factor, whatever that might be.
              */
-            System.err.println("Opening index segment.");
-            final IndexSegment seg = new IndexSegmentStore(outFile).loadIndexSegment();
-            try {
-            
-            // verify fast forward leaf scan.
-            testForwardScan(seg);
-
-            // verify fast reverse leaf scan.
-            testReverseScan(seg);
-
+            btree.getBranchingFactor(),
             /*
-             * Verify the total index order.
+             * Various large branching factors, at least one of which should be
+             * odd to exercise the fence posts involved in handling odd
+             * branching factors.
              */
-            System.err.println("Verifying index segment.");
-            assertSameBTree(btree, seg);
+            257, 512, 4196, 8196 };
 
-            System.err.println("Closing index segment.");
-            seg.close();
+            for (int i = 0; i < branchingFactors.length; i++) {
 
-            /*
-             * Note: close() is a reversible operation. This verifies that by
-             * immediately re-verifying the index segment. The index segment
-             * SHOULD be transparently re-opened for this operation.
-             */
-            System.err.println("Re-verifying index segment.");
-            assertSameBTree(btree, seg);
-            } finally {
-            // Close again so that we can delete the backing file.
-            System.err.println("Re-closing index segment.");
-            seg.close();
-            seg.getStore().destroy();
+                final int m = branchingFactors[i];
 
-            if (!outFile.delete()) {
+                final File outFile = new File(getName() + "_m" + m + ".seg");
 
-                log.warn("Could not delete index segment: " + outFile);
+                if (outFile.exists() && !outFile.delete()) {
+                    fail("Could not delete old index segment: "
+                            + outFile.getAbsoluteFile());
+                }
 
-            }
-            }
+                final File tmpDir = outFile.getAbsoluteFile().getParentFile();
 
-        } // build index segment with the next branching factor.
+                /*
+                 * Build the index segment.
+                 */
+                {
+                    
+                    final long commitTime = System.currentTimeMillis();
+
+                    // The actual #of tuples in the source BTree.
+                    final int actualRangeCount = btree.getEntryCount();
+
+                    /*
+                     * The #of tuples reported to the index segment builder.
+                     * 
+                     * Note: This conditionally over reports the #of tuples in
+                     * the source B+Tree. This causes the code paths in the
+                     * index segment builder which handle premature exhaustion
+                     * of the tuples during the build to be exercised.
+                     */
+                    // FIXME change to .2f to test over reporting of rangeCount
+                    final float percentOverReported = 0f;
+                    final int reportedRangeCount = actualRangeCount
+                            + (r.nextFloat() < percentOverReported
+                            // over report by up to 2x.
+                            ? r.nextInt(actualRangeCount)
+                                // report the actual range count.
+                                : 0);
+
+                    System.err.println("Building index segment: in(m="
+                            + btree.getBranchingFactor()
+                            + ", actualRangeCount=" + actualRangeCount
+                            + ", reportedRangeCount=" + reportedRangeCount
+                            + "), out(m=" + m + ")");
+
+                    new IndexSegmentBuilder(outFile, tmpDir, reportedRangeCount,
+                            btree.rangeIterator(), m, btree.getIndexMetadata(),
+                            commitTime, compactingMerge).call();
+                    
+                }
+                
+                /*
+                 * Verify can load the index file and that the metadata
+                 * associated with the index file is correct (we are only
+                 * checking those aspects that are easily defined by the test
+                 * case and not, for example, those aspects that depend on the
+                 * specifics of the length of serialized nodes or leaves).
+                 */
+                System.err.println("Opening index segment.");
+                final IndexSegment seg = new IndexSegmentStore(outFile)
+                        .loadIndexSegment();
+                try {
+
+                    // verify fast forward leaf scan.
+                    testForwardScan(seg);
+
+                    // verify fast reverse leaf scan.
+                    testReverseScan(seg);
+
+                    /*
+                     * Verify the total index order.
+                     */
+                    System.err.println("Verifying index segment.");
+                    assertSameBTree(btree, seg);
+
+                    System.err.println("Closing index segment.");
+                    seg.close();
+
+                    /*
+                     * Note: close() is a reversible operation. This verifies
+                     * that by immediately re-verifying the index segment. The
+                     * index segment SHOULD be transparently re-opened for this
+                     * operation.
+                     */
+                    System.err.println("Re-verifying index segment.");
+                    assertSameBTree(btree, seg);
+                } finally {
+                    // Close again so that we can delete the backing file.
+                    System.err.println("Re-closing index segment.");
+                    seg.close();
+                    seg.getStore().destroy();
+                    if (outFile.exists()) {
+                        log.warn("Did not delete index segment: " + outFile);
+                    }
+                }
+
+            } // build index segment with the next branching factor.
 
         } finally {
-        /*
-         * Closing the journal.
-         */
-        System.err.println("Closing journal.");
-        btree.getStore().destroy();
+            /*
+             * Closing the journal.
+             */
+            System.err.println("Closing journal.");
+            btree.getStore().destroy();
         }
+
+    }
+
+    /**
+     * Test helper builds an index segment from the btree using several
+     * different branching factors and each time compares the resulting total
+     * ordering to the original btree.
+     * 
+     * @param btree
+     *            The source btree.
+     */
+    public void doBuildIndexSegmentAndCompare2(final BTree btree)
+            throws Exception {
+
+        /*
+         * Note: If the source BTree maintains delete markers then the
+         * entryCount will not decrease and we can not locate the undeleted
+         * tuples using the linear list API.
+         */
+        assert !btree.getIndexMetadata().getDeleteMarkers() : "The source BTree must not maintain delete markers for this unit test.";
+
+        final int reportedRangeCount = btree.getEntryCount();
+
+        /*
+         * Branching factors used for the index segment.
+         * 
+         * Note: Large branching factors are not used for this stress test
+         * because they tend to place all of the tuples into a root leaf and
+         * that case does not stress the structural adaptations which the index
+         * segment builder needs to make when it discovers that the source
+         * B+Tree was exhausted prematurely.
+         */
+        final int branchingFactors[] = new int[] {
+        /*
+         * This is the minimum branching factor (maximum depth, lots of edge
+         * conditions). m=4 and m=5 can also be included here to increase the
+         * likelihood of uncovering a structural edge case problem in the
+         * generated index segment.
+         */
+        3, 4, 5,
+        /*
+         * This is the caller's branching factor, whatever that might be.
+         */
+        btree.getBranchingFactor(),
+        /*
+         * A nice prime, but not too big.
+         */
+        13 };
+
+//        /*
+//         * This is the index of the current branching factor (modulo the #of
+//         * branching factors.
+//         */
+//        int branchingFactorIndex = 0;
         
+        /*
+         * This is incremented on each build for the source B+Tree and is used
+         * to detect non-termination.
+         */
+        int pass = 0;
+        
+        try {
+
+            // until the btree is empty.
+            while (btree.getEntryCount() > 0) {
+
+                pass++;
+
+//                // select the branching factors using a round robin.
+//                final int m = branchingFactors[branchingFactorIndex++
+//                        % branchingFactors.length];
+
+                // for each branching factor.
+                for(int m : branchingFactors) {
+                
+                final File outFile = new File(getName() + "_m" + m + ".seg");
+
+                if (outFile.exists() && !outFile.delete()) {
+                    fail("Could not delete old index segment: "
+                            + outFile.getAbsoluteFile());
+                }
+
+                final File tmpDir = outFile.getAbsoluteFile().getParentFile();
+               
+                /*
+                 * Build the index segment.
+                 */
+                {
+                    
+                    final long commitTime = System.currentTimeMillis();
+
+                    // The actual #of tuples in the source BTree.
+                    final int actualRangeCount = btree.getEntryCount();
+
+                    System.err.println("Building index segment: in(m="
+                            + btree.getBranchingFactor()
+                            + ", actualRangeCount=" + actualRangeCount
+                            + ", reportedRangeCount=" + reportedRangeCount
+                            + "), out(m=" + m + "), pass=" + pass);
+
+                    new IndexSegmentBuilder(outFile, tmpDir, reportedRangeCount,
+                            btree.rangeIterator(), m, btree.getIndexMetadata(),
+                            commitTime, compactingMerge).call();
+                    
+                }
+                
+                /*
+                 * Verify can load the index file and that the metadata
+                 * associated with the index file is correct (we are only
+                 * checking those aspects that are easily defined by the test
+                 * case and not, for example, those aspects that depend on the
+                 * specifics of the length of serialized nodes or leaves).
+                 */
+                System.err.println("Opening index segment.");
+                final IndexSegment seg = new IndexSegmentStore(outFile)
+                        .loadIndexSegment();
+                try {
+
+                    // verify fast forward leaf scan.
+                    testForwardScan(seg);
+
+                    // verify fast reverse leaf scan.
+                    testReverseScan(seg);
+
+                    /*
+                     * Verify the total index order.
+                     */
+                    System.err.println("Verifying index segment.");
+                    assertSameBTree(btree, seg);
+
+                    System.err.println("Closing index segment.");
+                    seg.close();
+
+                    /*
+                     * Note: close() is a reversible operation. This verifies
+                     * that by immediately re-verifying the index segment. The
+                     * index segment SHOULD be transparently re-opened for this
+                     * operation.
+                     */
+                    System.err.println("Re-verifying index segment.");
+                    assertSameBTree(btree, seg);
+                } finally {
+                    // Close again so that we can delete the backing file.
+                    System.err.println("Re-closing index segment.");
+                    seg.close();
+                    seg.getStore().destroy();
+                    if (outFile.exists()) {
+                        log.warn("Did not delete index segment: " + outFile);
+                    }
+                }
+                
+                }
+
+                /*
+                 * Delete randomly selected tuples from the source BTree.
+                 * 
+                 * Note: This MUST eventually reduce the #of tuples in the
+                 * source BTree to ZERO (0) or the unit test WILL NOT terminate.
+                 */
+                {
+
+                    int entryCount = btree.getEntryCount();
+                    int ndeleted = 0;
+                    
+                    final int inc = entryCount / 5;
+
+                    final int targetCount = inc == 0
+                            // count down the tuples by one until zero.
+                            ? entryCount - 1
+                            // remove inc plus some random #of tuples down to zero.
+                            : Math.max(0, entryCount - (inc + r.nextInt(inc)));
+
+                    assert targetCount >= 0;
+                    assert targetCount < entryCount;
+                    
+                    // delete tuples.
+                    while ((entryCount = btree.getEntryCount()) > targetCount) {
+
+                        // choose a tuple at random.
+                        final int index = r.nextInt(entryCount);
+
+                        // and delete it from the source B+Tree.
+                        if (btree.remove(btree.keyAt(index)) == null) {
+
+                            // should return the deleted tuple.
+                            throw new AssertionError();
+                            
+                        }
+
+                        ndeleted++;
+                        
+                    }
+        
+                    System.err.println("Deleted " + ndeleted + " tuples of "
+                            + reportedRangeCount
+                            + " original tuples: entryCount is now "
+                            + btree.getEntryCount());
+
+                }
+                
+            } // build another index segment with the next branching factor.
+
+        } finally {
+            /*
+             * Closing the journal.
+             */
+            System.err.println("Closing journal.");
+            btree.getStore().destroy();
+        }
+
     }
 
 }

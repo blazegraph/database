@@ -415,7 +415,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
      * Note: I have placed the "receive" of the historical index partition view
      * within the atomic update task deliberately. It should add at most a few
      * seconds to the execution time of that task and makes it easier to write
-     * corrective actions for the atomic update since we can offer a guarentees
+     * corrective actions for the atomic update since we can offer a guarantees
      * such that the existence of the target index partition on the target data
      * service is sufficient to determine that the entire operation was
      * successful.
@@ -853,7 +853,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
     /**
      * Method used to test whether or not the target index partition was
      * successfully registered on the target data service. This class explicitly
-     * uses the write service in order to guarentee that it can not execute
+     * uses the write service in order to guarantee that it can not execute
      * until the "receive" operation is complete.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -1452,7 +1452,7 @@ public class MoveTask extends AbstractPrepareTask<MoveResult> {
              * @todo This flag is unused for this impl since MDS update is done
              * by the target data service - in fact, the flag can probably be
              * discarded if this move procedure works out nicely since it offers
-             * better atomicity guarentees.  The OverflowSubtaskEnum can also
+             * better atomicity guarantees.  The OverflowSubtaskEnum can also
              * be pruned since we will no longer use certain subtasks which it
              * declares.
              */

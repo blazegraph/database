@@ -2173,7 +2173,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          */
 //        properties.setProperty(Options.FORCE_SERIAL_EXECUTION, "false");
         
-//      properties.setProperty(Options.MUTATION_BUFFER_CAPACITY, "20000");
+//      properties.setProperty(Options.BUFFER_CAPACITY, "20000");
         properties.setProperty(Options.CHUNK_CAPACITY, "100");
 //      properties.setProperty(Options.QUERY_BUFFER_CAPACITY, "10000");
 //      properties.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "10000");

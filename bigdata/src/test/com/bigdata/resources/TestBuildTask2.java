@@ -83,29 +83,29 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
      * Note: The parameters here determine how stressful this test will be.
      */
 
-    final private long maxSumSegBytes = (Bytes.kilobyte * 6);
+    static final private long maxSumSegBytes = (Bytes.kilobyte * 6);
 
     /**
      * The maximum #of tuples to insert or remove in each update.
      */
-    final int maxtuples = 100;
+    static final int maxtuples = 100;
 
     /**
      * When <code>true</code>, uses randomly generated but strictly
      * increasing keys within each insert pass. Otherwise uses strictly
      * increasing keys generated using a fixed pattern.
      */
-    final boolean randomKeys = true;
+    static final boolean randomKeys = true;
 
     /**
      * Used iff {@link #randomKeys} is <code>true</code>.
      */
-    final int maxBaseKey = 1000;
+    static final int maxBaseKey = 1000;
 
     /**
      * Used iff {@link #randomKeys} is <code>true</code>.
      */
-    final int maxKeyInc = 100;
+    static final int maxKeyInc = 100;
 
     /**
      * Percentage of updates that delete the tuple under a key. When zero (0d),
@@ -116,11 +116,11 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
      * <p>
      * Note: There needs to be a preponderance of inserts so the test will
      * eventually complete. If there are a lot of deletes and a compacting merge
-     * is always choosen then the resulting index segment always will be small
+     * is always chosen then the resulting index segment always will be small
      * and will fail to trigger an incremental build so the test will not
      * terminate.
      */
-    final double percentRemove = 0.2d;
+    static final double percentRemove = 0.2d;
 
     /**
      * This sets a very low threshold for the #of index segment bytes which can
@@ -128,7 +128,9 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
      * test below will run until it has exceeded this threshold so that it can
      * verify use cases where all sources are accepted and the build is actually
      * a compacting merge as well as cases where only an ordered subset of the
-     * sources are accepted, which is the true incremental build.
+     * sources are accepted, which is the true incremental build (the use case
+     * when there is only data on the journal also qualifies as a compacting
+     * merge since we are able to discard deleted tuples).
      * 
      * @see OverflowManager.Options#MAXIMUM_BUILD_SEGMENT_BYTES
      */
@@ -148,15 +150,23 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
     }
 
     /**
-     * Test maintains ground truth and writes on an index partition and peforms
+     * Test maintains ground truth and writes on an index partition and performs
      * a controlled overflow operation in which we do an index partition build.
      * After each overflow we re-verify the index partition against ground
-     * truth. This continues until there is enough data in the view that an
-     * incremental build is performed rather than a compacting merge. Once
-     * again, we verify the outcomes and then quit.
+     * truth. The process stops once we do an incremental build which does not
+     * result in a compact view.
+     * <p>
+     * Note: If an index partition view has only a little bit of data, then the
+     * "build" operation will actually incorporate all sources in the view, in
+     * effect doing a compacting merge instead of an incremental build in an
+     * effort to keep down the complexity of the view when that can be done with
+     * little cost. Therefore, it actually takes several passes before we have
+     * enough data on hand to take the code path which does an incremental build
+     * rather than a compacting merge.
      * 
-     * @todo run this test through two or more cycles such that #of index
-     *       segments in the view builds up to more than just one.  
+     * @todo Run this test through two or more cycles such that #of index
+     *       segments in the view builds up to more than just one, perhaps until
+     *       there is enough data on hand to require a split.
      */
     public void test_builds() throws InterruptedException, ExecutionException {
 

@@ -26,7 +26,6 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.service.DataService;
 
 /**
  * <p>
@@ -43,7 +42,6 @@ import com.bigdata.service.DataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-
 public enum BufferMode {
 
     /**
@@ -123,31 +121,7 @@ public enum BufferMode {
      * 
      * @see DiskOnlyStrategy
      */
-    Temporary(false/* stable */, false/* fullyBuffered */),
-
-    /**
-     * <p>
-     * The journal is managed on disk, but with a direct {@link ByteBuffer}
-     * equal in size to the {@link Options#INITIAL_EXTENT}. This option is
-     * designed for use with periodic overflow of the live journal for a
-     * {@link DataService}. You pay a modest premium for the fully buffered
-     * journal (~200M of RAM per journal, and the data service maintains both
-     * the live journal and the historical journal). However, this mode offers
-     * higher read concurrency than {@link #Disk} and faster asynchronous
-     * overflow processing (since it is not reading through to the disk).
-     * </p>
-     * <p>
-     * Note: The implementation in fact limits the capacity of the buffer to a
-     * maximum extent. Beyond that, this solution degrades into a partly
-     * buffered approach.
-     * </p>
-     * 
-     * @see BufferedDiskStrategy
-     * 
-     * @deprecated This has not been implemented yet. It may not be necessary
-     *             with the use of global buffers for B+Tree nodes and leaves.
-     */
-    BufferedDisk(true/* stable */, false/* fullyBuffered */);
+    Temporary(false/* stable */, false/* fullyBuffered */);
 
     private final boolean stable;
     private final boolean fullyBuffered;

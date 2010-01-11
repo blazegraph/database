@@ -967,7 +967,7 @@ public class IndexSegmentStore extends AbstractRawStore {
             
             counters.nodesRead++;
             
-            synchronized (this) {
+            synchronized (this) { // @todo Why is this synchronized here down to the read on the buffer?
 
                 if (buf_nodes != null) {
 

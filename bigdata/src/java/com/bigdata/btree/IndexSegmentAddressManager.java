@@ -209,9 +209,13 @@ public class IndexSegmentAddressManager extends WormAddressManager {
         
         final int nbytes = getByteCount(addr);
         
-        return "{nbytes=" + nbytes + ",offset="
-                + IndexSegmentRegion.decodeOffset(encodedOffset) + ",region="
-                + IndexSegmentRegion.decodeRegion(encodedOffset) + "}";
+        return "{region=" + IndexSegmentRegion.decodeRegion(encodedOffset)
+                + ",off=" + IndexSegmentRegion.decodeOffset(encodedOffset)
+                + ",len=" + nbytes + "}";
+
+//        return "{nbytes=" + nbytes + ",offset="
+//                + IndexSegmentRegion.decodeOffset(encodedOffset) + ",region="
+//                + IndexSegmentRegion.decodeRegion(encodedOffset) + "}";
 
     }
 

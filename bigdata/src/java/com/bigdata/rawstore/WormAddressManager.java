@@ -541,11 +541,12 @@ public class WormAddressManager implements IAddressManager {
         
         if(addr==0L) return _NULL_;
         
-        long offset = getOffset(addr);
+        final long offset = getOffset(addr);
         
-        int nbytes = getByteCount(addr);
+        final int nbytes = getByteCount(addr);
         
-        return "{nbytes="+nbytes+",offset="+offset+"}";
+        return "{off="+offset+",len="+nbytes+"}";
+//        return "{nbytes="+nbytes+",offset="+offset+"}";
         
     }
 
@@ -555,7 +556,7 @@ public class WormAddressManager implements IAddressManager {
      */
     public String toString() {
 
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         
         sb.append(super.toString());
         
@@ -588,9 +589,9 @@ public class WormAddressManager implements IAddressManager {
      * @param args
      *            unused.
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
 
-        NumberFormat nf = NumberFormat.getInstance();
+        final NumberFormat nf = NumberFormat.getInstance();
         
         nf.setGroupingUsed(true);
         
@@ -598,11 +599,11 @@ public class WormAddressManager implements IAddressManager {
 
         for (int offsetBits = MIN_OFFSET_BITS; offsetBits <= MAX_OFFSET_BITS; offsetBits++) {
             
-            WormAddressManager am = new WormAddressManager( offsetBits );
+            final WormAddressManager am = new WormAddressManager( offsetBits );
             
-            long maxRecords = am.getMaxOffset();
+            final long maxRecords = am.getMaxOffset();
             
-            int maxRecordSize = am.getMaxByteCount();
+            final int maxRecordSize = am.getMaxByteCount();
             
             System.out.println("" + offsetBits + "\t" + nf.format(maxRecords)
                     + "\t" + nf.format(maxRecordSize));

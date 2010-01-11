@@ -39,6 +39,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
+import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.ISplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -682,6 +683,238 @@ public class SplitUtility {
             
         }
         
+    }
+
+    /**
+     * Choose a set of splits which may be reasonably expected to divide the
+     * {@link IndexSegment} into extents each of which is approximately 50%
+     * full. The first split MUST use the leftSeparator of the index view as its
+     * leftSeparator. The last split MUST use the rightSeparator of the index
+     * view as its rightSeparator. The #of splits SHOULD be chosen such that the
+     * resulting index partitions are approximately 50% full.
+     * 
+     * @param keyRange
+     *            The left and right separator keys for the view.
+     * @param seg
+     *            The {@link IndexSegment} containing most of the data for the
+     *            view.
+     * @param nominalShardSize
+     *            The nominal size of an index partition (typically 200MB).
+     * @param splitHandler
+     *            Applies an application constraint to the choice of the
+     *            separator key (optional).
+     * 
+     * @return A {@link Split}[] array contains everything that we need to
+     *         define the new index partitions -or- <code>null</code> if a more
+     *         detailed examination reveals that the index SHOULD NOT be split
+     *         at this time.
+     * 
+     * @see src/architecture/SplitMath.xls
+     */
+    public static Split[] getSplits(
+            final IPartitionIdFactory partitionIdFactory,
+            final LocalPartitionMetadata oldpmd, final IndexSegment seg,
+            final long nominalShardSize,
+            final ISimpleSplitHandler splitHandler) {
+
+        final String scaleOutIndexName = seg.getIndexMetadata().getName();
+        
+        // The target #of splits.
+        final int N = (int) (seg.getStore().size() / (nominalShardSize / 2));
+
+        if (log.isInfoEnabled()) {
+
+            log.info("segSize=" + seg.getStore().size() + ", nominalShardSize="
+                    + nominalShardSize + ", N=" + N);
+            
+        }
+        
+        // The splits (may be fewer than N).
+        final List<Split> splits = new ArrayList<Split>(N);
+
+        // the index of the inclusive lower bound.
+        int low = 0;
+        // the index of the _inclusive_ upper bound.
+        final int high = seg.getEntryCount() - 1;
+        // the next key to use as the left separator key.
+        byte[] lastSeparatorKey = oldpmd.getLeftSeparatorKey();
+
+        // do until done.
+        while (low < high) {
+
+            // The #of splits already decided.
+            final int splitCount = splits.size();
+            
+            // The #of splits that we will still create.
+            final int remainingSplits = N - splitCount;
+            
+            // The #of tuples in [low:high].
+            final int rangeCount = high - low + 1;
+
+            // inclusive lower bound of the split.
+            final int fromIndex = low;
+            final byte[] fromKey = lastSeparatorKey;
+            
+            // exclusive upper bound of the split.
+            final int toIndex;
+            final byte[] toKey;
+
+            /*
+             * Figure out the last tuple to copy into this split and the
+             * separatorKey which is the exclusive upper bound for this split.
+             * Note that the separatorKey does not need to correspond to the
+             * last tuple copied into the split. It can be a successor of that
+             * tuple in the unsigned byte[] ordering which is less than the next
+             * tuple actually present in the index.
+             */
+            if (remainingSplits == 1) {
+
+                /*
+                 * This is the last split: always use the rightSeparator.
+                 */
+
+                toKey = oldpmd.getRightSeparatorKey();
+                
+                toIndex = high;
+                
+            } else {
+                
+                // The index of recommended separatorKey.
+                final int splitAt = (rangeCount / remainingSplits) + low;
+                
+                if (splitHandler != null) {
+                
+                    /*
+                     * Allow override of the recommended separator.
+                     * 
+                     * Note: we receive a separatorKey from the override so we
+                     * can create a separation not represented by any key
+                     * actually present in the index. To handle this case, we
+                     * lookup the desired separatorKey in the index. If it is
+                     * not found then we convert the insertion point to the
+                     * index of the key where it would be inserted and use that
+                     * as the toIndex.
+                     */
+                    
+                    // Allow override of the separatorKey.
+                    final byte[] chosenKey = splitHandler.getSeparatorKey(seg,
+                            fromIndex, (high + 1)/* toIndex */, splitAt);
+
+                    if (chosenKey == null) {
+
+                        /*
+                         * No separator key could be identified. The rest of the
+                         * data in the segment will all go into this split.
+                         */
+                        
+                        toKey = oldpmd.getRightSeparatorKey();
+                        
+                        toIndex = high;
+
+                    } else {
+
+                        // We will use the chosen key.
+                        toKey = chosenKey;
+
+                        // Lookup key in the index.
+                        final int pos = seg.indexOf(toKey);
+
+                        // If key not found, convert pos to the insertion point.
+                        toIndex = pos < 0 ? -(pos + 1) : pos;
+
+                        if (toIndex < fromIndex || toIndex > high) {
+
+                            /*
+                             * The override did not return a separator key
+                             * within the key range which we instructed it to
+                             * use. This is a bug in the override code.
+                             */
+
+                            throw new RuntimeException(
+                                    "bad split override: name="
+                                            + scaleOutIndexName
+                                            + ", fromIndex=" + fromIndex
+                                            + ", toIndex=" + (high + 1)
+                                            + ", recommendedSplitAt=" + splitAt
+                                            + ", but split choose at "
+                                            + toIndex);
+
+                        }
+
+                    }
+
+                } else {
+
+                    /*
+                     * Take whatever key is at the recommended split index and
+                     * use that as the separator key for this split.
+                     */
+                    
+                    toKey = seg.keyAt(splitAt);
+                    
+                    toIndex = splitAt;
+                    
+                }
+                
+            }
+
+            if (log.isInfoEnabled()) {
+                log.info("splitCount=" + splitCount + ", remainingSplits="
+                        + remainingSplits + ", low=" + low + ", high=" + high
+                        + ", rangeCount=" + rangeCount + ", fromIndex="
+                        + fromIndex + ", toIndex=" + toIndex + ", ntuples="
+                        + (toIndex - fromIndex) + ", separatorKey="
+                        + BytesUtil.toString(toKey));
+            }
+            
+            // Create Split description.
+            {
+                
+                /*
+                 * Get the next partition identifier for the named scale-out
+                 * index.
+                 * 
+                 * Note: This is a RMI.
+                 */
+                final int partitionId = partitionIdFactory
+                        .nextPartitionId(scaleOutIndexName);
+
+                /*
+                 * Describe the partition metadata for the new split.
+                 */
+                final LocalPartitionMetadata newpmd = new LocalPartitionMetadata(
+                        partitionId,//
+                        -1, // Note: split not allowed during move.
+                        fromKey, // leftSeparatorKey
+                        toKey, // rightSeparatorKey
+                        /*
+                         * Note: no resources for an index segment.
+                         */
+                        null,//
+                        /*
+                         * Note: cause will be set by the atomic update task.
+                         */
+                        null,//
+                        oldpmd.getHistory()
+                                + "chooseSplitPoint(oldPartitionId="
+                                + oldpmd.getPartitionId() + ",nsplits=" + N
+                                + ",newPartitionId=" + partitionId + ") ");
+
+                final Split split = new Split(newpmd, fromIndex, toIndex);
+
+                // add to list of splits.
+                splits.add(split);
+                
+            }
+
+            // prepare for the next round.
+            low = toIndex;
+            lastSeparatorKey = toKey;
+
+        }
+
+        return splits.toArray(new Split[splits.size()]);
+
     }
 
 }

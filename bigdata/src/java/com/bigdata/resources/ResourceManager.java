@@ -350,6 +350,20 @@ abstract public class ResourceManager extends OverflowManager implements
                                 }
                             });
 
+                    tmp2.addCounter(IIndexPartitionTaskCounters.ConcurrentBuildCount,
+                            new Instrument<Integer>() {
+                                public void sample() {
+                                    setValue(concurrentBuildTaskCount.get());
+                                }
+                            });
+
+                    tmp2.addCounter(IIndexPartitionTaskCounters.ConcurrentMergeCount,
+                            new Instrument<Integer>() {
+                                public void sample() {
+                                    setValue(concurrentMergeTaskCount.get());
+                                }
+                            });
+
                     tmp2.addCounter(IIndexPartitionTaskCounters.RunningBuilds,
                             new Instrument<String>() {
                                 public void sample() {
@@ -460,53 +474,18 @@ abstract public class ResourceManager extends OverflowManager implements
                 tmp.addCounter(IIndexManagerCounters.IndexCount,
                         new Instrument<Long>() {
                             public void sample() {
-                                /*
-                                 * FIXME This works around a hole during
-                                 * synchronous overflow which is documented in
-                                 * the OverflowManager. Due to how the direct
-                                 * buffers are being managed, we are closing out
-                                 * the old journal before creating the new
-                                 * journal and updating the live journal
-                                 * reference to the new journal before the
-                                 * indices have been propagated to that journal
-                                 * and before the first commit on the new live
-                                 * journal. As a work around, this will loop
-                                 * until the first commit point is recorded on
-                                 * the new live journal.
-                                 * 
-                                 * @todo test with AbstractJournal#getName2Addr()
-                                 * instead once that hole is closed up.
-                                 */
                                 final ManagedJournal liveJournal = getLiveJournal();
-                                long lastCommitTime;
-                                int ntries = 1;
-                                while ((lastCommitTime = liveJournal
-                                        .getLastCommitTime()) == 0L
-                                        && ntries < 10) {
-                                    try {
-                                        Thread.sleep(10/* ms */);
-                                        ntries++;
-                                    } catch (InterruptedException ex) {
-                                        if (log.isInfoEnabled())
-                                            log
-                                                    .info("Awaiting 1st commit on the new journal.");
-                                    }
-                                }
+                                long lastCommitTime = liveJournal.getLastCommitTime();
                                 if (lastCommitTime == 0L) {
                                     /*
-                                     * @todo This warning will be issued for the
-                                     * first live journal for a data service
-                                     * since there are no commit points until
-                                     * the application registers an index on
-                                     * that data service. When the issue
-                                     * described above is resolved, we will have
-                                     * to return silently for this case or go
-                                     * ahead and force an initial commit when
-                                     * the 1st live journal is created for the
-                                     * data service by the store manager.
+                                     * This warning will be issued for the first
+                                     * live journal for a data service since
+                                     * there are no commit points until the
+                                     * application registers an index on that
+                                     * data service.
                                      */
-                                    log.warn(
-                                            "No commit points on the live journal?");
+                                    log
+                                            .warn("No commit points on the live journal?");
                                     return;
                                 }
                                 final long indexCount = liveJournal

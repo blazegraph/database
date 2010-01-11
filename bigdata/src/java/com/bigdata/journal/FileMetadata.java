@@ -33,7 +33,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.LRUNexus;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
@@ -119,21 +119,21 @@ public class FileMetadata {
      */
     final int offsetBits;
 
-    /**
-     * The #of records to be buffered in an optional read cache -or- ZERO(0) to
-     * disable the read cache.
-     */
-    final int readCacheCapacity;
+//    /**
+//     * The #of records to be buffered in an optional read cache -or- ZERO(0) to
+//     * disable the read cache.
+//     */
+//    final int readCacheCapacity;
+//    
+//    /**
+//     * The maximum size of a record that will be allowed into the read cache.
+//     */
+//    final int readCacheMaxRecordSize;
     
     /**
-     * The maximum size of a record that will be allowed into the read cache.
+     * When <code>true</code> the write cache will be enabled.
      */
-    final int readCacheMaxRecordSize;
-    
-    /**
-     * The optional {@link ByteBuffer} to be used as the write cache.
-     */
-    final ByteBuffer writeCache;
+    final boolean writeCacheEnabled;
     
     /**
      * The next offset at which a record would be written on the store.  The
@@ -244,32 +244,13 @@ public class FileMetadata {
      *            The #of bits out of a 64-bit long integer that are used to
      *            encode the byte offset as an unsigned integer. The remaining
      *            bits are used to encode the byte count (aka record length) as
-     *            an unsigned integer.  This value is <em>ignored</em> if the
+     *            an unsigned integer. This value is <em>ignored</em> if the
      *            journal is being reopened, in which case the real offset bits
      *            is read from the root block of the journal.
-     * @param readCacheCapacity
-     *            The capacity of an optional read cache. When ZERO(0) the read
-     *            cache will be disabled. The capacity specifies the #of records
-     *            that will be retained by an LRU style cache. Note that this
-     *            option is only supported by the {@link DiskOnlyStrategy}.
-     *            Further note that most of the other {@link IBufferStrategy}s
-     *            are already fully buffered and hence can not benefit from a
-     *            read cache. Finally, note that the higher-level data
-     *            structures use the {@link LRUNexus}, which provides a read
-     *            cache of the decompressed records. For these reasons there is
-     *            little reason to enable this lower-level read cache.
-     * @param readCacheMaxRecordSize
-     *            The maximum size of a record that will be allowed into the
-     *            optional read cache.
-     * @param writeCache
-     *            A direct {@link ByteBuffer} to be used as the write cache
-     *            (optional). Note that this write cache is only used by the
-     *            {@link DiskOnlyStrategy}. Further note that this MUST be a
-     *            direct {@link ByteBuffer} in order to avoid potential memory
-     *            leaks since NIO will otherwise force the allocation of a
-     *            "temporary" direct {@link ByteBuffer} and there is a known bug
-     *            from 1.4 through at least 1.6 with the release of such
-     *            temporary buffers.
+     * @param writeCacheEnabled
+     *            When <code>true</code>, the {@link DiskOnlyStrategy} will
+     *            allocate a direct {@link ByteBuffer} from the
+     *            {@link DirectBufferPool} to service as a write cache.
      * @param createTime
      *            The create time to be assigned to the root block iff a new
      *            file is created.
@@ -295,11 +276,27 @@ public class FileMetadata {
      *             if there is a problem preparing the file for use by the
      *             journal.
      */
+//    * @param readCacheCapacity
+//    *            The capacity of an optional read cache. When ZERO(0) the read
+//    *            cache will be disabled. The capacity specifies the #of records
+//    *            that will be retained by an LRU style cache. Note that this
+//    *            option is only supported by the {@link DiskOnlyStrategy}.
+//    *            Further note that most of the other {@link IBufferStrategy}s
+//    *            are already fully buffered and hence can not benefit from a
+//    *            read cache. Finally, note that the higher-level data
+//    *            structures use the {@link LRUNexus}, which provides a read
+//    *            cache of the decompressed records. For these reasons there is
+//    *            little reason to enable this lower-level read cache.
+//    * @param readCacheMaxRecordSize
+//    *            The maximum size of a record that will be allowed into the
+//    *            optional read cache.
     FileMetadata(final File file, final BufferMode bufferMode, final boolean useDirectBuffers,
             final long initialExtent, final long maximumExtent, final boolean create,
             final boolean isEmptyFile, boolean deleteOnExit, final boolean readOnly,
-            final ForceEnum forceWrites, final int offsetBits, int readCacheCapacity,
-            final int readCacheMaxRecordSize, final ByteBuffer writeCache,
+            final ForceEnum forceWrites, final int offsetBits, 
+//            final int readCacheCapacity,
+//            final int readCacheMaxRecordSize, 
+            final boolean writeCacheEnabled,
             final boolean validateChecksum, final long createTime,
             final ChecksumUtility checker, final boolean alternateRootBlock)
             throws RuntimeException {
@@ -340,11 +337,11 @@ public class FileMetadata {
 
 //        this.offsetBits = offsetBits;
 
-        this.readCacheCapacity = readCacheCapacity;
+//        this.readCacheCapacity = readCacheCapacity;
+//        
+//        this.readCacheMaxRecordSize = readCacheMaxRecordSize;
         
-        this.readCacheMaxRecordSize = readCacheMaxRecordSize;
-        
-        this.writeCache = writeCache;
+        this.writeCacheEnabled = writeCacheEnabled;
         
         this.fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
@@ -545,18 +542,6 @@ public class FileMetadata {
                 }
                 
                 switch (bufferMode) {
-                case BufferedDisk: {
-                    /*
-                     * FIXME read the data from the disk into the buffer, but
-                     * only up to the maximum extent of the buffer. Perhaps do
-                     * this lazily in the BufferedDiskStrategy so that we can
-                     * avoid reading in the data when scanning the dataDir
-                     * during StoreManager startup.
-                     */
-                    if(true)
-                        throw new UnsupportedOperationException();
-                    break;
-                }
                 case Direct: {
                     // Allocate the buffer buffer.
                     buffer = (useDirectBuffers ? ByteBuffer

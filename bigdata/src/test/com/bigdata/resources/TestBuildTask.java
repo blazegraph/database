@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -44,6 +45,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.proc.IIndexProcedure;
 import com.bigdata.btree.proc.BatchInsert.BatchInsertConstructor;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.IndexProcedureTask;
 import com.bigdata.journal.RegisterIndexTask;
@@ -102,7 +104,7 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
      * {@link MetadataIndex} before clients will being reading from the new view
      * using the new {@link IndexSegment}.
      */
-    public void test_build() throws IOException,
+    public void test_buildWithOverflow() throws IOException,
             InterruptedException, ExecutionException {
 
         /*
@@ -284,5 +286,299 @@ public class TestBuildTask extends AbstractResourceManagerTestCase {
         }
 
     }
-    
+
+    /**
+     * Unit test of a build conducted against a historical snapshot of a view
+     * created by {@link BTree#createViewCheckpoint()}.
+     * 
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    public void test_buildWithoutOverflow() throws InterruptedException,
+            ExecutionException {
+
+        /*
+         * Register the index.
+         */
+        final String name = "testIndex";
+        final UUID indexUUID = UUID.randomUUID();
+        final IndexMetadata indexMetadata = new IndexMetadata(name, indexUUID);
+        {
+
+            // must support delete markers
+            indexMetadata.setDeleteMarkers(true);
+
+            // must be an index partition.
+            indexMetadata.setPartitionMetadata(new LocalPartitionMetadata(
+                    0, // partitionId.
+                    -1, // not a move.
+                    new byte[] {}, // leftSeparator
+                    null, // rightSeparator
+                    new IResourceMetadata[] {//
+                            resourceManager.getLiveJournal().getResourceMetadata(), //
+                    }, //
+                    IndexPartitionCause.register(resourceManager),
+                    "" // history
+                    ));
+
+            // submit task to register the index and wait for it to complete.
+            concurrencyManager.submit(
+                    new RegisterIndexTask(concurrencyManager, name,
+                            indexMetadata)).get();
+
+        }
+
+        /*
+         * Populate the index with some data.
+         */
+        final BTree groundTruth = BTree.create(new SimpleMemoryRawStore(),
+                new IndexMetadata(indexUUID));
+        {
+
+            final int nentries = 10;
+
+            final byte[][] keys = new byte[nentries][];
+            final byte[][] vals = new byte[nentries][];
+
+            final Random r = new Random();
+
+            for (int i = 0; i < nentries; i++) {
+
+                keys[i] = KeyBuilder.asSortKey(i);
+
+                vals[i] = new byte[4];
+
+                r.nextBytes(vals[i]);
+
+                groundTruth.insert(keys[i], vals[i]);
+
+            }
+
+            final IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
+                    .newInstance(indexMetadata, 0/* fromIndex */,
+                            nentries/*toIndex*/, keys, vals);
+
+            // submit the task and wait for it to complete.
+            concurrencyManager.submit(
+                    new IndexProcedureTask(concurrencyManager, ITx.UNISOLATED,
+                            name, proc)).get();
+
+        }
+
+        /*
+         * Rather than forcing overflow, we run a task which replaces the root
+         * of the BTree with an empty leaf and updates view definition to
+         * include the previous BTree plus the new BTree. This prepares us to
+         * run a build without overflow. We need to know the timestamp of the
+         * previous view, which is available from the 2nd source in the new
+         * view.
+         */
+        final long priorCommitTime1 = resourceManager.getLiveJournal().getLastCommitTime();
+        {
+
+            final AbstractTask<Long> redefineView = new AbstractTask<Long>(
+                    concurrencyManager, ITx.UNISOLATED, new String[] { name }) {
+
+                @Override
+                protected Long doTask() throws Exception {
+
+                    final ILocalBTreeView view = getIndex(getOnlyResource());
+
+                    final long priorCommitTime = view.getMutableBTree().createViewCheckpoint();
+                    
+                    /*
+                     * Done. The new view will be seek by any task executing
+                     * after this one within the commit group and by any task
+                     * starting after the group commit iff the commit is
+                     * successful.
+                     */
+                    
+                    return priorCommitTime;
+
+                }
+                
+            };
+
+            // run that task and verify that it executed Ok.
+            final long priorCommitTime = concurrencyManager
+                    .submit(redefineView).get();
+
+            // true unless intervening commit.
+            assertEquals(priorCommitTime, priorCommitTime1);
+            
+        }
+
+        /*
+         * Verify the new view was applied and also verify that the view agrees
+         * with the ground truth.
+         */
+        {
+
+            final ILocalBTreeView actual = resourceManager.getIndex(name,
+                    ITx.UNISOLATED);
+
+            final LocalPartitionMetadata pmd = actual.getIndexMetadata()
+                    .getPartitionMetadata();
+
+            final IResourceMetadata[] resources = pmd.getResources();
+
+            assertEquals(2, resources.length);
+
+            assertEquals(0, resources[0].getCommitTime());
+
+            assertEquals(priorCommitTime1, resources[1].getCommitTime());
+
+            assertEquals(resourceManager.getLiveJournal(),
+                    actual.getSources()[0].getStore());
+
+            assertEquals(resourceManager.getLiveJournal(),
+                    actual.getSources()[1].getStore());
+
+            // the mutable btree should be empty.
+            assertEquals(0, actual.getMutableBTree().getEntryCount());
+
+            // the other btree should not be empty.
+            assertNotSame(0, actual.getSources()[1].getEntryCount());
+
+            AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
+
+        }
+
+        // buffer some more writes on the index before doing the build.
+        {
+
+                final int nentries = 10;
+
+                final byte[][] keys = new byte[nentries][];
+                final byte[][] vals = new byte[nentries][];
+
+                final Random r = new Random();
+
+                for (int i = 0; i < nentries; i++) {
+
+                    keys[i] = KeyBuilder.asSortKey(i+100);
+
+                    vals[i] = new byte[4];
+
+                    r.nextBytes(vals[i]);
+
+                    groundTruth.insert(keys[i], vals[i]);
+
+                }
+
+                final IIndexProcedure proc = BatchInsertConstructor.RETURN_NO_VALUES
+                        .newInstance(indexMetadata, 0/* fromIndex */,
+                                nentries/*toIndex*/, keys, vals);
+
+                // submit the task and wait for it to complete.
+                concurrencyManager.submit(
+                        new IndexProcedureTask(concurrencyManager, ITx.UNISOLATED,
+                                name, proc)).get();
+
+        }
+
+        // Verify the new writes showed up in the unisolated view.
+        {
+
+            final ILocalBTreeView actual = resourceManager.getIndex(name,
+                    ITx.UNISOLATED);
+
+            AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
+
+        }
+
+        /*
+         * Run the build task.
+         * 
+         * Note: The task start time is the timestamp of the BTree before we
+         * created the view checkpoint. This means that the generated index
+         * segment will have a createTime EQ to that commitTime and will have
+         * been generated from a fused view of all data as of the corresponding
+         * commit point.
+         */
+        final BuildResult result;
+        {
+
+            // grab the btree performance counters.
+            final BTreeCounters btreeCounters = resourceManager
+                    .getIndexCounters(name).clone();
+
+            final ViewMetadata vmd = new ViewMetadata(resourceManager,
+                    priorCommitTime1, name, btreeCounters);
+
+            // task to run.
+            final IncrementalBuildTask task = new IncrementalBuildTask(vmd);
+
+            try {
+
+                /*
+                 * Overflow must be disallowed as a task pre-condition.
+                 */
+                resourceManager.overflowAllowed.compareAndSet(true, false);
+
+                /*
+                 * Submit task and await result (metadata describing the new
+                 * index segment).
+                 */
+                result = concurrencyManager.submit(task).get();
+
+            } finally {
+
+                // re-enable overflow processing.
+                resourceManager.overflowAllowed.set(true);
+                
+            }
+
+            /*
+             * since all sources were incorporated into the build, this was
+             * actually a compacting merge.
+             */
+            assertTrue(result.compactingMerge);
+            
+            final IResourceMetadata segmentMetadata = result.segmentMetadata;
+
+            if (log.isInfoEnabled())
+                log.info(segmentMetadata.toString());
+
+            // verify index segment can be opened.
+            resourceManager.openStore(segmentMetadata.getUUID());
+
+            // verify createTime == commitTime for view checkpoint.
+            assertEquals("createTime", priorCommitTime1, segmentMetadata
+                    .getCreateTime());
+
+        }
+
+        /*
+         * Reverify the post-build view against the ground truth.
+         */
+        {
+
+            final ILocalBTreeView actual = resourceManager.getIndex(name,
+                    ITx.UNISOLATED);
+
+            AbstractBTreeTestCase.assertSameBTree(groundTruth, actual);
+
+        }
+
+//        /*
+//         * @todo do a compacting merge on the current state of the view and
+//         * verify the resulting view is compact and agrees with the ground truth
+//         * btree.
+//         */
+//
+//        // verify segment has all data in the groundTruth btree.
+//        {
+//
+//            final IndexSegmentStore segStore = (IndexSegmentStore) resourceManager
+//                    .openStore(segmentMetadata.getUUID());
+//
+//            final IndexSegment seg = segStore.loadIndexSegment();
+//
+//            AbstractBTreeTestCase.assertSameBTree(groundTruth, seg);
+//
+//        }
+
+    }
+
 }

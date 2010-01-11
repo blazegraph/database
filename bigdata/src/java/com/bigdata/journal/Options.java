@@ -33,6 +33,7 @@ import java.util.Properties;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileLockUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
@@ -77,9 +78,9 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
 public interface Options {
 
     /**
-     * The name of the file. If the file not found and {@link #CREATE} is true,
-     * then a new journal will be created. The filename extension {@value #JNL}
-     * is recommended.
+     * The name of the file. If the file not found (or if it exists but is
+     * empty) and {@link #CREATE} is true, then a new journal will be created.
+     * The filename extension {@value #JNL} is recommended.
      */
     String FILE = AbstractJournal.class.getName()+".file";
 
@@ -194,43 +195,51 @@ public interface Options {
      */
     String USE_DIRECT_BUFFERS = AbstractJournal.class.getName()+".useDirectBuffers";
 
-    /**
-     * An integer property whose value controls the size of the write cache (in
-     * records) (default {@value #DEFAULT_READ_CACHE_CAPACITY} bytes). A value
-     * of ZERO (0) will disable the read cache.
-     * <p>
-     * Note that only the {@link BufferMode#Disk} mode supports a read cache -
-     * most of the other modes are already fully buffered.
-     * 
-     * @see #DEFAULT_READ_CACHE_CAPACITY
-     */
-    String READ_CACHE_CAPACITY = AbstractJournal.class.getName()+".readCacheCapacity";
+//    /**
+//     * An integer property whose value controls the size of the write cache (in
+//     * records) (default {@value #DEFAULT_READ_CACHE_CAPACITY} bytes). A value
+//     * of ZERO (0) will disable the read cache.
+//     * <p>
+//     * Note that only the {@link BufferMode#Disk} mode supports a read cache -
+//     * most of the other modes are already fully buffered.
+//     * 
+//     * @see #DEFAULT_READ_CACHE_CAPACITY
+//     */
+//    String READ_CACHE_CAPACITY = AbstractJournal.class.getName()+".readCacheCapacity";
+//
+//    /**
+//     * An integer property whose value is the maximum size of a record that will
+//     * be allowed into the optional read cache. Records larger than this size
+//     * are always read from the backing store.
+//     * 
+//     * @see #DEFAULT_READ_CACHE_MAX_RECORD_SIZE
+//     */
+//    String READ_CACHE_MAX_RECORD_SIZE = AbstractJournal.class.getName()+".readCacheMaxRecordSize";
 
     /**
-     * An integer property whose value is the maximum size of a record that will
-     * be allowed into the optional read cache. Records larger than this size
-     * are always read from the backing store.
-     * 
-     * @see #DEFAULT_READ_CACHE_MAX_RECORD_SIZE
+     * Option may be used to disable the write cache on the
+     * {@link DiskOnlyStrategy}. Generally, this option is only used by some
+     * unit tests to avoid direct buffer allocation using the
+     * {@link DirectBufferPool}.
      */
-    String READ_CACHE_MAX_RECORD_SIZE = AbstractJournal.class.getName()+".readCacheMaxRecordSize";
-
-    /**
-     * An integer property whose value controls the size of the write cache (in
-     * bytes) used by the selected {@link BufferMode} (default
-     * {@value #DEFAULT_WRITE_CACHE_CAPACITY} bytes). A value of ZERO (0) will
-     * disable the write cache.
-     * <p>
-     * Note: This value is ignored by some {@link BufferMode}s.
-     * <p>
-     * Note: The write cache is flushed incrementally each time it becomes full
-     * and on each commit. Therefore there is no point having a write cache that
-     * is significantly larger then the #of bytes which are written on average
-     * during a commit.
-     * 
-     * @see #DEFAULT_WRITE_CACHE_CAPACITY
-     */
-    String WRITE_CACHE_CAPACITY = AbstractJournal.class.getName()+".writeCacheCapacity";
+    String WRITE_CACHE_ENABLED = AbstractJournal.class.getName()+".writeCacheEnabled";
+    
+//    /**
+//     * An integer property whose value controls the size of the write cache (in
+//     * bytes) used by the selected {@link BufferMode} (default
+//     * {@value #DEFAULT_WRITE_CACHE_CAPACITY} bytes). A value of ZERO (0) will
+//     * disable the write cache.
+//     * <p>
+//     * Note: This value is ignored by some {@link BufferMode}s.
+//     * <p>
+//     * Note: The write cache is flushed incrementally each time it becomes full
+//     * and on each commit. Therefore there is no point having a write cache that
+//     * is significantly larger then the #of bytes which are written on average
+//     * during a commit.
+//     * 
+//     * @see #DEFAULT_WRITE_CACHE_CAPACITY
+//     */
+//    String WRITE_CACHE_CAPACITY = AbstractJournal.class.getName()+".writeCacheCapacity";
 
     /**
      * The initial extent of the journal (bytes). When the journal is backed by
@@ -250,7 +259,7 @@ public interface Options {
 
     long minimumInitialExtent = Bytes.megabyte;
 
-    int minimumWriteCacheCapacity = Bytes.megabyte32;
+//    int minimumWriteCacheCapacity = Bytes.megabyte32;
 
     /**
      * The maximum extent of the journal (bytes). The journal will
@@ -302,11 +311,14 @@ public interface Options {
      * point in doing so.
      */
     String ALTERNATE_ROOT_BLOCK = AbstractJournal.class.getName()+".alternateRootBlock";
-    
+
     /**
      * An optional boolean property (default is {@value #DEFAULT_CREATE}). When
-     * <code>true</code> and the named file is not found, a new journal will
-     * be created.
+     * <code>true</code> and the named file is not found, a new journal will be
+     * created. If the file exists but is empty, then a new journal will be
+     * initialized on that file (this makes it possible to use the temporary
+     * file mechanism to atomically create the file on which the journal will be
+     * initialized).
      */
     String CREATE = AbstractJournal.class.getName()+".create";
 
@@ -405,9 +417,12 @@ public interface Options {
     String DOUBLE_SYNC = AbstractJournal.class.getName()+".doubleSync";
 
     /**
-     * This boolean option causes a new file to
-     * be created using the {@link File#createTempFile(String, String, File)}
-     * temporary file mechanism.
+     * This boolean option causes a new file to be created using the
+     * {@link File#createTempFile(String, String, File)} temporary file
+     * mechanism. However, if all you need is an atomic create of a new
+     * filename, you can just create the temporary file and then pass it in
+     * using {@link #FILE} since an empty file will be initialized as a new
+     * journal.
      * <p>
      * Note: If {@link #DELETE_ON_EXIT} is also specified, then the temporary
      * file will be {@link File#deleteOnExit() marked for deletion} when the JVM
@@ -419,8 +434,8 @@ public interface Options {
      * the {@link #TMP_DIR} option.
      * <p>
      * Note: In order to re-open a journal that was created with this option you
-     * MUST (a) set this option to <code>false</code> and (b) set
-     * {@link #FILE} to the value returned by {@link AbstractJournal#getFile()}.
+     * MUST (a) set this option to <code>false</code> and (b) set {@link #FILE}
+     * to the value returned by {@link AbstractJournal#getFile()}.
      */
     String CREATE_TEMP_FILE = AbstractJournal.class.getName()+".createTempFile";
     
@@ -476,10 +491,17 @@ public interface Options {
      */
     String DEFAULT_USE_DIRECT_BUFFERS = "false";
 
+//    /**
+//     * The default for {@link #WRITE_CACHE_CAPACITY} (1M).
+//     */
+//    String DEFAULT_WRITE_CACHE_CAPACITY = ""+(1 * Bytes.megabyte32);
+    
     /**
-     * The default for {@link #WRITE_CACHE_CAPACITY} (1M).
+     * The {@link DiskOnlyStrategy} write cache is enabled by default.
+     * 
+     * @see #WRITE_CACHE_ENABLED
      */
-    String DEFAULT_WRITE_CACHE_CAPACITY = ""+(1 * Bytes.megabyte32);
+    String DEFAULT_WRITE_CACHE_ENABLED = "true";
     
     /**
      * The default for {@link #READ_CACHE_CAPACITY}.

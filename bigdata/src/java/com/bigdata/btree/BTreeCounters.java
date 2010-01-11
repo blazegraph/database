@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -33,11 +36,11 @@ import com.bigdata.counters.Instrument;
  * Note: This class DOES NOT have a hard reference to the {@link AbstractBTree}.
  * Holding an instance of this class WILL NOT force the {@link AbstractBTree} to
  * remain strongly reachable.
- * 
- * @todo counters need to be atomic if we want to avoid the possibility of
- *       concurrent <code>x++</code> operations failing to correctly increment
- *       <code>x</code> for each request. I have not seen any problems
- *       resulting from this.
+ * <p>
+ * Note: Counters for mutation are plain fields. Counters for read-only
+ * operations are {@link AtomicLong} or {@link AtomicInteger} objects since read
+ * operations may involve high concurrently and could otherwise lead to lost
+ * counter updates.
  * 
  * @todo {@link #add(BTreeCounters)}, {@link #subtract(BTreeCounters)} and the
  *       copy ctor are not atomic. I have not seen any problems resulting from
@@ -48,17 +51,18 @@ import com.bigdata.counters.Instrument;
  * @todo instrument bloom filter time when the bloom filter is used (this should
  *       be done separately on the bloom filter object).
  * 
- * @todo At present, deserialization is much slower than serialization,
- *       primarily because of object creation. Changing to a raw record format
- *       for nodes and leaves would likely reduce the deserialization costs
- *       significantly. The time could also be reduced by lazy decompression of
- *       the values and lazy deserialization of the values such that tuple scans
- *       for keys only do not require value deserialization.
+ * @todo (I should recheck these costs now that that refactor has been done). At
+ *       present, deserialization is much slower than serialization, primarily
+ *       because of object creation. Changing to a raw record format for nodes
+ *       and leaves would likely reduce the deserialization costs significantly.
+ *       The time could also be reduced by lazy decompression of the values and
+ *       lazy deserialization of the values such that tuple scans for keys only
+ *       do not require value deserialization.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-final public class BTreeCounters {
+final public class BTreeCounters implements Cloneable {
 
     public BTreeCounters() {
         
@@ -81,6 +85,16 @@ final public class BTreeCounters {
     public BTreeCounters(final BTreeCounters c) {
         
         add(c);
+        
+    }
+    
+    public BTreeCounters clone() {
+        
+        final BTreeCounters tmp = new BTreeCounters();
+        
+        tmp.add(this);
+        
+        return tmp;
         
     }
     
@@ -110,16 +124,16 @@ final public class BTreeCounters {
             throw new IllegalArgumentException();
         
         // IKeySearch
-        nfinds += o.nfinds;
-        ninserts += o.ninserts;
-        nremoves += o.nremoves;
+        nfinds.addAndGet(o.nfinds.get());
+        ninserts.addAndGet(o.ninserts.get());
+        nremoves.addAndGet(o.nremoves.get());
         // ILinearList
-        nindexOf += o.nindexOf; // Note: also does key search.
-        ngetKey  += o.ngetKey;
-        ngetValue += o.ngetValue;
+        nindexOf.addAndGet(o.nindexOf.get()); // Note: also does key search.
+        ngetKey.addAndGet(o.ngetKey.get());
+        ngetValue.addAndGet(o.ngetValue.get());
         // IRangeQuery
-        nrangeCount += o.nrangeCount;
-        nrangeIterator += o.nrangeIterator;
+        nrangeCount.addAndGet(o.nrangeCount.get());
+        nrangeIterator.addAndGet(o.nrangeIterator.get());
         // Structural mutation.
         rootsSplit += o.rootsSplit;
         rootsJoined += o.rootsJoined;
@@ -137,18 +151,18 @@ final public class BTreeCounters {
         ntupleUpdateValue += o.ntupleUpdateValue;
         ntupleUpdateDelete += o.ntupleUpdateDelete;
         ntupleRemove += o.ntupleRemove;
-        // IO
-        nodesRead += o.nodesRead;
-        leavesRead += o.leavesRead;
+        // IO reads
+        nodesRead.addAndGet(o.nodesRead.get());
+        leavesRead.addAndGet(o.leavesRead.get());
+        bytesRead.addAndGet(o.bytesRead.get());
+        readNanos.addAndGet(o.readNanos.get());
+        deserializeNanos.addAndGet(o.deserializeNanos.get());
+        // IO writes.
         nodesWritten += o.nodesWritten;
         leavesWritten += o.leavesWritten;
-        bytesRead += o.bytesRead;
         bytesWritten += o.bytesWritten;
-        
-        serializeNanos += o.serializeNanos;
-        deserializeNanos += o.deserializeNanos;
         writeNanos += o.writeNanos;
-        readNanos += o.readNanos;
+        serializeNanos += o.serializeNanos;
         
     }
     
@@ -171,16 +185,16 @@ final public class BTreeCounters {
          */
         
         // IKeySearch
-        t.nfinds -= o.nfinds;
-        t.ninserts -= o.ninserts;
-        t.nremoves -= o.nremoves;
+        t.nfinds.addAndGet(-o.nfinds.get());
+        t.ninserts.addAndGet(-o.ninserts.get());
+        t.nremoves.addAndGet(-o.nremoves.get());
         // ILinearList
-        t.nindexOf -= o.nindexOf; // Note: also does key search.
-        t.ngetKey  -= o.ngetKey;
-        t.ngetValue -= o.ngetValue;
+        t.nindexOf.addAndGet(-o.nindexOf.get()); // Note: also does key search.
+        t.ngetKey.addAndGet(-o.ngetKey.get());
+        t.ngetValue.addAndGet(-o.ngetValue.get());
         // IRangeQuery
-        t.nrangeCount -= o.nrangeCount;
-        t.nrangeIterator -= o.nrangeIterator;
+        t.nrangeCount.addAndGet(-o.nrangeCount.get());
+        t.nrangeIterator.addAndGet(-o.nrangeIterator.get());
         // Structural mutation.
         t.rootsSplit -= o.rootsSplit;
         t.rootsJoined -= o.rootsJoined;
@@ -198,18 +212,18 @@ final public class BTreeCounters {
         t.ntupleUpdateValue -= o.ntupleUpdateValue;
         t.ntupleUpdateDelete -= o.ntupleUpdateDelete;
         t.ntupleRemove -= o.ntupleRemove;
-        // IO
-        t.nodesRead -= o.nodesRead;
-        t.leavesRead -= o.leavesRead;
+        // IO reads
+        t.nodesRead.addAndGet(-o.nodesRead.get());
+        t.leavesRead.addAndGet(-o.leavesRead.get());
+        t.bytesRead.addAndGet(-o.bytesRead.get());
+        t.readNanos.addAndGet(-o.readNanos.get());
+        t.deserializeNanos.addAndGet(-o.deserializeNanos.get());
+        // IO writes.
         t.nodesWritten -= o.nodesWritten;
         t.leavesWritten -= o.leavesWritten;
-        t.bytesRead -= o.bytesRead;
         t.bytesWritten -= o.bytesWritten;
-        
         t.serializeNanos -= o.serializeNanos;
-        t.deserializeNanos -= o.deserializeNanos;
         t.writeNanos -= o.writeNanos;
-        t.readNanos -= o.readNanos;
         
         return t;
         
@@ -220,17 +234,17 @@ final public class BTreeCounters {
      * those rejected by the bloom filter before they are tested against the
      * B+Tree).
      */
-    public long nfinds = 0;
-    public long ninserts = 0;
-    public long nremoves = 0;
+    public final AtomicLong nfinds = new AtomicLong();
+    public final AtomicLong ninserts = new AtomicLong();
+    public final AtomicLong nremoves = new AtomicLong();
     // ILinearList
-    public long nindexOf = 0;
-    public long ngetKey = 0;
-    public long ngetValue = 0;
+    public final AtomicLong nindexOf = new AtomicLong();
+    public final AtomicLong ngetKey = new AtomicLong();
+    public final AtomicLong ngetValue = new AtomicLong();
     // IRangeQuery
-    public long nrangeCount = 0;
-    public long nrangeIterator = 0;
-    // Structural change.
+    public final AtomicLong nrangeCount = new AtomicLong();
+    public final AtomicLong nrangeIterator = new AtomicLong();
+    // Structural change (single-threaded, so plain variables are Ok).
     public int rootsSplit = 0;
     public int rootsJoined = 0;
     public int nodesSplit = 0;
@@ -292,29 +306,34 @@ final public class BTreeCounters {
      * when the B+Tree does not support delete markers).
      */
     public long ntupleRemove = 0;
+
+    /*
+     * IO times.
+     * 
+     * Note: The nanosecond time fields are for nodes + leaves.
+     */
     
-    // IO
-    public int nodesRead = 0;
-    public int leavesRead = 0;
+    // IO reads (concurrent)
+    public final AtomicInteger nodesRead = new AtomicInteger();
+    public final AtomicInteger leavesRead = new AtomicInteger();
+    public final AtomicLong bytesRead = new AtomicLong();
+    public final AtomicLong readNanos = new AtomicLong();
+    public final AtomicLong deserializeNanos = new AtomicLong();
+
+    // IO writes (single-threaded)
     public int nodesWritten = 0;
     public int leavesWritten = 0;
-    public long bytesRead = 0L;
     public long bytesWritten = 0L;
-    /*
-     * Note: The nano time fields are for nodes+leaves.
-     */
-    public long serializeNanos = 0;
-    public long deserializeNanos = 0;
     public long writeNanos = 0;
-    public long readNanos = 0;
-
+    public long serializeNanos = 0;
+    
     /**
      * Return a score whose increasing value is correlated with the amount of
      * read/write activity on an index as reflected in these
      * {@link BTreeCounters}.
      * <p>
      * The score is the serialization / deserialization time plus the read /
-     * write time. Time was choosen since it is a common unit and since it
+     * write time. Time was chosen since it is a common unit and since it
      * reflects the combination of CPU time, memory time (for allocations and
      * garbage collection - the latter can be quite significant), and the disk
      * wait time. The other main component of time is key search, but that is
@@ -342,8 +361,8 @@ final public class BTreeCounters {
     public double computeRawReadWriteScore() {
         
         return //
-            (serializeNanos + deserializeNanos) + //
-            (writeNanos + readNanos)//
+            (serializeNanos + deserializeNanos.get()) + //
+            (writeNanos + readNanos.get())//
             ;
         
     }
@@ -357,7 +376,7 @@ final public class BTreeCounters {
      */
     public double computeRawReadScore() {
         
-        return deserializeNanos + readNanos;
+        return deserializeNanos.get() + readNanos.get();
         
     }
 
@@ -420,7 +439,7 @@ final public class BTreeCounters {
      */
     final public long getBytesRead() {
         
-        return bytesRead;
+        return bytesRead.get();
         
     }
     
@@ -455,19 +474,19 @@ final public class BTreeCounters {
 
                 tmp.addCounter("find", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(nfinds);
+                        setValue(nfinds.get());
                     }
                 });
 
                 tmp.addCounter("insert", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(ninserts);
+                        setValue(ninserts.get());
                     }
                 });
 
                 tmp.addCounter("remove", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(nremoves);
+                        setValue(nremoves.get());
                     }
                 });
             }
@@ -481,19 +500,19 @@ final public class BTreeCounters {
 
                 tmp.addCounter("indexOf", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(nindexOf);
+                        setValue(nindexOf.get());
                     }
                 });
 
                 tmp.addCounter("getKey", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(ngetKey);
+                        setValue(ngetKey.get());
                     }
                 });
 
                 tmp.addCounter("getValue", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(ngetValue);
+                        setValue(ngetValue.get());
                     }
                 });
                 
@@ -514,13 +533,13 @@ final public class BTreeCounters {
 
                 tmp.addCounter("rangeCount", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(nrangeCount);
+                        setValue(nrangeCount.get());
                     }
                 });
                 
                 tmp.addCounter("rangeIterator", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(nrangeIterator);
+                        setValue(nrangeIterator.get());
                     }
                 });
                 
@@ -648,13 +667,13 @@ final public class BTreeCounters {
 
                 tmp.addCounter("leafReadCount", new Instrument<Integer>() {
                     protected void sample() {
-                        setValue(leavesRead);
+                        setValue(leavesRead.get());
                     }
                 });
 
                 tmp.addCounter("nodeReadCount", new Instrument<Integer>() {
                     protected void sample() {
-                        setValue(nodesRead);
+                        setValue(nodesRead.get());
                     }
                 });
 
@@ -675,13 +694,13 @@ final public class BTreeCounters {
                  */
                 tmp.addCounter("bytesRead", new Instrument<Long>() {
                     protected void sample() {
-                        setValue(bytesRead);
+                        setValue(bytesRead.get());
                     }
                 });
 
                 tmp.addCounter("readSecs", new Instrument<Double>() {
                     public void sample() {
-                        final double elapsedReadSecs = (readNanos / 1000000000.);
+                        final double elapsedReadSecs = (readNanos.get() / 1000000000.);
                         setValue(elapsedReadSecs);
                     }
                 });
@@ -689,9 +708,9 @@ final public class BTreeCounters {
                 tmp.addCounter("bytesReadPerSec",
                         new Instrument<Double>() {
                             public void sample() {
-                                final double readSecs = (readNanos / 1000000000.);
+                                final double readSecs = (readNanos.get() / 1000000000.);
                                 final double bytesReadPerSec = (readSecs == 0L ? 0d
-                                        : (bytesRead / readSecs));
+                                        : (bytesRead.get() / readSecs));
                                 setValue(bytesReadPerSec);
                             }
                         });
@@ -738,14 +757,14 @@ final public class BTreeCounters {
                             public void sample() {
                                 final double serializeSecs = (serializeNanos / 1000000000.);
                                 final double serializePerSec = (serializeSecs== 0L ? 0d
-                                        : ((nodesRead+leavesRead) / serializeSecs));
+                                        : ((nodesRead.get()+leavesRead.get()) / serializeSecs));
                                 setValue(serializePerSec);
                             }
                         });
 
                 tmp.addCounter("deserializeSecs", new Instrument<Double>() {
                     public void sample() {
-                        final double deserializeSecs = (deserializeNanos / 1000000000.);
+                        final double deserializeSecs = (deserializeNanos.get() / 1000000000.);
                         setValue(deserializeSecs);
                     }
                 });
@@ -753,9 +772,9 @@ final public class BTreeCounters {
                 tmp.addCounter("deserializePerSec",
                         new Instrument<Double>() {
                             public void sample() {
-                                final double deserializeSecs = (deserializeNanos / 1000000000.);
+                                final double deserializeSecs = (deserializeNanos.get() / 1000000000.);
                                 final double deserializePerSec = (deserializeSecs== 0L ? 0d
-                                        : ((nodesRead+leavesRead) / deserializeSecs));
+                                        : ((nodesRead.get()+leavesRead.get()) / deserializeSecs));
                                 setValue(deserializePerSec);
                             }
                         });
