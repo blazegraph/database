@@ -78,7 +78,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
@@ -3036,6 +3035,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * RingBuffer#add(ref) reporting that size == capacity, which indicates
          * that the size was not updated consistently and hence is basically a
          * concurrency problem.
+         * 
+         * @todo Actually, I think that this is just a fence post in ringbuffer
+         * beforeOffer() method and the code might work without the synchronized
+         * block if the fence post was fixed.
          */
 
         synchronized (this) {

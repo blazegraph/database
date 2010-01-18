@@ -680,6 +680,42 @@ ${postInstallMessage}</echo>
 	</apply>
 </target>
 
+<!-- lubm runtime classpath w/o install. -->
+<path id="lubm.runtime.classpath">
+	<pathelement location="${build.dir}/lubm/classes"/>
+	<pathelement location="${build.dir}/classes" />
+	<path refid="build.classpath" />
+</path>
+
+<target name="lubm-load" depends="lubm-compile" description="Load data into a configured lubm test harness, typically standalone.">
+
+	<java classname="edu.lehigh.swat.bench.ubt.Test"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="lubm.runtime.classpath"/>
+		<jvmarg value="-Xmx1024m" />
+		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties"/>
+		<arg value="load" />
+		<arg value="bigdata-lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata" />
+	</java>
+	
+</target>
+		
+<target name="lubm-test" depends="lubm-compile" description="Run queries against a configured lubm test harness, typically standalone.">
+
+	<java classname="edu.lehigh.swat.bench.ubt.Test"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="lubm.runtime.classpath" />
+		<jvmarg value="-Xmx1024m" />
+		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties"/>
+		<arg value="query" />
+		<arg value="bigdata-lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/config.kb.bigdata" />
+		<arg value="bigdata-lubm/src/java/edu/lehigh/swat/bench/ubt/bigdata/config.query.sparql" />
+	</java>
+	
+</target>
+		
 <target name="scale-out-sample" description="Run the scale-out sample code.">
 
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
