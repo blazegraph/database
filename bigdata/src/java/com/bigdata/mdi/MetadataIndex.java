@@ -195,9 +195,9 @@ public class MetadataIndex extends BTree implements IMetadataIndex {
      * @param checkpoint
      * @param metadata
      */
-    public MetadataIndex(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+    public MetadataIndex(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
         
-        super(store, checkpoint, metadata);
+        super(store, checkpoint, metadata, readOnly);
 
         /*
          * copy the initial value from the checkpoint record.

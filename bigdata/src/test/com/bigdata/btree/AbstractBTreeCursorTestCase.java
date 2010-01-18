@@ -62,9 +62,14 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTes
 
         BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(UUID.randomUUID()));
         
-        if (isReadOnly())
-            btree.setReadOnly(true);
- 
+        if(isReadOnly()) {
+            
+            btree.writeCheckpoint();
+            
+            btree = btree.asReadOnly();
+            
+        }
+        
         doEmptyIndexTest(btree);
         
     }
@@ -73,8 +78,13 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTes
 
         BTree btree = getOneTupleBTree();
         
-        if (isReadOnly())
-            btree.setReadOnly(true);
+        if(isReadOnly()) {
+            
+            btree.writeCheckpoint();
+            
+            btree = btree.asReadOnly();
+            
+        }
  
         doOneTupleTest(btree);
 
@@ -82,9 +92,15 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTes
 
     public void test_baseCase() {
         
-        final BTree btree = getBaseCaseBTree();
+        BTree btree = getBaseCaseBTree();
 
-        btree.setReadOnly(isReadOnly());
+        if(isReadOnly()) {
+            
+            btree.writeCheckpoint();
+            
+            btree = btree.asReadOnly();
+            
+        }
         
         doBaseCaseTest(btree);
         
@@ -96,12 +112,14 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTes
      */
     public void test_keyRange_correctRejection() {
 
-        final BTree btree = BTree.create(new SimpleMemoryRawStore(),
+        BTree btree = BTree.create(new SimpleMemoryRawStore(),
                 new IndexMetadata(UUID.randomUUID()));
 
         if(isReadOnly()) {
             
-            btree.setReadOnly(true);
+            btree.writeCheckpoint();
+            
+            btree = btree.asReadOnly();
             
         }
         

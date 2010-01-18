@@ -847,13 +847,14 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
          * @param checkpoint
          * @param metadata
          */
-        public NoEvictionBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+        public NoEvictionBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
          
-            super(store, checkpoint, metadata);
+            super(store, checkpoint, metadata, readOnly);
             
         }
-        
-        protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+
+        @Override
+        protected HardReferenceQueue<PO> newWriteRetentionQueue(boolean readOnly) {
 
             return new HardReferenceQueue<PO>(//
                     new NoEvictionListener(),//
@@ -1501,7 +1502,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 if (trace >= 2) {
 
                     System.err.println("Before insert: index=" + i + ", key="
-                            + key);
+                            + BytesUtil.toString(key));
                     assertTrue(btree.dump(System.err));
 
                 }
@@ -1511,7 +1512,7 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                 if (trace >= 2) {
 
                     System.err.println("After insert: index=" + i + ", key="
-                            + key);
+                            + BytesUtil.toString(key));
                     
                     assertTrue(btree.dump(System.err));
 
@@ -1893,21 +1894,21 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
 
             final byte[] key = keys[order[i]];
             
-            SimpleEntry val = vals[order[i]];
+            final SimpleEntry val = vals[order[i]];
             
             //System.err.println("i="+i+", key="+key+", val="+val);
             
             // lookup finds the key, return the correct value.
-            assertEquals("lookup("+key+")", val,btree.lookup(key));
+            assertEquals("lookup("+BytesUtil.toString(key)+")", val,btree.lookup(key));
             
             // remove returns the existing key.
-            assertEquals("remove(" + key+")", val, btree.remove(key));
+            assertEquals("remove(" + BytesUtil.toString(key)+")", val, btree.remove(key));
             
             // verify structure.
             assertTrue(btree.dump(Level.ERROR,System.out));
 
             // lookup no longer finds the key.
-            assertNull("lookup("+key+")",BytesUtil.toString(btree.lookup(key)));
+            assertNull("lookup("+BytesUtil.toString(key)+")",btree.lookup(key));
 
         }
         
@@ -2130,18 +2131,10 @@ abstract public class AbstractBTreeTestCase extends TestCase2 {
                     /*
                      * Lazily generate message.
                      */
-                    fail("Values differ: index="
-                            + index
-                            + ", key="
-                            + BytesUtil.toString(expectedKey)
-                            + ", expected="
-                            + (expectedVal instanceof byte[] ? BytesUtil
-                                    .toString((byte[]) expectedVal)
-                                    : expectedVal)
-                            + ", actual="
-                            + (actualVal instanceof byte[] ? BytesUtil
-                                    .toString((byte[]) actualVal) : actualVal),
-                            ex);
+                    fail("Values differ: index=" + index + ", key="
+                            + BytesUtil.toString(expectedKey) + ", expected="
+                            + Arrays.toString(expectedVal) + ", actual="
+                            + Arrays.toString(actualVal), ex);
 
                 }
 

@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.IHardReferenceQueue;
 
 /**
  * Hard reference cache eviction listener for leaves always throws an
@@ -43,7 +43,7 @@ import com.bigdata.cache.HardReferenceQueue;
 public class NoEvictionListener implements
         IEvictionListener {
 
-    public void evicted(HardReferenceQueue<PO> cache, PO ref) {
+    public void evicted(IHardReferenceQueue<PO> cache, PO ref) {
 
         assert ref instanceof Leaf;
         

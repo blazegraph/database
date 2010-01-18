@@ -89,12 +89,12 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
 
     /**
      * Return a B+Tree populated with data for
-     * {@link #doBaseCaseTest(IndexSegment)}
+     * {@link #doBaseCaseTest(AbstractBTree)}.
      */
     protected BTree getBaseCaseBTree() {
 
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
-                UUID.randomUUID()));
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(),
+                new IndexMetadata(UUID.randomUUID()));
 
         btree.insert(10, "Bryan");
         btree.insert(20, "Mike");

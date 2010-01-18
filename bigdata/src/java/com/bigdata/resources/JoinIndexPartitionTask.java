@@ -445,7 +445,7 @@ public class JoinIndexPartitionTask extends AbstractPrepareTask<JoinResult> {
                  */
                 final BTree btree = BTree
                         .load(resourceManager.getLiveJournal(),
-                                result.checkpointAddr);
+                                result.checkpointAddr, false /* readOnly */ );
                 // resourceManager.getLiveJournal().getIndex(result.checkpointAddr);
 
                 assert btree != null;

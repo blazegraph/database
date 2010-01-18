@@ -35,8 +35,6 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -1621,91 +1619,101 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             _commitRecord = _getCommitRecord();
 
             /*
-             * Convert all of the unisolated BTree objects into read-historical
-             * BTrees as of the lastCommitTime on the journal. This is done in
-             * order to benefit from any data buffered by those BTrees since
-             * buffered data is data that we don't need to read from disk and we
-             * don't need to de-serialize. This is especially important for
-             * asynchronous overflow processing which performs full index scans
-             * of the BTree's shortly after synchronous overflow process (and
-             * which is the main reason why closeForWrites() exists).
-             * 
-             * Note: The caller already promises that they hold the exclusive
-             * write lock so we don't really need to synchronize on [name2Addr].
-             * 
-             * Note: If we find a dirty mutable BTree then we ignore it rather
-             * than repurposing it. This allows the possibility that there are
-             * uncommitted writes.
+             * FIXME Verify that we can safely convert the writeRetentionQueue
+             * and readOnly flags on the BTree and then re-enable this code
+             * block. The tricky issue is the safe publication of the change to
+             * the writeRetentionQueue field (and populating it with the old
+             * queue's data) and the readOnly field. If those changes are not
+             * safely published then I also need to consider what the side
+             * effects of inconsistent views of those fields might be. One way
+             * to handle the safe publication is using AtomicBoolean and
+             * AtomicReference for those fields.
              */
-            synchronized (_name2Addr) {
-
-                final Iterator<Map.Entry<String, WeakReference<BTree>>> itr = _name2Addr
-                        .indexCacheEntryIterator();
-
-                while (itr.hasNext()) {
-
-                    final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr
-                            .next();
-
-                    final String name = entry.getKey();
-
-                    final BTree btree = entry.getValue().get();
-
-                    if (btree == null) {
-
-                        // Note: Weak reference was cleared.
-                        continue;
-
-                    }
-
-                    if (btree.needsCheckpoint()) {
-
-                        // Note: Don't convert a dirty BTree.
-                        continue;
-
-                    }
-
-                    // Recover the Entry which has the last checkpointAddr.
-                    final Name2Addr.Entry _entry = _name2Addr.getEntry(name);
-
-                    if (_entry == null) {
-
-                        /*
-                         * There must be an Entry for each index in Name2Addr's
-                         * cache.
-                         */
-
-                        throw new AssertionError("No entry: name=" + name);
-
-                    }
-
-                    /*
-                     * Mark the index as read-only (the whole journal no longer
-                     * accepts writes) before placing it in the historical index
-                     * cache (we don't want concurrent requests to be able to
-                     * obtain a BTree that is not marked as read-only from the
-                     * historical index cache).
-                     */
-
-                    btree.setReadOnly(true);
-
-                    /*
-                     * Put the BTree into the historical index cache under that
-                     * checkpointAddr.
-                     * 
-                     * Note: putIfAbsent() avoids the potential problem of
-                     * having more than one object for the same checkpointAddr.
-                     */
-
-                    historicalIndexCache.putIfAbsent(_entry.checkpointAddr,
-                            btree);
-
-                } // next index.
-
-                // discard since no writers are allowed.
-                _name2Addr = null;
-
-            }
+//            /* Convert all of the unisolated BTree objects into read-historical
+//             * BTrees as of the lastCommitTime on the journal. This is done in
+//             * order to benefit from any data buffered by those BTrees since
+//             * buffered data is data that we don't need to read from disk and we
+//             * don't need to de-serialize. This is especially important for
+//             * asynchronous overflow processing which performs full index scans
+//             * of the BTree's shortly after synchronous overflow process (and
+//             * which is the main reason why closeForWrites() exists).
+//             * 
+//             * Note: The caller already promises that they hold the exclusive
+//             * write lock so we don't really need to synchronize on [name2Addr].
+//             * 
+//             * Note: If we find a dirty mutable BTree then we ignore it rather
+//             * than repurposing it. This allows the possibility that there are
+//             * uncommitted writes.
+//             */
+//            synchronized (_name2Addr) {
+//
+//                final Iterator<Map.Entry<String, WeakReference<BTree>>> itr = _name2Addr
+//                        .indexCacheEntryIterator();
+//
+//                while (itr.hasNext()) {
+//
+//                    final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr
+//                            .next();
+//
+//                    final String name = entry.getKey();
+//
+//                    final BTree btree = entry.getValue().get();
+//
+//                    if (btree == null) {
+//
+//                        // Note: Weak reference was cleared.
+//                        continue;
+//
+//                    }
+//
+//                    if (btree.needsCheckpoint()) {
+//
+//                        // Note: Don't convert a dirty BTree.
+//                        continue;
+//
+//                    }
+//
+//                    // Recover the Entry which has the last checkpointAddr.
+//                    final Name2Addr.Entry _entry = _name2Addr.getEntry(name);
+//
+//                    if (_entry == null) {
+//
+//                        /*
+//                         * There must be an Entry for each index in Name2Addr's
+//                         * cache.
+//                         */
+//
+//                        throw new AssertionError("No entry: name=" + name);
+//
+//                    }
+//
+//                    /*
+//                     * Mark the index as read-only (the whole journal no longer
+//                     * accepts writes) before placing it in the historical index
+//                     * cache (we don't want concurrent requests to be able to
+//                     * obtain a BTree that is not marked as read-only from the
+//                     * historical index cache).
+//                     */
+//
+//                    btree.convertToReadOnly();
+//
+//                    /*
+//                     * Put the BTree into the historical index cache under that
+//                     * checkpointAddr.
+//                     * 
+//                     * Note: putIfAbsent() avoids the potential problem of
+//                     * having more than one object for the same checkpointAddr.
+//                     */
+//
+//                    historicalIndexCache.putIfAbsent(_entry.checkpointAddr,
+//                            btree);
+//
+//                } // next index.
+//
+//                // discard since no writers are allowed.
+//                _name2Addr = null;
+//
+//            }
 
             // close();
 
@@ -2551,7 +2559,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         } else {
 
             /*
-             * Reload the btree from its checkpoint address.
+             * Reload the mutable btree from its checkpoint address.
              * 
              * Note: This is the live view of the B+Tree. In this specific case
              * we DO NOT use the canonicalizing mapping since we do not want
@@ -2700,7 +2708,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         } else {
 
             /*
-             * Reload the btree from its root address.
+             * Reload the mutable btree from its root address.
              */
 
             ndx = (CommitRecordIndex) BTree.load(this, addr);

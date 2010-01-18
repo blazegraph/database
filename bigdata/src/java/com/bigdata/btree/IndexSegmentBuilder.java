@@ -115,43 +115,48 @@ import com.bigdata.rawstore.WormAddressManager;
  * @see IndexSegmentCheckpoint
  * @see IndexSegmentMerger
  * 
- * @todo There are at least three design alternatives for handling the fast
- *       range count during builds: (A) do an exact range count instead and
- *       generate a perfect plan; (B) fully buffer the source iterator into
- *       byte[][] keys, byte[][] vals, boolean[] deleteMarkers, and long[]
- *       versionTimestamps and generate an exact plan, consuming the buffered
- *       byte[]s directly from RAM; and (C) use the fast range count to generate
- *       a plan based on an overestimate of the tuple count and then apply a
- *       variety of hacks when the source iterator is exhausted to make the
- *       output B+Tree usable, but not well formed.
- *       <p>
- *       The disadvantage of (C) is that the hacks break encapsulation and can
- *       leak into the API where operations such as the sibling of a node could
- *       return an empty leaf. It seems like it would be difficult to have
- *       confidence that the B+Tree API was fully insulated against the effects
- *       of ill-formed {@link IndexSegment}s. In fact, I do not like these side
- *       effects enough that it could be worthwhile to back the changes out of
- *       the Node and Leaf classes.
- *       <p>
- *       The disadvantage of (A) is that it requires two passes over the source
- *       view. Those passes could cause churn in the global LRU and could defeat
- *       caching for a view approaching the nominal size for a split.
- *       <p>
- *       The disadvantage of (B) is that it requires more memory. If the JVM is
- *       tight on memory, then we could single thread builds, merges, and splits
- *       or fall back to (A). If the source view is much larger than the nominal
- *       size (or the fast range count is much larger than we would expect) then
- *       we could fall back to (A). The memory burden could be eased if
- *       copyTuple() was overridden to move the byte[] key and byte[] val
- *       references, clearing them from the source byte[][] keys and byte[][]
- *       vals as they were consumed.
- *       <p>
- *       Another optimization for (B) is to write the leaves directly on the
- *       backing file using double-buffering or directly updating the prior/next
- *       addrs and to buffer the nodes in memory, writing them once the leaves
- *       are finished.
- *       <p>
- *       It occurs to me that if we have the data in a bunch of byte[][]s we
+ *      FIXME Implement (B). There are at least three design alternatives for
+ *      faster builds: (A) do an exact range count instead and generate a
+ *      perfect plan; (B) fully buffer the source iterator into byte[][] keys,
+ *      byte[][] vals, boolean[] deleteMarkers, and long[] versionTimestamps and
+ *      generate an exact plan, consuming the buffered byte[]s directly from
+ *      RAM; and (C) use the fast range count to generate a plan based on an
+ *      overestimate of the tuple count and then apply a variety of hacks when
+ *      the source iterator is exhausted to make the output B+Tree usable, but
+ *      not well formed.
+ *      <p>
+ *      The disadvantage of (C) is that the hacks break encapsulation and can
+ *      leak into the API where operations such as the sibling of a node could
+ *      return an empty leaf. It seems like it would be difficult to have
+ *      confidence that the B+Tree API was fully insulated against the effects
+ *      of ill-formed {@link IndexSegment}s. In fact, I do not like these side
+ *      effects enough that it could be worthwhile to back the changes out of
+ *      the Node and Leaf classes.
+ *      <p>
+ *      The disadvantage of (A) is that it requires two passes over the source
+ *      view. Those passes could cause churn in the global LRU and could defeat
+ *      caching for a view approaching the nominal size for a split.
+ *      <p>
+ *      The disadvantage of (B) is that it requires more memory. If the JVM is
+ *      tight on memory, then we could single thread builds, merges, and splits
+ *      or fall back to (A). If the source view is much larger than the nominal
+ *      size (or the fast range count is much larger than we would expect) then
+ *      we could fall back to (A), which suggests factory method returning an
+ *      instance of an abstract base class for (A) vs (B).
+ *      <p>
+ *      The memory burden of (B) could be eased if copyTuple() was overridden to
+ *      move the byte[] key and byte[] val references, clearing them from the
+ *      source byte[][] keys and byte[][] vals as they were consumed.
+ *      <p>
+ *      Another optimization for (B) is to write the leaves directly on the
+ *      backing file using double-buffering or directly updating the prior/next
+ *      addrs and to buffer the nodes in memory, writing them once the leaves
+ *      are finished.
+ * 
+ * @todo Make sure it is possible to grab the {@link IndexMetadata} and the
+ *       bloom filter from the generated file in a single IO.
+ * 
+ * @todo GPU parallel builds. Once we have the data in a bunch of byte[][]s we
  *       could conceivable get this stuff organized to the point where each
  *       tuple and child in the output B+Tree could be assigned to a thread and
  *       each leaf and node to a core on a GPU. At that point, we run the
@@ -171,6 +176,13 @@ import com.bigdata.rawstore.WormAddressManager;
  *       of the leaves from the (ordered) view and then do a parallel build
  *       segment from the backing representation. We could do that build step in
  *       java or on a GPU.
+ * 
+ * @todo done. Backout the changes to {@link Node}, {@link Leaf}, {@link BTree},
+ *       {@link AbstractBTree}, the {@link IndexSegmentBuilder},
+ *       {@link IndexSegment}, and the test suites to support underflow of a
+ *       node or leaf and to support materialization of an empty leaf from a 0L
+ *       childAddr for a {@link Node}. Per my notes above, underflow breaks
+ *       encapsulation and will not be supported.
  */
 public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     
@@ -574,7 +586,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             flags = IRangeQuery.DEFAULT;
 
-            // FIXME use the fast range count.
             final long n = src.rangeCountExact(fromKey, toKey);
             
             if (n > Integer.MAX_VALUE) {
@@ -600,7 +611,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             flags = IRangeQuery.DEFAULT | IRangeQuery.DELETED;
 
-            // FIXME use the fast range count.
             final long n = src.rangeCountExactWithDeleted(fromKey, toKey);
 
             if (n > Integer.MAX_VALUE) {
@@ -682,15 +692,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            (optional - the default temporary directory is used if this is
      *            <code>null</code>).
      * @param entryCount
-     *            The #of entries that will be visited by the iterator. This MAY
-     *            be an overestimate. By allowing an overestimate you can pass
-     *            in the fast range count for a view and generate a "good" (but
-     *            not perfect) index segment. This allows the caller to avoid
-     *            the cost of obtaining the exact range count for the view.
-     *            However, if the caller reports a rangeCount which is TOO SMALL
-     *            for the actual data then the index segment build will fail
-     *            because the {@link IndexSegmentPlan} will not contain enough
-     *            nodes/leaves to hold the tuples.
+     *            The #of entries that will be visited by the iterator. This MUST
+     *            be an exact range count.
      * @param entryIterator
      *            Visits the index entries in key order that will be written
      *            onto the {@link IndexSegment}.
@@ -1034,12 +1037,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              */
             buildBTree();
             
-// Note: These asserts can be violated if the rangeCount overestimates.
-//            // Verify that all leaves were written out.
-//            assert plan.nleaves == nleavesWritten;
-//            
-//            // Verify that all nodes were written out.
-//            assert plan.nnodes == nnodesWritten;
+            // Verify that all leaves were written out.
+            assert plan.nleaves == nleavesWritten;
+            
+            // Verify that all nodes were written out.
+            assert plan.nnodes == nnodesWritten;
 
             elapsed_build = System.currentTimeMillis() - begin_build;
             
@@ -1164,42 +1166,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * key as a separatorKey in the appropriate parent node.
      * <p>
      * Note: The root may be a leaf as a degenerate case.
-     * <p>
-     * Note: The right most leaf(s) and node(s) MAY underflow and/or MAY never
-     * be generated if the expected range count overestimates the actual number
-     * of tuples. This is a feature. It makes it possible to do a compacting
-     * merge without requiring a tuple scan first to obtain an exact range
-     * count. The resulting index segment is still very good, even if it is not
-     * perfect (some nodes and leaves may underflow), and it is much faster to
-     * produce since we only scan the source data once.
-     * <p>
-     * There are several consequences of this feature: (A) If the last leaf is
-     * never populated, then its address in the parent will remain NULL (0L) and
-     * the leaf will not be emitted; (B) When one or more leaves is not emitted,
-     * it may happen that the separator key was not assigned to the parent node
-     * already having at least one child leaf. If this occurs, then we assign
-     * successor(lastkey) as the successor key for that parent node; and (C) it
-     * may happen that the root node is never populated. In such cases we use
-     * the highest node whose separator key was assigned as the root (this
-     * generalization covers all cases, including when the range count was
-     * exact).
-     * <p>
-     * In order to support these changes to the build, the {@link AbstractBTree}
-     * (or at least the {@link IndexSegment}) must allow the rightSibling of a
-     * node having only a single key to be NULL (0L) and treat this as the right
-     * edge of the BTree. In addition, the {@link AbstractBTree} (or at least
-     * the {@link IndexSegment}) must allow a non-root leaf to underflow (down
-     * to one tuple) and to allow a non-root node to underflow (down to one
-     * separator key with no right child). These are all conditions which would
-     * indicate an ill-formed B+Tree under normal circumstances, but which must
-     * be explicitly allowed for an {@link IndexSegment} in order to support
-     * builds based on overestimates of the range count.
      * 
-     * FIXME Support underflow in the source tuple iterator.
-     * 
-     * @todo Verify correct rejection if the source iterator visits too many
-     *       tuples (or right expand the output BTree to handle the actual
-     *       tuples).
+     * @todo Verify correct rejection if the source iterator visits too many or
+     *       too few tuples.
      */
     protected void buildBTree() {
 
@@ -1501,8 +1470,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         if(parent != null) {
 
             addChild(parent, addr, node, exhausted);
-
-            // @todo assert weakened well-formedness module constraints.
             
         }
 
@@ -1580,54 +1547,54 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         parent.nchildren++;
 
         final int h = parent.level;
-        if (exhausted
-                && child.isLeaf()
-//                && parent != null
-                // #of separator keys LT planned childCount for parent.
-                && (parent.keys.nkeys + 1) < plan.numInNode[h][writtenInLevel[h]]) {
-
-            /*
-             * When the source iterator is exhausted before the expected #of
-             * tuples have been processed then the last leaf will be
-             * non-empty (we do not start a leaf unless there is at least
-             * one tuple on hand to copy into that leaf). Unless this is the
-             * root leaf, then its parent may lack a separator key since the
-             * separator key is chosen based on the first key to enter the
-             * next leaf and we will never generate that next leaf since
-             * there are no more tuples in the source iterator. This edge
-             * case is detected when the #of children in the parent of the
-             * last leaf is less than the #of planned children. Since we
-             * never saw the next planned leaf, we need to hack in a
-             * separator key for that leaf now so that queries LT the
-             * separator key are directed to the last leaf which we did see.
-             * This edge case is handled by adding a separatorKey based on
-             * successor(lastKey) to the parent of the last leaf.
-             */
-
-            final byte[] lastKey = leaf.keys.keys[leaf.keys.nkeys - 1];
-
-            final byte[] separatorKey = BytesUtil.successor(lastKey);
-
-            parent.keys.keys[parent.keys.nkeys++] = separatorKey;
-//            addSeparatorKey(parent, separatorKey);
-
-            /*
-             * @todo Note that the childAddr of the next leaf was already
-             * assigned since we allocate the leaf's record before it is
-             * populated, so we zero out that childAddr now. [The non-0L
-             * childAddr for this last least is not really a problem since it
-             * will never be visited by top-down navigation (the B+Tree will not
-             * have any data for keys GTE the successor key directing probes to
-             * that leaf). What is more important is that the
-             * IndexSegmentCheckpoint should not direct us to the empty last
-             * leaf and that the current leaf [node] should have nextAddr=0L so
-             * we never navigate to that last leaf.
-             * 
-             * @todo Write more detailed unit tests for these points.
-             */
-//            parent.childAddr[parent.keys.nkeys] = 0L;
-
-        }
+//        if (exhausted
+//                && child.isLeaf()
+////                && parent != null
+//                // #of separator keys LT planned childCount for parent.
+//                && (parent.keys.nkeys + 1) < plan.numInNode[h][writtenInLevel[h]]) {
+//
+//            /*
+//             * When the source iterator is exhausted before the expected #of
+//             * tuples have been processed then the last leaf will be
+//             * non-empty (we do not start a leaf unless there is at least
+//             * one tuple on hand to copy into that leaf). Unless this is the
+//             * root leaf, then its parent may lack a separator key since the
+//             * separator key is chosen based on the first key to enter the
+//             * next leaf and we will never generate that next leaf since
+//             * there are no more tuples in the source iterator. This edge
+//             * case is detected when the #of children in the parent of the
+//             * last leaf is less than the #of planned children. Since we
+//             * never saw the next planned leaf, we need to hack in a
+//             * separator key for that leaf now so that queries LT the
+//             * separator key are directed to the last leaf which we did see.
+//             * This edge case is handled by adding a separatorKey based on
+//             * successor(lastKey) to the parent of the last leaf.
+//             */
+//
+//            final byte[] lastKey = leaf.keys.keys[leaf.keys.nkeys - 1];
+//
+//            final byte[] separatorKey = BytesUtil.successor(lastKey);
+//
+//            parent.keys.keys[parent.keys.nkeys++] = separatorKey;
+////            addSeparatorKey(parent, separatorKey);
+//
+//            /*
+//             * @todo Note that the childAddr of the next leaf was already
+//             * assigned since we allocate the leaf's record before it is
+//             * populated, so we zero out that childAddr now. [The non-0L
+//             * childAddr for this last leaf is not really a problem since it
+//             * will never be visited by top-down navigation (the B+Tree will not
+//             * have any data for keys GTE the successor key directing probes to
+//             * that leaf). What is more important is that the
+//             * IndexSegmentCheckpoint should not direct us to the empty last
+//             * leaf and that the current leaf [node] should have nextAddr=0L so
+//             * we never navigate to that last leaf.
+//             * 
+//             * @todo Write more detailed unit tests for these points.
+//             */
+////            parent.childAddr[parent.keys.nkeys] = 0L;
+//
+//        }
 
         if (parent.nchildren == parent.max || exhausted) {
 
@@ -1946,10 +1913,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * 
              * Note: The last leaf is the one for which we allocated storage
              * immediately above.
-             * 
-             * Note: We must force out the last leaf when the source iterator is
-             * exhausted since the plan could have been generated from an
-             * overestimate of the range count.
              * 
              * Note: We only invoke flush() if a leaf has data so we should
              * never be in a position of writing out an empty leaf.
@@ -2304,7 +2267,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 nodeBuffer.close();
 
                 // Note: already encoded relative to NODE region.
-                // FIXME Use the highest node whose separator key was assigned.
                 addrRoot = (((SimpleNodeData) stack[0]).addr);
 
             } else {
@@ -2437,13 +2399,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             
             outChannel.position(0);
 
-            /*
-             * Note: The checkpoint needs to report the actual #of leaves,
-             * nodes, and tuples written -- not those in the plan since the plan
-             * can report more of each when the given range count is
-             * overestimates the actual #of tuples copied into the index
-             * segment.
-             */
             final IndexSegmentCheckpoint md = new IndexSegmentCheckpoint(
                     addressManager.getOffsetBits(), //
                     plan.height, // will always be correct.
@@ -2873,20 +2828,20 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         protected void reset(final int max) {
 
-            /*
-             * Note: We have to clear these arrays for the edge case when source
-             * iterator is prematurely exhausted. If we do not clear them then
-             * the last entry in each array can be non-zero when it should be 0L
-             * when the planned right child under a separatorKey in a Node was
-             * not emitted.
-             */
-            for (int i = 0; i < nchildren; i++) {
-
-                childAddr[i] = 0L;
-                
-                childEntryCount[i] = 0;
-                
-            }
+//            /*
+//             * Note: We have to clear these arrays for the edge case when source
+//             * iterator is prematurely exhausted. If we do not clear them then
+//             * the last entry in each array can be non-zero when it should be 0L
+//             * when the planned right child under a separatorKey in a Node was
+//             * not emitted.
+//             */
+//            for (int i = 0; i < nchildren; i++) {
+//
+//                childAddr[i] = 0L;
+//                
+//                childEntryCount[i] = 0;
+//                
+//            }
                 
             super.reset(max);
             

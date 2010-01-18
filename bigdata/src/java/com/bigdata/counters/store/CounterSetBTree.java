@@ -131,9 +131,9 @@ public class CounterSetBTree extends BTree {
      * @param metadata
      */
     public CounterSetBTree(IRawStore store, Checkpoint checkpoint,
-            IndexMetadata metadata) {
+            IndexMetadata metadata, boolean readOnly) {
 
-        super(store, checkpoint, metadata);
+        super(store, checkpoint, metadata, readOnly);
 
     }
 

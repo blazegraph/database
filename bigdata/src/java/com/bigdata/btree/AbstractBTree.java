@@ -36,7 +36,6 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -62,6 +61,8 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.HardReferenceQueueWithBatchingUpdates;
+import com.bigdata.cache.IHardReferenceQueue;
 import com.bigdata.cache.RingBuffer;
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.counters.CounterSet;
@@ -426,7 +427,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *       code inside of
      *       {@link Node#Node(BTree btree, AbstractNode oldRoot, int nentries)}.
      */
-    final protected HardReferenceQueue<PO> writeRetentionQueue;
+    final protected IHardReferenceQueue<PO> writeRetentionQueue;
 
     /**
      * The #of distinct nodes and leaves on the {@link #writeRetentionQueue}.
@@ -667,7 +668,13 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         this.store = store;
 
-        this.writeRetentionQueue = newWriteRetentionQueue();
+        /*
+         * Setup buffer for Node and Leaf objects accessed via top-down
+         * navigation. While a Node or a Leaf remains on this buffer the
+         * parent's WeakReference to the Node or Leaf will not be cleared and it
+         * will remain reachable.
+         */
+        this.writeRetentionQueue = newWriteRetentionQueue(readOnly);
 
         this.nodeSer = new NodeSerializer(//
                 store, // addressManager
@@ -733,8 +740,29 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Note: Method is package private since it must be overridden for some unit
      * tests.
      */
-    HardReferenceQueue<PO> newWriteRetentionQueue() {
+    IHardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
 
+        if(readOnly) {
+
+            /*
+             * This provisions an alternative hard reference queue using thread
+             * local queues to collect hard references which are then batched
+             * through to the backing hard reference queue in order to reduce
+             * contention for the lock required to write on the backing hard
+             * reference queue (no lock is required for the thread-local
+             * queues).
+             */
+            
+            return new HardReferenceQueueWithBatchingUpdates<PO>(//
+                    new DefaultEvictionListener(),//
+                    metadata.getWriteRetentionQueueCapacity(),// shared capacity
+                    metadata.getWriteRetentionQueueScan(),// thread local
+                    128,//64, // thread-local queue capacity @todo config
+                    64//32 // thread-local tryLock size @todo config
+            );
+
+        }
+        
         return new HardReferenceQueue<PO>(//
                 new DefaultEvictionListener(),//
                 metadata.getWriteRetentionQueueCapacity(),//
@@ -1367,6 +1395,9 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * 
      * @todo This is a place holder for finger(s) for hot spots in the B+Tree,
      *       but the finger(s) are currently disabled.
+     *       <p>
+     *       One way to implement fingers is to track the N most frequent leaf
+     *       accesses using a streaming algorithm.
      */
     protected AbstractNode<?> getRootOrFinger(final byte[] key) {
 
@@ -2902,19 +2933,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
     /**
      * <p>
-     * Touch the node or leaf on the {@link #writeRetentionQueue}. If the node
-     * is not found on a scan of the head of the queue, then it is appended to
-     * the queue and its {@link AbstractNode#referenceCount} is incremented. If
-     * a node is being appended to the queue and the queue is at capacity, then
-     * this will cause a reference to be evicted from the queue. If the
-     * reference counter for the evicted node or leaf is zero and the evicted
-     * node or leaf is dirty, then the evicted node or leaf will be coded and
-     * written onto the backing store. A subsequent attempt to modify the node
-     * or leaf will force copy-on-write for that node or leaf. Regardless of
-     * whether or not the node or leaf is dirty, it is touched on the
-     * {@link LRUNexus#getGlobalLRU()} when it is evicted from the write
-     * retention queue.
+     * This method is responsible for putting the node or leaf onto the ring
+     * buffer which controls (a) how long we retain a hard reference to the node
+     * or leaf; and (b) for writes, when the node or leaf is evicted with a zero
+     * reference count and made persistent (along with all dirty children). The
+     * concurrency requirements and the implementation behavior and guarentees
+     * differ depending on whether the B+Tree is read-only or mutable for two
+     * reasons: For writers, the B+Tree is single-threaded so there is no
+     * contention. For readers, every touch on the B+Tree goes through this
+     * point, so it is vital to make this method non-blocking.
      * </p>
+     * <h3>Writers</h3>
      * <p>
      * This method guarantees that the specified node will NOT be synchronously
      * persisted as a side effect and thereby made immutable. (Of course, the
@@ -2926,143 +2955,57 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * times that the node is actually present on the
      * {@link #writeRetentionQueue}.
      * </p>
+     * <p>
+     * If the node is not found on a scan of the head of the queue, then it is
+     * appended to the queue and its {@link AbstractNode#referenceCount} is
+     * incremented. If a node is being appended to the queue and the queue is at
+     * capacity, then this will cause a reference to be evicted from the queue.
+     * If the reference counter for the evicted node or leaf is zero and the
+     * evicted node or leaf is dirty, then a data record will be coded for the
+     * evicted node or leaf and written onto the backing store. A subsequent
+     * attempt to modify the node or leaf will force copy-on-write for that node
+     * or leaf. Regardless of whether or not the node or leaf is dirty, it is
+     * touched on the {@link LRUNexus#getGlobalLRU()} when it is evicted from
+     * the write retention queue.
+     * </p>
+     * <p>
+     * For the mutable B+Tree we also track the #of references to the node/leaf
+     * on the ring buffer. When that reference count reaches zero we do an
+     * eviction and the node/leaf is written onto the backing store if it is
+     * dirty. Those reference counting games DO NOT matter for read-only views
+     * so we can take a code path which does not update the per-node/leaf
+     * reference count and we do not need to use either synchronization or
+     * atomic counters to track the reference counts.
+     * </p>
+     * <h3>Readers</h3>
+     * <p>
+     * In order to reduce contention for the lock required to update the backing
+     * queue, the {@link #writeRetentionQueue} is configured to collect
+     * references for touched nodes or leaves in a thread-local queue and then
+     * batch those references through to the backing hard reference queue while
+     * holding the lock.
+     * </p>
      * 
      * @param node
      *            The node or leaf.
      * 
-     * @todo review the guarentees offered by this method under the assumption
-     *       of concurrent readers. See
-     *       http://www.ibm.com/developerworks/java/library/j-jtp06197.html for
-     *       some related issues. Among them ++ and -- are not atomic unless you
-     *       are single-threaded, so this code probably needs to use
-     *       synchronized(){} or the reference counts could be wrong. Since the
-     *       reference counts only effect when a node is made persistent
-     *       (assuming its dirty) and since we already require single threaded
-     *       access for writes on the btree, there may not actually be a problem
-     *       here. The reference counts could only be wrong for concurrent
-     *       readers, and nodes are never dirty and hence will never be made
-     *       persistent on eviction so it probably does not matter if the
-     *       reference counts are over or under for this case.
-     *       <p>
-     *       Note: I have since seen an exception where the evicted node
-     *       reference was [null]. The problem is that the
-     *       {@link HardReferenceQueue} is NOT thread-safe. Concurrent readers
-     *       driving {@link HardReferenceQueue#add(Object)} can cause the data
-     *       structure to become inconsistent. This is not much of a problem for
-     *       readers since the queue is being used to retain hard references -
-     *       effectively a cache and the null reference could be ignored. For
-     *       writers, we are always single threaded.
-     *       <p>
-     *       Still, it seems best to either make this method synchronized or to
-     *       replace the {@link HardReferenceQueue} with an
-     *       {@link ArrayBlockingQueue} since there could well be side-effects
-     *       of concurrent appends on the queue with concurrent writers. The
-     *       latency for synchronization will be short for readers since
-     *       eviction is a NOP while the latency of append can be high for a
-     *       single threaded writer since IO may result.
-     *       <p>
-     *       The use of an {@link ArrayBlockingQueue} opens up some interesting
-     *       possibilities since a concurrent thread could now handle
-     *       serialization and eviction of nodes while the caller was blocked
-     *       and the caller would not need to wait for serialization and IO
-     *       unless the queue was full. This really sounds like the same old
-     *       concept of a write retention queue (we do not want to evict nodes
-     *       too quickly or we will make them persistent while they are still
-     *       likely to be touched) and a read retention queue (keeping nodes
-     *       around for a while after they have been made persistent) with the
-     *       new twist being that serialization and IO could be asynchronous in
-     *       the zone of action available between those queues in order to keep
-     *       the write reference queue at a minimium capacity).
-     *       <p>
-     *       AbstractBTree#touch(AbstractNode) is responsible for putting the
-     *       node or leaf onto the ring buffer which controls (a) how long we
-     *       retain a hard reference to the node or leaf; and (b) for writes,
-     *       when the node or leaf is evicted with a zero reference count and
-     *       made persistent (along with all dirty children).
-     *       <p>
-     *       For writes, the B+Tree is single-threaded so there is no
-     *       contention.
-     *       <p>
-     *       For reads, every touch on the B+Tree goes through this point, so we
-     *       are paying huge penalty even relatively little work is done in this
-     *       method.
-     *       <p>
-     *       There are some notes on AbstractBTree#touch(AbstractNode) which
-     *       talk about this problem and some possible ways of addressing it. In
-     *       addition to those notes, I would like to add the following, all of
-     *       which applies to only reads since mutation is single threaded:
-     *       <p>
-     *       - A wait free data structure could be used here, such as
-     *       LinkedBlockingQueue. We could also look at a wait free version of
-     *       the ring buffer, but that might be more algorithm work. The problem
-     *       with wait free data structures is that the CAS operations (compare
-     *       and swap) can wind up doing much more work than is necessary under
-     *       high concurrency since each thread winds up redoing part of the
-     *       work in order to have an eventually consistent data structure.
-     *       (Infinispan is currently wrestling with this issue in their cache.)
-     *       <p>
-     *       - Batching touch()s would help tremendously by reducing contention
-     *       for the lock. Here we could have a per-thread AbstractNode[] queue
-     *       which flushes to the backing ring buffer once the per-thread array
-     *       is full. This means using a thread-local and we would want to
-     *       ensure that the ThreadLocal AbstractNode[] queue was cleared when
-     *       the thread was recycled by the executor service. Access to thread
-     *       locals can be a bit slow, so passing this around on the stack might
-     *       also help. See [1], which describes a "batching" approach which is
-     *       a generalization of how we already handle evictions for the global
-     *       LRU. For example, with an AbstractNode[] queue having 64 entries we
-     *       would invoke tryLock() when it was half full and lock() when it was
-     *       full. This maximimizes the chance for barging (tryLock()) and
-     *       guarantees timely transfer from the per-thread queue to the backing
-     *       ring buffer. Having the per-thread-queue only for readers will not
-     *       hurt the semantics since the purpose of the backing ring buffer is
-     *       to ensure that recently touched nodes and leaves remain strongly
-     *       reachable for top-down navigation in the B+Tree.
-     *       <p>
-     *       The hard reference queue currently scans the MRU entries on the
-     *       ring for a matching reference, in which case the reference is not
-     *       added to the ring buffer to minimize churn. That test could be done
-     *       against the current batch when transferring references from the
-     *       pre-thread queue to the backing ring buffer, or even on a
-     *       pre-thread basis against the pre-thread queue to avoid the scan
-     *       while we hold the lock.
-     *       <p>
-     *       For the mutable B+Tree we also track the #of references to the
-     *       node/leaf on the ring buffer. When that reference count reaches
-     *       zero we do an eviction and the node/leaf is written onto the
-     *       backing store if it is dirty. Those reference counting games DO NOT
-     *       matter for read-only views so we can take a code path which does
-     *       not update the per-node/leaf reference count and we do not need to
-     *       use either synchronization or atomic counters to track the
-     *       reference counts.
-     *       <p>
-     *       I want to think some more about the specifics of the per-thread
-     *       queue. It's life cycle needs to be linked to the life cycle of the
-     *       B+Tree view against which the touch() was directed. That suggests
-     *       maybe a hash map on the BTree object whose key is the Thread and
-     *       whose value is the per-thread queue.
-     *       <p>
-     *       So, basically, I think that we need two code paths for touch(). One
-     *       for mutable B+Trees and one for read-only views. For the former, it
-     *       is exactly the code that we already have. For the latter, we need
-     *       to resolve the pre-thread queue on which we will accumulate a chunk
-     *       of hard references. When that queue reaches 1/2 of its capacity, we
-     *       do a tryLock() and batch the update to the hard reference queue if
-     *       we get the lock. When the queue reaches is capacity, we do a lock()
-     *       and batch the update to the hard reference queue. For the read-only
-     *       case, we do not maintain the reference counts since they are unused
-     *       and we probably want to change the eviction handler for the ring
-     *       buffer to be a NOP so it does not even bother checking the
-     *       reference count and whether or not the node or leaf is dirty on
-     *       eviction.
-     *       <p>
-     *       This might be abstract here and final in BTree and in IndexSegment.
+     * @todo The per-node/leaf reference counts and
+     *       {@link #ndistinctOnWriteRetentionQueue} fields are not guaranteed
+     *       to be consistent for of concurrent readers since no locks are held
+     *       when those fields are updated. Since the reference counts only
+     *       effect when a node is made persistent (assuming its dirty) and
+     *       since we already require single threaded access for writes on the
+     *       btree, this does not cause a problem but can lead to unexpected
+     *       values for the reference counters and
+     *       {@link #ndistinctOnWriteRetentionQueue}.
+     * 
+     * @todo This might be abstract here and final in BTree and in IndexSegment.
      *       For {@link IndexSegment}, we know it is read-only so we do not need
      *       to test anything. For {@link BTree}, we can break encapsulation and
-     *       check whether or not the {@link BTree} is read-only more readily 
+     *       check whether or not the {@link BTree} is read-only more readily
      *       than we can in this class.
      */
-    synchronized
+//    synchronized
 //    final 
     protected void touch(final AbstractNode<?> node) {
 
@@ -3073,6 +3016,36 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * is a huge performance penalty!
          */
 //        touch();
+
+        if (isReadOnly()) {
+
+            doTouch(node);
+
+            return;
+
+        }
+
+        /*
+         * Note: Synchronization appears to be necessary for the mutable BTree.
+         * Presumably this provides safe publication when the application is
+         * invoking operations on the same mutable BTree instance from different
+         * threads but it coordinating those threads in order to avoid
+         * concurrent operations, e.g., by using the UnisolatedReadWriteIndex
+         * wrapper class. The error which is prevented by synchronization is
+         * RingBuffer#add(ref) reporting that size == capacity, which indicates
+         * that the size was not updated consistently and hence is basically a
+         * concurrency problem.
+         */
+
+        synchronized (this) {
+
+            doTouch(node);
+
+        }
+
+    }
+    
+    private final void doTouch(final AbstractNode<?> node) {
         
         /*
          * We need to guarentee that touching this node does not cause it to be
@@ -3086,9 +3059,14 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * the node is selected for eviction, eviction will not cause the node
          * to be made persistent.
          * 
-         * Note that only mutable BTrees may have dirty nodes and the mutable
-         * BTree is NOT thread-safe so we do not need to use synchronization or
-         * an AtomicInteger for the referenceCount field.
+         * Note: Only mutable BTrees may have dirty nodes and the mutable BTree
+         * is NOT thread-safe so we do not need to use synchronization or an
+         * AtomicInteger for the referenceCount field.
+         * 
+         * Note: The reference counts and the #of distinct nodes or leaves on
+         * the writeRetentionQueue are not exact for a read-only B+Tree because
+         * neither synchronization nor atomic counters are used to track that
+         * information.
          */
 
         assert ndistinctOnWriteRetentionQueue >= 0;
@@ -3126,15 +3104,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-//        if (useFinger && node instanceof ILeafData) {
-//
-//            if (finger == null || finger.get() != node) {
-//
-//                finger = new WeakReference<Leaf>((Leaf) node);
-//
-//            }
-//
-//        }
+//      if (useFinger && node instanceof ILeafData) {
+        //
+//                    if (finger == null || finger.get() != node) {
+        //
+//                        finger = new WeakReference<Leaf>((Leaf) node);
+        //
+//                    }
+        //
+//                }
 
     }
 

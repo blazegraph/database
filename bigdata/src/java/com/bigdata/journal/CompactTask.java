@@ -432,8 +432,9 @@ public class CompactTask implements Callable<Journal> {
                 /*
                  * Load the B+Tree from the store using that checkpoint record.
                  */
-                final BTree newBTree = BTree.load(newJournal,
-                        overflowCheckpoint.getCheckpointAddr());
+                final BTree newBTree = BTree
+                        .load(newJournal, overflowCheckpoint
+                                .getCheckpointAddr(), false/* readOnly */);
 
                 // Note the counter value on the new BTree.
                 final long newCounter = newBTree.getCounter().get();

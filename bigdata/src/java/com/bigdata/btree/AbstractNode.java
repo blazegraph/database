@@ -558,9 +558,9 @@ public abstract class AbstractNode<T extends AbstractNode
     }
 
     /**
-     * Post-order traveral of nodes and leaves in the tree. For any given
+     * Post-order traversal of nodes and leaves in the tree. For any given
      * node, its children are always visited before the node itself (hence
-     * the node occurs in the post-order position in the traveral). The
+     * the node occurs in the post-order position in the traversal). The
      * iterator is NOT safe for concurrent modification.
      * 
      * @param dirtyNodesOnly
@@ -733,6 +733,7 @@ public abstract class AbstractNode<T extends AbstractNode
             if ((btree instanceof IndexSegment)) {
 
                 /*
+                 * @todo back out underflow support.
                  * The leaves and nodes of an IndexSegment are allowed to
                  * underflow down to one key when the IndexSegment was generated
                  * using an overestimate of the actual tuple count.

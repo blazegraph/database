@@ -59,6 +59,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestRingBuffer.class);
         
         suite.addTestSuite(TestHardReferenceQueue.class);
+
+        suite.addTestSuite(TestHardReferenceQueueWithBatchingUpdates.class);
         
 //        // Test all ICacheEntry implementations.
 //        retval.addTestSuite( TestCacheEntry.class );
