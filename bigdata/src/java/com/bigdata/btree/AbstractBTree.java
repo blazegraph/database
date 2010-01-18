@@ -78,6 +78,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
