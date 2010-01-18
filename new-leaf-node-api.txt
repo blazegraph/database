@@ -7,7 +7,6 @@ release:
    - sourceforce news
    - announce where?
 
-6
 -- merge to branch #1 -- 
 
 from: THE TRUNK!!!
@@ -45,11 +44,18 @@ svn switch https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BIGDATA_
 
 svn switch https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/BTREE_BUFFER_BRANCH .
 
+svn switch https://bigdata.svn.sourceforge.net/svnroot/bigdata/branches/DEV_BRANCH_27_OCT_2009 .
+
 svn auto-props: This could be used to put the license in each file!
 
 ------------------------------------------------------------
 
 Issues to be resolved in this branch.
+
+x. Other. GOM, row stores, RDF, OWL modeling of classes, object
+   binding, annotations, different language bindings, protocol
+   buffers.  How can we fuse these things together into a cloud data
+   model crossing semweb, row store, and OODBMS lines?
 
 1. Done. Re-design of the node/leaf API to support processing of
    serialized nodes and leaves without materializing their contents as
@@ -75,9 +81,518 @@ Issues to be resolved in this branch.
 
 6. Full tx support for the RDF store.
 
+7. Bottlenecks under sustained writes
+
+   1. Build, merge and split performance and scheduling.
+
+     - Proactive scheduling and imperfect index segment builds based
+       on fast range count estimates.  Together, this should be a huge
+       performance win - especially as the data scale increases.
+   
+       I still have not worked out the parallelism limits for build,
+       merge and split operations. One idea is to atomically replace
+       the queues for those behaviors during atomic overflow.
+
+     - Faster.  The best solution is to split after a compacting merge
+       since we have exact knowledge of the tuple counts and exact
+       knowledge of the on disk storage requirements at that time.
+
+     - More robust (transactional)
+
+     - Based on #of bytes in post-merge file (no need to tweak,
+       radically simplifies life).
+
+     - Make sure that the bloom filter is buffered in the cache by the
+       build and the IndexSegmentStore on reopen().
+
+     - Do split from merge w/ app constraint on separator key choice
+       and linear list key for recommending keys and build segment
+       without exact range count.
+
+     - LIRS cache would help here to reduce churn but note caching of
+       tuples vs records.
+
+       Also, the lexicon cache should be a tuple cache.  Perhaps tuple
+       to leaf.  This needs to be tied in with the IGlobalLRU memory
+       limits.
+
+     - Global LRU: Neither LIRS nor LRU need to be strong orderings.
+       It is enough that a cache eviction policy be "approximately"
+       LRU (or LIRS).  As long as the least desirable entries wind up
+       getting evicted, it does not matter what the precise eviction
+       order is.
+ 
+       If you accept "approximate" eviction orders, then striped locks
+       could be used to reduce thread contention.  Evictions could be
+       driven on each segment of the cache independently.  If we hash
+       the cache entry key to choose the segment, then each cache
+       entry will only appear in one segment and all segments should
+       be driven more or less equally by the application workload
+       (assuming a decent hash function).  So using 16 segments /
+       locks, you have 1/16th the contention.
+
+       Also see the paper on BP-Wrapper (FIFO queues per thread and
+       batch updates to the cache orderings).
+
+       http://www.cse.ohio-state.edu/hpcs/WWW/HTML/publications/papers/TR-09-1.pdf
+
+8. Index Segment Builds with fast range count. 
+
+  - Reduce IO during segment builds (fully scan the leaves on the
+    source views, which is one sequential IO per segment and scattered
+    reads on the journal) and when writing out the segment (buffer in
+    memory only, not on the disk).
+
+        - The bulk view materialize could use a scattered read for
+          those leaves which are not already pinned in memory.  So
+          first pin the leaves already in RAM for the segment (how?)
+          and then scatter reads for the collesced regions spanning
+          the non-pinned leaves.  Or do prefetching.
+
+  - Allow over estimate of the range count for index builds so we can
+    avoid a full range scan just to prepare for the build.
+
+	- done. Write stress tests.
+
+	- done. Document sample inputs and outputs in worksheet.
+
+		- Do more examples?
+
+	- (***) Modify the IndexSegmentBuilder to drop tuples from
+		leaves (done), to use a 0L addr for the rightSibling
+		of a node if that child was never emitted in
+		combination with the successor of the lastKey for the
+		separator key in that node (done), and to 
+
+		use the highest node whose separator key was assigned
+		as the root (***NOT***DONE***YET***).
+
+		Note: One of the trickier bugs turns out to have been
+		the failure to clear the childAddr[] and
+		childEntryCount[] in SimpleNodeData#reset().
+
+	- done. Modify AbstractBTree (at least for the IndexSegment)
+		to allow the rightSibling of a node having only a
+		single key to be 0L and treat this as the right edge
+		of the BTree.  There are a bunch of stress tests which
+		should identify behavioral problems if any exist.
+
+		done. Materializing the rightmost child of an
+		      IndexSegment node with a 0L address will return
+		      a mock empty immutable leaf with the appropriate
+		      priorAddr field.
+
+		- Enable testing of over reporting in
+		  TestIndexSegmentBuilderWithLargeTrees#doBuildIndexSegmentAndCompare(BTree)
+		  (change the constant in the code in that method to
+		  .2).
+
+		- Change IndexSegmentBuilder to use a fast range count
+                  and rerun all the tests.
+
+	- Done. Modify AbstractBTree (at least for the IndexSegment)
+		to allow a non-root leaf to underflow (down to one
+		tuple) and to allow a non-root node to underflow (
+		down to one separator key with no right child).
+
+   2. Clients buffer to disk (MGC?).
+
+   3. Closure: async write API and parallel closure.  Watch swapping.
+      Consider less heap for the run.
+
+   4. Query: test with incremental GC mode.
+
+   x. Improved reporting
+      
+      - No. Just do this in excel.  Should have runtime minutes and
+        event duration in minutes as fields in the event log.
+      
+      - done. Should have #of concurrent builds and merges in the log
+	and in the performance counters.
+
+      - done. Report the #of MB in as well as out for builds.  For
+        compacting merges this is a great indicator of what we knew
+        about the shard size before the build/merge and what we got
+        out the other end.
+
+      - Logging using the SimpleSocketServer does not include the
+	hostname or service identifier. [tried adding %X{clientname}
+	%X{hostname} %X{serviceName} to the log4jServer.properties
+	file.]
+
+   (**) Journal extent grows w/o bound.
+
+      - Try w/ smaller journal (100M).  This will in turn result in
+        smaller builds.  Unless the parameters are adjusted, that will
+        drive more merges since we merge when the view gets too
+        complex.  But if we prioritize the merges, then we will never
+        do more merges than we have the time to handle.
+
+      - At 3CS to 11DS (run6) the extent problem appears to be under control
+        and there is a sustained 140k tps load rate out to 750M
+        triples (so far).  So less CS is more throughput.  Once we
+        resolve the extent issue, we should go back and test with too
+        many clients and make sure that they can not overdrive the
+        data services.
+
+   x. Raise move threashold and optimize moves.  Trigger currently at
+      80% DS CPU, but does not account for relative vs absolute load
+      sufficiently and can cause moves among highly loaded systems.
+      Moves drag things down when the happen, so it might be better to
+      let machines achieve higher load (but it might not be as safe).
+
+   x. Clients target LDS, not shard.  Low-level xfer of work to DS.
+      DS can pause low-level xfer if too busy.  Write sets must move
+      with shard on split/move.
+
+   x. destroy all DS could be an option w/o bringing down the service
+      managers.  that would give confirmation that the services were
+      down.
+
+   x. test throughput against fixed DS set varying numbers of clients
+      and look for the point where return diminishes and the point
+      where the DS are overloaded.  For the latter, examine how the
+      federation behaves when there are not enough DS instances.
+
+   x. ntp
+
+rackspace-16node-5CS-10DS
+
+   run1: baseline on U8000.
+
+   run2: same.
+
+   run3: changed the partitionSizeMultiplier from 2 to 1.  This
+         reduced the size of index segment builds and revealed a
+         problem with too much concurrent work being demanded when
+         forcing overflow.  Also had OOM during closure (java heap).
+
+   run4: same as run3, but did not force overflow after load or
+	 closure.  can be done separately if we like. [Ran into
+	 trouble with very large journals on some services during the
+	 load.  Run aborted.  Counters extracted on the server.]
+
+   run5: same as run4, but 4CS, 11DS.  This should reduce the workload
+         applied by the clients while giving the database more
+         resources. 
+
+	 [tps peaks lower @ 147k, down from 160k+; try w/ 3CS, 12DS].
+
+	 Appeared to deadlock during closure with bigdata14 pinned at
+	 nearly 90% CPU.
+
+   run6: same as run4, but 3CS, 12DS.  Modified the log4jServer
+	 properties file to include some MDC state (did not work).
+
+	 At 3CS to 11DS the extent problem appears to be under control
+	 and there is a sustained 140k tps load rate out to 750M
+	 triples.  There was one journal run up to 1.3GB during the
+	 load but everything else was bunched up much closer to 200M.
+	 Net throughput of 130k tps with final throughput of 136k tps.
+	 Some more larger journals as we leave load and enter closure.
+
+	 This run was swapping at between 10 and 100 pages per second
+	 so if we can reduce the memory demand through better
+	 management of the concurrency then we will have a double win.
+
+	 (***) OOM for Java Heap space during closure again.  Not sure
+	       why.  Wow.  It looks like it was trying to split 1M
+	       tuples destined for the SPO index!  I've saved off
+	       nohup.out and I am collecting the counters for this run
+	       as well.  At some point, the mutation operation should
+	       be modified to use the asynchronous write API, but that
+	       can also yield large RAM overheads.  For now, it should
+	       not be buffering 1M elements!
+
+	 (***) Analyze run6 and compare with run5 and run7.  What is
+	       the best CS/DS ratio in terms of sustained throughput,
+	       swapping, etc.
+
+    run7: same as run4, but 2DS, 13DS.
+
+	  The system was even better behaved, but the load was only
+	  106,023 tps, down from 130,000 tps for run6.  The extents
+	  rarely exceeded 200M until we were into closure, and that
+	  could be related to coding a 1M tuple buffer for write on
+	  the indices.
+
+    run8: same as run6 (3CS, 12DS), but chunkOfChunksCapacity=100 (was
+	  1000).
+
+	  Note: This lowers the maximum write buffer capacity from 1M
+	  to 100k.  In fact the mutation api should run through the
+	  asynchronous write API but we have to be careful to avoid
+	  too much buffered RAM there too.
+
+	  Analysis: look at memory demand and sync index writes during
+	  closure and compare to run6.
+
+	    - VirtualSize (process size) spikes once we enter closure.
+              Try an even smaller size for chunksOfChunks.  If closure
+              completes, first verify that the query performance is
+              not adversely effected by the chunksOfChunks=100 rather
+              than 1000.  In fact, we can test that independently of
+              the chunksOfChunks value used to load the data or
+              compute the closure, so one way to get past this memory
+              problem is to reduce chunkSize to 100 for closure.
+              However, larger chunks for closure are probably going to
+              do better, so I would prefer to try smaller values for
+              chunksOfChunks first.
+
+	   - Picked up run8-output from bigdata01.  This has the load
+             plus closure plus one presentation of the fast lubm
+             queries.  There is a period of high IO Wait during
+             closure.  The extents periodically climb up to 1.2G but
+             always recover (this was mostly on bigdata13, but also
+             some on bigdata05 during closure).  Only modest swapping,
+             but not a lot of free RAM is available.  GC is most
+             pronounced during load, but high GC appears during some
+             parts of closure.
+
+	   - The #of write requests on SPO during closure far exceeds
+             that for the other indices (20x).  Why?  Are the writes
+             less well clustered for some reason?  I can not make much
+             sense of these data.  I do see a spike in the #of
+             requests and the #of elements per request which appears
+             to correlate with a high IO Wait spike.
+
+	     (*) Correlate these data to the rule firing and see what
+		 is going on.
+
+   run9: Generated ~2B triples (LUBM U16000 is 2,136,128,061 triples,
+	 319994 files).  Run uses the same settings as run8. 
+
+	 - IO Wait goes up significantly during the early phase of
+	   closure.
+
+	 - TPS climbs to 146k by 80m, then starts to fall off linearly
+           ending at 126ktps.
+
+	   (**) Diagnose why throughput falls off.  Is this because it
+	   is taking longer for the write buffer sinks to fill up as
+	   there are more index partitions?  Is this a function of the
+	   B+Tree depth.
+
+	   Try larger runs and see what the curve looks like (4B, 8B).
+
+	   Try two loads against the same federation and see if both
+	   loads have the same profile.
+
+	   (*) If it is a function of the #of partitions, then an
+	       alternative strategy which buffers per DS target might
+	       keep up higher throughput.  What is probably happening
+	       is that the clients are at the limit on the #of
+	       buffered statements so sinks are timing out and
+	       flushing partial chunks.  TEST THIS with smaller limits
+	       on the #of buffered statements.  The bottleneck could
+	       be addressed by buffering the sinks on the sink as
+	       sorted chunks and then doing a merge sort of the chunks
+	       when the sink has enough data.  The problem with that
+	       is the latches which have to stay in memory.  Could
+	       also be tested against a mock DS.
+
+	 - (***) IllegalStateException on the Journal during read
+		 during closure.
+
+		 Check the log and see if the journal was deleted or
+		 just concurrently closed.  If it was deleted, then
+		 this is a problem with the purge resources logic.  If
+		 it was concurrently closed, then it is a problem with
+		 the IndexManager / StoreManager logic.
+
+	 Do those
+	 settings scale or does it break down for larger data sets?
+	 [If this fails, try w/ 2CS and 13DS].
+
+Caused by: java.lang.IllegalStateException: file=/var/bigdata/benchmark/DataServer/logicalService0000000011/4a1793b3-81b6-4b4f-8403-f6c07a0b9afa/journals/journal2235513210954576187.jnl
+	at com.bigdata.journal.AbstractJournal.assertOpen(AbstractJournal.java:1793)
+	at com.bigdata.journal.AbstractJournal.read(AbstractJournal.java:2408)
+	at com.bigdata.btree.AbstractBTree.readNodeOrLeaf(AbstractBTree.java:3424)
+	at com.bigdata.btree.Node._getChild(Node.java:2562)
+	at com.bigdata.btree.Node.getChild(Node.java:2515)
+	at com.bigdata.btree.ChildIterator.next(ChildIterator.java:163)
+
+   run10: Identify the deadlock by increasing to 4 clients and when
+	  deadlocked get a thread dump and give it to MGC.  This might
+	  be better with the profiler enabled.
+
+	  (*) Did not find a deadlock.  Ran 2B triples. 89195 tps
+	      load.  Moderate swapping and high IO wait during
+	      closure.  [Try to reduce HEAP.]
+
+   run11: 2CS, 13DS ~4B triples (LUBM U32000)
+
+	  Next run: reduce DS heap from 12G to 11G to avoid DS
+	  swapping.  Could also reduce the writeRetentionQueue to
+	  reduce RAM demand.
+
+	  (*) findbugs -- add instructions or remove from properties.
+
+	  (*) It appears that the job master is pinning one core.
+	      That surprises me.  It is just handing off tasks to the
+	      clients.
+
+
+   --------------------
+   run1/run2: analysis
+
+    - Builds are too large, easily crossing 200MB in output size.
+
+      Oh! The partitionSizeMultiplier was at TWO (2).  I am trying
+      run3 with this value changed to ONE (1).  I may have to reduce
+      the heap to prevent swapping (the larger multipler was to
+      control RAM demand but I do not know if that was before or after
+      I found the swappiness fix).
+
+   --------------------
+   run3: analysis
+
+      The extents are under control. A bit of a dip in cpu across
+      hosts @ ~20m. Better peak tps @ 22m (165k). Minor swapping
+      started on the DS at this time (reduce heap?).  bigdata07 had
+      higher IO wait and was busy clearing a 600m journal during the
+      performance dip (several DS had this problem to a lesser
+      extent). The RDF parser threads were mostly paused during this
+      time, so the CS CPU dropped.  Throughput starts to drop ~ 30m.
+      Split splits, some moves.  Some segment operations are taking up
+      to 3m at this point.  Appears to be keeping to reasonable
+      journal extents.  Could help if only did builds off the journal
+      and then split or move as necessary.  Leveled out at 150ktps @
+      40m through 52m+.  At ~ 1.5h everyone took a CPU dive while
+      bigdata07 cleared a 2G journal.  This was associated with 15% IO
+      Wait on that node.  There is even higher IO Wait (30%) 30m
+      later, which brings down CPU across the cluster.  load=124,187
+      tps so that is a definate improvement.
+
+      - OOM (Java heap) during pipeline join in closure @ 451m!  I am
+	not sure which machine this was.
+
+	- Maybe 16, since that had a larger direct buffer pool (204 vs
+	  180 for the others, so it had 25m less to work with).
+
+	- GC (mark and sweep) are outrageous on 10, 12, 15 starting at
+          the moment we force overflow after the data load.
+
+      - Look at events.  Try w/ smaller target segment sizes and
+        journals.  Try fewer splits for the scatter split and see if
+        that brings down the DS memory demand.  Look at the cache
+        sizes.  Try a smaller LRU heap allocation (10%).  What was
+        going on with swap?  (scatter, splatter(tids), and RAM
+        demands).
+
+	- A few very long running builds shortly after we force
+          overflow on all services.  What are those builds?  Why are
+          they so slow? 
+
+	  - They all occur at 159 minutes, which is when we forced
+            overflow processing after the data load.  The slow builds
+            are not actually for large segments.  Instead, the
+            concurrent workload was clearly too high.
+
+	    Better throughput for overflow might occur with less
+            simultaneous builds.
+
+	    Better throughput overall might occur w/o forcing overflow
+            after the data load which could tend to resynchronize the
+            need for new builds.
+
+	  - It also looks like some builds originated for that
+            overflow event NEVER completed for bigdata15!  This is the
+            host whose journal extent was climbing as well!
+
+	- The segment size is about right unless we treat 200M as the
+          maximum across segs for a shard.  Look at the index dumps
+          and see what the sumSegBytes is for the shards. Are we are
+          target or over for the shard as a whole?
+
+	  - index dumps:
+
+	- Extent: 7 and 13 ran up to ~2G during load, but cleared
+          their journals.  Forcing overflow after load caused 15 to
+          run up to 3G twice in a row!
+
+	- The #of index partitions is moderate (40-50 w/ 16 going to
+	  62). clearly more segments than partitions since the direct
+	  buffer pool is larger than the #of partitions.
+
+	- Swap: Forcing overflow caused at least two hosts to spike in
+          major page faults per second (8,9,11).  15 was never
+          swapping hard.
+
+	- RAM: I can not identify which host had the OOM.
+
+      - There are some large synchronous overflow events: bigdata13
+        has one event at 15s.
+
 --------------------
 
 Query optimization
+
+x. BSBM
+
+   - During query evaluation (1M), one CPU runs most of the time and
+     then there are brief periods with all CPUs running.  There are no
+     blocks in or out, so this is all in memory.  Put a profiler on
+     it.  Is this GC?  Is there some synchronized method? 
+
+     Overall, I get the sense that query is very slow.  Why?  Slice?
+     Lexicon?
+
+     Note: 5 and 6 are the heavy queries.  Look into them.  But they
+     may be disabled for the query set that ryan is using.
+
+     Do the result counts vary based on the parameterization of the
+     queries?
+
+     query2: min/max result count:   16 / 25
+     query3: min/max result count:   0 / 2
+     query7: min/max result count:   1 / 21
+     
+     Why no results for 12 and a falsely high QPS?
+     QPS:                    992649.57 Queries per second
+
+     ----
+
+     Set CHUNK_OF_CHUNKS_CAPACITY (1000 -> 10).
+
+     Examine CHUNK_TIMEOUT.
+
+     ?!? FORCE_SERIAL_EXECUTION IS TRUE BY DEFAULT ?!?
+
+     MAX_PARALLEL_SUBQUERIES = 5 (default).
+
+     Default join: NESTED_SUBQUERIES = true (default).  Does the
+     pipeline join handle concurrency better?
+
+     Observed:
+
+        - Heavy contention for AbstractBTree#touch(AbstractNode) for
+	  READERS.  We need a non-blocking queue for read-only
+	  views. This problem is driven by concurrent query and by
+	  concurrent evaluation of binding sets for during evaluation
+	  of a single query.
+	  
+	- Lots of GC time.  Try a smaller heap.
+
+	- The initial query mixes are pretty fast.  Things might be
+          slowing down with GC.  YOUNG generation GC is driven MUCH
+          more by query answering than it is by load (but try on a
+          longer load).
+
+	- Huge hot spot for readers on AbstractBTree#touch().
+
+     ----
+
+     Setup files copied from the server on my laptop under the btree
+     read hotspot project so I can make a patch against the current
+     dev version.  Patch is batching using per-thread btree local hash
+     map of array queues.  Test patch locally against BSBM, with
+     baseline performance comparison first.
+
+     ---- 
+     Look at the actual queries.
+
+x. How do smaller shards effect query?
 
 x. Look at monitors in profiler when tuning query performance.  How
    often are threads blocking: on disk read? on BTree#touch()?  In
@@ -85,10 +600,109 @@ x. Look at monitors in profiler when tuning query performance.  How
 
 x. done. Parallel range iterator flag.
 
+x. Revise AbstractTripleStore's use of unisolated opertions and its
+   reliance on fully buffered reads and the UnisolatedReadWriteIndex
+   to avoid concurrent modification of the index while under
+   traversal, which is now supported by the TupleCursor.  
+
+   I believe that TM relies on fully buffered reads due to the
+   historical B+Tree iterator (which did not support traversal with
+   concurrent modification) and due to the use of a temporary triple
+   store backed by a persistence store which did not support
+   read-behind views (vs the Journal's Temporary mode), which places a
+   scale limit on standalone TM. 
+
+   Also examine the use of synchronous reads by the
+   AbstractAccessPath.
+
+x. We have a lot of IO Wait on closure and probably on some
+   queries. Look into this further and see what we can do to reduce
+   waiting time by ensuring that readers are not synchronized when
+   they go to the disk and perhaps even using scattered reads
+   (gathered writes do not matter for the journal as we only do big
+   appends and updates of the root blocks).  Check the temporary store
+   used for buffering various things (segment builds and
+   transactions). Does it synchronize on reads? 
+
+x. Tuple cache at shard for ID2T.
+
+x. Local term caches for data loaders.
+
 x. Resolve RDF Values using JOINs.
 
 x. Distributed join optimization (performance tuning, hot spot
    elimination, configuration parameter tuning, etc).
+
+      I suspect that a lot of the latency for load and query is
+      related to how we transmit the data from node to node.  Right
+      now that is RMI.  For load and other IIndexProcedure calls the
+      data are marshalled using the same coding that is used for a
+      B+Tree leaf for the associated index and then handled on the
+      receiver by wrapping the transmitted byte[] as one or more IRaba
+      (Random Access Byte Array) objects.  For query, the data are
+      probably marshalled using default java serialization.  In both
+      cases, we are marshalling chunks of elements.  For load, this is
+      between 5000 and 80000 elements in a chunk.  For query, it is
+      more likely to be chunks of 100s to 1000s, but it is possible
+      that the chunks are larger since we combine chunks together.
+      Finally, I suspect that the B+Tree leaf coding has increasing
+      time in the size of the leaf (#of tuples).  In fact, there are
+      different coders and each coder will have a different cost
+      profile.  It would be well worth measuring the coding time as a
+      function of the #of tuples to be coded for different coders.
+
+      All of this could contribute not only to performance cost, but
+      to latency as well to the extent that the transmission of the
+      data are being serialized between the source and target process.
+      I suspect that an approach which allocates a receiver buffer to
+      a process and is smarter about how the data are transmitted
+      (smaller units, less latency) could do substantially better.
+      There are some things to be careful of here of course.  For
+      example, the clients are less heavily loaded than the DS right
+      now and this would likely shift some compute burden to the data
+      services.
+
+      As we have discussed, changing how this works for load is
+      complicated since the clients need to obtain results back from
+      the data service for the T2ID index and need to know once the
+      writes have become stable.  Also, if the data service does a
+      split or move, then the buffered data needs to follow the
+      split/move, potentially being transferred again to another
+      machine.  The buffered writes should also be discarded if the
+      job is cancelled. In many ways this is similar to a distributed
+      transaction, but there is no transaction identifier since the
+      work is unisolated.  Instead, there is both a persistent and an
+      ephemeral znode in zookeeper for the job and the master running
+      the job respectively.  Since zk can report false disconnects
+      under heavy load, I am inclined to require explicit cancellation
+      of a job and link the buffers to the persistent znode for the
+      job rather than the ephemeral znode for the master.  This is
+      similar to explicit cancel for a transaction.  In both cases if
+      the client dies or hangs an operator would have to cancel the
+      job/tx.
+
+      Some of this can be profiled very easily, e.g., the performance
+      curve of the B+Tree coders.  It would be good to get a handle on
+      how much overhead is involved there on representative data
+      (e.g., the time to code 10000 terms from a document or 80000
+      statements using term identifiers) and an estimate of how much
+      overhead is involved in marshalling the binding sets between the
+      join tasks for query.
+
+      The case of propagating binding sets from join task to join task
+      is ripe for optimization.  In fact, the bindings accepted on
+      input will be unchanged and could be passed down stream exactly
+      once for all binding sets derived from a given input binding set
+      (different input binding sets can produce different solutions).
+      Instead, we set the complete binding set for each solution each
+      time.  The binding set serialization could also be optimized for
+      tids.  Joins are entirely in terms of tids today, but we plan to
+      allow cross relation joins soon, including joins against the
+      lexicon to resolve RDF terms and joins against the proof chains
+      index in support of truth maintenance when retracting statements
+      (in fact, the proof chains are also coded as sequences of
+      statements modelled using tids, but the point is we will have
+      joins against other kinds of data in the future).
 
 x. Correct handling for optionals, nexted filters, etc.
 
@@ -97,23 +711,54 @@ x. Fast handling of default graph queries for the quad store.
 x. Fast handling of named graph queries for the quad store when there
    are a large number of named graphs.
 
+x. Batch lookup operations (such as resolving terms or termIds against
+   the lexicon) can trivially be parallelized within a shard.  With
+   some more effort, it may be possible to parallelize batch insert
+   operations by queueing mutations while performing hit tests in
+   parallel.
+
+x. Parallel decomposition of OWL-DPL (which is being standardized as
+   OWL RL) using key-range partitioning.  This is essentially a
+   generalization of the parallel decomposition of the RDFS closure,
+   with extensions to compile rules from the OWL ontology and to
+   handle any JOINs which might read on other than the SPO/POS index
+   for ontological/assertional triples.  There are also some rules
+   which have more than a single join, which needs to be studied as
+   well.  Both Jena and OWLIM can generate compile rules from an OWL
+   ontology.  Those rules can be trivially mapped onto our native rule
+   execution layer.
+
+x. General case support for parallel decomposition of programs.  Rules
+   should be annotated when they allow parallel decomposition.  The
+   obvious use case replicates a triple store (perhaps with just a
+   single SPO index) and decomposes the rule against the shards of
+   another index (typically POS).  The parallel decomposition of the
+   program will look just like the original program, but this approach
+   is only warranted when the rule is part of a fixed point closure
+   (when the rule is not part of a fixed point closure, the pipeline
+   join already does parallel decomposition against the data). 
+
+   When we compute the transitive closure of a rule set, it will bring
+   a per-shard triple store to a fixed point.  This means that the
+   closure will look very much like the incremental truth maintenance
+   for insert, where we rewrite the program to read on a fused view of
+   the database (now the shard) and the focus store (now the temp
+   triple store).  Once the program reaches fixed point for a shard,
+   the triples in the temp triple store should be written onto all
+   access paths (SPO, POS, OSP) using the asynchronous index write API
+   (without any dependency on the lexicon).  The ontological triples
+   will be held in a temporary triple store linked either to the
+   program (replicated when the program is submitted) or the KB
+   instance (in which case it gets maintained).  The same temporary
+   store could be used for all operations on a given data service so
+   long as it supports MRMW.
+
+   - Consider rules such as rdfs2 which are APF.
+
+   - Consider optimized rule groupings, such as {rdfs 5,7}, {rdfs 2,3}
+     and {rdfs 9, 11, 12 and 13} per the map/reduce paper.
+
 --------------------
-
-Index partition splits.
-
-   - Proactive scheduling and imperfect index segment builds based on
-     fast range count estimates.  Together, this should be a huge
-     performance win - especially as the data scale increases.
-   
-   - Faster.  The best solution is to split after a compacting merge
-     since we have exact knowledge of the tuple counts and exact
-     knowledge of the on disk storage requirements at that time.
-
-   - More robust (transactional)
-
-   - Based on #of bytes in post-merge file (no need to tweak,
-     radically simplifies life).
-
 --------------------
 
 Full tx support for RDF
@@ -123,6 +768,19 @@ Full tx support for RDF
      - Add a Jena integration?  http://openjena.org/ARQ/arq-query-eval.html
 
      - Verify transactional create of indices and kb.
+
+     - For scale-out ONLY, we could log transactons on the journal
+       using the tx id plus the index name (e.g., tx345162_foo#12
+       would be the index for a given transaction) and drop the B+Tree
+       with the buffered writes when the tx starts (it should not be
+       there unless there was a crash with an old tx index left
+       registered) and when the tx completes (success or failure). The
+       advantage of buffering on the journal (for scale-out) is that
+       it is MRMW and we already have it open with nice fat writes and
+       this will make it easier to keep the tx write set together with
+       the shard.  [The advantage of a separate temporary file for
+       scale-up is that we do not grow the journal needlessly to
+       buffer transactions.]
 
      - Verify that index views isolated by a tx are not wrapped with
        the UnisolatedReadWriteIndex class.  They should be direct
@@ -384,6 +1042,27 @@ HA
           kinds of services and under different workloads.  How do
           services and clients handle things when the logical service
           is brought back up?
+
+     - Problem with zookeeper leading to "Too many open files" if
+       there is a configuration / firewall issue.
+
+ERROR: 409560    main com.bigdata.zookeeper.ZooKeeperAccessor.getZookeeper(ZooKeeperAccessor.java:197): Could not connect: ntries=406
+java.io.IOException: Too many open files
+        at sun.nio.ch.IOUtil.initPipe(Native Method)
+        at sun.nio.ch.EPollSelectorImpl.<init>(EPollSelectorImpl.java:49)
+        at sun.nio.ch.EPollSelectorProvider.openSelector(EPollSelectorProvider.java:18)
+        at java.nio.channels.Selector.open(Selector.java:209)
+        at org.apache.zookeeper.ClientCnxn.<init>(ClientCnxn.java:143)
+        at org.apache.zookeeper.ClientCnxn.<init>(ClientCnxn.java:268)
+        at org.apache.zookeeper.ZooKeeper.<init>(ZooKeeper.java:373)
+        at com.bigdata.zookeeper.ZooKeeperAccessor.getZookeeper(ZooKeeperAccessor.java:189)
+        at com.bigdata.zookeeper.ZooKeeperAccessor.<init>(ZooKeeperAccessor.java:138)
+        at com.bigdata.service.jini.JiniFederation.<init>(JiniFederation.java:330)
+        at com.bigdata.service.jini.JiniClient.connect(JiniClient.java:156)
+        at com.bigdata.service.jini.AbstractServer.<init>(AbstractServer.java:782)
+        at com.bigdata.jini.start.ServicesManagerServer.<init>(ServicesManagerServer.java:357)
+        at com.bigdata.jini.start.ServicesManagerServer.main(ServicesManagerServer.java:467)
+
 
 --------------------
 Monitoring.  
@@ -1818,22 +2497,6 @@ Quads:
        interactions among those proof chains.
 
 ------------------------------------------------------------
-
-x. Windows performance tips:
-
-   1. Set to optimize scheduling for programs (rather than background
-      processes) and memory for programs (rather than the system
-      cache)?
-
-   2. On win64 platforms, the kernal can wind up consuming all
-      available memory for IO heavy applications, resulting in heavy
-      swapping and poor performance.  The links below can help you to
-      understand this issue and include a utility to specify the size
-      of the file system cache.
-
-      http://www.microsoft.com/downloads/details.aspx?FamilyID=e24ade0a-5efe-43c8-b9c3-5d0ecb2f39af&displaylang=en
-      
-      http://blogs.msdn.com/ntdebugging/archive/2009/02/06/microsoft-windows-dynamic-cache-service.aspx
 
 x. TM Bug.
 

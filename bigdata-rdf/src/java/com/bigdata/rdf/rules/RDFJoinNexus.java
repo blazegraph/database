@@ -139,7 +139,7 @@ import com.bigdata.striterator.IKeyOrder;
  * <p>
  * There is a pragmatic limit on the #of concurrent threads for a single host.
  * When those threads target a blocking queue, then thread contention becomes
- * very high and throughput drops drammatically. We can reduce this problem by
+ * very high and throughput drops dramatically. We can reduce this problem by
  * allocating a distinct {@link UnsynchronizedArrayBuffer} to each task. The
  * task collects a 'chunk' in the {@link UnsynchronizedArrayBuffer}. When full,
  * the buffer propagates onto a thread-safe buffer of chunks which flushes

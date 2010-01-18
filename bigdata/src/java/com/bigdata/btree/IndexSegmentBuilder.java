@@ -153,9 +153,11 @@ import com.bigdata.rawstore.WormAddressManager;
  *      addrs and to buffer the nodes in memory, writing them once the leaves
  *      are finished.
  * 
+ * @todo Put profiler on (B) for build stress tests. 
+ * 
  * @todo Make sure it is possible to grab the {@link IndexMetadata} and the
  *       bloom filter from the generated file in a single IO.
- * 
+ *       
  * @todo GPU parallel builds. Once we have the data in a bunch of byte[][]s we
  *       could conceivable get this stuff organized to the point where each
  *       tuple and child in the output B+Tree could be assigned to a thread and
