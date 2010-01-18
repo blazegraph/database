@@ -528,8 +528,10 @@ public class TestRestartSafe extends ProxyTestCase<Journal> {
          * @param checkpoint
          * @param metadata
          */
-        public MyBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
-            super(store, checkpoint, metadata);
+        public MyBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
+            
+            super(store, checkpoint, metadata, readOnly);
+            
         }
 
     }

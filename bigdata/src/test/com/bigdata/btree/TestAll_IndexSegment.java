@@ -74,8 +74,6 @@ public class TestAll_IndexSegment extends TestCase {
         suite.addTestSuite(TestIndexSegmentCheckpoint.class);
         // test with small known examples in detail.
         suite.addTestSuite(TestIndexSegmentBuilderWithSmallTree.class);
-        // test with small known examples and overestimation of the range count in detail.
-        suite.addTestSuite(TestIndexSegmentBuilderWithSmallTreeAndOvercount.class);
         // test ability to pre-populate the cache with records for the generated index segment.
         suite.addTestSuite(TestIndexSegmentBuilderCacheInteraction.class);
         // test fence posts for incremental builds with deleted index entries.

@@ -2556,14 +2556,15 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         if (addr == NULL) {
 
-            if (index == data.getKeyCount() && btree instanceof IndexSegment) {
-
-                final long priorAddr = data.getChildAddr(index - 1);
-
-                return new IndexSegment.ImmutableNodeFactory.ImmutableEmptyLastLeaf(
-                        btree, priorAddr);
-
-            }
+            // Note: Node/leaf underflow will not be supported.
+//            if (index == data.getKeyCount() && btree instanceof IndexSegment) {
+//
+//                final long priorAddr = data.getChildAddr(index - 1);
+//
+//                return new IndexSegment.ImmutableNodeFactory.ImmutableEmptyLastLeaf(
+//                        btree, priorAddr);
+//
+//            }
             
 //                dump(Level.DEBUG, System.err);
             /*
@@ -2766,7 +2767,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
          * force children to be loaded from disk if the are not resident since
          * dirty nodes are always resident.
          * 
-         * The iterator must touch the node in order to guarentee that a node
+         * The iterator must touch the node in order to guarantee that a node
          * will still be dirty by the time that the caller visits it. This
          * places the node onto the hard reference queue and increments its
          * reference counter. Evictions do NOT cause IO when the reference is
@@ -2948,16 +2949,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         final int minKeys = this.minKeys();
         final int maxKeys = this.maxKeys();
         
-        if (parent != null
-                && ((nkeys == 0) || (!(btree instanceof IndexSegment) && (nkeys < minKeys)))) {
-            /*
-             * Min keys failure.
-             * 
-             * Note: An IndexSegment may have leaves or nodes which underflow
-             * (nkeys < minKeys). This arises when the IndexSegmentPlan was
-             * generated based on an overestimate of the actual range count. See
-             * IndexSegmentBuilder for details.
-             */
+        if (parent != null && nkeys < minKeys) {
             // min keys failure.
             out.println(indent(height) + "ERROR: too few keys: m="
                     + branchingFactor + ", minKeys=" + minKeys + ", nkeys="

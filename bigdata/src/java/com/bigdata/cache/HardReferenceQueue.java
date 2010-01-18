@@ -27,6 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+
+import com.bigdata.btree.BTree;
+
 /**
  * <p>
  * A cache for hard references using an LRU policy. References are simply
@@ -69,30 +74,6 @@ public class HardReferenceQueue<T> extends RingBuffer<T> implements IHardReferen
      * The listener to which cache eviction notices are reported.
      */
     private final HardReferenceQueueEvictionListener<T> listener;
-
-//    /**
-//     * The capacity of the cache.
-//     */
-//    protected final int capacity;
-//    /**
-//     * The hard references. There is no guarantee that the references are
-//     * distinct. Unused entries are cleared to null so that we do not hold onto
-//     * hard references after they have been evicted.
-//     */
-//    protected final T[] refs;
-//    /**
-//     * The head (the insertion point for the next reference).
-//     */
-//    protected int head = 0;
-//    /**
-//     * The tail (LRU position).
-//     */
-//    protected int tail = 0;
-//    /**
-//     * The #of references in the cache. The cache is empty when this field is
-//     * zero. The cache is full when this field equals the {@link #capacity}.
-//     */
-//    protected int count = 0;
 
     /**
      * The #of references to scan backwards from the LRU position when testing

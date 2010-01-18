@@ -800,13 +800,8 @@ public class IndexSegment extends AbstractBTree {
                 return 0L;
             }
 
-            /**
-             * Returns ZERO (0) since there is no prior leaf.
-             * 
-             * Note: This is not final since it gets overridden for the data
-             * record for an {@link ImmutableEmptyLastLeaf}.
-             */
-            public long getPriorAddr() {
+            /** Returns ZERO (0) since there is no prior leaf. */
+            final public long getPriorAddr() {
                 return 0L;
             }
 
@@ -973,58 +968,58 @@ public class IndexSegment extends AbstractBTree {
 
         } // class ImmutableLeaf
 
-        /**
-         * An immutable empty leaf used as the right-most child of an
-         * {@link IndexSegment} {@link Node} when the right-most child was not
-         * emitted by the {@link IndexSegmentBuilder}. Normally the builder will
-         * assign tuples to the nodes and leaves in the {@link IndexSegmentPlan}
-         * such that each separatorKey in a {@link Node} has a left and a right
-         * child. When the {@link IndexSegmentPlan} was based on an overestimate
-         * of the actual range count, then the right child for a separatorKey in
-         * a {@link Node} is sometimes not populated and will have the address
-         * 0L. When that address is dereferenced an instance of this class is
-         * transparently materialized which gives the {@link Node} the
-         * appearence of having both a left- and right-child for that
-         * separatorKey.
-         * <p>
-         * Nodes other than those immediately dominating leaves can have a mock
-         * rightmost leaf as a child. This means that the rightSibling of a Node
-         * can be a Leaf!
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         * @version $Id$
-         */
-        static public class ImmutableEmptyLastLeaf extends ImmutableLeaf {
-
-            /**
-             * @param btree
-             *            The owning {@link IndexSegment}.
-             * @param priorAddr
-             *            The address of the previous leaf in the natural
-             *            traversal order or 0L if there is no prior leaf.
-             */
-            public ImmutableEmptyLastLeaf(final AbstractBTree btree,
-                    final long priorAddr) {
-
-                super(  (IndexSegment) btree,
-                        0L/* selfAddr */,
-                        new EmptyReadOnlyLeafData(//
-                                btree.getIndexMetadata().getDeleteMarkers(), //
-                                btree.getIndexMetadata().getVersionTimestamps()) {
-                            /**
-                             * Overridden to use the priorAddr field passed to
-                             * the constructor.
-                             */
-                    @Override
-                    public long getPriorAddr() {
-                        return priorAddr;
-                    }
-                });
-
-            }
-
-        } // class ImmutableEmptyLastLeaf
+//        /**
+//         * An immutable empty leaf used as the right-most child of an
+//         * {@link IndexSegment} {@link Node} when the right-most child was not
+//         * emitted by the {@link IndexSegmentBuilder}. Normally the builder will
+//         * assign tuples to the nodes and leaves in the {@link IndexSegmentPlan}
+//         * such that each separatorKey in a {@link Node} has a left and a right
+//         * child. When the {@link IndexSegmentPlan} was based on an overestimate
+//         * of the actual range count, then the right child for a separatorKey in
+//         * a {@link Node} is sometimes not populated and will have the address
+//         * 0L. When that address is dereferenced an instance of this class is
+//         * transparently materialized which gives the {@link Node} the
+//         * appearence of having both a left- and right-child for that
+//         * separatorKey.
+//         * <p>
+//         * Nodes other than those immediately dominating leaves can have a mock
+//         * rightmost leaf as a child. This means that the rightSibling of a Node
+//         * can be a Leaf!
+//         * 
+//         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//         *         Thompson</a>
+//         * @version $Id$
+//         */
+//        static public class ImmutableEmptyLastLeaf extends ImmutableLeaf {
+//
+//            /**
+//             * @param btree
+//             *            The owning {@link IndexSegment}.
+//             * @param priorAddr
+//             *            The address of the previous leaf in the natural
+//             *            traversal order or 0L if there is no prior leaf.
+//             */
+//            public ImmutableEmptyLastLeaf(final AbstractBTree btree,
+//                    final long priorAddr) {
+//
+//                super(  (IndexSegment) btree,
+//                        0L/* selfAddr */,
+//                        new EmptyReadOnlyLeafData(//
+//                                btree.getIndexMetadata().getDeleteMarkers(), //
+//                                btree.getIndexMetadata().getVersionTimestamps()) {
+//                            /**
+//                             * Overridden to use the priorAddr field passed to
+//                             * the constructor.
+//                             */
+//                    @Override
+//                    public long getPriorAddr() {
+//                        return priorAddr;
+//                    }
+//                });
+//
+//            }
+//
+//        } // class ImmutableEmptyLastLeaf
         
     } // class ImmutableNodeFactory
 

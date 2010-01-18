@@ -610,7 +610,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     // re-load btree from the store.
                     btree = BTree.load(//
                             resourceManager.getLiveJournal(),//
-                            entry.checkpointAddr//
+                            entry.checkpointAddr,//
+                            false// readOnly
                             );
 
                     // set the lastCommitTime on the index.

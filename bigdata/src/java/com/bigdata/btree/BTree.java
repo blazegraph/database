@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -293,7 +294,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
 //        return metadata.getBTreeReadRetentionQueueScan();
 //        
 //    }
-    
+
     /**
      * Required constructor form for {@link BTree} and any derived subclasses.
      * This ctor is used both to create a new {@link BTree}, and to load a
@@ -305,24 +306,23 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      *            A {@link Checkpoint} record for that {@link BTree}.
      * @param metadata
      *            The metadata record for that {@link BTree}.
+     * @param readOnly
+     *            When <code>true</code> the {@link BTree} will be immutable.
      * 
      * @see BTree#create(IRawStore, IndexMetadata)
      * @see BTree#load(IRawStore, long, boolean)
      */
     public BTree(final IRawStore store, final Checkpoint checkpoint,
-            final IndexMetadata metadata) {
+            final IndexMetadata metadata, final boolean readOnly) {
 
         super(  store, 
                 NodeFactory.INSTANCE, //
-                /*
-                 * Note: A BTree is not known to be read-only during its ctor.
-                 * It might be marked as read-only afterwards, but we can't be
-                 * sure at this point.
-                 */
-                false, // read-only
+                readOnly, // read-only
                 metadata,//
                 metadata.getBtreeRecordCompressorFactory()
                 );
+
+        this.readOnly = readOnly;
         
         if (checkpoint == null) {
 
@@ -357,7 +357,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
          * Note: the mutable BTree has a limit here so that split() will always
          * succeed. That limit does not apply for an immutable btree.
          */
-        assert writeRetentionQueue.capacity() >= IndexMetadata.Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY;
+        assert readOnly || writeRetentionQueue.capacity() >= IndexMetadata.Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY;
 
         /*
          * Note: Re-open is deferred so that we can mark the BTree as read-only
@@ -370,7 +370,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
     /**
      * Sets the {@link #checkpoint} and initializes the mutable fields from the
      * checkpoint record. In order for this operation to be atomic, the caller
-     * must be synchronized on the {@link BTree} or otherwise guarenteed to have
+     * must be synchronized on the {@link BTree} or otherwise guaranteed to have
      * exclusive access, e.g., during the ctor or when the {@link BTree} is
      * mutable and access is therefore required to be single-threaded.
      */
@@ -566,31 +566,30 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         
     }
     
-    /**
-     * Mark the B+Tree as read-only. Once the B+Tree is marked as read-only,
-     * that instance will remain read-only.
-     * 
-     * @param readOnly
-     *            <code>true</code> if you want to mark the B+Tree as
-     *            read-only.
-     * 
-     * @throws UnsupportedOperationException
-     *             if the B+Tree is already read-only and you pass
-     *             <code>false</code>.
-     */
-    // @todo synchronized here and on isReadOnly() to ensure that the state change is published or use an AtomicBoolean?
-    final public void setReadOnly(final boolean readOnly) {
-
-        if (this.readOnly && !readOnly) {
-
-            throw new UnsupportedOperationException(ERROR_READ_ONLY);
-            
-        }
-        
-        this.readOnly = readOnly;
-        
-    }
-    transient private boolean readOnly = false;
+//    /**
+//     * Mark the B+Tree as read-only. Once the B+Tree is marked as read-only,
+//     * that instance will remain read-only.
+//     * 
+//     * @param readOnly
+//     *            <code>true</code> if you want to mark the B+Tree as
+//     *            read-only.
+//     * 
+//     * @throws UnsupportedOperationException
+//     *             if the B+Tree is already read-only and you pass
+//     *             <code>false</code>.
+//     */
+//    final public void setReadOnly(final boolean readOnly) {
+//
+//        if (this.readOnly && !readOnly) {
+//
+//            throw new UnsupportedOperationException(ERROR_READ_ONLY);
+//            
+//        }
+//        
+//        this.readOnly = readOnly;
+//        
+//    }
+    final private boolean readOnly;
     
     final public long getLastCommitTime() {
         
@@ -724,6 +723,81 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
 
     }
 
+    /**
+     * Returns an immutable view of this {@link BTree}. If {@link BTree} is
+     * already read-only, then <i>this</i> instance is returned. Otherwise, a
+     * read-only {@link BTree} is loaded from the last checkpoint and returned.
+     * 
+     * @throws IllegalStateException
+     *             If the {@link BTree} is dirty.
+     * 
+     * @todo The {@link Checkpoint} could hold a {@link WeakReference} singleton
+     *       to the read-only view loaded from that checkpoint.
+     */
+    public BTree asReadOnly() {
+
+        if (isReadOnly()) {
+
+            return this;
+            
+        }
+
+        if(needsCheckpoint())
+            throw new IllegalStateException();
+        
+        return BTree.load(store, checkpoint.addrCheckpoint, true/* readOnly */);
+
+    }
+
+//    /**
+//     * Converts this {@link BTree} to a read-only {@link BTree}, stealing its
+//     * cached nodes and leaves. If {@link BTree} is already read-only, then
+//     * <i>this</i> instance is returned. Otherwise, a read-only {@link BTree} is
+//     * loaded from the last checkpoint, populated with new instances of cached
+//     * nodes and leaves from this {@link BTree} using a pre-order dirty node
+//     * traversal, and then returned. When the cached nodes and leaves are
+//     * populated, new instances are used but they will wrap the data records
+//     * already in memory. The new nodes and leaves are touched as they are
+//     * brought into the new {@link BTree} so they will be entered onto the write
+//     * retention cache.
+//     * 
+//     * @throws IllegalStateException
+//     *             If the {@link BTree} is dirty.
+//     * */
+//    public BTree convertToReadOnly() {
+//
+//        if(isReadOnly()) {
+//            
+//            return this;
+//            
+//        }
+//
+//        if(needsCheckpoint())
+//            throw new IllegalStateException();
+//        
+//        final BTree tmp = BTree
+//                .load(store, checkpoint.addrCheckpoint, true/* readOnly */);
+//
+//        /*
+//         * @todo We do not have a pre-order iterator which only visits the
+//         * materialized children. That is what we need here. Then for each
+//         * visited Node or Leaf, we would create an appropriate child of the
+//         * corresponding Node in the new read-only BTree. The visitation has to
+//         * be pre-order to ensure that the parent node already exists in the new
+//         * read-only BTree. It needs to only visit the materialized children to
+//         * avoid overhead with materializing nodes from the backing store.
+//         */
+////        {
+////
+////            final Iterator itr = getRoot()
+////                    .postOrderNodeIterator(true/* dirtyNodesOnly */);
+////
+////        }
+//        
+//        return tmp;
+//        
+//    }
+    
     /**
      * Checkpoint operation {@link #flush()}es dirty nodes, the optional
      * {@link IBloomFilter} (if dirty), the {@link IndexMetadata} (if dirty),
@@ -1345,7 +1419,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
          * Load the B+Tree from the store using that checkpoint record. There is
          * no root so a new root leaf will be created when the B+Tree is opened.
          */
-        return load(store, firstCheckpoint.getCheckpointAddr());
+        return load(store, firstCheckpoint.getCheckpointAddr(), false/* readOnly */);
         
     }
 
@@ -1398,13 +1472,15 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             final Constructor ctor = cl.getConstructor(new Class[] {
                     IRawStore.class,//
                     Checkpoint.class,//
-                    IndexMetadata.class //
+                    IndexMetadata.class,//
+                    Boolean.TYPE//
                     });
 
             final BTree btree = (BTree) ctor.newInstance(new Object[] { //
                     null , // store
                     firstCheckpoint, //
-                    metadata //
+                    metadata, //
+                    false// readOnly
                     });
 
             // create the root node.
@@ -1419,13 +1495,13 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         }
         
     }
-    
+
     /**
      * Load an instance of a {@link BTree} or derived class from the store. The
      * {@link BTree} or derived class MUST declare a constructor with the
      * following signature: <code>
      * 
-     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
+     * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
      * 
      * </code>
      * 
@@ -1437,36 +1513,39 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      * 
      * @return The {@link BTree} or derived class loaded from that
      *         {@link Checkpoint} record.
+     * 
+     * @deprecated by {@link #load(IRawStore, long, boolean)} which specifies
+     *             whether or not the {@link BTree} will be opened in a
+     *             read-only mode and therefore allows for certain
+     *             optimizations within the {@link BTree} constructor.
      */
     public static BTree load(final IRawStore store, final long addrCheckpoint) {
 
         return load(store, addrCheckpoint, false/* readOnly */);
         
     }
-    
+
     /**
      * Load an instance of a {@link BTree} or derived class from the store. The
      * {@link BTree} or derived class MUST declare a constructor with the
      * following signature: <code>
      * 
-     * <i>className</i>(IRawStore store, BTreeMetadata metadata)
+     * <i>className</i>(IRawStore store, Checkpoint checkpoint, BTreeMetadata metadata, boolean readOnly)
      * 
      * </code>
      * 
      * @param store
      *            The store.
-     * 
      * @param addrCheckpoint
      *            The address of a {@link Checkpoint} record for the index.
      * @param readOnly
      *            When <code>true</code> the {@link BTree} will be marked as
-     *            read-only. Marking the {@link BTree} as read-only here rather
-     *            than with {@link BTree#setReadOnly(boolean)} has some
-     *            advantages relating to the locking scheme used by
-     *            {@link Node#getChild(int)} since the root node is known to be
-     *            read-only at the time that it is allocated as per-child
-     *            locking is therefore in place for all nodes in the read-only
-     *            {@link BTree}.
+     *            read-only. Marking has some advantages relating to the locking
+     *            scheme used by {@link Node#getChild(int)} since the root node
+     *            is known to be read-only at the time that it is allocated as
+     *            per-child locking is therefore in place for all nodes in the
+     *            read-only {@link BTree}. It also results in much higher
+     *            concurrency for {@link AbstractBTree#touch(AbstractNode)}.
      * 
      * @return The {@link BTree} or derived class loaded from that
      *         {@link Checkpoint} record.
@@ -1511,20 +1590,22 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
             final Constructor ctor = cl.getConstructor(new Class[] {
                     IRawStore.class,//
                     Checkpoint.class,//
-                    IndexMetadata.class //
+                    IndexMetadata.class, //
+                    Boolean.TYPE
                     });
 
             final BTree btree = (BTree) ctor.newInstance(new Object[] { //
                     store,//
-                            checkpoint, //
-                            metadata //
+                    checkpoint, //
+                    metadata, //
+                    readOnly
                     });
 
-            if (readOnly) {
-
-                btree.setReadOnly(true);
-
-            }
+//            if (readOnly) {
+//
+//                btree.setReadOnly(true);
+//
+//            }
 
             // read the root node.
             btree.reopen();

@@ -4332,7 +4332,8 @@ abstract public class StoreManager extends ResourceEvents implements
                                 .load(
                                         journal,
                                         commitRecord
-                                                .getRootAddr(AbstractJournal.ROOT_NAME2ADDR));
+                                                .getRootAddr(AbstractJournal.ROOT_NAME2ADDR),
+                                        true/* readOnly */);
                         
                         @SuppressWarnings("unchecked")
                         final ITupleIterator<Name2Addr.Entry> itr3 = name2addr.rangeIterator();
