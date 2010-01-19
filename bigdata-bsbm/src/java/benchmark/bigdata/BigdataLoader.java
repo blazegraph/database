@@ -32,23 +32,23 @@ public class BigdataLoader {
             String data = args[3];
             File file = new File(journal);
             if (file.exists()) {
-                file.delete();
-            }
-            if (file.exists()) {
-                throw new RuntimeException("could not delete old journal file");
+                if(!file.delete()) {
+                    throw new RuntimeException("could not delete old journal file");
+                }
             }
             
             Properties properties = new Properties();
-            properties.setProperty(
-                    BigdataSail.Options.QUADS, "false");
-            properties.setProperty(
-                    BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
-            properties.setProperty(
-                    BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-            properties.setProperty(
-                    BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-            properties.setProperty(
-                    BigdataSail.Options.FILE, file.getAbsolutePath());
+            properties.setProperty(BigdataSail.Options.QUADS, "false");
+            properties.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
+            properties.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+            properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+            properties.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
+            properties.setProperty(BigdataSail.Options.BUFFER_CAPACITY, "100000"); // 10000 default.
+            properties.setProperty(BigdataSail.Options.NESTED_SUBQUERY, "true"); // true is default.
+            properties.setProperty(BigdataSail.Options.MAX_PARALLEL_SUBQUERIES, "5"); // 5 is default, only applies to nextedSubquery joins.
+            properties.setProperty(com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "8000");
+            properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT, ""+(1048576*200)); // 200M initial extent.
+            properties.setProperty(BigdataSail.Options.FILE, file.getAbsolutePath());
 
             BigdataSail sail = new BigdataSail(properties);
             BigdataSailRepository repo = new BigdataSailRepository(sail);
@@ -60,14 +60,16 @@ public class BigdataLoader {
             ex.printStackTrace();
         }
     }
-    
+
     /**
      * Load a data file into a SAIL via the Sesame Repository API.
      * 
      * @param sail
-     *          the SAIL
+     *            the SAIL
      * @param data
-     *          path to the data (assumes ntriples)
+     *            path to the data (assumes ntriples)
+     * 
+     * @todo this is not an efficient API for loading the data.
      */
     private static final void loadData(BigdataSailRepository repo, String data) 
             throws Exception {
