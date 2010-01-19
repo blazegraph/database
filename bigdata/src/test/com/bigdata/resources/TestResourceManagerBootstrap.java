@@ -35,7 +35,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
@@ -432,7 +432,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
                     final int branchingFactor = 20;
 
-                    final IndexSegmentBuilder builder = new IndexSegmentBuilder(
+                    final IndexSegmentBuilder builder = IndexSegmentBuilder.newInstance(
                             outFile, tmpDir, ndx.getEntryCount(), ndx
                                     .rangeIterator(), branchingFactor, ndx
                                     .getIndexMetadata(), commitTime, true/* compactingMerge */);
@@ -568,7 +568,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
                 indexMetadata.setDeleteMarkers(true);
 
                 // create index and register on the journal.
-                IIndex ndx = journal.registerIndex(indexName, BTree.create(journal, indexMetadata));
+                ILocalBTreeView ndx = journal.registerIndex(indexName, BTree.create(journal, indexMetadata));
                 
 //                // commit journal so that it will notice when the index gets dirty. 
 //                journal.commit();
@@ -604,7 +604,7 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
                     final int branchingFactor = 20;
 
-                    final IndexSegmentBuilder builder = new IndexSegmentBuilder(
+                    final IndexSegmentBuilder builder = IndexSegmentBuilder.newInstance(
                             outFile, tmpDir, (int) ndx.rangeCount(null, null), ndx
                                     .rangeIterator(null, null),
                             branchingFactor, ndx

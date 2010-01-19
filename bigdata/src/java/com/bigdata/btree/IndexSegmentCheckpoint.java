@@ -907,8 +907,8 @@ public class IndexSegmentCheckpoint {
         sb.append(", nnodes=" + nnodes);
         sb.append(", nentries=" + nentries);
         sb.append(", maxNodeOrLeafLength=" + maxNodeOrLeafLength);
-        sb.append(", leavesRegion={extent=" + extentLeaves+", offset="+offsetLeaves+"}");
-        sb.append(", nodesRegion={extent=" + extentNodes+", offset="+offsetNodes+"}");
+        sb.append(", leavesRegion={extent=" + extentLeaves+", offset="+offsetLeaves+"}, avgLeafSize="+(extentLeaves/nleaves));
+        sb.append(", nodesRegion={extent=" + extentNodes+", offset="+offsetNodes+"}, avgNodeSize="+(nnodes==0?0:(extentNodes/nnodes)));
         sb.append(", blobsRegion={extent=" + extentBlobs+", offset="+offsetBlobs+"}");
         sb.append(", addrRoot=" + am.toString(addrRoot));
         sb.append(", addrFirstLeaf=" + am.toString(addrFirstLeaf));

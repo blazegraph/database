@@ -1800,8 +1800,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Constructor used to configure a new <em>unnamed</em> B+Tree. The index
      * UUID is set to the given value and all other fields are defaulted as
      * explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
-     * defaults may be overriden using the various setter methods, but some
-     * values can not be safely overriden after the index is in use.
+     * defaults may be overridden using the various setter methods, but some
+     * values can not be safely overridden after the index is in use.
      * 
      * @param indexUUID
      *            The indexUUID.
@@ -1819,8 +1819,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Constructor used to configure a new <em>named</em> B+Tree. The index
      * UUID is set to the given value and all other fields are defaulted as
      * explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
-     * defaults may be overriden using the various setter methods, but some
-     * values can not be safely overriden after the index is in use.
+     * defaults may be overridden using the various setter methods, but some
+     * values can not be safely overridden after the index is in use.
      * 
      * @param name
      *            The index name. When this is a scale-out index, the same

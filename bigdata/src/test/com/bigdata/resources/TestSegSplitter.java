@@ -137,7 +137,7 @@ public class TestSegSplitter extends TestCase2 {
             outFile = File.createTempFile(name, Options.SEG, tmpDir);
 
             // new builder.
-            builder = IndexSegmentBuilder.newInstance(name, src, outFile,
+            builder = IndexSegmentBuilder.newInstance(/*name, */src, outFile,
                     tmpDir, true/* compactingMerge */, commitTime, fromKey,
                     toKey);
 

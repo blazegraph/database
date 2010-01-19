@@ -91,19 +91,18 @@ public class TestIndexSegmentBuilderCacheInteraction extends
      * 
      * @return The btree.
      */
-    public BTree getBTree(int branchingFactor, BloomFilterFactory bloomFilterFactory) {
+    public BTree getBTree(final int branchingFactor,
+            final BloomFilterFactory bloomFilterFactory) {
 
-        IRawStore store = new SimpleMemoryRawStore(); 
+        final IRawStore store = new SimpleMemoryRawStore(); 
 
-        IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+        final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
         
         metadata.setBranchingFactor(branchingFactor);
         
         metadata.setBloomFilterFactory(bloomFilterFactory);
         
-        BTree btree = BTree.create(store, metadata);
-
-        return btree;
+        return BTree.create(store, metadata);
 
     }
     
@@ -145,7 +144,7 @@ public class TestIndexSegmentBuilderCacheInteraction extends
 
         final long commitTime = System.currentTimeMillis();
 
-        final IndexSegmentBuilder builder = new IndexSegmentBuilder(outFile,
+        final IndexSegmentBuilder builder = IndexSegmentBuilder.newInstance(outFile,
                 tmpDir, btree.getEntryCount(), btree.rangeIterator(), 3/* m */,
                 btree.getIndexMetadata(), commitTime, true/* compactingMerge */);
 

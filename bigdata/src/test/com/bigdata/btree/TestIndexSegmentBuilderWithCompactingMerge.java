@@ -136,7 +136,7 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             assertEquals(10, expected.rangeCountExact(fromKey, toKey));
 
             final IndexSegmentBuilder builder = IndexSegmentBuilder
-                    .newInstance(name, expected, outFile, tmpDir,
+                    .newInstance(/*name,*/ expected, outFile, tmpDir,
                             true/* compactingMerge */, createTime, fromKey,
                             toKey);
 
@@ -199,7 +199,7 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             assertEquals(8, expected.rangeCountExact(fromKey, toKey));
 
             final IndexSegmentBuilder builder = IndexSegmentBuilder
-                    .newInstance(name, expected, outFile, tmpDir,
+                    .newInstance(/*name,*/ expected, outFile, tmpDir,
                             true/* compactingMerge */, createTime, fromKey,
                             toKey);
 
@@ -266,7 +266,7 @@ public class TestIndexSegmentBuilderWithCompactingMerge extends
             assertEquals(0, expected.rangeCountExact(fromKey, toKey));
 
             final IndexSegmentBuilder builder = IndexSegmentBuilder
-                    .newInstance(name, expected, outFile, tmpDir,
+                    .newInstance(/*name, */ expected, outFile, tmpDir,
                             true/* compactingMerge */, createTime, fromKey,
                             toKey);
 

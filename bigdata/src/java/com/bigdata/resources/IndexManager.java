@@ -1765,7 +1765,7 @@ abstract public class IndexManager extends StoreManager {
                 outFile = getIndexSegmentFile(indexMetadata);
 
                 // new builder.
-                builder = IndexSegmentBuilder.newInstance(indexPartitionName, src, outFile,
+                builder = IndexSegmentBuilder.newInstance(/*indexPartitionName,*/ src, outFile,
                         tmpDir, compactingMerge, commitTime, fromKey, toKey);
 
                 try {

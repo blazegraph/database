@@ -177,7 +177,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
     /**
      * Test forward leaf scan.
      */
-    public void testForwardScan(final IndexSegment seg)
+    static public void testForwardScan(final IndexSegment seg)
     {
 
         final int nleaves = seg.getStore().getCheckpoint().nleaves;
@@ -226,7 +226,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
      * Note: the scan starts with the last leaf in the key order and then
      * proceeds in reverse key order.
      */
-    public void testReverseScan(final IndexSegment seg) {
+    static public void testReverseScan(final IndexSegment seg) {
 
         final int nleaves = seg.getStore().getCheckpoint().nleaves;
 

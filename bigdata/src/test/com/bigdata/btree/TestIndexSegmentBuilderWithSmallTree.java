@@ -116,7 +116,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         final long commitTime = System.currentTimeMillis();
         
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
                 true/*compactingMerge*/).call();
 
@@ -212,8 +212,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         final long commitTime = System.currentTimeMillis();
         
 //        IndexSegmentBuilder.log.setLevel(Level.DEBUG); 
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+
+        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 9/* m */, btree.getIndexMetadata(), commitTime,
                 true/*compactingMerge*/).call();
 
@@ -336,8 +336,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         final BTree btree = getProblem1();
 
         final long commitTime = System.currentTimeMillis();
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+
+        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 10/* m */, btree.getIndexMetadata(), commitTime,
                 true/*compactingMerge*/).call();
 
@@ -444,8 +444,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         btree.dump(Level.DEBUG,System.err);        
 
         final long commitTime = System.currentTimeMillis();
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+
+        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
                 true/*compactingMerge*/).call();
         
@@ -548,8 +548,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         btree.dump(Level.DEBUG,System.err);
 
         final long commitTime = System.currentTimeMillis();
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+
+        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
                 true/*compactingMerge*/).call();
 
