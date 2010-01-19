@@ -1,0 +1,123 @@
+<!-- @todo add dependencies for GOM and add GOM to sources that are compiled, jared, etc. -->
+<!-- @todo trim fastutils using a tool to chase the actual class files that we use. -->
+<!-- @todo change the release target to put release notes into the root of the archives. -->
+<!-- @todo maven2 setup so we can run and publish unit tests results. -->
+<!-- $Id: build.xml 2266 2009-10-26 18:21:50Z mrpersonick $ -->
+<project name="bsbm" default="compile" basedir=".">
+ 
+	<property file="build.properties" />
+
+	<!-- build-time classpath. -->
+	<path id="build.classpath">
+		<fileset dir="${bsbm.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bsbm.dir}/../bigdata/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bsbm.dir}/../bigdata-jini/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bsbm.dir}/../bigdata-rdf/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bsbm.dir}/../bigdata-sails/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+
+	<!-- runtime classpath w/o install. -->
+	<path id="runtime.classpath">
+	    <pathelement location="${build.dir}/classes" />
+		<path refid="build.classpath" />
+	</path>
+
+	<target name="clean" description="cleans everything in [build.dir]">
+		<delete dir="${build.dir}" />
+	</target>
+
+	<target name="prepare">
+		<!-- create directories. -->
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${build.dir}/classes" />
+		<mkdir dir="${build.dir}/bin" />
+	</target>
+
+	<!-- Note: javac error results often if verbose is disabled. -->
+	<!-- I was able to perform a build with 1.6.0_07. -->
+	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
+	<target name="compile" depends="prepare">
+		<mkdir dir="${build.dir}" />
+		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
+		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+	     encoding="${javac.encoding}"
+	     	>
+			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
+			<!-- target="${javac.target}" source="${javac.source}" -->
+			<src path="${bsbm.dir}/src/java" />
+			<src path="${bsbm.dir}/../bigdata/src/java" />
+			<src path="${bsbm.dir}/../bigdata-jini/src/java" />
+			<src path="${bsbm.dir}/../bigdata-rdf/src/java" />
+			<src path="${bsbm.dir}/../bigdata-sails/src/java" />
+			<compilerarg value="-version"/>
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/classes">
+			<fileset dir="${bsbm.dir}/src/java">
+				<exclude name="**/*.java" />
+				<exclude name="**/package.html" />
+			</fileset>
+			<fileset dir="${bsbm.dir}/src/resources/logging"/>
+		</copy>
+		<copy toDir="${build.dir}/bin">
+			<fileset dir="${bsbm.dir}/src/resources/bsbm-data"/>
+		</copy>
+	</target>
+
+	<target name="run-generator" depends="compile">
+		<java classname="benchmark.generator.Generator"
+	          fork="true"
+	          failonerror="true"
+	          maxmemory="512m"
+	          dir="${build.dir}/bin"
+			  >
+		    <arg value="-fc"/>
+			<arg line="-pc 10"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
+	<target name="run-load" depends="compile">
+		<delete file="${build.dir}/bin/bigdata-bsbm.jnl" />
+		<java classname="benchmark.bigdata.BigdataLoader"
+	          fork="true"
+	          failonerror="true"
+	          maxmemory="512m"
+	          dir="${build.dir}/bin"
+			  >
+			<arg line="-journal bigdata-bsbm.jnl -data dataset.nt"/>
+			<jvmarg value="-server"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
+	<target name="run-query" depends="compile">
+		<java classname="benchmark.bigdata.BigdataQueryDriver"
+	          fork="true"
+	          failonerror="true"
+	          maxmemory="512m"
+	          dir="${build.dir}/bin"
+			  >
+			<arg line="-runs 2 -w 2 -mt 2 -journal bigdata-bsbm.jnl"/>
+			<jvmarg value="-server"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
+</project>
