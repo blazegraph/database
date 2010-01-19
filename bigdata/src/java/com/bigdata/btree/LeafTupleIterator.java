@@ -28,6 +28,7 @@ package com.bigdata.btree;
 
 import java.util.NoSuchElementException;
 
+import com.bigdata.btree.data.ILeafData;
 
 /**
  * Visits the values of a {@link Leaf} in the external key ordering. There is
@@ -36,11 +37,11 @@ import java.util.NoSuchElementException;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LeafTupleIterator implements ITupleIterator {
+public class LeafTupleIterator<E> implements ITupleIterator<E> {
 
-    private final Leaf leaf;
+    private final ILeafData leaf;
 
-    private final Tuple tuple;
+    private final AbstractTuple<E> tuple;
     
     private int index;
 
@@ -56,13 +57,13 @@ public class LeafTupleIterator implements ITupleIterator {
     // first index to NOT visit.
     private final int toIndex;
 
-    public LeafTupleIterator(Leaf leaf) {
+    public LeafTupleIterator(final Leaf leaf) {
 
-        this(leaf, new Tuple(leaf.btree,IRangeQuery.DEFAULT), null, null);
+        this(leaf, new Tuple<E>(leaf.btree, IRangeQuery.DEFAULT), null, null);
 
     }
 
-    public LeafTupleIterator(Leaf leaf, Tuple tuple) {
+    public LeafTupleIterator(final ILeafData leaf, final AbstractTuple<E> tuple) {
 
         this(leaf, tuple, null, null);
 
@@ -88,7 +89,8 @@ public class LeafTupleIterator implements ITupleIterator {
      * @exception IllegalArgumentException
      *                if fromKey is given and is greater than toKey.
      */
-    public LeafTupleIterator(Leaf leaf, Tuple tuple, byte[] fromKey, byte[] toKey) {
+    public LeafTupleIterator(final ILeafData leaf, final AbstractTuple<E> tuple,
+            final byte[] fromKey, final byte[] toKey) {
 
         assert leaf != null;
 
@@ -202,7 +204,7 @@ public class LeafTupleIterator implements ITupleIterator {
         
     }
     
-    public ITuple next() {
+    public ITuple<E> next() {
 
         if (!hasNext()) {
 

@@ -93,7 +93,7 @@ public class TestNullValues extends AbstractBTreeTestCase {
         
         final long addrCheckpoint1 = btree.writeCheckpoint();
         
-        btree = BTree.load(store, addrCheckpoint1);
+        btree = BTree.load(store, addrCheckpoint1, true/*readOnly*/);
         
         assertNull(btree.lookup(k1));
         assertTrue(btree.contains(k1));
@@ -115,7 +115,7 @@ public class TestNullValues extends AbstractBTreeTestCase {
 
             final long commitTime = System.currentTimeMillis();
             
-            new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
+            IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                     .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
                     true/*compactingMerge*/).call();
 
