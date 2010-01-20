@@ -20,13 +20,33 @@ import org.openrdf.sail.SailException;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 
 public class BigdataSailGraphQuery extends SailGraphQuery {
+    
+    /**
+     * Allow clients to bypass the native construct iterator, which resolves
+     * binding sets into SPOs into BigdataStatements.
+     */
+    private boolean useNativeConstruct = true;
+    
     public BigdataSailGraphQuery(ParsedGraphQuery tupleQuery,
             SailRepositoryConnection con) {
         super(tupleQuery, con);
     }
 
+    /**
+     * Allow clients to bypass the native construct iterator, which resolves
+     * binding sets into SPOs into BigdataStatements.  Sometimes this can
+     * cause problems, especially when construct graphs contain values not
+     * in the database's lexicon. 
+     */
+    public void setUseNativeConstruct(boolean useNativeConstruct) {
+        this.useNativeConstruct = useNativeConstruct;
+    }
+    
     @Override
     public GraphQueryResult evaluate() throws QueryEvaluationException {
+        if (!useNativeConstruct) {
+            return super.evaluate();
+        }
         TupleExpr tupleExpr = getParsedQuery().getTupleExpr();
         try {
             BigdataSailConnection sailCon =
