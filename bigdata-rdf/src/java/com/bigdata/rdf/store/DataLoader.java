@@ -56,15 +56,16 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.spo.SPO;
 
 /**
- * A utility class to efficiently load RDF data into an
- * {@link AbstractTripleStore} without using Sesame API.
- * 
- * FIXME it should be easier to configure the underlying parsers in order to
- * enable or disable various features which they support, e.g., preserving BNode
- * IDs, validation, etc.
+ * A utility class to load RDF data into an {@link AbstractTripleStore} without
+ * using Sesame API. This class does not parallelize the RDF parsing and writing
+ * on the database. This class is not efficient for scale-out.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo It should be easier to configure the underlying parsers in order to
+ *       enable or disable various features which they support, e.g., preserving
+ *       BNode IDs, validation, etc.
  */
 public class DataLoader {
 
@@ -73,7 +74,7 @@ public class DataLoader {
      */
     protected static final Logger log = Logger.getLogger(DataLoader.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
 
     private final boolean verifyData;
 
@@ -227,7 +228,7 @@ public class DataLoader {
 
         if (buffer != null) {
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("");
             
             buffer.flush();
@@ -408,7 +409,7 @@ public class DataLoader {
          * <strong>This feature is most useful when blank nodes are not in use,
          * but it causes memory to grow when blank nodes are in use and forces
          * statements using blank nodes to be deferred until the application
-         * flushes the {@link DataLoader} when statement identifers are enabled.
+         * flushes the {@link DataLoader} when statement identifiers are enabled.
          * </strong>
          */
         public static final String FLUSH = DataLoader.class.getName()+".flush";
@@ -427,14 +428,14 @@ public class DataLoader {
      * @param database
      *            The database.
      */
-    public DataLoader(AbstractTripleStore database) {
+    public DataLoader(final AbstractTripleStore database) {
         
         this(database.getProperties(), database );
         
     }
 
     /**
-     * Configure a data loader with overriden properties.
+     * Configure a data loader with overridden properties.
      * 
      * @param properties
      *            Configuration properties - see {@link Options}.
@@ -442,8 +443,9 @@ public class DataLoader {
      * @param database
      *            The database.
      */
-    public DataLoader(Properties properties, AbstractTripleStore database) {
-        
+    public DataLoader(final Properties properties,
+            final AbstractTripleStore database) {
+
         if (properties == null)
             throw new IllegalArgumentException();
 
@@ -453,52 +455,53 @@ public class DataLoader {
         verifyData = Boolean.parseBoolean(properties.getProperty(
                 Options.VERIFY_DATA, Options.DEFAULT_VERIFY_DATA));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.VERIFY_DATA + "=" + verifyData);
 
         commitEnum = CommitEnum.valueOf(properties.getProperty(Options.COMMIT,
                 Options.DEFAULT_COMMIT));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.COMMIT + "=" + commitEnum);
 
-        closureEnum = database.getAxioms().isNone()?ClosureEnum.None:(ClosureEnum.valueOf(properties.getProperty(
-                Options.CLOSURE, Options.DEFAULT_CLOSURE)));
+        closureEnum = database.getAxioms().isNone() ? ClosureEnum.None
+                : (ClosureEnum.valueOf(properties.getProperty(Options.CLOSURE,
+                        Options.DEFAULT_CLOSURE)));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(Options.CLOSURE + "=" + closureEnum);
 
         bufferCapacity = Integer.parseInt(properties.getProperty(
-                Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));        
+                Options.BUFFER_CAPACITY, Options.DEFAULT_BUFFER_CAPACITY));
 
         this.database = database;
-        
+
         inferenceEngine = database.getInferenceEngine();
-        
+
         if (closureEnum != ClosureEnum.None) {
 
             /*
              * Truth maintenance: buffer will write on a tempStore.
              */
-            
+
             tm = new TruthMaintenance(inferenceEngine);
-            
+
         } else {
-            
+
             /*
              * No truth maintenance: buffer will write on the database.
              */
-            
+
             tm = null;
-            
+
         }
-        
-        flush = Boolean.parseBoolean(properties.getProperty(
-                Options.FLUSH, Options.DEFAULT_FLUSH));
-        
-        if(INFO)
-            log.info(Options.FLUSH+"="+flush);
-        
+
+        flush = Boolean.parseBoolean(properties.getProperty(Options.FLUSH,
+                Options.DEFAULT_FLUSH));
+
+        if (log.isInfoEnabled())
+            log.info(Options.FLUSH + "=" + flush);
+
     }
 
     /**
@@ -512,8 +515,8 @@ public class DataLoader {
      * 
      * @throws IOException
      */
-    final public LoadStats loadData(String resource, String baseURL,
-            RDFFormat rdfFormat) throws IOException {
+    final public LoadStats loadData(final String resource, final String baseURL,
+            final RDFFormat rdfFormat) throws IOException {
 
         if (resource == null)
             throw new IllegalArgumentException();
@@ -542,8 +545,9 @@ public class DataLoader {
      * 
      * @throws IOException
      */
-    final public LoadStats loadData(String[] resource, String[] baseURL,
-            RDFFormat[] rdfFormat) throws IOException {
+    final public LoadStats loadData(final String[] resource,
+            final String[] baseURL, final RDFFormat[] rdfFormat)
+            throws IOException {
 
         if (resource.length != baseURL.length)
             throw new IllegalArgumentException();
@@ -551,26 +555,23 @@ public class DataLoader {
         if (resource.length != rdfFormat.length)
             throw new IllegalArgumentException();
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("commit=" + commitEnum + ", closure=" + closureEnum
                     + ", resource=" + Arrays.toString(resource));
 
-        LoadStats totals = new LoadStats();
-        
-        LoadStats[] loadStats = new LoadStats[resource.length];
+        final LoadStats totals = new LoadStats();
 
-        for(int i=0; i<resource.length; i++) {
-            
+        for (int i = 0; i < resource.length; i++) {
+
             final boolean endOfBatch = i + 1 == resource.length;
-            
-            loadStats[i] = loadData2(//
+
+            loadData2(//
+                    totals,//
                     resource[i],//
                     baseURL[i],//
                     rdfFormat[i],//
-                    endOfBatch
+                    endOfBatch//
                     );
-            
-            totals.add(loadStats[i]);
             
         }
 
@@ -584,7 +585,7 @@ public class DataLoader {
         
         if (commitEnum == CommitEnum.Batch) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Commit after batch of "+resource.length+" resources");
 
             long beginCommit = System.currentTimeMillis();
@@ -593,12 +594,12 @@ public class DataLoader {
 
             totals.commitTime += System.currentTimeMillis() - beginCommit;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("commit: latency="+totals.commitTime+"ms");
 
         }
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Loaded " + resource.length+" resources: "+totals);
         
         return totals;
@@ -614,11 +615,16 @@ public class DataLoader {
      * @return
      * @throws IOException
      */
-    public LoadStats loadData(Reader reader, String baseURL, RDFFormat rdfFormat) throws IOException  {
+    public LoadStats loadData(final Reader reader, final String baseURL,
+            final RDFFormat rdfFormat) throws IOException {
 
         try {
 
-            return loadData3(reader, baseURL, rdfFormat, true/*endOfBatch*/);
+            final LoadStats totals = new LoadStats();
+
+            loadData3(totals, reader, baseURL, rdfFormat, true/*endOfBatch*/);
+            
+            return totals;
         
         } finally {
             
@@ -637,12 +643,16 @@ public class DataLoader {
      * @return
      * @throws IOException
      */
-    public LoadStats loadData(InputStream is, String baseURL,
-            RDFFormat rdfFormat) throws IOException {
+    public LoadStats loadData(final InputStream is, final String baseURL,
+            final RDFFormat rdfFormat) throws IOException {
 
         try {
 
-            return loadData3(is, baseURL, rdfFormat, true/* endOfBatch */);
+            final LoadStats totals = new LoadStats();
+            
+            loadData3(totals, is, baseURL, rdfFormat, true/* endOfBatch */);
+            
+            return totals;
             
         } finally {
             
@@ -661,20 +671,24 @@ public class DataLoader {
      * @return
      * @throws IOException
      */
-    public LoadStats loadData(URL url, String baseURL, RDFFormat rdfFormat)
-            throws IOException {
+    public LoadStats loadData(final URL url, final String baseURL,
+            final RDFFormat rdfFormat) throws IOException {
 
         if (url == null)
             throw new IllegalArgumentException();
         
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info("loading: " + url);
 
         final InputStream is = url.openStream();
         
         try {
         
-            return loadData3(is, baseURL, rdfFormat, true/*endOfBatch*/);
+            final LoadStats totals = new LoadStats();
+            
+            loadData3(totals, is, baseURL, rdfFormat, true/*endOfBatch*/);
+            
+            return totals;
         
         } finally {
             
@@ -699,10 +713,11 @@ public class DataLoader {
      * @throws IOException
      *             if the <i>resource</i> can not be resolved or loaded.
      */
-    protected LoadStats loadData2(String resource, String baseURL,
-            RDFFormat rdfFormat, boolean endOfBatch) throws IOException {
+    protected void loadData2(final LoadStats totals, final String resource,
+            final String baseURL, final RDFFormat rdfFormat,
+            final boolean endOfBatch) throws IOException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("loading: " + resource);
 
         // try the classpath
@@ -718,8 +733,10 @@ public class DataLoader {
             
             if(file.exists()) {
                 
-                return loadFiles(0/* depth */, file, baseURL, rdfFormat,
-                        null/* filter */, endOfBatch);
+                loadFiles(totals, 0/* depth */, file, baseURL,
+                        rdfFormat, null/* filter */, endOfBatch);
+
+                return;
                 
             }
             
@@ -743,7 +760,7 @@ public class DataLoader {
 
         try {
 
-            return loadData3(reader, baseURL, rdfFormat, endOfBatch);
+            loadData3(totals, reader, baseURL, rdfFormat, endOfBatch);
 
         } catch (Exception ex) {
 
@@ -780,27 +797,33 @@ public class DataLoader {
      * 
      * @throws IOException
      */
-    public LoadStats loadFiles(File file, String baseURI, RDFFormat rdfFormat,
-            FilenameFilter filter) throws IOException {
+    public LoadStats loadFiles(final File file, final String baseURI,
+            final RDFFormat rdfFormat, final FilenameFilter filter)
+            throws IOException {
 
         if (file == null)
             throw new IllegalArgumentException();
         
-        return loadFiles(0/* depth */, file, baseURI, rdfFormat, filter, true/* endOfBatch */
+        final LoadStats totals = new LoadStats();
+
+        loadFiles(totals, 0/* depth */, file, baseURI, rdfFormat, filter, true/* endOfBatch */
         );
+
+        return totals;
 
     }
 
-    protected LoadStats loadFiles(int depth, File file, String baseURI,
-            RDFFormat rdfFormat, FilenameFilter filter, boolean endOfBatch)
+    protected void loadFiles(final LoadStats totals, final int depth,
+            final File file, final String baseURI, final RDFFormat rdfFormat,
+            final FilenameFilter filter, final boolean endOfBatch)
             throws IOException {
 
         if (file.isDirectory()) {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("loading directory: " + file);
 
-            final LoadStats loadStats = new LoadStats();
+//            final LoadStats loadStats = new LoadStats();
 
             final File[] files = (filter != null ? file.listFiles(filter)
                     : file.listFiles());
@@ -812,12 +835,12 @@ public class DataLoader {
 //                final RDFFormat fmt = RDFFormat.forFileName(f.toString(),
 //                        rdfFormat);
 
-                loadStats.add(loadFiles(depth + 1, f, baseURI, rdfFormat, filter,
-                        (depth == 0 && i < files.length ? false : endOfBatch)));
+                loadFiles(totals, depth + 1, f, baseURI, rdfFormat, filter,
+                        (depth == 0 && i < files.length ? false : endOfBatch));
                 
             }
             
-            return loadStats;
+            return;
             
         }
         
@@ -826,11 +849,11 @@ public class DataLoader {
         RDFFormat fmt = RDFFormat.forFileName(n);
 
         if (fmt == null && n.endsWith(".zip")) {
-            fmt = rdfFormat.forFileName(n.substring(0, n.length() - 4));
+            fmt = RDFFormat.forFileName(n.substring(0, n.length() - 4));
         }
 
         if (fmt == null && n.endsWith(".gz")) {
-            fmt = rdfFormat.forFileName(n.substring(0, n.length() - 3));
+            fmt = RDFFormat.forFileName(n.substring(0, n.length() - 3));
         }
 
         if (fmt == null) // fallback
@@ -867,7 +890,9 @@ public class DataLoader {
                 final String s = baseURI != null ? baseURI : file.toURI()
                         .toString();
 
-                return loadData3(reader, s, fmt, endOfBatch);
+                loadData3(totals, reader, s, fmt, endOfBatch);
+                
+                return;
 
             } catch (Exception ex) {
 
@@ -899,8 +924,9 @@ public class DataLoader {
      * @param endOfBatch
      * @return
      */
-    protected LoadStats loadData3(Object source, String baseURL,
-            RDFFormat rdfFormat, boolean endOfBatch) throws IOException {
+    protected void loadData3(final LoadStats totals, final Object source,
+            final String baseURL, final RDFFormat rdfFormat,
+            final boolean endOfBatch) throws IOException {
 
         final long begin = System.currentTimeMillis();
         
@@ -933,7 +959,7 @@ public class DataLoader {
             
             public void processingNotification( RioLoaderEvent e ) {
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info
                     ( e.getStatementsProcessed() + 
                       " stmts added in " + 
@@ -950,59 +976,61 @@ public class DataLoader {
             
             if(source instanceof Reader) {
                 
-                loader.loadRdf((Reader)source, baseURL, rdfFormat, verifyData);
-                
-            } else if(source instanceof InputStream) {
-                
-                loader.loadRdf((InputStream)source, baseURL, rdfFormat, verifyData);
-                
-            } else throw new AssertionError();
-            
-            long nstmts = loader.getStatementsAdded();
-            
+                loader.loadRdf((Reader) source, baseURL, rdfFormat, verifyData);
+
+            } else if (source instanceof InputStream) {
+
+                loader.loadRdf((InputStream) source, baseURL, rdfFormat,
+                        verifyData);
+
+            } else
+                throw new AssertionError();
+
+            final long nstmts = loader.getStatementsAdded();
+
             stats.toldTriples = nstmts;
-            
+
             stats.loadTime = System.currentTimeMillis() - begin;
 
             if (closureEnum == ClosureEnum.Incremental
                     || (endOfBatch && closureEnum == ClosureEnum.Batch)) {
-                
+
                 /*
                  * compute the closure.
                  * 
                  * @todo batch closure logically belongs in the outer method.
                  */
-                
-                if (INFO)
+
+                if (log.isInfoEnabled())
                     log.info("Computing closure.");
-                
+
                 stats.closureStats.add(doClosure());
-                
+
             }
 
             // commit the data.
             if (commitEnum == CommitEnum.Incremental) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("Commit after each resource");
 
-                long beginCommit = System.currentTimeMillis();
+                final long beginCommit = System.currentTimeMillis();
 
                 database.commit();
 
                 stats.commitTime = System.currentTimeMillis() - beginCommit;
 
-                if(INFO)
-                    log.info("commit: latency="+stats.commitTime+"ms");
-                
-            }
-            
-            stats.totalTime = System.currentTimeMillis() - begin;
-            
-            if (INFO)
-                log.info(stats.toString());
+                if (log.isInfoEnabled())
+                    log.info("commit: latency=" + stats.commitTime + "ms");
 
-            return stats;
+            }
+
+            stats.totalTime = System.currentTimeMillis() - begin;
+
+            if (log.isInfoEnabled())
+                log.info(stats.toString());
+            
+            return;
             
         } catch ( Exception ex ) {
 
@@ -1041,6 +1069,11 @@ public class DataLoader {
             ex2.initCause(ex);
             
             throw ex2;
+            
+        } finally {
+            
+            // aggregate regardless of the outcome.
+            totals.add(stats);
             
         }
 

@@ -59,7 +59,7 @@ public class LoadStats {
 
     }
 
-    public void add(LoadStats stats) {
+    public void add(final LoadStats stats) {
 
         toldTriples += stats.toldTriples;
 

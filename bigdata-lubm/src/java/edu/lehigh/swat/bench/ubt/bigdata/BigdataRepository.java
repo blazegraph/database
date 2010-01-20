@@ -956,11 +956,13 @@ public class BigdataRepository implements Repository {
         System.out.println(verifyTaskFactory.reportTotals());
         
     }
-    
+
     /**
      * Loads the files using the {@link DataLoader}.
      * <p>
-     * Note: this does not handle recursion into subdirectories.
+     * Note: the parsing of files does NOT proceed in parallel with index writes
+     * which limits the throughput of this loader. The scale-out bulk loader
+     * does not have that limitation.
      * 
      * @param dataDir
      *            The directory containing the files.
@@ -1025,9 +1027,9 @@ public class BigdataRepository implements Repository {
         try {
 
             final String filename = ontology;
-            
-            System.out.print("Loading ontology: "+ontology+"...");
-            
+
+            System.out.print("Loading ontology: " + ontology + "...");
+
             final String baseURI = new File(filename).toURI().toString();
             
             final RDFFormat rdfFormat = RDFFormat.forFileName(filename);
