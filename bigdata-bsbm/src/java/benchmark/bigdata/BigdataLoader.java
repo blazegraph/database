@@ -76,6 +76,13 @@ public class BigdataLoader {
         
         RepositoryConnection cxn = null;
         try {
+            RDFFormat format = null;
+            if (data.toLowerCase().endsWith(".ttl")) {
+                format = RDFFormat.TURTLE;
+            } else if (data.toLowerCase().endsWith(".nt")) {
+                format = RDFFormat.NTRIPLES;
+            }  
+            
             // setup
             cxn = repo.getConnection();
             cxn.setAutoCommit(false);
@@ -83,7 +90,7 @@ public class BigdataLoader {
             long start = System.currentTimeMillis();
 
             // perform the load
-            cxn.add(new File(data), baseURI, RDFFormat.NTRIPLES);
+            cxn.add(new File(data), baseURI, format);
             cxn.commit();
         
             // report throughput

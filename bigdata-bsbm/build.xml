@@ -104,6 +104,56 @@
 		</java>
 	</target>
 	
+	<!-- @todo load split data files for s/o. -->
+	<!-- @todo specify property for journal location. -->
+ 	<target name="run-load-qualification" depends="compile">
+		<delete file="${build.dir}/bin/bigdata-bsbm.jnl" />
+		<java classname="benchmark.bigdata.BigdataLoader"
+	          fork="true"
+	          failonerror="true"
+	          maxmemory="512m"
+	          dir="${build.dir}/bin"
+			  >
+			<arg line="-journal bigdata-bsbm.jnl -data dataset_1m.ttl"/>
+			<jvmarg value="-server"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
+	<!-- @todo config in property file. -->
+	<target name="run-qualification-1" depends="compile">
+		<java classname="benchmark.bigdata.BigdataQueryDriver"
+	          fork="true"
+	          failonerror="true"
+	          maxmemory="512m"
+	          dir="${build.dir}/bin"
+			  >
+			<arg line="-q http://dummyendpoint -journal bigdata-bsbm.jnl"/>
+			<jvmarg value="-server"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
+	<!-- @todo config in property file. -->
+	<target name="run-qualification-2" depends="compile">
+		<java classname="benchmark.qualification.Qualification"
+	          fork="true"
+	          failonerror="true"
+	          maxmemory="512m"
+	          dir="${build.dir}/bin"
+			  >
+			<arg line="correct.qual run.qual"/>
+			<jvmarg value="-server"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
 	<!-- @todo config in property file. -->
 	<target name="run-query" depends="compile">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
