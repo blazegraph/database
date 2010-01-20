@@ -1,13 +1,11 @@
 package benchmark.bigdata;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Properties;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import org.apache.log4j.Level;
@@ -18,18 +16,14 @@ import org.jdom.JDOMException;
 import org.jdom.Namespace;
 import org.jdom.input.SAXBuilder;
 import org.jdom.output.XMLOutputter;
-import org.openrdf.repository.RepositoryException;
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.DefaultHandler;
 import benchmark.qualification.QueryResult;
 import benchmark.testdriver.CompiledQuery;
 import benchmark.testdriver.CompiledQueryMix;
-import benchmark.testdriver.NetQuery;
 import benchmark.testdriver.Query;
 import benchmark.testdriver.QueryMix;
 import benchmark.testdriver.ServerConnection;
-import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 
 public class BigdataConnection implements ServerConnection{
@@ -68,9 +62,11 @@ public class BigdataConnection implements ServerConnection{
 		double timeInSeconds;
 
         /**
-         * Modified by MRP 1/19/10.  BigdataQuery accepts a repository rather than a SPARQL endpoint URL.
+         * Modified by MRP 1/19/10.  
+         * 
+         * BigdataQuery accepts a repository rather than a SPARQL endpoint URL.
          */
-		BigdataQuery qe = new BigdataQuery(repo, queryString, queryType, defaultGraph, timeout);
+		BigdataQuery qe = new BigdataQuery(repo, queryString, queryType);
 		int queryMixRun = queryMix.getRun() + 1;
 
 		InputStream is = qe.exec();
@@ -116,9 +112,11 @@ public class BigdataConnection implements ServerConnection{
 		int queryNr = query.getNr();
 		
         /**
-         * Modified by MRP 1/19/10.  BigdataQuery accepts a repository rather than a SPARQL endpoint URL.
+         * Modified by MRP 1/19/10.  
+         * 
+         * BigdataQuery accepts a repository rather than a SPARQL endpoint URL.
          */
-        BigdataQuery qe = new BigdataQuery(repo, queryString, queryType, defaultGraph, timeout);
+        BigdataQuery qe = new BigdataQuery(repo, queryString, queryType);
 
 		int queryMixRun = queryMix.getRun() + 1;
 
@@ -259,9 +257,11 @@ private int countBytes(InputStream is) {
 		QueryResult queryResult = null;
 
         /**
-         * Modified by MRP 1/19/10.  BigdataQuery accepts a repository rather than a SPARQL endpoint URL.
+         * Modified by MRP 1/19/10.  
+         * 
+         * BigdataQuery accepts a repository rather than a SPARQL endpoint URL.
          */
-        BigdataQuery qe = new BigdataQuery(repo, queryString, queryType, defaultGraph, 0);
+        BigdataQuery qe = new BigdataQuery(repo, queryString, queryType);
 
 		InputStream is = qe.exec();
 		Document doc = getXMLDocument(is);
