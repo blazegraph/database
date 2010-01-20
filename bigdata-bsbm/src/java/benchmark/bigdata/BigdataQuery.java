@@ -75,7 +75,7 @@ public class BigdataQuery {
             
             if (queryType == Query.SELECT_TYPE) {
                 return execTupleQuery();
-            } else if (queryType == Query.CONSTRUCT_TYPE) {
+            } else {
                 return execGraphQuery();
             }
             
