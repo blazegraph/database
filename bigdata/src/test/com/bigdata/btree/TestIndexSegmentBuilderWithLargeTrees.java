@@ -28,11 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.btree.IndexSegmentBuilder.BuildEnum;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -325,21 +327,6 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
             btree.getStore().destroy();
         }
 
-    }
-
-    /**
-     * Identifies which build method to use.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo add other methods here as they are defined.
-     */
-    private static enum BuildEnum {
-        
-        TwoPass,
-        FullyBuffered;
-        
     }
 
     /**
@@ -691,12 +678,12 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 //    }
 
     /**
-     * Comparison test of large build using different algorithms against the
-     * same source data.
+     * Driver for comparison of index segment build performance using different
+     * algorithms against the same source data.
      * 
      * @param args
      *            <code>[opts] [ntuples]</code>, where <i>ntuples</i> defaults
-     *            to 5,000,000 and <i>opts</i> are any of:
+     *            to <code>1,000,000</code> and <i>opts</i> are any of:
      *            <dl>
      *            <dt>-m</dt>
      *            <dd>The branching factor for the generated index segment
@@ -716,11 +703,17 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
      *            .
      * 
      * @throws Exception
+     * 
+     * @todo Nearly all the run time for the build is to generate the data!
+     *       Either add a parameter for the synthetic data generator or separate
+     *       that out into another main() routine and have one to generate test
+     *       data sets and another to run the builds [my preference is the
+     *       latter].
      */
     public static void main(final String[] args) throws Exception {
         
         // The target number of tuples for the build.
-        int ninserts = 5000000; // 5M.
+        int ntuples = 1000000; // 1M.
 
         // The output branching factor.
         int m = 512;
@@ -737,6 +730,12 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 
         boolean revisionTimestampFilters = false;
 
+        // The journal file iff opening a pre-existing journal.
+        File file = null;
+        
+        // The name of the index from which an index segment will be generated. 
+        String name = null;
+        
         /*
          * Parse the command line, overriding various properties.
          */
@@ -752,6 +751,16 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 
                         m = Integer.valueOf(args[++i]);
 
+                    } else if (arg.equals("-j")) {
+
+                        file = new File(args[++i]);
+
+                        if (!file.exists()) {
+
+                            throw new FileNotFoundException(file.toString());
+
+                        }
+                        
                     } else if (arg.equals("-verify")) {
 
                         verify = true;
@@ -774,6 +783,10 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
                         
                     }
                     
+                } else {
+                    
+                    ntuples = Integer.valueOf(arg);
+                    
                 }
                 
             }
@@ -788,7 +801,12 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
         final Journal journal;
         {
 
-            final File file = File.createTempFile(prefix, Journal.Options.JNL);
+            if (file == null) {
+
+                // create a temporary file.
+                file = File.createTempFile(prefix, Journal.Options.JNL);
+
+            }
 
             final Properties properties = new Properties();
             
@@ -800,48 +818,58 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 
         try {
 
-            System.out.println("Generating data: ninserts=" + ninserts);
+            final BTree btree;
 
-            final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+            {
 
-            if(bloom) {
-                
-                metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
-                
+                System.out.println("Generating data: ninserts=" + ntuples);
+
+                final IndexMetadata metadata = new IndexMetadata(UUID
+                        .randomUUID());
+
+                if (bloom) {
+
+                    metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
+
+                }
+
+                metadata.setDeleteMarkers(deleteMarkers);
+
+                metadata.setVersionTimestampFilters(revisionTimestamps);
+
+                metadata.setVersionTimestampFilters(revisionTimestampFilters);
+
+                btree = BTree.create(journal, metadata);
+
+                doInsertRandomSparseKeySequenceTest(//
+                        btree, ntuples, // #of inserts into the source btree.
+                        0// disable trace
+                );
+
+                System.out
+                        .println("Generated data: ninserts="
+                                + ntuples
+                                + ", userExtent="
+                                + (journal.getBufferStrategy().getUserExtent() / Bytes.megabyte)
+                                + "mb");
+
             }
-            
-            metadata.setDeleteMarkers(deleteMarkers);
-            
-            metadata.setVersionTimestampFilters(revisionTimestamps);
-
-            metadata.setVersionTimestampFilters(revisionTimestampFilters);
-
-            final BTree btree = BTree.create(journal, metadata);
-
-            doInsertRandomSparseKeySequenceTest(//
-                    btree,
-                    ninserts, // #of inserts into the source btree.
-                    0// disable trace
-            );
-
-            System.out
-                    .println("Generated data: ninserts="
-                            + ninserts
-                            + ", userExtent="
-                            + (journal.getBufferStrategy().getUserExtent() / Bytes.megabyte)
-                            + "mb");
 
             class Result {
 
                 final BuildEnum buildEnum;
 
+                final long elapsed;
+                
                 final IndexSegmentBuilder builder;
 
-                public Result(final BuildEnum buildEnum,
+                public Result(final BuildEnum buildEnum, final long elapsed,
                         final IndexSegmentBuilder builder) {
 
                     this.buildEnum = buildEnum;
 
+                    this.elapsed = elapsed;
+                    
                     this.builder = builder;
 
                 }
@@ -849,7 +877,7 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
                 public String toString() {
 
                     return buildEnum//
-                            + ", " + builder.elapsed//
+                            + ", " + elapsed// note: total build time!
                             + ", " + builder.elapsed_build//
                             + ", " + builder.elapsed_write//
                             + ", " + builder.mbPerSec//
@@ -888,10 +916,15 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 
                 System.err.println("Doing build: " + buildEnum);
 
+                final long begin = System.currentTimeMillis();
+                
                 final IndexSegmentBuilder builder = doBuildIndexSegment(prefix,
                         btree, m, buildEnum);
 
-                final Result result = new Result(buildEnum, builder);
+                // The total elapsed build time, including range count or pre-materialization of tuples. 
+                final long elapsed = System.currentTimeMillis() - begin;
+                
+                final Result result = new Result(buildEnum, elapsed, builder);
 
                 results.add(result);
 

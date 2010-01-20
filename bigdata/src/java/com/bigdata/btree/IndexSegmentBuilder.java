@@ -28,12 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -51,8 +55,9 @@ import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
-import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.Journal;
+import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -86,20 +91,54 @@ import com.bigdata.rawstore.WormAddressManager;
  * 
  * </ol>
  * 
- * Note: In order for the nodes to be written in a contiguous block we either
- * have to buffer them in memory or have to write them onto a temporary file and
- * then copy them into place after the last leaf has been processed. The code
- * abstracts this decision using a {@link TemporaryRawStore} for this purpose.
- * This space demand was not present in West's algorithm because it did not
- * attempt to place the leaves contiguously onto the store.
+ * <h3>One pass vs. Two Pass Design Alternatives</h3>
  * 
+ * There are at least three design alternatives for index segment builds: (A) do
+ * an exact range count instead and generate a perfect plan; (B) fully buffer
+ * the source iterator into byte[][] keys, byte[][] vals, boolean[]
+ * deleteMarkers, and long[] versionTimestamps and generate an exact plan,
+ * consuming the buffered byte[]s directly from RAM; and (C) use the fast range
+ * count to generate a plan based on an overestimate of the tuple count and then
+ * apply a variety of hacks when the source iterator is exhausted to make the
+ * output B+Tree usable, but not well formed.
  * <p>
+ * The disadvantage of (A) is that it requires two passes over the source view,
+ * which substantially increases the run time of the algorithm. In addition, the
+ * passes can drive evictions in the global LRU and could defeat caching for a
+ * view approaching the nominal size for a split. However, with (A) we can do
+ * builds for very large source B+Trees. Therefore, (A) is implemented for such
+ * use cases.
+ * <p>
+ * The disadvantage of (B) is that it requires more memory. However, it is much
+ * faster than (A). To compensate for the increased memory demand, we can single
+ * thread builds, merges, and splits and fall back to (A) if memory is very
+ * tight or the source view is very large.
+ * <p>
+ * The disadvantage of (C) is that the "hacks" break encapsulation and leak into
+ * the API where operations such as retrieving the right sibling of a node could
+ * return an empty leaf (since we ran out of tuples for the plan). Since these
+ * "hacks" would break encapsulation, it would be difficult to have confidence
+ * that the B+Tree API was fully insulated against the effects of ill-formed
+ * {@link IndexSegment}s. Therefore, I have discarded this approach and backed
+ * out changes designed to support it from the code base.
  * 
- * Note: The use of up to three {@link TemporaryRawStore}s per index segment
- * build can raise the demand on the {@link DirectBufferPool}, for example if a
- * number of concurrent index builds are occurring on a data service with a
- * large #of index partitions. One choice is to limit the parallelism of the
- * asynchronous overflow operation.
+ * <h3>Design alternatives for totally ordered nodes and leaves</h3>
+ * 
+ * In order for the nodes to be written in a contiguous block we either have to
+ * buffer them in memory or have to write them onto a temporary file and then
+ * copy them into place after the last leaf has been processed. This concern was
+ * not present in West's algorithm because it did not attempt to place the nodes
+ * and/or leaves contiguously onto the generated B+Tree file.
+ * <p>
+ * For the two pass design described above as option (A), the code buffers the
+ * nodes and leaves onto {@link TemporaryRawStore}s. This approach is scalable,
+ * which is the concern of (A), but requires at least twice the IO when compared
+ * to directly writing the nodes and leaves onto the output file.
+ * <p>
+ * When sufficient memory is available, as cases where (B) would apply, we can
+ * write the leaves directly on the backing file (using double-buffering to
+ * update the prior/next addrs). Since there are far fewer nodes than leaves, we
+ * can buffer the nodes in memory, writing them once the leaves are finished.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: IndexSegmentBuilder.java 2265 2009-10-26 12:51:06Z thompsonbry
@@ -118,56 +157,20 @@ import com.bigdata.rawstore.WormAddressManager;
  * @see IndexSegmentFile
  * @see IndexSegmentCheckpoint
  * 
- *      FIXME Implement (B). There are at least three design alternatives for
- *      faster builds: (A) do an exact range count instead and generate a
- *      perfect plan; (B) fully buffer the source iterator into byte[][] keys,
- *      byte[][] vals, boolean[] deleteMarkers, and long[] versionTimestamps and
- *      generate an exact plan, consuming the buffered byte[]s directly from
- *      RAM; and (C) use the fast range count to generate a plan based on an
- *      overestimate of the tuple count and then apply a variety of hacks when
- *      the source iterator is exhausted to make the output B+Tree usable, but
- *      not well formed.
- *      <p>
- *      The disadvantage of (C) is that the hacks break encapsulation and can
- *      leak into the API where operations such as the sibling of a node could
- *      return an empty leaf. It seems like it would be difficult to have
- *      confidence that the B+Tree API was fully insulated against the effects
- *      of ill-formed {@link IndexSegment}s. In fact, I do not like these side
- *      effects enough that it could be worthwhile to back the changes out of
- *      the Node and Leaf classes.
- *      <p>
- *      The disadvantage of (A) is that it requires two passes over the source
- *      view. Those passes could cause churn in the global LRU and could defeat
- *      caching for a view approaching the nominal size for a split.
- *      <p>
- *      The disadvantage of (B) is that it requires more memory. If the JVM is
- *      tight on memory, then we could single thread builds, merges, and splits
- *      or fall back to (A). If the source view is much larger than the nominal
- *      size (or the fast range count is much larger than we would expect) then
- *      we could fall back to (A), which suggests factory method returning an
- *      instance of an abstract base class for (A) vs (B).
- *      <p>
- *      The memory burden of (B) could be eased if copyTuple() was overridden to
- *      move the byte[] key and byte[] val references, clearing them from the
- *      source byte[][] keys and byte[][] vals as they were consumed.
- *      <p>
- *      Another optimization for (B) is to write the leaves directly on the
- *      backing file using double-buffering or directly updating the prior/next
- *      addrs and to buffer the nodes in memory, writing them once the leaves
- *      are finished.
- * 
- * @todo Put profiler on (B) for build stress tests. 
- * 
- * @todo Make sure it is possible to grab the {@link IndexMetadata} and the
- *       bloom filter from the generated file in a single IO.
- *       
- * @todo GPU parallel builds. Once we have the data in a bunch of byte[][]s we
- *       could conceivable get this stuff organized to the point where each
- *       tuple and child in the output B+Tree could be assigned to a thread and
- *       each leaf and node to a core on a GPU. At that point, we run the
- *       "build" in parallel, including the coding of the leaves and the emit
- *       them onto the output file in parallel once we know their final size on
- *       the disk and have their prior/next addr field values.
+ * @todo Put profiler on (B) for build stress tests. The source view should be
+ *       pre-generated such that we only measure the build behavior in the
+ *       profiler. See {@link TestIndexSegmentBuilderWithLargeTrees}.
+ *       <p>
+ *       Make sure that {@link #elapsed} reports the total build time, including
+ *       the range count or pre-materialization costs as those are a significant
+ *       part of the total cost.
+ *       <p>
+ *       Much of the cost of the build is the range iterator, including decoding
+ *       the nodes and leaves and materializing tuples. Most of the remaining
+ *       cost is the coding of the new nodes and leaves and their IO. Some of
+ *       that cost can be trimmed by faster coders, but we can also trim the IO
+ *       using parallel materialization of leaves (for {@link IndexSegment}) and
+ *       pre-fetch of nodes and leaves (for {@link BTree}s).
  *       <p>
  *       The B+Tree iterator on the fused view of the journal and index segments
  *       is effectively an incremental merge of the source iterators. However,
@@ -182,12 +185,33 @@ import com.bigdata.rawstore.WormAddressManager;
  *       segment from the backing representation. We could do that build step in
  *       java or on a GPU.
  * 
- * @todo done. Backout the changes to {@link Node}, {@link Leaf}, {@link BTree},
- *       {@link AbstractBTree}, the {@link IndexSegmentBuilder},
- *       {@link IndexSegment}, and the test suites to support underflow of a
- *       node or leaf and to support materialization of an empty leaf from a 0L
- *       childAddr for a {@link Node}. Per my notes above, underflow breaks
- *       encapsulation and will not be supported.
+ * @todo GPU parallel builds. Once we have the data in a bunch of byte[][]s we
+ *       could conceivable get this stuff organized to the point where each
+ *       tuple and child in the output B+Tree could be assigned to a thread and
+ *       each leaf and node to a core on a GPU. At that point, we run the
+ *       "build" in parallel. For this approach, the uncoded leaves will all
+ *       wind up in memory using the same byte[]s for keys and values as the
+ *       source view.
+ *       <p>
+ *       This approach could be carried further to code the nodes and leaves in
+ *       parallel, perhaps as a 2nd GPU program. If the source view was fully
+ *       buffered, then it should be released once the nodes and leaves have
+ *       been coded as no more use will be made of those data.
+ *       <p>
+ *       While it may not improve the IO substantially, it is possible to use
+ *       gathered writes if the leaves and nodes are fully buffered in memory.
+ *       For the leaves, we write them in the index order. For the nodes, we
+ *       write them in their pre-order traversal. The order in which we would
+ *       write out the nodes and leaves should be part of the state during a GPU
+ *       build regardless of whether the IO is done sequentially or as a
+ *       gathered write.
+ * 
+ * @todo Make sure it is possible to grab the {@link IndexMetadata} and the
+ *       bloom filter from the generated file in a single IO. This could be
+ *       useful when the index segment files are stored on a parallel file
+ *       system. [It is possible to do this since these data are contiguous and
+ *       in the same region of the generated file (they both use addresses
+ *       relative to the BASE of the file).]
  */
 public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     
@@ -304,8 +328,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * Note: If the build fails, then the cache will be cleared.
      * 
      * @todo The {@link IndexMetadata} and the {@link BloomFilter} should be in
-     * the {@link #storeCache} as well. Make sure that we do this for read and
-     * write for both the {@link BTree} and the {@link IndexSegment}.
+     *       the {@link #storeCache} as well. Make sure that we do this for read
+     *       and write for both the {@link BTree} and the {@link IndexSegment}.
      */
     final private ILRUCache<Long, Object> storeCache;
 
@@ -724,11 +748,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * 
      * FIXME The unit tests need to run against both builds based on the
      * materialized tuples and builds based on two passes in order to obtain the
-     * exact range count.
+     * exact range count. They already do for
+     * {@link TestIndexSegmentBuilderWithLargeTrees} but not yet for the other
+     * test suite variants.
      * 
-     * FIXME Introduce variation that buffers the nodes in memory rather than
-     * on a temporary store.  Introduce variation that buffers the leaves in
-     * memory as well
+     * FIXME Introduce variation that buffers the nodes in memory rather than on
+     * a temporary store. Introduce variation that buffers the leaves in memory
+     * as well
      */
     protected static IndexSegmentBuilder newInstanceFullyBuffered(
             final ILocalBTreeView src, final File outFile, final File tmpDir,
@@ -3456,5 +3482,303 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         }
         
     }
-    
+
+    /**
+     * Identifies which build method to use.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     * 
+     * @todo add other methods here as they are defined.
+     */
+    enum BuildEnum {
+
+        TwoPass, FullyBuffered;
+
+    }
+
+    /**
+     * Driver for index segment build against a named index on a local journal.
+     * 
+     * @param args
+     *            <code>[opts] journal [name]*</code>, where <i>journal</i> is
+     *            the name of the journal file, where <i>name</i> is the name of
+     *            a B+Tree registered on that journal, and where <i>opts</i> are
+     *            any of:
+     *            <dl>
+     *            <dt>-m #</dt>
+     *            <dd>Override the default branching factor for the index
+     *            segment.</dd>
+     *            <dt>-alg <i>algorithm</i></dt>
+     *            <dd>Specify which build algorithm to use. See
+     *            {@link BuildEnum}.</dd>
+     *            <dt>-merge or -build</dt>
+     *            <dd>Specifies whether to do a compacting merge (deleted tuples
+     *            are purged from the generated index segment) or an incremental
+     *            build (deleted tuples are preserved). The default is
+     *            <i>merge</i>.</dd>
+     *            <dt>-O outDir</dt>
+     *            <dd>Specify the name of the directory on which the generated
+     *            index segment file(s) will be written. This defaults to the
+     *            current working directory. Each index segment file will be
+     *            named based on the name of the source index with the
+     *            <code>.seg</code> extension). .</dd>
+     *            </dl>
+     *            . If no <i>name</i>s are specified, then an index segment will
+     *            be generated for each named B+Tree registered on the source
+     *            journal.
+     * 
+     * @throws Exception
+     */
+//    *            <dt>-verify</dt>
+//    *            <dd>Verify the generated index segment against the source
+//    *            B+Tree.</dd>
+    public static void main(final String[] args) throws Exception {
+
+        // The output branching factor (optional override).
+        Integer branchingFactorOverride = null;
+
+        // When true, performs a correctness check against the source BTree.
+        boolean verify = false;
+
+        // The journal file (must already exist).
+        File journalFile = null;
+
+        // The name(s) of the indices to be processed.
+        final List<String> names = new LinkedList<String>();
+
+        // The directory into which the generated index segments will be
+        // written. Each index segment will be named based on the source index
+        // name.  The default is the current directory.
+        File outDir = new File(".");
+
+        /*
+         * When true, a compacting merge will be performed (deleted tuples will
+         * be purged). Otherwise this will be an incremental build (deleted
+         * tuples will be preserved in the generated index segment).
+         */
+        boolean compactingMerge = true;
+
+        // Which build algorithm to use.
+        BuildEnum buildEnum = BuildEnum.FullyBuffered;
+        
+        final File tmpDir = new File(System.getProperty("java.io.tmpdir"));
+
+        if (!tmpDir.exists() && !tmpDir.mkdir()) {
+
+            throw new IOException(
+                    "Temporary directory does not exist / can not be created: "
+                            + tmpDir);
+            
+        }
+
+        /*
+         * Parse the command line, overriding various properties.
+         */
+        {
+
+            int i = 0;
+            for (; i < args.length && args[i].startsWith("-"); i++) {
+
+                final String arg = args[i];
+
+                if (arg.equals("-m")) {
+
+                    branchingFactorOverride = Integer.valueOf(args[++i]);
+
+                } else if (arg.equals("-O")) {
+
+                    outDir = new File(args[++i]);
+
+                } else if (arg.equals("-verify")) {
+
+                    verify = true;
+
+                } else if (arg.equals("-merge")) {
+
+                    compactingMerge = true;
+
+                } else if (arg.equals("-build")) {
+
+                    compactingMerge = false;
+
+                } else if (arg.equals("-alg")) {
+
+                    buildEnum = BuildEnum.valueOf(args[++i]);
+
+                } else {
+
+                    throw new UnsupportedOperationException("Unknown option: "
+                            + arg);
+
+                }
+
+            } // next arg.
+
+            // The next argument is the journal file name.
+            journalFile = new File(args[i++]);
+
+            if (!journalFile.exists()) {
+
+                throw new FileNotFoundException(journalFile.toString());
+
+            }
+
+            // The remaining argument(s) are the source B+Tree names.
+            while (i < args.length) {
+
+                names.add(args[i++]);
+
+            }
+
+            if (verify) {
+
+                /*
+                 * @todo Support optional verify. The necessary logic is in
+                 * the unit test suite.
+                 */
+                
+                throw new UnsupportedOperationException(
+                        "Verify is not supported yet.");
+
+            }
+
+            if (journalFile == null) {
+
+                throw new RuntimeException(
+                        "The journal file was not specified.");
+
+            }
+
+            if (names == null) {
+
+                throw new RuntimeException("The index name was not specified.");
+
+            }
+
+            if (!outDir.exists() && !outDir.mkdirs()) {
+
+                throw new IOException(
+                        "Output directory does not exist and could not be created: "
+                                + outDir);
+
+            }
+            
+        } // parse command line.
+
+        // Open the journal: must already exist.
+        final Journal journal;
+        {
+
+            final Properties properties = new Properties();
+
+            properties
+                    .setProperty(Journal.Options.FILE, journalFile.toString());
+
+            properties.setProperty(Journal.Options.READ_ONLY, Boolean.TRUE
+                    .toString());
+
+            journal = new Journal(properties);
+
+        }
+
+        try {
+
+            // @todo allow caller to specify the commitTime of interest.
+            if (names.isEmpty()) {
+
+                final ITupleIterator<Name2Addr.Entry> itr = journal
+                        .getName2Addr().rangeIterator();
+
+                while (itr.hasNext()) {
+
+                    names.add(itr.next().getObject().name);
+
+                }
+                
+            } else {
+
+                assert names.size() == 1;
+                
+                final String name = names.get(0);
+
+                if (journal.getIndex(name) == null) {
+
+                    throw new RuntimeException("Index not found: " + name);
+
+                }
+
+            }
+
+            System.err.println("Will process " + names.size() + " indices.");
+            
+            final long beginAll = System.currentTimeMillis();
+
+            // For each named index.
+            for (String name : names) {
+
+                // Do the build for this B+Tree.
+                final BTree btree = journal.getIndex(name);
+
+                final File outFile = new File(outDir, name
+                        + Journal.Options.SEG);
+
+                final int m = branchingFactorOverride == null ? btree
+                        .getIndexMetadata().getIndexSegmentBranchingFactor()
+                        : branchingFactorOverride.intValue();
+
+                final long begin = System.currentTimeMillis();
+
+                final long commitTime = btree.getLastCommitTime();
+
+                System.out.println("Building index segment: in(m="
+                        + btree.getBranchingFactor() + ", rangeCount="
+                        + btree.rangeCount() + "), out(m=" + m + "), alg="+buildEnum);
+
+                final IndexSegmentBuilder builder;
+                switch (buildEnum) {
+                case TwoPass:
+                    builder = IndexSegmentBuilder.newInstanceTwoPass(btree,
+                            outFile, tmpDir, m, compactingMerge, commitTime,
+                            null/* fromKey */, null/* toKey */);
+                    break;
+                case FullyBuffered:
+                    builder = IndexSegmentBuilder.newInstanceFullyBuffered(
+                            btree, outFile, tmpDir, m, compactingMerge,
+                            commitTime, null/* fromKey */, null/* toKey */);
+                    break;
+                default:
+                    throw new AssertionError(buildEnum.toString());
+                }
+                builder.call();
+
+                // The total elapsed build time, including range count or
+                // pre-materialization of tuples.
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                final String results = "name=" + name + " : elapsed=" + elapsed
+                        + "ms, setup=" + builder.elapsed_setup + "ms, write="
+                        + builder.elapsed_write + "ms, m=" + builder.plan.m
+                        + ", size="
+                        + (builder.outFile.length() / Bytes.megabyte)
+                        + "mb, mb/sec=" + builder.mbPerSec;
+
+                System.out.println(results);
+
+            } // next source B+Tree.
+            
+            final long elapsedAll = System.currentTimeMillis() - beginAll;
+            
+            System.out.println("Processed " + names.size() + " indices in "
+                    + elapsedAll + "ms");
+
+        } finally {
+
+            journal.close();
+
+        }
+
+    }
+
 }
