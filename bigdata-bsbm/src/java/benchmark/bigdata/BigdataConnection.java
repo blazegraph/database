@@ -73,6 +73,7 @@ public class BigdataConnection implements ServerConnection{
 		if(is==null) {
 			double t = this.timeout/1000.0;
 			System.out.println("Query " + queryNr + ": " + t + " seconds timeout!");
+            System.out.println(queryString);
 			queryMix.reportTimeOut();//inc. timeout counter
 			queryMix.setCurrent(0, t);
 			qe.close();
@@ -88,6 +89,7 @@ public class BigdataConnection implements ServerConnection{
 		} catch(SocketTimeoutException e) {
 			double t = this.timeout/1000.0;
 			System.out.println("Query " + queryNr + ": " + t + " seconds timeout!");
+            System.out.println(queryString);
 			queryMix.reportTimeOut();//inc. timeout counter
 			queryMix.setCurrent(0, t);
 			qe.close();
@@ -125,6 +127,7 @@ public class BigdataConnection implements ServerConnection{
 		if(is==null) {//then Timeout!
 			double t = this.timeout/1000.0;
 			System.out.println("Query " + queryNr + ": " + t + " seconds timeout!");
+            System.out.println(queryString);
 			queryMix.reportTimeOut();//inc. timeout counter
 			queryMix.setCurrent(0, t);
 			qe.close();
@@ -144,6 +147,7 @@ public class BigdataConnection implements ServerConnection{
 		} catch(SocketTimeoutException e) {
 			double t = this.timeout/1000.0;
 			System.out.println("Query " + queryNr + ": " + t + " seconds timeout!");
+            System.out.println(queryString);
 			queryMix.reportTimeOut();//inc. timeout counter
 			queryMix.setCurrent(0, t);
 			qe.close();

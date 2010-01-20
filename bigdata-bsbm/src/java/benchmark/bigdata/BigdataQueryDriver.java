@@ -72,6 +72,7 @@ public class BigdataQueryDriver {
             }
 */            
             String queryString = 
+/*
 "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> " +
 "PREFIX rev: <http://purl.org/stuff/rev#> " +
 "PREFIX foaf: <http://xmlns.com/foaf/0.1/> " +
@@ -97,7 +98,11 @@ public class BigdataQueryDriver {
 "        <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer9> bsbm:deliveryDays ?deliveryDays . " +
 "        <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromVendor1/Offer9> bsbm:validTo ?validTo " +
 "}";
-
+*/
+"PREFIX rev: <http://purl.org/stuff/rev#> " +
+"DESCRIBE ?x " +
+"WHERE { <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/dataFromRatingSite1/Review96> rev:reviewer ?x }";
+                       
             StringWriter writer = new StringWriter();
 /*            
             TupleQuery query = 
