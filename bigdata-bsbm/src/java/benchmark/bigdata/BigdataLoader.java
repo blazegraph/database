@@ -92,7 +92,7 @@ public class BigdataLoader {
             System.err.println("loaded " + size + " triples in " + duration + " millis.");
             long tps = (long) (((double) size) / ((double) duration) * 1000d);
             System.err.println("tps: " + tps);
-
+            
         } finally {
             cxn.close();
         }
