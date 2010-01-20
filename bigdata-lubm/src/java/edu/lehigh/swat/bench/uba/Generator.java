@@ -727,16 +727,20 @@ public class Generator {
                  * allows ~32000 subdirectories in a directory. Therefore we
                  * have to break up the file system hierarchy a little bit
                  * further to generate U32000, U50000, etc.
+                 * 
+                 * The parent directory will advance every n Universities,
+                 * so there will be up to n subdirectories in each parent
+                 * directory. Note that 10000 is too large a value here.
+                 * ext3 has significant IO wait time on directories with
+                 * that many files!
                  */
-                 // The parent directory will advance every 10000 Universities,
-                 // so there will be up to 10000 subdirectories in each parent
-                 // directory.
-                 final File p = new File(outDir, _getName(CS_C_UNIV, 10000*(k/10000)));
+                 final int n = 1000;
+                 final File p = new File(outDir, _getName(CS_C_UNIV, n*(k/n)));
                  // The subdirectory is the specific University.  The departments
                  // in that University will be the individual files in the subdir.
                  dir = new File(p, _getName(CS_C_UNIV, k));
                  // create parent (if necessary) and subdirectory.
-                 dir.mkdirs();
+                 if(!dir.mkdirs()){/*ignore*/}
              } else {
                  // all files in the same directory
                  dir = outDir;
