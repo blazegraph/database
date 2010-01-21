@@ -543,6 +543,7 @@ ${postInstallMessage}</echo>
 	<java classname="com.bigdata.counters.AbstractStatisticsCollector"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="install.classpath" />
+		<jvmarg value="-Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_HOME}"/>
 		<arg value="1" /><!-- interval between reports. -->
 		<arg value="10" /><!-- #of seconds to run. -->
 	</java>
