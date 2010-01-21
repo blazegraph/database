@@ -536,6 +536,18 @@ an "NOP" bash script or edit your crontab.
 ${postInstallMessage}</echo>
 </target>
 
+<!-- This may be used to verify that statistics are being collected for the
+     target platform and diagnose errors related to a missing or incomplete
+     sysstat install or other monitoring dependencies. -->
+<target name="test-monitoring" depends="compile" description="Run the statistics collectors for the deployment platform.">
+	<java classname="com.bigdata.counters.AbstractStatisticsCollector"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="install.classpath" />
+		<arg value="1" /><!-- interval between reports. -->
+		<arg value="10" /><!-- #of seconds to run. -->
+	</java>
+</target>
+	
 <!-- Note: we must fork the JVM to the jvmarg overrides applied. -->
 <!-- Note: We disable registration of log4j MBeans since that requires policy file. -->
 <!-- @todo add a target to launch the post-mortem counter set/events viewer. -->
