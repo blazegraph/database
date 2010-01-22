@@ -828,14 +828,27 @@ public class SPORelation extends AbstractRelation<ISPO> {
         public boolean resolveConflict(IIndex writeSet, ITuple txTuple,
                 ITuple currentTuple) throws Exception {
 
-            if (txTuple.isDeletedVersion() && currentTuple.isDeletedVersion()) {
-
-//                System.err.println("Resolved retract/retract conflict");
-                
-                // retract/retract is not a conflict.
-                return true;
-
-            }
+            /*
+             * Note: In fact, retract-retract conflicts SHOULD NOT be resolved
+             * because retracts are often used to remove an old property value
+             * when a new value will be assigned for that property. For example,
+             * 
+             * tx1: -red, +green
+             * 
+             * tx2: -red, +blue
+             * 
+             * if we resolve the retract-retract conflict, then we will get
+             * {green,blue} after the transactions run, rather than either
+             * {green} or {blue}.
+             */
+//            if (txTuple.isDeletedVersion() && currentTuple.isDeletedVersion()) {
+//
+////                System.err.println("Resolved retract/retract conflict");
+//                
+//                // retract/retract is not a conflict.
+//                return true;
+//
+//            }
 
             if (!txTuple.isDeletedVersion() && !currentTuple.isDeletedVersion()) {
 
