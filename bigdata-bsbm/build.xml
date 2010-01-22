@@ -122,6 +122,21 @@
 		</java>
 	</target>
 	
+	<!--
+	Here is how to qualify the system.
+
+	Yes, but you have to download the qualification dataset [1] (it's 20M) and test driver data [2] and put them in the ant-build/bin directory.  Then follow the instructions in [3], which boils down to three ant tasks:
+
+	ant run-load-qualification (loads the dataset)
+	ant run-qualification-1 (runs the queries)
+	ant run-qualification-2 (compares the actual query results to the correct query results)
+
+	[1] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/datasets/qualification.ttl.gz
+	[2] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/datasets/td_data_q.zip
+	[3] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/spec/index.html#qualification
+
+	-->
+		
 	<!-- @todo config in property file. -->
 	<target name="run-qualification-1" depends="compile">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
@@ -162,7 +177,10 @@
 	          maxmemory="512m"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-runs 2 -w 2 -mt 2 -journal bigdata-bsbm.jnl"/>
+			<!-- -runs # is the #of query mix runs (default is 500). -->
+			<!-- -w # is the #of warmup query mixes (default is 50). -->
+			<!-- -mt # is the #of concurrent clients. -->
+			<arg line="-runs 500 -w 50 -mt 1 -journal bigdata-bsbm.jnl"/>
 			<jvmarg value="-server"/>
 			<classpath>
 				<path refid="runtime.classpath" />
