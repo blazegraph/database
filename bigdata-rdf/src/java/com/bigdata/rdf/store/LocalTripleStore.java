@@ -159,6 +159,12 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
      */
     public LocalTripleStore(Properties properties) {
 
+        /*
+         * FIXME This should pass up the existing properties for the KB instance
+         * when the KB instance is pre-existing.  Really though, you should first
+         * obtain the Journal and then attempt to locate the KB and create it if
+         * it does not exist.
+         */
         this(new Journal(properties), "kb"/* namespace */, ITx.UNISOLATED,
                 properties);
         
