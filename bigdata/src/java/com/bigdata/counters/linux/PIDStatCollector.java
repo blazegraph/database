@@ -50,12 +50,15 @@ import com.bigdata.rawstore.Bytes;
 
 /**
  * Collects statistics on the JVM process relating to CPU, memory, and IO
- * statistics (when available) using <code>pidstat -p 501 -u -I -r -d -w</code> [[<i>interval</i> [<i>count</i>]]
+ * statistics (when available) using <code>pidstat -p 501 -u -I -r -d -w</code>
+ * [[<i>interval</i> [<i>count</i>]]
  * <p>
- * Where -p is the pid to montitor -u is cpi (-I normalizes to 100% for SMP), -r
- * is memory stats, -d gives IO statistics with kernels 2.6.20 and up; -w is
- * context switching data; The interval is in seconds. The count is optional -
- * when missing or zero will repeat forever if interval was specified.
+ * Where <code>-p</code> is the pid to monitor, <code>-u</code> is cpu
+ * utilization (<code>-I</code> normalizes to 100% for SMP), <code>-r</code>
+ * gives the process memory statistics, <code>-d</code> gives IO statistics with
+ * kernels 2.6.20 and up; <code>-w</code> gives context switching data; The
+ * interval is in seconds. The count is optional - when missing or zero will
+ * repeat forever if interval was specified.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
