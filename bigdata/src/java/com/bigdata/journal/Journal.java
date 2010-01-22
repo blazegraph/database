@@ -159,11 +159,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         }
 
         resourceLockManager = new ResourceLockService();
-        
+
+        localTransactionManager = newLocalTransactionManager();
+
+        concurrencyManager = new ConcurrencyManager(properties,
+                localTransactionManager, this);
+
+    }
+
+    protected AbstractLocalTransactionManager newLocalTransactionManager() {
+
         final JournalTransactionService abstractTransactionService = new JournalTransactionService(
                 properties, this).start();
 
-        localTransactionManager = new AbstractLocalTransactionManager() {
+        return new AbstractLocalTransactionManager() {
 
             public AbstractTransactionService getTransactionService() {
                 
@@ -197,11 +206,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         };
 
-        concurrencyManager = new ConcurrencyManager(properties,
-                localTransactionManager, this);
-
     }
-
+    
     public AbstractLocalTransactionManager getLocalTransactionManager() {
 
         return localTransactionManager;
