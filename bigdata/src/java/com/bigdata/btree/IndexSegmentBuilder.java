@@ -613,7 +613,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         // ~2x the nominal size of a 200M index shard in tuples at 50 bytes/tuple.
         final long MAX_TUPLES_IN_VIEW = Bytes.megabyte * 8;
 
-        if (stats.sumSegBytes < MAX_SIZE_ON_DISK
+        /*
+         * FIXME I have temporary disabled this as it appears to be slower to
+         * fully buffer the data on the current test cluster.... I will look
+         * into this further as soon as I get a good baseline on that cluster.
+         */
+        if (false && stats.sumSegBytes < MAX_SIZE_ON_DISK
                 && fastRangeCount < MAX_TUPLES_IN_VIEW) {
 
             /*
