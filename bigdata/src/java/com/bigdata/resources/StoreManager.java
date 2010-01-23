@@ -921,6 +921,18 @@ abstract public class StoreManager extends ResourceEvents implements
      *         directory -or- <code>-1L</code> if the free space could not be
      *         determined.
      */
+    /*
+     * Note: This was written using Apache FileSystemUtil originally. That would
+     * shell out "df" under un*x. Unfortunately, shelling out a child process
+     * requires a commitment from the OS to support a process with as much
+     * process space as the parent. For the data service, that is a lot of RAM.
+     * In general, the O/S allows "over committment" of the available swap
+     * space, but you can run out of swap and then you have a problem. If the
+     * host was configured with scanty swap, then this problem could be
+     * triggered very easily and would show up as "Could not allocate memory".
+     * 
+     * See http://forums.sun.com/thread.jspa?messageID=9834041#9834041
+     */
     private long getFreeSpace(final File dir) {
         
         try {
