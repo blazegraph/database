@@ -51,7 +51,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
@@ -914,10 +913,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
     /**
      * Return the free space in bytes on the volume hosting some directory.
-     * <p>
-     * Note: This uses the apache IO commons {@link FileSystemUtils} to report
-     * the free space on the volume hosting the directory and then converts kb
-     * to bytes.
      * 
      * @param dir
      *            A directory hosted on some volume.
@@ -925,15 +920,24 @@ abstract public class StoreManager extends ResourceEvents implements
      * @return The #of bytes of free space remaining for the volume hosting the
      *         directory -or- <code>-1L</code> if the free space could not be
      *         determined.
-     * 
-     * @see http://commons.apache.org/io/api-release/org/apache/commons/io/FileSystemUtils.html
      */
     private long getFreeSpace(final File dir) {
         
         try {
 
-            return FileSystemUtils.freeSpaceKb(dir.toString())
-                    * Bytes.kilobyte;
+            if(!dir.exists()) {
+                
+                return -1;
+                
+            }
+
+            /*
+             * Note: This return 0L if there is no free space or if the File
+             * does not "name" a partition in the file system semantics. That
+             * is why we check dir.exists() above.
+             */
+
+            return dir.getUsableSpace();
             
         } catch(Throwable t) {
             
@@ -946,6 +950,41 @@ abstract public class StoreManager extends ResourceEvents implements
         }
 
     }
+
+//    /**
+//     * Return the free space in bytes on the volume hosting some directory.
+//     * <p>
+//     * Note: This uses the apache IO commons {@link FileSystemUtils} to report
+//     * the free space on the volume hosting the directory and then converts kb
+//     * to bytes.
+//     * 
+//     * @param dir
+//     *            A directory hosted on some volume.
+//     * 
+//     * @return The #of bytes of free space remaining for the volume hosting the
+//     *         directory -or- <code>-1L</code> if the free space could not be
+//     *         determined.
+//     * 
+//     * @see http://commons.apache.org/io/api-release/org/apache/commons/io/FileSystemUtils.html
+//     */
+//    private long getFreeSpace(final File dir) {
+//        
+//        try {
+//
+//            return FileSystemUtils.freeSpaceKb(dir.toString())
+//                    * Bytes.kilobyte;
+//            
+//        } catch(Throwable t) {
+//            
+//            log.error("Could not get free space: dir=" + dir + " : "
+//                            + t, t);
+//            
+//            // the error is logger and ignored.
+//            return -1L;
+//            
+//        }
+//
+//    }
     
     /**
      * An object wrapping the {@link Properties} given to the ctor.
