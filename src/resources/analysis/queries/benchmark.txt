@@ -130,6 +130,8 @@ http://localhost:8080/?filter=hosts/scores&correlated=true&depth=7&file=service/
 # Live Journal
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/readSecs&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/readSecs
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/writeSecs&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/writeSecs
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/bytesReadPerSec&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/bytesReadPerSec
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/bytesWrittenPerSec&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/bytesWrittenPerSec
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/extent&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/extent
 
 # OverflowManager
