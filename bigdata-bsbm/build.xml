@@ -39,17 +39,13 @@
 		<mkdir dir="${build.dir}/bin" />
 	</target>
 
-	<!-- Note: javac error results often if verbose is disabled. -->
-	<!-- I was able to perform a build with 1.6.0_07. -->
-	<!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
+	<!-- @todo modify to use the bigdata jar and libraries as a dependency rather than recompile all here. -->
 	<target name="compile" depends="prepare">
 		<mkdir dir="${build.dir}" />
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
 		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
 	     encoding="${javac.encoding}"
 	     	>
-			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
-			<!-- target="${javac.target}" source="${javac.source}" -->
 			<src path="${bsbm.dir}/src/java" />
 			<src path="${bsbm.dir}/../bigdata/src/java" />
 			<src path="${bsbm.dir}/../bigdata-jini/src/java" />
@@ -75,47 +71,42 @@
 		<java classname="benchmark.generator.Generator"
 	          fork="true"
 	          failonerror="true"
-	          maxmemory="512m"
 	          dir="${build.dir}/bin"
 			  >
+			<!-- -fc causes the generator to forward chain the test data. -->
+			<!-- -pc # specifies the #of products. -->
+			<!-- -s specifies the output type, generally 'nt' for ntriples. -->
+			<!-- -fn specifies the output file w/o the .nt extension. -->
 		    <arg value="-fc"/>
-			<arg line="-pc 10"/><!-- @todo config in properties file. -->
+			<arg line="-pc ${bsbm.pc}"/>
+			<arg line="-dir ${bsbm.dataDir}"/>
+			<arg line="-s ${bsbm.outputType}"/>
+			<arg line="-fn ${bsbm.outputFile}"/>
+			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
 		</java>
 	</target>
 		
-	<!-- @todo load split data files for s/o. -->
-	<!-- @todo specify property for journal location. -->
- 	<target name="run-load" depends="compile">
-		<delete file="${build.dir}/bin/bigdata-bsbm.jnl" />
-		<java classname="benchmark.bigdata.BigdataLoader"
-	          fork="true"
-	          failonerror="true"
-	          maxmemory="512m"
-	          dir="${build.dir}/bin"
-			  >
-			<arg line="-journal bigdata-bsbm.jnl -data dataset.nt"/>
-			<jvmarg value="-server"/>
-			<classpath>
-				<path refid="runtime.classpath" />
-            </classpath>
-		</java>
-	</target>
+	<!-- @todo Support standalone and scale-out.  Specify properties file, not
+		 journal???  If .config, then use the JiniFederation, not the Journal. 
+		 If .properties, then the filename of the journal should be set in that
+		 file. -->
 	
-	<!-- @todo load split data files for s/o. -->
-	<!-- @todo specify property for journal location. -->
- 	<target name="run-load-qualification" depends="compile">
-		<delete file="${build.dir}/bin/bigdata-bsbm.jnl" />
+	<!-- @todo specify the kb namespace (default is "kb"). -->
+	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
+ 	<target name="run-load" depends="compile">
+ 		<!-- delete file if it exists (@todo dangerous!). -->
+		<delete file="${bsbm.journalFile}" />
 		<java classname="benchmark.bigdata.BigdataLoader"
 	          fork="true"
 	          failonerror="true"
-	          maxmemory="512m"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-journal bigdata-bsbm.jnl -data dataset_1m.ttl"/>
+			<arg line="-journal ${bsbm.journalFile} -data ${bsbm.outputFile}.${bsbm.outputType}"/>
 			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
@@ -125,7 +116,10 @@
 	<!--
 	Here is how to qualify the system.
 
-	Yes, but you have to download the qualification dataset [1] (it's 20M) and test driver data [2] and put them in the ant-build/bin directory.  Then follow the instructions in [3], which boils down to three ant tasks:
+	You have to download the qualification dataset [1] (it's 20M) and test driver
+	data [2] and put them in the ant-build/bin directory (or elsewhere if you
+	modify the ant script).  Then follow the instructions in [3], which boils
+	down to three ant tasks:
 
 	ant run-load-qualification (loads the dataset)
 	ant run-qualification-1 (runs the queries)
@@ -137,51 +131,65 @@
 
 	-->
 		
-	<!-- @todo config in property file. -->
+ 	<target name="run-load-qualification" depends="compile">
+		<delete file="${build.dir}/bin/bigdata-bsbm.jnl" />
+		<java classname="benchmark.bigdata.BigdataLoader"
+	          fork="true"
+	          failonerror="true"
+	          dir="${build.dir}/bin"
+			  >
+			<arg line="-journal ${bsbm.journalFile} -data dataset_1m.ttl"/>
+			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx${bsbm.maxMem}"/>
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
 	<target name="run-qualification-1" depends="compile">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
 	          fork="true"
 	          failonerror="true"
-	          maxmemory="512m"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-q http://dummyendpoint -journal bigdata-bsbm.jnl"/>
+			<arg line="-q http://dummyendpoint -journal ${bsbm.journalFile}"/>
 			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
 		</java>
 	</target>
 	
-	<!-- @todo config in property file. -->
 	<target name="run-qualification-2" depends="compile">
 		<java classname="benchmark.qualification.Qualification"
 	          fork="true"
 	          failonerror="true"
-	          maxmemory="512m"
 	          dir="${build.dir}/bin"
 			  >
 			<arg line="correct.qual run.qual"/>
 			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
 		</java>
 	</target>
 	
-	<!-- @todo config in property file. -->
+	<!-- @todo relocate the query mixes, ignored queries, etc. out of ant-build/bin. -->
 	<target name="run-query" depends="compile">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
 	          fork="true"
 	          failonerror="true"
-	          maxmemory="512m"
 	          dir="${build.dir}/bin"
 			  >
 			<!-- -runs # is the #of query mix runs (default is 500). -->
 			<!-- -w # is the #of warmup query mixes (default is 50). -->
 			<!-- -mt # is the #of concurrent clients. -->
-			<arg line="-runs 500 -w 50 -mt 1 -journal bigdata-bsbm.jnl"/>
+			<arg line="-runs ${bsbm.runs} -w ${bsbm.w} -mt ${bsbm.mt} -idir ${bsbm.dataDir} -journal ${bsbm.journalFile}"/>
 			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
