@@ -14,10 +14,11 @@ import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 
 /**
- * Executes a query against a supplied Bigdata Sesame Repository.  For the
+ * Executes a query against a supplied Bigdata Sesame Repository. For the
  * purposes of this benchmark, this class will simulate remote access to the
- * repository, by serializing results into XML and return an InputStream
- * against that XML document (String).
+ * repository, by serializing results into XML and return an InputStream against
+ * that XML document (String). The "query" connection is used, which permits
+ * concurrent readers against the lastCommitTime of the backing database.
  * 
  * @author mike
  */

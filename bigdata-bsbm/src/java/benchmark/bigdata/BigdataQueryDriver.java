@@ -3,48 +3,84 @@ package benchmark.bigdata;
 import java.io.File;
 import java.io.StringWriter;
 import java.util.Properties;
+
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
+
 import benchmark.testdriver.TestDriver;
-import com.bigdata.rdf.axioms.NoAxioms;
+
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 public class BigdataQueryDriver {
     /**
      * @param args
-     *          USAGE: -journal <journal file> -data <data file>
+     *            USAGE: -journal <journal file> -data <data file>
+     *            
+     * @see TestDriver for other options.
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
+        Journal jnl = null;
+        /*
+         * @todo this is the default kb namespace. it should be a parameter to
+         * the test harness since you can have multiple instances in a single
+         * journal.
+         */
+        final String namespace = "kb";
         try {
             if (args.length < 2) {
                 System.err.println("USAGE: <bsbm args...> -journal <journal file>");
             }
-            String journal = args[args.length-1];
-            File file = new File(journal);
+            final String journal = args[args.length-1];
+            final File file = new File(journal);
             if (!file.exists()) {
-                throw new RuntimeException("could not find the journal");
+                throw new RuntimeException("Could not find the journal: "+file);
             }
-            
-            String[] bsbmArgs = new String[args.length-2];
-            System.arraycopy(args, 0, bsbmArgs, 0, bsbmArgs.length);
-            
-            Properties properties = new Properties();
-            properties.setProperty(
-                    BigdataSail.Options.QUADS, "false");
-            properties.setProperty(
-                    BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
-            properties.setProperty(
-                    BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-            properties.setProperty(
-                    BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-            properties.setProperty(
-                    BigdataSail.Options.FILE, file.getAbsolutePath());
 
-            BigdataSail sail = new BigdataSail(properties);
-            BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final String[] bsbmArgs = new String[args.length-2];
+            System.arraycopy(args, 0, bsbmArgs, 0, bsbmArgs.length);
+
+            /*
+             * Note: we only need to specify the FILE when re-opening a journal
+             * containing a pre-existing KB.
+             */
+            final BigdataSail sail;
+            {
+                final Properties properties = new Properties();
+//            properties.setProperty(
+//                    BigdataSail.Options.QUADS, "false");
+//            properties.setProperty(
+//                    BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
+//            properties.setProperty(
+//                    BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
+//            properties.setProperty(
+//                    BigdataSail.Options.TRUTH_MAINTENANCE, "false");
+                properties.setProperty(BigdataSail.Options.FILE, file
+                        .getAbsolutePath());
+
+                jnl = new Journal(properties);
+
+                // resolve the kb instance of interest.
+                final AbstractTripleStore tripleStore = (AbstractTripleStore) jnl
+                        .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+                if (tripleStore == null) {
+
+                    throw new RuntimeException("No such kb: "+namespace);
+                    
+                }
+
+                // since the kb exists, wrap it as a sail.
+                sail = new BigdataSail(tripleStore);
+                
+            }
+//            final BigdataSail sail = new BigdataSail(properties);
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
             repo.initialize();
             
             // take the repository for a test spin
@@ -55,6 +91,10 @@ public class BigdataQueryDriver {
             
         } catch (Exception ex) {
             ex.printStackTrace();
+        } finally {
+            if(jnl!=null) {
+                jnl.close();
+            }
         }
     }
     
