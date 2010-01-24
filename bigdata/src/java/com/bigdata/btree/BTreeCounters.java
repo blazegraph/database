@@ -124,7 +124,7 @@ final public class BTreeCounters implements Cloneable {
             throw new IllegalArgumentException();
         
         // IKeySearch
-        nfinds.addAndGet(o.nfinds.get());
+//        nfinds.addAndGet(o.nfinds.get());
         ninserts.addAndGet(o.ninserts.get());
         nremoves.addAndGet(o.nremoves.get());
         // ILinearList
@@ -185,7 +185,7 @@ final public class BTreeCounters implements Cloneable {
          */
         
         // IKeySearch
-        t.nfinds.addAndGet(-o.nfinds.get());
+//        t.nfinds.addAndGet(-o.nfinds.get());
         t.ninserts.addAndGet(-o.ninserts.get());
         t.nremoves.addAndGet(-o.nremoves.get());
         // ILinearList
@@ -234,7 +234,11 @@ final public class BTreeCounters implements Cloneable {
      * those rejected by the bloom filter before they are tested against the
      * B+Tree).
      */
-    public final AtomicLong nfinds = new AtomicLong();
+    /*
+     * Note: This is a hot spot with concurrent readers and does not provide
+     * terribly useful information so I have taken it out. BBT 1/24/2010.
+     */
+//    public final AtomicLong nfinds = new AtomicLong();
     public final AtomicLong ninserts = new AtomicLong();
     public final AtomicLong nremoves = new AtomicLong();
     // ILinearList
@@ -472,11 +476,11 @@ final public class BTreeCounters implements Cloneable {
                 
                 final CounterSet tmp = counterSet.makePath("keySearch");
 
-                tmp.addCounter("find", new Instrument<Long>() {
-                    protected void sample() {
-                        setValue(nfinds.get());
-                    }
-                });
+//                tmp.addCounter("find", new Instrument<Long>() {
+//                    protected void sample() {
+//                        setValue(nfinds.get());
+//                    }
+//                });
 
                 tmp.addCounter("insert", new Instrument<Long>() {
                     protected void sample() {

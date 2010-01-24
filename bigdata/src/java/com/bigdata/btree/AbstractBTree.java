@@ -1971,7 +1971,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        btreeCounters.nfinds.incrementAndGet();
+        /*
+         * Note: This is a hot spot with concurrent readers and does not provide
+         * terribly useful information so I have taken it out. BBT 1/24/2010.
+         */
+//        btreeCounters.nfinds.incrementAndGet();
 
         tuple = getRootOrFinger(key).lookup(key, tuple);
         
