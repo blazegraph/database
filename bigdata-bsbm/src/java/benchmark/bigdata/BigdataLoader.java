@@ -23,19 +23,20 @@ public class BigdataLoader {
      * @param args
      *          USAGE: -journal <journal file> -data <data file>
      */
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         try {
             if (args.length < 4) {
                 System.err.println("USAGE: -journal <journal file> -data <data file>");
             }
-            String journal = args[1];
-            String data = args[3];
-            File file = new File(journal);
+            final String journal = args[1];
+            final String data = args[3];
+            final File file = new File(journal);
             if (file.exists()) {
                 if(!file.delete()) {
                     throw new RuntimeException("could not delete old journal file");
                 }
             }
+            System.out.println("Journal: "+file);
             
             Properties properties = new Properties();
             properties.setProperty(BigdataSail.Options.QUADS, "false");
