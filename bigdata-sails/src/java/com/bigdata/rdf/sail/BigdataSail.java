@@ -86,6 +86,7 @@ import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.TripleSource;
 import org.openrdf.query.algebra.evaluation.impl.BindingAssigner;
@@ -2580,6 +2581,16 @@ public class BigdataSail extends SailBase implements Sail {
                     
                 }
                 
+                @Override
+                public void meet(final ValueConstant constant) {
+                    
+                    final Value val = constant.getValue();
+
+                    // add BigdataValue variant of the var's Value.
+                    values.put(val, valueFactory.asValue(val));
+                    
+                }
+                
             });
 
             /*
@@ -2637,6 +2648,38 @@ public class BigdataSail extends SailBase implements Sail {
                         var.setValue(val2);
 
                     }
+                }
+                
+                @Override
+                public void meet(ValueConstant constant) {
+                    
+                    // the Sesame Value object.
+                    final Value val = constant.getValue();
+
+                    // Lookup the resolve BigdataValue object.
+                    final BigdataValue val2 = values.get(val);
+
+                    assert val2 != null : "value not found: "+constant.getValue();
+                    
+                    if (log.isDebugEnabled())
+                        log.debug("value: " + val + " : " + val2 + " ("
+                                + val2.getTermId() + ")");
+
+                    if (val2.getTermId() == NULL) {
+
+                        /*
+                         * Since the term identifier is NULL this value is
+                         * not known to the kb.
+                         */
+                        
+                        if(log.isInfoEnabled())
+                            log.info("Not in knowledge base: " + val2);
+                        
+                    }
+                    
+                    // replace the constant in the query.
+                    constant.setValue(val2);
+                    
                 }
                 
             });
