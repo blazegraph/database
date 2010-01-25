@@ -154,8 +154,9 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
      * @param terms
      * @return
      */
-    private Map<Long, BigdataValue> doAddTermsTest(AbstractTripleStore store,
-            Collection<BigdataValue> terms) {
+    private Map<Long, BigdataValue> doAddTermsTest(
+            final AbstractTripleStore store,
+            final Collection<BigdataValue> terms) {
 
         final int size = terms.size();
 

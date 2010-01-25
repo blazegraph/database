@@ -28,6 +28,7 @@
 package com.bigdata.rdf.store;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -45,6 +46,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -57,6 +59,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
+
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -1744,7 +1747,8 @@ abstract public class AbstractTripleStore extends
      */
 
     /**
-     * Delegates to the batch API.
+     * This method delegates to the batch API, but it is extremely inefficient
+     * for scale-out as it does one RMI per request!
      */
     public long addTerm(final Value value) {
 
@@ -1760,12 +1764,20 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public BigdataValue getTerm(final long id) {
 
         return getLexiconRelation().getTerm(id);
 
     }
 
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public long getTermId(final Value value) {
 
         return getLexiconRelation().getTermId(value);
@@ -1975,6 +1987,10 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public boolean hasStatement(final Resource s, final URI p,
             final Value o) {
 
@@ -1982,6 +1998,10 @@ abstract public class AbstractTripleStore extends
 
     }
     
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public boolean hasStatement(Resource s, URI p, Value o, Resource c) {
 
         /*

@@ -997,9 +997,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                     log.debug("solution: " + bindingSet);
                 }
 
-                final ISolution solution = joinNexus.newSolution(rule,
-                        bindingSet);
-
                 final long solutionCount = ruleStats.solutionCount.incrementAndGet();
                 
                 if (last > 0 && solutionCount > last) {
@@ -1010,6 +1007,9 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 }
 
                 if (solutionCount > offset) {
+
+                    final ISolution solution = joinNexus.newSolution(rule,
+                            bindingSet);
 
                     // add the solution to the buffer.
                     buffer.add(solution);

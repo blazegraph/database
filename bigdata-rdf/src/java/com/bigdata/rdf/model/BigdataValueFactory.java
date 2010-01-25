@@ -187,6 +187,6 @@ public interface BigdataValueFactory extends ValueFactory {
      * 
      * @return
      */
-    BigdataValueSerializer<BigdataValue> getValueSerializer();
+    BigdataValueSerializer<BigdataValueImpl> getValueSerializer();
 
 }
