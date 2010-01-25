@@ -133,13 +133,13 @@
 	-->
 		
  	<target name="run-load-qualification" depends="compile">
-		<delete file="${build.dir}/bin/bigdata-bsbm.jnl" />
+		<delete file="${bsbm.qualJournal}" />
 		<java classname="benchmark.bigdata.BigdataLoader"
 	          fork="true"
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-journal ${bsbm.journalFile} -data dataset_1m.ttl"/>
+			<arg line="-journal ${bsbm.qualJournal} -data ${bsbm.qualDataDir}/dataset_1m.ttl"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
@@ -154,7 +154,7 @@
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-q http://dummyendpoint -journal ${bsbm.journalFile}"/>
+			<arg line="-idir ${bsbm.qualDataDir}\td_data -q http://dummyendpoint -journal ${bsbm.qualJournal}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
