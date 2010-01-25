@@ -14,6 +14,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -33,7 +34,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
     private final IIndex idTermIndex;
 
-    private final BigdataValueSerializer<BigdataValue> ser;
+    private final BigdataValueSerializer<BigdataValueImpl> ser;
 
     private final KVO<BigdataValue>[] a;
 
@@ -103,7 +104,7 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
             for (int i = 0; i < ndistinct; i++) {
 
-                final BigdataValue x = a[i].obj;
+                final BigdataValueImpl x = (BigdataValueImpl) a[i].obj;
 
                 if (x instanceof BNode) {
 

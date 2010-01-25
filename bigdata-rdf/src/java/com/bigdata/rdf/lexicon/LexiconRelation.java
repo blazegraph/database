@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
+import org.omg.CORBA.portable.ValueFactory;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
@@ -47,16 +48,17 @@ import com.bigdata.btree.proc.IResultHandler;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
-import com.bigdata.cache.LRUCache;
-import com.bigdata.io.DataInputBuffer;
+import com.bigdata.btree.raba.IRaba;
+import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Term2IdWriteProcConstructor;
-import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.model.TermIdComparator2;
 import com.bigdata.rdf.rio.IStatementBuffer;
@@ -248,6 +250,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          */
         valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
         
+        termCache = new ConcurrentWeakValueCache<Long, BigdataValueImpl>(//
+                50000, // queueCapacity @todo configure term cache capacity.
+                .75f, // loadFactor (.75 is the default)
+                16 // concurrency level (16 is the default)
+                );
+        
     }
     
     /**
@@ -358,6 +366,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             // discard the value factory for the lexicon's namespace.
             BigdataValueFactoryImpl.remove(getNamespace());
+            
+            if (termCache != null) {
+
+                termCache.clear();
+                
+            }
             
         } finally {
 
@@ -554,18 +568,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         
     }
 
-//    /**
-//     * @todo Not implemented yet. Exact counts are not very useful on this
-//     *       relation.
-//     * 
-//     * @throws UnsupportedOperationException
-//     */
-//    public long getElementCount(boolean exact) {
-//
-//        throw new UnsupportedOperationException();
-//        
-//    }
-
     /**
      * Note : this method is part of the mutation api. it is primarily (at this
      * point, only) invoked by the rule execution layer and, at present, no
@@ -573,16 +575,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * 
      * @throws UnsupportedOperationException
      */
-    public BigdataValue newElement(IPredicate<BigdataValue> predicate, IBindingSet bindingSet) {
-        
+    public BigdataValue newElement(IPredicate<BigdataValue> predicate,
+            IBindingSet bindingSet) {
+
         throw new UnsupportedOperationException();
-        
+
     }
-    
+
     public Class<BigdataValue> getElementClass() {
-        
+
         return BigdataValue.class;
-        
+
     }
 
     /**
@@ -593,9 +596,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @throws UnsupportedOperationException
      */
     public long delete(IChunkedOrderedIterator<BigdataValue> itr) {
-        
+
         throw new UnsupportedOperationException();
-        
+
     }
 
     /**
@@ -721,23 +724,23 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                      * Decode the value, which is the term identifier.
                      */
                     @Override
-                    protected Object resolve(Object arg0) {
+                    protected Object resolve(final Object arg0) {
 
-                        final ITuple tuple = (ITuple) arg0;
+                        return ((ITuple) arg0).getValueBuffer()
+                                .getLong(0/* pos */);
 
-                        final long tid;
-                        try {
-
-                            tid = tuple.getValueStream().readLong();
-//                            tid = LongPacker.unpackLong(tuple.getValueStream());
-
-                        } catch (IOException e) {
-
-                            throw new RuntimeException(e);
-
-                        }
-
-                        return tid;
+//                        try {
+//
+//                            tid = tuple.getValueStream().readLong();
+////                            tid = LongPacker.unpackLong(tuple.getValueStream());
+//
+//                        } catch (IOException e) {
+//
+//                            throw new RuntimeException(e);
+//
+//                        }
+//
+//                        return tid;
 
                     }
                 });
@@ -894,7 +897,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                         private static final long serialVersionUID = 1L;
 
                         @Override
-                        protected Object resolve(Object obj) {
+                        protected Object resolve(final Object obj) {
                         
                             return ((KVO<BigdataValue>) obj).obj;
                             
@@ -1196,6 +1199,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * 
      * @todo allow registeration of datatype specific tokenizers (we already
      *       have language family based lookup).
+     * 
+     * @todo Provide a lucene integration point as an alternative to the
+     *       {@link FullTextIndex}. Integrate for query and search of course.
      */
     protected void indexTermText(final int capacity,
             final Iterator<BigdataValue> itr) {
@@ -1274,9 +1280,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @return A map from term identifier to the {@link BigdataValue}. If a
      *         term identifier was not resolved then the map will not contain an
      *         entry for that term identifier.
-     * 
-     * @todo performance tuning for statement pattern scans with resolution to
-     *       terms, e.g., LUBM Q6.
      */
     final public Map<Long,BigdataValue> getTerms(final Collection<Long> ids) {
 
@@ -1288,12 +1291,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         
         if (n == 0) {
 
-            return Collections.EMPTY_MAP;
+            return Collections.emptyMap();
             
         }
 
         final long begin = System.currentTimeMillis();
-        
+
+        /*
+         * Note: A concurrent hash map is since the request may be split across
+         * shards, in which case updates on the map may be concurrent.
+         */
         final ConcurrentHashMap<Long/* id */, BigdataValue/* term */> ret = new ConcurrentHashMap<Long, BigdataValue>(
                 n);
 
@@ -1305,14 +1312,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         int numNotFound = 0;
         
-        for(Long id : ids ) {
-            
-            final BigdataValue value = _getTermId(id.longValue());
+        for (Long lid : ids) {
+
+            final BigdataValueImpl value = _getTermId(lid);
             
             if (value != null) {
-            
+
+                assert value.getValueFactory() == valueFactory;
+
                 // resolved.
-                ret.put(id, valueFactory.asValue(value));
+                ret.put(lid, value);//valueFactory.asValue(value));
                 
                 continue;
 
@@ -1321,7 +1330,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             /*
              * We will need to test the index for this term identifier.
              */
-            notFound[numNotFound++] = id;
+            notFound[numNotFound++] = lid;
             
         }
 
@@ -1333,8 +1342,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             if (log.isInfoEnabled())
                 log.info("nterms=" + n + ", numNotFound=" + numNotFound
                         + (termCache!=null?(", cacheSize=" + termCache.size() + "\n"
-                        + termCache.getStatistics()):""));
-            
+//                        + termCache.getStatistics()
+                        ): ""));
+
             /*
              * sort term identifiers into index order.
              * 
@@ -1394,10 +1404,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 int fromIndex = 0;
                 int remaining = numNotFound;
 
-                for(int i=0; i<nchunks; i++) {
+                for (int i = 0; i < nchunks; i++) {
 
                     final boolean lastChunk = i + 1 == nchunks;
-                    
+    
                     final int chunkSize = lastChunk ? remaining : perChunk;
 
                     final int toIndex = fromIndex + chunkSize;
@@ -1465,7 +1475,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         final Long[] notFound;
 
         final ConcurrentHashMap<Long, BigdataValue> map;
-        
+
         /**
          * 
          * @param ndx
@@ -1484,7 +1494,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          *            for <i>keys</i>.
          * @param map
          *            Terms are inserted into this map under using their term
-         *            identifier as the key.
+         *            identifier as the key. This is a concurrent map because
+         *            the operation may have been split across multiple shards,
+         *            in which case the updates to the map can be concurrent.
          */
         ResolveTermTask(final IIndex ndx, final int fromIndex,
                 final int toIndex, final byte[][] keys, final Long[] notFound,
@@ -1522,21 +1534,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * definitions, which are distinct objects, into the cache then one
              * will get an IllegalStateException since the other's object will
              * already be in the cache.
-             * 
-             * @todo move de-serialization out of the synchronized block and the
-             * putAll() into the term cache?
              */
             {
 
+                final IRaba vals = results.getValues();
+                
                 for (int i = fromIndex; i < toIndex; i++) {
 
-                    final Long id = notFound[i];
+                    final Long lid = notFound[i];
 
-                    final byte[] data = results.getResult(i);
+                    final byte[] data = vals.get(i);
 
                     if (data == null) {
 
-                        log.warn("No such term: " + id);
+                        log.warn("No such term: " + lid);
 
                         continue;
 
@@ -1546,21 +1557,33 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                      * Note: This automatically sets the valueFactory reference
                      * on the de-serialized value.
                      */
-                    final BigdataValue value = valueFactory
-                            .getValueSerializer().deserialize(data);
+                    BigdataValueImpl value = valueFactory.getValueSerializer()
+                            .deserialize(data);
+                    
+                    // Set the term identifier.
+                    value.setTermId(lid.longValue());
 
                     if (termCache != null) {
 
-                        synchronized (termCache) {
-
-                            if (termCache.get(id) == null) {
-
-                                termCache.put(id, value, false/* dirty */);
-
-                            }
-                            
-                        }
+//                        synchronized (termCache) {
+//
+//                            if (termCache.get(id) == null) {
+//
+//                                termCache.put(id, value, false/* dirty */);
+//
+//                            }
+//                            
+//                        }
                         
+                        final BigdataValueImpl tmp = termCache.putIfAbsent(lid,
+                                value);
+
+                        if (tmp != null) {
+
+                            value = tmp;
+
+                        }
+                            
                     }
 
                     /*
@@ -1569,10 +1592,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                      * IllegalStateException if the value somehow was assigned
                      * the wrong term identifier (paranoia test).
                      */
-                    value.setTermId(id);
+                    assert value.getTermId() == lid : "expecting id=" + lid
+                            + ", but found " + value.getTermId();
+                    assert ((BigdataValueImpl) value).getValueFactory() == valueFactory;
 
-                    // save in local map.
-                    map.put(id, value);
+                    // save in caller's concurrent map.
+                    map.put(lid, value);
 
                 }
 
@@ -1761,8 +1786,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       the {@link StatementBuffer} to use a term cache in order to
      *       minimize the #of terms that it has to resolve against the indices -
      *       this especially matters for the scale-out implementation.
+     *       <p>
+     *       Or perhaps this can be rolled into the {@link ValueFactory} impl
+     *       along with the reverse bnodes mapping?
      */
-    private LRUCache<Long, BigdataValue> termCache = null;
+    private ConcurrentWeakValueCache<Long, BigdataValueImpl> termCache;
+//    private LRUCache<Long, BigdataValue> termCache = null;
 //    private LRUCache<Long, BigdataValue> termCache = new LRUCache<Long, BigdataValue>(10000);
 
     /**
@@ -1781,8 +1810,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * Handles {@link IRawTripleStore#NULL}, blank node identifiers, statement
      * identifiers, and the {@link #termCache}.
      * 
-     * @param id
-     *            A term identifier.
+     * @param lid
+     *            A term identifier (passed as a {@link Long} to avoid creation
+     *            of a {@link Long} inside of this method).
      * 
      * @return The corresponding {@link BigdataValue} if the term identifier is
      *         a blank node identifier, a statement identifier, or found in the
@@ -1791,8 +1821,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      * @throws IllegalArgumentException
      *             if <i>id</i> is {@link IRawTripleStore#NULL}.
      */
-    private BigdataValue _getTermId(final long id) {
+    private BigdataValueImpl _getTermId(final Long lid) {
 
+        final long id = lid.longValue();
+        
         if (id == IRawTripleStore.NULL)
             throw new IllegalArgumentException();
 
@@ -1807,7 +1839,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * BNode corresponds to a statement identifier.
              */
 
-            final BigdataBNodeImpl stmt = valueFactory.createBNode("S" + Long.toString(id));
+            final BigdataBNodeImpl stmt = valueFactory.createBNode("S"
+                    + Long.toString(id));
 
             // set the term identifier on the object.
             stmt.setTermId(id);
@@ -1816,7 +1849,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             stmt.statementIdentifier = true;
 
             return stmt;
-            
+
         }
 
         if (AbstractTripleStore.isBNode(id)) {
@@ -1826,19 +1859,21 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * "B" prefix is a syntactic marker for a real blank node.
              */
 
-            final BigdataBNode bnode = valueFactory.createBNode("B" + Long.toString(id));
+            final BigdataBNodeImpl bnode = valueFactory.createBNode("B"
+                    + Long.toString(id));
 
             // set the term identifier on the object.
-            bnode.setTermId( id );
+            bnode.setTermId(id);
 
             return bnode;
 
         }
 
-        // test the term cache (promotes to Long since not native long map).
+        // test the term cache.
         if (termCache != null) {
 
-            return termCache.get(id);
+            // Note: passing the Long from the caller as the cache key.
+            return termCache.get(lid);
 
         }
 
@@ -1871,10 +1906,14 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      */
     final public BigdataValue getTerm(final long id) {
         
-        // handle NULL, bnodes, statement identifiers, and the termCache.
-        BigdataValue value = _getTermId( id );
+        // Convert to Long object.
+        final Long lid = Long.valueOf(id);
         
-        if(value != null) return value;
+        // handle NULL, bnodes, statement identifiers, and the termCache.
+        BigdataValueImpl value = _getTermId(lid);
+        
+        if (value != null)
+            return value;
         
         final IIndex ndx = getId2TermIndex();
 
@@ -1891,33 +1930,45 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         }
 
+        // This also sets the value factory.
         value = valueFactory.getValueSerializer().deserialize(data);
+        
+        // This sets the term identifier.
+        value.setTermId(id);
 
-        if (termCache != null)
-            synchronized (termCache) {
+        if (termCache != null) {
 
-            /*
-             * Note: This code block is synchronized to address a possible race
-             * condition where concurrent threads resolve the term against the
-             * database. It both threads attempt to insert their resolved term
-             * definitions, which are distinct objects, into the cache then one
-             * will get an IllegalStateException since the other's object will
-             * already be in the cache.
-             */
+//            synchronized (termCache) {
+//
+//            /*
+//             * Note: This code block is synchronized to address a possible race
+//             * condition where concurrent threads resolve the term against the
+//             * database. It both threads attempt to insert their resolved term
+//             * definitions, which are distinct objects, into the cache then one
+//             * will get an IllegalStateException since the other's object will
+//             * already be in the cache.
+//             */
+//
+//            if (termCache.get(id) == null) {
+//
+//                termCache.put(id, value, false/* dirty */);
+//
+//            }
+            
+            // Note: passing the Long object as the key.
+            final BigdataValueImpl tmp = termCache.putIfAbsent(lid, value);
 
-            if (termCache.get(id) == null) {
+            if (tmp != null) {
 
-                termCache.put(id, value, false/* dirty */);
+                value = tmp;
 
             }
 
         }
 
-        // @todo modify unit test to verify that this field is being set.
-
-        value.setTermId( id );
-
-//        value.known = true;
+        assert value.getTermId() == id : "expecting id=" + id + ", but found "
+                + value.getTermId();
+        //        value.setTermId( id );
 
         return value;
 
@@ -1967,44 +2018,46 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         }
 
         // decode the term identifier.
-        final long termId;
-        try {
-
-            termId = new DataInputBuffer(tmp).readLong();
-//            termId = new DataInputBuffer(tmp).unpackLong();
-
-        } catch (IOException ex) {
-
-            throw new RuntimeException(ex);
-
-        }
-
-        /*
-         * @todo now that we have the termId and the term, we should stick them
-         * in the termCache, right?
-         */
-
-//        if (termCache.get(id) == null) {
+        final long termId = new FixedByteArrayBuffer(tmp, 0/* off */, 8/* len */)
+                .getLong(0);
+//        final long termId;
+//        try {
 //
-//            termCache.put(id, value, false/* dirty */);
+//            termId = new DataInputBuffer(tmp).readLong();
+////            termId = new DataInputBuffer(tmp).unpackLong();
+//
+//        } catch (IOException ex) {
+//
+//            throw new RuntimeException(ex);
 //
 //        }
 
         if(value instanceof BigdataValue) {
 
-            // set as side-effect.
-            ((BigdataValue)value).setTermId(termId);
+            final BigdataValueImpl impl = (BigdataValueImpl)value;
             
+            // set as side-effect.
+            impl.setTermId(termId);
+
+            /*
+             * Note that we have the termId and the term, we stick the value
+             * into in the term cache IFF it has the correct value factory, but
+             * do not replace the entry if there is one already there.
+             */
+
+            if (termCache != null && impl.getValueFactory() == valueFactory) {
+
+                // if (termCache.get(id) == null) {
+                //
+                // termCache.put(id, value, false/* dirty */);
+                //
+                // }
+
+                termCache.putIfAbsent(termId, impl);
+
+            }
+
         }
-        
-//        if((value instanceof _Value)) {
-//
-//            // was found in the forward mapping (@todo if known means in both
-//            // mappings then DO NOT set it here)
-//
-//            ((_Value)value).known = true;
-//            
-//        }
 
         return termId;
 
@@ -2034,16 +2087,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
              * @param obj
              *            the serialized term.
              */
-            protected Object resolve(Object obj) {
+            protected Object resolve(final Object obj) {
 
-//                final ITuple<BigdataValue> tuple =  obj;
-
-//                BigdataValue term = _Value.deserialize(tuple.getValueStream());
-
-                final BigdataValue value = ((ITuple<BigdataValue>) obj)
-                        .getObject();
-                
-                return value;
+                return ((ITuple<BigdataValue>) obj).getObject();
 
             }
 
@@ -2066,7 +2112,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
             private static final long serialVersionUID = 1L;
 
             /**
-             * Deserialize the term identifier (packed long integer).
+             * Deserialize the term identifier (long integer).
              * 
              * @param val
              *            The serialized term identifier.
@@ -2123,15 +2169,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             /**
              * @param val
-             *            the term identifer (Long).
+             *            the term identifier (Long).
              */
-            protected Object resolve(Object val) {
-
-                // the term identifier.
-                long termId = (Long) val;
+            protected Object resolve(final Object val) {
 
                 // resolve against the id:term index (random lookup).
-                return getTerm(termId);
+                return getTerm(((Long) val).longValue());
 
             }
 

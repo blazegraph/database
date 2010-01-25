@@ -191,6 +191,7 @@
 			<arg line="-runs ${bsbm.runs} -w ${bsbm.w} -mt ${bsbm.mt} -idir ${bsbm.dataDir} -journal ${bsbm.journalFile}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
+            <jvmarg line="${queryJvmArgs}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>

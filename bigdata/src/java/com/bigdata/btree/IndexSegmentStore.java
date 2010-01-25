@@ -967,18 +967,18 @@ public class IndexSegmentStore extends AbstractRawStore {
             
             counters.nodesRead++;
             
-            synchronized (this) { // @todo Why is this synchronized here down to the read on the buffer?
+            synchronized (this) { // @todo Why is this synchronized here?
 
                 if (buf_nodes != null) {
 
-                    counters.nodesReadFromDisk++;
-                    
                     return readFromBuffer(offset, length);
 
                 }
 
             }
 
+            counters.nodesReadFromDisk++;
+            
             // The data need to be read from the file.
             return readFromFile(offset, length);
 

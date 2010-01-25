@@ -102,6 +102,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -2973,7 +2974,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         public Void call() throws Exception {
 
             // used to serialize the Values for the BTree.
-            final BigdataValueSerializer<BigdataValue> ser = valueFactory
+            final BigdataValueSerializer<BigdataValueImpl> ser = valueFactory
                     .getValueSerializer();
 
             // thread-local key builder removes single-threaded constraint.
@@ -3015,7 +3016,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                 .getKey();
 
                         // Serialize the term.
-                        final byte[] val = ser.serialize(v, out.reset());
+                        final byte[] val = ser.serialize((BigdataValueImpl)v, out.reset());
 
                         /*
                          * Note: The BigdataValue instance is NOT supplied to

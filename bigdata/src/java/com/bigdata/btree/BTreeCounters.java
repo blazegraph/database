@@ -476,12 +476,14 @@ final public class BTreeCounters implements Cloneable {
                 
                 final CounterSet tmp = counterSet.makePath("keySearch");
 
+//                Note: This is a hotspot since it is used by concurrent readers.
 //                tmp.addCounter("find", new Instrument<Long>() {
 //                    protected void sample() {
 //                        setValue(nfinds.get());
 //                    }
 //                });
 
+                // Note: mutation counters are Ok since mutation is single-threaded.
                 tmp.addCounter("insert", new Instrument<Long>() {
                     protected void sample() {
                         setValue(ninserts.get());

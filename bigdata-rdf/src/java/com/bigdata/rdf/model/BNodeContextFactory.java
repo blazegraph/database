@@ -147,7 +147,7 @@ public class BNodeContextFactory implements BigdataValueFactory {
         return valueFactory.createURI(uriString);
     }
 
-    public BigdataValueSerializer<BigdataValue> getValueSerializer() {
+    public BigdataValueSerializer<BigdataValueImpl> getValueSerializer() {
         return valueFactory.getValueSerializer();
     }
 

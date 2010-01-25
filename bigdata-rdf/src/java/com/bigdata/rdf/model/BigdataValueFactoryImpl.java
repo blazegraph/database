@@ -1,46 +1,26 @@
-/**
+/*
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
-License:
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
 
-  http://www.CognitiveWeb.org/legal/license/
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
-
-Copyrights:
-
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
-
-  http://www.CognitiveWeb.org
-
-Portions Copyright (c) 2002-2003 Bryan Thompson.
-
-Acknowledgements:
-
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
-
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
-
-Modifications:
-
-*/
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 /*
  * Created on Apr 21, 2008
  */
@@ -57,6 +37,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.lexicon.LexiconRelation;
@@ -68,11 +49,6 @@ import com.bigdata.rdf.store.IRawTripleStore;
  * Statements constructed using this factory do NOT have statement identifiers
  * assigned. Those metadata can be resolved against the various indices and then
  * set on the returned values and statements.
- * 
- * @todo Hide {@link BigdataValue} ctors that can cause people problems. The
- *       public ctors are evil since they do not specify a value factory which
- *       causes a new {@link BigdataValue} be allocated once you try to write on
- *       the DB.
  * 
  * @todo Consider a {@link WeakValueCache} on this factory to avoid duplicate
  *       values.
@@ -95,7 +71,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private BigdataValueFactoryImpl() {
         
     }
-    
+
     /**
      * Canonicalizing mapping for {@link BigdataValueFactoryImpl}s based on the
      * namespace of the {@link LexiconRelation}.
@@ -106,6 +82,9 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      * {@link LexiconRelation} for that instance and that all
      * {@link BigdataValueImpl}s for that instance had become weakly reachable
      * or been swept).
+     * 
+     * @todo replace with {@link ConcurrentWeakValueCache} and a zero backing
+     *       hard reference LRU capacity?
      */
     private static WeakValueCache<String/* namespace */, BigdataValueFactoryImpl> cache = new WeakValueCache<String, BigdataValueFactoryImpl>(
             new LRUCache<String, BigdataValueFactoryImpl>(1/* capacity */));
@@ -404,10 +383,10 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     /**
      * (De-)serializer paired with this {@link BigdataValueFactoryImpl}.
      */
-    private final transient BigdataValueSerializer<BigdataValue> valueSer = new BigdataValueSerializer<BigdataValue>(
+    private final transient BigdataValueSerializer<BigdataValueImpl> valueSer = new BigdataValueSerializer<BigdataValueImpl>(
             this);
 
-    public BigdataValueSerializer<BigdataValue> getValueSerializer() {
+    public BigdataValueSerializer<BigdataValueImpl> getValueSerializer() {
 
         return valueSer;
 
