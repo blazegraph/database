@@ -117,10 +117,10 @@
 	<!--
 	Here is how to qualify the system.
 
-	You have to download the qualification dataset [1] (it's 20M) and test driver
-	data [2] and put them in the ant-build/bin directory (or elsewhere if you
-	modify the ant script).  Then follow the instructions in [3], which boils
-	down to three ant tasks:
+	You have to download the qualification dataset [1] (it's 20M), its test driver
+	data [2], and the correct results [3], and put them in the ant-build/bin
+	directory (or elsewhere if you modify the ant script).  Then follow the
+	instructions in [4], which boils down to three ant tasks:
 
 	ant run-load-qualification (loads the dataset)
 	ant run-qualification-1 (runs the queries)
@@ -128,6 +128,7 @@
 
 	[1] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/datasets/qualification.ttl.gz
 	[2] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/datasets/td_data_q.zip
+	[3] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/code/correct.qual
 	[3] http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/spec/index.html#qualification
 
 	-->
@@ -169,7 +170,7 @@
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="correct.qual run.qual"/>
+			<arg line="${bsbm.qualDataDir}/correct.qual run.qual"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>

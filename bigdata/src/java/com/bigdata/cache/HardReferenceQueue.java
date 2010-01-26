@@ -27,11 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-
-import com.bigdata.btree.BTree;
-
 /**
  * <p>
  * A cache for hard references using an LRU policy. References are simply

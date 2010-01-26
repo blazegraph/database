@@ -108,7 +108,9 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
         final String ref5 = "5";
 
         final IHardReferenceQueue<String> q = new HardReferenceQueueWithBatchingUpdates<String>(
-                listener, capacity, threadLocalNSCan, threadLocalQueueCapacity,
+                new HardReferenceQueue<String>(listener, capacity, 0/* nscan */),
+//                listener, capacity,
+                threadLocalNSCan, threadLocalQueueCapacity,
                 threadLocalTryLockSize);
 
         // add ref, but not batched through.
@@ -265,7 +267,9 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
             TimeoutException, ExecutionException {
 
         final HardReferenceQueueWithBatchingUpdates<Object> queue = new HardReferenceQueueWithBatchingUpdates<Object>(
-                null/* listener */, capacity, threadLocalNScan,
+                new HardReferenceQueue<Object>(null/*listener*/, capacity, 0/* nscan */),
+//                null/* listener */, capacity, 
+                threadLocalNScan,
                 threadLocalQueueCapacity, threadLocalTryLockSize);
 
         final ExecutorService service = Executors.newFixedThreadPool(

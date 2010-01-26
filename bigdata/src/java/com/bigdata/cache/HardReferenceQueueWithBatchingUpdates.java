@@ -84,7 +84,7 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
      * The shared queue. Touches are batched onto this queue by the
      * {@link #threadLocalQueues}.
      */
-    private final HardReferenceQueue<T> sharedQueue;
+    private final IHardReferenceQueue<T> sharedQueue;
 
     /**
      * The listener to which cache eviction notices are reported by the thread-
@@ -105,7 +105,9 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             final HardReferenceQueueEvictionListener<T> listener,
             final int capacity) {
 
-        this(listener, capacity,
+            this(//
+                    new HardReferenceQueue<T>(listener, capacity, 0/* nscan */),
+//                    listener, capacity,
                 IHardReferenceQueue.DEFAULT_NSCAN/* threadLocalNScan */,
                 64/* threadLocalCapacity */, 32/* threadLocalTryLockSize */);
 
@@ -114,12 +116,8 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
     /**
      * Designated constructor.
      * 
-     * @param listener
-     *            The eviction listener (sees only evictions from the outer
-     *            class).
-     * @param capacity
-     *            The capacity of the shared queue (does not include the
-     *            capacity of the thread-local queues).
+     * @param sharedQueue
+     *            The backing {@link IHardReferenceQueue}.
      * @param threadLocalQueueNScan
      *            The #of references to scan on the thread-local queue.
      * @param threadLocalQueueCapacity
@@ -133,17 +131,22 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
      *            (0).
      */
     public HardReferenceQueueWithBatchingUpdates(
-            final HardReferenceQueueEvictionListener<T> listener,
-            final int capacity,//
+            final IHardReferenceQueue<T> sharedQueue,
+//            final HardReferenceQueueEvictionListener<T> listener,
+//            final int capacity,//
             final int threadLocalQueueNScan,//
             final int threadLocalQueueCapacity,//
             final int threadLocalTryLockSize//
             ) {
 
+        if (sharedQueue == null)
+            throw new IllegalArgumentException();
+        
         // @todo configure concurrency, initialCapacity (defaults are pretty good).
         threadLocalQueues = new ConcurrentHashMap<Thread, BatchQueue<T>>();
         
-        sharedQueue = new HardReferenceQueue<T>(listener, capacity, 0/* nscan */);
+        this.sharedQueue = sharedQueue;
+//        sharedQueue = new HardReferenceQueue<T>(listener, capacity, 0/* nscan */);
 
         if (threadLocalQueueCapacity <= 0)
             throw new IllegalArgumentException();
@@ -237,7 +240,7 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
      * The size of the shared queue (approximate).
      */
     public int size() {
-        return sharedQueue.size;
+        return sharedQueue.size();
     }
 //    /**
 //     * Reports the combined size of the thread-local queue plus the shared
@@ -253,14 +256,14 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
      * The capacity of the shared queue.
      */
     public int capacity() {
-        return sharedQueue.capacity;
+        return sharedQueue.capacity();
     }
 
     /**
      * The nscan value of the shared queue.
      */
     public int nscan() {
-        return sharedQueue.nscan;
+        return sharedQueue.nscan();
     }
 
     /**
@@ -349,7 +352,7 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             threadLocalQueues.clear();
 
             // clear the shared backing queue.
-            sharedQueue.clear();
+            sharedQueue.clear(true/* clearRefs */);
             
         } finally {
             

@@ -57,6 +57,10 @@ public class LeafTupleIterator<E> implements ITupleIterator<E> {
     // first index to NOT visit.
     private final int toIndex;
 
+    private final boolean hasDeleteMarkers;
+    
+    private final boolean visitDeleted;
+    
     public LeafTupleIterator(final Leaf leaf) {
 
         this(leaf, new Tuple<E>(leaf.btree, IRangeQuery.DEFAULT), null, null);
@@ -99,6 +103,10 @@ public class LeafTupleIterator<E> implements ITupleIterator<E> {
         this.leaf = leaf;
         
         this.tuple = tuple;
+
+        this.hasDeleteMarkers = leaf.hasDeleteMarkers();
+
+        this.visitDeleted = (tuple.flags() & IRangeQuery.DELETED) != 0;
 
 //        this.fromKey = fromKey; // may be null (no lower bound).
 //        
@@ -182,10 +190,9 @@ public class LeafTupleIterator<E> implements ITupleIterator<E> {
             /*
              * Skip deleted entries unless specifically requested.
              */
-            if (leaf.hasDeleteMarkers()
-                    && ((tuple.flags() & IRangeQuery.DELETED) == 0)
+            if (hasDeleteMarkers && !visitDeleted
                     && leaf.getDeleteMarker(index)) {
-                
+
                 // skipping a deleted version.
                 
                 continue;
