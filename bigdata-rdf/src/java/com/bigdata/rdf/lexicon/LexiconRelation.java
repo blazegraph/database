@@ -72,7 +72,7 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBufferHandler;
 import com.bigdata.btree.proc.BatchLookup.BatchLookupConstructor;
 import com.bigdata.btree.raba.IRaba;
-import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -274,7 +274,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          */
         valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
         
-        termCache = new ConcurrentWeakValueCache<Long, BigdataValueImpl>(//
+        termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValueImpl>(//
                 50000, // queueCapacity @todo configure term cache capacity.
                 .75f, // loadFactor (.75 is the default)
                 16 // concurrency level (16 is the default)
@@ -1814,7 +1814,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       Or perhaps this can be rolled into the {@link ValueFactory} impl
      *       along with the reverse bnodes mapping?
      */
-    private ConcurrentWeakValueCache<Long, BigdataValueImpl> termCache;
+    private ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValueImpl> termCache;
 //    private LRUCache<Long, BigdataValue> termCache = null;
 //    private LRUCache<Long, BigdataValue> termCache = new LRUCache<Long, BigdataValue>(10000);
 
