@@ -2218,8 +2218,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         }
 
-        // only count the expensive ones.
-        btreeCounters.nrangeCount.incrementAndGet();
+//        // only count the expensive ones.
+//        btreeCounters.nrangeCount.incrementAndGet();
         
         final AbstractNode root = getRoot();
 
@@ -2425,7 +2425,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             final IFilterConstructor filter//
             ) {
 
-        btreeCounters.nrangeIterator.incrementAndGet();
+//        btreeCounters.nrangeIterator.incrementAndGet();
 
         /*
          * Does the iterator declare that it will not write back on the index?
