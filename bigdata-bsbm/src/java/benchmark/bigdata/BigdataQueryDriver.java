@@ -41,6 +41,7 @@ public class BigdataQueryDriver {
             if (!file.exists()) {
                 throw new RuntimeException("Could not find the journal: "+file);
             }
+            System.out.println("journal: " + file);
 
             final String[] bsbmArgs = new String[args.length-2];
             System.arraycopy(args, 0, bsbmArgs, 0, bsbmArgs.length);

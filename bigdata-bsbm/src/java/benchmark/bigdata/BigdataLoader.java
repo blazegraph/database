@@ -45,7 +45,7 @@ public class BigdataLoader {
             properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
             properties.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
             properties.setProperty(BigdataSail.Options.BUFFER_CAPACITY, "100000"); // 10000 default.
-            properties.setProperty(BigdataSail.Options.NESTED_SUBQUERY, "true"); // true is default.
+            properties.setProperty(BigdataSail.Options.NESTED_SUBQUERY, "false"); // true is default for standalone; false is the pipeline join, which is generally competitive even for standalone.
             properties.setProperty(BigdataSail.Options.MAX_PARALLEL_SUBQUERIES, "5"); // 5 is default, only applies to nextedSubquery joins.
             properties.setProperty(com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "8000");
             properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT, ""+(1048576*200)); // 200M initial extent.

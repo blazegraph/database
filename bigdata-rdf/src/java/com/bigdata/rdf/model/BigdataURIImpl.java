@@ -130,7 +130,7 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
         
     }
 
-    final public boolean equals(Object o) {
+    final public boolean equals(final Object o) {
         
         if (!(o instanceof URI))
             return false;
@@ -139,7 +139,7 @@ public class BigdataURIImpl extends BigdataResourceImpl implements BigdataURI {
         
     }
 
-    final public boolean equals(URI o) {
+    final public boolean equals(final URI o) {
 
         if (this == o)
             return true;
