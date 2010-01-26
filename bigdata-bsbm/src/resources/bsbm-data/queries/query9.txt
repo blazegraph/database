@@ -1,4 +1,7 @@
 PREFIX rev: <http://purl.org/stuff/rev#>
-
-DESCRIBE ?x
-WHERE { %ReviewXYZ% rev:reviewer ?x }
+CONSTRUCT { ?x ?p1 ?o . ?s ?p2 ?x . }
+WHERE {
+   { %ReviewXYZ% rev:reviewer ?x . ?x ?p1 ?o . }
+   UNION
+   { %ReviewXYZ% rev:reviewer ?x . ?s ?p2 ?x . }
+}
