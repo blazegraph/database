@@ -131,9 +131,9 @@ final public class BTreeCounters implements Cloneable {
         nindexOf.addAndGet(o.nindexOf.get()); // Note: also does key search.
         ngetKey.addAndGet(o.ngetKey.get());
         ngetValue.addAndGet(o.ngetValue.get());
-        // IRangeQuery
-        nrangeCount.addAndGet(o.nrangeCount.get());
-        nrangeIterator.addAndGet(o.nrangeIterator.get());
+//        // IRangeQuery
+//        nrangeCount.addAndGet(o.nrangeCount.get());
+//        nrangeIterator.addAndGet(o.nrangeIterator.get());
         // Structural mutation.
         rootsSplit += o.rootsSplit;
         rootsJoined += o.rootsJoined;
@@ -192,9 +192,9 @@ final public class BTreeCounters implements Cloneable {
         t.nindexOf.addAndGet(-o.nindexOf.get()); // Note: also does key search.
         t.ngetKey.addAndGet(-o.ngetKey.get());
         t.ngetValue.addAndGet(-o.ngetValue.get());
-        // IRangeQuery
-        t.nrangeCount.addAndGet(-o.nrangeCount.get());
-        t.nrangeIterator.addAndGet(-o.nrangeIterator.get());
+//        // IRangeQuery
+//        t.nrangeCount.addAndGet(-o.nrangeCount.get());
+//        t.nrangeIterator.addAndGet(-o.nrangeIterator.get());
         // Structural mutation.
         t.rootsSplit -= o.rootsSplit;
         t.rootsJoined -= o.rootsJoined;
@@ -245,9 +245,15 @@ final public class BTreeCounters implements Cloneable {
     public final AtomicLong nindexOf = new AtomicLong();
     public final AtomicLong ngetKey = new AtomicLong();
     public final AtomicLong ngetValue = new AtomicLong();
+
+    /*
+     * Note: These counters are hot spots with concurrent readers and do not
+     * provide terribly useful information so I have taken them out. BBT
+     * 1/26/2010.
+     */
     // IRangeQuery
-    public final AtomicLong nrangeCount = new AtomicLong();
-    public final AtomicLong nrangeIterator = new AtomicLong();
+//    public final AtomicLong nrangeCount = new AtomicLong();
+//    public final AtomicLong nrangeIterator = new AtomicLong();
     // Structural change (single-threaded, so plain variables are Ok).
     public int rootsSplit = 0;
     public int rootsJoined = 0;
@@ -524,32 +530,32 @@ final public class BTreeCounters implements Cloneable {
                 
             }
             
-            /*
-             * IRangeQuery
-             * 
-             * FIXME instrument the IRangeQuery API for times (must aggregate
-             * across hasNext() and next()). Note that rangeCount and rangeCopy
-             * both depend on rangeIterator so that is the only one for which we
-             * really need timing data. The iterator should report the
-             * cumulative service time when it is finalized.
-             */
-            {
-                
-                final CounterSet tmp = counterSet.makePath("rangeQuery");
-
-                tmp.addCounter("rangeCount", new Instrument<Long>() {
-                    protected void sample() {
-                        setValue(nrangeCount.get());
-                    }
-                });
-                
-                tmp.addCounter("rangeIterator", new Instrument<Long>() {
-                    protected void sample() {
-                        setValue(nrangeIterator.get());
-                    }
-                });
-                
-            }
+//            /*
+//             * IRangeQuery
+//             * 
+//             * @todo Instrument the IRangeQuery API for times (must aggregate
+//             * across hasNext() and next()). Note that rangeCount and rangeCopy
+//             * both depend on rangeIterator so that is the only one for which we
+//             * really need timing data. The iterator should report the
+//             * cumulative service time when it is finalized.
+//             */
+//            {
+//                
+//                final CounterSet tmp = counterSet.makePath("rangeQuery");
+//
+//                tmp.addCounter("rangeCount", new Instrument<Long>() {
+//                    protected void sample() {
+//                        setValue(nrangeCount.get());
+//                    }
+//                });
+//                
+//                tmp.addCounter("rangeIterator", new Instrument<Long>() {
+//                    protected void sample() {
+//                        setValue(nrangeIterator.get());
+//                    }
+//                });
+//                
+//            }
             
             /*
              * Structural mutation statistics.
