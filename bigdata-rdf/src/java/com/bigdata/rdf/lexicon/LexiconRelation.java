@@ -273,12 +273,25 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
          * triple store.
          */
         valueFactory = BigdataValueFactoryImpl.getInstance(namespace);
-        
-        termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValueImpl>(//
-                50000, // queueCapacity @todo configure term cache capacity.
-                .75f, // loadFactor (.75 is the default)
-                16 // concurrency level (16 is the default)
-                );
+
+        /*
+         * @todo This should be a high concurrency LIRS or similar cache in
+         * order to prevent the cache being flushed by the materialization of
+         * low frequency terms.
+         */
+        {
+            
+            final int termCacheCapacity = Integer.parseInt(getProperty(
+                    AbstractTripleStore.Options.TERM_CACHE_CAPACITY,
+                    AbstractTripleStore.Options.DEFAULT_TERM_CACHE_CAPACITY));
+
+            termCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValueImpl>(//
+                    termCacheCapacity, // queueCapacity
+                    .75f, // loadFactor (.75 is the default)
+                    16 // concurrency level (16 is the default)
+            );
+            
+        }
         
     }
     

@@ -549,6 +549,16 @@ abstract public class AbstractTripleStore extends
                 + ".textIndex.datatypeLiterals";
 
         String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
+
+        /**
+         * Integer option whose value is the capacity of the term cache. This
+         * cache provides fast lookup of frequently used RDF {@link Value}s by
+         * their term identifier.
+         */
+        String TERM_CACHE_CAPACITY = AbstractTripleStore.class.getName()
+                + ".termCache.capacity";
+        
+        String DEFAULT_TERM_CACHE_CAPACITY = "50000";
         
         /**
          * The name of the class that will establish the pre-defined
