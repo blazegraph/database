@@ -486,8 +486,20 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                     Math.min(d1.getCardinality(), d2.getCardinality());
             } else {
                 // shared vars and unshared vars - take the max
+                /*
+                 * This modification to the join planner results in
+                 * significantly faster queries for the bsbm benchmark (3x - 5x
+                 * overall). It takes a more optimistic perspective on the
+                 * intersection of two statement patterns, predicting that this
+                 * will constraint, rather than increase, the multiplicity of
+                 * the solutions. However, this COULD lead to pathological cases
+                 * where the resulting join plan is WORSE than it would have
+                 * been otherwise. For example, this change produces a 3x
+                 * improvement in the BSBM benchmark results.
+                 */
                 joinCardinality = 
-                    Math.max(d1.getCardinality(), d2.getCardinality());
+                    Math.min(d1.getCardinality(), d2.getCardinality());
+//                    Math.max(d1.getCardinality(), d2.getCardinality());
             }
         }
         return joinCardinality;
