@@ -518,8 +518,31 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                  * the solutions. However, this COULD lead to pathological cases
                  * where the resulting join plan is WORSE than it would have
                  * been otherwise. For example, this change produces a 3x to 5x
-                 * improvement in the BSBM benchmark results.  However, it has
-                 * a negative effect on LUBM Q2.  We are working on that.
+                 * improvement in the BSBM benchmark results. However, it has a
+                 * negative effect on LUBM Q2.
+                 * 
+                 * Update: Ok so just to go into a little detail - yesterday's
+                 * change means we choose the join ordering based on an
+                 * optimistic view of the cardinality of any particular join. If
+                 * you have two triple patterns that share variables but that
+                 * also have unshared variables, then technically the maximum
+                 * cardinality of the join is the maximum range count of the two
+                 * tails. But often the true cardinality of the join is closer
+                 * to the minimum range count than the maximum. So yesterday we
+                 * started assigning an expected cardinality for the join of the
+                 * minimum range count rather than the maximum. What this means
+                 * is that a lot of the time when those joins move toward the
+                 * front of the line the query will do a lot better, but
+                 * occasionally (LUBM 2), the query will do much much worse
+                 * (when the true cardinality is closer to the max range count).
+                 * 
+                 * Today we put in an extra tie-breaker condition. We already
+                 * had one tie-breaker - if two joins have the same expected
+                 * cardinality we chose the one with the lower minimum range
+                 * count. But the new tie-breaker is that if two joins have the
+                 * same expected cardinality and minimum range count, we now
+                 * chose the one that has the minimum range count on the other
+                 * tail (the minimum maximum if that makes sense).
                  */
                 joinCardinality = 
                     Math.min(d1.getCardinality(), d2.getCardinality());
