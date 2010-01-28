@@ -2484,6 +2484,16 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.write(data);
         }
 
+        public long write(ByteBuffer data, long oldAddr) {
+        	return write(data);
+        }
+
+		@Override
+		public void delete(long addr) {
+			// void
+			
+		}
+
     }
 
     /**
@@ -2755,6 +2765,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         public long write(ByteBuffer data) {
             throw new UnsupportedOperationException();
+        }       
+
+        public long write(ByteBuffer data, long oldAddr) {
+            throw new UnsupportedOperationException();
         }
         
         /*
@@ -2864,6 +2878,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public long unpackAddr(DataInput in) throws IOException {
             return delegate.unpackAddr(in);
         }
+
+		@Override
+		public void delete(long addr) {
+			// TODO Auto-generated method stub
+			
+		}
 
     }
 

@@ -1081,6 +1081,31 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
         
+        case DiskRW: {
+
+            /*
+             * Setup the buffer strategy.
+             */
+
+//            fileMetadata = new FileMetadata(file, BufferMode.Disk,
+//                    useDirectBuffers, initialExtent, maximumExtent, create,
+//                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
+//                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+//                    //readOnly ? null : writeCache,
+//                    writeCacheEnabled,
+//                    validateChecksum,
+//                    createTime, checker, alternateRootBlock);
+
+        	fileMetadata = null;
+        	
+            _bufferStrategy = new RWStrategy(file);
+
+            this._rootBlock = null;
+
+            break;
+
+        }
+        
         case Temporary: { 
             
             /*
@@ -2374,6 +2399,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         return _bufferStrategy.size();
         
+    }
+    
+    public long write(ByteBuffer data, long oldAddr) {
+        return _bufferStrategy.write(data, oldAddr);
+    }
+    
+    public void delete(long addr) {
+        _bufferStrategy.delete(addr);
     }
     
     public long write(final ByteBuffer data) {

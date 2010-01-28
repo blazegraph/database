@@ -581,4 +581,10 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         
     }
 
+	@Override
+	public void delete(long addr) {
+		// void
+		
+	}
+
 }

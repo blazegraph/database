@@ -112,6 +112,20 @@ public enum BufferMode {
 
     /**
      * <p>
+     * The journal is managed on disk. This option may be used with files of
+     * more than {@link Integer#MAX_VALUE} bytes in extent. RW indicates that
+     * it is not a WORM with append only semantics but rather a disk alloc/realloc
+     * mechanism that supports updates to values.  In general the store locality
+     * may be poor but should normally benefit in comparison to a WORM with
+     * smaller disk size.
+     * </p>
+     * 
+     * @see RWStrategy
+     */
+    DiskRW(true/* stable */, false/* fullyBuffered */),
+
+    /**
+     * <p>
      * A variant on the {@link #Disk} mode that is not restart-safe. This mode
      * is useful for all manners of temporary data with full concurrency control
      * and scales-up to very large temporary files. The backing file (if any) is

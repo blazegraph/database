@@ -2528,5 +2528,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
         
     }
+
+	@Override
+	public void delete(long addr) {
+		// void behaviour
+	}
     
 }
