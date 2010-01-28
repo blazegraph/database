@@ -94,4 +94,12 @@ abstract public class AbstractRawStore implements IRawStore, IStoreSerializer {
         
     }
 
+    public long write(ByteBuffer data, long oldAddr) {
+    	return write(data);
+    }
+
+	public void delete(long addr) {
+		// TODO Auto-generated method stub
+		
+	}
 }

@@ -135,29 +135,50 @@ public interface IRawStore extends IAddressManager, IStoreSerializer {
      *       Journal it is used to hold the root blocks).
      */
     public long write(ByteBuffer data);
+    
+    /**
+     * 
+     * @param data
+     *            The data. The bytes from the current
+     *            {@link ByteBuffer#position()} to the
+     *            {@link ByteBuffer#limit()} will be written and the
+     *            {@link ByteBuffer#position()} will be advanced to the
+     *            {@link ByteBuffer#limit()} . The caller may subsequently
+     *            modify the contents of the buffer without changing the state
+     *            of the store (i.e., the data are copied into the store).
+     * @param oldAddr as returned from a previous write of the same object, or zero if a new write
+     * 
+     * @return  A long integer formed that encodes both the offset from which the
+     *         data may be read and the #of bytes to be read. See
+     *         {@link IAddressManager}.
+     */
+    public long write(ByteBuffer data, long oldAddr);
 
-//    /**
-//     * Delete the data (unisolated).
-//     * <p>
-//     * After this operation subsequent reads on the address MAY fail and the
-//     * caller MUST NOT depend on the ability to read at that address.
-//     * 
-//     * @param addr
-//     *            A long integer formed using {@link Addr} that encodes both the
-//     *            offset at which the data was written and the #of bytes that
-//     *            were written.
-//     * 
-//     * @exception IllegalArgumentException
-//     *                If the address is known to be invalid (never written or
-//     *                deleted). Note that the address 0L is always invalid.
-//     * 
-//     * @deprecated This method has been discarded. It is only applicable in the
-//     *             context of a garbage collection strategy. With an append only
-//     *             store and with eviction of btrees into index segments there
-//     *             is no reason to delete anything on the store - and nothing to
-//     *             keep track of the delete.
-//     */
-//    public void delete(long addr);
+    /**
+     * Delete the data (unisolated).
+     * <p>
+     * After this operation subsequent reads on the address MAY fail and the
+     * caller MUST NOT depend on the ability to read at that address.
+     * 
+     * @param addr
+     *            A long integer formed using {@link Addr} that encodes both the
+     *            offset at which the data was written and the #of bytes that
+     *            were written.
+     * 
+     * @exception IllegalArgumentException
+     *                If the address is known to be invalid (never written or
+     *                deleted). Note that the address 0L is always invalid.
+     * 
+     * It is only applicable in the
+     * context of a garbage collection strategy. With an append only
+     * store and with eviction of btrees into index segments there
+     * is no reason to delete anything on the store - and nothing to
+     * keep track of the delete.
+     * 
+     * However, with a Read-Write store it is a requirement, and a void
+     * implementation is provided for other stores.
+     */
+    public void delete(long addr);
     
     /**
      * Read the data (unisolated).
