@@ -1857,7 +1857,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Constructor used to configure a new <em>named</em> B+Tree. The index
      * UUID is set to the given value and all other fields are defaulted as
      * explained at {@link #getProperty(Properties, String, String, String)}.
-     * Those defaults may be overriden using the various setter methods.
+     * Those defaults may be overridden using the various setter methods.
      * 
      * @param indexManager
      *            Optional. When given and when the {@link IIndexManager} is a
@@ -1865,7 +1865,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      *            used to interpret the {@link Options#INITIAL_DATA_SERVICE}
      *            property.
      * @param properties
-     *            Properties object used to overriden the default values for
+     *            Properties object used to overridden the default values for
      *            this {@link IndexMetadata} instance.
      * @param namespace
      *            The index name. When this is a scale-out index, the same
@@ -1965,16 +1965,24 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
              * better ergonomics, but the larger write retention queue capacity
              * will only benefit applications which perform sustained writes on
              * the index.
+             * 
+             * Note: For now I am turning off the write retention queue capacity
+             * "ergonomics". I am exploring whether or not this is too
+             * aggressive. The advantage of the ergonomics is that it
+             * automatically tunes the indices for a store used for a single
+             * purpose, such as a KB. However, if you have a lot of open
+             * indices, then this is not a good idea as each open index will
+             * allocate a ring buffer of that capacity.
              */
-            final long maxMemory = Runtime.getRuntime().maxMemory();
             final String defaultCapacity;
-            if (maxMemory >= Bytes.gigabyte * 10) {
-                defaultCapacity = "20000";
-            } else if (maxMemory >= Bytes.gigabyte * 1) {
-                defaultCapacity = "8000";
-            } else {
+//            final long maxMemory = Runtime.getRuntime().maxMemory();
+//            if (maxMemory >= Bytes.gigabyte * 10) {
+//                defaultCapacity = "20000";
+//            } else if (maxMemory >= Bytes.gigabyte * 1) {
+//                defaultCapacity = "8000";
+//            } else {
                 defaultCapacity = Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY;
-            }
+//            }
             this.writeRetentionQueueCapacity = getProperty(indexManager,
                     properties, namespace,
                     Options.WRITE_RETENTION_QUEUE_CAPACITY,
