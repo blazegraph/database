@@ -1828,8 +1828,6 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
      *       along with the reverse bnodes mapping?
      */
     private ConcurrentWeakValueCacheWithBatchedUpdates<Long, BigdataValueImpl> termCache;
-//    private LRUCache<Long, BigdataValue> termCache = null;
-//    private LRUCache<Long, BigdataValue> termCache = new LRUCache<Long, BigdataValue>(10000);
 
     /**
      * Constant for the {@link LexiconRelation} namespace component.
@@ -1844,8 +1842,15 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
     public static final transient String NAME_LEXICON_RELATION = "lex";
 
     /**
-     * Handles {@link IRawTripleStore#NULL}, blank node identifiers, statement
-     * identifiers, and the {@link #termCache}.
+     * Handles {@link IRawTripleStore#NULL}, blank nodes (unless the told bnodes
+     * mode is being used), statement identifiers, and tests the
+     * {@link #termCache}. When told bnodes are not being used, then if the term
+     * identifier is a blank node the corresponding {@link BigdataValue} will be
+     * dynamically generated and returned. If the term identifier is a SID, then
+     * the corresponding {@link BigdataValue} will be dynamically generated and
+     * returned. Finally, if the term identifier is found in the
+     * {@link #termCache}, then the cached {@link BigdataValue} will be
+     * returned.
      * 
      * @param lid
      *            A term identifier (passed as a {@link Long} to avoid creation
@@ -1889,11 +1894,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
         }
 
-        if (AbstractTripleStore.isBNode(id)) {
+        if (!storeBlankNodes && AbstractTripleStore.isBNode(id)) {
 
             /*
              * BNodes are not stored in the reverse lexicon (or the cache). The
              * "B" prefix is a syntactic marker for a real blank node.
+             * 
+             * Note: In a told bnodes mode, we need to store the blank nodes in
+             * the lexicon and enter them into the term cache since their
+             * lexical form will include the specified ID, not the term
+             * identifier.
+             * 
+             * FIXME Write a unit test for the told bnodes mode.
              */
 
             final BigdataBNodeImpl bnode = valueFactory.createBNode("B"
@@ -2084,14 +2096,18 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
 
             if (termCache != null && impl.getValueFactory() == valueFactory) {
 
-                // if (termCache.get(id) == null) {
-                //
-                // termCache.put(id, value, false/* dirty */);
-                //
-                // }
+                if (storeBlankNodes || !AbstractTripleStore.isBNode(termId)) {
 
-                termCache.putIfAbsent(termId, impl);
+                    // if (termCache.get(id) == null) {
+                    //
+                    // termCache.put(id, value, false/* dirty */);
+                    //
+                    // }
 
+                    termCache.putIfAbsent(termId, impl);
+
+                }
+                
             }
 
         }
