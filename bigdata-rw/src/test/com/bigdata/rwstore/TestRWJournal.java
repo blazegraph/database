@@ -219,7 +219,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
         protected BufferMode getBufferMode() {
             
-            return BufferMode.Disk;
+            return BufferMode.DiskRW;
             
         }
 
@@ -570,7 +570,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW
                     .toString());
 
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
@@ -606,7 +606,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW
                     .toString());
 
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
@@ -642,7 +642,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             properties.setProperty(Options.DELETE_ON_EXIT, "true");
 
-            properties.setProperty(Options.BUFFER_MODE, BufferMode.Disk
+            properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW
                     .toString());
 
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
