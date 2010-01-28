@@ -43,6 +43,7 @@ import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -344,6 +345,30 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
             properties.setProperty(
                     IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
                     "8000");
+
+            if(false){ // custom OSP index override
+                final String namespace = getNamespace();
+                final String overrideValue = "200000";
+                final String overrideProperty = com.bigdata.config.Configuration
+                        .getOverrideProperty(
+                                namespace + "." + SPORelation.NAME_SPO_RELATION
+                                        + "." + SPOKeyOrder.OSP,
+                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
+                properties.setProperty(overrideProperty, overrideValue);
+                System.err.println(overrideProperty + "=" + overrideValue);
+            }
+            if(false){ // custom POS index override
+                final String namespace = getNamespace();
+                final String overrideValue = "200000";
+                final String overrideProperty = com.bigdata.config.Configuration
+                        .getOverrideProperty(
+                                namespace + "." + SPORelation.NAME_SPO_RELATION
+                                        + "." + SPOKeyOrder.POS,
+                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
+                properties.setProperty(overrideProperty, overrideValue);
+                System.err.println(overrideProperty + "=" + overrideValue);
+            }
+              
 //
 //            properties.setProperty(
 //                    IndexMetadata.Options.BTREE_BRANCHING_FACTOR,

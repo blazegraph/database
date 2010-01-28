@@ -74,12 +74,33 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
      */
     public StringBuilder getLocalBTreeBytesWritten(final StringBuilder sb) {
 
-        final SPORelation r = getSPORelation();
-        
         boolean first = true;
         
-        for (String fqn : r.getIndexNames()) {
-        
+        for (String fqn : getLexiconRelation().getIndexNames()) {
+            
+            /*
+             * Note: This tunnels to the unisolated index. This is the one with
+             * the performance counters. Since we are only going to access the
+             * performance counters, this is safe (no concurrent modification).
+             */
+            final BTreeCounters btreeCounters = ((BTree) getIndexManager()
+                    .getIndex(fqn, ITx.UNISOLATED)).getBtreeCounters();
+            
+//            final int leavesSplit = btreeCounters.leavesSplit;
+            final long nodesWritten = btreeCounters.getNodesWritten();
+            final long leavesWritten = btreeCounters.getLeavesWritten();
+            final long bytesWritten = btreeCounters.getBytesWritten();
+
+            sb.append((first ? "" : ", ") + fqn + "{nodes=" + nodesWritten
+                    + ",leaves=" + leavesWritten + ", bytes=" + bytesWritten
+                    + "}");
+
+            first = false;
+
+        }
+
+        for (String fqn : getSPORelation().getIndexNames()) {
+            
             /*
              * Note: This tunnels to the unisolated index. This is the one with
              * the performance counters. Since we are only going to access the
