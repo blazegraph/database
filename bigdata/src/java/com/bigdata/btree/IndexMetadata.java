@@ -285,11 +285,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * avoid cache evictions of the leaves participating in a split.
          */
         int MIN_WRITE_RETENTION_QUEUE_CAPACITY = 2;
-        
+
         /**
-         * A reasonable maximum write retention queue capacity.
+         * A large maximum write retention queue capacity. A reasonable value
+         * with a large heap is generally in 8000 to 50000. The larger values
+         * are of benefit only if you are doing sustained writes on the index
+         * and have a large java heap.
          */
-        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 20000;
+        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 500000;
         
          /*
          * Options that apply to FusedViews as well as to AbstractBTrees.
@@ -302,7 +305,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * maintained (default {@value #DEFAULT_BLOOM_FILTER}). When enabled,
          * the bloom filter is effective up to ~ 2M entries per index
          * (partition). For scale-up, the bloom filter is automatically disabled
-         * after its error rate would be too large given the #of index enties.
+         * after its error rate would be too large given the #of index entries.
          * For scale-out, as the index grows we keep splitting it into more and
          * more index partitions, and those index partitions are comprised of
          * both views of one or more {@link AbstractBTree}s. While the mutable
@@ -368,6 +371,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@link IndexSegment}. Any touched node or leaf is placed onto this
          * queue. As nodes and leaves are evicted from this queue, they are then
          * placed onto the optional read-retention queue.
+         * <p>
+         * The default value is a function of the JVM heap size. For small
+         * heaps, it is {@value #DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY}. For
+         * larger heaps the value may be 8000 (1G), or 20000 (10G). These larger
+         * defaults are heuristics. Values larger than 8000 benefit the size of
+         * disk of the journal, while values up to 8000 can also improve
+         * throughput dramatically. Larger values are ONLY useful if the
+         * application is performing sustained writes on the index (hundreds of
+         * thousands to millions of records).
          */
         String WRITE_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
@@ -1946,11 +1958,32 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 new IntegerRangeValidator(Options.MIN_BRANCHING_FACTOR,
                         Options.MAX_BTREE_BRANCHING_FACTOR));
 
-        this.writeRetentionQueueCapacity = getProperty(indexManager,
-                properties, namespace, Options.WRITE_RETENTION_QUEUE_CAPACITY,
-                Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
-                new IntegerRangeValidator(Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY,
-                        Options.MAX_WRITE_RETENTION_QUEUE_CAPACITY));
+        {
+            /*
+             * The default capacity is set dynamically based on the maximum java
+             * heap as specified by -Xmx on the command line. This provides
+             * better ergonomics, but the larger write retention queue capacity
+             * will only benefit applications which perform sustained writes on
+             * the index.
+             */
+            final long maxMemory = Runtime.getRuntime().maxMemory();
+            final String defaultCapacity;
+            if (maxMemory >= Bytes.gigabyte * 10) {
+                defaultCapacity = "20000";
+            } else if (maxMemory >= Bytes.gigabyte * 1) {
+                defaultCapacity = "8000";
+            } else {
+                defaultCapacity = Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY;
+            }
+            this.writeRetentionQueueCapacity = getProperty(indexManager,
+                    properties, namespace,
+                    Options.WRITE_RETENTION_QUEUE_CAPACITY,
+                    defaultCapacity,
+//                    Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
+                    new IntegerRangeValidator(
+                            Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY,
+                            Options.MAX_WRITE_RETENTION_QUEUE_CAPACITY));
+        }
 
         this.writeRetentionQueueScan = getProperty(indexManager,
                 properties, namespace, Options.WRITE_RETENTION_QUEUE_SCAN,
