@@ -354,7 +354,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         if (DEBUG) {
             log.debug("evaluating next join");
         }
-        long minCardinality = Long.MAX_VALUE;
+        long minJoinCardinality = Long.MAX_VALUE;
+        long minTailCardinality = Long.MAX_VALUE;
         Tail minTail = null;
         for (int i = 0; i < tailCount; i++) {
             // only check unused tails
@@ -362,17 +363,26 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 continue;
             }
             Tail tail = new Tail(i, rangeCount(i), getVars(i));
+            long tailCardinality = cardinality(i);
             long joinCardinality = computeJoinCardinality(d1, tail);
             if(DEBUG) log.debug("evaluating " + d1.toJoinString() + " X " + i + ": cardinality= " + joinCardinality);
-            if (joinCardinality < minCardinality) {
+            if (joinCardinality < minJoinCardinality) {
                 if(DEBUG) log.debug("found a new min: " + joinCardinality);
-                minCardinality = joinCardinality;
+                minJoinCardinality = joinCardinality;
+                minTailCardinality = tailCardinality;
                 minTail = tail;
+            } else if (joinCardinality == minJoinCardinality) {
+                if (tailCardinality < minTailCardinality) {
+                    if(DEBUG) log.debug("found a new min: " + joinCardinality);
+                    minJoinCardinality = joinCardinality;
+                    minTailCardinality = tailCardinality;
+                    minTail = tail;
+                }
             }
         }
         // if we are at the "no shared variables" tails, order by range count
-        if (minCardinality == NO_SHARED_VARS) {
-            minCardinality = Long.MAX_VALUE;
+        if (minJoinCardinality == NO_SHARED_VARS) {
+            minJoinCardinality = Long.MAX_VALUE;
             for (int i = 0; i < tailCount; i++) {
                 // only check unused tails
                 if (used[i]) {
@@ -380,9 +390,9 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 }
                 Tail tail = new Tail(i, rangeCount(i), getVars(i));
                 long tailCardinality = cardinality(i);
-                if (tailCardinality < minCardinality) {
+                if (tailCardinality < minJoinCardinality) {
                     if(DEBUG) log.debug("found a new min: " + tailCardinality);
-                    minCardinality = tailCardinality;
+                    minJoinCardinality = tailCardinality;
                     minTail = tail;
                 }
             }            
@@ -391,7 +401,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         Set<String> vars = new HashSet<String>();
         vars.addAll(d1.getVars());
         vars.addAll(minTail.getVars());
-        return new Join(d1, minTail, minCardinality, vars);
+        return new Join(d1, minTail, minJoinCardinality, vars);
     }
     
     /**
