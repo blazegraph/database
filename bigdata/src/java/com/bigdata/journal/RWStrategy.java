@@ -24,13 +24,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.UUID;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.rawstore.AbstractRawStore;
+import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rwstore.RWStore;
 
@@ -40,123 +46,107 @@ import com.bigdata.rwstore.RWStore;
  * 
  * @author mgc
  */
-public class RWStrategy extends AbstractBufferStrategy implements
-IDiskBasedStrategy, IUpdateStore {
+public class RWStrategy extends AbstractRawStore implements
+IDiskBasedStrategy, IUpdateStore, IBufferStrategy, IAddressManager {
 
 	File m_file = null;
 	
 	RWStore m_store = null;
 	
-	RWStrategy(final long maximumExtent, final FileMetadata fileMetadata) {
-
-        super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
-                fileMetadata.nextOffset, fileMetadata.bufferMode,
-                fileMetadata.readOnly);
-
-        m_file = fileMetadata.file;
-        
-        m_store = new RWStore(m_file, false); // not read-only for now
-	}
+//	RWStrategy(final long maximumExtent, final FileMetadata fileMetadata) {
+//
+////        super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
+////                fileMetadata.nextOffset, fileMetadata.bufferMode,
+////                fileMetadata.readOnly);
+//
+//        m_file = fileMetadata.file;
+//        
+//        m_store = new RWStore(m_file, false); // not read-only for now
+//	}
 
 	RWStrategy(File file) {
 
-        super(0L, 200*1000*1000, 32,
-                8 * 1000, BufferMode.DiskRW,
-                false);
+//        super(0L, 200*1000*1000, 32,
+//                8 * 1000, BufferMode.DiskRW,
+//                false);
 
         m_file = file;
         
         m_store = new RWStore(m_file, false); // not read-only for now
 	}
 
-	@Override
 	public FileChannel getChannel() {
 		return m_store.getChannel();
 	}
 
-	@Override
 	public File getFile() {
 		return m_file;
 	}
 
-	@Override
 	public int getHeaderSize() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public RandomAccessFile getRandomAccessFile() {
 		return m_store.getRandomAccessFile();
 	}
 
-	@Override
 	public CounterSet getCounters() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public long getExtent() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public long getUserExtent() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public ByteBuffer readRootBlock(boolean rootBlock0) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
 	public long transferTo(RandomAccessFile out) throws IOException {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	@Override
 	public void truncate(long extent) {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
 	public void writeRootBlock(IRootBlockView rootBlock,
 			ForceEnum forceOnCommitEnum) {
 		rootBlock.asReadOnlyBuffer();
 		
 	}
 
-	@Override
 	public void deleteResources() {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
 	public void force(boolean metadata) {
 		// TODO Auto-generated method stub
 		
 	}
 
-	@Override
 	public boolean isFullyBuffered() {
 		return false;
 	}
 
-	@Override
 	public boolean isStable() {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
 	public ByteBuffer read(long addr) {
 		int rwaddr = decodeAddr(addr);
 		int sze = decodeSize(addr);
@@ -167,7 +157,6 @@ IDiskBasedStrategy, IUpdateStore {
 		return ByteBuffer.wrap(buf);
 	}
 
-	@Override
 	public long write(ByteBuffer data) {
         final int nbytes = data.remaining();
 		long rwaddr = m_store.alloc(data.array(), nbytes);
@@ -194,14 +183,107 @@ IDiskBasedStrategy, IUpdateStore {
 		return (int) (addr & 0xFFFFFFFF);
 	}
 
-	@Override
 	public void update(long addr, int off, ByteBuffer data) {
 		// m_store.
 	}
 
-	@Override
 	public void delete(long addr) {
 		m_store.free(addr);
 	}
+
+    public IAddressManager getAddressManager() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public void closeForWrites() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    public BufferMode getBufferMode() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public long getInitialExtent() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public long getMaximumExtent() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public long getNextOffset() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public void close() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    public void destroy() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    public IResourceMetadata getResourceMetadata() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public UUID getUUID() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public boolean isOpen() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public boolean isReadOnly() {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public long size() {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public int getByteCount(long addr) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public long getOffset(long addr) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public void packAddr(DataOutput out, long addr) throws IOException {
+        // TODO Auto-generated method stub
+        
+    }
+
+    public long toAddr(int nbytes, long offset) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    public String toString(long addr) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public long unpackAddr(DataInput in) throws IOException {
+        // TODO Auto-generated method stub
+        return 0;
+    }
 
 }

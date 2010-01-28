@@ -625,7 +625,6 @@ public class ReplicatedStore implements IRawStore {
     public CounterSet getCounters() {
         return localStore.getCounters();
     }
-	@Override
 	public void delete(long addr) {
 		// TODO Auto-generated method stub
 		
