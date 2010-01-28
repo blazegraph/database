@@ -433,6 +433,12 @@ public class ReplicatedStore implements IRawStore {
         return addr;
         
     }
+    /**
+     * FIXME: Not sure if replication makes sense for re-allocation (mgc)
+     */
+    public long write(ByteBuffer data, long oldAddr) {
+    	return write(data);
+    }
 
     public long getNextOffset() {
 
@@ -619,5 +625,10 @@ public class ReplicatedStore implements IRawStore {
     public CounterSet getCounters() {
         return localStore.getCounters();
     }
+	@Override
+	public void delete(long addr) {
+		// TODO Auto-generated method stub
+		
+	}
 
 }
