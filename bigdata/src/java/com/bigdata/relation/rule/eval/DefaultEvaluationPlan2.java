@@ -285,6 +285,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         }
         long minJoinCardinality = Long.MAX_VALUE;
         long minTailCardinality = Long.MAX_VALUE;
+        long minOtherTailCardinality = Long.MAX_VALUE;
         Tail minT1 = null;
         Tail minT2 = null;
         for (int i = 0; i < tailCount; i++) {
@@ -303,11 +304,13 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 long t2Cardinality = cardinality(j);
                 long joinCardinality = computeJoinCardinality(t1, t2);
                 long tailCardinality = Math.min(t1Cardinality, t2Cardinality);
+                long otherTailCardinality = Math.max(t1Cardinality, t2Cardinality);
                 if(DEBUG) log.debug("evaluating " + i + " X " + j + ": cardinality= " + joinCardinality);
                 if (joinCardinality < minJoinCardinality) {
                     if(DEBUG) log.debug("found a new min: " + joinCardinality);
                     minJoinCardinality = joinCardinality;
                     minTailCardinality = tailCardinality;
+                    minOtherTailCardinality = otherTailCardinality;
                     minT1 = t1;
                     minT2 = t2;
                 } else if (joinCardinality == minJoinCardinality) {
@@ -315,8 +318,18 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                         if(DEBUG) log.debug("found a new min: " + joinCardinality);
                         minJoinCardinality = joinCardinality;
                         minTailCardinality = tailCardinality;
+                        minOtherTailCardinality = otherTailCardinality;
                         minT1 = t1;
                         minT2 = t2;
+                    } else if (tailCardinality == minTailCardinality) {
+                        if (otherTailCardinality < minOtherTailCardinality) {
+                            if(DEBUG) log.debug("found a new min: " + joinCardinality);
+                            minJoinCardinality = joinCardinality;
+                            minTailCardinality = tailCardinality;
+                            minOtherTailCardinality = otherTailCardinality;
+                            minT1 = t1;
+                            minT2 = t2;
+                        }
                     }
                 }
             }
