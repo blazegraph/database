@@ -590,4 +590,10 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
 
+
+	@Override
+	public void delete(long addr) {
+		// TODO Auto-generated method stub
+		
+	}
 }

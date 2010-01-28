@@ -102,6 +102,10 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
 
+    public void delete(long addr) {
+    	// void
+    }
+    
     /**
      * Forces the data to disk.
      */
