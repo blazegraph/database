@@ -2488,7 +2488,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         	return write(data);
         }
 
-		@Override
 		public void delete(long addr) {
 			// void
 			
@@ -2879,7 +2878,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.unpackAddr(in);
         }
 
-		@Override
 		public void delete(long addr) {
 			// TODO Auto-generated method stub
 			
