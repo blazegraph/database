@@ -494,8 +494,9 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                  * will constraint, rather than increase, the multiplicity of
                  * the solutions. However, this COULD lead to pathological cases
                  * where the resulting join plan is WORSE than it would have
-                 * been otherwise. For example, this change produces a 3x
-                 * improvement in the BSBM benchmark results.
+                 * been otherwise. For example, this change produces a 3x to 5x
+                 * improvement in the BSBM benchmark results.  However, it has
+                 * a negative effect on LUBM Q2.  We are working on that.
                  */
                 joinCardinality = 
                     Math.min(d1.getCardinality(), d2.getCardinality());

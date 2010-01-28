@@ -29,7 +29,12 @@ package com.bigdata.rdf.store;
 
 import java.util.Properties;
 
+import com.bigdata.btree.BTree;
+import com.bigdata.btree.BTreeCounters;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITx;
+import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.spo.SPORelation;
 
 /**
  * Abstract base class for both transient and persistent {@link ITripleStore}
@@ -50,6 +55,53 @@ abstract public class AbstractLocalTripleStore extends AbstractTripleStore {
             String namespace, Long timestamp, Properties properties) {
 
         super(indexManager, namespace, timestamp, properties);
+
+    }
+
+    /**
+     * Reports the bytes written on each of the {@link SPORelation} indices and
+     * on each of the {@link LexiconRelation} indices. These performance data
+     * are not restart safe. However, they are help by a hard reference from the
+     * {@link BTree}, and the {@link BTree} instances for these indices are held
+     * by hard references from the {@link SPORelation} and the
+     * {@link LexiconRelation} so the data will remain valid across the life
+     * cycle of a {@link LocalTripleStore} instance, e.g., between restarts.
+     * 
+     * @param sb
+     *            The caller's buffer.
+     * 
+     * @return The caller's buffer.
+     */
+    public StringBuilder getLocalBTreeBytesWritten(final StringBuilder sb) {
+
+        final SPORelation r = getSPORelation();
+        
+        boolean first = true;
+        
+        for (String fqn : r.getIndexNames()) {
+        
+            /*
+             * Note: This tunnels to the unisolated index. This is the one with
+             * the performance counters. Since we are only going to access the
+             * performance counters, this is safe (no concurrent modification).
+             */
+            final BTreeCounters btreeCounters = ((BTree) getIndexManager()
+                    .getIndex(fqn, ITx.UNISOLATED)).getBtreeCounters();
+            
+//            final int leavesSplit = btreeCounters.leavesSplit;
+            final long nodesWritten = btreeCounters.getNodesWritten();
+            final long leavesWritten = btreeCounters.getLeavesWritten();
+            final long bytesWritten = btreeCounters.getBytesWritten();
+
+            sb.append((first ? "" : ", ") + fqn + "{nodes=" + nodesWritten
+                    + ",leaves=" + leavesWritten + ", bytes=" + bytesWritten
+                    + "}");
+
+            first = false;
+
+        }
+
+        return sb;
 
     }
 

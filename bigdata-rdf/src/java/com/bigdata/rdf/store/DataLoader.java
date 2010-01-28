@@ -957,16 +957,17 @@ public class DataLoader {
         // add listener to log progress.
         loader.addRioLoaderListener( new RioLoaderListener() {
             
-            public void processingNotification( RioLoaderEvent e ) {
+            public void processingNotification( final RioLoaderEvent e ) {
                 
-                if (log.isInfoEnabled())
+                if (log.isInfoEnabled()) {
                     log.info
                     ( e.getStatementsProcessed() + 
                       " stmts added in " + 
                       (e.getTimeElapsed() / 1000d) +
                       " secs, rate= " + 
-                      e.getInsertRate() 
+                      e.getInsertRate()
                       );
+                }
                 
             }
             
@@ -1027,8 +1028,14 @@ public class DataLoader {
 
             stats.totalTime = System.currentTimeMillis() - begin;
 
-            if (log.isInfoEnabled())
+            if (log.isInfoEnabled()) {
                 log.info(stats.toString());
+                if (buffer.getDatabase() instanceof AbstractLocalTripleStore) {
+                    log.info(((AbstractLocalTripleStore) buffer.getDatabase())
+                            .getLocalBTreeBytesWritten(new StringBuilder())
+                            .toString());
+                }
+            }
             
             return;
             
