@@ -42,8 +42,8 @@ import com.bigdata.journal.AbstractMROWTestCase;
 import com.bigdata.journal.AbstractRestartSafeTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.DiskOnlyStrategy;
-import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
@@ -137,7 +137,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
         try {
 
-            final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) journal
+            final RWStrategy bufferStrategy = (RWStrategy) journal
                     .getBufferStrategy();
 
             assertTrue("isStable", bufferStrategy.isStable());
@@ -289,7 +289,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             try {
 
-                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+                final RWStrategy bufferStrategy = (RWStrategy) store
                         .getBufferStrategy();
 
                 final int nbytes = 100;
@@ -337,7 +337,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             try {
 
-                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+                final RWStrategy bufferStrategy = (RWStrategy) store
                         .getBufferStrategy();
 
                 final int nbytes = 60;
@@ -407,7 +407,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             try {
 
-                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+                RWStrategy bufferStrategy = (RWStrategy) store
                         .getBufferStrategy();
 
                 final int nbytes = 60;
@@ -479,7 +479,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
             try {
 
-                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+                RWStrategy bufferStrategy = (RWStrategy) store
                         .getBufferStrategy();
 
                 final int nbytes = 60;
