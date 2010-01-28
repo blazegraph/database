@@ -175,7 +175,6 @@ IDiskBasedStrategy, IUpdateStore {
 		return 0;
 	}
 
-	@Override
 	public long allocate(int nbytes) {
 		return encodeAddr(m_store.alloc(nbytes), nbytes);
 	}
