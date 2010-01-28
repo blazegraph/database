@@ -199,4 +199,17 @@
 		</java>
 	</target>
 	
+    <target name="set-properties" depends="compile" description="Set or change properties for a kb instance. The new values are read from stdin.">
+        <java classname="com.bigdata.rdf.sail.BigdataSailHelper"
+              fork="true"
+              failonerror="true"
+              dir="${build.dir}/bin"
+   			  >
+              <arg line="${bsbm.journalFile} LTS kb"/>
+              <classpath>
+                 <path refid="runtime.classpath" />
+              </classpath>
+        </java>
+	</target>
+
 </project>
