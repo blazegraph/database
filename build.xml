@@ -759,4 +759,36 @@ ${postInstallMessage}</echo>
 	
 </target>
 
+<target name="DataLoader" depends="compile" description="Loads RDF data into a local KB.  You MUST edit this ant target before running it.">
+	<java classname="com.bigdata.rdf.store.DataLoader"
+          fork="true"
+          failonerror="true"
+		  >
+		<!-- usage: [-namespace namespace] propertyFile (fileOrDir)+ -->
+		<!-- Where:                                                  -->
+		<!-- [-namespace namespace] is the KB namespace (default is 'kb'). -->
+		<!-- propertyFile is a properties file identifying the Journal and
+		     giving various Journal and/or kb configuration properties if one
+		     or the other needs to be created. -->
+		<!-- (fileOrDir)+ is a list of one or more RDF files or directories to
+		     be loaded.  zip and gz extensions are recognized, but only one file
+		     is loaded per archive. -->
+		<arg line="custom.properties fileOrDir"/>
+		<jvmarg value="-server"/>
+		<!-- Specify the maximum Java heap size. -->
+		<jvmarg value="-Xmx10g"/>
+		<!-- optionally enable yourkit profiler. 
+        <jvmarg value="-agentpath:/nas/install/yjp-8.0.20/bin/linux-x86-64/libyjpagent.so"/>
+        <jvmarg value="-agentlib:yjpagent=disableexceptiontelemetry,disablestacktelemetry"/>
+        -->
+		<jvmarg value="-XX:+UseParallelOldGC"/>
+		<!-- Optional enable GC trace.
+		<jvmarg line="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:jvm_gc.log"/>
+		-->
+		<classpath>
+			<path refid="runtime.classpath" />
+        </classpath>
+	</java>
+</target>
+
 </project>
