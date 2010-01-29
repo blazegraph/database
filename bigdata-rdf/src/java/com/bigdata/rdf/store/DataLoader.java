@@ -30,6 +30,7 @@ package com.bigdata.rdf.store;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,6 +38,8 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipInputStream;
@@ -44,6 +47,8 @@ import java.util.zip.ZipInputStream;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.load.IStatementBufferFactory;
@@ -1152,5 +1157,172 @@ public class DataLoader {
         return stats;
         
     }
+
+    /**
+     * Utility method may be used to create and/or load RDF data into a local
+     * database instance. Directories will be recursively processed. The data
+     * files may be compressed using zip or gzip, but the loader does not
+     * support multiple data files within a single archive.
+     * 
+     * @param args
+     *            [-namespace <i>namespace</i>] propertyFile (fileOrDir)+
+     * 
+     * @throws IOException
+     */
+    public static void main(final String[] args) throws IOException {
+
+        // default namespace.
+        String namespace = "kb";
+        
+        int i = 0;
+
+        while (i < args.length) {
+            
+            final String arg = args[i];
+            
+            if(arg.startsWith("-")) {
+                
+                if(arg.equals("-namespace")) {
+        
+                    namespace = args[++i];
+                    
+                } else {
+                    
+                    System.err.println("Unknown argument: " + arg);
+                    
+                    usage();
+                    
+                }
+                
+            } else {
+                
+                break;
+
+            }
+            
+            i++;
+            
+        }
+        
+        final int remaining = args.length - i;
+
+        if (remaining < 2) {
+
+            System.err.println("Not enough arguments.");
+
+            usage();
+
+        }
+
+        final File propertyFile = new File(args[i++]);
+
+        if (!propertyFile.exists()) {
+
+            throw new FileNotFoundException(propertyFile.toString());
+
+        }
+
+        final Properties properties = new Properties();
+        {
+            System.out.println("Reading properties: "+propertyFile);
+            final InputStream is = new FileInputStream(propertyFile);
+            try {
+                properties.load(is);
+            } finally {
+                if (is != null) {
+                    is.close();
+                }
+            }
+        }
+
+        final List<File> files = new LinkedList<File>();
+        while(i<args.length) {
+            
+            final File fileOrDir = new File(args[i++]);
+            
+            if(!fileOrDir.exists()) {
+                
+                throw new FileNotFoundException(fileOrDir.toString());
+                
+            }
+            
+            files.add(fileOrDir);
+            
+            System.out.println("Will load from: " + fileOrDir);
+
+        }
+            
+        Journal jnl = null;
+        try {
+
+            jnl = new Journal(properties);
+            
+            System.out.println("Journal file: "+jnl.getFile());
+
+            AbstractTripleStore kb = (AbstractTripleStore) jnl
+                    .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (kb == null) {
+
+                kb = new LocalTripleStore(jnl, namespace, Long
+                        .valueOf(ITx.UNISOLATED), properties);
+
+                kb.create();
+                
+            }
+
+            for (File fileOrDir : files) {
+
+                kb.getDataLoader().loadFiles(fileOrDir, null/* baseURI */,
+                        null/* rdfFormat */, filter);
+
+            }
+            
+        } finally {
+
+            if (jnl != null) {
+
+                jnl.close();
+
+            }
+            
+        }
+
+    }
+
+    private static void usage() {
+        
+        System.err.println("usage: [-namespace namespace] propertyFile (fileOrDir)+");
+
+        System.exit(1);
+        
+    }
+
+    /**
+     * Note: The filter is chosen to select RDF data files and to allow the data
+     * files to use owl, ntriples, etc as their file extension.  gzip and zip
+     * extensions are also supported.
+     */
+    final private static FilenameFilter filter = new FilenameFilter() {
+
+        public boolean accept(File dir, String name) {
+
+            if(new File(dir,name).isDirectory()) {
+                
+                // visit subdirectories.
+                return true;
+                
+            }
+
+            // if recognizable as RDF.
+            return RDFFormat.forFileName(name) != null
+                    || (name.endsWith(".zip") && RDFFormat.forFileName(name
+                            .substring(0, name.length() - 4)) != null)
+                    || (name.endsWith(".gz") && RDFFormat.forFileName(name
+                            .substring(0, name.length() - 3)) != null);
+
+        }
+
+    };
     
 }
