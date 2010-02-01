@@ -48,6 +48,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -75,6 +76,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
@@ -86,6 +88,8 @@ import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -1055,6 +1059,16 @@ public class SPORelation extends AbstractRelation<ISPO> {
          * on allocation costs, formatting the from/to keys, etc.
          */
 
+        if (predicate.getPartitionId() != -1) {
+
+            /*
+             * Note: This handles a read against a local index partition.
+             */
+
+            return getAccessPathForIndexPartition(predicate);
+
+        }
+
         return _getAccessPath(predicate);
               
     }
@@ -1079,6 +1093,101 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+
+    /**
+     * This handles a request for an access path that is restricted to a
+     * specific index partition.
+     * <p>
+     * Note: This path is used with the scale-out JOIN strategy, which
+     * distributes join tasks onto each index partition from which it needs to
+     * read. Those tasks constrain the predicate to only read from the index
+     * partition which is being serviced by that join task.
+     * <p>
+     * Note: Since the relation may materialize the index views for its various
+     * access paths, and since we are restricted to a single index partition and
+     * (presumably) an index manager that only sees the index partitions local
+     * to a specific data service, we create an access path view for an index
+     * partition without forcing the relation to be materialized.
+     * 
+     * @todo caching for the access path?
+     */
+    private IAccessPath<ISPO> getAccessPathForIndexPartition(
+            final IPredicate<ISPO> predicate) {
+        
+        final IIndexManager indexManager = getIndexManager();
+
+        if (indexManager instanceof IBigdataFederation) {
+       
+            /*
+             * This will happen if you fail to re-create the JoinNexus
+             * within the target execution environment.
+             * 
+             * This is disallowed because the predicate specifies an index
+             * partition and expects to have access to the local index
+             * objects for that index partition. However, the index
+             * partition is only available when running inside of the
+             * ConcurrencyManager and when using the IndexManager exposed by
+             * the ConcurrencyManager to its tasks.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+
+        if (predicate.getRelationCount() != 1) {
+
+            /*
+             * This is disallowed. The predicate must be reading on a single
+             * local index partition, not a view comprised of more than one
+             * index partition.
+             * 
+             * @todo In fact, we could allow a view here as long as all parts of
+             * the view are local. That would be relevant when the other view
+             * component was a shard of a focusStore for parallel decomposition
+             * of RDFS closure, etc.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        final String namespace = getNamespace();//predicate.getOnlyRelationName();
+
+        /*
+         * Find the best access path for that predicate.
+         */
+        final SPOKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate,
+                keyArity);
+
+        // The name of the desired index partition.
+        final String name = DataService.getIndexPartitionName(namespace + "."
+                + keyOrder.getIndexName(), predicate.getPartitionId());
+
+        /*
+         * Note: whether or not we need both keys and values depends on the
+         * specific index/predicate.
+         * 
+         * Note: If the timestamp is a historical read, then the iterator will
+         * be read only regardless of whether we specify that flag here or not.
+         */
+//      * Note: We can specify READ_ONLY here since the tail predicates are not
+//      * mutable for rule execution.
+        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;// | IRangeQuery.READONLY;
+
+        final long timestamp = getTimestamp();//getReadTimestamp();
+        
+//        final IIndex ndx = indexManager.getIndex(name, timestamp);
+        
+        // MUST be a local index view.
+        final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
+                .getIndex(name, timestamp);
+
+        return new SPOAccessPath(indexManager, timestamp, predicate,
+                keyOrder, ndx, flags, getChunkOfChunksCapacity(),
+                getChunkCapacity(), getFullyBufferedReadThreshold()).init();
+
+    }
+    
     /**
      * Core impl.
      * 

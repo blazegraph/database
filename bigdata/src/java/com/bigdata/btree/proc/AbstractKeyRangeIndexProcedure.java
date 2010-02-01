@@ -67,8 +67,9 @@ abstract public class AbstractKeyRangeIndexProcedure extends
         
     }
     
-    public AbstractKeyRangeIndexProcedure(byte[] fromKey,byte[] toKey) {
-        
+    public AbstractKeyRangeIndexProcedure(final byte[] fromKey,
+            final byte[] toKey) {
+
         this.fromKey = fromKey;
         
         this.toKey = toKey;

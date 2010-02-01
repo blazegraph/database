@@ -48,6 +48,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
@@ -400,16 +401,41 @@ public interface IJoinNexus {
      */
     IRelation getTailRelationView(IPredicate pred);
 
-	/**
-	 * Obtain an access path reading from the view for the relation associated
-	 * with the specified predicate (from the tail of some rule).
-	 * 
-	 * @param pred
-	 *            The predicate.
-	 * 
-	 * @return The access path.
-	 */
+    /**
+     * Obtain an access path reading from the view for the relation associated
+     * with the specified predicate (from the tail of some rule).
+     * 
+     * @param pred
+     *            The predicate.
+     * 
+     * @return The access path.
+     * 
+     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)} which
+     *             factors out obtaining the {@link IRelation} view into the
+     *             caller, which turns out to be a significant cost savings.
+     */
     IAccessPath getTailAccessPath(IPredicate pred);
+
+    /**
+     * Obtain an access path reading from relation for the specified predicate
+     * (from the tail of some rule).
+     * <p>
+     * Note that passing in the {@link IRelation} is important since it
+     * otherwise must be discovered using the {@link IResourceLocator}. By
+     * requiring the caller to resolve it before hand and pass it into this
+     * method the contention and demand on the {@link IResourceLocator} cache is
+     * reduced.
+     * 
+     * @param relation
+     *            The relation.
+     * @param pred
+     *            The predicate. When {@link IPredicate#getPartitionId()} is
+     *            set, the returned {@link IAccessPath} MUST read on the
+     *            identified local index partition (directly, not via RMI).
+     * 
+     * @return The access path.
+     */
+    IAccessPath getTailAccessPath(IRelation relation, IPredicate pred);
     
     /**
      * Return an iterator visiting the {@link PartitionLocator} for the index

@@ -51,6 +51,11 @@ import com.bigdata.io.DataOutputBuffer;
  */
 public class ConditionalRabaCoder implements IRabaCoder, Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 167667045118062564L;
+    
     private int bigSize;
     private IRabaCoder smallCoder;
     private IRabaCoder bigCoder;

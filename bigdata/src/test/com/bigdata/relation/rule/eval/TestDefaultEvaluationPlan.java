@@ -289,6 +289,11 @@ public class TestDefaultEvaluationPlan extends TestCase2 {
             return null;
         }
 
+        public IAccessPath getTailAccessPath(IRelation rel, IPredicate pred) {
+
+            return null;
+        }
+
         public IRelation getTailRelationView(IPredicate pred) {
 
             return null;

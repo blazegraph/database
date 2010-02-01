@@ -60,7 +60,7 @@ public class DefaultRangeCountFactory implements IRangeCountFactory {
     
     private final IJoinNexus joinNexus;
     
-    public DefaultRangeCountFactory(IJoinNexus joinNexus) {
+    public DefaultRangeCountFactory(final IJoinNexus joinNexus) {
         
         if (joinNexus == null)
             throw new IllegalArgumentException();
@@ -80,7 +80,7 @@ public class DefaultRangeCountFactory implements IRangeCountFactory {
      * 
      * @return The range count for that tail predicate.
      */
-    public long rangeCount(IPredicate predicate) {
+    public long rangeCount(final IPredicate predicate) {
 
         final IAccessPath accessPath = joinNexus.getTailAccessPath(predicate);
 

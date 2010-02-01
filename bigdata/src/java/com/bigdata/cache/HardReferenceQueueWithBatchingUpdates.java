@@ -76,6 +76,11 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
     private final int threadLocalTryLockSize;
 
     /**
+     * Optional listener is notified when updates are batched through.
+     */
+    private final IBatchedUpdateListener batchedUpdatedListener;
+    
+    /**
      * Lock used to synchronize operations on the {@link #sharedQueue}.
      */
     private final ReentrantLock lock = new ReentrantLock(false/* fair */);
@@ -108,8 +113,11 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             this(//
                     new HardReferenceQueue<T>(listener, capacity, 0/* nscan */),
 //                    listener, capacity,
-                IHardReferenceQueue.DEFAULT_NSCAN/* threadLocalNScan */,
-                64/* threadLocalCapacity */, 32/* threadLocalTryLockSize */);
+                IHardReferenceQueue.DEFAULT_NSCAN,// threadLocalNScan
+                64,// threadLocalCapacity
+                32, // threadLocalTryLockSize
+                null // batched update listener
+                );
 
     }
 
@@ -136,7 +144,8 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
 //            final int capacity,//
             final int threadLocalQueueNScan,//
             final int threadLocalQueueCapacity,//
-            final int threadLocalTryLockSize//
+            final int threadLocalTryLockSize,//
+            final IBatchedUpdateListener batchedUpdateListener//
             ) {
 
         if (sharedQueue == null)
@@ -164,6 +173,8 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
 
         this.threadLocalTryLockSize = threadLocalQueueCapacity;
 
+        this.batchedUpdatedListener = batchedUpdateListener;
+        
         this.threadLocalQueueEvictionListener = new HardReferenceQueueEvictionListener<T>() {
 
             /**
@@ -214,7 +225,9 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             if (threadLocalQueues.put(t, tmp = new BatchQueue<T>(
                     threadLocalQueueNScan, threadLocalQueueCapacity,
                     threadLocalTryLockSize, lock,
-                    threadLocalQueueEvictionListener)) != null) {
+                    threadLocalQueueEvictionListener,
+                    batchedUpdatedListener
+                    )) != null) {
                 
                 /*
                  * Note: Since the key is the thread it is not possible for there to
@@ -410,13 +423,15 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
         private final int tryLockSize;
         private final Lock lock;
         private final HardReferenceQueueEvictionListener<T> listener;
+        private final IBatchedUpdateListener batchedUpdatedListener;
 
         public BatchQueue(
                 final int nscan,//
                 final int capacity,//
                 final int tryLockSize, //
                 final ReentrantLock lock,//
-                final HardReferenceQueueEvictionListener<T> listener//
+                final HardReferenceQueueEvictionListener<T> listener,//
+                final IBatchedUpdateListener batchedUpdateListener//
                 ) {
 
             super(capacity);
@@ -428,6 +443,8 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
             this.lock = lock;
             
             this.listener = listener;
+
+            this.batchedUpdatedListener = batchedUpdateListener;
 
         }
 
@@ -513,6 +530,12 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
 
 //                        assert size == 0 : "size=" + size;
 
+                        if (batchedUpdatedListener != null) {
+
+                            batchedUpdatedListener.didBatchUpdates();
+
+                        }
+                        
                     } finally {
 
                         lock.unlock();
@@ -540,6 +563,12 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
                     evictAll(true/* clearRefs */);
 
 //                    assert size == 0 : "size=" + size;
+
+                    if (batchedUpdatedListener != null) {
+
+                        batchedUpdatedListener.didBatchUpdates();
+
+                    }
 
                 } finally {
 
@@ -632,4 +661,15 @@ public class HardReferenceQueueWithBatchingUpdates<T> implements
 
     }
 
+    /**
+     * This callback is invoked when updates are batched through from the
+     * thread-local queue to the shared queue. The default implementation does
+     * nothing.
+     */
+    interface IBatchedUpdateListener {
+       
+        void didBatchUpdates();
+        
+    }
+    
 }

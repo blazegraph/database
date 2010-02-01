@@ -51,6 +51,11 @@ import com.bigdata.rawstore.Bytes;
  */
 public class SimpleRabaCoder implements IRabaCoder, Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 3385188183979794781L;
+
     private static final byte VERSION0 = 0x00;
 
     public static transient final SimpleRabaCoder INSTANCE = new SimpleRabaCoder();

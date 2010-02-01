@@ -211,6 +211,8 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
     private static final transient boolean debug = log.isDebugEnabled();
 
+    private static final long serialVersionUID = -9207148905767204181L;
+    
     /**
      * The original serialization version for the coded data record.
      */

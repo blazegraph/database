@@ -111,7 +111,9 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
                 new HardReferenceQueue<String>(listener, capacity, 0/* nscan */),
 //                listener, capacity,
                 threadLocalNSCan, threadLocalQueueCapacity,
-                threadLocalTryLockSize);
+                threadLocalTryLockSize,
+                null// batched updates listener.
+                );
 
         // add ref, but not batched through.
         q.add(ref0);
@@ -269,8 +271,9 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
         final HardReferenceQueueWithBatchingUpdates<Object> queue = new HardReferenceQueueWithBatchingUpdates<Object>(
                 new HardReferenceQueue<Object>(null/*listener*/, capacity, 0/* nscan */),
 //                null/* listener */, capacity, 
-                threadLocalNScan,
-                threadLocalQueueCapacity, threadLocalTryLockSize);
+                threadLocalNScan, threadLocalQueueCapacity,
+                threadLocalTryLockSize, null// batched updates listener
+                );
 
         final ExecutorService service = Executors.newFixedThreadPool(
                 threadPoolSize, new DaemonThreadFactory(getName()));
