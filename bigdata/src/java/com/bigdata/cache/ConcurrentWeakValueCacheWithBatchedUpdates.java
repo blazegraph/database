@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.cache.HardReferenceQueueWithBatchingUpdates.IBatchedUpdateListener;
+
 /**
  * A low-contention/high concurrency weak value cache. This class can offer
  * substantially less lock contention and hence greater performance than the
@@ -274,7 +276,20 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
                 queue, // sharedQueue
                 10, // threadLocalQueueNScan
                 64, // threadLocalQueueCapacity
-                32 // threadLocalTryLockSize
+                32, // threadLocalTryLockSize
+                new IBatchedUpdateListener() {
+                    /**
+                     * Since processing the ReferenceQueue requires a lock, we
+                     * let the thread which batches the access order updates
+                     * remove entries for cleared references. [Historically this
+                     * task was handled by the thread modifying the map in put()
+                     * and putIfAbsent(), which caused contention for the lock
+                     * inside of the ReferenceQueue.]
+                     */
+                    public void didBatchUpdates() {
+                        removeClearedEntries();
+                    }
+                }
                 );
         
         /*
@@ -421,7 +436,7 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
      */
     public V put(final K k, final V v) {
 
-        try {
+//        try {
             
             // new reference.
             final WeakReference<V> ref = newWeakRef(k, v, referenceQueue);
@@ -454,11 +469,11 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
 
             return oldVal;
             
-        } finally {
-            
-            removeClearedEntries();
-
-        }
+//        } finally {
+//            
+//            removeClearedEntries();
+//
+//        }
         
     }
 
@@ -479,7 +494,7 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
      */
     public V putIfAbsent(final K k, final V v) {
 
-        try {
+//        try {
 
             // new reference.
             final WeakReference<V> ref = newWeakRef(k, v, referenceQueue);
@@ -565,11 +580,11 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
 
             return oldVal;
 
-        } finally {
-
-            removeClearedEntries();
-
-        }
+//        } finally {
+//
+//            removeClearedEntries();
+//
+//        }
 
     }
 
@@ -604,7 +619,7 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
     
     public V remove(final K k) {
 
-        try {
+//        try {
 
             final WeakReference<V> ref = removeMapEntry(k);
 
@@ -616,19 +631,24 @@ public class ConcurrentWeakValueCacheWithBatchedUpdates<K, V> implements
 
             return null;
 
-        } finally {
-
-            removeClearedEntries();
-
-        }
+//        } finally {
+//
+//            removeClearedEntries();
+//
+//        }
         
     }
-    
+
     /**
      * <p>
      * Remove any entries whose weak reference has been cleared from the
-     * {@link #map}. This method does not block and only polls the
-     * {@link ReferenceQueue}.
+     * {@link #map}. This method polls the {@link ReferenceQueue}, but the
+     * {@link ReferenceQueue} uses an internal lock so this does impose
+     * synchronization on the callers. For that reason, this method is now
+     * invoked from an {@link IBatchedUpdateListener} which is called when the
+     * access order updates are batched for a given thread. This does not
+     * eliminate the possibility of synchronization costs inside of
+     * {@link ReferenceQueue}, but it should dramatically reduce those costs.
      * </p>
      * <p>
      * Note: This method does not clear entries from the hard reference queue

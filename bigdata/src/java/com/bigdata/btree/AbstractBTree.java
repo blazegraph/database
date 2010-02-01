@@ -760,7 +760,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 //                    metadata.getWriteRetentionQueueCapacity(),// shared capacity
                     metadata.getWriteRetentionQueueScan(),// thread local
                     128,//64, // thread-local queue capacity @todo config
-                    64//32 // thread-local tryLock size @todo config
+                    64, //32 // thread-local tryLock size @todo config
+                    null // batched updates listener.
             );
 
         }

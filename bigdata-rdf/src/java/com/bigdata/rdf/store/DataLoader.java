@@ -234,7 +234,7 @@ public class DataLoader {
         if (buffer != null) {
 
             if(log.isInfoEnabled())
-                log.info("");
+                log.info("Flushing the buffer.");
             
             buffer.flush();
             
@@ -1257,6 +1257,8 @@ public class DataLoader {
 
             jnl = new Journal(properties);
             
+            final long firstOffset = jnl.getRootBlockView().getNextOffset();
+            
             System.out.println("Journal file: "+jnl.getFile());
 
             AbstractTripleStore kb = (AbstractTripleStore) jnl
@@ -1271,12 +1273,23 @@ public class DataLoader {
                 
             }
 
+            final DataLoader dataLoader = kb.getDataLoader();
+            
             for (File fileOrDir : files) {
 
-                kb.getDataLoader().loadFiles(fileOrDir, null/* baseURI */,
+                dataLoader.loadFiles(fileOrDir, null/* baseURI */,
                         null/* rdfFormat */, filter);
 
             }
+            
+            dataLoader.endSource();
+            
+            jnl.commit();
+            
+            final long lastOffset = jnl.getRootBlockView().getNextOffset();
+
+            System.out.println("Wrote: " + (lastOffset - firstOffset)
+                    + " bytes.");
             
         } finally {
 

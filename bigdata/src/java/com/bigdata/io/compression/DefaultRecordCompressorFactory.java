@@ -43,6 +43,11 @@ import java.util.zip.Deflater;
 public class DefaultRecordCompressorFactory implements
         IRecordCompressorFactory<RecordCompressor>, Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 6440561103264583846L;
+
     private int level;
 
     /**

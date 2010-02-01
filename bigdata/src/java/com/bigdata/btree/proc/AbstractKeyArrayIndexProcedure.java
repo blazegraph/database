@@ -447,6 +447,11 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      */
     public static class ResultBuffer implements Externalizable {
         
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3545214696708412869L;
+
         private IRaba vals;
 
         private IRabaCoder valsCoder;
@@ -581,6 +586,11 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      * @version $Id$
      */
     public static class ResultBitBuffer implements Externalizable {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 1918403771057371471L;
 
         private int n;
 

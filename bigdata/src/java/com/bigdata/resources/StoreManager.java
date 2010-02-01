@@ -467,6 +467,9 @@ abstract public class StoreManager extends ResourceEvents implements
      * {@link IResourceMetadata} object describing that index segment. This map
      * is used to provide some basic reporting but is primarily used to delete
      * index segment resources once they are no longer required.
+     * 
+     * @todo Is this strictly necessary? Do we have all the necessary
+     *       information in the journals?  Review the logic and decide.
      */
     final private IndexSegmentIndex segmentIndex;
 

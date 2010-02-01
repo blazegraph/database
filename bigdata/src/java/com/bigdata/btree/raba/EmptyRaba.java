@@ -6,8 +6,8 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.util.Iterator;
-
 
 import cutthecrap.utils.striterators.EmptyIterator;
 
@@ -37,7 +37,12 @@ public abstract class EmptyRaba implements IRaba, Externalizable {
      * @version $Id$
      */
     public static class EmptyKeysRaba extends EmptyRaba {
-        
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = -1171667811365413307L;
+
         /**
          * De-serialization ctor.
          */
@@ -61,6 +66,11 @@ public abstract class EmptyRaba implements IRaba, Externalizable {
      */
     public static class EmptyValuesRaba extends EmptyRaba {
         
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 858342963304055608L;
+
         /**
          * De-serialization ctor.
          */

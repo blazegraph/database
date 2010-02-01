@@ -4,6 +4,7 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
@@ -184,10 +185,12 @@ public class RuleState implements IRuleState {
 
             final IPredicate pred = rule.getTail(tailIndex);
 
+            final IRelation rel = joinNexus.getTailRelationView(pred);
+            
             final IPredicate asBound = pred.asBound(bindingSet);
             
             final IKeyOrder keyOrder = joinNexus.getTailAccessPath(
-                    asBound).getKeyOrder();
+                    rel, asBound).getKeyOrder();
 
             if (DEBUG)
                 log.debug("keyOrder=" + keyOrder + ", orderIndex=" + orderIndex

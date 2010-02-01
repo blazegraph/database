@@ -50,6 +50,11 @@ import com.bigdata.io.DataOutputBuffer;
  */
 public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -8011456562258609162L;
+
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 

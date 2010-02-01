@@ -55,6 +55,11 @@ import com.bigdata.io.DataOutputBuffer;
 public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = -2225107318522852096L;
+
     protected static final Logger log = Logger
             .getLogger(DefaultLeafCoder.class);
 

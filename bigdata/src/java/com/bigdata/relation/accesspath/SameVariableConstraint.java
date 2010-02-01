@@ -40,6 +40,11 @@ public class SameVariableConstraint<E> implements IElementFilter<E>,
         Externalizable {
 
     /**
+     * 
+     */
+    private static final long serialVersionUID = 7284343752802648779L;
+
+    /**
      * The predicate template.
      */
     private IPredicate<E> p;

@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.magic;
 
+import java.io.Externalizable;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
@@ -57,7 +59,11 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * handle the overflow flag and the optional statement identifier correctly.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: MagicIndexWriteProc.java 2265 2009-10-26 12:51:06Z thompsonbry
+ *          $
+ * 
+ *          FIXME This does not implement {@link Externalizable} and does not
+ *          declare a serialVersionId.
  */
 public class MagicIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
