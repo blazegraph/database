@@ -30,15 +30,19 @@ package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.keys.ISortKeyBuilder;
+import com.bigdata.config.Configuration;
+import com.bigdata.config.IValidator;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -145,9 +149,38 @@ public interface IJoinNexus {
      * This value should on the order of {@link #getChunkCapacity()}.
      * 
      * @see IAccessPath#iterator(int, int)
+     * @see AbstractResource.Options#FULLY_BUFFERED_READ_THRESHOLD
      */
     int getFullyBufferedReadThreshold();
-    
+
+    /**
+     * Resolve the property value using the {@link IIndexManager}, the namespace
+     * of the resource, and the {@link Properties} instance to be tested as
+     * hidden parameters.
+     * 
+     * @param name
+     *            The property name.
+     * @param defaultValue
+     *            The default.
+     * 
+     * @return The resolved property value.
+     * 
+     * @see Configuration
+     */
+    String getProperty(final String name, final String defaultValue);
+
+    /**
+     * Resolves, parses, and validates the property value.
+     * 
+     * @param name
+     *            The property name.
+     * @param defaultValue
+     *            The default value.
+     * @return
+     */
+    <T> T getProperty(final String name, final String defaultValue,
+            IValidator<T> validator);
+
     /**
      * Binds variables from a visited element.
      * <p>

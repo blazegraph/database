@@ -39,12 +39,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.DelegateSortKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.config.Configuration;
+import com.bigdata.config.IValidator;
+import com.bigdata.config.IntegerValidator;
+import com.bigdata.config.LongValidator;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ConcurrencyManager;
@@ -59,14 +61,14 @@ import com.bigdata.rdf.magic.MagicTuple;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOAccessPath;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOSortKeyBuilder;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
+import com.bigdata.relation.AbstractResource.Options;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -119,7 +121,6 @@ import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
@@ -185,10 +186,6 @@ public class RDFJoinNexus implements IJoinNexus {
     
     private final long readTimestamp;
 
-    private final boolean forceSerialExecution;
-    
-    private final int maxParallelSubqueries;
-    
     private final boolean justify;
     
     /**
@@ -197,15 +194,23 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     private final boolean backchain;
 
+    private final int chunkCapacity;
     private final int chunkOfChunksCapacity;
+    private final boolean forceSerialExecution;
+    private final int maxParallelSubqueries;
+    private final int fullyBufferedReadThreshold;
+    private final long chunkTimeout;
+
+    /**
+     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
+     */
+    private static final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
     public int getChunkOfChunksCapacity() {
 
         return chunkOfChunksCapacity;
         
     }
-    
-    private final int chunkCapacity;
 
     public int getChunkCapacity() {
 
@@ -213,21 +218,31 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
     
-    private final long chunkTimeout;
-
-    /**
-     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
-     */
-    private final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
-    
-    private final int fullyBufferedReadThreshold;
-
     public int getFullyBufferedReadThreshold() {
         
         return fullyBufferedReadThreshold;
         
     }
-    
+
+    public String getProperty(final String name, final String defaultValue) {
+
+        // @todo pass namespace in with the RDFJoinNexusFactory?
+        return Configuration.getProperty(indexManager,
+                joinNexusFactory.properties, null/* namespace */, name,
+                defaultValue);
+
+    }
+
+    public <T> T getProperty(final String name, final String defaultValue,
+            final IValidator<T> validator) {
+
+        // @todo pass namespace in with the RDFJoinNexusFactory?
+        return Configuration.getProperty(indexManager,
+                joinNexusFactory.properties, null/* namespace */, name,
+                defaultValue, validator);
+
+    }
+
     private final int solutionFlags;
     
     @SuppressWarnings("unchecked")
@@ -316,13 +331,13 @@ public class RDFJoinNexus implements IJoinNexus {
          * 
          * @param indexManager
          *            When non-<code>null</code>, this is used to resolve
-         *            the term identifers in the {@link IPredicate}s in the
+         *            the term identifiers in the {@link IPredicate}s in the
          *            tail of the rule to {@link BigdataValue}s.
          * 
          * @param ruleState
          */
-        public RDFRuleStats(IIndexManager indexManager, long timestamp,
-                IRuleState ruleState) {
+        public RDFRuleStats(final IIndexManager indexManager,
+                final long timestamp, final IRuleState ruleState) {
 
             super(ruleState);
 
@@ -432,22 +447,61 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.readTimestamp = joinNexusFactory.readTimestamp;
 
-        this.forceSerialExecution = joinNexusFactory.forceSerialExecution;
-        
-        this.maxParallelSubqueries = joinNexusFactory.maxParallelSubqueries;
-        
         this.justify = joinNexusFactory.justify;
- 
+        
         this.backchain = joinNexusFactory.backchain;
         
-        this.chunkOfChunksCapacity = joinNexusFactory.chunkOfChunksCapacity;
-        
-        this.chunkCapacity = joinNexusFactory.chunkCapacity;
+//        this.forceSerialExecution = joinNexusFactory.forceSerialExecution;
+//        
+//        this.maxParallelSubqueries = joinNexusFactory.maxParallelSubqueries;
+//        
+//        this.chunkOfChunksCapacity = joinNexusFactory.chunkOfChunksCapacity;
+//        
+//        this.chunkCapacity = joinNexusFactory.chunkCapacity;
+//
+//        this.chunkTimeout = joinNexusFactory.chunkTimeout;
+//        
+//        this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
 
-        this.chunkTimeout = joinNexusFactory.chunkTimeout;
-        
-        this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
-        
+        forceSerialExecution = Boolean.parseBoolean(getProperty(
+                AbstractResource.Options.FORCE_SERIAL_EXECUTION,
+                AbstractResource.Options.DEFAULT_FORCE_SERIAL_EXECUTION));
+
+        maxParallelSubqueries = getProperty(
+                AbstractResource.Options.MAX_PARALLEL_SUBQUERIES,
+                AbstractResource.Options.DEFAULT_MAX_PARALLEL_SUBQUERIES,
+                IntegerValidator.GTE_ZERO);
+
+        /*
+         * FIXME You can not override the rule execution model yet
+         * (nestedSubquery vs pipeline). This is currently a separate field on
+         * RDFJoinNexus.
+         */
+//        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
+//                .isScaleOut());
+//
+//        nestedSubquery = Boolean.parseBoolean(getProperty(
+//                AbstractResource.Options.NESTED_SUBQUERY, Boolean
+//                        .toString(!pipelineIsBetter)));
+
+        chunkOfChunksCapacity = getProperty(
+                AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY,
+                AbstractResource.Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY,
+                IntegerValidator.GT_ZERO);
+
+        chunkCapacity = getProperty(AbstractResource.Options.CHUNK_CAPACITY,
+                AbstractResource.Options.DEFAULT_CHUNK_CAPACITY,
+                IntegerValidator.GT_ZERO);
+
+        chunkTimeout = getProperty(AbstractResource.Options.CHUNK_TIMEOUT,
+                AbstractResource.Options.DEFAULT_CHUNK_TIMEOUT,
+                LongValidator.GTE_ZERO);
+
+        fullyBufferedReadThreshold = getProperty(
+                AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD,
+                AbstractResource.Options.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD,
+                IntegerValidator.GT_ZERO);
+
         this.solutionFlags = joinNexusFactory.solutionFlags;
 
         this.filter = joinNexusFactory.filter;
@@ -660,34 +714,9 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final String relationName = pred.getOnlyRelationName();
 
-//            synchronized (relationLock) {
-//                /*
-//                 * Cache optimization for the last relation returned.
-//                 * 
-//                 * @todo could scan list of up to N ~= 7 relations and that
-//                 * might also beat the hash map. Could also optimize for the
-//                 * case with two relations in the view (truth maintenance). also
-//                 * explore optimizing this call out of the caller since they
-//                 * should be able to reuse the result in a given join context.
-//                 */
-//                if (relationName == lastRelationName
-//                        || relationName.equals(lastRelationName))
-//                    return lastRelation;
-//
-////              final long timestamp = getReadTimestamp(/*relationName*/);
-
-                // hotspot on locate(name,ts)
-                relation = (IRelation) resourceLocator.locate(relationName,
-                        readTimestamp);
+            relation = (IRelation) resourceLocator.locate(relationName,
+                    readTimestamp);
                 
-////                System.err.println(pred.toString());
-//                
-//                lastRelationName = relationName;
-//                
-//                lastRelation = relation;
-//
-//            }
-            
         } else if (nsources == 2) {
 
             final String relationName0 = pred.getRelationName(0);
@@ -721,10 +750,6 @@ public class RDFJoinNexus implements IJoinNexus {
         return relation;
         
     }
-//    // FIXME we need to cache at least 2 relations for truth maintenance.
-//    private transient final Object relationLock = new Object();
-//    private transient String lastRelationName = null;
-//    private transient IRelation lastRelation = null;
 
     /**
      * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)}
@@ -734,7 +759,6 @@ public class RDFJoinNexus implements IJoinNexus {
     public IAccessPath getTailAccessPath(final IPredicate predicate) {
      
         // Resolve the relation name to the IRelation object.
-        // @todo hotspot: 24%
         final IRelation relation = getTailRelationView(predicate);
 
         return getTailAccessPath(relation, predicate);
@@ -1072,8 +1096,8 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     final private static transient IConstant<Long> fakeTermId = new Constant<Long>(-1L);
-    
-    public ISolution newSolution(IRule rule, IBindingSet bindingSet) {
+
+    public ISolution newSolution(final IRule rule, final IBindingSet bindingSet) {
 
         final Solution solution = new Solution(this, rule, bindingSet);
         

@@ -717,7 +717,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * 
      * @see Configuration
      */
-    protected String getProperty(String localName, String defaultValue) {
+    protected String getProperty(final String localName,
+            final String defaultValue) {
 
         return Configuration.getProperty(indexManager, properties, namespace,
                 localName, defaultValue);
@@ -734,7 +735,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * @return
      */
     protected <T> T getProperty(final String name, final String defaultValue,
-            IValidator<T> validator) {
+            final IValidator<T> validator) {
 
         return Configuration.getProperty(indexManager, properties, namespace,
                 name, defaultValue, validator);

@@ -3622,6 +3622,34 @@ abstract public class AbstractTripleStore extends
             final int solutionFlags, final IElementFilter filter,
             final boolean justify, final boolean backchain,
             final IEvaluationPlanFactory planFactory) {
+
+        return newJoinNexusFactory(ruleContext, action, solutionFlags, filter,
+                justify, backchain, planFactory, null/*overrides*/);
+        
+    }
+
+    /**
+     * 
+     * @param solutionFlags
+     *            See {@link IJoinNexus#ELEMENT} and friends.
+     * @param filter
+     *            Optional filter.
+     * @param overrides
+     *            Optional overrides of the properties controlling the rule
+     *            execution layer. When given, the property values will override
+     *            those inherited from {@link AbstractResource}.
+     * @return
+     */
+    public IJoinNexusFactory newJoinNexusFactory(
+            final RuleContextEnum ruleContext, //
+            final ActionEnum action,//
+            final int solutionFlags,//
+            final IElementFilter filter,//
+            final boolean justify, //
+            final boolean backchain,//
+            final IEvaluationPlanFactory planFactory,//
+            final Properties overrides//
+            ) {
         
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -3747,17 +3775,40 @@ abstract public class AbstractTripleStore extends
                 : DefaultRuleTaskFactory.PIPELINE//
                 ;
 
+        // Note: returns a Properties wrapping the resource's properties.
+        final Properties tmp = getProperties();
+
+        if (overrides != null) {
+
+            /*
+             * Layer in the overrides.
+             * 
+             * Note: If the caller passes in a Properties object, then only the
+             * top level of that properties object will be copied in.  This can
+             * be "fixed" by the caller using PropertyUtil.flatten(Properties).
+             */
+            tmp.putAll(overrides);
+
+        }
+        
         return new RDFJoinNexusFactory(
-                ruleContext,
+                ruleContext,//
                 action, //
-                writeTimestamp,
+                writeTimestamp,//
                 readTimestamp, //
-                isForceSerialExecution(),
-                getMaxParallelSubqueries(), //
-                justify, backchain, isOwlSameAsUsed,
-                getChunkOfChunksCapacity(), getChunkCapacity(),
-                getChunkTimeout(), getFullyBufferedReadThreshold(),
-                solutionFlags, filter, planFactory, defaultRuleTaskFactory);
+//                isForceSerialExecution(),
+//                getMaxParallelSubqueries(), //
+                justify,//
+                backchain, //
+                isOwlSameAsUsed,//
+                tmp,//
+//                getChunkOfChunksCapacity(), getChunkCapacity(),
+//                getChunkTimeout(), getFullyBufferedReadThreshold(),
+                solutionFlags, //
+                filter, //
+                planFactory, //
+                defaultRuleTaskFactory//
+                );
 
     }
 
