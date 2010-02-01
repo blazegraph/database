@@ -106,7 +106,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
     
     /**
      * Test helper tests first(), last(), next(), prior(), and seek() given a
-     * B+Tree that has been pre-popluated with some known tuples.
+     * B+Tree that has been pre-populated with some known tuples.
      * 
      * @param btree
      *            The B+Tree.
@@ -247,8 +247,8 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
-                    null/* fromKey */, null/* toKey */);
+            final ITupleCursor<String> cursor = newCursor(btree,
+                    IRangeQuery.DEFAULT, null/* fromKey */, null/* toKey */);
 
             // probe(30)
             assertEquals(new TestTuple<String>(30, "James"), cursor.seek(30));
@@ -281,7 +281,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
          */
         {
 
-            ITupleCursor2<String> cursor = newCursor(btree);
+            final ITupleCursor2<String> cursor = newCursor(btree);
 
             // seek to a probe key that does not exist.
             assertEquals(null, cursor.seek(29));
@@ -452,7 +452,27 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
                 
             }
 
-        }
+            {
+
+                final byte[] fromKey = KeyBuilder.asSortKey(10);
+                
+                final byte[] toKey = KeyBuilder.asSortKey(19);
+
+                final ITupleCursor2<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                // seek to last and scan backward.
+//                assertEquals(null, cursor.last());
+//                assertEquals(null, cursor.tuple());
+//                assertEquals(KeyBuilder.asSortKey(19),cursor.currentKey());
+                assertTrue(cursor.hasPrior());
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+                assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+                assertFalse(cursor.hasPrior());
+
+            }
+            
+        } // end test optional range constraints
         
     }
 
@@ -465,7 +485,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      * @param btree
      *            An empty B+Tree.
      */
-    protected void doEmptyIndexTest(AbstractBTree btree) {
+    protected void doEmptyIndexTest(final AbstractBTree btree) {
 
         /*
          * Test with no range limits.
@@ -696,8 +716,8 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      */
     protected BTree getOneTupleBTree() {
 
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
-                UUID.randomUUID()));
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(),
+                new IndexMetadata(UUID.randomUUID()));
 
         btree.insert(10, "Bryan");
 

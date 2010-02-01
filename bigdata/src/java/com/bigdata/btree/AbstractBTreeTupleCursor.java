@@ -117,7 +117,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     }
     
     /**
-     * The current cursor position.
+     * The current cursor position (initially <code>null</code>).
      */
     protected AbstractCursorPosition<L,E> currentPosition;
 
@@ -252,7 +252,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
      * @return <code>true</code> unless the <i>key</i> is LT [fromKey] or GTE
      *         [toKey].
      */
-    final protected boolean rangeCheck(byte[] key) {
+    final protected boolean rangeCheck(final byte[] key) {
 
         if (fromKey == null && toKey == null) {
 
@@ -569,7 +569,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                  * exists in the index and it is the first tuple in the leaf
                  * then this will convert the tuple index into an insertion
                  * point and the first visitable tuple will be in the prior
-                 * left.
+                 * leaf.
                  */
                 
                 index--;
@@ -1283,9 +1283,10 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * @param key
          *            The key (required).
          */
-        protected AbstractCursorPosition(ITupleCursor2<E> cursor, ILeafCursor<L> leafCursor,
-                int index, byte[] key) {
-            
+        protected AbstractCursorPosition(final ITupleCursor2<E> cursor,
+                final ILeafCursor<L> leafCursor, final int index,
+                final byte[] key) {
+
             if (cursor == null)
                 throw new IllegalArgumentException();
 
@@ -1327,7 +1328,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
          * 
          * @param p
          */
-        public AbstractCursorPosition(AbstractCursorPosition<L,E> p) {
+        public AbstractCursorPosition(final AbstractCursorPosition<L,E> p) {
            
             if (p == null)
                 throw new IllegalArgumentException();
@@ -1360,7 +1361,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
         /**
          * Seek to the given position.
          */
-        public void seek(AbstractCursorPosition<L, E> src) {
+        public void seek(final AbstractCursorPosition<L, E> src) {
 
             if (src == null)
                 throw new IllegalArgumentException();
@@ -1569,7 +1570,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             /*
              * The key for the cursor position.
              * 
-             * @todo Performance optimization. Try to optimize out this
+             * FIXME Performance optimization. Try to optimize out this
              * allocation of a copy of the key using an inline comparison. I've
              * made one pass at this but it causes problems for TestIterators so
              * there is clearly something wrong. Alternatively, raise this into
@@ -1700,7 +1701,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
                 // if it is an insert position then convert it to an index first.
                 index = -index - 1;
-
+                
             } else if (skipCurrent) {
 
                 /*
@@ -1823,7 +1824,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
                 // if it is an insert position then convert it to an index first.
                 index = -index - 1;
-                
+
             }
 
             if (skipCurrent) {
@@ -1855,7 +1856,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
                     if (index == nkeys) continue;
                     
-                    if (!rangeCheck(leaf, index)) {
+                    if (!rangeCheck(leaf, index)) { // @todo does too much work when scanning backwards.
                         
                         // tuple is LT [fromKey] or GTE [toKey].
                         
@@ -2104,8 +2105,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
     public static class ReadOnlyBTreeTupleCursor<E> extends
             AbstractBTreeTupleCursor<BTree, Leaf, E> {
 
-        public ReadOnlyBTreeTupleCursor(BTree btree, Tuple<E> tuple, byte[] fromKey,
-                byte[] toKey) {
+        public ReadOnlyBTreeTupleCursor(final BTree btree,
+                final Tuple<E> tuple, final byte[] fromKey, final byte[] toKey) {
 
             super(btree, tuple, fromKey, toKey);
 
@@ -2113,7 +2114,8 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         @Override
         protected ReadOnlyCursorPosition<E> newPosition(
-                ILeafCursor<Leaf> leafCursor, int index, byte[] key) {
+                final ILeafCursor<Leaf> leafCursor, final int index,
+                final byte[] key) {
 
             return new ReadOnlyCursorPosition<E>(this, leafCursor, index, key);
 
@@ -2121,7 +2123,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
         @Override
         protected ReadOnlyCursorPosition<E> newTemporaryPosition(
-                ICursorPosition<Leaf, E> p) {
+                final ICursorPosition<Leaf, E> p) {
 
             return new ReadOnlyCursorPosition<E>( (ReadOnlyCursorPosition<E>) p );
 
