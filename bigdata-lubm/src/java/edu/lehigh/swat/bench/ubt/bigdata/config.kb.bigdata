@@ -14,8 +14,8 @@
 
 #[BIGDATA_LTS_1]
 #class=edu.lehigh.swat.bench.ubt.bigdata.LTS
-#data=../rdf-data/lehigh/U1
-#ontology=../rdf-data/lehigh/univ-bench.owl
+#ontology=d:/bigdata-perf-analysis/lubm/univ-bench.owl
+#data=d:/bigdata-perf-analysis/lubm/U10
 #database=d:/LTS.U1
 
 #[BIGDATA_LTS_5]
@@ -36,31 +36,11 @@
 #data=../rdf-data/lehigh/U20
 #database=d:/LTS.U20
 
-#[BIGDATA_LTS_50]
-#class=edu.lehigh.swat.bench.ubt.bigdata.LTS
-#ontology=../rdf-data/lehigh/univ-bench.owl
-#data=../rdf-data/lehigh/U50
-#database=d:/LTS.U50
-#database=d:/LTS.U50.pipeline
-
-#[BIGDATA_LTS_50]
-#class=edu.lehigh.swat.bench.ubt.bigdata.LTS
-#ontology=../rdf-data/lehigh/univ-bench.owl
-#data=E:/lehigh benchmark/U50
-#database=E:/LTS.U50
-
 [BIGDATA_LTS_50]
 class=edu.lehigh.swat.bench.ubt.bigdata.LTS
 ontology=d:/bigdata-perf-analysis/lubm/univ-bench.owl
 data=d:/bigdata-perf-analysis/lubm/U50
 database=d:/LTS.U50.jnl
-
-# a compacted version of BIGDATA_LTS_50.
-#[BIGDATA_LTS_50_compact]
-#class=edu.lehigh.swat.bench.ubt.bigdata.LTS
-#ontology=../rdf-data/lehigh/univ-bench.owl
-#data=../rdf-data/lehigh/U50
-#database=d:/LTS.U50.compact
 
 #[BIGDATA_LTS_100]
 #class=edu.lehigh.swat.bench.ubt.bigdata.LTS

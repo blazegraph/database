@@ -284,14 +284,14 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
 //        properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "5");
         properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
 
-        /*
-         * Choice of the join algorithm.
-         * 
-         * false is pipeline.
-         * 
-         * true is nested, which is also the default right now.
-         */
-        properties.setProperty(Options.NESTED_SUBQUERY, "true");
+//        /*
+//         * Choice of the join algorithm.
+//         * 
+//         * false is pipeline.
+//         * 
+//         * true is nested.
+//         */
+//        properties.setProperty(Options.NESTED_SUBQUERY, "false");
         
         {
          

@@ -475,14 +475,17 @@ public class RDFJoinNexus implements IJoinNexus {
         /*
          * FIXME You can not override the rule execution model yet
          * (nestedSubquery vs pipeline). This is currently a separate field on
-         * RDFJoinNexus.
+         * RDFJoinNexus. However, this will give way to a different approach all
+         * together with the rule execution refactor to support things like star
+         * joins.
          */
-//        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
-//                .isScaleOut());
+////        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
+////                .isScaleOut());
 //
 //        nestedSubquery = Boolean.parseBoolean(getProperty(
-//                AbstractResource.Options.NESTED_SUBQUERY, Boolean
-//                        .toString(!pipelineIsBetter)));
+//                AbstractResource.Options.NESTED_SUBQUERY, Boolean.FALSE);
+////        Boolean
+////                        .toString(!pipelineIsBetter)));
 
         chunkOfChunksCapacity = getProperty(
                 AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY,
