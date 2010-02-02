@@ -936,4 +936,11 @@ public class SPOPredicate implements IPredicate<ISPO> {
      */
     private int hash = 0;
 
+    
+    public SPOPredicate reBound( IVariableOrConstant<Long> s, IVariableOrConstant<Long> p, IVariableOrConstant<Long> o, IVariableOrConstant<Long> c) {
+
+        return new SPOPredicate(relationName, partitionId, s, p, o, c,
+                optional, constraint, expander);
+        
+    }
 }
