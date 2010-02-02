@@ -46,8 +46,8 @@ public class BigdataLoader {
             properties.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
             properties.setProperty(BigdataSail.Options.TERM_CACHE_CAPACITY, "50000"); // 50000 default.
             properties.setProperty(BigdataSail.Options.BUFFER_CAPACITY, "100000"); // 10000 default.
-            properties.setProperty(BigdataSail.Options.NESTED_SUBQUERY, "true"); // true is default for standalone; false is the pipeline join, which is generally competitive even for standalone.
-            properties.setProperty(BigdataSail.Options.MAX_PARALLEL_SUBQUERIES, "5"); // 5 is default, only applies to nextedSubquery joins.
+//            properties.setProperty(BigdataSail.Options.NESTED_SUBQUERY, "false"); // false is the pipeline join, which is much better.
+//            properties.setProperty(BigdataSail.Options.MAX_PARALLEL_SUBQUERIES, "5"); // 5 is default, only applies to nextedSubquery joins.
             properties.setProperty(BigdataSail.Options.CHUNK_CAPACITY,"100"); // 100 default.
             properties.setProperty(BigdataSail.Options.CHUNK_OF_CHUNKS_CAPACITY,"1000"); // 1000 default.
             properties.setProperty(com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "8000");

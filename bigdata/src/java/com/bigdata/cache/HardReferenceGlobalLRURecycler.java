@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -1127,7 +1128,9 @@ public class HardReferenceGlobalLRURecycler<K, V> implements
 //
 //            }
 
-            globalLRU.lock.lock();
+            // allow barging in on the lock.
+            try {
+            if(globalLRU.lock.tryLock()||globalLRU.lock.tryLock(Long.MAX_VALUE,TimeUnit.NANOSECONDS)) {
 
             try {
 
@@ -1163,7 +1166,17 @@ public class HardReferenceGlobalLRURecycler<K, V> implements
                 globalLRU.lock.unlock();
                 
             }
+            
+            }
+            } catch(InterruptedException ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
 
+            // should not timeout.
+            throw new AssertionError();
+            
         }
 
         public V remove(final K key) {
