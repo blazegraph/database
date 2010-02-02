@@ -66,19 +66,19 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
     /**
      * Delegates the operation to the backing store.
      */
-    synchronized public void commit() {
+    synchronized public long commit() {
      
         final long begin = System.currentTimeMillis();
 
         super.commit();
         
-        getIndexManager().commit();
+        long commitTime= getIndexManager().commit();
         
         final long elapsed = System.currentTimeMillis() - begin;
 
         if (log.isInfoEnabled())
             log.info("commit: commit latency="+elapsed+"ms");
-
+        return commitTime;
     }
 
     public void abort() {

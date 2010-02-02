@@ -28,7 +28,6 @@
 package com.bigdata.rdf.store;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -46,7 +45,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -59,7 +57,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
-
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -549,7 +546,7 @@ abstract public class AbstractTripleStore extends
                 + ".textIndex.datatypeLiterals";
 
         String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
-
+        
         /**
          * Integer option whose value is the capacity of the term cache. This
          * cache provides fast lookup of frequently used RDF {@link Value}s by
@@ -1612,7 +1609,7 @@ abstract public class AbstractTripleStore extends
      * @throws IllegalStateException
      *             if the view is read only.
      */
-    public void commit() {
+    public long commit() {
         
         if (isReadOnly())
             throw new IllegalStateException();
@@ -1621,7 +1618,7 @@ abstract public class AbstractTripleStore extends
          * Clear the reference since it was as of the last commit point.
          */
         readCommittedRef = null;
-
+        return 0l;
     }
     
     /**
@@ -2336,7 +2333,20 @@ abstract public class AbstractTripleStore extends
         return getSPORelation().getAccessPath(s, p, o, NULL/* c */, filter);
 
     }
+	final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
+            final long o,final long c) {
 
+        return getSPORelation()
+                .getAccessPath(s, p, o, c, null/* filter */);
+
+    }
+
+    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
+            final long o,final long c, final IElementFilter<ISPO> filter) {
+
+        return getSPORelation().getAccessPath(s, p, o, c, filter);
+
+    }
     final public IAccessPath<ISPO> getAccessPath(final IKeyOrder<ISPO> keyOrder) {
 
         return getAccessPath(keyOrder, null/* filter */);
@@ -3622,7 +3632,7 @@ abstract public class AbstractTripleStore extends
             final int solutionFlags, final IElementFilter filter,
             final boolean justify, final boolean backchain,
             final IEvaluationPlanFactory planFactory) {
-
+        
         return newJoinNexusFactory(ruleContext, action, solutionFlags, filter,
                 justify, backchain, planFactory, null/*overrides*/);
         
