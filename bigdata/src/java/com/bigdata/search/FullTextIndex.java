@@ -62,6 +62,8 @@ import org.apache.lucene.analysis.nl.DutchAnalyzer;
 import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
+import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+import org.apache.lucene.util.Version;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
@@ -651,7 +653,7 @@ public class FullTextIndex extends AbstractRelation {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new BrazilianAnalyzer();
+                    return new BrazilianAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("por", a);
@@ -686,7 +688,7 @@ public class FullTextIndex extends AbstractRelation {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new CJKAnalyzer();
+                    return new CJKAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
 //            analyzers.put("zho", a);
@@ -702,7 +704,7 @@ public class FullTextIndex extends AbstractRelation {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new CzechAnalyzer();
+                    return new CzechAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("ces",a);
@@ -713,7 +715,7 @@ public class FullTextIndex extends AbstractRelation {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new DutchAnalyzer();
+                    return new DutchAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("dut",a);
@@ -724,7 +726,7 @@ public class FullTextIndex extends AbstractRelation {
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new FrenchAnalyzer();
+                    return new FrenchAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("fra",a); 
@@ -739,7 +741,7 @@ public class FullTextIndex extends AbstractRelation {
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new GermanAnalyzer();
+                    return new GermanAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("deu",a); 
@@ -751,7 +753,7 @@ public class FullTextIndex extends AbstractRelation {
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new GreekAnalyzer();
+                    return new GreekAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("gre",a); 
@@ -763,7 +765,7 @@ public class FullTextIndex extends AbstractRelation {
         {  
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new RussianAnalyzer();
+                    return new RussianAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("rus",a); 
@@ -773,7 +775,7 @@ public class FullTextIndex extends AbstractRelation {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new ThaiAnalyzer();
+                    return new ThaiAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("tha",a); 
@@ -784,7 +786,7 @@ public class FullTextIndex extends AbstractRelation {
         {
             AnalyzerConstructor a = new AnalyzerConstructor() {
                 public Analyzer newInstance() {
-                    return new StandardAnalyzer();
+                    return new StandardAnalyzer(Version.LUCENE_CURRENT);
                 }
             };
             analyzers.put("eng", a);
@@ -902,32 +904,17 @@ public class FullTextIndex extends AbstractRelation {
         
         // tokenize (note: docId,fieldId are not on the tokenStream, but the field could be).
         final TokenStream tokenStream = getTokenStream(languageCode, r);
-
-        while (true) {
-            
-            final Token token;
-            try {
-
-                token = tokenStream.next(/* token */);
-
-            } catch (IOException ex) {
-
-                throw new RuntimeException(ex);
-
-            }
-
-            if (token == null) {
-
-                break;
-                
-            }
-
-            buffer.add(docId, fieldId, token);
+        try {
+        while (tokenStream.incrementToken()) {
+            TermAttribute term=tokenStream.getAttribute(TermAttribute.class);
+            buffer.add(docId, fieldId, term.term());
             
             n++;
 
         }
-        
+        }catch(IOException ioe) {
+            
+        }
         if (log.isInfoEnabled())
             log.info("Indexed " + n + " tokens: docId=" + docId + ", fieldId="
                     + fieldId);

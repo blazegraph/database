@@ -501,7 +501,7 @@ abstract public class AbstractChunkedTupleIterator<E> implements ITupleIterator<
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      * @version $Id$
      */
-    private class ResultSetTuple implements ITuple<E> {
+    public class ResultSetTuple implements ITuple<E> {
 
         private final ResultSet rset;
         private final int lastVisited;

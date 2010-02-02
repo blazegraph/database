@@ -15,7 +15,7 @@ public class TermMetadata {
     
     public String termText() {
         
-        return occurrences.get(0).termText();
+        return occurrences.get(0);
         
     }
     
@@ -34,7 +34,7 @@ public class TermMetadata {
     public double localTermWeight;
 
     // @todo make private?
-    ArrayList<Token> occurrences = new ArrayList<Token>();
+    ArrayList<String> occurrences = new ArrayList<String>();
     
     /**
      * Add an occurrence.
@@ -42,7 +42,7 @@ public class TermMetadata {
      * @param token
      *            The token.
      */
-    public void add(Token token) {
+    public void add(String token) {
 
         assert token != null;
         
