@@ -415,8 +415,10 @@ interface ITripleStore {
      * Note: The semantics of this operation depend on whether the database is
      * embedded (does a commit), temporary (ignored), or a federation (ignored
      * since unisolated writes on the federation are atomic and auto-committed).
+     *
+     * @return commit time if store supports commit timestamps
      */
-    void commit();
+    long commit();
     
     /**
      * Deletes all data for the {@link ITripleStore}.

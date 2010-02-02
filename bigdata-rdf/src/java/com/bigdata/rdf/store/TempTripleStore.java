@@ -99,11 +99,11 @@ public class TempTripleStore extends AbstractLocalTripleStore {
      * access to the indices so the checkpoint can not be atomic. Therefore this
      * method is a NOP and {@link #abort()} will throw an exception.
      */
-    final public void commit() {
+    final public long commit() {
      
 //        final long begin = System.currentTimeMillis();
 
-        super.commit();
+        return super.commit();
         
 //        final long checkpointAddr = getIndexManager().checkpoint();
 //
