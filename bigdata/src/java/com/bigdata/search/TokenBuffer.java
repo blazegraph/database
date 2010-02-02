@@ -6,6 +6,7 @@ import java.util.Iterator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Token;
+import org.apache.lucene.analysis.TokenStream;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KV;
@@ -166,7 +167,7 @@ public class TokenBuffer {
      * @param token
      *            The token.
      */
-    public void add(final long docId, final int fieldId, final Token token) {
+    public void add(final long docId, final int fieldId, final String token) {
 
         if (log.isDebugEnabled()) {
 

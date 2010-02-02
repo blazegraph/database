@@ -121,7 +121,7 @@ public class Banner {
 
                 } catch (Throwable t) {
 
-                    log.error("Problem registering log4j mbean?", t);
+                    log.info("Problem registering log4j mbean?", t);
 
                 }
 
