@@ -122,7 +122,7 @@
 			</manifest>
 		</jar>
 	</target>
-	
+
 	<!-- This generates an osgi bundle jar, and does not bundled the dependencies.
 		 See 'bundleJar'. -->
 	<target name="osgi" depends="compile" description="Generates the osgi bundle jar (see also bundleJar).">
@@ -1029,6 +1029,7 @@ ${postInstallMessage}</echo>
 		<!-- Specify the maximum Java heap size. -->
 		<jvmarg value="-Xmx10g"/>
 		<!-- optionally enable yourkit profiler. 
+        <jvmarg value="-DLD_LIBRARY_PATH=/nas/install/yjp-8.0.19/bin/linux-x86-64"/>
         <jvmarg value="-agentpath:/nas/install/yjp-8.0.20/bin/linux-x86-64/libyjpagent.so"/>
         <jvmarg value="-agentlib:yjpagent=disableexceptiontelemetry,disablestacktelemetry"/>
         -->
@@ -1040,6 +1041,29 @@ ${postInstallMessage}</echo>
 			<path refid="runtime.classpath" />
         </classpath>
 	</java>
+</target>
+
+<target name="set-properties" depends="compile"
+	 description="Set or change properties for a kb instance. You MUST edit this target to specify the name of the journal.  The new values are read from stdin.">
+    <java classname="com.bigdata.rdf.sail.BigdataSailHelper"
+          fork="true"
+          failonerror="true"
+    	  inputstring="com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.nestedSubquery=false"
+    	>
+<!-- Various things you might want to change:
+
+	  Maximum #of threads for joins.
+  	  inputstring="com.bigdata.relation.rule.eval.ProgramTask.maxParallelSubqueries=5"
+  	  
+  	  Nested subquery vs pipeline joins.
+  	  inputstring="com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.nestedSubquery=true"
+  	  
+-->
+          <arg line="d:/LTS.U50.jnl LTS kb"/>
+          <classpath>
+             <path refid="runtime.classpath" />
+          </classpath>
+    </java>
 </target>
 
 </project>
