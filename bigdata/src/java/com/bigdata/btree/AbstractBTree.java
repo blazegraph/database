@@ -751,6 +751,30 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
              * contention for the lock required to write on the backing hard
              * reference queue (no lock is required for the thread-local
              * queues).
+             * 
+             * The danger with a true thread-local design is that a thread can
+             * come in and do some work, get some updates buffered in its
+             * thread-local array, and then never visit again. In this case
+             * those updates would remain buffered on the thread and would not
+             * in fact cause the access order to be updated in a timely manner.
+             * Worse, if you are relying on WeakReference semantics, the
+             * buffered updates would remain strongly reachable and the
+             * corresponding objects would be wired into the cache.
+             * 
+             * I've worked around this issue by scoping the buffers to the
+             * AbstractBTree instance. When the B+Tree container is closed, all
+             * buffered updates were discarded. This nicely eliminated the
+             * problems with "escaping" threads. This approach also has the
+             * maximum concurrency since there is no blocking when adding a
+             * touch to the thread-local buffer.
+             * 
+             * Another approach is to use striped locks. The infinispan BCHM
+             * does this. In this approach, the Segment is guarded by a lock and
+             * the array buffering the touches is inside of the Segment. Since
+             * the Segment is selected by the hash of the key, all Segments will
+             * be visited in a timely fashion for any reasonable workload. This
+             * ensures that updates can not "escape" and will be propagated to
+             * the shared backing buffer in a timely manner.
              */
             
             return new HardReferenceQueueWithBatchingUpdates<PO>(//
