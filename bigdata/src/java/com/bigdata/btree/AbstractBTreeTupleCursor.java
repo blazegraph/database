@@ -548,7 +548,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             
             leafCursor = btree.newLeafCursor(key);
             
-            final L leaf = leafCursor.leaf();
+            L leaf = leafCursor.leaf();
             
             /*
              * Find the position (or the insertion point) of the key in the
@@ -557,25 +557,57 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
             index = leaf.getKeys().search(key);
 
-            /*
-             * If the key actually exists in the index then we need to find the
-             * previous index since we do not visit the exclusive upper bound.
-             */
-            
-            if (index >= 0) {
+            if (index == 0 || index == -1) {
 
                 /*
-                 * Note: If the key corresponding to the exclusive upper bound
-                 * exists in the index and it is the first tuple in the leaf
-                 * then this will convert the tuple index into an insertion
-                 * point and the first visitable tuple will be in the prior
-                 * leaf.
+                 * Either the key exists in at index ZERO (0) in the leaf -or-
+                 * the insertion point is -1, which means that the key would 
+                 * be inserted at index ZERO (0) in
+                 * the leaf. Either way, we want to start the cursor at the
+                 * last tuple in the previous leaf.
                  */
-                
-                index--;
-                
+
+                // Note: Will be null if there is no prior leaf.
+                leaf = leafCursor.prior();
+
+                // Start at the last tuple in the prior leaf.
+                index = leaf == null ? 0 : leaf.getKeyCount() - 1;
+
+            } else {
+
+
+                if (index > 0) {
+
+                    /*
+                     * The key exists in the leaf at some position GT the first
+                     * index in the leaf. Since the toKey is an exclusive upper
+                     * bound, we subtract one to start the cursor at the prior
+                     * tuple in the leaf.
+                     * 
+                     * Note: The case where index == 0 was handled above.
+                     */
+
+                    index--;
+                    
+                } else {
+
+                    /*
+                     * Since index is an insertion point, it is one index beyond
+                     * the last tuple that we should visit. Therefore we add one
+                     * to the insertion point, which has the effect of shifting
+                     * the index position down by one in the leaf.
+                     * 
+                     * Note: The case where index == -1 was handled above.
+                     * Therefore index++ can not turn the insertion point into a
+                     * valid index.
+                     */
+
+                    index++;
+
+                }
+
             }
-            
+
         }
 
         return newPosition(leafCursor, index, key);
@@ -1543,23 +1575,45 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
             return true;
             
         }
-        
+
         /**
-         * Return <code>true</code> if the key at the current {@link #index}
-         * in the current {@link #leaf} lies inside of the optional half-open
-         * range constraint.
+         * Return <code>true</code> if the key at the current {@link #index} in
+         * the current {@link #leaf} lies inside of the optional half-open range
+         * constraint.
+         * 
+         * @param leaf
+         *            The current leaf.
+         * @param index
+         *            The index of the current tuple in that leaf.
+         * @param forward
+         *            <code>true</code> iff the cursor is moving in the forward
+         *            direction (increasing key order) and <code>false</code>
+         *            iff the cursor is moving in the reverse direction
+         *            (decreasing key order). We only check the
+         *            <code>fromKey</code> when moving in reverse order and the
+         *            <code>toKey</code> when moving in forward order.
          * 
          * @return <code>true</code> unless the current key is LT [fromKey] or
          *         GTE [toKey].
+         * 
+         * @todo could only rangeCheck in the direction of the traversal, but
+         *       this causes cursor test failures for some reason.
+         * 
+         * @todo for a read-only view, we could compute the leaf addr and the
+         *       tuple index of the fromKey and/or to key and then just compare
+         *       those with the given leaf and index to decide if we were within
+         *       the necessary bounds.
          */
-        private boolean rangeCheck(final L leaf, final int index) {
+        private boolean rangeCheck(final L leaf, final int index) {//, boolean forward) {
 
             // optional inclusive lower bound (may be null).
             final byte[] fromKey = cursor.getFromKey();
-            
+//            final byte[] fromKey = forward ? null : cursor.getFromKey();
+
             // optional exclusive upper bound (may be null).
             final byte[] toKey = cursor.getToKey();
-            
+//            final byte[] toKey = forward ? cursor.getToKey() : null;
+
             if (fromKey == null && toKey == null) {
 
                 // no range constraint.
@@ -1569,27 +1623,28 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
             /*
              * The key for the cursor position.
-             * 
-             * FIXME Performance optimization. Try to optimize out this
-             * allocation of a copy of the key using an inline comparison. I've
-             * made one pass at this but it causes problems for TestIterators so
-             * there is clearly something wrong. Alternatively, raise this into
-             * the IAbstractNodeData interface.
              */
             if (true) {
                 final byte[] key = leaf.getKeys().get(index);
-                if (fromKey!=null&&BytesUtil.compareBytes(key, fromKey) < 0) {
+                if (fromKey != null && BytesUtil.compareBytes(key, fromKey) < 0) {
                     // key is LT then the optional inclusive lower bound.
                     return false;
                 }
-                if (toKey!=null&&BytesUtil.compareBytes(key, toKey) >= 0) {
+                if (toKey != null && BytesUtil.compareBytes(key, toKey) >= 0) {
                     // key is GTE the optional exclusive upper bound
                     return false;
 
                 }
 
             } else {
-                
+
+                /*
+                 * FIXME This performance optimizes out the allocation of a copy
+                 * of the key using an inline comparison. However, there is
+                 * something wrong as this causes
+                 * AbstractBTreeCursorTestCase#test_baseCase() to fail.
+                 */
+
                 if (tbuf == null) {
                     tbuf = new DataOutputBuffer(0);
                 }
@@ -1735,7 +1790,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
                  */
                 for (; index < nkeys; index++) {
 
-                    if (!rangeCheck(leaf, index)) {
+                    if (!rangeCheck(leaf, index)) {//, true/* forward */)) {
                         
                         // tuple is LT [fromKey] or GTE [toKey].
                         
@@ -1856,7 +1911,7 @@ abstract public class AbstractBTreeTupleCursor<I extends AbstractBTree, L extend
 
                     if (index == nkeys) continue;
                     
-                    if (!rangeCheck(leaf, index)) { // @todo does too much work when scanning backwards.
+                    if (!rangeCheck(leaf, index)) {//, false/* forward */)) {
                         
                         // tuple is LT [fromKey] or GTE [toKey].
                         

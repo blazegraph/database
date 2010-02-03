@@ -105,6 +105,22 @@ abstract public class AbstractBTreeCursorTestCase extends AbstractTupleCursorTes
         doBaseCaseTest(btree);
         
     }
+    
+    public void test_reverseTraversal() {
+        
+        BTree btree = getReverseTraversalBTree();
+        
+        if(isReadOnly()) {
+            
+            btree.writeCheckpoint();
+            
+            btree = btree.asReadOnly();
+            
+        }
+        
+        doReverseTraversalTest(btree);
+        
+    }
 
     /**
      * Unit test verifies that a fromKey and toKey which are out of order will
