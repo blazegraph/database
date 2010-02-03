@@ -2487,9 +2487,18 @@ public class Node extends AbstractNode<Node> implements INodeData {
                 return _getChild(index);
                 
             }
-            
+
             /*
-             * This case handles synchronization for concurrent readers. 
+             * This case handles synchronization for concurrent readers.
+             * 
+             * FIXME This code path accounts for 8-10% of BSBM 100M with 4
+             * concurrent clients. It seems to me that we could use the Memoizer
+             * (FutureTask) pattern in Java Concurrency In Practice (page 108)
+             * to handle this in a manner which only causes the caller to block
+             * if they are awaiting a request for a specific child address. The
+             * Memoizer In
+             * order to do this we need a means to expire entries from the
+             * Memoizer's cache.  
              */
             
             if (childLocks != null) {
