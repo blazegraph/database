@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -324,6 +325,38 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
     // this.distinct = true;
     // return super.evaluate(distinct, bindings);
     // }
+
+    /**
+     * A set of properties that act as query hints for the join nexus.
+     */
+    private Properties queryHints;
+    
+    /**
+     * This is the top-level method called by the SAIL to evaluate a query.
+     * The TupleExpr parameter here is guaranteed to be the root of the operator
+     * tree for the query.  Query hints are parsed by the SAIL from the
+     * namespaces in the original query.  See {@link BD#QUERY_HINTS_PREFIX}.
+     */
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            TupleExpr expr, BindingSet bindings, Properties queryHints)
+            throws QueryEvaluationException {
+        
+        // spit out the whole operator tree
+        if (INFO) {
+            log.info("operator tree:\n" + expr);
+        }
+
+        this.queryHints = queryHints;
+
+        if (INFO) {
+            log.info("queryHints:\n" + queryHints);
+        }
+        
+        return super.evaluate(expr, bindings);
+        
+    }
+
+    
     
     /**
      * Eventually we will want to translate the entire operator tree into a
@@ -334,9 +367,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             TupleExpr expr, BindingSet bindings)
             throws QueryEvaluationException {
         
-        // spit out the whole operator tree
-        if (INFO) {
-            log.info("tuple expr:\n" + expr);
+        if (DEBUG) {
+            log.debug("tuple expr:\n" + expr);
         }
         
         return super.evaluate(expr, bindings);
@@ -369,8 +401,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             return super.evaluate(union, bindings);
         }
 
-        if (INFO) {
-            log.info("union:\n" + union);
+        if (DEBUG) {
+            log.debug("union:\n" + union);
         }
         
         /*
@@ -381,6 +413,14 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         while ((operator = operator.getParentNode()) != null) {
             if (operator instanceof LeftJoin || operator instanceof Join) {
                 // Use Sesame 2 evaluation
+                
+                if (INFO) {
+                    log.info("could not evaluate natively, punting to Sesame"); 
+                }
+                if (DEBUG) {
+                    log.debug(operator);
+                }
+                
                 return super.evaluate(union, bindings);
             }
         }
@@ -398,12 +438,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
         } catch (UnknownOperatorException ex) {
             
+            // Use Sesame 2 evaluation
+            
             if (INFO) {
-                /*
-                 * Use Sesame 2 evaluation.
-                 */
-                log.info("need to implement native TupleExpr: "
-                            + ex.getOperator());
+                log.info("could not evaluate natively, punting to Sesame"); 
+            }
+            if (DEBUG) {
+                log.debug(ex.getOperator());
             }
 
             return super.evaluate(union, bindings);
@@ -423,8 +464,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         // no check against the nativeJoins property here because we are simply
         // using the native execution model to take care of magic searches.
         
-        if (INFO) {
-            log.info("evaluating statement pattern:\n" + sp);
+        if (DEBUG) {
+            log.debug("evaluating statement pattern:\n" + sp);
         }
         
         IStep query = createNativeQuery(sp);
@@ -456,8 +497,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             return super.evaluate(join, bindings);
         }
 
-        if (INFO) {
-            log.info("join:\n" + join);
+        if (DEBUG) {
+            log.debug("join:\n" + join);
         }
         
         /*
@@ -488,7 +529,16 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         QueryModelNode operator = join;
         while ((operator = operator.getParentNode()) != null) {
             if (operator instanceof LeftJoin) {
+
                 // Use Sesame 2 evaluation
+                
+                if (INFO) {
+                    log.info("could not evaluate natively, punting to Sesame"); 
+                }
+                if (DEBUG) {
+                    log.debug(operator);
+                }
+                
                 return super.evaluate(join, bindings);
             }
         }
@@ -505,12 +555,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
         } catch (UnknownOperatorException ex) {
             
+            // Use Sesame 2 evaluation
+            
             if (INFO) {
-                /*
-                 * Use Sesame 2 evaluation.
-                 */
-                log.info("need to implement native TupleExpr: "
-                            + ex.getOperator());
+                log.info("could not evaluate natively, punting to Sesame"); 
+            }
+            if (DEBUG) {
+                log.debug(ex.getOperator());
             }
 
             return super.evaluate(join, bindings);
@@ -537,8 +588,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             return super.evaluate(join, bindings);
         }
 
-        if (INFO) {
-            log.info("left join:\n" + join);
+        if (DEBUG) {
+            log.debug("left join:\n" + join);
         }
         
         /*
@@ -570,7 +621,16 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         QueryModelNode operator = join;
         while ((operator = operator.getParentNode()) != null) {
             if (operator instanceof LeftJoin) {
+
                 // Use Sesame 2 evaluation
+                
+                if (INFO) {
+                    log.info("could not evaluate natively, punting to Sesame"); 
+                }
+                if (DEBUG) {
+                    log.debug(operator);
+                }
+
                 return super.evaluate(join, bindings);
             }
         }
@@ -587,12 +647,13 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             
         } catch (UnknownOperatorException ex) {
             
+            // Use Sesame 2 evaluation
+            
             if (INFO) {
-                /*
-                 * Use Sesame 2 evaluation.
-                 */
-                log.info("need to implement native TupleExpr: "
-                            + ex.getOperator());
+                log.info("could not evaluate natively, punting to Sesame"); 
+            }
+            if (DEBUG) {
+                log.debug(ex.getOperator());
             }
 
             return super.evaluate(join, bindings);
@@ -652,10 +713,10 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         if (false) {
             for (Map.Entry<StatementPattern, Boolean> entry : 
                     stmtPatterns.entrySet()) {
-                log.info(entry.getKey() + ", optional=" + entry.getValue());
+                log.debug(entry.getKey() + ", optional=" + entry.getValue());
             }
             for (Filter filter : filters) {
-                log.info(filter.getCondition());
+                log.debug(filter.getCondition());
             }
         }
         
@@ -722,8 +783,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 // get ahold of the search variable
                 com.bigdata.relation.rule.Var searchVar = 
                     (com.bigdata.relation.rule.Var) search.get(0);
-                if (INFO) {
-                    log.info(searchVar);
+                if (DEBUG) {
+                    log.debug(searchVar);
                 }
                 // start by assuming it needs filtering, guilty until proven
                 // innocent
@@ -742,8 +803,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     boolean appears = false;
                     for (int i = 0; i < tail.arity(); i++) {
                         IVariableOrConstant term = tail.get(i);
-                        if (INFO) {
-                            log.info(term);
+                        if (DEBUG) {
+                            log.debug(term);
                         }
                         if (term.equals(searchVar)) {
                             appears = true;
@@ -758,8 +819,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 }
                 // if it needs a filter, add it to the expander
                 if (needsFilter) {
-                    if (INFO) {
-                        log.info("needs filter: " + searchVar);
+                    if (DEBUG) {
+                        log.debug("needs filter: " + searchVar);
                     }
                     FreeTextSearchExpander expander = (FreeTextSearchExpander) 
                             search.getSolutionExpander();
@@ -777,8 +838,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             final IConstraint constraint = generateConstraint(filter);
             if (constraint != null) {
                 // remove if we are able to generate a native constraint for it
-                if (INFO) {
-                    log.info("able to generate a constraint: " + constraint);
+                if (DEBUG) {
+                    log.debug("able to generate a constraint: " + constraint);
                 }
                 filterIt.remove();
                 constraints.add(constraint);
@@ -835,11 +896,11 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
         // we have filters that we could not translate natively
         if (filters.size() > 0) {
-            if (INFO) {
-                log.info("could not translate " + filters.size()
+            if (DEBUG) {
+                log.debug("could not translate " + filters.size()
                         + " filters into native constraints:");
                 for (Filter filter : filters) {
-                    log.info("\n" + filter.getCondition());
+                    log.debug("\n" + filter.getCondition());
                 }
             }
             // use the basic filter iterator for remaining filters
@@ -884,11 +945,11 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     // unfortunately I think we just have to punt to be super safe
                     Collection<Filter> filters = 
                         ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-                    if (INFO) {
-                        log.info("could not translate " + filters.size()
+                    if (DEBUG) {
+                        log.debug("could not translate " + filters.size()
                                 + " filters into native constraints:");
                         for (Filter filter : filters) {
-                            log.info("\n" + filter.getCondition());
+                            log.debug("\n" + filter.getCondition());
                         }
                     }
                     throw new UnknownOperatorException(filters.iterator().next());
@@ -914,11 +975,11 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                     // unfortunately I think we just have to punt to be super safe
                     Collection<Filter> filters = 
                         ((ProxyRuleWithSesameFilters) rule).getSesameFilters();
-                    if (INFO) {
-                        log.info("could not translate " + filters.size()
+                    if (DEBUG) {
+                        log.debug("could not translate " + filters.size()
                                 + " filters into native constraints:");
                         for (Filter filter : filters) {
-                            log.info("\n" + filter.getCondition());
+                            log.debug("\n" + filter.getCondition());
                         }
                     }
                     throw new UnknownOperatorException(filters.iterator().next());
@@ -1334,14 +1395,14 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
         } else {
             return null;
         }
-        if (INFO) {
-            log.info("var: " + var);
-            log.info("constant: " + constant);
+        if (DEBUG) {
+            log.debug("var: " + var);
+            log.debug("constant: " + constant);
         }
         if (var == null || constant == null) {
-            if (INFO) {
-                log.info("left: " + left);
-                log.info("right: " + right);
+            if (DEBUG) {
+                log.debug("left: " + left);
+                log.debug("right: " + right);
             }
             return null;
         }
@@ -1375,9 +1436,9 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 && tripleSource.includeInferred
                 && tripleSource.conn.isQueryTimeExpander();
         
-        if (INFO) {
-            log.info("Running tupleExpr as native rule:\n" + step);
-            log.info("backchain: " + backchain);
+        if (DEBUG) {
+            log.debug("Running tupleExpr as native rule:\n" + step);
+            log.debug("backchain: " + backchain);
         }
         
         // run the query as a native rule.
@@ -1404,7 +1465,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                             null, // filter
                             false, // justify
                             backchain, //
-                            planFactory//
+                            planFactory, //
+                            queryHints
                     );
             
             final IJoinNexus joinNexus = joinNexusFactory.newInstance(database
@@ -1466,8 +1528,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             final StatementPattern sp, final BindingSet bindings)
             throws QueryEvaluationException {
         
-        if (INFO) {
-            log.info("evaluating statement pattern:\n" + sp);
+        if (DEBUG) {
+            log.debug("evaluating statement pattern:\n" + sp);
         }
         
         // check for magic search
@@ -1550,8 +1612,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             final BindingSet bindings, final Scope scope)
             throws QueryEvaluationException {
         
-        if (INFO) {
-            log.info("languageCode=" + languageCode + ", label=" + label);
+        if (DEBUG) {
+            log.debug("languageCode=" + languageCode + ", label=" + label);
         }
         
         final Iterator<IHit> itr = database.getSearchEngine().search(label,
