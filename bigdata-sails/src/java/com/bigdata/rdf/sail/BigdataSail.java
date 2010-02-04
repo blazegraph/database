@@ -2440,6 +2440,21 @@ public class BigdataSail extends SailBase implements Sail {
          */
 
         /**
+         * This overload is here to complete the SailConnection interface, but
+         * is never used.  The BigdataSailRepositoryConnection will always use
+         * the other overloaded version (the one with queryHints).
+         * <p>
+         * See {@link #evaluate(TupleExpr, Dataset, BindingSet, boolean, Properties)}.
+         */
+        public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
+                TupleExpr tupleExpr, Dataset dataset,
+                final BindingSet bindings, final boolean includeInferred)
+                throws SailException {
+            return evaluate(tupleExpr, dataset, bindings, includeInferred, new Properties());
+        }
+        
+        
+        /**
          * Note: The <i>includeInferred</i> argument is applied in two ways.
          * First, inferences are stripped out of the {@link SPOAccessPath}.
          * Second, query time expansion of
@@ -2447,6 +2462,9 @@ public class BigdataSail extends SailBase implements Sail {
          * <p>
          * Note: Query time expansion can be disabled independently using
          * {@link Options#QUERY_TIME_EXPANDER}, but not on a per-query basis.
+         * <p>
+         * QueryHints are a set of properties that are parsed from a SPARQL 
+         * query.  See {@link BD#QUERY_HINTS_PREFIX} for more information.
          * 
          * @todo The [bindings] are supposed to be inputs to the query
          *       evaluation, but I am still not quite clear what the role of the
@@ -2457,7 +2475,8 @@ public class BigdataSail extends SailBase implements Sail {
          */
         public CloseableIteration<? extends BindingSet, QueryEvaluationException> evaluate(
                 TupleExpr tupleExpr, Dataset dataset,
-                final BindingSet bindings, final boolean includeInferred)
+                final BindingSet bindings, final boolean includeInferred,
+                final Properties queryHints)
                 throws SailException {
 
             if (log.isInfoEnabled())
@@ -2483,11 +2502,11 @@ public class BigdataSail extends SailBase implements Sail {
                  * this.
                  */
                     dataset = replaceValues(dataset, tupleExpr);
-
+                    
                 final TripleSource tripleSource = new BigdataTripleSource(this,
                         includeInferred);
 
-                final EvaluationStrategyImpl strategy = new BigdataEvaluationStrategyImpl2(
+                final BigdataEvaluationStrategyImpl2 strategy = new BigdataEvaluationStrategyImpl2(
                         (BigdataTripleSource) tripleSource, dataset,
                         nativeJoins);
 
@@ -2514,8 +2533,8 @@ public class BigdataSail extends SailBase implements Sail {
                 // caller's bindingSet.
                 final CloseableIteration<BindingSet, QueryEvaluationException> itr = strategy
                         .evaluate(tupleExpr,
-                                org.openrdf.query.impl.EmptyBindingSet
-                                        .getInstance());
+                                org.openrdf.query.impl.EmptyBindingSet.getInstance(),
+                                queryHints);
 
                 return itr;
 

@@ -1,18 +1,33 @@
 package com.bigdata.rdf.sail;
 
+import java.util.Map;
+import java.util.Properties;
+import java.util.StringTokenizer;
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.parser.ParsedBooleanQuery;
 import org.openrdf.query.parser.ParsedGraphQuery;
+import org.openrdf.query.parser.ParsedQuery;
+import org.openrdf.query.parser.ParsedTupleQuery;
 import org.openrdf.query.parser.QueryParserUtil;
+import org.openrdf.query.parser.sparql.BaseDeclProcessor;
+import org.openrdf.query.parser.sparql.PrefixDeclProcessor;
+import org.openrdf.query.parser.sparql.StringEscapesProcessor;
+import org.openrdf.query.parser.sparql.ast.ASTQueryContainer;
+import org.openrdf.query.parser.sparql.ast.ParseException;
+import org.openrdf.query.parser.sparql.ast.SyntaxTreeBuilder;
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.sail.SailBooleanQuery;
 import org.openrdf.repository.sail.SailGraphQuery;
+import org.openrdf.repository.sail.SailQuery;
 import org.openrdf.repository.sail.SailRepositoryConnection;
+import org.openrdf.repository.sail.SailTupleQuery;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
-
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BD;
 
 public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
    
@@ -25,16 +40,69 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         
     }
     
+    /**
+     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * embedded in query strings as namespaces.  
+     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     */
     @Override
-    public SailGraphQuery prepareGraphQuery(QueryLanguage ql, String queryString, String baseURI)
-        throws MalformedQueryException
-    {
-        
+    public SailGraphQuery prepareGraphQuery(QueryLanguage ql,
+            String queryString, String baseURI) throws MalformedQueryException {
         final ParsedGraphQuery parsedQuery = QueryParserUtil.parseGraphQuery(
                 ql, queryString, baseURI);
-        
-        return new BigdataSailGraphQuery(parsedQuery, this);
-        
+        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
+        return new BigdataSailGraphQuery(parsedQuery, this, queryHints);
+    }
+
+    /**
+     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * embedded in query strings as namespaces.  
+     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     */
+    @Override
+    public SailTupleQuery prepareTupleQuery(QueryLanguage ql,
+            String queryString, String baseURI) throws MalformedQueryException {
+        final ParsedTupleQuery parsedQuery = QueryParserUtil.parseTupleQuery(
+                ql, queryString, baseURI);
+        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
+        return new BigdataSailTupleQuery(parsedQuery, this, queryHints);
+    }
+
+    /**
+     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * embedded in query strings as namespaces.  
+     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     */
+    @Override
+    public SailBooleanQuery prepareBooleanQuery(QueryLanguage ql,
+            String queryString, String baseURI) throws MalformedQueryException {
+        final ParsedBooleanQuery parsedQuery = QueryParserUtil
+                .parseBooleanQuery(ql, queryString, baseURI);
+        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
+        return new BigdataSailBooleanQuery(parsedQuery, this, queryHints);
+    }
+
+    /**
+     * Overriden to capture query hints from SPARQL queries. Query hints are
+     * embedded in query strings as namespaces.  
+     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     */
+    @Override
+    public SailQuery prepareQuery(QueryLanguage ql, String queryString,
+            String baseURI) throws MalformedQueryException {
+        ParsedQuery parsedQuery = QueryParserUtil.parseQuery(ql, queryString,
+                baseURI);
+        Properties queryHints = parseQueryHints(ql, queryString, baseURI);
+        if (parsedQuery instanceof ParsedTupleQuery) {
+            return new BigdataSailTupleQuery((ParsedTupleQuery) parsedQuery, this, queryHints);
+        } else if (parsedQuery instanceof ParsedGraphQuery) {
+            return new BigdataSailGraphQuery((ParsedGraphQuery) parsedQuery, this, queryHints);
+        } else if (parsedQuery instanceof ParsedBooleanQuery) {
+            return new BigdataSailBooleanQuery((ParsedBooleanQuery) parsedQuery, this, queryHints);
+        } else {
+            throw new RuntimeException("Unexpected query type: "
+                    + parsedQuery.getClass());
+        }
     }
 
     /**
@@ -148,6 +216,57 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 
         }
 
+    }
+    
+    /**
+     * Parse query hints from a query string.  Query hints are embedded in the 
+     * query string via special namespaces.      
+     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     */
+    private Properties parseQueryHints(QueryLanguage ql, String queryString, 
+            String baseURI) 
+                throws MalformedQueryException {
+        try {
+            Properties queryHints = new Properties();
+            // currently only supporting SPARQL
+            if (ql == QueryLanguage.SPARQL) {
+                // the next four lines were taken directly from
+                // org.openrdf.query.parser.sparql.SPARQLParser.parseQuery(String queryStr, String baseURI)
+                ASTQueryContainer qc = SyntaxTreeBuilder.parseQuery(queryString);
+                StringEscapesProcessor.process(qc);
+                BaseDeclProcessor.process(qc, baseURI);
+                Map<String, String> prefixes = PrefixDeclProcessor.process(qc);
+                // iterate the namespaces
+                for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
+                    // if we see one that matches the magic namespace, try
+                    // to parse it
+                    if (prefix.getKey().equalsIgnoreCase(BD.QUERY_HINTS_PREFIX)) {
+                        String hints = prefix.getValue();
+                        // has to have a # and it can't be at the end
+                        int i = hints.indexOf('#');
+                        if (i < 0 || i == hints.length()-1) {
+                            throw new MalformedQueryException("bad query hints: " + hints);
+                        }
+                        hints = hints.substring(i+1);
+                        // properties are separated by &
+                        StringTokenizer st = new StringTokenizer(hints, "&");
+                        while (st.hasMoreTokens()) {
+                            String hint = st.nextToken();
+                            i = hint.indexOf('=');
+                            if (i < 0 || i == hint.length()-1) {
+                                throw new MalformedQueryException("bad query hint: " + hint);
+                            }
+                            String key = hint.substring(0, i);
+                            String val = hint.substring(i+1);
+                            queryHints.put(key, val);
+                        }
+                    }
+                }
+            }
+            return queryHints;
+        } catch (ParseException e) {
+            throw new MalformedQueryException(e.getMessage(), e);
+        }
     }
 
 }
