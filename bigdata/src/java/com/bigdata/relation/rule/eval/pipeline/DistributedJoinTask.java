@@ -127,23 +127,23 @@ public class DistributedJoinTask extends JoinTask {
     final private Map<PartitionLocator, JoinTaskSink> sinkCache;
 
     public DistributedJoinTask(
-            final String scaleOutIndexName,
-            final IRule rule,
-            final IJoinNexus joinNexus,
-            final int[] order,
-            final int orderIndex,
-            final int partitionId,
-            final AbstractScaleOutFederation fed,
-            final IJoinMaster master,
-            final UUID masterUUID,
-            final IAsynchronousIterator<IBindingSet[]> src,
-            final IKeyOrder[] keyOrders,
-            final DataService dataService
+//            final String scaleOutIndexName,
+            final IRule rule,//
+            final IJoinNexus joinNexus,//
+            final int[] order,//
+            final int orderIndex,//
+            final int partitionId,//
+            final AbstractScaleOutFederation fed,//
+            final IJoinMaster master,//
+            final UUID masterUUID,//
+            final IAsynchronousIterator<IBindingSet[]> src,//
+            final IKeyOrder[] keyOrders,//
+            final DataService dataService//
             ) {
 
         super(
-                DataService.getIndexPartitionName(scaleOutIndexName,
-                        partitionId), rule, joinNexus, order, orderIndex,
+                /*DataService.getIndexPartitionName(scaleOutIndexName,
+                        partitionId),*/ rule, joinNexus, order, orderIndex,
                 partitionId, master, masterUUID);
 
         if (fed == null)
