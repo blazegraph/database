@@ -1035,7 +1035,8 @@ public class DataLoader {
 
             if (log.isInfoEnabled()) {
                 log.info(stats.toString());
-                if (buffer.getDatabase() instanceof AbstractLocalTripleStore) {
+                if (buffer != null
+                        && buffer.getDatabase() instanceof AbstractLocalTripleStore) {
                     log.info(((AbstractLocalTripleStore) buffer.getDatabase())
                             .getLocalBTreeBytesWritten(new StringBuilder())
                             .toString());
