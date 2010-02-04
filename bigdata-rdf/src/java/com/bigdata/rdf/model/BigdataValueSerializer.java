@@ -254,17 +254,17 @@ public class BigdataValueSerializer<V extends Value> {
  
         case ITermIndexCodes.TERM_CODE_BND: {
             
-            if (true) {
-
-                /*
-                 * Note: disabled since we never write the BNode as a value in
-                 * the id:term index because BNodes IDs are only consistent, not
-                 * stable.
-                 */
-
-                throw new UnsupportedOperationException();
-
-            }
+//            if (true) {
+//
+//                /*
+//                 * Note: disabled since we never write the BNode as a value in
+//                 * the id:term index because BNodes IDs are only consistent, not
+//                 * stable.
+//                 */
+//
+//                throw new UnsupportedOperationException();
+//
+//            }
 
             out.writeUTF(((BNode) val).getID());
 
@@ -378,27 +378,25 @@ public class BigdataValueSerializer<V extends Value> {
         
         case ITermIndexCodes.TERM_CODE_BND: {
             
-            if(true) {
-                
-                /*
-                 * Note: disabled since we never write the BNode as a value in
-                 * the id:term index because BNodes IDs are only consistent, not
-                 * stable.
-                 */
+//            if(true) {
+//                
+//                /*
+//                 * Note: disabled since we never write the BNode as a value in
+//                 * the id:term index because BNodes IDs are only consistent, not
+//                 * stable.
+//                 */
+//
+//                throw new UnsupportedOperationException();
+//
+//         }
 
-                throw new UnsupportedOperationException();
-
-            }
-
-            assert termCode == ITermIndexCodes.TERM_CODE_BND;
-
-            return (V)valueFactory.createBNode(in.readUTF());
+            return (V) valueFactory.createBNode(in.readUTF());
 
         }
 
         case ITermIndexCodes.TERM_CODE_URI: {
 
-            return (V)valueFactory.createURI(in.readUTF());
+            return (V) valueFactory.createURI(in.readUTF());
 
         }
 

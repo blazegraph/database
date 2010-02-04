@@ -225,8 +225,9 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
 
-        public Term2IdWriteProcConstructor(boolean readOnly,
-                boolean storeBlankNodes, int scaleOutTermIdBitsToReverse) {
+        public Term2IdWriteProcConstructor(final boolean readOnly,
+                final boolean storeBlankNodes,
+                final int scaleOutTermIdBitsToReverse) {
 
             this.readOnly = readOnly;
 
@@ -236,9 +237,9 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        public Term2IdWriteProc newInstance(IRabaCoder keySer,
-                IRabaCoder valSer, int fromIndex, int toIndex,
-                byte[][] keys, byte[][] vals) {
+        public Term2IdWriteProc newInstance(final IRabaCoder keySer,
+                final IRabaCoder valSer, final int fromIndex,
+                final int toIndex, final byte[][] keys, final byte[][] vals) {
 
             assert vals == null;
 
@@ -330,10 +331,14 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                 
             } else {
 
-                // Lookup in the forward index (URIs, Literals, and SIDs)
-                //
-                // Also BNodes iff storeBlankNodes is true
-                // @todo reuse Tuple for lookups to reduce allocation (will reuse an internal buffer).
+                /*
+                 * Lookup in the forward index (URIs, Literals, and SIDs)
+                 * 
+                 * Note: Also handles BNodes iff storeBlankNodes is true
+                 * 
+                 * @todo reuse Tuple for lookups to reduce allocation (will
+                 * reuse an internal buffer).
+                 */
                 final byte[] tmp = ndx.lookup(key);
     
                 if (tmp == null) {

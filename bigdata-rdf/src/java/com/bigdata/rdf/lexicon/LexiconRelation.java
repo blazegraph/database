@@ -913,7 +913,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
                 final List<Callable<Long>> tasks = new LinkedList<Callable<Long>>();
 
                 tasks.add(new ReverseIndexWriterTask(getId2TermIndex(),
-                        valueFactory, a, ndistinct));
+                        valueFactory, a, ndistinct, storeBlankNodes));
 
                 if (textIndex) {
 
@@ -1897,15 +1897,16 @@ public class LexiconRelation extends AbstractRelation<BigdataValue> {
         if (!storeBlankNodes && AbstractTripleStore.isBNode(id)) {
 
             /*
-             * BNodes are not stored in the reverse lexicon (or the cache). The
-             * "B" prefix is a syntactic marker for a real blank node.
+             * Except when the "told bnodes" mode is enabled, blank nodes are
+             * not stored in the reverse lexicon (or the cache). The "B" prefix
+             * is a syntactic marker for a real blank node.
              * 
              * Note: In a told bnodes mode, we need to store the blank nodes in
              * the lexicon and enter them into the term cache since their
              * lexical form will include the specified ID, not the term
              * identifier.
              * 
-             * FIXME Write a unit test for the told bnodes mode.
+             * @see TestAddTerms
              */
 
             final BigdataBNodeImpl bnode = valueFactory.createBNode("B"
