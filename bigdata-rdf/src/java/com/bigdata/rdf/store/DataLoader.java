@@ -739,7 +739,7 @@ public class DataLoader {
             if(file.exists()) {
                 
                 loadFiles(totals, 0/* depth */, file, baseURL,
-                        rdfFormat, null/* filter */, endOfBatch);
+                        rdfFormat, filter, endOfBatch);
 
                 return;
                 
@@ -1319,9 +1319,23 @@ public class DataLoader {
      */
     final private static FilenameFilter filter = new FilenameFilter() {
 
-        public boolean accept(File dir, String name) {
+        public boolean accept(final File dir, final String name) {
 
-            if(new File(dir,name).isDirectory()) {
+            if (new File(dir, name).isDirectory()) {
+
+                if(dir.isHidden()) {
+                    
+                    // Skip hidden files.
+                    return false;
+                    
+                }
+                
+//                if(dir.getName().equals(".svn")) {
+//                    
+//                    // Skip .svn files.
+//                    return false;
+//                    
+//                }
                 
                 // visit subdirectories.
                 return true;
@@ -1329,14 +1343,19 @@ public class DataLoader {
             }
 
             // if recognizable as RDF.
-            return RDFFormat.forFileName(name) != null
+            boolean isRDF = RDFFormat.forFileName(name) != null
                     || (name.endsWith(".zip") && RDFFormat.forFileName(name
                             .substring(0, name.length() - 4)) != null)
                     || (name.endsWith(".gz") && RDFFormat.forFileName(name
                             .substring(0, name.length() - 3)) != null);
 
+            System.err.println("dir=" + dir + ", name=" + name + " : isRDF="
+                    + isRDF);
+
+            return isRDF;
+
         }
 
     };
-    
+
 }

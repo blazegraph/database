@@ -93,6 +93,9 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
     
     protected static final transient Logger log = Logger.getLogger(JoinTaskFactoryTask.class);
 
+    /**
+     * @deprecated This is only used by a logging statement.
+     */
     final String scaleOutIndexName;
     
     final IRule rule;
@@ -313,7 +316,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
             final IIndexManager indexManager = new DelegateIndexManager(
                     getDataService());
 
-            task = new DistributedJoinTask(scaleOutIndexName, rule,
+            task = new DistributedJoinTask(/*scaleOutIndexName,*/ rule,
                     joinNexusFactory.newInstance(indexManager), order,
                     orderIndex, partitionId, fed, masterProxy, masterUUID,
                     sourceItrProxy, keyOrders, getDataService());

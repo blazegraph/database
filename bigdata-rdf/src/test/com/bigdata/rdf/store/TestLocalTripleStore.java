@@ -111,6 +111,10 @@ public class TestLocalTripleStore extends AbstractTestCase {
                 com.bigdata.rdf.store.AbstractTripleStore.Options.QUADS,
                 "false");
 
+//        properties.setProperty(
+//                com.bigdata.rdf.store.AbstractTripleStore.Options.NESTED_SUBQUERY,
+//                "true");
+
         return properties;
 
     }

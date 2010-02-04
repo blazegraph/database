@@ -418,7 +418,7 @@ abstract public class JoinTask implements Callable<Void> {
      * 
      * @see JoinTaskFactoryTask
      */
-    public JoinTask(final String indexName, final IRule rule,
+    public JoinTask(/*final String indexName,*/ final IRule rule,
             final IJoinNexus joinNexus, final int[] order,
             final int orderIndex, final int partitionId,
             final IJoinMaster masterProxy, final UUID masterUUID) {
