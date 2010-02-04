@@ -440,24 +440,23 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_LEXICON = "true";
 
         /**
-         * Boolean option (default {@value #DEFAULT_STORE_BLANK_NODES})
-         * controls whether or not we store blank nodes in the forward mapping
-         * of the lexicon.
+         * Boolean option (default {@value #DEFAULT_STORE_BLANK_NODES}) controls
+         * whether or not we store blank nodes in the forward mapping of the
+         * lexicon (this is also known as the "told bnodes" mode).
          * <p>
          * When <code>false</code> blank node semantics are enforced, you CAN
          * NOT unify blank nodes based on their IDs in the lexicon, and
          * {@link AbstractTripleStore#getBNodeCount()} is disabled.
          * <p>
-         * When <code>true</code>, you are able to violate blank node
-         * semantics and force unification of blank nodes by assigning the ID
-         * from the RDF interchange syntax to the blank node. RIO has an option
-         * that will allow you to do this. When this option is also
-         * <code>true</code>, then you will in fact be able to resolve
-         * pre-existing blank nodes using their identifiers. The tradeoff is
-         * time and space : if you have a LOT of document using blank nodes then
-         * you might want to disable this option in order to spend less time
-         * writing the forward lexicon index (and it will also take up less
-         * space).
+         * When <code>true</code>, you are able to violate blank node semantics
+         * and force unification of blank nodes by assigning the ID from the RDF
+         * interchange syntax to the blank node. RIO has an option that will
+         * allow you to do this. When this option is also <code>true</code>,
+         * then you will in fact be able to resolve pre-existing blank nodes
+         * using their identifiers. The tradeoff is time and space : if you have
+         * a LOT of document using blank nodes then you might want to disable
+         * this option in order to spend less time writing the forward lexicon
+         * index (and it will also take up less space).
          */
         String STORE_BLANK_NODES = AbstractTripleStore.class.getName() + ".storeBlankNodes";
         
