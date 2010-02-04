@@ -121,8 +121,7 @@ public class RDFLoadAndValidateHelper {
 
         // Note: no write buffer for 'verify' since it is not doing any writes!
         final RDFLoadTaskFactory loadTaskFactory = new RDFLoadTaskFactory(db,
-                bufferCapacity, null/* writeBuffer */, verifyData,
-                false/* deleteAfter */, fallback);
+                bufferCapacity, verifyData, false/* deleteAfter */, fallback);
 
         final FileSystemLoader scanner = new FileSystemLoader(service,
                 nclients, clientNum);

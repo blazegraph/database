@@ -453,7 +453,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
                         + " entries from " + locator + " to trigger underflow");
 
             groundTruth.submit(0/* fromIndex */, ndelete/* toIndex */, keys,
-                    null/* vals */, BatchRemoveConstructor.RETURN_NO_VALUES,
+                    null/* vals */, BatchRemoveConstructor.RETURN_MUTATION_COUNT,
                     null/* handler */);
 
             dataService0
@@ -461,7 +461,7 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
             fed.getIndex(name, ITx.UNISOLATED).submit(0/* fromIndex */,
                     ndelete/* toIndex */, keys, null/* vals */,
-                    BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
+                    BatchRemoveConstructor.RETURN_MUTATION_COUNT, null/* handler */);
             
         }
 
@@ -509,13 +509,13 @@ public class TestOverflow extends AbstractEmbeddedFederationTestCase {
 
             // overwrite the value (if any) under the left separator key.
             groundTruth.submit(0/* fromIndex */, 1/* toIndex */, keys,
-                    null/* vals */, BatchRemoveConstructor.RETURN_NO_VALUES,
+                    null/* vals */, BatchRemoveConstructor.RETURN_MUTATION_COUNT,
                     null/* handler */);
 
             // overwrite the value (if any) under the left separator key.
             fed.getIndex(name, ITx.UNISOLATED)
                     .submit(0/* fromIndex */, 1/* toIndex */, keys, null/*vals*/,
-                            BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
+                            BatchRemoveConstructor.RETURN_MUTATION_COUNT, null/* handler */);
             
         }
 

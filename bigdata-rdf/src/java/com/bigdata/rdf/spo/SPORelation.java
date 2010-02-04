@@ -56,7 +56,6 @@ import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.isolation.IConflictResolver;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.BatchRemove;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
@@ -76,7 +75,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
-import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
@@ -1572,11 +1570,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
     /**
      * Deletes {@link SPO}s, writing on the statement indices in parallel.
      * <p>
+     * Note: The {@link ISPO#isModified()} flag is set by this method.
+     * <p>
      * Note: This does NOT write on the justifications index. If justifications
-     * are being maintained then the {@link ISolution}s MUST report binding
-     * sets and an {@link InsertSolutionBuffer} MUST be used that knows how to
-     * write on the justifications index AND delegate writes on the statement
-     * indices to this method.
+     * are being maintained then the {@link ISolution}s MUST report binding sets
+     * and an {@link InsertSolutionBuffer} MUST be used that knows how to write
+     * on the justifications index AND delegate writes on the statement indices
+     * to this method.
      * <p>
      * Note: This does NOT perform truth maintenance!
      * <p>
@@ -1584,7 +1584,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * (statements that need to be deleted because they are about a statement
      * that is being deleted).
      * 
-     * @see AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)
+     * @see AbstractTripleStore#removeStatements(IChunkedOrderedIterator,
+     *      boolean)
      * @see SPOAccessPath#removeAll()
      */
     public long delete(final IChunkedOrderedIterator<ISPO> itr) {
@@ -1612,12 +1613,34 @@ public class SPORelation extends AbstractRelation<ISPO> {
     }
 
     /**
+     * Deletes {@link SPO}s, writing on the statement indices in parallel.
+     * <p>
+     * Note: The {@link ISPO#isModified()} flag is set by this method.
+     * <p>
+     * Note: This does NOT write on the justifications index. If justifications
+     * are being maintained then the {@link ISolution}s MUST report binding sets
+     * and an {@link InsertSolutionBuffer} MUST be used that knows how to write
+     * on the justifications index AND delegate writes on the statement indices
+     * to this method.
+     * <p>
+     * Note: This does NOT perform truth maintenance!
+     * <p>
+     * Note: This does NOT compute the closure for statement identifiers
+     * (statements that need to be deleted because they are about a statement
+     * that is being deleted).
+     * 
      * Note: The statements are inserted into each index in parallel. We clone
      * the statement[] and sort and bulk load each statement index in parallel
-     * using a thread pool.
+     * using a thread pool. All mutation to the statement indices goes through
+     * this method.
      * 
      * @param a
-     *            An {@link SPO}[].
+     *            An {@link ISPO}[] of the statements to be written onto the
+     *            statement indices. For each {@link ISPO}, the
+     *            {@link ISPO#isModified()} flag will be set iff the tuple
+     *            corresponding to the statement was : (a) inserted; (b) updated
+     *            (state change, such as to the {@link StatementEnum} value), or
+     *            (c) removed.
      * @param numStmts
      *            The #of elements of that array that will be written.
      * @param filter
@@ -1656,43 +1679,60 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
+        /*
+         * When true, mutations on the primary index (SPO or SPOC) will be
+         * reported. That metadata is used to set the isModified flag IFF the
+         * tuple corresponding to the statement in the indices was (a) inserted;
+         * (b) modified; or (c) removed.
+         */
+        final boolean reportMutation = true;
+        
         if (keyArity == 3) {
 
             tasks.add(new SPOIndexWriter(this, a, numStmts, false/* clone */,
-                    SPOKeyOrder.SPO, filter, sortTime, insertTime, mutationCount));
+                    SPOKeyOrder.SPO, filter, sortTime, insertTime, mutationCount,
+                    reportMutation));
     
             if (!oneAccessPath) {
     
                 tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.POS, filter, sortTime, insertTime, mutationCount));
+                        SPOKeyOrder.POS, filter, sortTime, insertTime, mutationCount,
+                        false/*reportMutation*/));
     
                 tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.OSP, filter, sortTime, insertTime, mutationCount));
+                        SPOKeyOrder.OSP, filter, sortTime, insertTime, mutationCount,
+                        false/*reportMutation*/));
     
             }
-            
+
         } else {
-            
+
             tasks.add(new SPOIndexWriter(this, a, numStmts, false/* clone */,
-                    SPOKeyOrder.SPOC, filter, sortTime, insertTime, mutationCount));
-    
+                    SPOKeyOrder.SPOC, filter, sortTime, insertTime,
+                    mutationCount, reportMutation));
+
             if (!oneAccessPath) {
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.POCS, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.OCSP, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.CSPO, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.PCSO, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.SOPC, filter, sortTime, insertTime, mutationCount));
-    
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.POCS, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.OCSP, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.CSPO, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.PCSO, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.SOPC, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
             }
             
         }
@@ -1716,7 +1756,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             for (int i = 0; i < tasks.size(); i++) {
                 
                 futures.get(i).get();
-                
+
             }
 /*
             elapsed_SPO = futures.get(0).get();
@@ -1759,7 +1799,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     /**
      * Delete the {@link SPO}s from the statement indices. Any justifications
-     * for those statements will also be deleted.
+     * for those statements will also be deleted. The {@link ISPO#isModified()}
+     * flag is set by this method if the {@link ISPO} was pre-existing in the
+     * database and was therefore deleted by this operation.
      * 
      * @param stmts
      *            The {@link SPO}s.
@@ -1767,15 +1809,17 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            The #of elements in that array to be processed.
      * 
      * @return The #of statements that were removed (mutationCount).
-     * 
-     * FIXME This needs to return the mutationCount. Resolve what is actually
-     * being reported. I expect that {@link BatchRemove} only removes those
-     * statements that it finds and that there is no constraint in place to
-     * assure that this method only sees {@link SPO}s known to exist (but
-     * perhaps it does since you can only do this safely for explicit
-     * statements).
      */
     public long delete(final ISPO[] stmts, final int numStmts) {
+
+        if (stmts == null)
+            throw new IllegalArgumentException();
+
+        if (numStmts < 0 || numStmts > stmts.length)
+            throw new IllegalArgumentException();
+
+        if (numStmts == 0)
+            return 0L;
         
         final long begin = System.currentTimeMillis();
 
@@ -1790,59 +1834,63 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
+        /*
+         * When true, mutations on the primary index (SPO or SPOC) will be
+         * reported. That metadata is used to set the isModified flag IFF the
+         * tuple corresponding to the statement in the indices was (a) inserted;
+         * (b) modified; or (c) removed.
+         */
+        final boolean reportMutation = true;
+
         if (keyArity == 3) {
-        
+
             tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                    SPOKeyOrder.SPO, false/* clone */, sortTime, writeTime));
-    
+                    SPOKeyOrder.SPO, false/* clone */, sortTime, writeTime,
+                    mutationCount, reportMutation));
+
             if (!oneAccessPath) {
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.POS, true/* clone */, sortTime,
-                                writeTime));
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.OSP, true/* clone */, sortTime,
-                                writeTime));
-    
-            }
-            
-        } else {
-            
-            tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                    SPOKeyOrder.SPOC, false/* clone */, sortTime, writeTime));
-    
-            if (!oneAccessPath) {
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.POCS, true/* clone */, sortTime,
-                                writeTime));
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.OCSP, true/* clone */, sortTime,
-                                writeTime));
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.CSPO, true/* clone */, sortTime,
-                                writeTime));
-        
-                        tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.PCSO, true/* clone */, sortTime,
-                                writeTime));
-        
-                        tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.SOPC, true/* clone */, sortTime,
-                                writeTime));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.POS, true/* clone */, sortTime, writeTime,
+                        mutationCount,
+                        false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.OSP, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
 
             }
-            
+
+        } else {
+
+            tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                    SPOKeyOrder.SPOC, false/* clone */, sortTime, writeTime,
+                    mutationCount, reportMutation));
+
+            if (!oneAccessPath) {
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.POCS, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.OCSP, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.CSPO, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.PCSO, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.SOPC, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+            }
+
         }
 
         if (justify) {
@@ -1924,7 +1972,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
-        return numStmts;
+        return mutationCount.get();
         
     }
     

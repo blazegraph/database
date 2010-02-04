@@ -33,6 +33,7 @@ import java.io.ObjectOutput;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
@@ -51,7 +52,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
     private static final long serialVersionUID = -5332443478547654844L;
 
     private boolean assertFound;
-    private boolean returnOldValues;
+    private ReturnWhatEnum returnWhat;
 
     /**
      * True iff the procedure will verify that each supplied key was in fact
@@ -69,7 +70,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
      */
     public boolean getReturnOldValues() {
 
-        return returnOldValues;
+        return returnWhat == ReturnWhatEnum.OldValues;
 
     }
 
@@ -78,6 +79,56 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
         return false;
         
     }
+
+    /**
+     * What to return.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    private static enum ReturnWhatEnum {
+      
+        /**
+         * Return the #of tuples that were deleted.
+         */
+        MutationCount(0),
+        
+        /**
+         * Return the old value for each tuple.
+         */
+        OldValues(1),
+        
+        /**
+         * Return a {@link ResultBitBuffer}, which is basically a bit mask
+         * indicating which of the caller's tuples were deleted.
+         */
+        BitMask(2);
+        
+        private final int w;
+        
+        private ReturnWhatEnum(int w) {
+            this.w = w;
+        }
+
+        public int getValue() {
+            return w;
+        }
+        
+        public static ReturnWhatEnum valueOf(final int w) {
+            switch (w) {
+            case 0:
+                return MutationCount;
+            case 1:
+                return OldValues;
+            case 2:
+                return BitMask;
+            default:
+                throw new IllegalArgumentException();
+            }
+        }
+        
+    };
     
     /**
      * Factory for {@link BatchRemove} procedures.
@@ -93,14 +144,24 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
          * the index by the operation.
          */
         public static final BatchRemoveConstructor RETURN_OLD_VALUES = new BatchRemoveConstructor(
-                false, true);
+                false, ReturnWhatEnum.OldValues);
 
         /**
          * Singleton does NOT request the return of the values that were removed
-         * from the index by the operation.
+         * from the index by the operation. Instead, only the #of deleted tuples
+         * is return (the mutationCount).
          */
-        public static final BatchRemoveConstructor RETURN_NO_VALUES = new BatchRemoveConstructor(
-                false, false);
+        public static final BatchRemoveConstructor RETURN_MUTATION_COUNT = new BatchRemoveConstructor(
+                false, ReturnWhatEnum.MutationCount);
+
+        /**
+         * Singleton requests the return of a {@link ResultBitBuffer} providing
+         * a bit mask of the tuples which were removed from the index by this
+         * operation (that is, those tuples which were pre-existing in the index
+         * in a non-deleted state).
+         */
+        public static final BatchRemoveConstructor RETURN_BIT_MASK = new BatchRemoveConstructor(
+                false, ReturnWhatEnum.BitMask);
 
         /**
          * Singleton does NOT request the return of the values that were removed
@@ -108,10 +169,10 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
          * present in the index.
          */
         public static final BatchRemoveConstructor ASSERT_FOUND_RETURN_NO_VALUES = new BatchRemoveConstructor(
-                true, false);
+                true, ReturnWhatEnum.BitMask);
 
         private final boolean assertFound;
-        private final boolean returnOldValues;
+        private final ReturnWhatEnum returnWhat;
 
         /**
          * Values ARE NOT sent.
@@ -122,11 +183,12 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
             
         }
 
-        private BatchRemoveConstructor(boolean assertFound, boolean returnOldValues) {
+        private BatchRemoveConstructor(final boolean assertFound,
+                final ReturnWhatEnum returnWhat) {
 
             this.assertFound = assertFound;
             
-            this.returnOldValues = returnOldValues;
+            this.returnWhat = returnWhat;
 
         }
 
@@ -137,7 +199,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
                 throw new IllegalArgumentException("vals should be null");
 
             return new BatchRemove(keySer, valSer, fromIndex, toIndex, keys,
-                    assertFound, returnOldValues);
+                    assertFound, returnWhat);
 
         }
 
@@ -166,14 +228,17 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
      */
     protected BatchRemove(IRabaCoder keySer, IRabaCoder valSer,
             int fromIndex, int toIndex, byte[][] keys, boolean assertFound,
-            boolean returnOldValues) {
+            ReturnWhatEnum returnWhat) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, null/* vals */);
 
         this.assertFound = assertFound;
 
-        this.returnOldValues = returnOldValues;
+        this.returnWhat = returnWhat;
 
+        if (returnWhat == null)
+            throw new IllegalArgumentException();
+        
     }
 
     /**
@@ -191,14 +256,34 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
 
         final int n = getKeyCount();
 
+        final boolean returnOldValues = getReturnOldValues();
+        
         final byte[][] ret = returnOldValues ? new byte[n][] : null;
 
-        int i = 0;
+        final boolean[] modified = returnWhat == ReturnWhatEnum.BitMask ? new boolean[n]
+                : null;
+        
+        int i = 0, mutationCount = 0;
 
+        final IRaba keys = getKeys();
+        
         while (i < n) {
 
-            final byte[] key = getKey(i);
+            final byte[] key = keys.get(i);
             
+            if (!returnOldValues && ndx.contains(key)) {
+
+                // Track a mutation counter.
+                mutationCount++;
+                
+                if (modified != null) {
+
+                    modified[i] = true;
+
+                }
+                
+            }
+
             final byte[] oldval = ndx.remove(key);
 
             if(assertFound) {
@@ -222,36 +307,48 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
 
         }
 
-        if (returnOldValues) {
-
+        switch (returnWhat) {
+        
+        case MutationCount:
+            
+            return Long.valueOf(mutationCount);
+        
+        case OldValues:
+        
             return new ResultBuffer(n, ret, ndx.getIndexMetadata()
                     .getTupleSerializer().getLeafValuesCoder());
-
+        
+        case BitMask:
+            
+            return new ResultBitBuffer(n, modified, mutationCount);
+        
+        default:
+            throw new AssertionError();
+        
         }
-
-        return null;
-
+        
     }
 
     @Override
-    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
+    protected void readMetadata(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
 
         super.readMetadata(in);
 
         assertFound = in.readBoolean();
-        
-        returnOldValues = in.readBoolean();
+
+        returnWhat = ReturnWhatEnum.valueOf(in.readByte());
 
     }
 
     @Override
-    protected void writeMetadata(ObjectOutput out) throws IOException {
+    protected void writeMetadata(final ObjectOutput out) throws IOException {
 
         super.writeMetadata(out);
-        
+
         out.writeBoolean(assertFound);
 
-        out.writeBoolean(returnOldValues);
+        out.writeByte((byte) returnWhat.getValue());
 
     }
 

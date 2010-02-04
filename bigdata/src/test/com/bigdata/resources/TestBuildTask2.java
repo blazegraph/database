@@ -298,7 +298,7 @@ public class TestBuildTask2 extends AbstractResourceManagerTestCase {
 
                     }
 
-                    final IIndexProcedure proc = BatchRemoveConstructor.RETURN_NO_VALUES
+                    final IIndexProcedure proc = BatchRemoveConstructor.RETURN_MUTATION_COUNT
                             .newInstance(indexMetadata, 0/* fromIndex */,
                                     nentries/* toIndex */, keys, null/* vals */);
 

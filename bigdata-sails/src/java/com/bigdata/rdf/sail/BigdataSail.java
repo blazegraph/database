@@ -79,7 +79,6 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ContextStatementImpl;
 import org.openrdf.model.impl.NamespaceImpl;
-import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
@@ -1093,62 +1092,61 @@ public class BigdataSail extends SailBase implements Sail {
         }
 
         /**
-         * Return the retraction buffer.
+         * Return the retraction buffer (truth maintenance only).
          * <p>
          * The retraction buffer is used by the {@link SailConnection} API IFF
          * truth maintenance is enabled since the only methods available on the
          * {@link Sail} to delete statements,
          * {@link #removeStatements(Resource, URI, Value)} and
          * {@link #removeStatements(Resource, URI, Value, Resource[])}, each
-         * accepts a triple pattern rather than a set of statements. The
+         * accepts a statement pattern rather than a set of statements. The
          * {@link AbstractTripleStore} directly supports removal of statements
          * matching a triple pattern, so we do not buffer retractions for those
          * method UNLESS truth maintenance is enabled.
-         * <p>
-         * Note: you CAN simply obtain the retraction buffer, write on it the
-         * statements to be retracted, and the {@link BigdataSailConnection}
-         * will do the right thing whether or not truth maintenance is enabled.
-         * <p>
-         * When non-<code>null</code> and non-empty the buffer MUST be
-         * flushed (a) if a transaction completes (otherwise writes will not be
-         * stored on the database); or (b) if there is a read against the
-         * database during a transaction (otherwise reads will not see the
-         * unflushed statements).
-         * <p>
-         * Note: if {@link #truthMaintenance} is enabled then this buffer is
-         * backed by a temporary store which accumulates the SPOs to be
-         * retracted. Otherwise it will write directly on the database each time
-         * it is flushed, including when it overflows.
-         * <p>
          */
+//        * <p>
+//        * Note: you CAN simply obtain the retraction buffer, write on it the
+//        * statements to be retracted, and the {@link BigdataSailConnection}
+//        * will do the right thing whether or not truth maintenance is enabled.
+//        * <p>
+//        * When non-<code>null</code> and non-empty the buffer MUST be
+//        * flushed (a) if a transaction completes (otherwise writes will not be
+//        * stored on the database); or (b) if there is a read against the
+//        * database during a transaction (otherwise reads will not see the
+//        * unflushed statements).
+//        * <p>
+//        * Note: if {@link #truthMaintenance} is enabled then this buffer is
+//        * backed by a temporary store which accumulates the SPOs to be
+//        * retracted. Otherwise it will write directly on the database each time
+//        * it is flushed, including when it overflows.
+//        * <p>
         synchronized protected StatementBuffer<Statement> getRetractionBuffer() {
 
-            if (retractBuffer == null) {
+            if (retractBuffer == null && truthMaintenance) {
 
-                if (truthMaintenance) {
-
-                    retractBuffer = new StatementBuffer<Statement>(tm
-                            .newTempTripleStore(), database, bufferCapacity);
-
-                } else {
-
-                    /*
-                     * Note: The SailConnection API will not use the
-                     * [retractBuffer] when truth maintenance is disabled, but
-                     * one is returned anyway so that callers may buffer
-                     * statements which they have on hand for retraction rather
-                     * as a complement to using triple patterns to describe the
-                     * statements to be retracted (which is how you do it with
-                     * the SailConnection API).
-                     */
-
-                    retractBuffer = new StatementBuffer<Statement>(database,
-                            bufferCapacity);
-
-                }
+                retractBuffer = new StatementBuffer<Statement>(tm
+                        .newTempTripleStore(), database, bufferCapacity);
 
                 // FIXME bnodes : Must also track the reverse mapping [bnodes2].
                 retractBuffer.setBNodeMap(bnodes);
+
+//                    /*
+//                     * Note: The SailConnection API will not use the
+//                     * [retractBuffer] when truth maintenance is disabled, but
+//                     * one is returned anyway so that callers may buffer
+//                     * statements which they have on hand for retraction rather
+//                     * as a complement to using triple patterns to describe the
+//                     * statements to be retracted (which is how you do it with
+//                     * the SailConnection API).
+//                     */
+//
+//                    retractBuffer = new StatementBuffer<Statement>(database,
+//                            bufferCapacity);
+//
+//                }
+//
+//                // FIXME bnodes : Must also track the reverse mapping [bnodes2].
+//                retractBuffer.setBNodeMap(bnodes);
                 
             }
             
@@ -2502,7 +2500,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * this.
                  */
                     dataset = replaceValues(dataset, tupleExpr);
-                    
+
                 final TripleSource tripleSource = new BigdataTripleSource(this,
                         includeInferred);
 

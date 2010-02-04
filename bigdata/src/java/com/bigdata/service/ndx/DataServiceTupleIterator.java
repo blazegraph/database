@@ -142,7 +142,7 @@ public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> 
          */
 
         ndx.submit(0/*fromIndex*/,n/*toIndex*/, keys, null/* vals */,
-                BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
+                BatchRemoveConstructor.RETURN_MUTATION_COUNT, null/* handler */);
 
     }
 
@@ -154,7 +154,7 @@ public class DataServiceTupleIterator<E> extends RawDataServiceTupleIterator<E> 
          */
 
         ndx.submit(0/*fromIndex*/,1/*toIndex*/, new byte[][] { key }, null/* vals */,
-                BatchRemoveConstructor.RETURN_NO_VALUES, null/* handler */);
+                BatchRemoveConstructor.RETURN_MUTATION_COUNT, null/* handler */);
         
     }
     
