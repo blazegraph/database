@@ -676,7 +676,7 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
         }
 
     }
-    
+
     /**
      * Verify that we can locate a statement that we add to the database using
      * each statement index.

@@ -64,7 +64,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
          * Use a proxy test suite and specify the delegate.
          */
 
-        ProxyTestSuite suite = new ProxyTestSuite(delegate,
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
                 "Local Triple Store With Provenance Test Suite");
 
         /*

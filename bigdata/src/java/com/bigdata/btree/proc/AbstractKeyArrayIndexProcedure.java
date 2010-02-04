@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
@@ -605,26 +606,48 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 //        private BitVector a;
         private boolean[] a;
 
+        transient private int onCount;
+        
         /**
          * De-serialization ctor.
          */
         public ResultBitBuffer() {
             
         }
-        
+
         /**
          * 
          * @param n
          *            #of values in <i>a</i> containing data.
          * @param a
          *            The data.
+         * @param onCount
+         *            The #of bits which were on in the array.
          */
-        public ResultBitBuffer(final int n, final boolean[] a) {
+        public ResultBitBuffer(final int n, final boolean[] a, final int onCount) {
 
+            if (n < 0)
+                throw new IllegalArgumentException();
+            
+            if (a == null)
+                throw new IllegalArgumentException();
+            
+            if (onCount < 0 || onCount > n)
+                throw new IllegalArgumentException();
+            
             this.n = n;
 
             this.a = a;
-            
+
+            /*
+             * Note: The onCount is a require parameter because this class is
+             * used in non-RMI contexts as well where it is not deserialized and
+             * hence onCount will not be set unless it is done in this
+             * constructor.
+             */
+ 
+            this.onCount = onCount;
+
         }
 
         public int getResultCount() {
@@ -632,11 +655,23 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             return n;
             
         }
-        
+
+        /**
+         * 
+         */
         public boolean[] getResult() {
 
             return a;
 
+        }
+        
+        /**
+         * Return the #of bits which are "on" (aka true).
+         */
+        public int getOnCount() {
+            
+            return onCount;
+            
         }
 
         public void readExternal(final ObjectInput in) throws IOException,
@@ -654,7 +689,9 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
                 final boolean bit = ibs.readBit() == 1 ? true : false;
 //                a.set(i, bit);
-                a[i] = bit;
+
+                if (a[i] = bit)
+                    onCount++;
                 
             }
             
@@ -736,6 +773,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             IResultHandler<ResultBitBuffer, ResultBitBuffer> {
 
         private final boolean[] results;
+        private final AtomicInteger onCount = new AtomicInteger();
 
         public ResultBitBufferHandler(final int nkeys) {
 
@@ -747,6 +785,8 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
             System.arraycopy(result.getResult(), 0, results, split.fromIndex,
                     split.ntuples);
+            
+            onCount.addAndGet(result.getOnCount());
 
         }
 
@@ -755,7 +795,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
          */
         public ResultBitBuffer getResult() {
 
-            return new ResultBitBuffer(results.length, results);
+            return new ResultBitBuffer(results.length, results, onCount.get());
 
         }
 

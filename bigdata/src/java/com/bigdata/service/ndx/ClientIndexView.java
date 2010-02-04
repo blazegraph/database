@@ -570,7 +570,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
 
     }
     
-    public byte[] remove(byte[] key) {
+    public byte[] remove(final byte[] key) {
 
         if (batchOnly)
             log.error(NON_BATCH_API,new RuntimeException());
@@ -584,7 +584,7 @@ public class ClientIndexView implements IScaleOutClientIndex {
         submit(0/* fromIndex */, 1/* toIndex */, keys, null/* vals */,
                 BatchRemoveConstructor.RETURN_OLD_VALUES, resultHandler);
 
-        return ((ResultBuffer) resultHandler.getResult()).getResult(0);
+        return ((ResultBuffer) resultHandler.getResult()).getValues().get(0);
 
     }
 

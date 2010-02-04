@@ -1028,16 +1028,9 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         final AbstractTripleStore db = sail.getDatabase();
 
-        /*
-         * @todo should be a parameter for the experimental configuration. the
-         * writeBuffer must be closed during normal shutdown and we must await
-         * its Future. for abnormal shutdown the Future should be cancelled.
-         */
-        final BlockingBuffer<ISPO[]> writeBuffer = null;
-        
         final RDFLoadTaskFactory loadTaskFactory = //
-        new RDFLoadTaskFactory(db, bufferCapacity, writeBuffer,
-                verifyRDFSourceData, false/*deleteAfter*/, fallback);
+        new RDFLoadTaskFactory(db, bufferCapacity, verifyRDFSourceData,
+                false/* deleteAfter */, fallback);
 
         final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,
                 nthreads);

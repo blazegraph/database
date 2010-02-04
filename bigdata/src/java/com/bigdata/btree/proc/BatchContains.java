@@ -97,8 +97,8 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
      * 
      * @see BatchContainsConstructor
      */
-    protected BatchContains(IRabaCoder keysCoder, int fromIndex, int toIndex,
-            byte[][] keys) {
+    protected BatchContains(final IRabaCoder keysCoder, final int fromIndex,
+            final int toIndex, final byte[][] keys) {
 
         super(keysCoder, null, fromIndex, toIndex, keys, null/*vals*/);
 
@@ -123,17 +123,21 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
 
         final boolean[] ret = new boolean[n];
 
-        int i = 0;
+        int i = 0, onCount = 0;
 
         while (i < n) {
 
-            ret[i] = ndx.contains(getKey(i));
+            if(ret[i] = ndx.contains(getKey(i))) {
+                
+                onCount++;
+                
+            }
 
             i++;
 
         }
 
-        return new ResultBitBuffer(n, ret);
+        return new ResultBitBuffer(n, ret, onCount);
 
     }
     
