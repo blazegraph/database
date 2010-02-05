@@ -92,12 +92,12 @@ public abstract class RepositoryConnectionTest extends TestCase {
      * when the blank node getStatements() query issue is removed from
      * consideration.
      */
-    protected Resource bob;
-//    protected BNode bob;
+//    protected Resource bob;
+    protected BNode bob;
 
     // @todo ditto for alice.
-//    protected BNode alice;
-	protected Resource alice;
+    protected BNode alice;
+//	protected Resource alice;
 
 	protected BNode alexander;
 
