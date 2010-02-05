@@ -131,14 +131,10 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
         q.add(ref2);
         assertEquals(0, q.size());
 
-        // 4th ref.
-        q.add(ref3);
-        assertEquals(0, q.size());
-
-        // 5th ref. causes batch eviction to the shared buffer before adding
+        // 4th ref. causes batch eviction to the shared buffer before adding
         // the new element.
-        q.add(ref4);
-        assertEquals(4, q.size());
+        q.add(ref3);
+        assertEquals(3, q.size());
         
     }
 
