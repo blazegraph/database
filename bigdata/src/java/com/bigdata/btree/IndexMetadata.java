@@ -1053,7 +1053,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private LocalPartitionMetadata pmd;
     private String btreeClassName;
     private String checkpointClassName;
-    private IAddressSerializer addrSer;
+//    private IAddressSerializer addrSer;
     private IRabaCoder nodeKeysCoder;
     private ITupleSerializer<?, ?> tupleSer;
     private IRecordCompressorFactory<?> btreeRecordCompressorFactory;
@@ -1374,10 +1374,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    /**
-     * Object used to (de-)serialize the addresses of the children of a node.
-     */
-    public final IAddressSerializer getAddressSerializer() {return addrSer;}
+//    /**
+//     * Object used to (de-)serialize the addresses of the children of a node.
+//     */
+//    public final IAddressSerializer getAddressSerializer() {return addrSer;}
 
     /**
      * Object used to code (compress) the keys in a node.
@@ -1452,16 +1452,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     public final boolean getDeleteMarkers() {return deleteMarkers;}
     
-    public final void setDeleteMarkers(boolean deleteMarkers) {
+    public final void setDeleteMarkers(final boolean deleteMarkers) {
 
         this.deleteMarkers = deleteMarkers;
         
     }
 
     /**
-     * When <code>true</code> the index will maintain a per-index entry
+     * When <code>true</code> the index will maintain a per-index entry revision
      * timestamp. The primary use of this is in support of transactional
-     * isolation.
+     * isolation. Delete markers MUST be enabled when using revision timestamps.
      * 
      * @see #getVersionTimestampFilters()
      */
@@ -1555,14 +1555,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setAddressSerializer(final IAddressSerializer addrSer) {
-        
-        if (addrSer == null)
-            throw new IllegalArgumentException();
-        
-        this.addrSer = addrSer;
-        
-    }
+//    public void setAddressSerializer(final IAddressSerializer addrSer) {
+//        
+//        if (addrSer == null)
+//            throw new IllegalArgumentException();
+//        
+//        this.addrSer = addrSer;
+//        
+//    }
 
     public void setNodeKeySerializer(final IRabaCoder nodeKeysCoder) {
         
@@ -2051,13 +2051,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         this.checkpointClassName = Checkpoint.class.getName();
         
-        /*
-         * FIXME Experiment with performance using a packed address serializer
-         * (or a nibble-based one). This effects how we serialize the child
-         * addresses for a Node. (PackedAddressSerialized appears to be broken
-         * - see the NodeSerialier test suite).
-         */
-        this.addrSer = AddressSerializer.INSTANCE;
+//        this.addrSer = AddressSerializer.INSTANCE;
         
 //        this.nodeKeySer = PrefixSerializer.INSTANCE;
         this.nodeKeysCoder = newInstance(getProperty(indexManager, properties,
@@ -2331,7 +2325,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", pmd=" + pmd);
         sb.append(", class=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
-        sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
+//        sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeysCoder=" + nodeKeysCoder.getClass().getName());
         sb.append(", btreeRecordCompressorFactory="
                 + (btreeRecordCompressorFactory == null ? "N/A"
@@ -2424,9 +2418,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private static transient final int VERSION7 = 0x07;
     
     /**
+     * This version gets rid of the IAddressSerializer interface used by the
+     * older {@link NodeSerializer} class to (de-)serialize the child addresses
+     * for a {@link Node}.
+     */
+    private static transient final int VERSION8 = 0x08;
+    
+    /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION7;
+    private static transient final int CURRENT_VERSION = VERSION8;
     
     /**
      * @todo review generated record for compactness.
@@ -2445,6 +2446,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION5:
         case VERSION6:
         case VERSION7:
+        case VERSION8:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2481,7 +2483,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         checkpointClassName = in.readUTF();
 
-        addrSer = (IAddressSerializer) in.readObject();
+        if (version < VERSION8) {
+
+            // Read and discard the IAddressSerializer object.
+            in.readObject();
+            
+        }
 
         nodeKeysCoder = (IRabaCoder) in.readObject();
 
@@ -2687,7 +2694,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         out.writeUTF(checkpointClassName);
         
-        out.writeObject(addrSer);
+        // Note: This field was dropped as of VERSION8.
+//        out.writeObject(addrSer);
         
         out.writeObject(nodeKeysCoder);
         

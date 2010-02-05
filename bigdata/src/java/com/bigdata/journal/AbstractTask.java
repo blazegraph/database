@@ -2376,18 +2376,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.getKeyBuilder();
 //        }
         
-        public Object deserialize(byte[] b, int off, int len) {
-            return delegate.deserialize(b, off, len);
-        }
-
-        public Object deserialize(byte[] b) {
-            return delegate.deserialize(b);
-        }
-
-        public Object deserialize(ByteBuffer buf) {
-            return delegate.deserialize(buf);
-        }
-
         public void force(boolean metadata) {
             delegate.force(metadata);
         }
@@ -2458,10 +2446,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
-        }
-
-        public byte[] serialize(Object obj) {
-            return delegate.serialize(obj);
         }
 
         public long size() {
@@ -2778,18 +2762,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.getKeyBuilder();
 //        }
         
-        public Object deserialize(byte[] b, int off, int len) {
-            return delegate.deserialize(b, off, len);
-        }
-
-        public Object deserialize(byte[] b) {
-            return delegate.deserialize(b);
-        }
-
-        public Object deserialize(ByteBuffer buf) {
-            return delegate.deserialize(buf);
-        }
-
         public int getByteCount(long addr) {
             return delegate.getByteCount(addr);
         }
@@ -2856,10 +2828,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
-        }
-
-        public byte[] serialize(Object obj) {
-            return delegate.serialize(obj);
         }
 
         public long size() {

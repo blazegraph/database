@@ -546,18 +546,6 @@ public class ReplicatedStore implements IRawStore {
         localStore.deleteResources();
     }
 
-    public Object deserialize(byte[] b, int off, int len) {
-        return localStore.deserialize(b, off, len);
-    }
-
-    public Object deserialize(byte[] b) {
-        return localStore.deserialize(b);
-    }
-
-    public Object deserialize(ByteBuffer buf) {
-        return localStore.deserialize(buf);
-    }
-
     public int getByteCount(long addr) {
         return localStore.getByteCount(addr);
     }
@@ -600,10 +588,6 @@ public class ReplicatedStore implements IRawStore {
 
     public ByteBuffer read(long addr) {
         return localStore.read(addr);
-    }
-
-    public byte[] serialize(Object obj) {
-        return localStore.serialize(obj);
     }
 
     public long size() {

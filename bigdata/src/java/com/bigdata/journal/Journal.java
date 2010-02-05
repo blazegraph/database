@@ -279,7 +279,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * Always returns an array containing a single {@link BTree} which is the
      * {@link BTree} loaded from the commit record whose commit timestamp is
      * less than or equal to <i>timestamp</i> -or- <code>null</code> if there
-     * are no {@link ICommitRecord}s that satisify the probe or if the named
+     * are no {@link ICommitRecord}s that satisfy the probe or if the named
      * index was not registered as of that timestamp.
      * 
      * @param name
@@ -422,7 +422,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     /**
      * Always returns <i>this</i>.
      */
-    final public AbstractJournal getJournal(long timestamp) {
+    final public AbstractJournal getJournal(final long timestamp) {
         
         return this;
         

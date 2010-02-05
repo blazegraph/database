@@ -3234,26 +3234,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
 
     /*
-     * IStoreSerializer
-     */
-    
-    final public Object deserialize(byte[] b, int off, int len) {
-        return _bufferStrategy.deserialize(b, off, len);
-    }
-
-    final public Object deserialize(byte[] b) {
-        return _bufferStrategy.deserialize(b);
-    }
-
-    final public Object deserialize(ByteBuffer buf) {
-        return _bufferStrategy.deserialize(buf);
-    }
-
-    final public byte[] serialize(Object obj) {
-        return _bufferStrategy.serialize(obj);
-    }
-
-    /*
      * IAddressManager
      */
 

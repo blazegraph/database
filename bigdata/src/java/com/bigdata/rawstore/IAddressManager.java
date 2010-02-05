@@ -31,18 +31,11 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.btree.Node;
 
 /**
  * An interface that encapsulates operations on opaque identifiers used to
  * locate data within an {@link IRawStore}.
- * 
- * @todo consider address segments to support fast combination of buffers each
- *       containing its own address space. A prime candidate for this is the
- *       {@link IndexSegmentBuilder} which currently jumps through hoops in
- *       order to make the nodes resolvable. When considering segments, note
- *       that addresses may currently be directly tested for order since the
- *       offset is in the high int32 word.
  *       
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -110,6 +103,15 @@ public interface IAddressManager {
      * @param addr
      *            The opaque identifier that is the within store locator for
      *            some datum.
+     * 
+     * @deprecated Address packing is not currently used by anything. While it
+     *             can produce somewhat more compact representations, it is
+     *             problematic in that it requires an awareness of the
+     *             {@link IAddressManager} at the point in the code where the
+     *             address is to be decoded. This is not always feasible and
+     *             other techniques are available to code the addresses more
+     *             efficiently, for example, the child addresses of a
+     *             {@link Node}.
      */
     public void packAddr(DataOutput out, long addr) throws IOException;
     
@@ -121,6 +123,15 @@ public interface IAddressManager {
      * 
      * @return The opaque identifier that is the within store locator for some
      *         datum.
+     * 
+     * @deprecated Address packing is not currently used by anything. While it
+     *             can produce somewhat more compact representations, it is
+     *             problematic in that it requires an awareness of the
+     *             {@link IAddressManager} at the point in the code where the
+     *             address is to be decoded. This is not always feasible and
+     *             other techniques are available to code the addresses more
+     *             efficiently, for example, the child addresses of a
+     *             {@link Node}.
      */
     public long unpackAddr(DataInput in) throws IOException;
 
