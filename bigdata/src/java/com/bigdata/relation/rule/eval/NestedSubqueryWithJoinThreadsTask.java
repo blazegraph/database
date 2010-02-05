@@ -85,12 +85,12 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  *       generalization of the binding set and its serialization and a mix up of
  *       that with the iterators on the {@link IAccessPath}.
  * 
- * @todo support foreign key joins.
- * 
- * @see JoinMasterTask, which is designed for scale-out federations.
+ * @see JoinMasterTask, which is designed for scale-out federations but is also
+ *      much faster under heavy query workloads for scale-up query as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: NestedSubqueryWithJoinThreadsTask.java 2372 2010-02-01
+ *          16:19:39Z thompsonbry $
  */
 public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 

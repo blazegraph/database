@@ -53,14 +53,15 @@ import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.ISlice;
 import com.bigdata.relation.rule.eval.ActionEnum;
 import com.bigdata.relation.rule.eval.IJoinNexus;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
 import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.IStepTask;
-import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.relation.rule.eval.RuleLog;
 import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.relation.rule.eval.RuleStats;
@@ -100,17 +101,17 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  * The last join dimension is slightly different. Its
  * {@link UnsynchronizedArrayBuffer} writes onto the
  * {@link IJoinNexus#newQueryBuffer()},
- * {@link IJoinNexus#newInsertBuffer(com.bigdata.relation.IMutableRelation)},
- * or {@link IJoinNexus#newDeleteBuffer(com.bigdata.relation.IMutableRelation)}
+ * {@link IJoinNexus#newInsertBuffer(com.bigdata.relation.IMutableRelation)}, or
+ * {@link IJoinNexus#newDeleteBuffer(com.bigdata.relation.IMutableRelation)}
  * depending on the {@link ActionEnum}.
  * <p>
  * For each {@link JoinTask}, once its source iterator(s) have been exhausted
  * and the {@link IAccessPath} reading from the last source {@link IBindingSet}
  * has been exhausted, then the {@link JoinTask} for that join dimension is done
  * and it will flush its {@link UnsynchronizedArrayBuffer} and close its output
- * {@link IBuffer} and wait for the downstream {@link JoinTask}s to report
- * their {@link RuleStats}. Those {@link RuleStats} are aggregated and passed
- * back to its caller in turn.
+ * {@link IBuffer} and wait for the downstream {@link JoinTask}s to report their
+ * {@link RuleStats}. Those {@link RuleStats} are aggregated and passed back to
+ * its caller in turn.
  * <p>
  * Each join dimension is single-threaded. Coordination of resources is achieved
  * using the output buffer for each join dimension. This allows a source join
@@ -119,9 +120,9 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  * <p>
  * The {@link JoinMasterTask} is responsible for the {@link JoinTask}s for the
  * first join dimension. Each {@link JoinTask} is responsible for the downstream
- * {@link JoinTask}s. If the {@link JoinMasterTask} is interrupted or
- * cancelled, then it interrupts or cancels the {@link JoinTask}s for the first
- * join dimension. If {@link JoinTask} is interrupted or cancelled then it must
+ * {@link JoinTask}s. If the {@link JoinMasterTask} is interrupted or cancelled,
+ * then it interrupts or cancels the {@link JoinTask}s for the first join
+ * dimension. If {@link JoinTask} is interrupted or cancelled then it must
  * cancel any {@link JoinTask}s which it has created for the next join
  * dimension.
  * 
@@ -154,16 +155,16 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  * {@link ConcurrencyManager} on the various {@link DataService}s on which the
  * index partitions reside from which the {@link IAccessPath}s must read. This
  * allows the {@link IAccessPath} to read on the local index object and reduces
- * the message traffic to pulling chunks of {@link IBindingSet}s from the
- * source {@link JoinTask}s.
+ * the message traffic to pulling chunks of {@link IBindingSet}s from the source
+ * {@link JoinTask}s.
  * <p>
  * For the {@link JoinMasterTask} and for each {@link JoinTask}, the fan out of
  * {@link JoinTask}s is determined by the #of index partitions that are spanned
- * by the {@link IAccessPath}s required to evaluate the {@link IBindingSet}s
- * for the next join dimension. The {@link IAccessPath} will not be used by the
+ * by the {@link IAccessPath}s required to evaluate the {@link IBindingSet}s for
+ * the next join dimension. The {@link IAccessPath} will not be used by the
  * source join dimension to read on the index, merely to discover the index
- * partitions to which the generating {@link IBindingSet}s must be assigned.
- * The index partition spanned for a given {@link IBindingSet} is determined by
+ * partitions to which the generating {@link IBindingSet}s must be assigned. The
+ * index partition spanned for a given {@link IBindingSet} is determined by
  * generating an as bound {@link IPredicate} for the next join dimension,
  * instantiating the {@link IAccessPath} on the source join dimension that will
  * be used by the target join dimension, and then using a locator scan for the
@@ -191,8 +192,8 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  * to manage this fan out.
  * <p>
  * Fan out means that there may be N>1 {@link JoinTask}s for each join
- * dimension. For this reason, a QUERY SLICE must be applied by the client
- * reading on the {@link IAsynchronousIterator} returned by the
+ * dimension. For this reason, a QUERY {@link ISlice} must be applied by the
+ * client reading on the {@link IAsynchronousIterator} returned by the
  * {@link JoinMasterTask}.
  * <p>
  * Fan out also implies a requirement for fan-in in order to reduce the scatter
@@ -223,9 +224,23 @@ import com.bigdata.util.concurrent.ExecutionExceptions;
  *       There is a strong requirement for closure to get back the
  *       mutationCount. That would require us to keep alive a source
  *       {@link JoinTask} until all downstream {@link JoinTask}s complete.
- *       
- * @todo Slice should be enforced by the solution buffer for query. This change
- *       could be made to the {@link NestedSubqueryWithJoinThreadsTask}.
+ * 
+ * @todo The pipeline join needs to be modified to force stable evaluation
+ *       (single-threaded) and to observed the {@link ISlice} constraints and
+ *       {@link IQueryOptions#isStable()} constraint.
+ *       <p>
+ *       In order to avoid a hot spot on {@link RuleStats#solutionCount}, that
+ *       field should only be updated as chunks of solutions are produced. When
+ *       evaluating a SLICE, we will constrain the evaluation to be single
+ *       threaded so once again there will not be a hot spot on that field.
+ *       <p>
+ *       All of this should be done when we refactor the pipeline join to use a
+ *       fixed thread pool for join processing. In the meantime, query hints can
+ *       be used to specify the nested subquery join if you need stable
+ *       evaluation. In the long run, SPARQL aware query caching is the right
+ *       way to handle stable query and SLICE for scale-out since a stable
+ *       evaluation order can impose far too much constraint on parallelism
+ *       otherwise.
  * 
  * @todo We are not seeing the totals when a SLICE is used. I believe that the
  *       test harness is simply exiting once it gets its N results and the

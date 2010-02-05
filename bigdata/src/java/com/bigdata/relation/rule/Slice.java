@@ -28,6 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.rule;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.math.BigInteger;
 
 /**
@@ -36,16 +40,16 @@ import java.math.BigInteger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class Slice implements ISlice {
+public class Slice implements ISlice, Externalizable {
 
     /**
      * 
      */
     private static final long serialVersionUID = 5396509164843609197L;
 
-    private final long offset;
-    private final long limit;
-    private final long last;
+    private long offset;
+    private long limit;
+    private long last;
     
     /**
      * A slice corresponding to all results (offset is zero, limit is
@@ -63,7 +67,7 @@ public class Slice implements ISlice {
      * @throws IllegalArgumentException
      *             if limit is non-positive.
      */
-    public Slice(long offset,long limit) {
+    public Slice(final long offset, final long limit) {
         
         if (offset < 0)
             throw new IllegalArgumentException();
@@ -102,6 +106,23 @@ public class Slice implements ISlice {
     public String toString() {
         
         return "Slice{offset="+offset+", limit="+limit+", last="+last+"}";
+        
+    }
+
+    public void readExternal(ObjectInput in) throws IOException,
+            ClassNotFoundException {
+        
+        offset = in.readLong();
+        limit  = in.readLong();
+        last   = in.readLong();
+        
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+
+        out.writeLong(offset);
+        out.writeLong(limit);
+        out.writeLong(last);
         
     }
     

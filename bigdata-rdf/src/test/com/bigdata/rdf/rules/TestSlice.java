@@ -95,7 +95,9 @@ public class TestSlice extends AbstractRuleTestCase {
         
             final Properties properties = new Properties(getProperties());
             
-            // turn off infererence.
+//            properties.setProperty(Options.NESTED_SUBQUERY, "true");
+            
+            // turn off inference.
             properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class
                     .getName());
             
@@ -204,7 +206,11 @@ public class TestSlice extends AbstractRuleTestCase {
                     store.getIndexManager()).runQuery(
                     newRule(store, null/* slice */, foo, bar)),
                     new IBindingSet[] { bs0, bs1, bs2 });
-            
+
+            /*
+             * FIXME This is failing for the pipeline join which currently DOES
+             * NOT enforce the slice. See JoinMasterTask for this issue.
+             */
             // slice(0,1).
             assertSameSolutions(joinNexusFactory.newInstance(
                     store.getIndexManager()).runQuery(
@@ -297,7 +303,8 @@ public class TestSlice extends AbstractRuleTestCase {
      * @param expected
      *            The expected {@link IBindingSet}s.
      */
-    protected void assertSameSolutions(final IChunkedOrderedIterator<ISolution> itr,
+    protected void assertSameSolutions(
+            final IChunkedOrderedIterator<ISolution> itr,
             final IBindingSet[] expected) {
 
         if (itr == null)
@@ -309,13 +316,20 @@ public class TestSlice extends AbstractRuleTestCase {
         try {
 
             int n = 0;
-            
-            while(itr.hasNext()) {
+
+            while (itr.hasNext()) {
+
+                if (n >= expected.length) {
+
+                    fail("Too many solutions were produced: #of expected solutions="
+                            + expected.length);
+
+                }
                 
                 final IBindingSet actual = itr.next().getBindingSet();
 
                 assertNotNull("bindings not requested?", actual);
-                
+
                 if(!actual.equals(expected[n])) {
                     
                     fail("Wrong bindings: index=" + n + ", actual=" + actual
