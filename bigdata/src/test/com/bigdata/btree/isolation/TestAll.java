@@ -62,6 +62,9 @@ public class TestAll extends TestCase {
 
         // test isolated fused view (handles delete markers).
         suite.addTestSuite(TestIsolatedFusedView.class);
+
+        // test for mixing full transactions with unisolated operations.
+        suite.addTestSuite(TestMixedModeOperations.class);
         
         // test for state-based validation _concept_
         suite.addTestSuite(TestAccount.class);

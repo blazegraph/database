@@ -30,8 +30,6 @@ package com.bigdata.io;
 
 import java.io.Serializable;
 
-import com.bigdata.rawstore.IStoreSerializer;
-
 /**
  * An abstraction for serializing and de-serializing objects as byte[]s.
  * <p>
@@ -46,7 +44,6 @@ import com.bigdata.rawstore.IStoreSerializer;
  * @see SerializerUtil
  * @see IStreamSerializer
  * @todo reconcile {@link org.CognitiveWeb.extser.ISerializer}
- * @todo reconsider {@link IStoreSerializer} (can we drop it?)
  */
 public interface IRecordSerializer<T> extends Serializable {
 

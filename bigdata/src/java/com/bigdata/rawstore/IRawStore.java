@@ -99,7 +99,7 @@ import com.bigdata.mdi.IResourceMetadata;
  *       The caller is free to reuse the byte[] and the store always copies the
  *       data.
  */
-public interface IRawStore extends IAddressManager, IStoreSerializer {
+public interface IRawStore extends IAddressManager {
     
     /**
      * Write the data (unisolated).

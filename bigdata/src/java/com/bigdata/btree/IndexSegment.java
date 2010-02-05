@@ -456,6 +456,17 @@ public class IndexSegment extends AbstractBTree {
         
     }
     
+    /**
+     * @throws UnsupportedOperationException
+     *             always since the {@link IndexSegment} is read-only.
+     */
+    final public long getRevisionTimestamp() {
+        
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
+        
+    }
+    
+    
     /*
      * ISimpleBTree (disallows mutation operations, applies the optional bloom
      * filter when present).

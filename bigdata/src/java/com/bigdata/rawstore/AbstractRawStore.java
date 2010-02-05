@@ -42,12 +42,7 @@ import com.bigdata.LRUNexus;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class AbstractRawStore implements IRawStore, IStoreSerializer {
-
-    /**
-     * The object that handles serialization.
-     */
-    protected final IStoreSerializer serializer;
+abstract public class AbstractRawStore implements IRawStore {
 
     /**
      * Return the delegate object that provides the {@link IAddressManager}
@@ -66,32 +61,6 @@ abstract public class AbstractRawStore implements IRawStore, IStoreSerializer {
      */
     public AbstractRawStore() {
 
-        serializer = new StoreSerializer(this);
-        
-    }
-
-    final public Object deserialize(byte[] b, int off, int len) {
-        
-        return serializer.deserialize(b, off, len);
-        
-    }
-
-    final public Object deserialize(byte[] b) {
-        
-        return serializer.deserialize(b,0,b.length);
-        
-    }
-
-    final public Object deserialize(ByteBuffer buf) {
-        
-        return serializer.deserialize(buf);
-        
-    }
-
-    final public byte[] serialize(Object obj) {
-
-        return serializer.serialize(obj);
-        
     }
 
     public long write(ByteBuffer data, long oldAddr) {

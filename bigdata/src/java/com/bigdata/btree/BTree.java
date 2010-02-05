@@ -119,14 +119,6 @@ import com.bigdata.rawstore.IRawStore;
  *       maintains its representation so, for example, a micro-index would have
  *       to be maintained as part of the key buffer.
  * 
- * @todo create ring buffers to track the serialized size of the last 50 nodes
- *       and leaves so that we can estimate the serialized size of the total
- *       btree based on recent activity. we could use a moving average and
- *       persist it as part of the btree metadata. this could be used when
- *       making a decision to evict a btree vs migrate it onto a new journal and
- *       whether to split or join index segments during a journal overflow
- *       event.
- * 
  * @todo we could defer splits by redistributing keys to left/right siblings
  *       that are under capacity - this makes the tree a b*-tree. however, this
  *       is not critical since the journal is designed to be fully buffered and
@@ -197,9 +189,10 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         return store;
 
     }
-    
+
     /**
-     * Returns a mutable counter. All {@link ICounter}s returned by this method
+     * Returns an {@link ICounter}. The {@link ICounter} is mutable iff the
+     * {@link BTree} is mutable. All {@link ICounter}s returned by this method
      * report and increment the same underlying counter.
      * <p>
      * Note: When the {@link BTree} is part of a scale-out index then the
@@ -297,8 +290,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
 
     /**
      * Required constructor form for {@link BTree} and any derived subclasses.
-     * This ctor is used both to create a new {@link BTree}, and to load a
-     * {@link BTree} from the store using a {@link Checkpoint} record.
+     * This constructor is used both to create a new {@link BTree}, and to load
+     * a {@link BTree} from the store using a {@link Checkpoint} record.
      * 
      * @param store
      *            The store.
@@ -596,6 +589,15 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         return lastCommitTime;
         
     }
+
+    final public long getRevisionTimestamp() {
+        
+        if (readOnly)
+            throw new UnsupportedOperationException(ERROR_READ_ONLY);
+
+        return lastCommitTime + 1;
+        
+    }
     
     /**
      * Sets the lastCommitTime.
@@ -616,7 +618,7 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      *             if the timestamp is less than the previous value (it is
      *             permitted to advance but not to go backwards).
      */
-    final public void setLastCommitTime(long lastCommitTime) {
+    final public void setLastCommitTime(final long lastCommitTime) {
         
         if (lastCommitTime == 0L)
             throw new IllegalArgumentException();
@@ -687,9 +689,6 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
         }
 
         l.dirtyEvent(this);
-        
-        if (DEBUG)
-            log.debug("");
         
     }
     
@@ -923,7 +922,8 @@ public class BTree extends AbstractBTree implements ICommitter, ILocalBTreeView 
      */
     final public Checkpoint getCheckpoint() {
 
-        assert checkpoint != null;
+        if (checkpoint == null)
+            throw new AssertionError();
         
         return checkpoint;
         

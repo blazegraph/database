@@ -74,6 +74,7 @@ import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.CompactTask;
 import com.bigdata.journal.IAtomicStore;
+import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
@@ -1063,6 +1064,48 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * Note: This is fixed for an {@link IndexSegment}.
      */
     abstract public long getLastCommitTime();
+
+    /**
+     * The timestamp associated with unisolated writes on this index. This
+     * timestamp is designed to allow the interleaving of full transactions
+     * (whose revision timestamp is assigned by the transaction service) with
+     * unisolated operations on the same indices.
+     * <p>
+     * The revision timestamp assigned by this method is
+     * <code>lastCommitTime+1</code>. The reasoning is as follows. Revision
+     * timestamps are assigned by the transaction manager when the transaction
+     * is validated as part of its commit protocol. Therefore, revision
+     * timestamps are assigned after the transaction write set is complete.
+     * Further, the assigned revisionTimestamp will be strictly LT the
+     * commitTime for that transaction. By using <code>lastCommitTime+1</code>
+     * we are guaranteed that the revisionTimestamp for new writes (which will
+     * be part of some future commit point) will always be strictly GT the
+     * revisionTimestamp of historical writes (which were part of some prior
+     * commit point).
+     * <p>
+     * Note: Unisolated operations using this timestamp ARE NOT validated. The
+     * timestamp is simply applied to the tuple when it is inserted or updated
+     * and will become part of the restart safe state of the B+Tree once the
+     * unisolated operation participates in a commit.
+     * <p>
+     * Note: If an unisolated operation were to execute concurrent with a
+     * transaction commit for the same index then that could produce
+     * inconsistent results in the index and could trigger concurrent
+     * modification errors. In order to avoid such concurrent modification
+     * errors, unisolated operations which are to be mixed with full
+     * transactions MUST ensure that they have exclusive access to the
+     * unisolated index before proceeding. There are two ways to do this: (1)
+     * take the application off line for transactions; (2) submit your unisolated
+     * operations to the {@link IConcurrencyManager} which will automatically
+     * impose the necessary constraints on concurrent access to the unisolated
+     * indices.
+     * 
+     * @return The revision timestamp to be assigned to an unisolated write.
+     * 
+     * @throws UnsupportedOperationException
+     *             if the index is read-only.
+     */
+    abstract public long getRevisionTimestamp();
     
     /**
      * The backing store.
@@ -1674,7 +1717,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         value = metadata.getTupleSerializer().serializeVal(value);
         
         final ITuple tuple = insert((byte[]) key, (byte[]) value,
-                false/* delete */, 0L/* timestamp */, getWriteTuple());
+                false/* delete */, getRevisionTimestamp(), getWriteTuple());
         
         if (tuple == null || tuple.isDeletedVersion()) {
             
@@ -1694,7 +1737,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             throw new IllegalArgumentException();
 
         final Tuple tuple = insert(key, value, false/* deleted */,
-                0L/* timestamp */, getWriteTuple());
+                getRevisionTimestamp(), getWriteTuple());
 
         return tuple == null || tuple.isDeletedVersion() ? null : tuple
                 .getValue();
@@ -1736,8 +1779,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         assert delete == false || value == null;
         
-        assert timestamp == 0L
-                || (getIndexMetadata().getVersionTimestamps() && timestamp != 0L);
+//        assert timestamp == 0L
+//                || (getIndexMetadata().getVersionTimestamps() && timestamp != 0L);
 
         if (key == null)
             throw new IllegalArgumentException();
@@ -1807,7 +1850,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
             // set the delete marker.
             tuple = insert((byte[]) key, null/* val */, true/* delete */,
-                    0L/* timestamp */, getWriteTuple());
+                    getRevisionTimestamp(), getWriteTuple());
             
         } else {
         
@@ -1833,7 +1876,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
             // set the delete marker.
             tuple = insert(key, null/* val */, true/* delete */,
-                    0L/* timestamp */, getWriteTuple());
+                    getRevisionTimestamp(), getWriteTuple());
             
         } else {
         
@@ -1861,7 +1904,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * when we test the index itself. This works out fine in the scale-out
      * design since the bloom filter is per {@link AbstractBTree} instance and
      * split/join/move operations all result in new mutable {@link BTree}s with
-     * new bloom filters to absorb new writes. For a non-scale-out deployement,
+     * new bloom filters to absorb new writes. For a non-scale-out deployment,
      * this can cause the performance of the bloom filter to degrade if you are
      * removing a lot of keys. However, in the special case of a {@link BTree}
      * that does NOT use delete markers, {@link BTree#removeAll()} will create a
