@@ -266,10 +266,10 @@ IDiskBasedStrategy, IUpdateStore, IBufferStrategy, IAddressManager {
         return 0;
     }
 
-    public void packAddr(DataOutput out, long addr) throws IOException {
-        // TODO Auto-generated method stub
-        
-    }
+//    public void packAddr(DataOutput out, long addr) throws IOException {
+//        // TODO Auto-generated method stub
+//        
+//    }
 
     public long toAddr(int nbytes, long offset) {
         // TODO Auto-generated method stub
@@ -281,9 +281,9 @@ IDiskBasedStrategy, IUpdateStore, IBufferStrategy, IAddressManager {
         return null;
     }
 
-    public long unpackAddr(DataInput in) throws IOException {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+//    public long unpackAddr(DataInput in) throws IOException {
+//        // TODO Auto-generated method stub
+//        return 0;
+//    }
 
 }

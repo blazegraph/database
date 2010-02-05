@@ -415,127 +415,127 @@ public class WormAddressManager implements IAddressManager {
 
     }
 
-    /**
-     * Breaks an address into its offset and size and packs each component
-     * separately. This provides much better packing then writing the entire
-     * address as a long integer since each component tends to be a small
-     * positive integer value. When the byte count will fit into a non-negative
-     * short integer, it is packed as such for better storage efficiency.
-     * 
-     * @param os
-     *            The output stream.
-     * 
-     * @param addr
-     *            The opaque identifier that is the within store locator for
-     *            some datum.
-     * 
-     * @throws IOException
-     */
-    final public void packAddr(final DataOutput os,final long addr) throws IOException {
-        
-        final long offset = getOffset(addr);
-        
-        final int nbytes = getByteCount(addr);
-
-        if(os instanceof DataOutputBuffer){
-        
-            DataOutputBuffer buf = (DataOutputBuffer)os;
-            
-            buf.packLong(offset);
-
-            if (byteCountBits <= 15) {
-
-                /*
-                 * 15 unsigned bits can be packed as a non-negative short integer.
-                 */
-
-                buf.packShort((short)nbytes);
-                
-            } else {
-
-                /*
-                 * Otherwise use the long integer packer.
-                 */
-                
-                buf.packLong(nbytes);
-                
-            }
-            
-        } else {
-            
-            LongPacker.packLong(os, offset);
-
-            if (byteCountBits <= 15) {
-
-                /*
-                 * 15 unsigned bits can be packed as a non-negative short integer.
-                 */
-
-                ShortPacker.packShort(os, (short)nbytes);
-                
-            } else {
-
-                /*
-                 * Otherwise use the long integer packer.
-                 */
-                
-                LongPacker.packLong(os, nbytes);
-                
-            }
-            
-        }
-        
-    }
-    
-    final public long unpackAddr(final DataInput is) throws IOException {
-    
-        final long offset;
-
-        final int nbytes;
-
-        if(is instanceof DataInputBuffer) {
-
-            DataInputBuffer in = (DataInputBuffer)is;
-            
-            offset = in.unpackLong();
-            
-            if (byteCountBits <= 15) {
-
-                nbytes = in.unpackShort();
-                
-            } else {
-
-                final long v = in.unpackLong();
-
-                assert v <= Integer.MAX_VALUE;
-            
-                nbytes = (int) v;
-                
-            }
-
-        } else {
-            
-            offset = LongPacker.unpackLong(is);
-            
-            if (byteCountBits <= 15) {
-
-                nbytes = ShortPacker.unpackShort(is);
-
-            } else {
-
-                final long v = LongPacker.unpackLong(is);
-
-                assert v <= Integer.MAX_VALUE;
-            
-                nbytes = (int) v;
-                
-            }
-
-        }
-
-        return toAddr(nbytes, offset);
-        
-    }
+//    /**
+//     * Breaks an address into its offset and size and packs each component
+//     * separately. This provides much better packing then writing the entire
+//     * address as a long integer since each component tends to be a small
+//     * positive integer value. When the byte count will fit into a non-negative
+//     * short integer, it is packed as such for better storage efficiency.
+//     * 
+//     * @param os
+//     *            The output stream.
+//     * 
+//     * @param addr
+//     *            The opaque identifier that is the within store locator for
+//     *            some datum.
+//     * 
+//     * @throws IOException
+//     */
+//    final public void packAddr(final DataOutput os,final long addr) throws IOException {
+//        
+//        final long offset = getOffset(addr);
+//        
+//        final int nbytes = getByteCount(addr);
+//
+//        if(os instanceof DataOutputBuffer){
+//        
+//            DataOutputBuffer buf = (DataOutputBuffer)os;
+//            
+//            buf.packLong(offset);
+//
+//            if (byteCountBits <= 15) {
+//
+//                /*
+//                 * 15 unsigned bits can be packed as a non-negative short integer.
+//                 */
+//
+//                buf.packShort((short)nbytes);
+//                
+//            } else {
+//
+//                /*
+//                 * Otherwise use the long integer packer.
+//                 */
+//                
+//                buf.packLong(nbytes);
+//                
+//            }
+//            
+//        } else {
+//            
+//            LongPacker.packLong(os, offset);
+//
+//            if (byteCountBits <= 15) {
+//
+//                /*
+//                 * 15 unsigned bits can be packed as a non-negative short integer.
+//                 */
+//
+//                ShortPacker.packShort(os, (short)nbytes);
+//                
+//            } else {
+//
+//                /*
+//                 * Otherwise use the long integer packer.
+//                 */
+//                
+//                LongPacker.packLong(os, nbytes);
+//                
+//            }
+//            
+//        }
+//        
+//    }
+//    
+//    final public long unpackAddr(final DataInput is) throws IOException {
+//    
+//        final long offset;
+//
+//        final int nbytes;
+//
+//        if(is instanceof DataInputBuffer) {
+//
+//            DataInputBuffer in = (DataInputBuffer)is;
+//            
+//            offset = in.unpackLong();
+//            
+//            if (byteCountBits <= 15) {
+//
+//                nbytes = in.unpackShort();
+//                
+//            } else {
+//
+//                final long v = in.unpackLong();
+//
+//                assert v <= Integer.MAX_VALUE;
+//            
+//                nbytes = (int) v;
+//                
+//            }
+//
+//        } else {
+//            
+//            offset = LongPacker.unpackLong(is);
+//            
+//            if (byteCountBits <= 15) {
+//
+//                nbytes = ShortPacker.unpackShort(is);
+//
+//            } else {
+//
+//                final long v = LongPacker.unpackLong(is);
+//
+//                assert v <= Integer.MAX_VALUE;
+//            
+//                nbytes = (int) v;
+//                
+//            }
+//
+//        }
+//
+//        return toAddr(nbytes, offset);
+//        
+//    }
 
     public String toString(final long addr) {
         

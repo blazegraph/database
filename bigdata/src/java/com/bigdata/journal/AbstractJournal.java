@@ -3245,9 +3245,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return _bufferStrategy.getByteCount(addr);
     }
 
-    final public void packAddr(DataOutput out, long addr) throws IOException {
-        _bufferStrategy.packAddr(out, addr);
-    }
+//    final public void packAddr(DataOutput out, long addr) throws IOException {
+//        _bufferStrategy.packAddr(out, addr);
+//    }
 
     final public long toAddr(int nbytes, long offset) {
         return _bufferStrategy.toAddr(nbytes, offset);
@@ -3257,9 +3257,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return _bufferStrategy.toString(addr);
     }
 
-    final public long unpackAddr(DataInput in) throws IOException {
-        return _bufferStrategy.unpackAddr(in);
-    }
+//    final public long unpackAddr(DataInput in) throws IOException {
+//        return _bufferStrategy.unpackAddr(in);
+//    }
 
     final public int getOffsetBits() {
         
