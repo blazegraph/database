@@ -69,6 +69,8 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
             
+            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
+            
             return p;
             
         }
@@ -94,6 +96,8 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
             
+            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
+
             return p;
             
         }
