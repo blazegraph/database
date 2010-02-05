@@ -131,7 +131,8 @@ public class TestMixedModeOperations extends AbstractBTreeTestCase {
             
             /*
              * Verify that the tuple written by tx1 is now visible in the
-             * unisolated index.
+             * unisolated index and that the current revision timestamp for
+             * unisolated writes is GT the lastCommitTime on the journal.
              */
             {
                 
@@ -140,9 +141,14 @@ public class TestMixedModeOperations extends AbstractBTreeTestCase {
 
                 assertEquals(new byte[] { 2 }, ndx.lookup(new byte[] { 2 }));
 
+                final long revisionTimestamp = ((BTree) ndx)
+                        .getRevisionTimestamp();
+
                 if (log.isInfoEnabled())
                     log.info("unisolated revisionTimestamp="
-                            + ((BTree) ndx).getRevisionTimestamp());
+                            + revisionTimestamp);
+
+                assertTrue(revisionTimestamp > t1);
 
             }
 
@@ -179,6 +185,20 @@ public class TestMixedModeOperations extends AbstractBTreeTestCase {
                     if (log.isInfoEnabled())
                         log.info("t2=" + t2);
 
+                    // Verify that the revision timestamp was advanced.
+                    {
+
+                        final long revisionTimestamp = ((BTree) ndx)
+                                .getRevisionTimestamp();
+
+                        if (log.isInfoEnabled())
+                            log.info("unisolated revisionTimestamp="
+                                    + revisionTimestamp);
+
+                        assertTrue(revisionTimestamp > t2);
+
+                    }
+
                 }
 
                 // attempt to commit the transaction (this should fail).
@@ -196,10 +216,6 @@ public class TestMixedModeOperations extends AbstractBTreeTestCase {
                 }
 
             }
-
-            /*
-             * @todo verify that
-             */
 
         } finally {
 

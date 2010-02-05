@@ -1525,9 +1525,9 @@ public class IndexSegmentStore extends AbstractRawStore {
         return addressManager.getOffset(addr);
     }
 
-    final public void packAddr(DataOutput out, long addr) throws IOException {
-        addressManager.packAddr(out, addr);
-    }
+//    final public void packAddr(DataOutput out, long addr) throws IOException {
+//        addressManager.packAddr(out, addr);
+//    }
 
     final public long toAddr(int nbytes, long offset) {
         return addressManager.toAddr(nbytes, offset);
@@ -1537,8 +1537,8 @@ public class IndexSegmentStore extends AbstractRawStore {
         return addressManager.toString(addr);
     }
 
-    final public long unpackAddr(DataInput in) throws IOException {
-        return addressManager.unpackAddr(in);
-    }
+//    final public long unpackAddr(DataInput in) throws IOException {
+//        return addressManager.unpackAddr(in);
+//    }
 
 }

@@ -94,46 +94,46 @@ public interface IAddressManager {
      */
     public int getByteCount(long addr);
 
-    /**
-     * Pack the address onto the output stream.
-     * 
-     * @param out
-     *            The output stream.
-     * 
-     * @param addr
-     *            The opaque identifier that is the within store locator for
-     *            some datum.
-     * 
-     * @deprecated Address packing is not currently used by anything. While it
-     *             can produce somewhat more compact representations, it is
-     *             problematic in that it requires an awareness of the
-     *             {@link IAddressManager} at the point in the code where the
-     *             address is to be decoded. This is not always feasible and
-     *             other techniques are available to code the addresses more
-     *             efficiently, for example, the child addresses of a
-     *             {@link Node}.
-     */
-    public void packAddr(DataOutput out, long addr) throws IOException;
-    
-    /**
-     * Unpack the address from the input stream.
-     * 
-     * @param in
-     *            The input stream.
-     * 
-     * @return The opaque identifier that is the within store locator for some
-     *         datum.
-     * 
-     * @deprecated Address packing is not currently used by anything. While it
-     *             can produce somewhat more compact representations, it is
-     *             problematic in that it requires an awareness of the
-     *             {@link IAddressManager} at the point in the code where the
-     *             address is to be decoded. This is not always feasible and
-     *             other techniques are available to code the addresses more
-     *             efficiently, for example, the child addresses of a
-     *             {@link Node}.
-     */
-    public long unpackAddr(DataInput in) throws IOException;
+//    /**
+//     * Pack the address onto the output stream.
+//     * 
+//     * @param out
+//     *            The output stream.
+//     * 
+//     * @param addr
+//     *            The opaque identifier that is the within store locator for
+//     *            some datum.
+//     * 
+//     * @deprecated Address packing is not currently used by anything. While it
+//     *             can produce somewhat more compact representations, it is
+//     *             problematic in that it requires an awareness of the
+//     *             {@link IAddressManager} at the point in the code where the
+//     *             address is to be decoded. This is not always feasible and
+//     *             other techniques are available to code the addresses more
+//     *             efficiently, for example, the child addresses of a
+//     *             {@link Node}.
+//     */
+//    public void packAddr(DataOutput out, long addr) throws IOException;
+//    
+//    /**
+//     * Unpack the address from the input stream.
+//     * 
+//     * @param in
+//     *            The input stream.
+//     * 
+//     * @return The opaque identifier that is the within store locator for some
+//     *         datum.
+//     * 
+//     * @deprecated Address packing is not currently used by anything. While it
+//     *             can produce somewhat more compact representations, it is
+//     *             problematic in that it requires an awareness of the
+//     *             {@link IAddressManager} at the point in the code where the
+//     *             address is to be decoded. This is not always feasible and
+//     *             other techniques are available to code the addresses more
+//     *             efficiently, for example, the child addresses of a
+//     *             {@link Node}.
+//     */
+//    public long unpackAddr(DataInput in) throws IOException;
 
     /**
      * A human readable representation of the address.

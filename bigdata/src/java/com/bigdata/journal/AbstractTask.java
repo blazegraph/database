@@ -2440,9 +2440,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.isStable();
         }
 
-        public void packAddr(DataOutput out, long addr) throws IOException {
-            delegate.packAddr(out, addr);
-        }
+//        public void packAddr(DataOutput out, long addr) throws IOException {
+//            delegate.packAddr(out, addr);
+//        }
 
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
@@ -2460,9 +2460,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-        public long unpackAddr(DataInput in) throws IOException {
-            return delegate.unpackAddr(in);
-        }
+//        public long unpackAddr(DataInput in) throws IOException {
+//            return delegate.unpackAddr(in);
+//        }
 
         public long write(ByteBuffer data) {
             return delegate.write(data);
@@ -2822,9 +2822,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.isStable();
         }
 
-        public void packAddr(DataOutput out, long addr) throws IOException {
-            delegate.packAddr(out, addr);
-        }
+//        public void packAddr(DataOutput out, long addr) throws IOException {
+//            delegate.packAddr(out, addr);
+//        }
 
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
@@ -2842,9 +2842,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-        public long unpackAddr(DataInput in) throws IOException {
-            return delegate.unpackAddr(in);
-        }
+//        public long unpackAddr(DataInput in) throws IOException {
+//            return delegate.unpackAddr(in);
+//        }
 
 		public void delete(long addr) {
 			// TODO Auto-generated method stub

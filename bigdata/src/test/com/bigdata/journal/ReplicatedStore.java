@@ -582,9 +582,9 @@ public class ReplicatedStore implements IRawStore {
         return localStore.getResourceMetadata();
     }
     
-    public void packAddr(DataOutput out, long addr) throws IOException {
-        localStore.packAddr(out, addr);
-    }
+//    public void packAddr(DataOutput out, long addr) throws IOException {
+//        localStore.packAddr(out, addr);
+//    }
 
     public ByteBuffer read(long addr) {
         return localStore.read(addr);
@@ -602,9 +602,9 @@ public class ReplicatedStore implements IRawStore {
         return localStore.toString(addr);
     }
 
-    public long unpackAddr(DataInput in) throws IOException {
-        return localStore.unpackAddr(in);
-    }
+//    public long unpackAddr(DataInput in) throws IOException {
+//        return localStore.unpackAddr(in);
+//    }
 
     public CounterSet getCounters() {
         return localStore.getCounters();
