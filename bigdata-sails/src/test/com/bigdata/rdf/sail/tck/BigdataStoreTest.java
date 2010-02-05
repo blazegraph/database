@@ -62,6 +62,8 @@ public class BigdataStoreTest extends RDFStoreTest {
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
             
+            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
+            
             return p;
             
         }
@@ -87,6 +89,8 @@ public class BigdataStoreTest extends RDFStoreTest {
             final Properties p = new Properties(super.getProperties());
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
+       
+            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
             
             return p;
             
