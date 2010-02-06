@@ -1451,7 +1451,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
             
             try {
 
-                return hasNext(Long.MAX_VALUE, TimeUnit.SECONDS);
+                // Note: This shaves off the conversion to nanoseconds.
+                return _hasNext(Long.MAX_VALUE);//, TimeUnit.SECONDS);
 
             } catch (InterruptedException ex) {
 
@@ -1475,16 +1476,16 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
         public boolean hasNext(final long timeout, final TimeUnit unit)
                 throws InterruptedException {
             
-            if (nextE != null) {
-
-                // we already have the next element on hand.
-                return true;
-                
-            }
-
-            /*
-             * core impl.
-             */
+//            if (nextE != null) {
+//
+//                // we already have the next element on hand.
+//                return true;
+//                
+//            }
+//
+//            /*
+//             * core impl.
+//             */
             
             final long nanos = unit.toNanos(timeout);
 
@@ -1518,6 +1519,13 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
          * @throws InterruptedException
          */
         private boolean _hasNext(long nanos) throws InterruptedException {
+
+            if (nextE != null) {
+
+                // we already have the next element on hand.
+                return true;
+                
+            }
 
         	// set to true to log stack traces at most once per request.
         	final boolean logOnce = !log.isDebugEnabled();

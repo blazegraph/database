@@ -8,23 +8,22 @@
 		<fileset dir="${bsbm.dir}/lib">
 			<include name="**/*.jar" />
 		</fileset>
-		<fileset dir="${bsbm.dir}/../bigdata/lib">
-			<include name="**/*.jar" />
-		</fileset>
-		<fileset dir="${bsbm.dir}/../bigdata-jini/lib">
-			<include name="**/*.jar" />
-		</fileset>
-		<fileset dir="${bsbm.dir}/../bigdata-rdf/lib">
-			<include name="**/*.jar" />
-		</fileset>
-		<fileset dir="${bsbm.dir}/../bigdata-sails/lib">
+		<fileset dir="${bigdata.build.dir}/lib">
 			<include name="**/*.jar" />
 		</fileset>
 	</path>
 
 	<!-- runtime classpath w/o install. -->
 	<path id="runtime.classpath">
+		<!-- the compiled classes. -->
 	    <pathelement location="${build.dir}/classes" />
+    	<!-- and the dependencies. -->
+		<fileset dir="${bsbm.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${bigdata.build.dir}/lib">
+			<include name="**/*.jar" />
+		</fileset>
 		<path refid="build.classpath" />
 	</path>
 
@@ -39,18 +38,13 @@
 		<mkdir dir="${build.dir}/bin" />
 	</target>
 
-	<!-- @todo modify to use the bigdata jar and libraries as a dependency rather than recompile all here. -->
+	<!-- Note: This depends on the bundleJar target of the top-level bigdata ant script. -->
 	<target name="compile" depends="prepare">
-		<mkdir dir="${build.dir}" />
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
 		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
 	     encoding="${javac.encoding}"
 	     	>
 			<src path="${bsbm.dir}/src/java" />
-			<src path="${bsbm.dir}/../bigdata/src/java" />
-			<src path="${bsbm.dir}/../bigdata-jini/src/java" />
-			<src path="${bsbm.dir}/../bigdata-rdf/src/java" />
-			<src path="${bsbm.dir}/../bigdata-sails/src/java" />
 			<compilerarg value="-version"/>
 		</javac>
 		<!-- copy resources. -->
@@ -59,10 +53,14 @@
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
+			<!-- copy log4j configuration file. -->
 			<fileset dir="${bsbm.dir}/src/resources/logging"/>
 		</copy>
 		<copy toDir="${build.dir}/bin">
+			<!-- copy benchmark data and queries. -->
 			<fileset dir="${bsbm.dir}/src/resources/bsbm-data"/>
+			<!-- copy the journal configuration file. -->
+			<fileset file="${bsbm.dir}/journal.properties"/>
 		</copy>
 	</target>
 
@@ -72,17 +70,17 @@
 		<java classname="benchmark.generator.Generator"
 	          fork="true"
 	          failonerror="true"
-	          dir="${build.dir}/bin"
+			  dir="${build.dir}/bin" 
 			  >
 			<!-- -fc causes the generator to forward chain the test data. -->
 			<!-- -pc # specifies the #of products. -->
 			<!-- -s specifies the output type, generally 'nt' for ntriples. -->
 			<!-- -fn specifies the output file w/o the .nt extension. -->
 		    <arg value="-fc"/>
-			<arg line="-pc ${bsbm.pc}"/>
-			<arg line="-dir ${bsbm.dataDir}"/>
-			<arg line="-s ${bsbm.outputType}"/>
-			<arg line="-fn ${bsbm.outputFile}"/>
+			<arg value="-pc"/><arg value="${bsbm.pc}"/>
+			<arg value="-dir"/><arg value="${bsbm.dataDir}"/>
+			<arg value="-s"/><arg value="${bsbm.outputType}"/>
+			<arg line="-fn"/><arg value="${bsbm.outputFile}"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
@@ -96,6 +94,7 @@
 		 file. -->
 	
 	<!-- @todo specify the kb namespace (default is "kb"). -->
+	<!-- Note: Can also load xxx.nt.zip and xxx.nt.gz files. -->
 	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
  	<target name="run-load" depends="compile">
  		<!-- delete file if it exists (@todo dangerous!). -->
@@ -103,11 +102,14 @@
 		<java classname="benchmark.bigdata.BigdataLoader"
 	          fork="true"
 	          failonerror="true"
-	          dir="${build.dir}/bin"
+			  dir="${build.dir}/bin"
 			  >
-			<arg line="-journal ${bsbm.journalFile} -data ${bsbm.outputFile}.${bsbm.outputType}"/>
+			<arg line="journal.properties ${bsbm.outputFile}.${bsbm.outputType}.zip"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
+			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
+			<!-- specify/override the journal file name. -->
+			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
@@ -139,10 +141,11 @@
 	          fork="true"
 	          failonerror="true"
 	          dir="${build.dir}/bin"
-			  >
+	          >
 			<arg line="-journal ${bsbm.qualJournal} -data ${bsbm.qualDataDir}/dataset_1m.ttl"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
+			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
@@ -158,12 +161,14 @@
 			<arg line="-idir ${bsbm.qualDataDir}\td_data -q http://dummyendpoint -journal ${bsbm.qualJournal}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
+			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
 		</java>
 	</target>
 	
+	<!-- FIXME something busted about the qualification configuration? -->
 	<target name="run-qualification-2" depends="compile">
 		<java classname="benchmark.qualification.Qualification"
 	          fork="true"
@@ -173,26 +178,43 @@
 			<arg line="${bsbm.qualDataDir}/correct.qual run.qual"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
+			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
 		</java>
 	</target>
 	
-	<!-- @todo relocate the query mixes, ignored queries, etc. out of ant-build/bin. -->
-	<target name="run-query" depends="compile">
+	<target name="run-query" depends="compile" description="Runs the benchmark queries against the loaded data.">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
 	          fork="true"
 	          failonerror="true"
-	          dir="${build.dir}/bin"
-			  >
+			  dir="${build.dir}/bin" 
+			>
 			<!-- -runs # is the #of query mix runs (default is 500). -->
+			<arg value="-runs"/><arg value="${bsbm.runs}"/>
+
 			<!-- -w # is the #of warmup query mixes (default is 50). -->
+			<arg value="-w"/><arg value="${bsbm.w}"/>
+			
 			<!-- -mt # is the #of concurrent clients. -->
-			<arg line="-runs ${bsbm.runs} -w ${bsbm.w} -mt ${bsbm.mt} -idir ${bsbm.dataDir} -journal ${bsbm.journalFile}"/>
-			<jvmarg value="-server"/>
-			<jvmarg value="-Xmx${bsbm.maxMem}"/>
-            <jvmarg line="${queryJvmArgs}"/>
+			<arg value="-mt"/><arg value="${bsbm.mt}"/>
+			
+			<!-- -qdir dir is the query directory (default is queries). -->
+			<!--<arg value="-qdir"/><arg value="src/resources/bsbm_data"/>-->
+			
+			<!-- -idir dir is the test data directory (default td_data). -->
+			<arg value="-idir"/><arg value="${bsbm.dataDir}"/>
+			
+			<!-- -o file is the name of the xml output file. -->
+			<arg value="-o"/>
+			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml"/>
+			
+			<!-- The bigdata database instance. -->
+			<arg value="-journal"/><arg value="${bsbm.journalFile}"/>
+            
+        	<jvmarg line="${queryJvmArgs}"/>
+			
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
@@ -203,9 +225,10 @@
         <java classname="com.bigdata.rdf.sail.BigdataSailHelper"
               fork="true"
               failonerror="true"
-              dir="${build.dir}/bin"
    			  >
+        <!-- dir="${build.dir}/bin" -->
               <arg line="${bsbm.journalFile} LTS kb"/>
+	 		  <jvmarg value="-Dlog4j.configuration=log4j.properties"/>
               <classpath>
                  <path refid="runtime.classpath" />
               </classpath>

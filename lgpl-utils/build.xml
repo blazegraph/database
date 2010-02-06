@@ -86,6 +86,6 @@ Portions copyright &#169; 2005-2009 Sebastiano Vigna
 		</javadoc>
 	</target>
 
-	<target name="all" depends="clean, jar, javadoc"/>
+	<target name="all" depends="clean, jar, javadoc" description="clean, jar, javadoc."/>
 	
 </project>
