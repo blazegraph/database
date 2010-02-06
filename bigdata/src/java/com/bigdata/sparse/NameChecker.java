@@ -83,7 +83,7 @@ public class NameChecker {
      * @throws IllegalArgumentException
      *             if the string is not valid as the name of a column.
      */
-    static public void assertColumnName(String s)
+    static public void assertColumnName(final String s)
             throws IllegalArgumentException {
 
         if (s == null)
@@ -98,7 +98,7 @@ public class NameChecker {
         final Matcher m = pattern_name.matcher(s);
 
         if (!m.matches())
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException(s);
 
     }
 
