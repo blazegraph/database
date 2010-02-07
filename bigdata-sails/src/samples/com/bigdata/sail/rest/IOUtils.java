@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.sail.rest;
 
+import info.aduna.xml.XMLWriter;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -29,9 +31,17 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.UUID;
+import org.openrdf.model.Graph;
 import org.openrdf.model.Statement;
+import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.query.QueryResultUtil;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.TupleQueryResultHandler;
+import org.openrdf.query.impl.TupleQueryResultBuilder;
+import org.openrdf.query.resultio.TupleQueryResultParser;
+import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLParser;
+import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
@@ -83,37 +93,38 @@ public class IOUtils {
      * @return
      *          the collection of statements
      */
-    public static Collection<Statement> deserialize(String rdfXml) 
+    public static Graph rdfXmlToStatements(String rdfXml) 
             throws Exception {
         
-        final Collection<Statement> stmts = new LinkedHashSet<Statement>();
+        //final Collection<Statement> stmts = new LinkedHashSet<Statement>();
+        final Graph graph = new GraphImpl();
         final String namespace = UUID.randomUUID().toString();
         final RDFXMLParser rdfParser = new RDFXMLParser(
                 BigdataValueFactoryImpl.getInstance(namespace));
         rdfParser.setVerifyData(false);
         rdfParser.setStopAtFirstError(true);
         rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
-        rdfParser.setRDFHandler(new StatementCollector(stmts));
+        rdfParser.setRDFHandler(new StatementCollector(graph));
         rdfParser.parse(new StringReader(rdfXml), "");
-        return stmts;
+        return graph;
         
     }
 
     /**
-     * Serialize a collection of bigdata statements into an rdf/xml graph.
+     * Serialize a collection of statements into an rdf/xml graph.
      * 
-     * @param stmts
+     * @param graph
      *          the collection of statements
      * @return
      *          the serialized rdf/xml
      */
-    public static String serialize(Collection<Statement> stmts) 
+    public static String statementsToRdfXml(Collection<Statement> graph) 
             throws Exception {
         
         final StringWriter sw = new StringWriter();
         final RDFXMLWriter writer = new RDFXMLWriter(sw);
         writer.startRDF();
-        for (Statement stmt : stmts) {
+        for (Statement stmt : graph) {
             writer.handleStatement(stmt);
         }
         writer.endRDF();
@@ -122,4 +133,42 @@ public class IOUtils {
         
     }
 
+    /**
+     * Deserialize SPARQL results xml into a TupleQueryResult object.
+     * 
+     * @param xml
+     *          the xml to deserialize
+     * @return
+     *          the TupleQueryResult object
+     */
+    public static TupleQueryResult xmlToSolutions(String xml) 
+            throws Exception {
+
+        TupleQueryResultParser parser = new SPARQLResultsXMLParser();
+        TupleQueryResultBuilder qrBuilder = new TupleQueryResultBuilder();
+        parser.setTupleQueryResultHandler(qrBuilder);
+        parser.parse(new ByteArrayInputStream(xml.getBytes()));
+        return qrBuilder.getQueryResult();
+        
+    }
+
+    /**
+     * Serialize a collection of statements into an rdf/xml graph.
+     * 
+     * @param graph
+     *          the collection of statements
+     * @return
+     *          the serialized rdf/xml
+     */
+    public static String solutionsToXml(TupleQueryResult solutions) 
+            throws Exception {
+        
+        StringWriter writer = new StringWriter();
+        TupleQueryResultHandler handler = 
+            new SPARQLResultsXMLWriter(new XMLWriter(writer));
+        QueryResultUtil.report(solutions, handler);
+        return writer.toString();
+        
+    }
+    
 }

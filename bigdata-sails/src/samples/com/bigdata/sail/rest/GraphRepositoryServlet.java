@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.sail.rest;
 
+import info.aduna.xml.XMLWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -42,9 +43,11 @@ import org.apache.commons.httpclient.HttpStatus;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.query.GraphQuery;
+import org.openrdf.query.Query;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.rdfxml.RDFXMLWriter;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -294,58 +297,88 @@ public class GraphRepositoryServlet extends HttpServlet {
         }
     }
 
+    public String read(String queryString, QueryLanguage ql, 
+            boolean includeInferred) throws Exception {
+        
+        RepositoryConnection cxn = repo.getQueryConnection();
+        
+        try {
+
+            if (queryString != null && ql != null) {
+                final Query query = cxn.prepareQuery(ql, queryString);
+                if (query instanceof GraphQuery) {
+                    return executeConstructQuery((GraphQuery) query, 
+                            includeInferred);
+                } else if (query instanceof TupleQuery) {
+                    return executeSelectQuery((TupleQuery) query, 
+                            includeInferred);
+                }
+            }
+            
+            return new String();
+
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+        
+    }
+    
     /**
-     * Perform a construct query in the syntax of the supplied query language,
-     * including or excluding inferred statements per the supplied parameter.
+     * Perform a construct query, including or excluding inferred statements 
+     * per the supplied parameter.
      * 
      * @param query
      *            the construct query to execute
-     * @param ql
-     *            the query language of the query string
      * @param includeInferred
      *            determines whether evaluation results of this query should
      *            include inferred statements
      * @return rdf/xml serialization of the subgraph
      * @throws Exception
      */
-    public String read(String query,
-            QueryLanguage ql, boolean includeInferred) throws Exception {
+    public String executeConstructQuery(GraphQuery query, 
+            boolean includeInferred) throws Exception {
 
-        RepositoryConnection cxn = repo.getQueryConnection();
-        
-        try {
-
-            final StringWriter sw = new StringWriter();
-            final RDFXMLWriter writer = new RDFXMLWriter(sw);
-            writer.startRDF();
-            if (query != null && ql != null) {
-                // silly construct queries, can't guarantee distinct results
-                final Set<Statement> results = new LinkedHashSet<Statement>();
-                final GraphQuery graphQuery = cxn.prepareGraphQuery(ql, query);
-                // if we set include inferred on the graph query, each dimension
-                // in the join is filtered for explicit statements. what we want
-                // is for the entire db to be considered in the query, then for
-                // explicit statements to be filtered afterwards.
-                // graphQuery.setIncludeInferred(includeInferred);
-                graphQuery.evaluate(
-                        new StatementCollector(results, includeInferred));
-                for (Statement stmt : results) {
-                    writer.handleStatement(stmt);
-                }
-            } else {
-                RepositoryResult<Statement> stmts =
-                    cxn.getStatements(null, null, null, includeInferred);
-                while (stmts.hasNext()) {
-                    writer.handleStatement(stmts.next());
-                }
+        final StringWriter sw = new StringWriter();
+        final RDFXMLWriter writer = new RDFXMLWriter(sw);
+        writer.startRDF();
+        if (query != null) {
+            // silly construct queries, can't guarantee distinct results
+            final Set<Statement> results = new LinkedHashSet<Statement>();
+            // if we set include inferred on the graph query, each dimension
+            // in the join is filtered for explicit statements. what we want
+            // is for the entire db to be considered in the query, then for
+            // explicit statements to be filtered afterwards.
+            // graphQuery.setIncludeInferred(includeInferred);
+            query.evaluate(
+                    new StatementCollector(results, includeInferred));
+            for (Statement stmt : results) {
+                writer.handleStatement(stmt);
             }
-            writer.endRDF();
-            return sw.toString();
-
-        } finally {
-            // close the repository connection
-            cxn.close();
         }
+        writer.endRDF();
+        return sw.toString();
+
+    }
+
+    /**
+     * Perform a select query, including or excluding inferred statements 
+     * per the supplied parameter.
+     * 
+     * @param query
+     *            the select query to execute
+     * @param includeInferred
+     *            determines whether evaluation results of this query should
+     *            include inferred statements
+     * @return xml serialization of the solutions
+     * @throws Exception
+     */
+    public String executeSelectQuery(TupleQuery query, 
+            boolean includeInferred) throws Exception {
+
+        StringWriter writer = new StringWriter();
+        query.evaluate(new SPARQLResultsXMLWriter(new XMLWriter(writer)));
+        return writer.toString();
         
     }
 
@@ -381,7 +414,7 @@ public class GraphRepositoryServlet extends HttpServlet {
      */
     public void delete(String rdfXml) throws Exception {
         // deserialize the statements into a collection enforcing uniqueness
-        Collection<Statement> stmts = IOUtils.deserialize(rdfXml);
+        Collection<Statement> stmts = IOUtils.rdfXmlToStatements(rdfXml);
         if (stmts.size() == 0) {
             return;
         }

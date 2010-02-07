@@ -25,11 +25,12 @@ package com.bigdata.sail.rest;
 import java.util.Collection;
 import org.openrdf.model.Statement;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
 
 /**
  * This interface describes a very simple contract between clients and an 
- * instance of a bigdata repository.  Defines basic create, read, and delete 
- * operations.
+ * instance of a bigdata repository.  Defines basic create, read, delete, and 
+ * update operations.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
@@ -37,7 +38,7 @@ import org.openrdf.query.QueryLanguage;
 public interface GraphRepository {
 
     /**
-     * Perform a query in the syntax of the supplied query language,
+     * Perform a construct query in the syntax of the supplied query language,
      * including or excluding inferred statements per the supplied parameter.
      * 
      * @param query
@@ -51,7 +52,25 @@ public interface GraphRepository {
      *            the query results
      * @throws Exception
      */
-    Collection<Statement> read(String queryString, QueryLanguage ql, 
+    Collection<Statement> executeConstructQuery(String queryString, QueryLanguage ql, 
+            boolean includeInferred) throws Exception;
+
+    /**
+     * Perform a select query in the syntax of the supplied query language,
+     * including or excluding inferred statements per the supplied parameter.
+     * 
+     * @param query
+     *            the construct query to execute
+     * @param ql
+     *            the query language of the query string
+     * @param includeInferred
+     *            determines whether evaluation results of this query should
+     *            include inferred statements
+     * @return 
+     *            the query results
+     * @throws Exception
+     */
+    TupleQueryResult executeSelectQuery(String queryString, QueryLanguage ql, 
             boolean includeInferred) throws Exception;
 
     /**
@@ -105,4 +124,26 @@ public interface GraphRepository {
      * @throws Exception
      */
     void delete(String queryString, QueryLanguage ql) throws Exception;
+    
+    /**
+     * Add and drop statements in one atomic update.
+     *
+     * @param rdfXmlToDelete
+     *            serialized rdf statements to delete
+     * @param rdfXmlToAdd
+     *            serialized rdf statements to add
+     */
+    void update(String rdfXmlToDelete, String rdfXmlToAdd) throws Exception;
+    
+    /**
+     * Add and drop statements in one atomic update.
+     *
+     * @param toDelete
+     *            serialized rdf statements to delete
+     * @param toAdd
+     *            serialized rdf statements to add
+     */
+    void update(Collection<Statement> toDelete, Collection<Statement> toAdd) 
+            throws Exception;
+    
 }
