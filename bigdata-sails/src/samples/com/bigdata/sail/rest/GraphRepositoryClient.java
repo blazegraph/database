@@ -39,6 +39,7 @@ import org.apache.commons.httpclient.ProxyHost;
 import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.apache.commons.httpclient.params.HttpClientParams;
 import org.apache.commons.httpclient.params.HttpConnectionParams;
@@ -46,6 +47,7 @@ import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
 
 /**
  * A client proxy to a remote GraphRepository instance.
@@ -70,9 +72,33 @@ public class GraphRepositoryClient implements GraphRepository {
     }
 
     /**
-     * @see {@link GraphRepository#read(String, QueryLanguage, boolean)}
+     * @see {@link GraphRepository#executeConstructQuery(String, QueryLanguage, boolean)}
      */
-    public Collection<Statement> read(final String query, 
+    public Collection<Statement> executeConstructQuery(final String query, 
+            final QueryLanguage ql, final boolean includeInferred) 
+            throws Exception {
+
+        String response = executeQuery(query, ql, includeInferred);
+        return IOUtils.rdfXmlToStatements(response);
+        
+    }
+
+    /**
+     * @see {@link GraphRepository#executeSelectQuery(String, QueryLanguage, boolean)}
+     */
+    public TupleQueryResult executeSelectQuery(final String query, 
+            final QueryLanguage ql, final boolean includeInferred) 
+            throws Exception {
+
+        String response = executeQuery(query, ql, includeInferred);
+        return IOUtils.xmlToSolutions(response);
+        
+    }
+
+    /**
+     * Construct and select are sent across the wire in exactly the same way.
+     */
+    private String executeQuery(final String query, 
             final QueryLanguage ql, final boolean includeInferred) 
             throws Exception {
 
@@ -105,7 +131,7 @@ public class GraphRepositoryClient implements GraphRepository {
             // Read the response body.
             String response = IOUtils.readString(
                     get.getResponseBodyAsStream(), get.getResponseCharSet());
-            return IOUtils.deserialize(response);
+            return response;
             
         } finally {
             // Release the connection.
@@ -118,7 +144,7 @@ public class GraphRepositoryClient implements GraphRepository {
      * @see {@link GraphRepository#create(Collection)}
      */
     public void create(Collection<Statement> stmts) throws Exception {
-        create(IOUtils.serialize(stmts));
+        create(IOUtils.statementsToRdfXml(stmts));
     }
         
     /**
@@ -165,7 +191,7 @@ public class GraphRepositoryClient implements GraphRepository {
      * @see {@link GraphRepository#delete(Collection)}
      */
     public void delete(Collection<Statement> stmts) throws Exception {
-        delete(IOUtils.serialize(stmts));
+        delete(IOUtils.statementsToRdfXml(stmts));
     }
         
     /**
@@ -233,6 +259,59 @@ public class GraphRepositoryClient implements GraphRepository {
             // Release the connection.
             del.releaseConnection();
         }
+        
+    }
+
+    /**
+     * @see {@link GraphRepository#update(String, String)}
+     */
+    public void update(String rdfXmlToDelete, String rdfXmlToAdd) 
+            throws Exception {
+
+        // DELETE
+        PutMethod put = new PutMethod(servletURL);
+        try {
+            
+            // add the range header
+            if (rdfXmlToDelete != null) {
+                String triples = "triples[" + trim(rdfXmlToDelete) + "]";
+                Header range = new Header(
+                        GraphRepositoryServlet.HTTP_RANGE, triples);
+                put.addRequestHeader(range);
+            }
+            
+            // set the body
+            if (rdfXmlToAdd != null) {
+                put.setRequestEntity(new StringRequestEntity(
+                        rdfXmlToAdd, // the rdf/xml body
+                        GraphRepositoryServlet.RDF_XML, // includes the encoding
+                        null // so we don't need to say it here.
+                        ));
+                put.setContentChunked(true);
+            }
+            
+            // Execute the method.
+            int sc = getHttpClient().executeMethod(put);
+            if (sc != HttpStatus.SC_OK) {
+                throw new IOException("HTTP-PUT failed: "
+                        + put.getStatusLine());
+            }
+            
+        } finally {
+            // Release the connection.
+            put.releaseConnection();
+        }
+        
+    }
+
+    /**
+     * @see {@link GraphRepository#update(Collection, Collection)}
+     */
+    public void update(Collection<Statement> toDelete, Collection<Statement> toAdd) 
+            throws Exception {
+
+        update(IOUtils.statementsToRdfXml(toDelete), 
+               IOUtils.statementsToRdfXml(toAdd));
         
     }
 
