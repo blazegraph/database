@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.infinispan.util.concurrent.BufferedConcurrentHashMap;
@@ -47,28 +48,81 @@ import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 
 /**
- * Global LRU implementation based on a single {@link BufferedConcurrentHashMap}
- * whose keys include both the {@link IRawStore#getUUID()} and the
- * <code>long addr</code> of the record within the store.
+ * A mostly non-blocking cache based on a {@link ConcurrentHashMap} and batched
+ * updates to its access policy. This approach encapsulates:
+ * <ul>
+ * <li>
+ * (a) an unmodified ConcurrentHashMap (CHM); combined with</li>
+ * <li>
+ * (b) non-thread-safe thread-local buffers (TLB) for touches, managed by an
+ * inner CHM<ThreadId,TLB> instance. The reason for this inner map is to allow
+ * the TLB instances to be discarded by clear(); The TLBs get batched onto;</li>
+ * <li>
+ * (c) a shared non-thread safe access policy (LIRS, LRU) built on double-linked
+ * nodes (DLN) stored in the inner CHM. Updates are deferred until holding the
+ * lock (d). The DLN reference to the cached value is final. The (prior, next,
+ * delete) fields are only read or written while holding the lock (d). Other
+ * fields could be defined by subclassing a newDLN() method to support LIRS,
+ * etc. The access policy will need [head, tail] or similar fields, which would
+ * also be guarded by the lock (d);</li>
+ * <li>
+ * (d) a single lock guarding mutation on the access policy. Since there is only
+ * one lock, there can be no lock ordering problems. Both batching touches onto
+ * (c) and eviction (per the access policy) require access to the lock, but that
+ * is the only lock. If the access policy batches evictions, then lock requests
+ * will be rare and the whole cache will be non-blocking, wait free, and not
+ * spinning on CAS locks 99% of the time; and</li>
+ * <li>
+ * (d) explicit management of the threads used to access the cache. e.g., by
+ * queuing accepted requests and servicing them out of a thread pool, which has
+ * the benefit of managing the workload imposed by the clients.</li>
+ * </ul>
+ * <p>
+ * This should have the best possible performance and the simplest
+ * implementation. (b) The TLB could be a DLN[] or other simple data structures.
+ * The access policy (c) is composed from linking DLN instances together while
+ * holding the lock.
+ * <ul>
+ * <li>
+ * A get() on the outer class looks up the DLN on the inner CHM and places it
+ * into the TLB (if found).</li>
+ * <li>
+ * A put() or putIfAbsent() on the outer class creates a new DLN and either
+ * unconditionally or conditionally puts it into the inner CHM. The new DLN is
+ * added to the TLB IFF it was added to the inner CHM. The access order is NOT
+ * updated at this time.</li>
+ * <li>
+ * A remove() on the outer class acquires the lock (d), looks up the DLN in the
+ * cache, and synchronously unlinks the DLN if found and sets its [deleted]
+ * flag. I would recommend that the clients do not call remove() directly, or
+ * that an outer remove() method exists which only removes the DLN from the
+ * inner CHM and queues up remove requests to be processed the next time any
+ * thread batches its touches through the lock. The inner remove() method would
+ * synchronously update the DLNs.</li>
+ * <li>
+ * A clear() clear the ConcurrentHashMap<Key,DLN<Val>> map. It would also clear
+ * the inner ConcurrentHashMap<ThreadId,TLB> map, which would cause the existing
+ * TLB instances to be discarded. It would have to obtain the lock in order to
+ * clear the [head,tail] or related fields for the access policy.</li>
+ * </ul>
+ * When batching touches through the lock, only the access order is updated by
+ * the appropriate updates of the DLN nodes. If the [deleted] flag is set, then
+ * the DLN has been removed from the cache and its access order is NOT updated.
+ * If the cache is over its defined maximums, then evictions are batched while
+ * holding the lock. Evictions are only processed when batching touches through
+ * the lock.
  * 
  * @todo Finish and test this implementation.
  *       <p>
- *       It is currently a copy of {@link StoreAndAddressLRUCache} and needs to
- *       be modified in depth to use the {@link BufferedConcurrentHashMap}.
+ *       It is currently a copy of {@link StoreAndAddressLRUCache}. Replace it
+ *       with a base implementation based on the
+ *       {@link HardReferenceGlobalLRURecyclerExplicitDeleteRequired}.
  *       <p>
- *       Starting from the {@link HardReferenceGlobalLRURecycler} is not
- *       practical since that design uses a collection of caches, one per
- *       {@link IRawStore}. Each cache would be based on the
- *       {@link BufferedConcurrentHashMap}. Unfortunately, the assumptions in
- *       {@link BufferedConcurrentHashMap.Eviction#LRU} are such that we can not
- *       impose a global constraint.
+ *       Make the inner class a generic high concurrency cache sharing an LRU
+ *       policy on the outer class. I guess the outer class needs to have the
+ *       lock, which really leads us right back here.
  *       <p>
- *       Given that, it is easier to construct an initial implementation from
- *       the {@link StoreAndAddressLRUCache} which uses a single cache across
- *       all stores. Then one LRU policy can work for all.
- *       <p>
- *       Regardless, we need to override the LRU policy to support eviction
- *       based on a memory capacity.
+ *       Adapt to support LIRS as well as LRU.
  * 
  * @todo Support tx isolation.
  * 
@@ -76,6 +130,10 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  * 
  *          FIXME THIS HAS NOT BEEN IMPLEMENTED YET USING BCHM!!!
+ * 
+ *          FIXME RE-DERIVE FROM
+ *          {@link HardReferenceGlobalLRURecyclerExplicitDeleteRequired}, but
+ *          Test {@link BufferedConcurrentHashMap} w/ LIRS first.
  */
 public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
 
@@ -243,8 +301,11 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
 
         };
 
-        map = new BufferedConcurrentHashMap<K, V>(initialCacheCapacity,
-                loadFactor, concurrencyLevel, evictionMode, evictionListener);
+        // @todo config
+        final int limitingCapacity = 2000000;
+
+        map = new BufferedConcurrentHashMap<K, V>(limitingCapacity, loadFactor,
+                concurrencyLevel, evictionMode, evictionListener);
 
     }
 
