@@ -104,6 +104,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery {
                             return vf.createStatement(subject, predicate, object, context);
                         }
                     }
+                    
                 };
 
                 return new GraphQueryResultImpl(getParsedQuery().getQueryNamespaces(), stIter);
@@ -111,8 +112,9 @@ public class BigdataSailGraphQuery extends SailGraphQuery {
             } else {
                 
                 // Convert the BindingSet objects to actual RDF statements
+                final ValueFactory vf = getConnection().getRepository().getValueFactory();
                 CloseableIteration<? extends Statement, QueryEvaluationException> stIter;
-                stIter = new BigdataConstructIterator(sailCon.getTripleStore(),  bindingsIter);
+                stIter = new BigdataConstructIterator(sailCon.getTripleStore(),  bindingsIter, vf);
                 return new GraphQueryResultImpl(getParsedQuery()
                         .getQueryNamespaces(), stIter);
                 

@@ -45,7 +45,9 @@ public class BigdataSparqlTest2 extends TestCase {
         "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/optional-filter/manifest#dawg-optional-filter-004",
 */        
 //      Dataset crap
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1"
+        // "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1"
+            
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/construct/manifest#construct-1"
         
     });
     
