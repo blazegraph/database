@@ -749,6 +749,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 Options.DEFAULT_MAXIMUM_EXTENT, new LongRangeValidator(
                         initialExtent, Long.MAX_VALUE));
         
+        final long minimumExtension = getProperty(Options.MINIMUM_EXTENSION,
+                Options.DEFAULT_MINIMUM_EXTENSION, new LongRangeValidator(
+                        Options.minimumMinimumExtension, Long.MAX_VALUE));
+
         /*
          * Note: The default depends on the AbstractJournal implementation.
          */
@@ -1073,7 +1077,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     createTime, checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
+                    0L/* soft limit for maximumExtent */,
+//                    minimumExtension,
+                    fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1126,7 +1132,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
+                    0L/* soft limit for maximumExtent */,
+//                    minimumExtension,
+                    fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
             

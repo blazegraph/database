@@ -191,6 +191,15 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
     
+    /**
+     * The minimum amount to extend the backing storage when it overflows.
+     */
+    protected long getMinimumExtension() {
+        
+        return Bytes.megabyte * 32;
+        
+    }
+    
     final public BufferMode getBufferMode() {
 
         return bufferMode;
@@ -292,7 +301,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     final public void destroy() {
         
-        close();
+        if (open)
+            close();
 
         deleteResources();
         
@@ -352,7 +362,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
          */
         long newExtent = userExtent
                 + Math.max(needed, Math.max(initialExtent,
-                                Bytes.megabyte * 32));
+                                getMinimumExtension()));
         
         if (newExtent > Integer.MAX_VALUE && bufferMode.isFullyBuffered()) {
 

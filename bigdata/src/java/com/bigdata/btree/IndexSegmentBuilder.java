@@ -56,6 +56,7 @@ import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryRawStore;
@@ -66,6 +67,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
@@ -389,10 +391,19 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         return checkpoint;
         
     }
-    
+
     /**
      * The buffer used to hold leaves so that they can be evicted en mass onto a
      * region of the {@link #outFile}.
+     * 
+     * @deprecated This forces us to do IO twice for the leaves. They should be
+     *             explicitly double-buffered in memory (the last leaf and the
+     *             current leaf) and evicted directly onto {@link #out}. This
+     *             will remove the requirement for the {@link IUpdateStore} API
+     *             on the {@link TemporaryRawStore} and on the
+     *             {@link DiskOnlyStrategy}. A r/w store version of the
+     *             {@link TemporaryRawStore} could be deployed which supports
+     *             update if that becomes important.
      */
     protected TemporaryRawStore leafBuffer;
     

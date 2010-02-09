@@ -270,6 +270,17 @@ public interface Options {
     String MAXIMUM_EXTENT = AbstractJournal.class.getName()+".maximumExtent";
 
     /**
+     * The minimum #of bytes that the journal will be extended when it runs out
+     * of room in the user extent.
+     * 
+     * @see #DEFAULT_MINIMUM_EXTENSION
+     */
+    String MINIMUM_EXTENSION = AbstractJournal.class.getName()
+            + ".minimumExtension";
+
+    long minimumMinimumExtension = 1 * Bytes.megabyte;
+
+    /**
      * The #of bits in a 64-bit long integer identifier that are used to encode
      * the byte offset of a record in the store as an unsigned integer. The
      * default is {@link WormAddressManager#SCALE_UP_OFFSET_BITS} for a
@@ -528,7 +539,15 @@ public interface Options {
      * @see #MAXIMUM_EXTENT
      */
     String DEFAULT_MAXIMUM_EXTENT = ""+(200 * Bytes.megabyte);
-    
+
+    /**
+     * The default minimum extension of the journal when the user extent runs
+     * out of room.
+     * 
+     * @see #MINIMUM_EXTENSION
+     */
+    String DEFAULT_MINIMUM_EXTENSION = "" + (32 * Bytes.megabyte);
+
 //    /**
 //     * The default #of bits ({@value WormAddressManager#SCALE_OUT_OFFSET_BITS})
 //     * used to encode the byte offset of a record in the store as an unsigned

@@ -57,7 +57,13 @@ import com.bigdata.util.ChecksumUtility;
  * @see DiskOnlyStrategy
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TemporaryRawStore.java 2356 2010-01-28 17:36:13Z martyncutcher
+ *          $
+ * 
+ * @todo Remove support for the {@link IUpdateStore} API, which is deprecated
+ *       for the {@link DiskOnlyStrategy} on which this class currently depends.
+ *       A r/w store version of the {@link TemporaryRawStore} could be deployed
+ *       which supports {@link IUpdateStore} if that becomes important.
  */
 public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateStore, IMRMW {
 
@@ -289,8 +295,10 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
                 false // alternateRootBlock
         );
         
-        buf = new DiskOnlyStrategy(maximumExtent, md);
-        
+        buf = new DiskOnlyStrategy(maximumExtent, //
+//                Long.valueOf(Options.DEFAULT_MINIMUM_EXTENSION), 
+                md);
+
     }
 
     /**
