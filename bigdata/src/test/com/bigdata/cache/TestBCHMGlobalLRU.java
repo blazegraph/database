@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.cache;
 
+import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.rawstore.Bytes;
 
 /**
@@ -63,12 +64,13 @@ public class TestBCHMGlobalLRU extends
 
         final int minimumCacheSetCapacity = 0;
 
-        final int initialCacheCapacity = 16;
+        final int limitingCacheCapacity = 100000;
 
         final float loadFactor = .75f;
 
         lru = new BCHMGlobalLRU<Object>(maximumBytesInMemory,
-                minimumCacheSetCapacity, initialCacheCapacity, loadFactor);
+                minimumCacheSetCapacity, limitingCacheCapacity, loadFactor,
+                AccessPolicyEnum.LIRS);
 
     }
 

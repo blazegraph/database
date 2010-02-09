@@ -40,6 +40,7 @@ import org.infinispan.util.concurrent.BufferedConcurrentHashMap.Eviction;
 import org.infinispan.util.concurrent.BufferedConcurrentHashMap.EvictionListener;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -260,16 +261,20 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
      *            The #of per-{@link IRawStore} {@link ILRUCache} instances that
      *            will be maintained by hard references unless their cache is
      *            explicitly discarded.
-     * @param initialCacheCapacity
-     *            The initial capacity of each new cache instance (in fact, a
+     * @param limitingCacheCapacity
+     *            The limiting capacity of each new cache instance (in fact, a
      *            single map is shared by all cache instances - the cache
      *            instances are just logical views onto the shared map).
      * @param loadFactor
      *            The load factor for the cache instances.
      */
-    public BCHMGlobalLRU(final long maximumBytesInMemory,
-            final int minimumCacheSetCapacity, final int initialCacheCapacity,
-            final float loadFactor) {
+    public BCHMGlobalLRU(//
+            final long maximumBytesInMemory,//
+            final int minimumCacheSetCapacity,//
+            final int limitingCacheCapacity,//
+            final float loadFactor,//
+            final AccessPolicyEnum accessPolicy//
+            ) {
 
         if (maximumBytesInMemory <= 0)
             throw new IllegalArgumentException();
@@ -281,10 +286,18 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
 
         final int concurrencyLevel = 16; // @todo config
         
-        // @todo config
-        // @todo test LIRS and LRU.
         // @todo impose a global memory capacity limit.
-        final Eviction evictionMode = Eviction.LRU;
+        final Eviction evictionMode;
+        switch (accessPolicy) {
+        case LRU:
+            evictionMode = Eviction.LRU;
+            break;
+        case LIRS:
+            evictionMode = Eviction.LIRS;
+            break;
+        default:
+            throw new UnsupportedOperationException(accessPolicy.toString());
+        }
         
         final EvictionListener<K, V> evictionListener = new EvictionListener<K, V>() {
 
@@ -301,11 +314,8 @@ public class BCHMGlobalLRU<V> implements IHardReferenceGlobalLRU<Long,V> {
 
         };
 
-        // @todo config
-        final int limitingCapacity = 2000000;
-
-        map = new BufferedConcurrentHashMap<K, V>(limitingCapacity, loadFactor,
-                concurrencyLevel, evictionMode, evictionListener);
+        map = new BufferedConcurrentHashMap<K, V>(limitingCacheCapacity,
+                loadFactor, concurrencyLevel, evictionMode, evictionListener);
 
     }
 
