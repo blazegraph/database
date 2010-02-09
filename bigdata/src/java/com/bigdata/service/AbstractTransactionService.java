@@ -58,7 +58,7 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**
- * Centalized transaction manager service. In response to a client request, the
+ * Centralized transaction manager service. In response to a client request, the
  * transaction manager will distribute prepare/commit or abort operations to all
  * data services on which writes were made by a transaction. The transaction
  * manager also provides global timestamps required for non-transactional commit
