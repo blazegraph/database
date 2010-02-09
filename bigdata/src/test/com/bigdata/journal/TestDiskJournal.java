@@ -35,6 +35,7 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IRawStore;
 
@@ -637,6 +638,23 @@ public class TestDiskJournal extends AbstractJournalTestCase {
             properties.setProperty(Options.WRITE_CACHE_ENABLED, ""
                     + writeCacheEnabled);
 
+            /*
+             * The following two properties are dialed way down in order to
+             * raise the probability that we will observe the following error
+             * during this test.
+             * 
+             * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
+             */
+            
+            // Note: Use a relatively small initial extent. 
+            properties.setProperty(Options.INITIAL_EXTENT, ""
+                    + DirectBufferPool.INSTANCE.getBufferCapacity() * 1);
+
+            // Note: Use a relatively small extension each time.
+            properties.setProperty(Options.MINIMUM_EXTENSION,
+                    "" + (long) (DirectBufferPool.INSTANCE
+                                    .getBufferCapacity() * 1.1));
+
             return new Journal(properties).getBufferStrategy();
 
         }
@@ -644,13 +662,21 @@ public class TestDiskJournal extends AbstractJournalTestCase {
     }
 
     /**
-     * Note: Since the write cache is a direct ByteBuffer we have to make it
-     * very small (or disable it entirely) when running the test suite or the
-     * JVM will run out of memory - this is exactly the same (Sun) bug which
-     * motivates us to reuse the same ByteBuffer when we overflow a journal
-     * using a write cache. Since small write caches are disallowed, we wind up
-     * testing with the write cache disabled!
+     * Note: The write cache is allocated by the {@link DiskOnlyStrategy} from
+     * the {@link DirectBufferPool} and should be released back to that pool as
+     * well, so the size of the {@link DirectBufferPool} SHOULD NOT grow as we
+     * run these tests. If it does, then there is probably a unit test which is
+     * not tearing down its {@link Journal} correctly.
      */
-    private static final boolean writeCacheEnabled = false; // 512;
+//    /**
+//     * Note: Since the write cache is a direct ByteBuffer we have to make it
+//     * very small (or disable it entirely) when running the test suite or the
+//     * JVM will run out of memory - this is exactly the same (Sun) bug which
+//     * motivates us to reuse the same ByteBuffer when we overflow a journal
+//     * using a write cache. Since small write caches are disallowed, we wind up
+//     * testing with the write cache disabled!
+//     */
+    private static final boolean writeCacheEnabled = true;
     
 }
+    

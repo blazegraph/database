@@ -413,11 +413,13 @@ public class FileMetadata {
             }
                 
             if (exists && !temporary) {
-    
+
                 /*
                  * The file already exists (but not for temporary files).
+                 * 
+                 * Note: this next line will throw IOException if there is a
+                 * file lock contention.
                  */
-    
                 this.extent = raf.length();
                 
                 this.userExtent = extent - headerSize0;

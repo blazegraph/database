@@ -111,7 +111,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_write_correctRejection_emptyRecord() {
         
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
+        
+        try {
         
         try {
 
@@ -141,8 +143,12 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             System.err.println("Ignoring expected exception: "+ex);
             
         }   
+        
+        } finally {
 
         store.destroy();
+        
+        }
         
     }
 
@@ -152,7 +158,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_write_correctRejection_null() {
         
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
+        
+        try {
         
         try {
 
@@ -166,7 +174,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
         
+        } finally {
+        
         store.destroy();
+        
+        }
 
     }
     
@@ -175,7 +187,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_read_correctRejection_0L() {
         
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
+        
+        try {
 
         try {
 
@@ -189,7 +203,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
         }   
 
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
             
     }
     
@@ -200,7 +218,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_read_correctRejection_zeroLength() {
         
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
 
         try {
 
@@ -216,9 +234,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             System.err.println("Ignoring expected exception: "+ex);
             
-        }   
+        } finally {
         
-        store.destroy();
+            store.destroy();
+        
+        }
 
     }
 
@@ -235,7 +255,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
    
         // @todo this test disabled until a RW store is implemented.
         
-//        IRawStore store = getStore();
+//        final IRawStore store = getStore();
 //
 //        try {
 //
@@ -251,9 +271,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //            
 //            System.err.println("Ignoring expected exception: "+ex);
 //            
-//        }   
+//        } finally {
 //
 //        store.destroy();
+//        
+//    }
 
     }
     
@@ -263,7 +285,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_delete_correctRejection_0L() {
 //        
-//        IRawStore store = getStore();
+//        final IRawStore store = getStore();
 //
 //        try {
 //
@@ -275,7 +297,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //            
 //            System.err.println("Ignoring expected exception: "+ex);
 //            
-//        }   
+//        } finally {
+//    store.destroy();
+//}
 //                
 //    }
 //    
@@ -286,7 +310,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_delete_correctRejection_zeroLength() {
 //        
-//        IRawStore store = getStore();
+//        final IRawStore store = getStore();
 //
 //        try {
 //
@@ -302,7 +326,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //            
 //            System.err.println("Ignoring expected exception: "+ex);
 //            
-//        }   
+//        } finally {
+//    store.destroy();
+//}
 //                
 //    }
 //    
@@ -311,7 +337,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_delete_correctRejection_neverWritten() {
 //        
-//        IRawStore store = getStore();
+//        final IRawStore store = getStore();
 //
 //        try {
 //
@@ -327,7 +353,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //            
 //            System.err.println("Ignoring expected exception: "+ex);
 //            
-//        }   
+//        } finally {
+//    store.destroy();
+//    }
 //                
 //    }
     
@@ -336,26 +364,28 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_writeRead() {
         
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
         
-        Random r = new Random();
+        try {
+        
+//        final Random r = new Random();
         
         final int len = 100;
         
-        byte[] expected = new byte[len];
+        final byte[] expected = new byte[len];
         
         r.nextBytes(expected);
         
-        ByteBuffer tmp = ByteBuffer.wrap(expected);
+        final ByteBuffer tmp = ByteBuffer.wrap(expected);
         
-        long addr1 = store.write(tmp);
+        final long addr1 = store.write(tmp);
 
         // verify that the position is advanced to the limit.
         assertEquals(len,tmp.position());
         assertEquals(tmp.position(),tmp.limit());
 
         // read the data back.
-        ByteBuffer actual = store.read(addr1);
+        final ByteBuffer actual = store.read(addr1);
         
         assertEquals(expected,actual);
         
@@ -366,7 +396,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         assertEquals(expected.length,actual.limit());
         assertEquals(actual.limit(),actual.capacity());
         
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
 
     }
 
@@ -375,19 +409,21 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_writeReadRead() {
         
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
         
-        Random r = new Random();
+        try {
+        
+//        final Random r = new Random();
         
         final int len = 100;
         
-        byte[] expected = new byte[len];
+        final byte[] expected = new byte[len];
         
         r.nextBytes(expected);
         
-        ByteBuffer tmp = ByteBuffer.wrap(expected);
+        final ByteBuffer tmp = ByteBuffer.wrap(expected);
         
-        long addr1 = store.write(tmp);
+        final long addr1 = store.write(tmp);
 
         // verify that the position is advanced to the limit.
         assertEquals(len, tmp.position());
@@ -398,7 +434,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         {
             // read the data back.
-            ByteBuffer actual = store.read(addr1);
+            final ByteBuffer actual = store.read(addr1);
 
             assertEquals(expected, actual);
 
@@ -414,7 +450,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         {
             // read the data back.
-            ByteBuffer actual2 = store.read(addr1);
+            final ByteBuffer actual2 = store.read(addr1);
 
             assertEquals(expected, actual2);
 
@@ -425,7 +461,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             assertEquals(expected.length, actual2.limit());
         }
     
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
 
     }
 
@@ -435,9 +475,9 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_writeReadWith2ndBuffer_exactCapacity() {
 //        
-//        IRawStore store = getStore();
-//        
-//        Random r = new Random();
+//        final IRawStore store = getStore();
+//        try {
+//        //Random r = new Random();
 //        
 //        final int len = 100;
 //        
@@ -473,13 +513,13 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //         */
 //        assertEquals(0,actual.position());
 //        assertEquals(len,actual.limit());
-//
+//        } finally {store.destroy();}
 //    }
 //    
 //    public void test_writeReadWith2ndBuffer_excessCapacity_zeroPosition() {
 //        
-//        IRawStore store = getStore();
-//        
+//        final IRawStore store = getStore();
+//        try {
 //        Random r = new Random();
 //        
 //        final int len = 100;
@@ -516,13 +556,13 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //         */
 //        assertEquals(0,actual.position());
 //        assertEquals(len,actual.limit());
-//
+//        } finally {store.destroy();}
 //    }
 //    
 //    public void test_writeReadWith2ndBuffer_excessCapacity_nonZeroPosition() {
 //        
-//        IRawStore store = getStore();
-//        
+//        final IRawStore store = getStore();
+//        try {        
 //        Random r = new Random();
 //        
 //        final int len = 100;
@@ -565,6 +605,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //        assertEquals(0,actual.position());
 //        assertEquals(len+1,actual.limit());
 //
+//  } finally {store.destroy();}
 //    }
 //    
 //    /**
@@ -573,8 +614,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_writeReadWith2ndBuffer_wouldUnderflow_nonZeroPosition() {
 //    
-//        IRawStore store = getStore();
-//        
+//        final IRawStore store = getStore();
+//        try {
 //        Random r = new Random();
 //        
 //        final int len = 100;
@@ -613,6 +654,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //        assertEquals(0,actual.position());
 //        assertEquals(len,actual.limit());
 //        
+//  } finally {store.destroy();}
 //    }
 //
 //    /**
@@ -621,8 +663,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_writeReadWith2ndBuffer_wouldUnderflow_zeroPosition() {
 //    
-//        IRawStore store = getStore();
-//        
+//        final IRawStore store = getStore();
+//        try {
 //        Random r = new Random();
 //        
 //        final int len = 100;
@@ -660,6 +702,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //        assertEquals(0,actual.position());
 //        assertEquals(len,actual.limit());
 //        
+//  } finally {store.destroy();}
 //    }
 //
 //    /**
@@ -669,8 +712,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_writeReadWith2ndBuffer_wouldOverflow_zeroPosition() {
 //    
-//        IRawStore store = getStore();
-//        
+//        final IRawStore store = getStore();
+//        try {
 //        Random r = new Random();
 //        
 //        final int len = 100;
@@ -708,6 +751,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //        assertEquals(0,actual.position());
 //        assertEquals(len,actual.limit());
 //        
+//  } finally {store.destroy();}
 //    }
 //
 //    /**
@@ -717,8 +761,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_writeReadWith2ndBuffer_wouldOverflow_nonZeroPosition() {
 //    
-//        IRawStore store = getStore();
-//        
+//        final IRawStore store = getStore();
+//        try {
 //        Random r = new Random();
 //        
 //        final int len = 100;
@@ -762,7 +806,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //         */
 //        assertEquals(0,actual.position());
 //        assertEquals(len+1,actual.limit());
-//        
+//  } finally {store.destroy();}
 //    }
 //
     /**
@@ -772,20 +816,22 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_writeImmutable() {
 
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
         
-        Random r = new Random();
+        try {
+            
+//        final Random r = new Random();
         
         final int len = 100;
         
-        byte[] expected1 = new byte[len];
+        final byte[] expected1 = new byte[len];
         
         r.nextBytes(expected1);
 
         // write
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+        final ByteBuffer tmp = ByteBuffer.wrap(expected1);
         
-        long addr1 = store.write(tmp);
+        final long addr1 = store.write(tmp);
 
         // verify that the position is advanced to the limit.
         assertEquals(len,tmp.position());
@@ -795,7 +841,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         assertEquals(expected1,store.read(addr1));
 
         // clone the data.
-        byte[] expected2 = expected1.clone();
+        final byte[] expected2 = expected1.clone();
         
         // modify the original data.
         r.nextBytes(expected1);
@@ -806,7 +852,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          */
         assertEquals(expected2,store.read(addr1));
 
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
 
     }
 
@@ -816,25 +866,27 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_readImmutable() {
        
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
         
-        Random r = new Random();
+        try {
+        
+//        final Random r = new Random();
         
         final int len = 100;
         
-        byte[] expected1 = new byte[len];
+        final byte[] expected1 = new byte[len];
         
         r.nextBytes(expected1);
         
-        ByteBuffer tmp = ByteBuffer.wrap(expected1);
+        final ByteBuffer tmp = ByteBuffer.wrap(expected1);
         
-        long addr1 = store.write(tmp);
+        final long addr1 = store.write(tmp);
 
         // verify that the position is advanced to the limit.
         assertEquals(len,tmp.position());
         assertEquals(tmp.position(),tmp.limit());
 
-        ByteBuffer actual = store.read(addr1);
+        final ByteBuffer actual = store.read(addr1);
         
         assertEquals(expected1,actual);
 
@@ -846,7 +898,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
             
             // overwrite [actual] with some random data.
             
-            byte[] tmp2 = new byte[100];
+            final byte[] tmp2 = new byte[100];
             
             r.nextBytes(tmp2);
             
@@ -860,7 +912,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 
         }
         
-        store.destroy();
+        } finally {
+ 
+            store.destroy();
+            
+        }
 
     }
     
@@ -871,9 +927,11 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      */
     public void test_multipleWrites() {
 
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
 
-        Random r = new Random();
+        try {
+        
+//        final Random r = new Random();
 
         /*
          * write a bunch of random records.
@@ -886,13 +944,13 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         
         for(int i=0; i<limit; i++) {
 
-            byte[] expected = new byte[r.nextInt(100) + 1];
+            final byte[] expected = new byte[r.nextInt(100) + 1];
         
             r.nextBytes(expected);
         
-            ByteBuffer tmp = ByteBuffer.wrap(expected);
+            final ByteBuffer tmp = ByteBuffer.wrap(expected);
             
-            long addr = store.write(tmp);
+            final long addr = store.write(tmp);
 
             // verify that the position is advanced to the limit.
             assertEquals(expected.length,tmp.position());
@@ -910,19 +968,23 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
          * now verify data with random reads.
          */
 
-        int[] order = getRandomOrder(limit);
+        final int[] order = getRandomOrder(limit);
         
         for(int i=0; i<limit; i++) {
             
-            long addr = addrs[order[i]];
+            final long addr = addrs[order[i]];
             
-            byte[] expected = records[order[i]];
+            final byte[] expected = records[order[i]];
 
             assertEquals(expected,store.read(addr));
             
         }
     
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
 
     }
     
@@ -932,8 +994,8 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //     */
 //    public void test_writeReadDeleteRead() {
 //        
-//        IRawStore store = getStore();
-//        
+//        final IRawStore store = getStore();
+//        try {
 //        Random r = new Random();
 //        
 //        final int len = 100;
@@ -973,32 +1035,40 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
 //            store.read(addr1, null);
 //
 //        }
-//        
+//     } finally {store.destroy();}
 //    }
 
-    /**
-     * Note: This will leave a test file around each time since we can
-     * not really call closeAndDelete() when we are testing close().
-     */
+//    /**
+//     * Note: This will leave a test file around each time since we can
+//     * not really call closeAndDelete() when we are testing close().
+//     */
     public void test_close() {
-        
-        IRawStore store = getStore();
-        
-        assertTrue(store.isOpen());
-        
-        store.close();
 
-        assertFalse(store.isOpen());
-        
+        final IRawStore store = getStore();
+
         try {
 
+            assertTrue(store.isOpen());
+
             store.close();
-            
-            fail("Expecting: "+IllegalStateException.class);
-            
-        } catch(IllegalStateException ex) {
-            
-            System.err.println("Ignoring expected exception: "+ex);
+
+            assertFalse(store.isOpen());
+
+            try {
+
+                store.close();
+
+                fail("Expecting: " + IllegalStateException.class);
+
+            } catch (IllegalStateException ex) {
+
+                System.err.println("Ignoring expected exception: " + ex);
+            }
+
+        } finally {
+
+            store.destroy();
+
         }
 
     }
@@ -1006,7 +1076,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
     /**
      * A random number generated - the seed is NOT fixed.
      */
-    protected Random r = new Random();
+    final protected Random r = new Random();
 
     /**
      * Returns random data that will fit in N bytes. N is choosen randomly in
@@ -1019,7 +1089,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         
         final int nbytes = r.nextInt(1024) + 1;
         
-        byte[] bytes = new byte[nbytes];
+        final byte[] bytes = new byte[nbytes];
         
         r.nextBytes(bytes);
         
