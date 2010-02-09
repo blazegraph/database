@@ -1533,8 +1533,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
 
     /**
-     * Convenience method sets both {@link #getDeleteMarkers()} and
-     * {@link #getVersionTimestamps()} at the same time.
+     * Convenience method sets both {@link #setDeleteMarkers(boolean)} and
+     * {@link #setVersionTimestamps(boolean)} at the same time.
      * 
      * @param isolatable
      *            <code>true</code> if delete markers and version timestamps
