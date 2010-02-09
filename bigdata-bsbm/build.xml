@@ -119,9 +119,9 @@
 	<!--
 	Here is how to qualify the system.
 
-	You have to download the qualification dataset [1] (it's 20M), its test driver
-	data [2], and the correct results [3], and put them in the ant-build/bin
-	directory (or elsewhere if you modify the ant script).  Then follow the
+	You have to download the qualification dataset [1] (it's 20M, unzip it as 
+	dataset_1m.ttl), its test driver data [2] (unzip this), and the correct
+	results [3], and put them in the ${bsbm.qualDataDir}.  Then follow the
 	instructions in [4], which boils down to three ant tasks:
 
 	ant run-load-qualification (loads the dataset)
@@ -142,9 +142,11 @@
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 	          >
-			<arg line="-journal ${bsbm.qualJournal} -data ${bsbm.qualDataDir}/dataset_1m.ttl"/>
+			<arg line="journal.properties ${bsbm.qualDataDir}/dataset_1m.ttl"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
+			<!-- specify/override the journal file name. -->
+			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.qualJournal}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
 			<classpath>
 				<path refid="runtime.classpath" />
@@ -158,7 +160,7 @@
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-idir ${bsbm.qualDataDir}\td_data -q http://dummyendpoint -journal ${bsbm.qualJournal}"/>
+			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint -journal ${bsbm.qualJournal}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
@@ -205,6 +207,9 @@
 			
 			<!-- -idir dir is the test data directory (default td_data). -->
 			<arg value="-idir"/><arg value="${bsbm.dataDir}"/>
+			
+			<!-- The randomizer seed. -->
+			<arg value="-seed"/><arg value="${bsbm.seed}"/>
 			
 			<!-- -o file is the name of the xml output file. -->
 			<arg value="-o"/>
