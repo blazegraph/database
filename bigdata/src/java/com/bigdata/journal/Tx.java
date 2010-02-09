@@ -627,17 +627,23 @@ public class Tx implements ITx {
         indices.clear();
 
         /*
-         * Close and delete the TemporaryRawStore.
-         * 
-         * @todo when changing to use a shared temporary store modify this to
-         * drop the BTree for the isolated indices on the temporary store. That
-         * will reduce clutter in its Name2Addr object.
+         * Note: The BTree instances used to isolated the tx are not registered
+         * under a name on the temporary store.  There is no concept of deleting
+         * an unregistered BTree -- not unless we change the temporary store to
+         * use a r/w backing store rather than a worm.
          */
-        if (tmpStore != null && tmpStore.isOpen()) {
-
-            tmpStore.close();
-
-        }
+//        /*
+//         * Close and delete the TemporaryRawStore.
+//         * 
+//         * Note: when changing to use a shared temporary store modify this to
+//         * drop the BTree for the isolated indices on the temporary store. That
+//         * will reduce clutter in its Name2Addr object.
+//         */
+//        if (tmpStore != null && tmpStore.isOpen()) {
+//
+//            tmpStore.close();
+//
+//        }
 
     }
 
@@ -670,18 +676,20 @@ public class Tx implements ITx {
      */
     private IRawStore getTemporaryStore() {
 
-        assert lock.isHeldByCurrentThread();
-
-        if (tmpStore == null) {
-
-            final int offsetBits = resourceManager.getLiveJournal()
-                    .getOffsetBits();
-            
-            tmpStore = new TemporaryRawStore(offsetBits);
-
-        }
-
-        return tmpStore;
+        return resourceManager.getLiveJournal().getTempStore();
+        
+//        assert lock.isHeldByCurrentThread();
+//
+//        if (tmpStore == null) {
+//
+//            final int offsetBits = resourceManager.getLiveJournal()
+//                    .getOffsetBits();
+//            
+//            tmpStore = new TemporaryRawStore(offsetBits);
+//
+//        }
+//
+//        return tmpStore;
 
     }
     
@@ -916,7 +924,13 @@ public class Tx implements ITx {
                 // the view definition.
                 final AbstractBTree[] b = new AbstractBTree[sources.length + 1];
 
-                // create the write set on a temporary store.
+                /*
+                 * Create the write set on a temporary store.
+                 * 
+                 * Note: The BTree is NOT registered under a name so it can not 
+                 * be discovered on the temporary store.  This is fine since we
+                 * hold onto a hard reference to the BTree in [indices].
+                 */
                 b[0] = BTree.create(getTemporaryStore(), sources[0]
                         .getIndexMetadata().clone());
 
