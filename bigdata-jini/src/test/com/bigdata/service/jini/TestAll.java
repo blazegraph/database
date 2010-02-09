@@ -77,10 +77,10 @@ public class TestAll extends TestCase {
          * @todo test service failover and restart-safety.
          */
 
-        /*
-         * The map/reduce test suite.
-         */
-        suite.addTest(com.bigdata.service.mapReduce.TestAll.suite());
+//        /*
+//         * The map/reduce test suite.
+//         */
+//        suite.addTest(com.bigdata.service.mapReduce.TestAll.suite());
 
         return suite;
         

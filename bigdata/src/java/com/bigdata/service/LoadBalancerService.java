@@ -44,7 +44,6 @@ import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.DataService.IDataServiceCounters;
 import com.bigdata.service.EventReceiver.EventBTree;
-import com.bigdata.service.mapred.IMapService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
@@ -52,8 +51,8 @@ import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounter
 /**
  * The {@link LoadBalancerService} collects a variety of performance counters
  * from hosts and services, identifies over- and under- utilized hosts and
- * services based on the collected data and reports those to {@link DataService}s
- * so that they can auto-balance, and acts as a clearing house for WARN and
+ * services based on the collected data and reports those to {@link DataService}
+ * s so that they can auto-balance, and acts as a clearing house for WARN and
  * URGENT alerts for hosts and services.
  * <p>
  * While the {@link LoadBalancerService} MAY observe service start/stop events,
@@ -100,11 +99,11 @@ import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounter
  *       maintain QOS on individual machines, indices, and across the
  *       federation.
  * 
- * @todo All clients ({@link IBigdataClient}, {@link DataService},
- *       {@link IMapService}, etc) should issue WARN and URGENT notices. The
- *       client-side rules for those alerts should be configurable / pluggable /
- *       declarative. It would be great if the WARN and URGENT notices were able
- *       to carry some information about the nature of the emergency.
+ * @todo All clients ({@link IBigdataClient}, {@link DataService}, etc) should
+ *       issue WARN and URGENT notices. The client-side rules for those alerts
+ *       should be configurable / pluggable / declarative. It would be great if
+ *       the WARN and URGENT notices were able to carry some information about
+ *       the nature of the emergency.
  * 
  * @todo logging on this {@link LoadBalancerService#log} can provide a single
  *       point for administrators to configure email or other alerts.

@@ -107,7 +107,7 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.search.TestAll.suite() );
         suite.addTest( com.bigdata.bfs.TestAll.suite() );
         suite.addTest( com.bigdata.relation.TestAll.suite() );
-        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
+//        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
 
         // Jini integration
         suite.addTest(com.bigdata.jini.TestAll.suite());

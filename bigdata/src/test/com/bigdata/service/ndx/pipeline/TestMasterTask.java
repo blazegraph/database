@@ -34,9 +34,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.bigdata.btree.keys.KVO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.mapred.AbstractMaster;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.H;
-import com.bigdata.service.ndx.pipeline.AbstractMasterTestCase.O;
 
 /**
  * Unit tests for the control logic used by {@link AbstractMasterTask} and
@@ -233,8 +230,8 @@ public class TestMasterTask extends AbstractMasterTestCase {
      *       {@link AbstractMasterStats#getSubtaskStats(Object)}. This forces
      *       the internal map to hold a hard reference to the subtask statistics
      *       objects. This demonstrates that the problem is not with the
-     *       termination conditions for the {@link AbstractMaster}. However, the
-     *       unit test are still broken until I track down the underlying
+     *       termination conditions for the {@link AbstractMasterTask}. However,
+     *       the unit test are still broken until I track down the underlying
      *       assumption within them which is being violated.
      * 
      * @throws InterruptedException
