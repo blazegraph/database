@@ -271,8 +271,10 @@ public interface IRawStore extends IAddressManager {
     public void deleteResources();
 
     /**
-     * Closes the store immediately, deletes its persistent resources, and
-     * clears any records for the store from the {@link IGlobalLRU}.
+     * Closes the store immediately (if open), deletes its persistent resources,
+     * and clears any records for the store from the {@link IGlobalLRU}. Does
+     * NOT throw an {@link IllegalStateException} if the store is already
+     * closed, but still deletes the backing resources.
      * 
      * @see #deleteResources()
      */
