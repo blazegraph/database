@@ -1733,7 +1733,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
-    private final IReopenChannel opener = new IReopenChannel() {
+    private final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
 
         public String toString() {
             
@@ -1931,7 +1931,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
         if (off + nbytes > addrByteCount) {
 
-            throw new IllegalArgumentException("Would overrun record");
+            throw new IllegalArgumentException(ERR_BUFFER_OVERRUN);
 
         }
         
@@ -2200,7 +2200,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
 
     }
-    
+
     /**
      * Write the data on the disk (synchronous).
      * <p>
@@ -2228,6 +2228,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * @param append
      *            <code>true</code> iff the write is an append (most record
      *            writes are appends).
+     * 
+     * @todo When integrating the new WriteCache, this method will still have to
+     *       make sure that the backing file exists and handle overflow of the
+     *       file (file extension).
      */
     private void writeOnDisk(final ByteBuffer data, final long offset, final boolean append) {
 

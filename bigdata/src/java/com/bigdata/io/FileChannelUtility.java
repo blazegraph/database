@@ -131,8 +131,8 @@ public class FileChannelUtility {
      *       temporary direct buffers since Java may attempt to allocate a
      *       "temporary" direct buffer if [dst] is not already a direct buffer.
      */
-    static public int readAll(final IReopenChannel opener, final ByteBuffer src,
-                final long pos) throws IOException {
+    static public int readAll(final IReopenChannel<FileChannel> opener,
+            final ByteBuffer src, final long pos) throws IOException {
 
         if (opener == null)
             throw new IllegalArgumentException();
@@ -365,7 +365,7 @@ public class FileChannelUtility {
      * 
      * @throws IOException
      */
-    static public int writeAll(final IReopenChannel opener,
+    static public int writeAll(final IReopenChannel<FileChannel> opener,
             final ByteBuffer data, final long pos) throws IOException {
 
         final int nbytes = data.remaining();
