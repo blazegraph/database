@@ -131,6 +131,13 @@ public class TestWriteCache extends TestCase2 {
     public void test_writeCache01() throws IOException, InterruptedException {
 
         /*
+         * Whether or nor the write cache will force writes to the disk. For
+         * this test, force is false since it just does not matter whether the
+         * data are restart safe.
+         */
+        final boolean force = false;
+        
+        /*
          * The offset into the file of the start of the "user" data. May be GTE
          * zero.
          */
@@ -358,7 +365,7 @@ public class TestWriteCache extends TestCase2 {
                     assertEquals(0L, file.length());
                     
                     // write to the backing file.
-                    writeCache.flush(false/* force */);
+                    writeCache.flush(force);
 
                     // verify read back of cache still good.
                     assertEquals(data1, writeCache.read(addr1));
@@ -373,15 +380,93 @@ public class TestWriteCache extends TestCase2 {
                 }
 
                 /*
-                 * FIXME Now reset the write cache and verify that (a) read back
-                 * of the old records fails; (b) the firstAddr was cleared to
-                 * its distinguished value; (c) that the entire capacity of the
-                 * cache is now available for a large record; and (d) that
+                 * FIXME Now reset the write cache and verify that (a) the
+                 * firstAddr was cleared to its distinguished value; (b) read
+                 * back of the old records fails;(c) that the entire capacity of
+                 * the cache is now available for a large record; and (d) that
                  * flushing the cache with that record sends the new data to the
                  * end of the file such that we can read back the large record
                  * from the cache and any of the records from the file.
                  */
+                // exact file record for the cache.
+                final ByteBuffer data4 = getRandomData(writeCache.capacity());
+                final long addr4 = _addr.get();
+                _addr.addAndGet(data4.capacity());
                 {
+                 
+                    writeCache.reset();
+                    
+                    assertEquals(-1L,writeCache.getFirstAddr());
+
+                    // verify read back of cache fails.
+                    assertNull(writeCache.read(addr1));
+                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr3));
+
+                    // verify read back from file still good.
+                    assertEquals(data1, opener.read(addr1, data1.capacity()));
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+                    assertEquals(data3b, opener.read(addr3, data3b.capacity()));
+
+                    // write record on the cache.
+                    assertTrue(writeCache.write(addr4, data4));
+
+                    // verify read back.
+                    assertEquals(data4, writeCache.read(addr4));
+
+                    // Verify no more writes are allowed on the cache (it is
+                    // full).
+                    assertFalse(writeCache.write(addr4 + 1, ByteBuffer
+                            .wrap(new byte[] { 1 })));
+
+                    // write on the disk.
+                    writeCache.flush(force);
+
+                    // verify read back of cache for other records still fails.
+                    assertNull(writeCache.read(addr1));
+                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr3));
+                    // verify read back from cache of the last record written.
+                    assertEquals(data4, writeCache.read(addr4));
+
+                    // verify read back from file still good.
+                    assertEquals(data1, opener.read(addr1, data1.capacity()));
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+                    assertEquals(data3b, opener.read(addr3, data3b.capacity()));
+                    assertEquals(data4, opener.read(addr4, data4.capacity()));
+
+
+                }
+
+                /*
+                 * Test close() [verify API throws IllegalStateException].
+                 */
+                {
+
+                    // close this instance.
+                    writeCache.close();
+
+                    // read fails.
+                    try {
+                        writeCache.read(1L/*addr*/);
+                        fail("Expected: " + IllegalStateException.class);
+                    } catch (IllegalStateException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+
+                    // write fails.
+                    try {
+                        writeCache.write(1L/* addr */, ByteBuffer
+                                .wrap(new byte[] { 1, 2, 3 }));
+                        fail("Expected: " + IllegalStateException.class);
+                    } catch (IllegalStateException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+
+                    // does not throw an exception.
+                    writeCache.close();
                     
                 }
                 
@@ -511,6 +596,18 @@ public class TestWriteCache extends TestCase2 {
 
         final int nbytes = r.nextInt(256) + 1;
 
+        return getRandomData(nbytes);
+
+    }
+
+    /**
+     * Returns random data that will fit in <i>nbytes</i>.
+     * 
+     * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code>
+     *         having random contents.
+     */
+    public ByteBuffer getRandomData(final int nbytes) {
+
         final byte[] bytes = new byte[nbytes];
 
         r.nextBytes(bytes);
@@ -518,7 +615,7 @@ public class TestWriteCache extends TestCase2 {
         return ByteBuffer.wrap(bytes);
 
     }
-    
+
     /**
      * Helper method verifies that the contents of <i>actual</i> from
      * position() to limit() are consistent with the expected byte[]. A

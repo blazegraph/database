@@ -497,6 +497,17 @@ abstract public class WriteCache<C extends Channel> {
                 // the position() at which the record is cached.
                 pos = tmp.position();
 
+                if (pos + nbytes > tmp.capacity()) {
+
+                    /*
+                     * There is not enough room left in the write cache for this
+                     * record.
+                     */
+                    
+                    return false;
+
+                }
+
                 // copy the record into the cache, updating position() as we go.
                 tmp.put(data);
 
@@ -844,6 +855,8 @@ abstract public class WriteCache<C extends Channel> {
      * the {@link WriteCache} is prepared to receive new writes.
      * 
      * @throws InterruptedException
+     * @throws IllegalStateException
+     *             if the write cache is closed.
      */
     public void reset() throws InterruptedException {
         
@@ -861,7 +874,7 @@ abstract public class WriteCache<C extends Channel> {
             if (tmp == null) {
 
                 // Already closed.
-                return;
+                throw new IllegalStateException();
                 
             }
 
@@ -880,10 +893,11 @@ abstract public class WriteCache<C extends Channel> {
      * Permanently take the {@link WriteCache} instance out of service. If the
      * buffer was allocated by the {@link WriteCache} then it is released back
      * to the {@link DirectBufferPool}. After this method is called, records can
-     * no longer be read from nor written onto the {@link WriteCache}.
+     * no longer be read from nor written onto the {@link WriteCache}. It is
+     * safe to invoke this method more than once.
      * <p>
      * Concurrent {@link #read(long, int)} requests will be serviced if the
-     * already hold the the read lock but requests will fail once the 
+     * already hold the the read lock but requests will fail once the
      * 
      * @throws InterruptedException
      */
