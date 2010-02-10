@@ -259,7 +259,7 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
 
             assertTrue(commitRecordIndexAddrs[i]!=0L);
 
-            if (i > 0)
+            if ((!(journal.getBufferStrategy() instanceof RWStrategy)) && i > 0)
                 assertTrue(commitRecordIndexAddrs[i] > commitRecordIndexAddrs[i - 1]);
 
             // get the current commit record.
