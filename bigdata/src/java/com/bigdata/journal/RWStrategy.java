@@ -20,7 +20,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 
 package com.bigdata.journal;
 
@@ -34,134 +34,178 @@ import java.nio.channels.FileChannel;
 import java.util.UUID;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.io.FileChannelUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.util.ChecksumUtility;
 
 /**
- * The hook that accesses the RWStore to provide read/write services as opposed to the
- * WORM characteristics of the DiskOnlyStrategy
+ * The hook that accesses the RWStore to provide read/write services as opposed
+ * to the WORM characteristics of the DiskOnlyStrategy AddressManager
  * 
  * @author mgc
  */
-public class RWStrategy extends AbstractRawStore implements
-IDiskBasedStrategy, IUpdateStore, IBufferStrategy, IAddressManager {
+public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
+	protected static java.util.logging.Logger cat = java.util.logging.Logger
+	.getLogger(RWStrategy.class.getName());
 
-	File m_file = null;
-	
+	FileMetadata m_fileMetadata = null;
+
 	RWStore m_store = null;
 	
-//	RWStrategy(final long maximumExtent, final FileMetadata fileMetadata) {
-//
-////        super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
-////                fileMetadata.nextOffset, fileMetadata.bufferMode,
-////                fileMetadata.readOnly);
-//
-//        m_file = fileMetadata.file;
-//        
-//        m_store = new RWStore(m_file, false); // not read-only for now
-//	}
+	FileMetadataView m_fmv = new FileMetadataView();
+	
+	IRootBlockView m_rb;
+	IRootBlockView m_rb0;
+	IRootBlockView m_rb1;
+	
+	CounterSet m_counters = new CounterSet();
 
-	RWStrategy(File file) {
+	/**
+	 * It is important to ensure that the RWStrategy keeps a check on the physical root blocks and uses
+	 * to manage re-opening of the store.
+	 * 
+	 * @param fileMetadata
+	 */
+	RWStrategy(final FileMetadata fileMetadata) {
 
-//        super(0L, 200*1000*1000, 32,
-//                8 * 1000, BufferMode.DiskRW,
-//                false);
+		m_fileMetadata = fileMetadata;
+		
+		m_rb = fileMetadata.rootBlock;
 
-        m_file = file;
-        
-        m_store = new RWStore(m_file, false); // not read-only for now
+		m_store = new RWStore(m_fmv, false); // not read-only for now
+		
+		m_rb0 = copyRootBlock(true);
+		m_rb1 = copyRootBlock(false);
+		
+		m_initialExtent = m_fileMetadata.file.length();
+	}
+	
+	IRootBlockView copyRootBlock(boolean rb0) {
+		IRootBlockView rbv = new RootBlockView(rb0, m_rb.getOffsetBits(), m_rb.getNextOffset(), m_rb.getFirstCommitTime(), m_rb.getLastCommitTime(),
+				m_rb.getCommitCounter(), m_rb.getCommitRecordAddr(), m_rb.getCommitRecordIndexAddr(), m_fileMetadata.rootBlock.getUUID(),
+				m_rb.getMetaStartAddr(), m_rb.getMetaBitsAddr(), StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(), m_rb.getCloseTime(),
+				s_ckutil);
+
+		return rbv;
 	}
 
-	public FileChannel getChannel() {
-		return m_store.getChannel();
+	/**
+	 * Create a wrapper to circumvent package visibility issues since we'd like
+	 * to keep RWStore in a separate package
+	 * 
+	 * @author mgc
+	 * 
+	 */
+	interface IFileMetadataView {
+		IRootBlockView getRootBlock();
+
+		IRootBlockView getRootBlock0();
+
+		IRootBlockView getRootBlock1();
+
+		File getFile();
+
+		RandomAccessFile getRandomAccessFile();
+
+		public IRootBlockView newRootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
+				long firstCommitTime, long lastCommitTime, long commitCounter, long commitRecordAddr,
+				long commitRecordIndexAddr, long metaStartAddr, long metaBitsAddr, long closeTime);
 	}
 
-	public File getFile() {
-		return m_file;
-	}
+	static final ChecksumUtility s_ckutil = new ChecksumUtility();
 
-	public int getHeaderSize() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+	public class FileMetadataView implements IFileMetadataView {
 
-	public RandomAccessFile getRandomAccessFile() {
-		return m_store.getRandomAccessFile();
-	}
+		private FileMetadataView() {
+		}
 
-	public CounterSet getCounters() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+		public IRootBlockView getRootBlock() {
+			return m_rb;
+		}
 
-	public long getExtent() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+		public IRootBlockView getRootBlock0() {
+			return m_rb0;
+		}
 
-	public long getUserExtent() {
-		// TODO Auto-generated method stub
-		return 0;
+		public IRootBlockView getRootBlock1() {
+			return m_rb1;
+		}
+
+		public File getFile() {
+			return m_fileMetadata.file;
+		}
+
+		public RandomAccessFile getRandomAccessFile() {
+			return m_fileMetadata.raf;
+		}
+
+		public IRootBlockView newRootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
+				long firstCommitTime, long lastCommitTime, long commitCounter, long commitRecordAddr,
+				long commitRecordIndexAddr, long metaStartAddr, long metaBitsAddr, long closeTime) {
+
+			IRootBlockView rbv = new RootBlockView(rootBlock0, offsetBits, nextOffset, firstCommitTime, lastCommitTime,
+					commitCounter, commitRecordAddr, commitRecordIndexAddr, m_fileMetadata.rootBlock.getUUID(),
+					metaStartAddr, metaBitsAddr, StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(), closeTime,
+					s_ckutil);
+
+			// writeRootBlock(rbv, ForceEnum.Force); // not sure if this is really needed now!
+
+			return rbv;
+		}
 	}
 
 	public ByteBuffer readRootBlock(boolean rootBlock0) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	public long transferTo(RandomAccessFile out) throws IOException {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	public void truncate(long extent) {
-		// TODO Auto-generated method stub
+		checkReopen();
 		
-	}
-
-	public void writeRootBlock(IRootBlockView rootBlock,
-			ForceEnum forceOnCommitEnum) {
-		rootBlock.asReadOnlyBuffer();
+		IRootBlockView rbv = rootBlock0 ? m_rb0 : m_rb1;
 		
-	}
-
-	public void deleteResources() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	public void force(boolean metadata) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	public boolean isFullyBuffered() {
-		return false;
-	}
-
-	public boolean isStable() {
-		// TODO Auto-generated method stub
-		return false;
+		return rbv.asReadOnlyBuffer();
 	}
 
 	public ByteBuffer read(long addr) {
-		int rwaddr = decodeAddr(addr);
+		checkReopen();
+		
+		int rwaddr = decodeAddr(addr);		
 		int sze = decodeSize(addr);
+
+		if (rwaddr == 0L || sze == 0) {
+			throw new IllegalArgumentException();
+		}
 		
-		byte buf[] = new byte[sze];		
+		byte buf[] = new byte[sze];
 		m_store.getData(rwaddr, buf);
-		
+
 		return ByteBuffer.wrap(buf);
 	}
 
 	public long write(ByteBuffer data) {
-        final int nbytes = data.remaining();
-		long rwaddr = m_store.alloc(data.array(), nbytes);
+		checkReopen();
 		
-		return 0;
+		if (data == null) {
+			throw new IllegalArgumentException();
+		}
+		
+		final int nbytes = data.remaining();
+		
+		if (nbytes == 0) {
+			throw new IllegalArgumentException();
+		}
+		
+		long rwaddr = m_store.alloc(data.array(), nbytes);
+		data.position(nbytes); // update position to end of buffer
+
+		return encodeAddr(rwaddr, nbytes);
+	}
+
+	private void checkReopen() {
+		if (m_needsReopen) {
+			reopen();
+			m_needsReopen = false;
+		}		
 	}
 
 	public long allocate(int nbytes) {
@@ -171,119 +215,309 @@ IDiskBasedStrategy, IUpdateStore, IBufferStrategy, IAddressManager {
 	private long encodeAddr(long alloc, int nbytes) {
 		alloc <<= 32;
 		alloc += nbytes;
-		
+
 		return alloc;
 	}
+
 	private int decodeAddr(long addr) {
 		addr >>= 32;
-		
+
 		return (int) addr;
 	}
+
 	private int decodeSize(long addr) {
 		return (int) (addr & 0xFFFFFFFF);
-	}
-
-	public void update(long addr, int off, ByteBuffer data) {
-		// m_store.
 	}
 
 	public void delete(long addr) {
 		m_store.free(addr);
 	}
 
-    public IAddressManager getAddressManager() {
-        // TODO Auto-generated method stub
-        return null;
-    }
+	public static class RWAddressManager implements IAddressManager {
 
-    public void closeForWrites() {
-        // TODO Auto-generated method stub
-        
-    }
+		public int getByteCount(long addr) {
+			return (int) addr & 0xFFFFFF;
+		}
 
-    public BufferMode getBufferMode() {
-        // TODO Auto-generated method stub
-        return null;
-    }
+		public long getOffset(long addr) {
+			return -(addr >> 32);
+		}
 
-    public long getInitialExtent() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+		public long toAddr(int nbytes, long offset) {
+			offset <<= 32;
+			
+			return offset + nbytes;
+		}
 
-    public long getMaximumExtent() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+		public String toString(long addr) {
+	        return "{off="+getOffset(addr)+",len="+getByteCount(addr)+"}";
+		}
+	}
+	IAddressManager m_am = new RWAddressManager();
+	
+	public IAddressManager getAddressManager() {
+		return m_am;
+	}
 
-    public long getNextOffset() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+	public void closeForWrites() {
+		// TODO Auto-generated method stub
 
-    public void close() {
-        // TODO Auto-generated method stub
-        
-    }
+	}
 
-    public void destroy() {
-        // TODO Auto-generated method stub
-        
-    }
+	public BufferMode getBufferMode() {
+		return BufferMode.DiskRW;
+	}
 
-    public IResourceMetadata getResourceMetadata() {
-        // TODO Auto-generated method stub
-        return null;
-    }
+	public CounterSet getCounters() {
+		return m_counters;
+	}
 
-    public UUID getUUID() {
-        // TODO Auto-generated method stub
-        return null;
-    }
+	public long getExtent() {
+		return this.m_fileMetadata.file.length();
+	}
 
-    public boolean isOpen() {
-        // TODO Auto-generated method stub
-        return false;
-    }
+	public int getHeaderSize() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 
-    public boolean isReadOnly() {
-        // TODO Auto-generated method stub
-        return false;
-    }
+	long m_initialExtent = 0;
 
-    public long size() {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+	private boolean m_needsReopen = false;
+	
+	public long getInitialExtent() {
+		return m_initialExtent;
+	}
 
-    public int getByteCount(long addr) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+	public long getMaximumExtent() {
+		return 0L;
+	}
 
-    public long getOffset(long addr) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+	public long getNextOffset() {
+		return m_store.getNextOffset();
+	}
 
-//    public void packAddr(DataOutput out, long addr) throws IOException {
-//        // TODO Auto-generated method stub
-//        
-//    }
+	public long getUserExtent() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 
-    public long toAddr(int nbytes, long offset) {
-        // TODO Auto-generated method stub
-        return 0;
-    }
+	public long transferTo(RandomAccessFile out) throws IOException {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 
-    public String toString(long addr) {
-        // TODO Auto-generated method stub
-        return null;
-    }
+	public void truncate(long extent) {
+		// TODO Auto-generated method stub
 
-//    public long unpackAddr(DataInput in) throws IOException {
-//        // TODO Auto-generated method stub
-//        return 0;
-//    }
+	}
+
+	public void writeRootBlock(IRootBlockView rootBlock, ForceEnum forceOnCommit) {
+
+		if (rootBlock == null)
+			throw new IllegalArgumentException();
+
+		try {
+			m_store.checkRootBlock(rootBlock);
+			
+			final ByteBuffer data = rootBlock.asReadOnlyBuffer();
+
+			final long pos = rootBlock.isRootBlock0() ? FileMetadata.OFFSET_ROOT_BLOCK0
+					: FileMetadata.OFFSET_ROOT_BLOCK1;
+
+			FileChannel channel = m_fileMetadata.raf.getChannel();
+
+			channel.write(data, pos);
+
+			if (forceOnCommit != ForceEnum.No) {
+
+				channel.force(forceOnCommit == ForceEnum.ForceMetadata);
+
+			}
+			
+			cat.info("Writing ROOTBLOCK");
+
+		}
+
+		catch (IOException ex) {
+			m_needsReopen = true;
+			
+			throw new RuntimeException(ex);
+
+		}
+
+	}
+
+	/**
+	 * Set close time in rootBlock, and close file
+	 */
+	public void close() {
+		if (m_fileMetadata.raf == null) {
+			throw new IllegalStateException();
+		}
+		try {
+			m_store.close();
+			m_fileMetadata.raf.close();
+			m_fileMetadata.raf = null;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public void deleteResources() {
+		// TODO Auto-generated method stub
+
+	}
+
+	public void destroy() {
+		m_fileMetadata.file.delete();
+	}
+
+	public IRootBlockView getRootBlock() {
+		return m_fmv.newRootBlockView(! m_rb.isRootBlock0(), m_rb.getOffsetBits(), getNextOffset(), 
+				m_rb.getFirstCommitTime(), m_rb.getLastCommitTime(), m_rb.getCommitCounter(), 
+				m_rb.getCommitRecordAddr(), m_rb.getCommitRecordIndexAddr(), getMetaStartAddr(), getMetaBitsAddr(), m_rb.getCloseTime() );
+		
+	}
+	public void commit() {
+		m_store.commitChanges(); // includes a force(false)
+		IRootBlockView rb = getRootBlock();
+		
+		writeRootBlock(rb, ForceEnum.No);
+
+		m_rb = rb;
+		
+		if (m_rb.isRootBlock0()) {
+			m_rb0 = m_rb;
+		} else {
+			m_rb1 = m_rb;
+		}
+	}
+	
+	public void force(boolean metadata) {
+		try {
+			m_store.flushWrites(metadata);
+		} catch (IOException e) {
+			m_needsReopen = true;
+			
+			throw new RuntimeException(e);
+		}
+	}
+	
+	protected void reopen() {
+		try {
+			cat.warning("Request to reopen store after interrupt");
+			
+			m_store.close();
+			m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file, m_fileMetadata.fileMode);
+			m_store = new RWStore(m_fmv, false); // not read-only for now
+		} catch (Throwable t) {
+			t.printStackTrace();
+			
+			throw new RuntimeException(t);
+		}		
+	}
+
+	public File getFile() {
+		return m_fileMetadata.file;
+	}
+
+	public Object getRandomAccessFile() {
+		checkReopen();
+		
+		return m_fileMetadata.raf;		
+	}
+	public IResourceMetadata getResourceMetadata() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public UUID getUUID() {
+		return m_fileMetadata.rootBlock.getUUID();
+	}
+
+	public boolean isFullyBuffered() {
+		return false;
+	}
+
+	public boolean isOpen() {
+		return m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen();
+	}
+
+	public boolean isReadOnly() {
+		return false;
+	}
+
+	public boolean isStable() {
+		return true;
+	}
+
+	public long size() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public int getByteCount(long addr) {
+		return (int) addr & 0xFFFFFFFF;
+	}
+
+	public long getOffset(long addr) {
+		return addr >> 32;
+	}
+
+	public void packAddr(DataOutput out, long addr) throws IOException {
+		// TODO Auto-generated method stub
+
+	}
+
+	public long toAddr(int nbytes, long offset) {
+		return (offset << 32) + nbytes;
+	}
+
+	public String toString(long addr) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public long unpackAddr(DataInput in) throws IOException {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	/**
+	 * The state of the provided block is not relevant since it does not hold
+	 * information on recent allocations (the meta allocations will only effect the
+	 * root block after a commit)
+	 */
+	public boolean requiresCommit(IRootBlockView block) {
+		return m_store.requiresCommit();
+	}
+
+	public long getMetaBitsAddr() {
+		return m_store.getMetaBitsAddr();
+	}
+
+	public long getMetaStartAddr() {
+		return m_store.getMetaStartAddr();
+	}
+
+	/**
+	 * Appears only to be used in unit tests.  Return current max fix allocation block of 8K.
+	 * 
+	 * FIXME: need to provide configurable allocation block sizes for the RWStore and this should access the same
+	 * information.
+	 */
+	public int getMaxRecordSize() {
+		return 8 * 1024;
+	}
+
+	/**
+	 * Although the RW Store uses a latched addressing strategy it is not meaningful to make this available 
+	 * in this interface.
+	 */
+	public int getOffsetBits() {
+		return 0;
+	}
 
 }

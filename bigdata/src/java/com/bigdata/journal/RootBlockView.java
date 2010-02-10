@@ -152,7 +152,7 @@ public class RootBlockView implements IRootBlockView {
      */
     final int VERSION1 = 0x1;
 
-    final int currentVersion = VERSION0;
+    final int currentVersion;
     
     /**
      * The buffer holding the backing data.
@@ -206,6 +206,9 @@ public class RootBlockView implements IRootBlockView {
             final long nextOffset, final long addr, final String label) {
 
         if(addr==0L) return;
+        
+        // TODO develop protocol to support address checking
+        if (am instanceof RWStrategy.RWAddressManager) return;
         
         final long offset = am.getOffset(addr);
         
@@ -282,15 +285,33 @@ public class RootBlockView implements IRootBlockView {
             long firstCommitTime, long lastCommitTime, long commitCounter,
             long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
             long createTime, long closeTime, ChecksumUtility checker) {
+        this(rootBlock0, offsetBits, nextOffset,
+                firstCommitTime, lastCommitTime, commitCounter,
+                commitRecordAddr, commitRecordIndexAddr, uuid,
+                0L, 0L, StoreTypeEnum.WORM,
+                createTime, closeTime, checker);
+    }
 
+    RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
+            long firstCommitTime, long lastCommitTime, long commitCounter,
+            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
+            long metaStartAddr, long metaBitsAddr, StoreTypeEnum storeTypeEnum,
+            long createTime, long closeTime, ChecksumUtility checker)
+    {
         assert SIZEOF_UNUSED > 0 : "Out of unused space in the root block? : "+SIZEOF_UNUSED;
 
         WormAddressManager.assertOffsetBits(offsetBits);
 
         // Note: used for assertions only and by toString().
-        am = new WormAddressManager(offsetBits);
+        if (StoreTypeEnum.RW == storeTypeEnum) {
+        	am = new RWStrategy.RWAddressManager();
+        	currentVersion = VERSION1;
+        } else {
+        	am = new WormAddressManager(offsetBits);
+        	currentVersion = VERSION0;
+        }
 
-        if(am instanceof WormAddressManager) {
+        if (am instanceof WormAddressManager) {
          
             /*
              * FIXME Use RW vs WORM address manager and check this based on the
@@ -442,9 +463,9 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(createTime);
         buf.putLong(closeTime);
         buf.position(buf.position()+SIZEOF_UNUSED); // skip unused region.
-        buf.putLong(0L); // FIXME metaBitsAddr
-        buf.putLong(0L); // FIXME metaStartAddr
-        buf.put(StoreTypeEnum.WORM.getType()); // FIXME metaBitsAddr
+        buf.putLong(metaBitsAddr);
+        buf.putLong(metaStartAddr);
+        buf.put(storeTypeEnum.getType());
         buf.putLong(uuid.getMostSignificantBits());
         buf.putLong(uuid.getLeastSignificantBits());
         buf.putLong(challisField);
@@ -454,7 +475,6 @@ public class RootBlockView implements IRootBlockView {
         assert buf.limit() == SIZEOF_ROOT_BLOCK;
 
         buf.position(0);
-        
     }
 
     public ByteBuffer asReadOnlyBuffer() {
@@ -506,13 +526,15 @@ public class RootBlockView implements IRootBlockView {
          */
         this.buf = buf.asReadOnlyBuffer();
         
+        currentVersion = getVersion();
+        
         this.rootBlock0 = rootBlock0;
 
         final int offsetBits = getOffsetBits();
 
-        am = new WormAddressManager(offsetBits);
+        am = currentVersion == VERSION1 ? new RWStrategy.RWAddressManager() : new WormAddressManager(offsetBits);
 
-        if(checker == null) {
+        if (checker == null) {
             
             log.warn("Checksum will not be validated");
             
@@ -767,19 +789,19 @@ public class RootBlockView implements IRootBlockView {
     }
 
     public long getMetaBitsAddr() {
-        // FIXME Auto-generated method stub
-        return 0;
+        return buf.getLong(OFFSET_META_BITS);
     }
 
     public long getMetaStartAddr() {
-        // FIXME Auto-generated method stub
-        return 0;
+        return buf.getLong(OFFSET_META_START);
     }
 
     public StoreTypeEnum getStoreType() {
         switch (getVersion()) {
         case VERSION0:
             return StoreTypeEnum.WORM;
+        case VERSION1:
+            return StoreTypeEnum.RW;
         default:
             return StoreTypeEnum.valueOf(buf.get(OFFSET_STORETYPE));
         }
