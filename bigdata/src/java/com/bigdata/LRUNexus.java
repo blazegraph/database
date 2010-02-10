@@ -49,6 +49,7 @@ import com.bigdata.cache.WeakReferenceGlobalLRU;
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.Bytes;
@@ -758,7 +759,7 @@ public class LRUNexus {
              * clone of the address manager instead).
              */
             
-            am = ((AbstractBufferStrategy) ((AbstractJournal) store)
+            am = ((IBufferStrategy) ((AbstractJournal) store)
                     .getBufferStrategy()).getAddressManager();
 
         } else if (store instanceof TemporaryRawStore) {
