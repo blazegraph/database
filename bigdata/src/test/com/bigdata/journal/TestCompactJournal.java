@@ -45,7 +45,7 @@ import com.bigdata.btree.keys.KV;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestCompactJournal extends AbstractJournalTestCase {
+public class TestCompactJournal extends ProxyTestCase<Journal> {
 
     /**
      * 

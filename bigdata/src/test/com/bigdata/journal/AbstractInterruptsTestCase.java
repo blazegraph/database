@@ -306,10 +306,13 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             final long addr1 = store.write(rec1);
 
-            if(store instanceof IAtomicStore) {
+            if (store instanceof IAtomicStore) {
                 
                 assertNotSame(0L, ((IAtomicStore)store).commit());
                 
+            } else if (store instanceof RWStrategy) {
+            	RWStrategy rws = (RWStrategy)store;
+            	rws.commit();
             }
 
             try {
@@ -361,16 +364,17 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * <p>
      * Note: Both the {@link DirectBufferStrategy} and the
      * {@link DiskOnlyStrategy} buffer writes, so both should pass this test.
+     * 
      * <p>
      * Note: This test is only for {@link IDiskBasedStrategy} implementations.
+     * Note: This test is not relevant for RWStrategy since it does not buffer writes in a 
+     * reliable way, and furthermore will invalidate the store after an interrupt.
      */
     public void test_reopenAfterInterrupt_checkWriteBuffer() {
         
         final IRawStore store = getStore();
-
         try {
-        
-        if (store.isStable()) {
+        if (store.isStable() && !(store instanceof RWStrategy)) {
 
             final ByteBuffer rec1 = getRandomData();
 
