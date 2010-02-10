@@ -61,13 +61,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * Text of the error message used when a {@link ByteBuffer} with zero bytes
      * {@link ByteBuffer#remaining()} is passed to {@link #write(ByteBuffer)}.
      */
-    protected static final String ERR_BUFFER_EMPTY = "Zero bytes remaining in buffer";
+    public static final String ERR_BUFFER_EMPTY = "Zero bytes remaining in buffer";
     
     /**
      * Text of the error message used when a <code>null</code> reference is
      * provided for a {@link ByteBuffer}.
      */
-    protected static final String ERR_BUFFER_NULL = "Buffer is null";
+    public static final String ERR_BUFFER_NULL = "Buffer is null";
 
     /**
      * Text of the error message used when an address is given has never been
@@ -82,7 +82,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * to {@link IRawStore#read(long)} or similar methods. This value 0L is
      * reserved to indicate a persistent null reference and may never be read.
      */
-    protected static final String ERR_ADDRESS_IS_NULL = "Address is 0L";
+    public static final String ERR_ADDRESS_IS_NULL = "Address is 0L";
     
     /**
      * Text of the error message used when an address provided to
@@ -90,7 +90,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * of zero (0). Empty records are not permitted on write and addresses with
      * a zero length are rejected on read.
      */
-    protected static final String ERR_RECORD_LENGTH_ZERO = "Record length is zero";
+    public static final String ERR_RECORD_LENGTH_ZERO = "Record length is zero";
     
     /**
      * Text of the error message used when a write operation would exceed the
@@ -123,13 +123,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     /**
      * Error message used when the store is closed. 
      */
-    protected static final String ERR_NOT_OPEN = "Not open";
+    public static final String ERR_NOT_OPEN = "Not open";
 
     /**
      * Error message used when an operation would write more data than would be
      * permitted onto a buffer.
      */
-    protected static final String ERR_BUFFER_OVERRUN = "Would overrun buffer";
+    public static final String ERR_BUFFER_OVERRUN = "Would overrun buffer";
     
     /**
      * <code>true</code> iff the {@link IBufferStrategy} is open.
