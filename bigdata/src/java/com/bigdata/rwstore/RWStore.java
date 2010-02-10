@@ -103,6 +103,16 @@ package com.bigdata.rwstore;
 import java.util.*;
 import java.io.*;
 import java.nio.channels.FileChannel;
+import java.nio.channels.OverlappingFileLockException;
+
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
+import com.bigdata.journal.FileMetadata;
+import com.bigdata.journal.ForceEnum;
+import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.RootBlockView;
+import com.bigdata.journal.RWStrategy.FileMetadataView;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Storage class
@@ -190,6 +200,7 @@ public class RWStore implements IStore {
 
 	static final int MAX_FIXED_ALLOC = 8 * 1024;
 	static final int MIN_FIXED_ALLOC = 64;
+	static final int ALLOC_BLOCK_SIZE = 1024;
 
 	ICommitCallback m_commitCallback;
 
@@ -202,7 +213,8 @@ public class RWStore implements IStore {
 	// ///////////////////////////////////////////////////////////////////////////////////////
 
 	protected File m_fd;
-	protected RandomAccessFile m_file;
+	protected RandomAccessFile m_raf;
+	protected FileMetadata m_metadata;
 	protected int m_transactionCount;
 	protected boolean m_committing;
 
@@ -219,13 +231,10 @@ public class RWStore implements IStore {
 	ArrayList m_commitList;
 
 	WriteBlock m_writes;
-
-	static final int cMinHdrSize = 2048; // FIXME 2048
-
+	
 	private void baseInit() {
 		m_commitCallback = null;
 
-		m_headerSize = cMinHdrSize;
 		m_metaBitsSize = cDefaultMetaBitsSize;
 
 		m_metaBits = new int[m_metaBitsSize];
@@ -251,62 +260,53 @@ public class RWStore implements IStore {
 	protected String m_filename;
 	protected LockFile m_lockFile;
 
-	// Constructor
-	public RWStore(String file, boolean readOnly) {
-		this(new File(file), readOnly);
-	}
+	private FileMetadataView m_fmv;
 
-	public RWStore(File fd, boolean readOnly) {
-		fd = fd.getAbsoluteFile();
-		m_fd = fd;
-		m_readOnly = readOnly;
-		m_filename = fd.getAbsolutePath();
+	private IRootBlockView m_rb;
+
+	private long m_commitCounter;
+
+	private long m_metaBitsAddr;
+
+	// Constructor
+
+	public RWStore(FileMetadataView fileMetadataView, boolean readOnly) {
+		m_fmv = fileMetadataView;
+		m_fd = fileMetadataView.getFile();
+		m_raf = fileMetadataView.getRandomAccessFile();
+		
+		m_rb = m_fmv.getRootBlock();
+		
+		m_filename = m_fd.getAbsolutePath();
 
 		if (Config.isLockFileNeeded() && !readOnly) {
 			m_lockFile = LockFile.create(m_filename + ".lock");
 
 			if (m_lockFile == null) {
-				throw new RuntimeException("Store file already open");
+				throw new OverlappingFileLockException();
 			}
 		}
 
 		baseInit();
 
 		try {
-			if (!fd.exists()) {
-				File pfile = fd.getParentFile();
-				if (pfile != null) {
-					pfile.mkdirs();
-				}
+			m_writes = new WriteBlock(m_raf);
+			
+			if (m_rb.getNextOffset() == 0) { // if zero then new file
 
-				// Should this be more "rwd" ???
-				m_file = new RandomAccessFile(fd, "rw");
-				m_writes = new WriteBlock(m_file);
-
-				// initialise the file
-
-				// m_fileSize = 1024 * 1024;
-				m_fileSize = -120; // 1Mb
-				// m_fileSize = -4; // 32K
+				m_fileSize = convertFromAddr(m_fd.length());
 				m_metaStartAddr = m_fileSize;
-				m_nextAllocation = -1; // keep on a 8K boundary (needed for
-										// BlobAllocation)
-				m_file.setLength(convertAddr(m_fileSize));
+				m_nextAllocation = -1; // keep on a minimum 8K boundary
+				
+				m_raf.setLength(convertAddr(m_fileSize));
 
 				startTransaction();
 				commitTransaction();
 
-				if (readOnly) {
-					m_file = new RandomAccessFile(fd, "r");
-				}
-
 			} else {
-				m_file = new RandomAccessFile(fd, (readOnly ? "r" : "rw"));
-				m_writes = new WriteBlock(m_file);
-
-				readFileSpec();
-				readHdr();
-				readAllocationBlocks();
+				initfromRootBlock();
+				// readHdr();
+				// readAllocationBlocks(); // this is done in initFromRootBlock!!
 			}
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to initialize store", e);
@@ -315,13 +315,96 @@ public class RWStore implements IStore {
 
 	public void close() {
 		try {
-			m_file.close();
+			m_raf.close();
 			if (m_lockFile != null) {
 				m_lockFile.clear();
 			}
 		} catch (IOException e) {
 			// ..oooh err... only trying to help
 		}
+	}
+
+	/**
+	 * Basic check on key root block validity
+	 * 
+	 * @param rbv
+	 */
+	public void checkRootBlock(IRootBlockView rbv) {
+		long nxtOffset = rbv.getNextOffset();
+		int nxtalloc = - (int) (nxtOffset >> 32);
+		
+		int metaBitsAddr = - (int) nxtOffset;
+		
+		long metaAddr = rbv.getMetaStartAddr();
+		long rawMetaBitsAddr = rbv.getMetaBitsAddr();
+		if (metaAddr == 0 || rawMetaBitsAddr == 0) {
+			cat.warning("No meta allocation data included in root block for RWStore"); // possible when rolling back to empty file
+		}
+		
+		int metaStartAddr = (int) -(metaAddr >> 32);
+		int fileSize = (int) -(metaAddr & 0xFFFFFFFF);
+		
+		// I think this is now right!
+		long metaAlloc = convertAddr(metaStartAddr);
+		long heapAlloc = convertAddr(nxtalloc);
+		if (metaAlloc < heapAlloc) {
+			throw new IllegalStateException("Incompatible Root Block values: " + metaAlloc + " < " + heapAlloc + " with " + nxtOffset + " and " + metaAddr);
+		}	
+		
+		cat.info("m_allocation: " + nxtalloc + ", m_metaStartAddr: " + metaStartAddr + ", m_metaBitsAddr: " + metaBitsAddr);
+	}
+	/**
+	 * Should be called where previously initFileSpec was used.
+	 * 
+	 * Rather than reading from file, instead reads from the current root block.
+	 * 
+	 * We use the rootBlock fields, nextOffset, metaStartAddr, metaBitsAddr
+	 * 
+	 * metaBitsAddr indicates where the meta allocation bits are.
+	 * 
+	 * metaStartAddr is the offset in the file where the allocation blocks are allocated
+	 * the long value also indicates the size of the allocation, such that the address
+	 * plus the size is the "filesize".
+	 * 
+	 * Note that metaBitsAddr must be an absolute address, with the low order 16 bits used to indicate the
+	 * size.
+	 * 
+	 * @throws IOException 
+	 */
+	private void initfromRootBlock() throws IOException {
+		m_rb = m_fmv.getRootBlock();
+		
+		m_commitCounter = m_rb.getCommitCounter();
+		
+		long nxtOffset = m_rb.getNextOffset();
+		m_nextAllocation = - (int) (nxtOffset >> 32);
+		
+		m_metaBitsAddr = - (int) nxtOffset;
+		
+		long metaAddr = m_rb.getMetaStartAddr();
+		m_metaStartAddr = (int) -(metaAddr >> 32);
+		m_fileSize = (int) -(metaAddr & 0xFFFFFFFF);
+		
+		long rawmbaddr = m_rb.getMetaBitsAddr();
+		m_metaBitsSize = (int) (rawmbaddr & 0xFFFF); // take bottom 16 bits ( even 1K of metabits is more than sufficient)
+		rawmbaddr >>= 16;
+		m_metaBits = new int[m_metaBitsSize];
+		
+		// RWStore now restore metabits
+		byte[] buf = new byte[m_metaBitsSize*4];
+		m_raf.seek(rawmbaddr);
+		m_raf.read(buf);
+		DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
+		for (int i = 0; i < m_metaBitsSize; i++) {
+			m_metaBits[i] = strBuf.readInt();
+		}
+		m_metaTransientBits = (int[]) m_metaBits.clone();
+		
+		checkCoreAllocations();
+
+		readAllocationBlocks();
+				
+		cat.info("restored from RootBlock: " + m_nextAllocation + ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
 	}
 
 	/*********************************************************************
@@ -337,16 +420,22 @@ public class RWStore implements IStore {
 		long metaStart = convertAddr(m_metaStartAddr);
 		int i = 0;
 
+		/**
+		 * Allocators are sorted in StartAddress order (which MUST be the order they were created and therefore
+		 * will correspond to their index)
+		 * The comparator also checks for equality, which would indicate an error in the metaAllocation if two
+		 * allocation blocks were loaded for the same address (must be two version of same Allocator).
+		 */		 
 		TreeSet blocks = new TreeSet();
 
 		while (addr > metaStart) {
-			addr -= 1024;
+			addr -= ALLOC_BLOCK_SIZE;
 			if (tstBit(m_metaBits, i++)) {
-				byte buf[] = new byte[1024];
+				byte buf[] = new byte[ALLOC_BLOCK_SIZE];
 
-				m_file.seek(addr);
+				m_raf.seek(addr);
 
-				m_file.readFully(buf);
+				m_raf.readFully(buf);
 				DataInputStream strBuf = new DataInputStream(
 						new ByteArrayInputStream(buf));
 
@@ -358,8 +447,7 @@ public class RWStore implements IStore {
 
 				int index = 0;
 				int fixedSize = MIN_FIXED_ALLOC;
-				for (; fixedSize < allocSize; fixedSize *= 2, index++)
-					;
+				for (; fixedSize < allocSize; fixedSize *= 2) index++;
 
 				blocks.add(allocator);
 
@@ -369,6 +457,7 @@ public class RWStore implements IStore {
 			}
 		}
 
+		// add sorted blocks into index array and set index number for address encoding
 		m_allocs.addAll(blocks);
 		for (int index = 0; index < m_allocs.size(); index++) {
 			((Allocator) m_allocs.get(index)).setIndex(index);
@@ -417,8 +506,8 @@ public class RWStore implements IStore {
 			PSInputStream instr = PSInputStream.getNew(this, size);
 
 			try {
-				m_file.seek(physicalAddress((int) addr));
-				m_file.readFully(instr.getBuffer(), 0, size);
+				m_raf.seek(physicalAddress((int) addr));
+				m_raf.readFully(instr.getBuffer(), 0, size);
 			} catch (IOException e) {
 				throw new StorageTerminalError("Unable to read data", e);
 			}
@@ -439,8 +528,8 @@ public class RWStore implements IStore {
 			PSInputStream instr = PSInputStream.getNew(this, size);
 
 			try {
-				m_file.seek(physicalAddress(addr));
-				m_file.readFully(instr.getBuffer(), 0, size);
+				m_raf.seek(physicalAddress(addr));
+				m_raf.readFully(instr.getBuffer(), 0, size);
 			} catch (IOException e) {
 				throw new StorageTerminalError("Unable to read data", e);
 			}
@@ -450,16 +539,21 @@ public class RWStore implements IStore {
 	}
 
 	public void getData(long addr, byte buf[]) {
+		if (addr == 0) {
+			return;
+		}
+
 		synchronized (this) {
 			m_writes.flush();
 
-			if (addr == 0) {
-				return;
-			}
-
 			try {
-				m_file.seek(physicalAddress((int) addr));
-				m_file.readFully(buf, 0, buf.length);
+				long paddr = physicalAddress((int) addr);
+				if (paddr == 0) {
+					cat.warning("Address " + addr + " did not resolve to physical address");
+					throw new IllegalArgumentException();
+				}
+				m_raf.seek(paddr);
+				m_raf.readFully(buf, 0, buf.length);
 			} catch (IOException e) {
 				throw new StorageTerminalError("Unable to read data", e);
 			}
@@ -476,8 +570,8 @@ public class RWStore implements IStore {
 
 			try {
 				int size = addr2Size((int) addr);
-				m_file.seek(physicalAddress((int) addr));
-				m_file.readFully(buf, 0, size);
+				m_raf.seek(physicalAddress((int) addr));
+				m_raf.readFully(buf, 0, size);
 
 				return size;
 			} catch (IOException e) {
@@ -505,6 +599,7 @@ public class RWStore implements IStore {
 	 * added for a blob.
 	 */
 	public void free(long laddr) {
+
 		int addr = (int) laddr;
 
 		switch (addr) {
@@ -522,7 +617,7 @@ public class RWStore implements IStore {
 				m_commitList.add(alloc);
 			}
 
-			// Is it a potential blob block? If so then
+			// Is it a potential continuation block? If so then
 			// read last 4 bytes to get next address
 			if (alloc.getBlockSize() == 8192) {
 				addr = absoluteReadInt(addr, 8188);
@@ -535,24 +630,23 @@ public class RWStore implements IStore {
 	/**
 	 * alloc
 	 * 
-	 * Just need to work out whether it should be a blob or one of several fixed
-	 * allocations
+	 * Alloc always allocates from a FixedAllocation.  Blob allocations are implemented
+	 * as chained allocations of the largest Fixed blocks.
 	 * 
-	 * The free list <b>must</b> be realiable. Remember that m_freeBlobs is an
-	 * ArrayList of free blob allocators while m_freeFixed is an <b>array</b> of
-	 * ArrayList(s)
+	 * The allocCurrent check
 	 * 
-	 * Note that the blob allocator is not guaranteed to return an allocation
-	 * block since it may only contain free entries that are too small for the
-	 * request.
+	 * TODO: For BigData we need an additional set of "special" blocks to support storage of objects
+	 * such as Bloom filters.  These could be upto 1Mb, so we'd need to allocate a set (not necessarily
+	 * 32), of these objects and provide an enhanced interface.
 	 */
 	boolean allocCurrent = false;
 
-	public int alloc(int size) {
+	public synchronized int alloc(int size) {
 		if (allocCurrent) {
 			throw new Error("Nested allocation .. WHY!");
 		}
 
+		try {
 		allocCurrent = true;
 
 		ArrayList list;
@@ -568,11 +662,14 @@ public class RWStore implements IStore {
 
 		list = m_freeFixed[i];
 		if (list.size() == 0) {
+			
 			allocator = new FixedAllocator(cmp, m_preserveSession, m_writes);
 			allocator.setFreeList(list);
 			allocator.setIndex(m_allocs.size());
 
 			addr = allocator.alloc(this, size);
+
+			cat.info("New FixedAllocator for " + cmp + " byte allocations at " + addr);
 
 			m_allocs.add(allocator);
 		} else {
@@ -588,9 +685,22 @@ public class RWStore implements IStore {
 			list.remove(allocator);
 		}
 
-		allocCurrent = false;
 
+		m_recentAlloc = true;
+		
+		if (physicalAddress(addr) == 0L) {
+			throw new IllegalStateException();
+		}
+		
 		return addr;
+		} catch (Throwable t) {
+			t.printStackTrace();
+			
+			throw new RuntimeException(t);
+		} finally {
+			allocCurrent = false;
+			
+		}
 	}
 
 	/****************************************************************************
@@ -619,7 +729,9 @@ public class RWStore implements IStore {
 
 		int newAddr = alloc(size);
 
-		m_writes.addWrite(physicalAddress(newAddr), buf, size);
+		synchronized(this) {
+			m_writes.addWrite(physicalAddress(newAddr), buf, size);
+		}
 
 		return newAddr;
 	}
@@ -684,10 +796,14 @@ public class RWStore implements IStore {
 	}
 
 	private void readHdr() throws IOException {
+		if (true) {
+			throw new IllegalStateException("Should NOT call readHdr, needs to iniFomrRootBlock!");
+		}
+		
 		byte buf[] = new byte[m_headerSize];
 
-		m_file.seek(m_curHdrAddr);
-		m_file.readFully(buf);
+		m_raf.seek(m_curHdrAddr);
+		m_raf.readFully(buf);
 
 		DataInputStream str = new DataInputStream(new ByteArrayInputStream(buf));
 		m_nextAllocation = str.readInt();
@@ -711,76 +827,65 @@ public class RWStore implements IStore {
 		m_metaTransientBits = (int[]) m_metaBits.clone();
 	}
 
-	private int calcHdrSize() {
-		return (m_metaBitsSize * 4) + 20;
-	}
-
-	private int calcHdrAllocSize() {
-		int req = calcHdrSize();
-
-		if (req <= cMinHdrSize) { // 2 * 2048 can be stored in first 8k
-			req = cMinHdrSize;
-		} else { // thereafter must be stored in mod 8K globally allocated block
-			req = 8192 + ((req / 8192) * 8192);
-		}
-
-		// return convertFromAddr(req);
-
-		return req;
-	}
-
-	private void writeHdr() throws IOException {
-		// System.out.println("Writing Header: " + calcHdrSize());
-
-		byte buf[] = new byte[calcHdrSize()];
+	/**
+	 * writeMetaBits must be called after all allocations have been made, the last one being the
+	 * allocation for the metabits themselves (allowing for an extension!).
+	 * 
+	 * @throws IOException
+	 */
+	private void writeMetaBits() throws IOException {
+		int len = 4 * m_metaBitsSize;
+		byte buf[] = new byte[len];
+		
 		FixedOutputStream str = new FixedOutputStream(buf);
-
-		str.writeInt(m_nextAllocation);
-		str.writeInt(m_rootAddr);
-		str.writeInt(m_maxFileSize);
-
-		str.writeInt(m_metaBitsSize);
-
 		for (int i = 0; i < m_metaBitsSize; i++) {
 			str.writeInt(m_metaBits[i]);
 		}
 
 		str.flush();
-
-		m_writes.addWrite(m_curHdrAddr, buf, buf.length);
+		
+		long addr = physicalAddress((int) m_metaBitsAddr);
+		m_writes.addWrite(addr, buf, len);
 	}
 
 	static final float s_version = 3.0f;
 
+	/**
+	 * This must now update the root block which is managed by FileMetadata in almost guaranteed secure manner
+	 * 
+	 * It is not the responsibility of the store to write this out, this is handled by whatever is managing the
+	 * FileMetadata that this RWStore was initialised from and should be forced by newRootBlockView
+	 * 
+	 * It should now only be called by extend file to ensure that the metaBits are set correctly
+	 * 
+	 * TODO: Should be replaced with specific updateExtendedMetaData that will simply reset the metaBitsAddr
+	 */
 	protected void writeFileSpec() {
-		try {
-			m_file.seek(0);
-			m_file.writeLong(m_curHdrAddr);
-			m_file.writeLong(m_altHdr1);
-			m_file.writeLong(m_altHdr2);
-			m_file.writeInt(m_fileSize);
-			m_file.writeInt(m_metaStartAddr);
-			m_file.writeFloat(s_version);
-			m_file.writeInt(m_headerSize);
-		} catch (IOException e) {
-			throw new StorageTerminalError("Unable to write file spec", e);
-		}
+		m_rb = m_fmv.newRootBlockView(!m_rb.isRootBlock0(), m_rb.getOffsetBits(), getNextOffset(),
+				m_rb.getFirstCommitTime(), m_rb.getLastCommitTime(), m_rb.getCommitCounter(),
+				m_rb.getCommitRecordAddr(), m_rb.getCommitRecordIndexAddr(),
+				getMetaStartAddr(), getMetaBitsAddr(),
+	            m_rb.getLastCommitTime());
 	}
 
 	float m_vers = 0.0f;
-
+	
 	protected void readFileSpec() {
+		if (true) {
+			throw new Error("Unexpected old format initialisation called");
+		}
+		
 		try {
-			m_file.seek(0);
-			m_curHdrAddr = m_file.readLong();
+			m_raf.seek(0);
+			m_curHdrAddr = m_raf.readLong();
 
-			m_altHdr1 = m_file.readLong();
-			m_altHdr2 = m_file.readLong();
+//			m_altHdr1 = m_raf.readLong();
+//			m_altHdr2 = m_raf.readLong();
 
-			m_fileSize = m_file.readInt();
-			m_metaStartAddr = m_file.readInt();
+			m_fileSize = m_raf.readInt();
+			m_metaStartAddr = m_raf.readInt();
 
-			m_vers = m_file.readFloat();
+			m_vers = m_raf.readFloat();
 
 			if (m_vers != s_version) {
 				String msg = "Incorrect store version : " + m_vers
@@ -788,7 +893,7 @@ public class RWStore implements IStore {
 
 				throw new IOException(msg);
 			} else {
-				m_headerSize = m_file.readInt();
+				m_headerSize = m_raf.readInt();
 			}
 
 		} catch (IOException e) {
@@ -801,6 +906,10 @@ public class RWStore implements IStore {
 	}
 
 	public void commitChanges() {
+		cat.info("checking meta data save");
+		
+		checkCoreAllocations();
+		
 		try {
 			// Commit Callback?
 			synchronized (this) {
@@ -810,37 +919,31 @@ public class RWStore implements IStore {
 					m_commitCallback.commitCallback();
 				}
 
-				// Reserve meta allocation - is this necessary? Not sure anymore
-
-				if (m_altHdr1 == 0 || m_altHdr2 == 0) {
-					throw new Error("Meta Allocation Error");
-				}
-
-				m_curHdrAddr = m_curHdrAddr == m_altHdr1 ? m_altHdr2
-						: m_altHdr1;
+				// Allocate storage for metaBits
+				m_metaBitsAddr = alloc(getRequiredMetaBitsStorage());
 
 				// save allocation headers
 				Iterator iter = m_commitList.iterator();
 				while (iter.hasNext()) {
-					Allocator allocator = (Allocator) iter.next();
-
-					metaFree(allocator.getDiskAddr());
-					allocator.setDiskAddr(metaAlloc());
+					FixedAllocator allocator = (FixedAllocator) iter.next();
+					long old = allocator.getDiskAddr();
+					metaFree(old);
+					long naddr = metaAlloc();
+					allocator.setDiskAddr(naddr);
+					
+					cat.info("Update allocator " + allocator.m_index + ", old addr: " + old + ", new addr: " + naddr);
 
 					byte[] buf = allocator.write();
 					m_writes.addWrite(allocator.getDiskAddr(), buf, buf.length);
 				}
 				m_commitList.clear();
 
-				// Write Header
-				// Write out fileSize, meta_StartAddr, metaAllocBits
-				writeHdr();
+				writeMetaBits();
 
 				m_writes.flush();
 
-				// Now write at address 0 the address of the header and we're
-				// done
-				writeFileSpec();
+				// Should not write rootBlock, this is responsibility of client to provide control
+				// writeFileSpec();
 
 				m_metaTransientBits = (int[]) m_metaBits.clone();
 
@@ -848,19 +951,31 @@ public class RWStore implements IStore {
 					m_commitCallback.commitComplete();
 				}
 
-				m_file.getChannel().force(false);
+				m_raf.getChannel().force(false); // TODO, check if required!
 			}
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to commit transaction", e);
 		} finally {
 			m_committing = false;
+			m_recentAlloc = false;
 		}
+		
+		checkCoreAllocations();
+		
+		cat.info("commitChanges for: " + m_nextAllocation + ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
+	}
+
+	/**
+	 * 
+	 * @return conservative requirement for metabits storage, mindful that the request to allocate the metabits may require
+	 * an increase in the number of allocation blocks and therefore an extension to the number of metabits.
+	 */
+	private int getRequiredMetaBitsStorage() {
+		return ((8 + m_commitList.size()) / 8) + (4 * (1 + m_metaBits.length));
 	}
 
 	// Header Data
 	private long m_curHdrAddr = 0;
-	private long m_altHdr1 = 2048;
-	private long m_altHdr2 = 4096;
 	private int m_rootAddr;
 
 	private int m_fileSize;
@@ -870,20 +985,19 @@ public class RWStore implements IStore {
 	private int m_headerSize = 2048;
 
 	// Meta Allocator
-	private static int cDefaultMetaBitsSize = 16; // DEBUG FIX ME
+	private static int cDefaultMetaBitsSize = 64; // DEBUG FIX ME
 	// private static int cDefaultMetaBitsSize = 128;
 	private int m_metaBits[];
 	private int m_metaBitsSize = cDefaultMetaBitsSize;
 	private int m_metaTransientBits[];
 	private int m_metaStartAddr;
 
+	private boolean m_recentAlloc = false;
+
 	protected int allocBlock(int size) {
 		// minimum 1
 		if (size <= 0) {
-			System.out.println("allocBlock fixing zero or less request: "
-					+ size);
-
-			size = 1;
+			throw new Error("allocBlock called with zero size request");
 		}
 
 		int allocAddr = m_nextAllocation;
@@ -892,10 +1006,23 @@ public class RWStore implements IStore {
 		while (convertAddr(m_nextAllocation) >= convertAddr(m_metaStartAddr)) {
 			extendFile();
 		}
+		
+		checkCoreAllocations();
+
+		cat.info("allocation created at " + convertAddr(allocAddr) + " for " + convertAddr(-size));
 
 		return allocAddr;
 	}
 
+	void checkCoreAllocations() {
+		long lmetaStart = convertAddr(m_metaStartAddr);
+		long lnextAlloc = convertAddr(m_nextAllocation);
+
+		if (lmetaStart <= lnextAlloc) {
+			throw new Error("Core Allocation Error");
+		}
+	}
+	
 	/**
 	 * meta allocation/free
 	 * 
@@ -923,52 +1050,22 @@ public class RWStore implements IStore {
 
 		if (bit < 0) {
 			// reallocate metaBits and recalculate m_headerSize
-			// extend m_metaBits by 16 ints!
-			int nsize = m_metaBitsSize + 16;
+			// extend m_metaBits by 32 ints!
+			int nsize = m_metaBitsSize + 32;
 
-			// System.out.println("New MetaBits: " + nsize);
-
+			// arrays initialized to zero by default
 			int[] nbits = new int[nsize];
 			int[] ntransients = new int[nsize];
 
+			// copy existing values
 			for (int i = 0; i < m_metaBitsSize; i++) {
 				nbits[i] = m_metaBits[i];
 				ntransients[i] = m_metaTransientBits[i];
-			}
-			for (int i = m_metaBitsSize; i < nsize; i++) {
-				nbits[i] = 0;
-				ntransients[i] = 0;
 			}
 
 			m_metaBitsSize = nsize;
 			m_metaBits = nbits;
 			m_metaTransientBits = ntransients;
-
-			// update header size
-			int nhdrsize = calcHdrAllocSize();
-
-			// System.out.println("Calc Header Size: " + nhdrsize +
-			// ", Current: " + m_headerSize);
-
-			if (nhdrsize != m_headerSize) {
-				// System.out.println("New Header Size: " + nhdrsize);
-
-				// header is not in re-allocatable memory
-				int allocSize = convertFromAddr(nhdrsize);
-
-				int naddr = allocBlock(allocSize);
-				// System.out.println("allocBlock(" + allocSize + ") -> " +
-				// naddr + " offset: " + getOffset(naddr));
-
-				m_altHdr1 = convertAddr(naddr); // allocated on 8K boundary -
-												// max addressable is 8K * 2G =
-												// 16TB
-				m_altHdr2 = convertAddr(allocBlock(allocSize));
-
-				m_curHdrAddr = m_altHdr1;
-
-				m_headerSize = nhdrsize;
-			}
 
 			// now get new allocation!
 			bit = fndBit(m_metaTransientBits, m_metaBitsSize);
@@ -995,7 +1092,15 @@ public class RWStore implements IStore {
 			addr = metaBit2Addr(bit);
 		}
 
+		// cat.info("meta allocation at " + addr);
+		
+		checkCoreAllocations();
+		
 		return addr;
+	}
+
+	private int calcHdrAllocSize() {
+		return 4 * (1 + m_metaBits.length);
 	}
 
 	void metaFree(long addr) {
@@ -1023,7 +1128,7 @@ public class RWStore implements IStore {
 	/*
 	 * clear
 	 * 
-	 * reset the file size and
+	 * reset the file size commit the root blocks
 	 */
 	public void clear() {
 		try {
@@ -1033,11 +1138,9 @@ public class RWStore implements IStore {
 			m_metaStartAddr = m_fileSize;
 			m_nextAllocation = -1; // keep on a 8K boundary (8K minimum
 									// allocation)
-			m_file.setLength(convertAddr(m_fileSize));
+			m_raf.setLength(convertAddr(m_fileSize));
 
 			m_curHdrAddr = 0;
-			m_altHdr1 = 0;
-			m_altHdr2 = 0;
 			m_rootAddr = 0;
 
 			startTransaction();
@@ -1080,6 +1183,8 @@ public class RWStore implements IStore {
 	 * by "zero'd" bits since this can indicate that memory has been cleared.
 	 */
 	private void extendFile() {
+		cat.warning("About to extend the file");
+		
 		int adjust = 0;
 
 		m_writes.flush();
@@ -1115,17 +1220,17 @@ public class RWStore implements IStore {
 			// System.out.println("Extending file from: " + fromAddr + " to " +
 			// convertAddr(m_fileSize));
 
-			m_file.setLength(convertAddr(m_fileSize));
+			m_raf.setLength(convertAddr(m_fileSize));
 
 			long toAddr = convertAddr(m_fileSize);
 			byte buf[] = new byte[1024];
 			while (fromAddr > oldMetaStart) {
 				fromAddr -= 1024;
 				toAddr -= 1024;
-				m_file.seek(fromAddr);
-				m_file.readFully(buf);
-				m_file.seek(toAddr);
-				m_file.write(buf);
+				m_raf.seek(fromAddr);
+				m_raf.readFully(buf);
+				m_raf.seek(toAddr);
+				m_raf.write(buf);
 			}
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to extend the file", e);
@@ -1246,7 +1351,9 @@ public class RWStore implements IStore {
 		if (addr > 0) {
 			return addr & 0xFFFFFFE0;
 		} else {
-			long laddr = getBlock(addr).getPhysicalAddress(getOffset(addr));
+			Allocator allocator = getBlock(addr);
+			int offset = getOffset(addr);
+			long laddr = allocator.getPhysicalAddress(offset);
 
 			return laddr;
 		}
@@ -1276,6 +1383,10 @@ public class RWStore implements IStore {
 		return alloc;
 	}
 
+	private int blockIndex(int addr) {
+		return (-addr) >>> 16;
+	}
+	
 	private Allocator getBlock(int addr) {
 		int index = (-addr) >>> 16;
 
@@ -1348,11 +1459,11 @@ public class RWStore implements IStore {
 		int bufSize = 64 * 1024;
 		byte[] buf = new byte[bufSize];
 
-		m_file.seek(0);
+		m_raf.seek(0);
 
 		int rdSize = bufSize;
 		while (rdSize == bufSize) {
-			rdSize = m_file.read(buf);
+			rdSize = m_raf.read(buf);
 			if (rdSize > 0) {
 				dest.write(buf, 0, rdSize);
 			}
@@ -1368,11 +1479,11 @@ public class RWStore implements IStore {
 		int bufSize = 64 * 1024;
 		byte[] buf = new byte[bufSize];
 
-		m_file.seek(0);
+		m_raf.seek(0);
 
 		int rdSize = bufSize;
 		while (rdSize == bufSize) {
-			rdSize = m_file.read(buf);
+			rdSize = m_raf.read(buf);
 			if (rdSize > 0) {
 				outstr.write(buf, 0, rdSize);
 			}
@@ -1383,13 +1494,13 @@ public class RWStore implements IStore {
 		int bufSize = 64 * 1024;
 		byte[] buf = new byte[bufSize];
 
-		m_file.seek(0);
+		m_raf.seek(0);
 
 		int rdSize = bufSize;
 		while (rdSize == bufSize) {
 			rdSize = instr.read(buf);
 			if (rdSize > 0) {
-				m_file.write(buf, 0, rdSize);
+				m_raf.write(buf, 0, rdSize);
 			}
 		}
 	}
@@ -1403,8 +1514,8 @@ public class RWStore implements IStore {
 			// flush for now
 			m_writes.flush();
 
-			m_file.seek(physicalAddress(addr) + offset);
-			m_file.writeInt(value);
+			m_raf.seek(physicalAddress(addr) + offset);
+			m_raf.writeInt(value);
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to write integer", e);
 		}
@@ -1415,8 +1526,8 @@ public class RWStore implements IStore {
 	 **/
 	public int absoluteReadInt(int addr, int offset) {
 		try {
-			m_file.seek(physicalAddress(addr) + offset);
-			return m_file.readInt();
+			m_raf.seek(physicalAddress(addr) + offset);
+			return m_raf.readInt();
 		} catch (IOException e) {
 			throw new StorageTerminalError("Unable to write integer", e);
 		}
@@ -1457,12 +1568,11 @@ public class RWStore implements IStore {
 	}
 
 	public int absoluteReadLong(long addr, int offset) {
-		// TODO Auto-generated method stub
-		return 0;
+		throw new NotImplementedException();
 	}
 
 	public void absoluteWriteLong(long addr, int threshold, long value) {
-		// TODO Auto-generated method stub
+		throw new NotImplementedException();
 	}
 
 	public void absoluteWriteAddress(long addr, int threshold, long addr2) {
@@ -1470,36 +1580,61 @@ public class RWStore implements IStore {
 	}
 
 	public int getAddressSize() {
-		// TODO Auto-generated method stub
 		return 4;
 	}
 
 	// DiskStrategy Support
 	public RandomAccessFile getRandomAccessFile() {
-		return m_file;
+		return m_raf;
 	}
 	public FileChannel getChannel() {
-		return m_file.getChannel();
+		return m_raf.getChannel();
+	}
+
+	public boolean requiresCommit() {
+		return m_recentAlloc;
+	}
+
+	/**
+	 * Note that the representation of the
+	 * @return long representation of metaBitsAddr PLUS the size
+	 */
+	public long getMetaBitsAddr() {
+		long ret = physicalAddress((int) m_metaBitsAddr);
+		ret <<= 16;
+		ret += m_metaBitsSize;
+		
+		return ret;
+	}
+
+	/**
+	 * 
+	 * @return long representation of metaStartAddr PLUS the size where addr + size is fileSize (not necessarily physical size)
+	 */
+	public long getMetaStartAddr() {
+		long ret = -m_metaStartAddr;
+		ret <<= 32;
+		ret += -m_fileSize;
+		
+		return ret;
+	}
+
+	/**
+	 * 
+	 * @return the nextAllocation from the file Heap to be provided to an Allocation Block
+	 */
+	public long getNextOffset() {
+		long ret = -m_nextAllocation;
+		ret <<= 32;
+		ret += -m_metaBitsAddr;
+		
+		return ret;
+	}
+
+	public void flushWrites(boolean metadata) throws IOException {
+		m_writes.flush();
+		
+		m_raf.getChannel().force(metadata);
 	}
 }
 
-/*****************************************************************
- * 8 Python test stuff
- * 
- * from cutthecrap.gpo.client import OMClient from cutthecrap.gpo import GPOMap
- * import sys;
- * 
- * client = OMClient("cutthecrap.oms.ObjectManager", "D:/testdb/newrw.rw"); om =
- * client.getObjectManager();
- * 
- * om.registerClassifier("parent", "name");
- * 
- * p = GPOMap(om);
- * 
- * def addLoads(i, t): while t > 0: om.startNativeTransaction(); j = i; while j
- * > 0: g = GPOMap(om); g.set("name", str(i) + "_gpo"); g.set("parent", p); j =
- * j -1; om.commitNativeTransaction(); t = t - 1;
- * 
- * 
- * # This seems to fail! addLoads(1000, 1000); addLoads(100000, 100);
- **/
