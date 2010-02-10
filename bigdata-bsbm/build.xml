@@ -80,7 +80,7 @@
 			<arg value="-pc"/><arg value="${bsbm.pc}"/>
 			<arg value="-dir"/><arg value="${bsbm.dataDir}"/>
 			<arg value="-s"/><arg value="${bsbm.outputType}"/>
-			<arg line="-fn"/><arg value="${bsbm.outputFile}"/>
+			<arg value="-fn"/><arg value="${bsbm.outputFile}"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
@@ -170,7 +170,6 @@
 		</java>
 	</target>
 	
-	<!-- FIXME something busted about the qualification configuration? -->
 	<target name="run-qualification-2" depends="compile">
 		<java classname="benchmark.qualification.Qualification"
 	          fork="true"
