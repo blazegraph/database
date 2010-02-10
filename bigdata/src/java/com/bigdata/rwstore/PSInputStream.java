@@ -227,7 +227,9 @@ public class PSInputStream extends InputStream {
 	}
 	
 	public long readLong() throws IOException {
-		long value = readInt() << 32;
+		long value = readInt();
+		value <<= 32;
+		
 		value += readInt();
 		
 		return value;
