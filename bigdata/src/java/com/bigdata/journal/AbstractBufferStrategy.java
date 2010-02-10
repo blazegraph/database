@@ -600,10 +600,33 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
 
-
 	@Override
 	public void delete(long addr) {
 		// TODO Auto-generated method stub
 		
 	}
+
+	public void commit() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public long getMetaBitsAddr() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public long getMetaStartAddr() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public boolean requiresCommit(IRootBlockView block) {
+		return getNextOffset() > block.getNextOffset();
+	}
+	
+    public int getMaxRecordSize() {
+        return getAddressManager().getMaxByteCount();
+
+    }
 }

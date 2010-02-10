@@ -1093,20 +1093,18 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * Setup the buffer strategy.
              */
 
-//            fileMetadata = new FileMetadata(file, BufferMode.Disk,
-//                    useDirectBuffers, initialExtent, maximumExtent, create,
-//                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-//                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
-//                    //readOnly ? null : writeCache,
-//                    writeCacheEnabled,
-//                    validateChecksum,
-//                    createTime, checker, alternateRootBlock);
+            fileMetadata = new FileMetadata(file, BufferMode.DiskRW,
+                    useDirectBuffers, initialExtent, maximumExtent, create,
+                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    //readOnly ? null : writeCache,
+                    writeCacheEnabled,
+                    validateChecksum,
+                    createTime, checker, alternateRootBlock);
 
-        	fileMetadata = null;
-        	
-            _bufferStrategy = new RWStrategy(file);
+            _bufferStrategy = new RWStrategy(fileMetadata);
 
-            this._rootBlock = null;
+            this._rootBlock = fileMetadata.rootBlock;
 
             break;
 
@@ -2241,7 +2239,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * See if anything has been written on the store since the last
              * commit.
              */
-            if (_bufferStrategy.getNextOffset() == _rootBlock.getNextOffset()) {
+            if (!_bufferStrategy.requiresCommit(_rootBlock)) {
 
                 /*
                  * No data was written onto the store so the commit can not
@@ -2252,9 +2250,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     log.info("Nothing to commit");
 
                 return 0L;
-
             }
-
+            
             /*
              * Write the commit record onto the store.
              */
@@ -2290,6 +2287,11 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             final long commitRecordIndexAddr = _commitRecordIndex
                     .writeCheckpoint();
 
+            /*
+             * Call to ensure strategy does everything required for itself before final root block commit
+             */
+            _bufferStrategy.commit();
+            
             /*
              * Force application data to stable storage _before_ we update the
              * root blocks. This option guarantees that the application data is
@@ -2352,12 +2354,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 }
 
                 final long lastCommitTime = commitTime;
+                final long metaStartAddr = _bufferStrategy.getMetaStartAddr();
+                final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
 
                 // Create the new root block.
                 final IRootBlockView newRootBlock = new RootBlockView(!old
                         .isRootBlock0(), old.getOffsetBits(), nextOffset,
                         firstCommitTime, lastCommitTime, newCommitCounter,
                         commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
+                        metaStartAddr, metaBitsAddr, old.getStoreType(),
                         old.getCreateTime(), old.getCloseTime(), checker);
 
                 _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
@@ -3252,11 +3257,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     final public int getByteCount(long addr) {
         return _bufferStrategy.getByteCount(addr);
     }
-
-//    final public void packAddr(DataOutput out, long addr) throws IOException {
-//        _bufferStrategy.packAddr(out, addr);
-//    }
-
+    
     final public long toAddr(int nbytes, long offset) {
         return _bufferStrategy.toAddr(nbytes, offset);
     }
@@ -3265,24 +3266,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return _bufferStrategy.toString(addr);
     }
 
-//    final public long unpackAddr(DataInput in) throws IOException {
-//        return _bufferStrategy.unpackAddr(in);
-//    }
-
     final public int getOffsetBits() {
-        
-        return ((AbstractRawWormStore)_bufferStrategy).getOffsetBits();
-        
+        return _bufferStrategy.getOffsetBits();
     }
     
     /**
      * The maximum length of a record that may be written on the store.
      */
     final public int getMaxRecordSize() {
-
-        return ((AbstractRawWormStore) _bufferStrategy).getAddressManager()
-                .getMaxByteCount();
-
+        return _bufferStrategy.getMaxRecordSize();
     }
 
 }

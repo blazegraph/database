@@ -581,6 +581,9 @@ public class FileMetadata {
                 case Disk:
                     buffer = null;
                     break;
+                case DiskRW:
+                    buffer = null;
+                    break;
                 default:
                     throw new AssertionError();
                 }
@@ -680,6 +683,7 @@ public class FileMetadata {
                 final long commitRecordAddr = 0L;
                 final long commitRecordIndexAddr = 0L;
                 final UUID uuid = UUID.randomUUID(); // journal's UUID.
+                final StoreTypeEnum stenum = bufferMode == BufferMode.DiskRW ? StoreTypeEnum.RW : StoreTypeEnum.WORM;
                 if(createTime == 0L) {
                     throw new IllegalArgumentException("Create time may not be zero.");
                 }
@@ -687,12 +691,14 @@ public class FileMetadata {
                 this.closeTime = 0L;
                 final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                         nextOffset, firstCommitTime, lastCommitTime,
-                        commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                        uuid, createTime, closeTime, checker);
+                        commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, 
+                        0L, 0L, stenum,
+                        createTime, closeTime, checker);
                 final IRootBlockView rootBlock1 = new RootBlockView(false,
                         offsetBits, nextOffset, firstCommitTime,
-                        lastCommitTime, commitCounter, commitRecordAddr,
-                        commitRecordIndexAddr, uuid, createTime, closeTime,
+                        lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid,
+                        0L, 0L, stenum,
+                        createTime, closeTime,
                         checker);
                 
                 if(!temporary) {
@@ -738,6 +744,9 @@ public class FileMetadata {
                         log.info("Mapping file="+file);
                     buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE,
                             headerSize0, userExtent);
+                    break;
+                case DiskRW:
+                    buffer = null;
                     break;
                 case Disk:
                     buffer = null;
