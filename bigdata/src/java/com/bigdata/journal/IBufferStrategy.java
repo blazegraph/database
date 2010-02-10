@@ -183,7 +183,7 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
     /**
      * Seals the store against further writes and discards any write caches
      * since they will no longer be used. Buffered writes are NOT forced to the
-     * disk so the caller SHOULD be able to guarentee that concurrent writers
+     * disk so the caller SHOULD be able to guarantee that concurrent writers
      * are NOT running. The method should be implemented such that concurrent
      * readers are NOT disturbed.
      * 
