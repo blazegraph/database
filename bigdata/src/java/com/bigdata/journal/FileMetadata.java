@@ -771,7 +771,7 @@ public class FileMetadata {
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
-    private final IReopenChannel opener = new IReopenChannel() {
+    private final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
 
         public String toString() {
             

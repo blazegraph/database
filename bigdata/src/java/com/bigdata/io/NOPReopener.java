@@ -35,12 +35,12 @@ import java.nio.channels.FileChannel;
 /**
  * Implementation that will not re-open the {@link FileChannel} once it has been
  * closed. This is useful for simple things where you still want the reliability
- * guarentees of {@link FileChannelUtility}.
+ * guarantees of {@link FileChannelUtility}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class NOPReopener implements IReopenChannel {
+public class NOPReopener implements IReopenChannel<FileChannel> {
     
     private final FileChannel channel;
     

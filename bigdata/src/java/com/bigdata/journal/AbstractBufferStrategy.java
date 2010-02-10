@@ -50,7 +50,7 @@ import com.bigdata.resources.ResourceManager;
 public abstract class AbstractBufferStrategy extends AbstractRawWormStore implements IBufferStrategy {
     
     /**
-     * Log for btree operations.
+     * Log for buffer operations.
      */
     protected static final Logger log = Logger.getLogger(AbstractBufferStrategy.class);
     
@@ -124,6 +124,12 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * Error message used when the store is closed. 
      */
     protected static final String ERR_NOT_OPEN = "Not open";
+
+    /**
+     * Error message used when an operation would write more data than would be
+     * permitted onto a buffer.
+     */
+    protected static final String ERR_BUFFER_OVERRUN = "Would overrun buffer";
     
     /**
      * <code>true</code> iff the {@link IBufferStrategy} is open.
@@ -600,33 +606,42 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
 
-	@Override
-	public void delete(long addr) {
-		// TODO Auto-generated method stub
-		
-	}
+    /*
+     * These are default implementations of methods defined for the R/W store
+     * which are NOPs for the WORM store.
+     */
 
-	public void commit() {
-		// TODO Auto-generated method stub
-		
-	}
+    @Override
+    public void delete(long addr) {
 
-	public long getMetaBitsAddr() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+        // NOP for WORM.
 
-	public long getMetaStartAddr() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
+    }
 
-	public boolean requiresCommit(IRootBlockView block) {
-		return getNextOffset() > block.getNextOffset();
-	}
-	
+    public void commit() {
+
+        // NOP for WORM.
+
+    }
+
+    public long getMetaBitsAddr() {
+
+        // NOP for WORM.
+        return 0;
+    }
+
+    public long getMetaStartAddr() {
+        // NOP for WORM.
+        return 0;
+    }
+
+    public boolean requiresCommit(IRootBlockView block) {
+        return getNextOffset() > block.getNextOffset();
+    }
+
     public int getMaxRecordSize() {
         return getAddressManager().getMaxByteCount();
 
     }
+
 }

@@ -644,6 +644,10 @@ public class TestDiskJournal extends AbstractJournalTestCase {
              * during this test.
              * 
              * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
+             * 
+             * FIXME We should make the MRMW test harder and focus on
+             * interleaving concurrent extensions of the backing store for both
+             * WORM and R/W stores.
              */
             
             // Note: Use a relatively small initial extent. 
