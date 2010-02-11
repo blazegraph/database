@@ -207,9 +207,9 @@ abstract public class WriteCache implements IWriteCache {
 	protected static class RecordMetadata {
 
 		/**
-		 * The address of the record on the {@link IRawStore}.
+		 * The offset of the record in the file.
 		 */
-		public final long addr;
+		public final long fileOffset;
 
 		/**
 		 * The offset within the backing {@link ByteBuffer} of the start of the
@@ -222,9 +222,10 @@ abstract public class WriteCache implements IWriteCache {
 		 */
 		public final int recordLength;
 
-		public RecordMetadata(final long addr, final int bufferOffset, final int recordLength) {
+        public RecordMetadata(final long fileOffset, final int bufferOffset,
+                final int recordLength) {
 
-			this.addr = addr;
+			this.fileOffset = fileOffset;
 
 			this.bufferOffset = bufferOffset;
 
@@ -234,29 +235,31 @@ abstract public class WriteCache implements IWriteCache {
 
 		public String toString() {
 
-			return getClass().getSimpleName() + "{addr=" + addr + ",off=" + bufferOffset + ",len=" + recordLength + "}";
+            return getClass().getSimpleName() + "{fileOffset=" + fileOffset
+                    + ",off=" + bufferOffset + ",len=" + recordLength + "}";
 
 		}
 
 	}
 
-	/**
-	 * An index into the write cache used for read through on the cache. The
-	 * keys are the addresses that would be used to read the corresponding
-	 * record. The values describe the position in buffer where that record is
-	 * found and the length of the record.
-	 */
-	final private ConcurrentMap<Long, RecordMetadata> addrMap;
+    /**
+     * An index into the write cache used for read through on the cache. The
+     * keys are the file offsets that would be used to read the corresponding
+     * record. The values describe the position in buffer where that record is
+     * found and the length of the record.
+     */
+	final private ConcurrentMap<Long, RecordMetadata> recordMap;
 
-	/**
-	 * The address of the first record written onto the {@link WriteCache}. This
-	 * information is used when {@link #appendOnly} is <code>true</code> as it
-	 * gives the starting address at which the entire {@link ByteBuffer} may be
-	 * written in a single IO. When {@link #appendOnly} is <code>false</code>
-	 * this is basically meaningless. This is initialized to <code>-1L</code> as
-	 * a clear indicator that there is no valid address written yet.
-	 */
-	final private AtomicLong firstAddr = new AtomicLong(-1L);
+    /**
+     * The offset of the first record written onto the {@link WriteCache}. This
+     * information is used when {@link #appendOnly} is <code>true</code> as it
+     * gives the starting offset at which the entire {@link ByteBuffer} may be
+     * written in a single IO. When {@link #appendOnly} is <code>false</code>
+     * this is basically meaningless. This is initialized to <code>-1L</code> as
+     * a clear indicator that there is no valid record written yet onto the
+     * cache.
+     */
+	final private AtomicLong firstOffset = new AtomicLong(-1L);
 
 	/**
 	 * The capacity of the backing buffer.
@@ -296,23 +299,26 @@ abstract public class WriteCache implements IWriteCache {
 	 * 
 	 * @throws InterruptedException
 	 */
-	public WriteCache(ByteBuffer buf) throws InterruptedException {
-		this(buf, false);
-	}
+	public WriteCache(final ByteBuffer buf) throws InterruptedException {
+	
+	    this(buf, false);
 
-	public WriteCache(ByteBuffer buf, boolean scatteredWrites) throws InterruptedException {
+    }
 
-		if (buf == null) {
+    public WriteCache(ByteBuffer buf, boolean scatteredWrites)
+            throws InterruptedException {
 
-			buf = DirectBufferPool.INSTANCE.acquire();
+        if (buf == null) {
 
-			this.releaseBuffer = true;
+            buf = DirectBufferPool.INSTANCE.acquire();
 
-		} else {
+            this.releaseBuffer = true;
 
-			this.releaseBuffer = false;
+        } else {
 
-		}
+            this.releaseBuffer = false;
+
+        }
 
 		// save reference to the write cache.
 		this.buf = new AtomicReference<ByteBuffer>(buf);
@@ -350,28 +356,28 @@ abstract public class WriteCache implements IWriteCache {
 		 * non-scattered writes as well.
 		 */
 		if (scatteredWrites) {
-			addrMap = new ConcurrentSkipListMap<Long, RecordMetadata>();
+			recordMap = new ConcurrentSkipListMap<Long, RecordMetadata>();
 		} else {
-			addrMap = new ConcurrentHashMap<Long, RecordMetadata>(indexDefaultCapacity);
+			recordMap = new ConcurrentHashMap<Long, RecordMetadata>(indexDefaultCapacity);
 		}
 
 	}
 
 	/**
-	 * The address of the first record written onto the {@link WriteCache}. This
+	 * The offset of the first record written onto the {@link WriteCache}. This
 	 * information is used when {@link #appendOnly} is <code>true</code> as it
-	 * gives the starting address at which the entire {@link ByteBuffer} may be
+	 * gives the starting offset at which the entire {@link ByteBuffer} may be
 	 * written in a single IO. When {@link #appendOnly} is <code>false</code>
 	 * this is basically meaningless.
 	 * 
-	 * @return The first address written into the {@link WriteCache} since it
+	 * @return The first offset written into the {@link WriteCache} since it
 	 *         was last {@link #reset()} and <code>-1L</code> if nothing has
 	 *         been written since the {@link WriteCache} was created or was last
 	 *         {@link #reset()}.
 	 */
-	final public long getFirstAddr() {
+	final public long getFirstOffset() {
 
-		return firstAddr.get();
+		return firstOffset.get();
 
 	}
 
@@ -384,54 +390,22 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * Write the record on the cache.
-	 * <p>
-	 * Note: It is perfectly reasonable to have more than one {@link WriteCache}
-	 * and to read through on any {@link WriteCache} until it has been recycled.
-	 * A {@link WriteCache} must be reset before it is put into play again for
-	 * new writes.
-	 * <p>
-	 * Note: For an append-only model (WORM), the caller MUST serialize writes
-	 * onto the {@link IRawStore} and the {@link WriteCache}. This is required
-	 * in order to ensure that the records are laid out in a dense linear
-	 * fashion on the {@link WriteCache} and permits the backing buffer to be
-	 * transferred in a single IO to the backing file.
-	 * <p>
-	 * Note: For a {@link RWStore}, the caller must take more responsibility for
-	 * managing the {@link WriteCache}(s) which are in play and scheduling their
-	 * eviction onto the backing store. The caller can track the space remaining
-	 * in each {@link WriteCache} and decide when to flush a {@link WriteCache}
-	 * based on that information.
-	 * 
-	 * @param addr
-	 *            The address assigned to that record.
-	 * @param data
-	 *            The record. The bytes from the current
-	 *            {@link ByteBuffer#position()} to the
-	 *            {@link ByteBuffer#limit()} will be written and the
-	 *            {@link ByteBuffer#position()} will be advanced to the
-	 *            {@link ByteBuffer#limit()} . The caller may subsequently
-	 *            modify the contents of the buffer without changing the state
-	 *            of the cache (i.e., the data are copied into the cache).
-	 * 
-	 * @return <code>true</code> iff the caller's record was transferred to the
-	 *         cache. When <code>false</code>, there is not enough room left in
-	 *         the write cache for this record.
-	 * 
-	 * @throws InterruptedException
-	 * @throws IllegalStateException
-	 *             If the buffer is closed.
-	 * @throws IllegalArgumentException
-	 *             If the caller's record is larger than the maximum capacity of
-	 *             cache (the record could not fit within the cache). The caller
-	 *             should check for this and provide special handling for such
-	 *             large records. For example, they can be written directly onto
-	 *             the backing channel.
-	 */
-	public boolean write(final long addr, final ByteBuffer data) throws InterruptedException, IllegalStateException {
+    /**
+     * Write the record on the cache.
+     * 
+     * @throws IllegalStateException
+     *             If the buffer is closed.
+     * @throws IllegalArgumentException
+     *             If the caller's record is larger than the maximum capacity of
+     *             cache (the record could not fit within the cache). The caller
+     *             should check for this and provide special handling for such
+     *             large records. For example, they can be written directly onto
+     *             the backing channel.
+     */
+    public boolean write(final long offset, final ByteBuffer data)
+            throws InterruptedException, IllegalStateException {
 
-		// Note: The address MAY be zero. This allows for stores without any
+        // Note: The offset MAY be zero. This allows for stores without any
 		// header block.
 
 		if (data == null)
@@ -516,13 +490,13 @@ abstract public class WriteCache implements IWriteCache {
 				tmp.put(data);
 
 				// set while synchronized since no contention.
-				firstAddr.compareAndSet(-1L/* expect */, addr/* update */);
+				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
 
 			}
 
 			// Add metadata for the record so it can be read back from the
 			// cache.
-			addrMap.put(Long.valueOf(addr), new RecordMetadata(addr, pos, nbytes));
+			recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, nbytes));
 
 			return true;
 
@@ -534,27 +508,12 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * Read a record from the write cache.
-	 * 
-	 * @param addr
-	 *            The address assigned to that record in the journal.
-	 * @param nbytes
-	 *            The length of the record (decoded from the address by the
-	 *            caller).
-	 * 
-	 * @return The data read -or- <code>null</code> iff the record does not lie
-	 *         within this {@link WriteCache}. When non-null, this will be a
-	 *         newly allocated exact fit mutable {@link ByteBuffer} backed by a
-	 *         Java <code>byte[]</code>. The buffer will be flipped to prepare
-	 *         for reading (the position will be zero and the limit will be the
-	 *         #of bytes read).
-	 * 
-	 * @throws InterruptedException
-	 * @throws IllegalStateException
-	 *             if the buffer is closed.
-	 */
-	public ByteBuffer read(final long addr) throws InterruptedException, IllegalStateException {
+    /**
+     * @throws IllegalStateException
+     *             If the buffer is closed.
+     */
+    public ByteBuffer read(final long offset) throws InterruptedException,
+            IllegalStateException {
 
 		final ByteBuffer tmp = acquire();
 
@@ -562,7 +521,7 @@ abstract public class WriteCache implements IWriteCache {
 
 			// Look up the metadata for that record in the cache.
 			final RecordMetadata md;
-			if ((md = addrMap.get(addr)) == null) {
+			if ((md = recordMap.get(offset)) == null) {
 				// The record is not in this write cache.
 				return null;
 			}
@@ -601,101 +560,101 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * Update a record in the {@link WriteCache}.
-	 * 
-	 * @param addr
-	 *            The address of the record.
-	 * @param off
-	 *            The byte offset of the update.
-	 * @param data
-	 *            The data to be written onto the record in the cache starting
-	 *            at that byte offset. The bytes from the current
-	 *            {@link ByteBuffer#position()} to the
-	 *            {@link ByteBuffer#limit()} will be written and the
-	 *            {@link ByteBuffer#position()} will be advanced to the
-	 *            {@link ByteBuffer#limit()}. The caller may subsequently modify
-	 *            the contents of the buffer without changing the state of the
-	 *            cache (i.e., the data are copied into the cache).
-	 * 
-	 * @return <code>true</code> iff the record was updated and
-	 *         <code>false</code> if no record for that address was found in the
-	 *         cache.
-	 * 
-	 * @throws InterruptedException
-	 * @throws IllegalStateException
-	 * 
-	 * @throws IllegalStateException
-	 *             if the buffer is closed.
-	 */
-	public boolean update(final long addr, final int off, final ByteBuffer data) throws IllegalStateException,
-			InterruptedException {
-
-		if (addr == 0L)
-			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_ADDRESS_IS_NULL);
-
-		if (off < 0)
-			throw new IllegalArgumentException("Offset is negative");
-
-		if (data == null)
-			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
-
-		// #of bytes to be updated on the pre-existing record.
-		final int nbytes = data.remaining();
-
-		if (nbytes == 0)
-			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
-
-		/*
-		 * Check the writeCache. If the record is found in the write cache then
-		 * we just update the slice of the record corresponding to the caller's
-		 * request. This is a common use case and results in no IO.
-		 */
-		final ByteBuffer tmp = acquire();
-
-		try {
-
-			// Look up the metadata for that record in the cache.
-			final RecordMetadata md;
-			if ((md = addrMap.get(addr)) == null) {
-
-				// The record is not in this write cache.
-				return false;
-
-			}
-
-			if (off + nbytes > md.recordLength) {
-
-				// The update would overrun the record's extent in the cache.
-				throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_OVERRUN);
-
-			}
-
-			// the start of the record in writeCache.
-			final int pos = md.bufferOffset;
-
-			// create a view with same offset, limit and position.
-			final ByteBuffer view = tmp.duplicate();
-
-			// adjust the limit on the record in the write cache.
-			view.limit(pos + off + nbytes);
-
-			// adjust the position on the record in the write cache.
-			view.position(pos + off);
-
-			// copy the caller's data onto the record in write cache.
-			view.put(data);
-
-			// Done.
-			return true;
-
-		} finally {
-
-			release();
-
-		}
-
-	}
+//	/**
+//	 * Update a record in the {@link WriteCache}.
+//	 * 
+//	 * @param addr
+//	 *            The address of the record.
+//	 * @param off
+//	 *            The byte offset of the update.
+//	 * @param data
+//	 *            The data to be written onto the record in the cache starting
+//	 *            at that byte offset. The bytes from the current
+//	 *            {@link ByteBuffer#position()} to the
+//	 *            {@link ByteBuffer#limit()} will be written and the
+//	 *            {@link ByteBuffer#position()} will be advanced to the
+//	 *            {@link ByteBuffer#limit()}. The caller may subsequently modify
+//	 *            the contents of the buffer without changing the state of the
+//	 *            cache (i.e., the data are copied into the cache).
+//	 * 
+//	 * @return <code>true</code> iff the record was updated and
+//	 *         <code>false</code> if no record for that address was found in the
+//	 *         cache.
+//	 * 
+//	 * @throws InterruptedException
+//	 * @throws IllegalStateException
+//	 * 
+//	 * @throws IllegalStateException
+//	 *             if the buffer is closed.
+//	 */
+//	public boolean update(final long addr, final int off, final ByteBuffer data) throws IllegalStateException,
+//			InterruptedException {
+//
+//		if (addr == 0L)
+//			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_ADDRESS_IS_NULL);
+//
+//		if (off < 0)
+//			throw new IllegalArgumentException("Offset is negative");
+//
+//		if (data == null)
+//			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
+//
+//		// #of bytes to be updated on the pre-existing record.
+//		final int nbytes = data.remaining();
+//
+//		if (nbytes == 0)
+//			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
+//
+//		/*
+//		 * Check the writeCache. If the record is found in the write cache then
+//		 * we just update the slice of the record corresponding to the caller's
+//		 * request. This is a common use case and results in no IO.
+//		 */
+//		final ByteBuffer tmp = acquire();
+//
+//		try {
+//
+//			// Look up the metadata for that record in the cache.
+//			final RecordMetadata md;
+//			if ((md = addrMap.get(addr)) == null) {
+//
+//				// The record is not in this write cache.
+//				return false;
+//
+//			}
+//
+//			if (off + nbytes > md.recordLength) {
+//
+//				// The update would overrun the record's extent in the cache.
+//				throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_OVERRUN);
+//
+//			}
+//
+//			// the start of the record in writeCache.
+//			final int pos = md.bufferOffset;
+//
+//			// create a view with same offset, limit and position.
+//			final ByteBuffer view = tmp.duplicate();
+//
+//			// adjust the limit on the record in the write cache.
+//			view.limit(pos + off + nbytes);
+//
+//			// adjust the position on the record in the write cache.
+//			view.position(pos + off);
+//
+//			// copy the caller's data onto the record in write cache.
+//			view.put(data);
+//
+//			// Done.
+//			return true;
+//
+//		} finally {
+//
+//			release();
+//
+//		}
+//
+//	}
 
 	/**
 	 * Flush the writes to the backing channel.
@@ -797,7 +756,7 @@ abstract public class WriteCache implements IWriteCache {
 				view.position(0);
 
 				// write the data on the disk file.
-				return writeOnChannel(view, Collections.unmodifiableMap(addrMap), remaining);
+				return writeOnChannel(view, Collections.unmodifiableMap(recordMap), remaining);
 
 			}
 
@@ -809,49 +768,50 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * Write the data from the buffer onto the channel. This method provides a
-	 * uniform means to request that the buffer write itself onto the backing
-	 * channel, regardless of whether the channel is backed by a file, a socket,
-	 * etc.
-	 * <p>
-	 * Implementations of this method MAY support gathered writes, depending on
-	 * the channel. The necessary information to perform a gathered write is
-	 * present in the address map. On the other hand, the implementation MAY
-	 * require that the records in the cache are laid out for a WORM, in which
-	 * case {@link #getFirstAddr()} provides the starting address for the data
-	 * to be written. The application MUST coordinate the requirements for a R/W
-	 * or WORM store with the use of the {@link WriteCache} and the means to
-	 * write on the backing channel.
-	 * 
-	 * @param buf
-	 *            The data to be written. Only the dirty bytes are visible in
-	 *            this view. The implementation should write all bytes from the
-	 *            current position to the limit.
-	 * @param addrMap
-	 *            The mapping of record addresses onto byte offsets within the
-	 *            give {@link ByteBuffer}.
-	 * @param nanos
-	 *            The timeout for the operation in nanoseconds.
-	 * 
-	 * @return <code>true</code> if the operation was completed successfully
-	 *         within the time alloted.
-	 * 
-	 * @throws InterruptedException
-	 * @throws TimeoutException
-	 * @throws IOException
-	 */
-	abstract protected boolean writeOnChannel(final ByteBuffer buf, final Map<Long, RecordMetadata> addrMap,
-			final long nanos) throws InterruptedException, TimeoutException, IOException;
+    /**
+     * Write the data from the buffer onto the channel. This method provides a
+     * uniform means to request that the buffer write itself onto the backing
+     * channel, regardless of whether the channel is backed by a file, a socket,
+     * etc.
+     * <p>
+     * Implementations of this method MAY support gathered writes, depending on
+     * the channel. The necessary information to perform a gathered write is
+     * present in the <i>recordMap</i>. On the other hand, the implementation
+     * MAY require that the records in the cache are laid out for a WORM, in
+     * which case {@link #getFirstOffset()} provides the starting offset for the
+     * data to be written. The application MUST coordinate the requirements for
+     * a R/W or WORM store with the use of the {@link WriteCache} and the means
+     * to write on the backing channel.
+     * 
+     * @param buf
+     *            The data to be written. Only the dirty bytes are visible in
+     *            this view. The implementation should write all bytes from the
+     *            current position to the limit.
+     * @param recordMap
+     *            The mapping of record offsets onto metadata about those
+     *            records.
+     * @param nanos
+     *            The timeout for the operation in nanoseconds.
+     * 
+     * @return <code>true</code> if the operation was completed successfully
+     *         within the time alloted.
+     * 
+     * @throws InterruptedException
+     * @throws TimeoutException
+     * @throws IOException
+     */
+    abstract protected boolean writeOnChannel(final ByteBuffer buf,
+            final Map<Long, RecordMetadata> recordMap, final long nanos)
+            throws InterruptedException, TimeoutException, IOException;
 
-	/**
-	 * Clear the buffer, the address map, and other internal metadata such that
-	 * the {@link WriteCache} is prepared to receive new writes.
-	 * 
-	 * @throws InterruptedException
-	 * @throws IllegalStateException
-	 *             if the write cache is closed.
-	 */
+    /**
+     * Clear the buffer, the record map, and other internal metadata such that
+     * the {@link WriteCache} is prepared to receive new writes.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
+     *             if the write cache is closed.
+     */
 	public void reset() throws InterruptedException {
 
 		final Lock writeLock = lock.writeLock();
@@ -964,10 +924,10 @@ abstract public class WriteCache implements IWriteCache {
 			throw new IllegalArgumentException();
 
 		// clear the index since all records were flushed to disk.
-		addrMap.clear();
+		recordMap.clear();
 
-		// clear to well known invalid address.
-		firstAddr.set(-1L);
+		// clear to well known invalid offset.
+		firstOffset.set(-1L);
 
 		// nextPosition.set(0);
 
@@ -1002,7 +962,7 @@ abstract public class WriteCache implements IWriteCache {
 		/**
 		 * Used to re-open the {@link FileChannel} in this class.
 		 */
-		private final IReopenChannel<FileChannel> opener;
+		public final IReopenChannel<FileChannel> opener;
 
 		/**
 		 * @param baseOffset
@@ -1029,36 +989,24 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
-		@Override
-		protected boolean writeOnChannel(final ByteBuffer data, final Map<Long, RecordMetadata> addrMap,
-				final long nanos) throws InterruptedException, TimeoutException, IOException {
+        @Override
+        protected boolean writeOnChannel(final ByteBuffer data,
+                final Map<Long, RecordMetadata> recordMap, final long nanos)
+                throws InterruptedException, TimeoutException, IOException {
 
-			final long begin = System.nanoTime();
+            /*
+             * The position in the file at which the record will be written.
+             */
+            final long pos = getFirstOffset() + baseOffset;
 
-			final int nbytes = data.remaining();
+            /*
+             * Write bytes in [data] from position to limit onto the channel.
+             * 
+             * @todo This ignores the timeout.
+             */
+            FileChannelUtility.writeAll(opener, data, pos);
 
-			/*
-			 * The position in the file at which the record will be written.
-			 */
-			final long pos = getFirstAddr() + baseOffset;
-
-			/*
-			 * Write bytes in [data] from position to limit onto the channel.
-			 * 
-			 * @todo This ignores the timeout.
-			 */
-			FileChannelUtility.writeAll(opener, data, pos);
-
-			final long elapsed = System.nanoTime() - begin;
-
-			if (log.isInfoEnabled()) {
-
-				log.info("wrote on disk: bytes=" + nbytes + ", elapsed=" + TimeUnit.NANOSECONDS.toMillis(elapsed)
-						+ "ms");
-
-			}
-
-			return true;
+            return true;
 
 		}
 
@@ -1099,18 +1047,19 @@ abstract public class WriteCache implements IWriteCache {
 		}
 
 		@Override
-		protected boolean writeOnChannel(final ByteBuffer data, final Map<Long, RecordMetadata> addrMap,
-				final long nanos) throws InterruptedException, TimeoutException, IOException {
+        protected boolean writeOnChannel(final ByteBuffer data,
+                final Map<Long, RecordMetadata> recordMap, final long nanos)
+                throws InterruptedException, TimeoutException, IOException {
 
-			final long begin = System.nanoTime();
-
-			final int nbytes = data.remaining();
+//			final long begin = System.nanoTime();
+//
+//			final int nbytes = data.remaining();
 
 			/*
 			 * Retrieve the sorted write iterator and write each block to the
 			 * file
 			 */
-			Iterator<Entry<Long, RecordMetadata>> entries = addrMap.entrySet().iterator();
+			Iterator<Entry<Long, RecordMetadata>> entries = recordMap.entrySet().iterator();
 			while (entries.hasNext()) {
 				Entry<Long, RecordMetadata> entry = entries.next();
 
@@ -1122,13 +1071,13 @@ abstract public class WriteCache implements IWriteCache {
 				view.limit(pos + md.recordLength);
 				view.position(pos);
 
-				final long addr = entry.getKey(); // address in file to update
-				FileChannelUtility.writeAll(opener, view, addr);
-				if (log.isInfoEnabled())
-					log.info("writing to: " + addr);
+				final long offset = entry.getKey(); // offset in file to update
+				FileChannelUtility.writeAll(opener, view, offset);
+//				if (log.isInfoEnabled())
+//					log.info("writing to: " + offset);
 			}
 
-			final long elapsed = System.nanoTime() - begin;
+//			final long elapsed = System.nanoTime() - begin;
 
 			return true;
 

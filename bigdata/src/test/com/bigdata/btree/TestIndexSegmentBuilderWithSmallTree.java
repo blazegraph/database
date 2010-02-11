@@ -44,6 +44,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
     File tmpDir;
 
+    final boolean bufferNodes = true;
+
     public TestIndexSegmentBuilderWithSmallTree() {
     }
 
@@ -118,7 +120,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         
         IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+                true/*compactingMerge*/, bufferNodes).call();
 
          /*
           * Verify can load the index file and that the metadata
@@ -215,7 +217,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 9/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+                true/*compactingMerge*/,bufferNodes).call();
 
         /*
          * Verify that we can load the index file and that the metadata
@@ -339,7 +341,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 10/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+                true/*compactingMerge*/, bufferNodes).call();
 
         /*
          * Verify that we can load the index file and that the metadata
@@ -447,7 +449,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+                true/*compactingMerge*/,bufferNodes).call();
         
 //        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 
@@ -551,7 +553,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
                 .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+                true/*compactingMerge*/,bufferNodes).call();
 
 //        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
 

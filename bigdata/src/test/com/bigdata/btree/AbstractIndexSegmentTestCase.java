@@ -100,7 +100,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
          */
         {
 
-            System.err.println("dumping root");
+            log.info("dumping root");
 
             assertTrue(seg.getRoot().toShortString(), seg.dump(Level.DEBUG,
                     System.err));
@@ -112,7 +112,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
          */
         {
 
-            System.err.println("dumping nodes");
+            log.info("dumping nodes");
 
             final Iterator<AbstractNode> itr = seg.getRoot()
                     .postOrderNodeIterator();
@@ -133,7 +133,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
          */
         {
 
-            System.err.println("dumping leaves (forward tuple cursor)");
+            log.info("dumping leaves (forward tuple cursor)");
 
             final ILeafCursor<?> cursor = seg.newLeafCursor(SeekEnum.First);
 
@@ -155,7 +155,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
          */
         {
 
-            System.err.println("dumping leaves (reverse tuple cursor)");
+            log.info("dumping leaves (reverse tuple cursor)");
 
             final ILeafCursor<?> cursor = seg.newLeafCursor(SeekEnum.Last);
 

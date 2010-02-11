@@ -77,6 +77,8 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
     public TestResourceManagerBootstrap(String name) {
         super(name);
     }
+
+    private final boolean bufferNodes = true;
     
     /**
      * Removes the per-test data directory.
@@ -432,11 +434,12 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
                     final int branchingFactor = 20;
 
-                    final IndexSegmentBuilder builder = IndexSegmentBuilder.newInstance(
-                            outFile, tmpDir, ndx.getEntryCount(), ndx
-                                    .rangeIterator(), branchingFactor, ndx
-                                    .getIndexMetadata(), commitTime, true/* compactingMerge */);
-                    
+                    final IndexSegmentBuilder builder = IndexSegmentBuilder
+                            .newInstance(outFile, tmpDir, ndx.getEntryCount(),
+                                    ndx.rangeIterator(), branchingFactor, ndx
+                                            .getIndexMetadata(), commitTime,
+                                    true/* compactingMerge */, bufferNodes);
+
                     builder.call();
 
                     segmentUUIDs[i] = builder.segmentUUID;
@@ -604,12 +607,13 @@ public class TestResourceManagerBootstrap extends AbstractResourceManagerBootstr
 
                     final int branchingFactor = 20;
 
-                    final IndexSegmentBuilder builder = IndexSegmentBuilder.newInstance(
-                            outFile, tmpDir, (int) ndx.rangeCount(null, null), ndx
-                                    .rangeIterator(null, null),
-                            branchingFactor, ndx
-                                    .getIndexMetadata(), commitTime, true/* compactingMerge */);
-                    
+                    final IndexSegmentBuilder builder = IndexSegmentBuilder
+                            .newInstance(outFile, tmpDir, (int) ndx.rangeCount(
+                                    null, null), ndx.rangeIterator(null, null),
+                                    branchingFactor, ndx.getIndexMetadata(),
+                                    commitTime, true/* compactingMerge */,
+                                    bufferNodes);
+
                     builder.call();
 
                     // assigned UUID for the index segment resource.

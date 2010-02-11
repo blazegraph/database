@@ -28,9 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -38,7 +35,6 @@ import com.bigdata.btree.IndexSegmentBuilder.BuildEnum;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},
@@ -313,18 +309,26 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
                 for (BuildEnum buildEnum : BuildEnum.values()) {
 
                     doBuildIndexSegmentAndCompare(getName(), btree, m,
-                            buildEnum);
+                            buildEnum, true/* bufferNodes */);
+
+                    doBuildIndexSegmentAndCompare(getName(), btree, m,
+                            buildEnum, false/* bufferNodes */);
 
                 }
 
             } // build index segment with the next branching factor.
 
         } finally {
+            
             /*
              * Closing the journal.
              */
-            System.err.println("Closing journal.");
+            
             btree.getStore().destroy();
+            
+            if (log.isInfoEnabled())
+                log.info("Closed journal.");
+
         }
 
     }
@@ -345,13 +349,15 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
      */
     static private IndexSegmentBuilder doBuildIndexSegmentAndCompare(
             final String prefix, final BTree btree, final int m,
-            final BuildEnum buildEnum) throws Exception {
+            final BuildEnum buildEnum, final boolean bufferNodes)
+            throws Exception {
 
         final IndexSegmentBuilder builder = doBuildIndexSegment(prefix, btree,
-                m, buildEnum);
+                m, buildEnum, bufferNodes);
 
-        System.err.println("Opening index segment.");
-        
+        if (log.isInfoEnabled())
+            log.info("Opening index segment.");
+
         final IndexSegment seg = new IndexSegmentStore(builder.outFile)
                 .loadIndexSegment();
         
@@ -362,8 +368,11 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
         } finally {
 
             seg.getStore().destroy();
+
             if (builder.outFile.exists()) {
+                
                 log.warn("Did not delete index segment: " + builder.outFile);
+                
             }
 
         }
@@ -383,8 +392,8 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
      * @throws Exception
      */
     static private IndexSegmentBuilder doBuildIndexSegment(final String prefix,
-            final BTree btree, final int m, final BuildEnum buildEnum)
-            throws Exception {
+            final BTree btree, final int m, final BuildEnum buildEnum,
+            final boolean bufferNodes) throws Exception {
 
         final File outFile = new File(prefix + "_m" + m + "_" + buildEnum
                 + ".seg");
@@ -398,22 +407,23 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 
         final long commitTime = System.currentTimeMillis();
 
-        System.err.println("Building index segment: in(m="
+        if (log.isInfoEnabled())
+            log.info("Building index segment: in(m="
                 + btree.getBranchingFactor() + ", rangeCount="
                 + btree.rangeCount() + "), out(m=" + m + "), buildEnum="
-                + buildEnum);
+                + buildEnum+", bufferNodes="+bufferNodes);
 
         final IndexSegmentBuilder builder;
         switch (buildEnum) {
         case TwoPass:
             builder = IndexSegmentBuilder.newInstanceTwoPass(btree, outFile,
                     tmpDir, m, compactingMerge, commitTime, null/* fromKey */,
-                    null/* toKey */);
+                    null/* toKey */, bufferNodes);
             break;
         case FullyBuffered:
             builder = IndexSegmentBuilder.newInstanceFullyBuffered(btree,
                     outFile, tmpDir, m, compactingMerge, commitTime,
-                    null/* fromKey */, null/* toKey */);
+                    null/* fromKey */, null/* toKey */, bufferNodes);
             break;
         default:
             throw new AssertionError(buildEnum.toString());
@@ -432,8 +442,8 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
     static private void doIndexSegmentCompare(final BTree btree,
             final IndexSegment seg) {
 
-        System.err.println("Verifying index segment: "
-                + seg.getStore().getFile());
+        if (log.isInfoEnabled())
+            log.info("Verifying index segment: " + seg.getStore().getFile());
 
         try {
 
@@ -446,10 +456,12 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
             /*
              * Verify the total index order.
              */
-            System.err.println("Verifying index segment.");
+            if (log.isInfoEnabled())
+                log.info("Verifying index segment.");
             assertSameBTree(btree, seg);
 
-            System.err.println("Closing index segment.");
+            if (log.isInfoEnabled())
+                log.info("Closing index segment.");
             seg.close();
 
             /*
@@ -457,12 +469,14 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
              * immediately re-verifying the index segment. The index segment
              * SHOULD be transparently re-opened for this operation.
              */
-            System.err.println("Re-verifying index segment.");
+            if (log.isInfoEnabled())
+                log.info("Re-verifying index segment.");
             assertSameBTree(btree, seg);
             
         } finally {
             // Close again so that we can delete the backing file.
-            System.err.println("Re-closing index segment.");
+            if (log.isInfoEnabled())
+                log.info("Re-closing index segment.");
             seg.close();
         }
 
@@ -677,301 +691,307 @@ public class TestIndexSegmentBuilderWithLargeTrees extends AbstractIndexSegmentT
 //
 //    }
 
-    /**
-     * Driver for comparison of index segment build performance using different
-     * algorithms against the same source data.
-     * 
-     * @param args
-     *            <code>[opts] [ntuples]</code>, where <i>ntuples</i> defaults
-     *            to <code>1,000,000</code> and <i>opts</i> are any of:
-     *            <dl>
-     *            <dt>-m</dt>
-     *            <dd>The branching factor for the generated index segment
-     *            (default is 512).</dd>
-     *            <dt>-verify</dt>
-     *            <dd>Verify the generated index segment against the source
-     *            B+Tree.</dd>
-     *            <dt>-bloom</dt>
-     *            <dd>Enable the bloom filter for the B+Tree.</dd>
-     *            <dt>-deleteMarkers</dt>
-     *            <dd>Enable delete markers in the B+Tree.</dd>
-     *            <dt>-revisionTimestamps</dt>
-     *            <dd>Enable revision timestamps in the B+Tree.</dd>
-     *            <dt>-revisionTimestampFilters</dt>
-     *            <dd>Enable filtering on revision timestamps in the B+Tree.</dd>
-     *            </dl>
-     *            .
-     * 
-     * @throws Exception
-     * 
-     * @todo Nearly all the run time for the build is to generate the data!
-     *       Either add a parameter for the synthetic data generator or separate
-     *       that out into another main() routine and have one to generate test
-     *       data sets and another to run the builds [my preference is the
-     *       latter].
+    /*
+     * Note: Use IndexSegmentBuilder#main() instead.
      */
-    public static void main(final String[] args) throws Exception {
-        
-        // The target number of tuples for the build.
-        int ntuples = 1000000; // 1M.
-
-        // The output branching factor.
-        int m = 512;
-        
-        // When true, performs a correctness check against the source BTree.
-        boolean verify = false;
-
-        // When true, the bloom filter will be enabled on the index.
-        boolean bloom = false;
-
-        boolean deleteMarkers = false;
-        
-        boolean revisionTimestamps = false;
-
-        boolean revisionTimestampFilters = false;
-
-        // The journal file iff opening a pre-existing journal.
-        File file = null;
-        
-        // The name of the index from which an index segment will be generated. 
-        String name = null;
-        
-        /*
-         * Parse the command line, overriding various properties.
-         */
-        {
-
-            for (int i = 0; i < args.length; i++) {
-
-                final String arg = args[i];
-
-                if (arg.startsWith("-")) {
-
-                    if (arg.equals("-m")) {
-
-                        m = Integer.valueOf(args[++i]);
-
-                    } else if (arg.equals("-j")) {
-
-                        file = new File(args[++i]);
-
-                        if (!file.exists()) {
-
-                            throw new FileNotFoundException(file.toString());
-
-                        }
-                        
-                    } else if (arg.equals("-verify")) {
-
-                        verify = true;
-
-                    } else if (arg.equals("-deleteMarkers")) {
-
-                        deleteMarkers = true;
-
-                    } else if (arg.equals("-revisionTimestamps")) {
-
-                        revisionTimestamps = true;
-
-                    } else if (arg.equals("-revisionTimestampFilters")) {
-
-                        revisionTimestamps = revisionTimestampFilters = true;
-
-                    } else {
-
-                        throw new UnsupportedOperationException("Unknown option: "+arg);
-                        
-                    }
-                    
-                } else {
-                    
-                    ntuples = Integer.valueOf(arg);
-                    
-                }
-                
-            }
-            
-        }
-        
-        // Prefix for the files created by this test (in the temp dir).
-        final String prefix = TestIndexSegmentBuilderWithLargeTrees.class
-                .getSimpleName();
-
-        // Setup journal on which the generated B+Tree will be written.
-        final Journal journal;
-        {
-
-            if (file == null) {
-
-                // create a temporary file.
-                file = File.createTempFile(prefix, Journal.Options.JNL);
-
-            }
-
-            final Properties properties = new Properties();
-            
-            properties.setProperty(Journal.Options.FILE, file.toString());
-            
-            journal = new Journal(properties);
-            
-        }
-
-        try {
-
-            final BTree btree;
-
-            {
-
-                System.out.println("Generating data: ninserts=" + ntuples);
-
-                final IndexMetadata metadata = new IndexMetadata(UUID
-                        .randomUUID());
-
-                if (bloom) {
-
-                    metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
-
-                }
-
-                metadata.setDeleteMarkers(deleteMarkers);
-
-                metadata.setVersionTimestampFilters(revisionTimestamps);
-
-                metadata.setVersionTimestampFilters(revisionTimestampFilters);
-
-                btree = BTree.create(journal, metadata);
-
-                doInsertRandomSparseKeySequenceTest(//
-                        btree, ntuples, // #of inserts into the source btree.
-                        0// disable trace
-                );
-
-                System.out
-                        .println("Generated data: ninserts="
-                                + ntuples
-                                + ", userExtent="
-                                + (journal.getBufferStrategy().getUserExtent() / Bytes.megabyte)
-                                + "mb");
-
-            }
-
-            class Result {
-
-                final BuildEnum buildEnum;
-
-                final long elapsed;
-                
-                final IndexSegmentBuilder builder;
-
-                public Result(final BuildEnum buildEnum, final long elapsed,
-                        final IndexSegmentBuilder builder) {
-
-                    this.buildEnum = buildEnum;
-
-                    this.elapsed = elapsed;
-                    
-                    this.builder = builder;
-
-                }
-
-                public String toString() {
-
-                    return buildEnum//
-                            + ", " + elapsed// note: total build time!
-                            + ", " + builder.elapsed_build//
-                            + ", " + builder.elapsed_write//
-                            + ", " + builder.mbPerSec//
-                            + ", " + (builder.outFile.length()/Bytes.megabyte)//
-                    ;
-
-                }
-
-            }
-
-            final String header = "algorithm, elapsed(ms), build(ms), write(ms), mbPerSec, size(mb)";
-
-            final List<Result> results = new LinkedList<Result>();
-
-            /*
-             * Do a full scan.
-             * 
-             * Note: There can be large side effects from the order in which we
-             * do the builds since each build does at least one full scan of the
-             * source B+Tree. We hide that side effect by pre-materializing all
-             * tuples using a range iterator. Another approach would be to close
-             * out the journal, discard its cache, and then reopening the
-             * journal before each pass.
-             */
-            {
-                System.err.println("Warming up: full B+Tree scan.");
-                final ITupleIterator<?> itr = btree.rangeIterator();
-                while (itr.hasNext())
-                    itr.next();
-            }
-
-            /*
-             * Apply each build algorithm in turn.
-             */
-            for (BuildEnum buildEnum : BuildEnum.values()) {
-
-                System.err.println("Doing build: " + buildEnum);
-
-                final long begin = System.currentTimeMillis();
-                
-                final IndexSegmentBuilder builder = doBuildIndexSegment(prefix,
-                        btree, m, buildEnum);
-
-                // The total elapsed build time, including range count or pre-materialization of tuples. 
-                final long elapsed = System.currentTimeMillis() - begin;
-                
-                final Result result = new Result(buildEnum, elapsed, builder);
-
-                results.add(result);
-
-                System.out.println(result);
-
-                if (verify) {
-                    
-                    final IndexSegment seg = new IndexSegmentStore(
-                            builder.outFile).loadIndexSegment();
-
-                    try {
-
-                        doIndexSegmentCompare(btree, seg);
-
-                    } finally {
-
-                        if (builder.outFile.exists()) {
-
-                            if (!builder.outFile.delete()) {
-
-                                log.warn("Did not delete index segment: "
-                                        + builder.outFile);
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-            System.out.println("---- Results ----");
-            System.out.println(header);
-            for (Result result : results) {
-
-                System.out.println(result);
-
-            }
-
-        } finally {
-
-            journal.destroy();
-
-        }
-
-    }
+//    /**
+//     * Driver for comparison of index segment build performance using different
+//     * algorithms against the same source data.
+//     * 
+//     * @param args
+//     *            <code>[opts] [ntuples]</code>, where <i>ntuples</i> defaults
+//     *            to <code>1,000,000</code> and <i>opts</i> are any of:
+//     *            <dl>
+//     *            <dt>-m</dt>
+//     *            <dd>The branching factor for the generated index segment
+//     *            (default is 512).</dd>
+//     *            <dt>-verify</dt>
+//     *            <dd>Verify the generated index segment against the source
+//     *            B+Tree.</dd>
+//     *            <dt>-bloom</dt>
+//     *            <dd>Enable the bloom filter for the B+Tree.</dd>
+//     *            <dt>-deleteMarkers</dt>
+//     *            <dd>Enable delete markers in the B+Tree.</dd>
+//     *            <dt>-revisionTimestamps</dt>
+//     *            <dd>Enable revision timestamps in the B+Tree.</dd>
+//     *            <dt>-revisionTimestampFilters</dt>
+//     *            <dd>Enable filtering on revision timestamps in the B+Tree.</dd>
+//     *            </dl>
+//     *            .
+//     * 
+//     * @throws Exception
+//     * 
+//     * @todo Nearly all the run time for the build is to generate the data!
+//     *       Either add a parameter for the synthetic data generator or separate
+//     *       that out into another main() routine and have one to generate test
+//     *       data sets and another to run the builds [my preference is the
+//     *       latter].
+//     */
+//    public static void main(final String[] args) throws Exception {
+//        
+//        // The target number of tuples for the build.
+//        int ntuples = 1000000; // 1M.
+//
+//        // The output branching factor.
+//        int m = 512;
+//        
+//        // When true, performs a correctness check against the source BTree.
+//        boolean verify = false;
+//
+//        // When true, the bloom filter will be enabled on the index.
+//        boolean bloom = false;
+//
+//        boolean deleteMarkers = false;
+//        
+//        boolean revisionTimestamps = false;
+//
+//        boolean revisionTimestampFilters = false;
+//
+//        // The journal file iff opening a pre-existing journal.
+//        File file = null;
+//        
+//        // The name of the index from which an index segment will be generated. 
+//        String name = null;
+//        
+//        /*
+//         * Parse the command line, overriding various properties.
+//         */
+//        {
+//
+//            for (int i = 0; i < args.length; i++) {
+//
+//                final String arg = args[i];
+//
+//                if (arg.startsWith("-")) {
+//
+//                    if (arg.equals("-m")) {
+//
+//                        m = Integer.valueOf(args[++i]);
+//
+//                    } else if (arg.equals("-j")) {
+//
+//                        file = new File(args[++i]);
+//
+//                        if (!file.exists()) {
+//
+//                            throw new FileNotFoundException(file.toString());
+//
+//                        }
+//                        
+//                    } else if (arg.equals("-verify")) {
+//
+//                        verify = true;
+//
+//                    } else if (arg.equals("-deleteMarkers")) {
+//
+//                        deleteMarkers = true;
+//
+//                    } else if (arg.equals("-revisionTimestamps")) {
+//
+//                        revisionTimestamps = true;
+//
+//                    } else if (arg.equals("-revisionTimestampFilters")) {
+//
+//                        revisionTimestamps = revisionTimestampFilters = true;
+//
+//                    } else {
+//
+//                        throw new UnsupportedOperationException("Unknown option: "+arg);
+//                        
+//                    }
+//                    
+//                } else {
+//                    
+//                    ntuples = Integer.valueOf(arg);
+//                    
+//                }
+//                
+//            }
+//            
+//        }
+//        
+//        // Prefix for the files created by this test (in the temp dir).
+//        final String prefix = TestIndexSegmentBuilderWithLargeTrees.class
+//                .getSimpleName();
+//
+//        // Setup journal on which the generated B+Tree will be written.
+//        final Journal journal;
+//        {
+//
+//            if (file == null) {
+//
+//                // create a temporary file.
+//                file = File.createTempFile(prefix, Journal.Options.JNL);
+//
+//            }
+//
+//            final Properties properties = new Properties();
+//            
+//            properties.setProperty(Journal.Options.FILE, file.toString());
+//            
+//            journal = new Journal(properties);
+//            
+//        }
+//
+//        try {
+//
+//            final BTree btree;
+//
+//            {
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Generating data: ninserts=" + ntuples);
+//
+//                final IndexMetadata metadata = new IndexMetadata(UUID
+//                        .randomUUID());
+//
+//                if (bloom) {
+//
+//                    metadata.setBloomFilterFactory(BloomFilterFactory.DEFAULT);
+//
+//                }
+//
+//                metadata.setDeleteMarkers(deleteMarkers);
+//
+//                metadata.setVersionTimestampFilters(revisionTimestamps);
+//
+//                metadata.setVersionTimestampFilters(revisionTimestampFilters);
+//
+//                btree = BTree.create(journal, metadata);
+//
+//                doInsertRandomSparseKeySequenceTest(//
+//                        btree, ntuples, // #of inserts into the source btree.
+//                        0// disable trace
+//                );
+//
+//                if (log.isInfoEnabled())
+//                    log
+//                            .info("Generated data: ninserts="
+//                                    + ntuples
+//                                    + ", userExtent="
+//                                    + (journal.getBufferStrategy()
+//                                            .getUserExtent() / Bytes.megabyte)
+//                                    + "mb");
+//
+//            }
+//
+//            class Result {
+//
+//                final BuildEnum buildEnum;
+//
+//                final long elapsed;
+//                
+//                final IndexSegmentBuilder builder;
+//
+//                public Result(final BuildEnum buildEnum, final long elapsed,
+//                        final IndexSegmentBuilder builder) {
+//
+//                    this.buildEnum = buildEnum;
+//
+//                    this.elapsed = elapsed;
+//                    
+//                    this.builder = builder;
+//
+//                }
+//
+//                public String toString() {
+//
+//                    return buildEnum//
+//                            + ", " + elapsed// note: total build time!
+//                            + ", " + builder.elapsed_build//
+//                            + ", " + builder.elapsed_write//
+//                            + ", " + builder.mbPerSec//
+//                            + ", " + (builder.outFile.length()/Bytes.megabyte)//
+//                    ;
+//
+//                }
+//
+//            }
+//
+//            final String header = "algorithm, elapsed(ms), build(ms), write(ms), mbPerSec, size(mb)";
+//
+//            final List<Result> results = new LinkedList<Result>();
+//
+//            /*
+//             * Do a full scan.
+//             * 
+//             * Note: There can be large side effects from the order in which we
+//             * do the builds since each build does at least one full scan of the
+//             * source B+Tree. We hide that side effect by pre-materializing all
+//             * tuples using a range iterator. Another approach would be to close
+//             * out the journal, discard its cache, and then reopening the
+//             * journal before each pass.
+//             */
+//            {
+//                System.err.println("Warming up: full B+Tree scan.");
+//                final ITupleIterator<?> itr = btree.rangeIterator();
+//                while (itr.hasNext())
+//                    itr.next();
+//            }
+//
+//            /*
+//             * Apply each build algorithm in turn.
+//             */
+//            for (BuildEnum buildEnum : BuildEnum.values()) {
+//
+//                System.err.println("Doing build: " + buildEnum);
+//
+//                final long begin = System.currentTimeMillis();
+//                
+//                final IndexSegmentBuilder builder = doBuildIndexSegment(prefix,
+//                        btree, m, buildEnum);
+//
+//                // The total elapsed build time, including range count or pre-materialization of tuples. 
+//                final long elapsed = System.currentTimeMillis() - begin;
+//                
+//                final Result result = new Result(buildEnum, elapsed, builder);
+//
+//                results.add(result);
+//
+//                System.out.println(result);
+//
+//                if (verify) {
+//                    
+//                    final IndexSegment seg = new IndexSegmentStore(
+//                            builder.outFile).loadIndexSegment();
+//
+//                    try {
+//
+//                        doIndexSegmentCompare(btree, seg);
+//
+//                    } finally {
+//
+//                        if (builder.outFile.exists()) {
+//
+//                            if (!builder.outFile.delete()) {
+//
+//                                log.warn("Did not delete index segment: "
+//                                        + builder.outFile);
+//
+//                            }
+//
+//                        }
+//
+//                    }
+//
+//                }
+//
+//            }
+//
+//            System.out.println("---- Results ----");
+//            System.out.println(header);
+//            for (Result result : results) {
+//
+//                System.out.println(result);
+//
+//            }
+//
+//        } finally {
+//
+//            journal.destroy();
+//
+//        }
+//
+//    }
 
 }

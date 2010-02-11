@@ -42,7 +42,6 @@ import com.bigdata.mdi.AbstractResourceMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IMRMW;
-import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.util.ChecksumUtility;
@@ -59,13 +58,8 @@ import com.bigdata.util.ChecksumUtility;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: TemporaryRawStore.java 2356 2010-01-28 17:36:13Z martyncutcher
  *          $
- * 
- * @todo Remove support for the {@link IUpdateStore} API, which is deprecated
- *       for the {@link DiskOnlyStrategy} on which this class currently depends.
- *       A r/w store version of the {@link TemporaryRawStore} could be deployed
- *       which supports {@link IUpdateStore} if that becomes important.
  */
-public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateStore, IMRMW {
+public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 
     protected static final Logger log = Logger.getLogger(TemporaryRawStore.class);
 
@@ -561,17 +555,17 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
                 
     }
 
-    final public long allocate(int nbytes) {
-
-        return buf.allocate(nbytes);
-        
-    }
-
-    final public void update(long addr, int off, ByteBuffer data) {
-
-        buf.update(addr, off, data);
-        
-    }
+//    final public long allocate(int nbytes) {
+//
+//        return buf.allocate(nbytes);
+//        
+//    }
+//
+//    final public void update(long addr, int off, ByteBuffer data) {
+//
+//        buf.update(addr, off, data);
+//        
+//    }
 
     /**
      * The maximum length of a record that may be written on the store.
