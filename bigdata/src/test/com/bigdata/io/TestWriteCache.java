@@ -35,10 +35,11 @@ import java.nio.channels.FileChannel;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.rwstore.RWStore;
-
 import junit.framework.TestCase2;
+
+import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.rawstore.Bytes;
+import com.bigdata.rawstore.IUpdateStore;
 
 /**
  * Test suite for the {@link WriteCache}.
@@ -53,53 +54,12 @@ import junit.framework.TestCase2;
  * 
  * @todo test concurrent readers and a single writer.
  * 
- * @todo Build out write cache service for WORM (serialize writes on the cache
- *       but the caller does not wait for the IO and readers are non-blocking).
- *       A pool of write cache instances should be used. Readers should check
- *       the current write cache and also each non-recycled write cache with
- *       writes on it in the pool. Write caches remain available to readers
- *       until they need to be recycled as the current write cache (the one
- *       servicing new writes). The write cache services needs to maintain a
- *       dirty list of write cache instances. A single thread will handle writes
- *       onto the disk. When the caller calls flush() on the write cache service
- *       it flush() the current write cache (if dirty) to the dirty list and
- *       then wait until the specific write cache instances now on the dirty
- *       list have been serviced (new writes MAY continue asynchronously).
- * 
- * @todo Build out write cache service for RW. The salient differences here is
- *       gathered writes on the store. Note that writers do not have more
- *       concurrency since that bit is still synchronized inside of
- *       {@link WriteCache#write(long, ByteBuffer)} and the {@link RWStore}
- *       serializes its allocation requests. Also, the gathering writes can
- *       combine and order records from the dirty write cache list for better
- *       efficiency. However, if it does this during flush(), then it should not
- *       combine records from write caches which are inside of the write cache
- *       set on which the flush() is waiting in order to ensure that flush() is
- *       service in a timely manner.
- * 
- * @todo The WORM (and RW) stores need to also establish a read-write lock to
- *       prevent changes in the file extent from causing corrupt data for
- *       concurrent read or write operations on the file.
- * 
  * @todo Next steps.
  *       <p>
  *       First I plan to modify IndexSegmentBuilder to use WriteCache over the
  *       output file without a leaf buffer which should reduce the IO for index
- *       segment builds by 50% and let us remove the IUpdateStore from the
- *       DiskOnlyStrategy.
- *       <p>
- *       I wonder if we can take this a step at a time without branching? The
- *       main danger point is when we allow readers (and a single write thread)
- *       to run concurrently on the store. We just need to MUTEX those
- *       conditions with file extension, and a read-write lock is exactly the
- *       tool for that job. We also need to explore whether or not (and if so,
- *       how) to queue disk reads for servicing. I would like to take a metrics
- *       based approach to that once we have concurrent readers. I expect that
- *       performance could be very good on a server grade IO bus such as the
- *       cluster machines. The SAS should already handle the reordering of
- *       concurrent reads. However, it is clear that the SATA (non-SCSI) bus is
- *       not as good at this, so maybe handling in s/w makes sense for non-SCSI
- *       disks?
+ *       segment builds by 50% and let us remove the {@link IUpdateStore} from
+ *       the {@link DiskOnlyStrategy}.
  */
 public class TestWriteCache extends TestCase2 {
 
@@ -183,7 +143,7 @@ public class TestWriteCache extends TestCase2 {
                 }
 
                 // allocate write cache using our buffer.
-                final WriteCache<FileChannel> writeCache = new WriteCache.FileChannelWriteCache(
+                final WriteCache writeCache = new WriteCache.FileChannelWriteCache(
                         baseOffset, buf, opener);
 
                 // verify the write cache self-reported capacity.
@@ -380,13 +340,13 @@ public class TestWriteCache extends TestCase2 {
                 }
 
                 /*
-                 * FIXME Now reset the write cache and verify that (a) the
-                 * firstAddr was cleared to its distinguished value; (b) read
-                 * back of the old records fails;(c) that the entire capacity of
-                 * the cache is now available for a large record; and (d) that
-                 * flushing the cache with that record sends the new data to the
-                 * end of the file such that we can read back the large record
-                 * from the cache and any of the records from the file.
+                 * Now reset the write cache and verify that (a) the firstAddr
+                 * was cleared to its distinguished value; (b) read back of the
+                 * old records fails; (c) that the entire capacity of the cache
+                 * is now available for a large record; and (d) that flushing
+                 * the cache with that record sends the new data to the end of
+                 * the file such that we can read back the large record from the
+                 * cache and any of the records from the file.
                  */
                 // exact file record for the cache.
                 final ByteBuffer data4 = getRandomData(writeCache.capacity());

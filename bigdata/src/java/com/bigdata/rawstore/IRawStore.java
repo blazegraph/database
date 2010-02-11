@@ -35,6 +35,7 @@ import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
 import com.bigdata.cache.IGlobalLRU;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.io.IByteArrayBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.mdi.IResourceMetadata;
 
@@ -71,33 +72,19 @@ import com.bigdata.mdi.IResourceMetadata;
  * @see AbstractJournal
  * @see BTree
  * 
- * @todo The existing implementations of this interface do NOT support the
- *       release and reuse of allocated records - that is, they are all
- *       {@link IWORM Write Once Read Many} stores rather than read/write
- *       stores. A read-write implementation of this interface is of course
- *       possible and will require a means to allocate, release, and reallocate
- *       chunks of varying sizes within the store. Those chunks may either be
- *       drawn from a set of fixed sized allocation pools spanning a variety of
- *       useful record sizes or can use a strategy where records are allocated on
- *       an exact fit basis the first time and reallocated on a best/good fit
- *       basis. A free list can offer fast best-fit or good fit access to chunks
- *       in the store that are available for reuse. Any such approach must
- *       serialize allocations by one means or another, even though different
- *       allocation pools might be used concurrently. A delete() operation on
- *       {@link IRawStore} should be defined so that we can release storage that
- *       is no longer required for data versions that can not be accessed by any
- *       current transaction (a gc strategy). This would make it possible for us
- *       to implement a scale up store based on a single monolithic file.
+ *      FIXME This should be restated in terms of {@link IByteArrayBuffer}. The
+ *      use of the {@link ByteBuffer} in this API has become limiting. It would
+ *      be nicer to specify a byte[] with optional offset and length parameters.
+ *      This would make it easier to wrap the byte[] in different ways for
+ *      reading and writing. The {@link ByteBuffer} has an advantage when
+ *      reading since it allows us to return a read-only view of the record, but
+ *      in practice that is only effective for an in-memory store (with or
+ *      without a backing file). The byte[] is more flexible. The caller is free
+ *      to reuse the byte[] and the store always copies the data. In practice,
+ *      we tend to work around this by copying to an array backed
+ *      {@link ByteBuffer} or to a byte[] wrapped as an {@link IByteArrayBuffer}
+ *      .
  * 
- *       FIXME The use of the {@link ByteBuffer} in this API has become
- *       limiting. It would be nicer to specify a byte[] with optional offset
- *       and length parameters. This would make it easier to wrap the byte[] in
- *       different ways for reading and writing. The {@link ByteBuffer} has an
- *       advantage when reading since it allows us to return a read-only view of
- *       the record, but in practice that is only effective for an in-memory
- *       store (with or without a backing file). The byte[] is more flexible.
- *       The caller is free to reuse the byte[] and the store always copies the
- *       data.
  */
 public interface IRawStore extends IAddressManager {
     
@@ -199,40 +186,6 @@ public interface IRawStore extends IAddressManager {
      *             if the store is not open.
      */
     public ByteBuffer read(long addr);
-
-//    /**
-//     * Read the data (unisolated).
-//     * 
-//     * @param addr
-//     *            A long integer formed using {@link Addr} that encodes both the
-//     *            offset from which the data will be read and the #of bytes to
-//     *            be read.
-//     * @param dst
-//     *            The destination buffer (optional). This buffer will be used if
-//     *            it has sufficient {@link ByteBuffer#remaining()} capacity.
-//     *            When used, the data will be written into the offered buffer
-//     *            starting at {@link ByteBuffer#position()} and the
-//     *            {@link ByteBuffer#position()} will be advanced by the #of
-//     *            bytes read.<br>
-//     *            When <code>null</code> or when a buffer is offered without
-//     *            sufficient {@link ByteBuffer#remaining()} capacity the
-//     *            implementation is encouraged to return a read-only slice
-//     *            containing the data or, failing that, to allocate a new buffer
-//     *            with sufficient capacity.<br>
-//     *            Note that it is not an error to offer a buffer that is too
-//     *            small - it will simply be ignored.<br>
-//     *            Note that it is not an error to offer a buffer with excess
-//     *            remaining capacity.
-//     * 
-//     * @return The data read. The buffer will be flipped to prepare for reading
-//     *         (the position will be zero and the limit will be the #of bytes
-//     *         read).
-//     * 
-//     * @exception IllegalArgumentException
-//     *                If the address is known to be invalid (never written or
-//     *                deleted). Note that the address 0L is always invalid.
-//     */
-//    public ByteBuffer read(long addr, ByteBuffer dst);
 
     /**
      * <code>true</code> iff the store is open.

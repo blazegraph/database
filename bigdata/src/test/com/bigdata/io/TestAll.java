@@ -71,6 +71,9 @@ public class TestAll extends TestCase {
         // test suite for the write cache mechanisms.
         suite.addTestSuite(TestWriteCache.class);
 
+        // test suite for the write cache service.
+        suite.addTestSuite(TestWriteCacheService.class);
+
         // test suite for FileLock and advisory locking class.
         suite.addTestSuite(TestFileLockUtility.class);
         
