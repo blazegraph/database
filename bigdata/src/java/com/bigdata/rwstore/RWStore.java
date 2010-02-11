@@ -105,10 +105,13 @@ import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.channels.OverlappingFileLockException;
 
+import org.apache.log4j.Logger;
+
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.RWStrategy.FileMetadataView;
@@ -195,8 +198,7 @@ import com.bigdata.util.ChecksumUtility;
  */
 
 public class RWStore implements IStore {
-	protected static java.util.logging.Logger cat = java.util.logging.Logger
-			.getLogger(RWStore.class.getName());
+    protected static final Logger log = Logger.getLogger(RWStore.class);
 
 	static final int MAX_FIXED_ALLOC = 8 * 1024;
 	static final int MIN_FIXED_ALLOC = 64;
@@ -338,7 +340,7 @@ public class RWStore implements IStore {
 		long metaAddr = rbv.getMetaStartAddr();
 		long rawMetaBitsAddr = rbv.getMetaBitsAddr();
 		if (metaAddr == 0 || rawMetaBitsAddr == 0) {
-			cat.warning("No meta allocation data included in root block for RWStore"); // possible when rolling back to empty file
+			log.warn("No meta allocation data included in root block for RWStore"); // possible when rolling back to empty file
 		}
 		
 		int metaStartAddr = (int) -(metaAddr >> 32);
@@ -351,7 +353,8 @@ public class RWStore implements IStore {
 			throw new IllegalStateException("Incompatible Root Block values: " + metaAlloc + " < " + heapAlloc + " with " + nxtOffset + " and " + metaAddr);
 		}	
 		
-		cat.info("m_allocation: " + nxtalloc + ", m_metaStartAddr: " + metaStartAddr + ", m_metaBitsAddr: " + metaBitsAddr);
+		if (log.isDebugEnabled())
+			log.debug("m_allocation: " + nxtalloc + ", m_metaStartAddr: " + metaStartAddr + ", m_metaBitsAddr: " + metaBitsAddr);
 	}
 	/**
 	 * Should be called where previously initFileSpec was used.
@@ -404,7 +407,8 @@ public class RWStore implements IStore {
 
 		readAllocationBlocks();
 				
-		cat.info("restored from RootBlock: " + m_nextAllocation + ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
+		if (log.isInfoEnabled())
+			log.info("restored from RootBlock: " + m_nextAllocation + ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
 	}
 
 	/*********************************************************************
@@ -549,7 +553,7 @@ public class RWStore implements IStore {
 			try {
 				long paddr = physicalAddress((int) addr);
 				if (paddr == 0) {
-					cat.warning("Address " + addr + " did not resolve to physical address");
+					log.warn("Address " + addr + " did not resolve to physical address");
 					throw new IllegalArgumentException();
 				}
 				m_raf.seek(paddr);
@@ -669,7 +673,8 @@ public class RWStore implements IStore {
 
 			addr = allocator.alloc(this, size);
 
-			cat.info("New FixedAllocator for " + cmp + " byte allocations at " + addr);
+			if (log.isDebugEnabled())
+				log.debug("New FixedAllocator for " + cmp + " byte allocations at " + addr);
 
 			m_allocs.add(allocator);
 		} else {
@@ -906,7 +911,8 @@ public class RWStore implements IStore {
 	}
 
 	public void commitChanges() {
-		cat.info("checking meta data save");
+		if (log.isDebugEnabled())
+			log.debug("checking meta data save");
 		
 		checkCoreAllocations();
 		
@@ -931,7 +937,8 @@ public class RWStore implements IStore {
 					long naddr = metaAlloc();
 					allocator.setDiskAddr(naddr);
 					
-					cat.info("Update allocator " + allocator.m_index + ", old addr: " + old + ", new addr: " + naddr);
+					if (log.isDebugEnabled())
+						log.debug("Update allocator " + allocator.m_index + ", old addr: " + old + ", new addr: " + naddr);
 
 					byte[] buf = allocator.write();
 					m_writes.addWrite(allocator.getDiskAddr(), buf, buf.length);
@@ -962,7 +969,8 @@ public class RWStore implements IStore {
 		
 		checkCoreAllocations();
 		
-		cat.info("commitChanges for: " + m_nextAllocation + ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
+		if (log.isInfoEnabled())
+			log.info("commitChanges for: " + m_nextAllocation + ", " + m_metaStartAddr + ", " + m_metaBitsAddr);
 	}
 
 	/**
@@ -1009,7 +1017,8 @@ public class RWStore implements IStore {
 		
 		checkCoreAllocations();
 
-		cat.info("allocation created at " + convertAddr(allocAddr) + " for " + convertAddr(-size));
+		if (log.isDebugEnabled())
+			log.debug("allocation created at " + convertAddr(allocAddr) + " for " + convertAddr(-size));
 
 		return allocAddr;
 	}
@@ -1183,7 +1192,7 @@ public class RWStore implements IStore {
 	 * by "zero'd" bits since this can indicate that memory has been cleared.
 	 */
 	private void extendFile() {
-		cat.warning("About to extend the file");
+		log.warn("About to extend the file");
 		
 		int adjust = 0;
 
@@ -1291,13 +1300,13 @@ public class RWStore implements IStore {
 
 	// --------------------------------------------------------------------------------------
 	private String allocListStats(ArrayList list) {
-		String stats = "";
+		StringBuffer stats = new StringBuffer();
 		Iterator iter = list.iterator();
 		while (iter.hasNext()) {
-			stats = stats + ((Allocator) iter.next()).getStats();
+			stats.append(((Allocator) iter.next()).getStats());
 		}
 
-		return stats;
+		return stats.toString();
 	}
 
 	protected static int s_allocation = 0;

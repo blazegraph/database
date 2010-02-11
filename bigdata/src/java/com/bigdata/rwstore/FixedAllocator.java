@@ -27,13 +27,15 @@ package com.bigdata.rwstore;
 import java.util.*;
 import java.io.*;
 
+import org.apache.log4j.Logger;
+
 /**
  * FixedAllocator
  * 
  * Maintains List of AllocBlock(s)
  */
 public class FixedAllocator implements Allocator {
-	protected static java.util.logging.Logger cat = java.util.logging.Logger.getLogger(FixedAllocator.class.getName());
+    protected static final Logger log = Logger.getLogger(FixedAllocator.class);
 
 	private WriteBlock m_writes = null;
 	private int m_freeBits;
@@ -46,7 +48,8 @@ public class FixedAllocator implements Allocator {
 
 	public void setIndex(int index) {
 		AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
-		cat.info("Restored index " + index + " with " + getStartAddr() + "[" + fb.m_bits[0] + "] from " + m_diskAddr);
+		if (log.isDebugEnabled())
+			log.debug("Restored index " + index + " with " + getStartAddr() + "[" + fb.m_bits[0] + "] from " + m_diskAddr);
 
 		m_index = index;
 	}
@@ -119,7 +122,8 @@ public class FixedAllocator implements Allocator {
 	public byte[] write() {
 		try {
 			AllocBlock fb = (AllocBlock) m_allocBlocks.get(0);
-			cat.info("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_bits[0]);
+			if (log.isDebugEnabled())
+				log.debug("writing allocator " + m_index + " for " + getStartAddr() + " with " + fb.m_bits[0]);
 			byte[] buf = new byte[1024];
 			DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
 
@@ -333,7 +337,8 @@ public class FixedAllocator implements Allocator {
 				int blockSize = 32 * m_bitSize * m_size;
 				blockSize >>= 13;
 				block.m_addr = store.allocBlock(blockSize);
-				cat.info("Allocation block at " + block.m_addr + " of " + (blockSize << 13) + " bytes");
+				if (log.isDebugEnabled())
+					log.debug("Allocation block at " + block.m_addr + " of " + (blockSize << 13) + " bytes");
 
 				if (m_startAddr == 0) {
 					m_startAddr = block.m_addr;

@@ -33,6 +33,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.mdi.IResourceMetadata;
@@ -49,8 +51,7 @@ import com.bigdata.util.ChecksumUtility;
  * @author mgc
  */
 public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
-	protected static java.util.logging.Logger cat = java.util.logging.Logger
-	.getLogger(RWStrategy.class.getName());
+    protected static final Logger log = Logger.getLogger(RWStrategy.class);
 
 	FileMetadata m_fileMetadata = null;
 
@@ -335,7 +336,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 
 			}
 			
-			cat.info("Writing ROOTBLOCK");
+			if (log.isDebugEnabled())
+				log.debug("Writing ROOTBLOCK");
 
 		}
 
@@ -407,7 +409,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 	
 	protected void reopen() {
 		try {
-			cat.warning("Request to reopen store after interrupt");
+			log.warn("Request to reopen store after interrupt");
 			
 			m_store.close();
 			m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file, m_fileMetadata.fileMode);
