@@ -943,7 +943,6 @@ abstract public class WriteCache implements IWriteCache {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id$
 	 */
 	public static class FileChannelWriteCache extends WriteCache {
 
@@ -1012,13 +1011,13 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * The scattered write cache is used by the RWStore since the writes can be
-	 * made to any part of the file assigned for data allocation.
-	 * 
-	 * The writeonChannel must therefore utilize the RecordMetaData to write
-	 * each update separately
-	 */
+    /**
+     * The scattered write cache is used by the {@link RWStore} since the writes
+     * can be made to any part of the file assigned for data allocation.
+     * 
+     * The writeonChannel must therefore utilize the {@link RecordMetadata} to
+     * write each update separately.
+     */
 	public static class FileChannelScatteredWriteCache extends WriteCache {
 
 		/**
