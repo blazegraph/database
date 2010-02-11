@@ -451,6 +451,367 @@ public class TestWriteCache extends TestCase2 {
     }
 
     /**
+     * Similar to writeCache01 but uses the ScatteredWrite. It uses the same simple random
+     * data but writes on explicit out of order 1K boundaries.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void test_writeCacheScatteredWrites() throws IOException, InterruptedException {
+
+        /*
+         * Whether or nor the write cache will force writes to the disk. For
+         * this test, force is false since it just does not matter whether the
+         * data are restart safe.
+         */
+        final boolean force = false;
+        
+        /*
+         * The offset into the file of the start of the "user" data. May be GTE
+         * zero.
+         */
+        final long baseOffset = 0L;
+
+        /*
+         * Note: For the scattered writes we need a non-sequential order to mimic the
+         * allocation of the RWStore.
+         */
+        long _addr[] = {4096,1024,3072,8192};
+        
+        final File file = File.createTempFile(getName(), ".tmp");
+        
+
+        try {
+
+            final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
+
+            final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
+
+            try {
+
+                // The buffer size must be at least 1k for these tests.
+                assertTrue(DirectBufferPool.INSTANCE.getBufferCapacity() >= Bytes.kilobyte32);
+
+                // ctor correct rejection tests: opener is null.
+                try {
+                    new WriteCache.FileChannelScatteredWriteCache(buf, null/* opener */);
+                    fail("Expected: " + IllegalArgumentException.class);
+                } catch (IllegalArgumentException ex) {
+                    if (log.isInfoEnabled())
+                        log.info("Expected exception: " + ex);
+                }
+
+                // allocate write cache using our buffer.
+                final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
+                        buf, opener);
+
+                // verify the write cache self-reported capacity.
+                assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity(),
+                        writeCache.capacity());
+
+                // correct rejection test for null write.
+                try {
+                    writeCache.write(1000L, null);
+                    fail("Expecting: " + IllegalArgumentException.class);
+                } catch (IllegalArgumentException ex) {
+                    if (log.isInfoEnabled())
+                        log.info("Expected exception: " + ex);
+                }
+
+                // correct rejection test for empty write.
+                try {
+                    writeCache.write(1000L, ByteBuffer.allocate(0));
+                    fail("Expecting: " + IllegalArgumentException.class);
+                } catch (IllegalArgumentException ex) {
+                    if (log.isInfoEnabled())
+                        log.info("Expected exception: " + ex);
+                }
+
+                /*
+                 * Correct rejection test for empty write (capacity>0 but still
+                 * empty).
+                 */
+                try {
+                    final ByteBuffer data = ByteBuffer.allocate(10);
+                    data.position(0);
+                    data.limit(0);
+                    writeCache.write(1000L, data);
+                    fail("Expecting: " + IllegalArgumentException.class);
+                } catch (IllegalArgumentException ex) {
+                    if (log.isInfoEnabled())
+                        log.info("Expected exception: " + ex);
+                }
+
+                // Test successful write on the cache and immediate read back.
+                final ByteBuffer data1 = getRandomData();
+                final long addr1 = _addr[0];
+                {
+                    assertEquals(-1L,writeCache.getFirstAddr());
+                    // verify addr not found before write.
+                    assertNull(writeCache.read(addr1));
+                    // write record @ addr.
+                    assertTrue(writeCache.write(addr1, data1));
+                    // verify record @ addr can be read.
+                    assertNotNull(writeCache.read(addr1));
+                    // verify data read back @ addr.
+                    assertEquals(data1, writeCache.read(addr1));
+                    // verify address set after 1st write.
+                    assertEquals(addr1,writeCache.getFirstAddr());
+                }
+
+                /*
+                 * Test successful write on the cache with 0L addr and immediate
+                 * read back. This verifies that the cache may be used with a
+                 * store which does not reserve any space for root blocks, etc.
+                 */
+                final ByteBuffer data2 = getRandomData();
+                final long addr2 = _addr[1];
+                {
+                    // verify addr not found before write.
+                    assertNull(writeCache.read(addr2));
+                    // write record @ addr.
+                    assertTrue(writeCache.write(addr2, data2));
+                    // verify record @ addr can be read.
+                    assertNotNull(writeCache.read(addr2));
+                    // verify data read back @ addr.
+                    assertEquals(data2, writeCache.read(addr2));
+                    // Verify the first record can still be read back.
+                    assertEquals(data1, writeCache.read(addr1));
+                    // verify address still set after 2nd write.
+                    assertEquals(addr1, writeCache.getFirstAddr());
+                }
+
+                /*
+                 * Verify that update of a record not found in the cache returns
+                 * false to indicate a cache miss.
+                 */
+                {
+                    final long addr3 = _addr[2];
+                    assertFalse(writeCache.update(addr3, 0/* off */, ByteBuffer
+                            .allocate(10)));
+                }
+
+                // Correct rejection error if offset is negative.
+                {
+                    try {
+                        assertFalse(writeCache.update(addr1, -1/* off */,
+                                ByteBuffer.allocate(10)));
+                        fail("Expecting: " + IllegalArgumentException.class);
+                    } catch (IllegalArgumentException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+                }
+
+                /*
+                 * Correct rejection error if offset is GTE the record length
+                 * (a zero update length is illegal, hence GTE).
+                 */
+                {
+                    // EQ
+                    try {
+                        assertFalse(writeCache.update(addr1,
+                                data1.capacity()/* off */, ByteBuffer
+                                        .allocate(1)));
+                        fail("Expecting: " + IllegalArgumentException.class);
+                    } catch (IllegalArgumentException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+                    // GT
+                    try {
+                        assertFalse(writeCache.update(addr1,
+                                data1.capacity()+1/* off */, ByteBuffer
+                                        .allocate(1)));
+                        fail("Expecting: " + IllegalArgumentException.class);
+                    } catch (IllegalArgumentException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+                }
+
+                /*
+                 * Correct rejection error if the offset plus the update run
+                 * length is GT the record length (i.e., would overrun the
+                 * record's extent in the write cache's internal buffer).
+                 */
+                {
+                    try {
+                        assertFalse(writeCache.update(addr1, 1/* off */,
+                                ByteBuffer.allocate(data1.capacity())));
+                        fail("Expecting: " + IllegalArgumentException.class);
+                    } catch (IllegalArgumentException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+                }
+
+                /*
+                 * Write one more record on the cache whose size is known in
+                 * advance. Verify read back, then update the record in the
+                 * cache and re-verify read back.
+                 */
+                final ByteBuffer data3b;
+                final long addr3 = _addr[2];
+                {
+                    // not found yet.
+                    assertNull(writeCache.read(addr3));
+                    // write record of known length.
+                    final ByteBuffer data3a = ByteBuffer.wrap(new byte[] { 1,
+                            2, 3, 4, 5 });
+                    assertTrue(writeCache.write(addr3, data3a));
+                    // verify read back.
+                    assertEquals(data3a, writeCache.read(addr3));
+                    // update the record in the cache.
+                    assertTrue(writeCache.update(addr3, 1/* off */, ByteBuffer
+                            .wrap(new byte[] { -2, -3, -4 })));
+                    // verify read back after update.
+                    data3b = ByteBuffer.wrap(new byte[] { 1, -2, -3, -4, 5 });
+                    assertEquals(data3b, writeCache.read(addr3));
+                }
+
+                /*
+                 * Now flush the write cache to the backing file and verify (a)
+                 * that we can still read the data from the write cache and (b)
+                 * that we can now read the data from the backing file.
+                 */
+                {
+
+                    // file should be empty before this.
+                    assertEquals(0L, file.length());
+                    
+                    // write to the backing file.
+                    writeCache.flush(force);
+
+                    // verify read back of cache still good.
+                    assertEquals(data1, writeCache.read(addr1));
+                    assertEquals(data2, writeCache.read(addr2));
+                    assertEquals(data3b, writeCache.read(addr3));
+
+                    // verify read back from file now good.
+                    assertEquals(data1, opener.read(addr1, data1.capacity()));
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+                    assertEquals(data3b, opener.read(addr3, data3b.capacity()));
+                    
+                }
+
+                /*
+                 * Now reset the write cache and verify that (a) the firstAddr
+                 * was cleared to its distinguished value; (b) read back of the
+                 * old records fails; (c) that the entire capacity of the cache
+                 * is now available for a large record; and (d) that flushing
+                 * the cache with that record sends the new data to the end of
+                 * the file such that we can read back the large record from the
+                 * cache and any of the records from the file.
+                 */
+                // exact file record for the cache.
+                final ByteBuffer data4 = getRandomData(writeCache.capacity());
+                final long addr4 = _addr[3];
+                {
+                 
+                    writeCache.reset();
+                    
+                    assertEquals(-1L,writeCache.getFirstAddr());
+
+                    // verify read back of cache fails.
+                    assertNull(writeCache.read(addr1));
+                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr3));
+
+                    // verify read back from file still good.
+                    assertEquals(data1, opener.read(addr1, data1.capacity()));
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+                    assertEquals(data3b, opener.read(addr3, data3b.capacity()));
+
+                    // write record on the cache.
+                    assertTrue(writeCache.write(addr4, data4));
+                    
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+
+                    // verify read back.
+                    assertEquals(data4, writeCache.read(addr4));
+
+                    // Verify no more writes are allowed on the cache (it is
+                    // full).
+                    assertFalse(writeCache.write(addr4 + 1, ByteBuffer
+                            .wrap(new byte[] { 1 })));
+
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+
+                    // write on the disk.
+                    writeCache.flush(force);
+
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+
+                    // verify read back of cache for other records still fails.
+                    assertNull(writeCache.read(addr1));
+                    assertNull(writeCache.read(addr2));
+                    assertNull(writeCache.read(addr3));
+                    // verify read back from cache of the last record written.
+                    assertEquals(data4, writeCache.read(addr4));
+
+                    // verify read back from file still good.
+                    assertEquals(data1, opener.read(addr1, data1.capacity()));
+                    assertEquals(data2, opener.read(addr2, data2.capacity()));
+                    assertEquals(data3b, opener.read(addr3, data3b.capacity()));
+                    assertEquals(data4, opener.read(addr4, data4.capacity()));
+
+
+                }
+
+                /*
+                 * Test close() [verify API throws IllegalStateException].
+                 */
+                {
+
+                    // close this instance.
+                    writeCache.close();
+
+                    // read fails.
+                    try {
+                        writeCache.read(1L/*addr*/);
+                        fail("Expected: " + IllegalStateException.class);
+                    } catch (IllegalStateException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+
+                    // write fails.
+                    try {
+                        writeCache.write(1L/* addr */, ByteBuffer
+                                .wrap(new byte[] { 1, 2, 3 }));
+                        fail("Expected: " + IllegalStateException.class);
+                    } catch (IllegalStateException ex) {
+                        if (log.isInfoEnabled())
+                            log.info("Expected exception: " + ex);
+                    }
+
+                    // does not throw an exception.
+                    writeCache.close();
+                    
+                }
+                
+            } finally {
+
+                DirectBufferPool.INSTANCE.release(buf);
+
+                opener.destroy();
+
+            }
+
+        } finally {
+
+            if (file.exists() && !file.delete()) {
+
+                log.warn("Could not delete: file=" + file);
+
+            }
+
+        }
+
+    }
+
+    /**
      * Simple implementation for a {@link RandomAccessFile} with hook for
      * deleting the test file.
      */
