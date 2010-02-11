@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,8 +43,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.bigdata.btree.IndexSegmentBuilder;
-import com.bigdata.io.WriteCache.RecordMetadata;
-import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.Latch;
@@ -103,12 +100,13 @@ import com.bigdata.util.concurrent.Latch;
  *       concurrent reads. However, it is clear that the SATA (non-SCSI) bus is
  *       not as good at this, so maybe handling in s/w makes sense for non-SCSI
  *       disks?
- * 
- * @todo {@link IUpdateStore} may be completely unnecessary and we could
- *       simplify many things if we get rid of it everywhere.
  */
-public class WriteCacheService implements IWriteCache {
+abstract public class WriteCacheService implements IWriteCache {
 
+    /**
+     * <code>true</code> until the service is shutdown (actually, until a
+     * request is made to shutdown the service).
+     */
     final private AtomicBoolean open = new AtomicBoolean(true);
     
     /**
@@ -163,39 +161,8 @@ public class WriteCacheService implements IWriteCache {
         current.set(newWriteCache());
         
     }
-    
-    protected WriteCache newWriteCache() throws InterruptedException {
-        
-        return new WriteCache(null/* buf */) {
 
-            @Override
-            protected boolean writeOnChannel(ByteBuffer buf,
-                    Map<Long, RecordMetadata> addrMap, long nanos)
-                    throws InterruptedException, TimeoutException,
-                    IOException {
-
-                return WriteCacheService.this.writeOnChannel(this, buf,
-                        addrMap, nanos);
-
-            }
-        };
-        
-    }
-    
-    /**
-     * FIXME Write a dirty buffer on the backing channel.
-     * @param buf
-     * @param addrMap
-     * @param nanos
-     * @return
-     */
-    protected boolean writeOnChannel(final WriteCache writeCache,
-            final ByteBuffer buf, final Map<Long, RecordMetadata> addrMap,
-            final long nanos) {
-
-        throw new UnsupportedOperationException();
-
-    }
+    abstract protected WriteCache newWriteCache() throws InterruptedException;
 
     public boolean isOpen() {
         return open.get();
@@ -417,14 +384,6 @@ public class WriteCacheService implements IWriteCache {
      */
     public ByteBuffer read(long addr) throws InterruptedException,
             IllegalStateException {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * @todo again, must search for the record and return false if not found.
-     */
-    public boolean update(long addr, int off, ByteBuffer data)
-            throws IllegalStateException, InterruptedException {
         throw new UnsupportedOperationException();
     }
 

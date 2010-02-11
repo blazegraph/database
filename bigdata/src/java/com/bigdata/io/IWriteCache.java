@@ -44,8 +44,8 @@ public interface IWriteCache {
     /**
      * Write the record on the cache.
      * 
-     * @param addr
-     *            The address assigned to that record.
+     * @param offset
+     *            The offset of that record (maybe relative to a base offset).
      * @param data
      *            The record. The bytes from the current
      *            {@link ByteBuffer#position()} to the
@@ -69,14 +69,14 @@ public interface IWriteCache {
      *             large records. For example, they can be written directly onto
      *             the backing channel.
      */
-    public boolean write(final long addr, final ByteBuffer data)
+    public boolean write(final long offset, final ByteBuffer data)
             throws InterruptedException, IllegalStateException;
 
     /**
      * Read a record from the write cache.
      * 
-     * @param addr
-     *            The address assigned to that record in the journal.
+     * @param offset
+     *            The offset of that record (maybe relative to a base offset).
      * @param nbytes
      *            The length of the record (decoded from the address by the
      *            caller).
@@ -92,38 +92,38 @@ public interface IWriteCache {
      * @throws IllegalStateException
      *             if the buffer is closed.
      */
-    public ByteBuffer read(final long addr) throws InterruptedException,
+    public ByteBuffer read(final long offset) throws InterruptedException,
             IllegalStateException;
 
-    /**
-     * Update a record in the write cache.
-     * 
-     * @param addr
-     *            The address of the record.
-     * @param off
-     *            The byte offset of the update.
-     * @param data
-     *            The data to be written onto the record in the cache starting
-     *            at that byte offset. The bytes from the current
-     *            {@link ByteBuffer#position()} to the
-     *            {@link ByteBuffer#limit()} will be written and the
-     *            {@link ByteBuffer#position()} will be advanced to the
-     *            {@link ByteBuffer#limit()}. The caller may subsequently modify
-     *            the contents of the buffer without changing the state of the
-     *            cache (i.e., the data are copied into the cache).
-     * 
-     * @return <code>true</code> iff the record was updated and
-     *         <code>false</code> if no record for that address was found in the
-     *         cache.
-     * 
-     * @throws InterruptedException
-     * @throws IllegalStateException
-     * 
-     * @throws IllegalStateException
-     *             if the buffer is closed.
-     */
-    public boolean update(final long addr, final int off, final ByteBuffer data)
-            throws IllegalStateException, InterruptedException;
+//    /**
+//     * Update a record in the write cache.
+//     * 
+//     * @param addr
+//     *            The address of the record.
+//     * @param off
+//     *            The byte offset of the update.
+//     * @param data
+//     *            The data to be written onto the record in the cache starting
+//     *            at that byte offset. The bytes from the current
+//     *            {@link ByteBuffer#position()} to the
+//     *            {@link ByteBuffer#limit()} will be written and the
+//     *            {@link ByteBuffer#position()} will be advanced to the
+//     *            {@link ByteBuffer#limit()}. The caller may subsequently modify
+//     *            the contents of the buffer without changing the state of the
+//     *            cache (i.e., the data are copied into the cache).
+//     * 
+//     * @return <code>true</code> iff the record was updated and
+//     *         <code>false</code> if no record for that address was found in the
+//     *         cache.
+//     * 
+//     * @throws InterruptedException
+//     * @throws IllegalStateException
+//     * 
+//     * @throws IllegalStateException
+//     *             if the buffer is closed.
+//     */
+//    public boolean update(final long addr, final int off, final ByteBuffer data)
+//            throws IllegalStateException, InterruptedException;
 
     /**
      * Flush the writes to the backing channel.

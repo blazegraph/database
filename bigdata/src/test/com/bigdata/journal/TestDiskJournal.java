@@ -213,326 +213,326 @@ public class TestDiskJournal extends AbstractJournalTestCase {
             
         }
 
-        /**
-         * Test that allocate() pre-extends the store when a record is allocated
-         * which would overflow the current user extent.
-         */
-        public void test_allocPreExtendsStore() {
-       
-            final Journal store = (Journal) getStore();
-
-            try {
-
-                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
-                        .getBufferStrategy();
-
-                final long nextOffset = store.getRootBlockView()
-                        .getNextOffset();
-
-                final long length = store.size();
-
-                final long headerSize = FileMetadata.headerSize0;
-
-                // #of bytes remaining in the user extent before overflow.
-                final long nfree = length - (headerSize + nextOffset);
-
-                if (nfree >= Integer.MAX_VALUE) {
-
-                    /*
-                     * The test is trying to allocate a single record that will
-                     * force the store to be extended. This will not work if the
-                     * store file already has a huge user extent with nothing
-                     * allocated on it.
-                     */
-                    
-                    fail("Can't allocate a record with: " + nfree + " bytes");
-
-                }
-
-                final int nbytes = (int) nfree;
-                
-                final long addr = bufferStrategy.allocate(nbytes);
-
-                assertNotSame(0L, addr);
-
-                assertEquals(nbytes, store.getByteCount(addr));
-                
-                // store file was extended.
-                assertTrue(store.size() > length);
-                
-            } finally {
-
-                store.destroy();
-            
-            }
-            
-        }
-
-        /**
-         * Test allocate()+read() where the record was never written (the data
-         * are undefined unless written so there is nothing really to test here
-         * except for exceptions which might be through for this condition).
-         */
-        public void test_allocate_then_read() {
-
-            final Journal store = (Journal) getStore();
-
-            try {
-
-                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
-                        .getBufferStrategy();
-
-                final int nbytes = 100;
-                
-                final long addr = bufferStrategy.allocate(nbytes);
-
-                assertEquals(nbytes, store.getByteCount(addr));
-                
-                final ByteBuffer b = bufferStrategy.read(addr);
-                
-                // read returns a buffer that was allocated but never written.
-                assertNotNull(b);
-                
-                // position in the buffer is zero.
-                assertEquals(0,b.position());
-                
-                // limit of the buffer is [nbytes].
-                assertEquals(nbytes,b.limit());
-
-                // capacity of the buffer is [nbytes].
-                assertEquals(nbytes,b.capacity());
-                
-                /*
-                 * Note: the actual bytes in the buffer ARE NOT DEFINED.
-                 */
-                
-            } finally {
-
-                store.destroy();
-            
-            }
-
-        }
-
-        /**
-         * Test allocate and update of a record for a record where
-         * {@link IRawStore#write(ByteBuffer)} was never invoked.
-         * <p>
-         * Note: Since the record was allocated but never written then it will
-         * not be found in the write cache by update().
-         */
-        public void test_allocate_plus_update() {
-            
-            final Journal store = (Journal) getStore();
-
-            try {
-
-                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
-                        .getBufferStrategy();
-
-                final int nbytes = 60;
-
-                // allocate a new record.
-                final long addr = bufferStrategy.allocate(nbytes);
-
-                assertEquals(nbytes, store.getByteCount(addr));
-                
-                // random data.
-                final byte[] a = new byte[nbytes];
-                r.nextBytes(a);
-                
-                /*
-                 * Update part of the record.
-                 * 
-                 * This updates bytes [20:40) from the array of random bytes
-                 * onto the record starting at byte 20 in the record.
-                 */
-                {
-                    
-                    final ByteBuffer b = ByteBuffer.wrap(a);
-                    
-                    b.limit(40);
-                    
-                    b.position(20);
-                    
-                    bufferStrategy.update(addr, 20, b);
-                    
-                }
-                
-                /*
-                 * Read back the record and verify the update is visible.
-                 */
-                {
-                 
-                    final ByteBuffer b = bufferStrategy.read(addr);
-                    
-                    assertNotNull(b);
-                    
-                    for(int i=20; i<40; i++) {
-                        
-                        assertEquals("data differs at offset=" + i, a[i], b
-                                .get(i));
-                        
-                    }
-                    
-                }
-                
-            } finally {
-
-                store.destroy();
-            
-            }
-
-        }
-        
-        /**
-         * Test write of a record and then update of a slice of that record.
-         * <p>
-         * Note: Since the record was written but not flushed it will be found
-         * in the write cache by update().
-         */
-        public void test_write_plus_update() {
-            
-            final Journal store = (Journal) getStore();
-
-            try {
-
-                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
-                        .getBufferStrategy();
-
-                final int nbytes = 60;
-
-                // random data.
-                byte[] a = new byte[nbytes];
-                r.nextBytes(a);
-                
-                // write a new record.
-                final long addr = bufferStrategy.write(ByteBuffer.wrap(a));
-
-                assertEquals(nbytes, store.getByteCount(addr));
-                
-                /*
-                 * Update part of the record.
-                 * 
-                 * This updates bytes [20:40) from the array of random bytes
-                 * onto the record starting at byte 20 in the record.
-                 */
-                {
-
-                    // increment the bytes in that region of the record.
-                    for(int i=20; i<40; i++) a[i]++;
-                    
-                    ByteBuffer b = ByteBuffer.wrap(a);
-                    
-                    b.limit(40);
-                    
-                    b.position(20);
-                    
-                    bufferStrategy.update(addr, 20, b);
-                    
-                }
-                
-                /*
-                 * Read back the record and verify the update is visible.
-                 */
-                {
-                 
-                    final ByteBuffer b = bufferStrategy.read(addr);
-                    
-                    assertNotNull(b);
-                    
-                    for(int i=20; i<40; i++) {
-                        
-                        assertEquals("data differs at offset=" + i, a[i], b
-                                .get(i));
-                        
-                    }
-                    
-                }
-                
-            } finally {
-
-                store.destroy();
-            
-            }
-
-        }
-        
-        /**
-         * Ttest write() + flush() + update() - for this case the data have been
-         * flushed from the write cache so the update will be a random write on
-         * the file rather than being buffered by the write cache.
-         */
-        public void test_write_flush_update() {
-            
-            final Journal store = (Journal) getStore();
-
-            try {
-
-                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
-                        .getBufferStrategy();
-
-                final int nbytes = 60;
-
-                // random data.
-                byte[] a = new byte[nbytes];
-                r.nextBytes(a);
-                
-                // write a new record.
-                final long addr = bufferStrategy.write(ByteBuffer.wrap(a));
-
-                assertEquals(nbytes, store.getByteCount(addr));
-                
-                // Note: This will flush the write cache.
-                store.commit();
-                
-                /*
-                 * Update part of the record which we just flushed from the
-                 * write cache.
-                 * 
-                 * This updates bytes [20:40) from the array of random bytes
-                 * onto the record starting at byte 20 in the record.
-                 */
-                {
-
-                    // increment the bytes in that region of the record.
-                    for(int i=20; i<40; i++) a[i]++;
-                    
-                    ByteBuffer b = ByteBuffer.wrap(a);
-                    
-                    b.limit(40);
-                    
-                    b.position(20);
-                    
-                    bufferStrategy.update(addr, 20, b);
-                    
-                }
-                
-                /*
-                 * Read back the record and verify the update is visible.
-                 */
-                {
-                 
-                    final ByteBuffer b = bufferStrategy.read(addr);
-                    
-                    assertNotNull(b);
-                    
-                    for(int i=20; i<40; i++) {
-                        
-                        assertEquals("data differs at offset=" + i, a[i], b
-                                .get(i));
-                        
-                    }
-                    
-                }
-                
-            } finally {
-
-                store.destroy();
-            
-            }
-
-        }
+//        /**
+//         * Test that allocate() pre-extends the store when a record is allocated
+//         * which would overflow the current user extent.
+//         */
+//        public void test_allocPreExtendsStore() {
+//       
+//            final Journal store = (Journal) getStore();
+//
+//            try {
+//
+//                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+//                        .getBufferStrategy();
+//
+//                final long nextOffset = store.getRootBlockView()
+//                        .getNextOffset();
+//
+//                final long length = store.size();
+//
+//                final long headerSize = FileMetadata.headerSize0;
+//
+//                // #of bytes remaining in the user extent before overflow.
+//                final long nfree = length - (headerSize + nextOffset);
+//
+//                if (nfree >= Integer.MAX_VALUE) {
+//
+//                    /*
+//                     * The test is trying to allocate a single record that will
+//                     * force the store to be extended. This will not work if the
+//                     * store file already has a huge user extent with nothing
+//                     * allocated on it.
+//                     */
+//                    
+//                    fail("Can't allocate a record with: " + nfree + " bytes");
+//
+//                }
+//
+//                final int nbytes = (int) nfree;
+//                
+//                final long addr = bufferStrategy.allocate(nbytes);
+//
+//                assertNotSame(0L, addr);
+//
+//                assertEquals(nbytes, store.getByteCount(addr));
+//                
+//                // store file was extended.
+//                assertTrue(store.size() > length);
+//                
+//            } finally {
+//
+//                store.destroy();
+//            
+//            }
+//            
+//        }
+//
+//        /**
+//         * Test allocate()+read() where the record was never written (the data
+//         * are undefined unless written so there is nothing really to test here
+//         * except for exceptions which might be through for this condition).
+//         */
+//        public void test_allocate_then_read() {
+//
+//            final Journal store = (Journal) getStore();
+//
+//            try {
+//
+//                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+//                        .getBufferStrategy();
+//
+//                final int nbytes = 100;
+//                
+//                final long addr = bufferStrategy.allocate(nbytes);
+//
+//                assertEquals(nbytes, store.getByteCount(addr));
+//                
+//                final ByteBuffer b = bufferStrategy.read(addr);
+//                
+//                // read returns a buffer that was allocated but never written.
+//                assertNotNull(b);
+//                
+//                // position in the buffer is zero.
+//                assertEquals(0,b.position());
+//                
+//                // limit of the buffer is [nbytes].
+//                assertEquals(nbytes,b.limit());
+//
+//                // capacity of the buffer is [nbytes].
+//                assertEquals(nbytes,b.capacity());
+//                
+//                /*
+//                 * Note: the actual bytes in the buffer ARE NOT DEFINED.
+//                 */
+//                
+//            } finally {
+//
+//                store.destroy();
+//            
+//            }
+//
+//        }
+//
+//        /**
+//         * Test allocate and update of a record for a record where
+//         * {@link IRawStore#write(ByteBuffer)} was never invoked.
+//         * <p>
+//         * Note: Since the record was allocated but never written then it will
+//         * not be found in the write cache by update().
+//         */
+//        public void test_allocate_plus_update() {
+//            
+//            final Journal store = (Journal) getStore();
+//
+//            try {
+//
+//                final DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+//                        .getBufferStrategy();
+//
+//                final int nbytes = 60;
+//
+//                // allocate a new record.
+//                final long addr = bufferStrategy.allocate(nbytes);
+//
+//                assertEquals(nbytes, store.getByteCount(addr));
+//                
+//                // random data.
+//                final byte[] a = new byte[nbytes];
+//                r.nextBytes(a);
+//                
+//                /*
+//                 * Update part of the record.
+//                 * 
+//                 * This updates bytes [20:40) from the array of random bytes
+//                 * onto the record starting at byte 20 in the record.
+//                 */
+//                {
+//                    
+//                    final ByteBuffer b = ByteBuffer.wrap(a);
+//                    
+//                    b.limit(40);
+//                    
+//                    b.position(20);
+//                    
+//                    bufferStrategy.update(addr, 20, b);
+//                    
+//                }
+//                
+//                /*
+//                 * Read back the record and verify the update is visible.
+//                 */
+//                {
+//                 
+//                    final ByteBuffer b = bufferStrategy.read(addr);
+//                    
+//                    assertNotNull(b);
+//                    
+//                    for(int i=20; i<40; i++) {
+//                        
+//                        assertEquals("data differs at offset=" + i, a[i], b
+//                                .get(i));
+//                        
+//                    }
+//                    
+//                }
+//                
+//            } finally {
+//
+//                store.destroy();
+//            
+//            }
+//
+//        }
+//        
+//        /**
+//         * Test write of a record and then update of a slice of that record.
+//         * <p>
+//         * Note: Since the record was written but not flushed it will be found
+//         * in the write cache by update().
+//         */
+//        public void test_write_plus_update() {
+//            
+//            final Journal store = (Journal) getStore();
+//
+//            try {
+//
+//                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+//                        .getBufferStrategy();
+//
+//                final int nbytes = 60;
+//
+//                // random data.
+//                byte[] a = new byte[nbytes];
+//                r.nextBytes(a);
+//                
+//                // write a new record.
+//                final long addr = bufferStrategy.write(ByteBuffer.wrap(a));
+//
+//                assertEquals(nbytes, store.getByteCount(addr));
+//                
+//                /*
+//                 * Update part of the record.
+//                 * 
+//                 * This updates bytes [20:40) from the array of random bytes
+//                 * onto the record starting at byte 20 in the record.
+//                 */
+//                {
+//
+//                    // increment the bytes in that region of the record.
+//                    for(int i=20; i<40; i++) a[i]++;
+//                    
+//                    ByteBuffer b = ByteBuffer.wrap(a);
+//                    
+//                    b.limit(40);
+//                    
+//                    b.position(20);
+//                    
+//                    bufferStrategy.update(addr, 20, b);
+//                    
+//                }
+//                
+//                /*
+//                 * Read back the record and verify the update is visible.
+//                 */
+//                {
+//                 
+//                    final ByteBuffer b = bufferStrategy.read(addr);
+//                    
+//                    assertNotNull(b);
+//                    
+//                    for(int i=20; i<40; i++) {
+//                        
+//                        assertEquals("data differs at offset=" + i, a[i], b
+//                                .get(i));
+//                        
+//                    }
+//                    
+//                }
+//                
+//            } finally {
+//
+//                store.destroy();
+//            
+//            }
+//
+//        }
+//        
+//        /**
+//         * Ttest write() + flush() + update() - for this case the data have been
+//         * flushed from the write cache so the update will be a random write on
+//         * the file rather than being buffered by the write cache.
+//         */
+//        public void test_write_flush_update() {
+//            
+//            final Journal store = (Journal) getStore();
+//
+//            try {
+//
+//                DiskOnlyStrategy bufferStrategy = (DiskOnlyStrategy) store
+//                        .getBufferStrategy();
+//
+//                final int nbytes = 60;
+//
+//                // random data.
+//                byte[] a = new byte[nbytes];
+//                r.nextBytes(a);
+//                
+//                // write a new record.
+//                final long addr = bufferStrategy.write(ByteBuffer.wrap(a));
+//
+//                assertEquals(nbytes, store.getByteCount(addr));
+//                
+//                // Note: This will flush the write cache.
+//                store.commit();
+//                
+//                /*
+//                 * Update part of the record which we just flushed from the
+//                 * write cache.
+//                 * 
+//                 * This updates bytes [20:40) from the array of random bytes
+//                 * onto the record starting at byte 20 in the record.
+//                 */
+//                {
+//
+//                    // increment the bytes in that region of the record.
+//                    for(int i=20; i<40; i++) a[i]++;
+//                    
+//                    ByteBuffer b = ByteBuffer.wrap(a);
+//                    
+//                    b.limit(40);
+//                    
+//                    b.position(20);
+//                    
+//                    bufferStrategy.update(addr, 20, b);
+//                    
+//                }
+//                
+//                /*
+//                 * Read back the record and verify the update is visible.
+//                 */
+//                {
+//                 
+//                    final ByteBuffer b = bufferStrategy.read(addr);
+//                    
+//                    assertNotNull(b);
+//                    
+//                    for(int i=20; i<40; i++) {
+//                        
+//                        assertEquals("data differs at offset=" + i, a[i], b
+//                                .get(i));
+//                        
+//                    }
+//                    
+//                }
+//                
+//            } finally {
+//
+//                store.destroy();
+//            
+//            }
+//
+//        }
 
     }
     

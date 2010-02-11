@@ -70,6 +70,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         super(name);
     }
 
+    private static final boolean bufferNodes = true;
+    
     public Properties getProperties() {
 
         if (properties == null) {
@@ -234,10 +236,11 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
         final long commitTime = System.currentTimeMillis();
         
-        final IndexSegmentBuilder builder2 = IndexSegmentBuilder.newInstance(outFile2,
-                tmpDir, btree.getEntryCount(), btree.rangeIterator(), m, btree
-                        .getIndexMetadata(), commitTime, true/* compactingMerge */);
-        
+        final IndexSegmentBuilder builder2 = IndexSegmentBuilder.newInstance(
+                outFile2, tmpDir, btree.getEntryCount(), btree.rangeIterator(),
+                m, btree.getIndexMetadata(), commitTime,
+                true/* compactingMerge */, bufferNodes);
+
         builder2.call();
         
 //        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
@@ -353,7 +356,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
                 IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(),
                         btree.rangeIterator(), m, metadata, commitTime,
-                        true/*compactingMerge*/).call();
+                        true/*compactingMerge*/,bufferNodes).call();
                 
 //              new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
                 
@@ -366,7 +369,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                         + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                         + "), out(m=" + m + ")");
             
-                IndexMetadata metadata = btree.getIndexMetadata().clone();
+                final IndexMetadata metadata = btree.getIndexMetadata().clone();
                 
                 /*
                  * Note: Since we know the exact #of index entries in an index
@@ -376,10 +379,11 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 metadata.setBloomFilterFactory(new BloomFilterFactory(
                         1/* n */, 1 / 64d/* p */, 1 / 32d/* maxP */));
 
-                builder2 = IndexSegmentBuilder.newInstance(outFile2, tmpDir, btree
-                        .getEntryCount(), btree.rangeIterator(), m, metadata,
-                        commitTime, true/* compactingMerge */);
-                
+                builder2 = IndexSegmentBuilder.newInstance(outFile2, tmpDir,
+                        btree.getEntryCount(), btree.rangeIterator(), m,
+                        metadata, commitTime, true/* compactingMerge */,
+                        bufferNodes);
+
                 builder2.call();
             
 //            IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,

@@ -53,6 +53,8 @@ public class TestIndexSegmentBuilderCacheInteraction extends
         super(name);
     }
 
+    final boolean bufferNodes = true;
+    
     public void setUp() throws Exception {
 
         super.setUp();
@@ -144,9 +146,10 @@ public class TestIndexSegmentBuilderCacheInteraction extends
 
         final long commitTime = System.currentTimeMillis();
 
-        final IndexSegmentBuilder builder = IndexSegmentBuilder.newInstance(outFile,
-                tmpDir, btree.getEntryCount(), btree.rangeIterator(), 3/* m */,
-                btree.getIndexMetadata(), commitTime, true/* compactingMerge */);
+        final IndexSegmentBuilder builder = IndexSegmentBuilder.newInstance(
+                outFile, tmpDir, btree.getEntryCount(), btree.rangeIterator(),
+                3/* m */, btree.getIndexMetadata(), commitTime,
+                true/* compactingMerge */, bufferNodes);
 
         final IndexSegmentCheckpoint checkpoint = builder.call();
 

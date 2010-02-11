@@ -40,6 +40,7 @@ import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Logger;
 
@@ -55,8 +56,10 @@ import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataInputBuffer;
+import com.bigdata.io.FileChannelUtility;
+import com.bigdata.io.NOPReopener;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.io.WriteCache;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Name2Addr;
 import com.bigdata.journal.TemporaryRawStore;
@@ -67,7 +70,6 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
@@ -161,7 +163,10 @@ import com.bigdata.rawstore.WormAddressManager;
  * 
  * @todo Put profiler on (B) for build stress tests. The source view should be
  *       pre-generated such that we only measure the build behavior in the
- *       profiler. See {@link TestIndexSegmentBuilderWithLargeTrees}.
+ *       profiler. See {@link TestIndexSegmentBuilderWithLargeTrees}. [We need
+ *       to first remove the synchronization for disk reads on the journal so we
+ *       have the maximum possible IO rate, and possibly materialize the leaves
+ *       of the source view in parallel using pre-fetch.]
  *       <p>
  *       Make sure that {@link #elapsed} reports the total build time, including
  *       the range count or pre-materialization costs as those are a significant
@@ -392,33 +397,74 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         
     }
 
+//    /**
+//     * The buffer used to hold leaves so that they can be evicted en mass onto a
+//     * region of the {@link #outFile}.
+//     * 
+//     * @deprecated This forces us to do IO twice for the leaves. They should be
+//     *             explicitly double-buffered in memory (the last leaf and the
+//     *             current leaf) and evicted directly onto {@link #out}. This
+//     *             will remove the requirement for the {@link IUpdateStore} API
+//     *             on the {@link TemporaryRawStore} and on the
+//     *             {@link DiskOnlyStrategy}. A r/w store version of the
+//     *             {@link TemporaryRawStore} could be deployed which supports
+//     *             update if that becomes important.
+//     */
+//    private TemporaryRawStore leafBuffer;
+
     /**
-     * The buffer used to hold leaves so that they can be evicted en mass onto a
-     * region of the {@link #outFile}.
+     * This is used to buffer the leaves written onto the output file for
+     * greater efficiency.
      * 
-     * @deprecated This forces us to do IO twice for the leaves. They should be
-     *             explicitly double-buffered in memory (the last leaf and the
-     *             current leaf) and evicted directly onto {@link #out}. This
-     *             will remove the requirement for the {@link IUpdateStore} API
-     *             on the {@link TemporaryRawStore} and on the
-     *             {@link DiskOnlyStrategy}. A r/w store version of the
-     *             {@link TemporaryRawStore} could be deployed which supports
-     *             update if that becomes important.
+     * FIXME Use a WriteCacheService which will hide this complexity and give
+     * better throughput.
      */
-    protected TemporaryRawStore leafBuffer;
+    private WriteCache.FileChannelWriteCache leafWriteCache;
+
+    /**
+     * Class combines the address at which a node is written onto the output
+     * file (relative to the start of the nodes region) with the coded data
+     * record for the node.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    private static class NodeMetadata {
+        public final long addr;
+        public final INodeData data;
+        public NodeMetadata(final long addr,final INodeData data) {
+            this.addr = addr;
+            this.data = data;
+        }
+    }
     
     /**
-     * The buffer used to hold nodes so that they can be evicted en mass onto
-     * a region of the {@link #outFile}.
+     * The buffer used to hold nodes so that they can be evicted en mass onto a
+     * region of the {@link #outFile}.  This is conditionally enabled depending
+     * on whether #bufferNodes is true.
      */
-    protected TemporaryRawStore nodeBuffer;
+    private TemporaryRawStore nodeBuffer;
+
+    /**
+     * When the nodes are to be fully buffered they are added into this list in
+     * the order in which they are generated.
+     */
+    private List<NodeMetadata> nodeList;
+    
+    /**
+     * When <code>true</code> the generated nodes will be fully buffered in RAM.
+     * Otherwise they will be buffered on the {@link #nodeBuffer} and then
+     * transferred to the output file en mass.
+     */
+    final protected boolean bufferNodes;
     
     /**
      * The optional buffer used to hold records referenced by index entries. In
      * order to use this buffer the {@link IndexMetadata} MUST specify an
      * {@link IOverflowHandler}.
      */
-    protected TemporaryRawStore blobBuffer;
+    private TemporaryRawStore blobBuffer;
     
     private final IOverflowHandler overflowHandler;
     
@@ -638,7 +684,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              * avoids a 2nd pass over the source view to read the tuples.
              */
             return newInstanceFullyBuffered(src, outFile, tmpDir, m,
-                    compactingMerge, createTime, fromKey, toKey);
+                    compactingMerge, createTime, fromKey, toKey, true/* bufferNodes */);
 
         } else {
 
@@ -647,7 +693,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              */
 
             return newInstanceTwoPass(src, outFile, tmpDir, m, compactingMerge,
-                    createTime, fromKey, toKey);
+                    createTime, fromKey, toKey, false/* bufferNodes */);
 
         }
         
@@ -664,7 +710,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     protected static IndexSegmentBuilder newInstanceTwoPass(
             final ILocalBTreeView src, final File outFile, final File tmpDir,
             final int m, final boolean compactingMerge, final long createTime,
-            final byte[] fromKey, final byte[] toKey) throws IOException {
+            final byte[] fromKey, final byte[] toKey, final boolean bufferNodes)
+            throws IOException {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -750,7 +797,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 m, // the output branching factor.
                 indexMetadata,//
                 createTime,//
-                compactingMerge//
+                compactingMerge,//
+                bufferNodes//
         );
 
     }
@@ -767,15 +815,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * exact range count. They already do for
      * {@link TestIndexSegmentBuilderWithLargeTrees} but not yet for the other
      * test suite variants.
-     * 
-     * FIXME Introduce variation that buffers the nodes in memory rather than on
-     * a temporary store. Introduce variation that buffers the leaves in memory
-     * as well
      */
     protected static IndexSegmentBuilder newInstanceFullyBuffered(
             final ILocalBTreeView src, final File outFile, final File tmpDir,
             final int m, final boolean compactingMerge, final long createTime,
-            final byte[] fromKey, final byte[] toKey) throws IOException {
+            final byte[] fromKey, final byte[] toKey, final boolean bufferNodes)
+            throws IOException {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -922,7 +967,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 m, // the output branching factor.
                 indexMetadata,//
                 createTime,//
-                compactingMerge//
+                compactingMerge,//
+                bufferNodes//
         );
 
     }
@@ -991,6 +1037,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            the specified <i>commitTime</i>. This flag is written into the
      *            {@link IndexSegmentCheckpoint} but does not otherwise effect
      *            the build process.
+     * @param bufferNodes
+     *            When <code>true</code> the generated nodes will be fully
+     *            buffered in RAM (faster, but imposes a memory constraint).
+     *            Otherwise they will be written onto a temporary file and then
+     *            transferred to the output file en mass.
      * 
      * @throws IOException
      */
@@ -1000,17 +1051,19 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             final int entryCount,//
             final ITupleIterator<?> entryIterator, //
             final int m,//
-            IndexMetadata metadata,//
+            final IndexMetadata metadata,//
             final long commitTime,//
-            final boolean compactingMerge// 
+            final boolean compactingMerge,//
+            final boolean bufferNodes//
             )
             throws IOException {
 
         return new IndexSegmentBuilder(outFile, tmpDir, entryCount,
-                entryIterator, m, metadata, commitTime, compactingMerge);
+                entryIterator, m, metadata, commitTime, compactingMerge,
+                bufferNodes);
 
     }
-    
+
     /**
      * <p>
      * Designated constructor sets up a build of an {@link IndexSegment} for
@@ -1050,8 +1103,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            (optional - the default temporary directory is used if this is
      *            <code>null</code>).
      * @param entryCount
-     *            The #of entries that will be visited by the iterator. This MUST
-     *            be an exact range count.
+     *            The #of entries that will be visited by the iterator. This
+     *            MUST be an exact range count.
      * @param entryIterator
      *            Visits the index entries in key order that will be written
      *            onto the {@link IndexSegment}.
@@ -1074,6 +1127,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      *            the specified <i>commitTime</i>. This flag is written into the
      *            {@link IndexSegmentCheckpoint} but does not otherwise effect
      *            the build process.
+     * @param bufferNodes
+     *            When <code>true</code> the generated nodes will be fully
+     *            buffered in RAM (faster, but imposes a memory constraint).
+     *            Otherwise they will be written onto a temporary file and then
+     *            transferred to the output file en mass.
      * 
      * @throws IOException
      */
@@ -1085,7 +1143,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             final int m,//
             IndexMetadata metadata,//
             final long commitTime,//
-            final boolean compactingMerge// 
+            final boolean compactingMerge,//
+            final boolean bufferNodes//
             )
             throws IOException {
 
@@ -1134,8 +1193,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         // the name of the index or the index partition.
         name = (metadata.getPartitionMetadata() == null)//
-        // local index name (if any).
-        ? metadata.getName() == null ? "N/A" : metadata.getName()
+                // local index name (if any).
+                ? metadata.getName() == null ? "N/A" : metadata.getName()
                 // index partition name
                 : metadata.getName() + "#"
                         + metadata.getPartitionMetadata().getPartitionId();
@@ -1196,6 +1255,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         this.commitTime = commitTime;
 
         this.compactingMerge = compactingMerge;
+        
+        this.bufferNodes = bufferNodes;
         
         /*
          * Override the branching factor on the index segment.
@@ -1385,19 +1446,36 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 //                
 //            }
 
-            /*
-             * Open the leaf buffer. We only do this if there is at least a
-             * single root leaf, i.e., if the output tree is not empty.
-             */
-            leafBuffer = plan.nleaves > 0 ? new TemporaryRawStore(offsetBits)
-                    : null;
+//            /*
+//             * Open the leaf buffer. We only do this if there is at least a
+//             * single root leaf, i.e., if the output tree is not empty.
+//             */
+//            leafBuffer = plan.nleaves > 0 ? new TemporaryRawStore(offsetBits)
+//                    : null;
             
+            leafWriteCache = plan.nleaves == 0 ? null
+                    : new WriteCache.FileChannelWriteCache(
+                            IndexSegmentCheckpoint.SIZE, null/* buf */,
+                            new NOPReopener(out));
+
             /*
              * Open the node buffer. We only do this if there will be at least
              * one node written, i.e., the output tree will consist of more than
              * just a root leaf.
              */
-            nodeBuffer = plan.nnodes > 0 ? new TemporaryRawStore(offsetBits) : null;
+            if (plan.nnodes == 0) {
+                // No nodes, so no buffering.
+                nodeBuffer = null;
+                nodeList = null;
+            } else if (bufferNodes) {
+                // Buffer the nodes in memory.
+                nodeBuffer = null;
+                nodeList = new LinkedList<NodeMetadata>();
+            } else {
+                // Buffer the nodes on a temporary file.
+                nodeBuffer = new TemporaryRawStore(offsetBits);
+                nodeList = null;
+            }
 
             /*
              * Open buffer for blobs iff an overflow handler was specified.
@@ -1496,12 +1574,22 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         } finally {
 
+//            /*
+//             * make sure that the temporary file gets deleted regardless.
+//             */
+//            if (leafBuffer != null && leafBuffer.isOpen()) {
+//                try {
+//                    leafBuffer.close(); // also deletes the file if any.
+//                } catch (Throwable t) {
+//                    log.warn(t,t);
+//                }
+//            }
             /*
-             * make sure that the temporary file gets deleted regardless.
+             * make sure that the leaf write cache is closed regardless.
              */
-            if (leafBuffer != null && leafBuffer.isOpen()) {
+            if (leafWriteCache != null) {
                 try {
-                    leafBuffer.close(); // also deletes the file if any.
+                    leafWriteCache.close();
                 } catch (Throwable t) {
                     log.warn(t,t);
                 }
@@ -2151,7 +2239,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     }
 
     /**
-     * Code the leaf onto the {@link #leafBuffer}, obtaining its address.
+     * Code the leaf, obtaining its address, update the prior/next addr of the
+     * previous leaf, and write that previous leaf onto the output file.
      * <p>
      * Note: For leaf addresses we know the absolute offset into the
      * {@link IndexSegmentStore} where the leaf will wind up so we encode the
@@ -2185,9 +2274,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             // code the leaf.
             final ILeafData thisLeafData = nodeSer.encodeLive(leaf);
 
-            // Allocate a record for the leaf on the temporary store.
+            // Obtain address to be assigned to this leaf.
+//            // Allocate a record for the leaf on the temporary store.
 //            final long addr1 = leafBuffer.allocate(buf.remaining());
-            final long addr1 = leafBuffer.allocate(thisLeafData.data().len());
+//            final long addr1 = leafBuffer.allocate(thisLeafData.data().len());
+            final long addr1 = allocateLeafAddr(thisLeafData.data().len());
             
             // encode the address assigned to the serialized leaf.
             addr = encodeLeafAddr(addr1);
@@ -2232,7 +2323,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 assert lastLeafData.getNextAddr() == addr;
 
                 // write the previous leaf onto the store.
-                leafBuffer.update(bufLastLeafAddr, 0/*offset*/, bufLastLeaf);
+//                leafBuffer.update(bufLastLeafAddr, 0/*offset*/, bufLastLeaf);
+                writeLeafForReal(bufLastLeafAddr, bufLastLeaf);
                 
                 // the encoded address of the leaf that we just wrote out.
                 addrPriorLeaf = encodeLeafAddr(bufLastLeafAddr);
@@ -2314,8 +2406,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             assert lastLeafData.getNextAddr() == 0L;
 
             // write the last leaf onto the store.
-            leafBuffer.update(bufLastLeafAddr, 0/*offset*/, bufLastLeaf);
-
+//            leafBuffer.update(bufLastLeafAddr, 0/*offset*/, bufLastLeaf);
+            writeLeafForReal(bufLastLeafAddr, bufLastLeaf);
+            
             if (storeCache != null) {
 
                 /*
@@ -2324,14 +2417,104 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                  */
 
                 storeCache.putIfAbsent(addrLastLeaf, lastLeafData);
-                
+
             }
-            
+
         }
 
         return addr;
         
     }
+    
+    private long allocateLeafAddr(final int nbytes) {
+        
+//        final long addr1 = leafBuffer.allocate(nbytes);
+        
+        final long offset = leafAddrFactory.get();
+        
+        leafAddrFactory.addAndGet(nbytes);
+
+        final long addr1 = addressManager.toAddr((int) nbytes, offset);
+
+        return addr1;
+        
+    }
+
+    /**
+     * The address factory for the leaves. Note that addresses are relative to
+     * the start of the leaf region, not the start of the output file.
+     */
+    private final AtomicLong leafAddrFactory = new AtomicLong(0L);
+//            IndexSegmentCheckpoint.SIZE);
+
+    private void writeLeafForReal(final long addr, final ByteBuffer data) {
+     
+        //leafBuffer.update(addr, 0/*offset*/, data);
+        
+        final long offset = addressManager.getOffset(addr);
+
+        try {
+
+            // write leaf on the cache.
+            if(!leafWriteCache.write(offset, data)) {
+                
+                // leaf does not fit in the cache, so evict cache to the file.
+                leafWriteCache.flush(false/*force*/);
+                
+                // write leaf on the cache.
+                if(!leafWriteCache.write(offset, data)) {
+
+                    /*
+                     * The leaf is larger than the write cache, so we will write
+                     * it directly onto the output file.
+                     * 
+                     * @todo This is tested by the larger random builds, but we
+                     * really should have an explicit test for this case.
+                     */
+
+                    // Write the record onto the file at that offset.
+                    FileChannelUtility.writeAll(leafWriteCache.opener, data,
+                            offset);
+
+                }
+                
+            }
+            
+        } catch (Throwable e) {
+            
+            throw new RuntimeException(e);
+            
+        }
+        
+    }
+
+    /**
+     * "Allocates" a node address when we will buffer the nodes in RAM.
+     * 
+     * @throws UnsupportedOperationException
+     *             if we are not buffering nodes in RAM.
+     */
+    private long allocateNodeAddr(final int nbytes) {
+
+        if (!bufferNodes)
+            throw new UnsupportedOperationException();
+
+        final long offset = nodeAddrFactory.get();
+
+        nodeAddrFactory.addAndGet(nbytes);
+
+        final long addr1 = addressManager.toAddr((int) nbytes, offset);
+
+        return addr1;
+
+    }
+
+    /**
+     * The address factory for the nodes used when we will buffer the nodes in
+     * RAM. Note that addresses are relative to the start of the node region,
+     * not the start of the output file.
+     */
+    private final AtomicLong nodeAddrFactory = new AtomicLong(0L);
 
     /**
      * Encode the address of a leaf.
@@ -2339,7 +2522,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * Note: This updates {@link #maxNodeOrLeafLength} as a side-effect.
      * 
      * @param addr1
-     *            The address of a leaf as allocated by the {@link #leafBuffer}
+     *            The address of a leaf as allocated by
+     *            {@link #allocateLeafAddr(int)}
      * 
      * @return The encoded address of the leaf relative to the
      *         {@link IndexSegmentRegion#BASE} region where it will appear once
@@ -2378,27 +2562,20 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      */
 
     /**
-     * The address of the previous leaf written on the {@link #leafBuffer}, but
-     * encoded for the generated {@link IndexSegmentStore}.
+     * The address of the previous leaf, but encoded for the generated
+     * {@link IndexSegmentStore}.
      */
     private long addrPriorLeaf = 0L;
-    
+
     /**
-     * The address of the last leaf allocated (but not yet written) on the
-     * {@link #leafBuffer} (the {@link TemporaryRawStore} on which the leaves
-     * are buffered).
+     * The address of the last leaf allocated (but not yet written out).
      * <p>
-     * Note: This address is NOT encoded for the {@link IndexSegmentStore}. It
-     * is used to specify which record we want to update the record on the
-     * {@link #leafBuffer} using
-     * {@link TemporaryRawStore#update(long, int, ByteBuffer)}.
-     * <p>
-     * Note: This is used to patch the representation of the last serialized
-     * leaf in {@link #bufLastLeaf} with the address of the next leaf in key
-     * order.
+     * Note: This address is NOT encoded for the {@link IndexSegmentStore}.
+     * Instead, it is encoded for the output file using the
+     * {@link #addressManager} and is relative to the start of leaves region in
+     * the output file.
      * 
      * @see #writeLeaf(SimpleLeafData)
-     * @see #writePriorLeaf(long nextLeafAddr)
      */
     private long bufLastLeafAddr = 0L;
     
@@ -2440,16 +2617,28 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
         final INodeData codedNodeData = nodeSer.encodeLive(node);
 //        final ByteBuffer buf = nodeSer.encode(node).asByteBuffer();
 
-        // write the node on the buffer (a temporary store).
-//        final long tempAddr = nodeBuffer.write(buf);
-        final long tempAddr = nodeBuffer.write(codedNodeData.data().asByteBuffer());
+        final long tempAddr;
+        if (nodeBuffer != null) {
+
+            // write the node on the buffer (a temporary store).
+            tempAddr = nodeBuffer.write(codedNodeData.data().asByteBuffer());
+            
+        } else {
+
+            // allocate address relative to the start of the nodes region.
+            tempAddr = allocateNodeAddr(codedNodeData.data().len());
+
+            // buffer the node (it will be written out later).
+            nodeList.add(new NodeMetadata(tempAddr, codedNodeData));
+
+        }
 
         final long offset = addressManager.getOffset(tempAddr);
-        
+
         final int nbytes = addressManager.getByteCount(tempAddr);
-        
-        if( nbytes > maxNodeOrLeafLength ) { 
-         
+
+        if (nbytes > maxNodeOrLeafLength) {
+
             // track the largest node or leaf written.
             maxNodeOrLeafLength = nbytes;
             
@@ -2526,10 +2715,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * @param commitTime
      * 
      * @throws IOException
+     * @throws InterruptedException 
      */
     protected IndexSegmentCheckpoint writeIndexSegment(
             final FileChannel outChannel, final long commitTime)
-            throws IOException {
+            throws IOException, InterruptedException {
 
         /*
          * All nodes and leaves have been written. If we wrote any nodes
@@ -2561,7 +2751,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          * buffer was backed by a file then that file will be deleted as a
          * post-condition on the index build operation.
          */
-        if (leafBuffer == null) {
+        if (plan.nleaves == 0) {
 
             /*
              * The tree is empty (no root leaf).
@@ -2585,29 +2775,44 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             // output the leaf buffer.
             {
 
-                /*
-                 * Transfer the leaf buffer en mass onto the output channel.
-                 * 
-                 * Note: If a planned leaf is not emitted then this can cause an
-                 * exception to be thrown indicating that the IO transfer is not
-                 * progressing. This occurs when the record for that leaf was
-                 * allocated on the leafBuffer but never written onto the
-                 * leafBuffer. This allocate-then-write policy allows us to
-                 * double-link the leaves during the build. The build SHOULD
-                 * automatically correct for cases when there are not enough
-                 * tuples to fill out the leaves in the plan. However, if it
-                 * does not correct the problem, and hence does not write the
-                 * last allocated leaf data record, then you might see this
-                 * exception.
-                 */
-                extentLeaves = leafBuffer.getBufferStrategy().transferTo(out);
+//                /*
+//                 * Transfer the leaf buffer en mass onto the output channel.
+//                 * 
+//                 * Note: If a planned leaf is not emitted then this can cause an
+//                 * exception to be thrown indicating that the IO transfer is not
+//                 * progressing. This occurs when the record for that leaf was
+//                 * allocated on the leafBuffer but never written onto the
+//                 * leafBuffer. This allocate-then-write policy allows us to
+//                 * double-link the leaves during the build. The build SHOULD
+//                 * automatically correct for cases when there are not enough
+//                 * tuples to fill out the leaves in the plan. However, if it
+//                 * does not correct the problem, and hence does not write the
+//                 * last allocated leaf data record, then you might see this
+//                 * exception.
+//                 */
+//                extentLeaves = leafBuffer.getBufferStrategy().transferTo(out);
 
-                if (nodeBuffer != null) {
+//                if (nodeBuffer != null) {
+//
+//                    // The offset to the start of the node region.
+//                    offsetNodes = IndexSegmentCheckpoint.SIZE + extentLeaves;
+//
+//                    assert outChannel.position() == offsetNodes;
+//
+//                } else {
+//
+//                    // zero iff there are no nodes.
+//                    offsetNodes = 0L;
+//
+//                }
+
+                // The extent of the leaves region on the file.
+                extentLeaves = leafAddrFactory.get();
+
+                if (plan.nnodes != 0) {
 
                     // The offset to the start of the node region.
                     offsetNodes = IndexSegmentCheckpoint.SIZE + extentLeaves;
-
-                    assert outChannel.position() == offsetNodes;
 
                 } else {
 
@@ -2617,7 +2822,15 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 }
 
                 // Close the buffer.
-                leafBuffer.close();
+//                leafBuffer.close();
+                try {
+                    // flush the last writes.
+                    leafWriteCache.flush(false/* force */);
+                    // close cache (discards buffer).
+                    leafWriteCache.close();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
 
             }
 
@@ -2628,11 +2841,93 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
              */
             if (nodeBuffer != null) {
 
+                /*
+                 * Seek to the start of the nodes region (the write cache does
+                 * not change the file position when it writes onto the file so
+                 * we need to explicitly seek to the desired location).
+                 */
+                outChannel.position(offsetNodes);
+              
+                // Verify we are at the start of the nodes region.
+                assert outChannel.position() == offsetNodes : "position="
+                        + outChannel.position() + ", but offsetNodes="
+                        + offsetNodes;
+                
                 // transfer the nodes en mass onto the output channel.
                 extentNodes = nodeBuffer.getBufferStrategy().transferTo(out);
 
                 // Close the buffer.
                 nodeBuffer.close();
+
+                // Note: already encoded relative to NODE region.
+                addrRoot = (((SimpleNodeData) stack[0]).addr);
+
+            } else if (nodeList != null) {
+
+                /*
+                 * Write the nodes onto the output file.
+                 * 
+                 * FIXME Use a WriteCacheService which will hide this complexity
+                 * and give better throughput.
+                 */
+                
+                // Setup a write cache.
+                final WriteCache.FileChannelWriteCache writeCache = new WriteCache.FileChannelWriteCache(
+                        offsetNodes, null/* buf */, new NOPReopener(out));
+
+                try {
+
+                    // Count the #of bytes in the nodes.
+                    int nbytes = 0;
+
+                    // For each node.
+                    for (NodeMetadata md : nodeList) {
+
+                        final long addr = md.addr;
+                        
+                        // the adjusted offset to the node in the file.
+                        final long offset = offsetNodes
+                                + addressManager.getOffset(addr);
+                        
+                        final AbstractFixedByteArrayBuffer slice = md.data
+                                .data();
+                        
+                        // track #of bytes across all nodes.
+                        nbytes += slice.len();
+                        
+                        final ByteBuffer data = slice.asByteBuffer();
+
+                        // write onto cache.
+                        if (!writeCache.write(offset, data)) {
+
+                            // cache is full, evict to file.
+                            writeCache.flush(false/* force */);
+                            
+                            // and write on the cache again.
+                            if (!writeCache.write(offset, data)) {
+
+                                // directly write onto the output file.
+                                FileChannelUtility.writeAll(writeCache.opener, data,
+                                        offset);
+                                
+                            }
+
+                        }
+
+                    }
+
+                    // force the last writes to the output file.
+                    writeCache.flush(false/* force */);
+
+                    // #of bytes across all nodes.
+                    extentNodes = nbytes;
+
+                } finally {
+
+                    // releases the buffer.
+                    writeCache.close();
+
+                }
 
                 // Note: already encoded relative to NODE region.
                 addrRoot = (((SimpleNodeData) stack[0]).addr);
@@ -3515,6 +3810,30 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
     }
 
     /**
+     * Prints the usage and then exits.
+     * 
+     * @param args
+     *            The command line args.
+     */
+    protected static void usage(final String[] args, final String msg, final int exitCode) {
+        
+        if (msg != null)
+            System.err.println(msg);
+        System.err.println("usage: [opts] journal [name]*");
+        System.err.println("    journal is the name of the journal file.");
+        System.err.println("    [name]* is the name of one or more indices (defaults to all).");
+        System.err.println("    [opts] is any of:");
+        System.err.println("       -m #\tThe branching factor for the output index segments.");
+        System.err.println("       -alg (FullyBuffered|TwoPass)\tThe algorithm to use.");
+        System.err.println("       -merge (true|false)\tWhen true, performs a compacting merge (default is merge).");
+        System.err.println("       -O outDir\tThe output directory.");
+        System.err.println("       -bufferNodes (true|false)\tWhen true, the nodes are fully buffered in memory (default true).");
+
+        System.exit(exitCode);
+        
+    }
+    
+    /**
      * Driver for index segment build against a named index on a local journal.
      * 
      * @param args
@@ -3576,6 +3895,12 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
          */
         boolean compactingMerge = true;
 
+        /*
+         * When true, the generats nodes will be fully buffered in memory rather
+         * than being written onto a temporary file.
+         */
+        boolean bufferNodes = true;
+        
         // Which build algorithm to use.
         BuildEnum buildEnum = BuildEnum.FullyBuffered;
         
@@ -3619,10 +3944,18 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
                     compactingMerge = false;
 
+                } else if (arg.equals("-bufferNodes")) {
+                    
+                    bufferNodes = Boolean.valueOf(args[++i]);
+                    
                 } else if (arg.equals("-alg")) {
 
                     buildEnum = BuildEnum.valueOf(args[++i]);
 
+                } else if (arg.equals("-help")||arg.equals("--?")) {
+
+                    usage(args, null/* msg */, 1/* exitCode */);
+                    
                 } else {
 
                     throw new UnsupportedOperationException("Unknown option: "
@@ -3632,7 +3965,13 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             } // next arg.
 
-            // The next argument is the journal file name.
+            // The next argument is the journal file name, which is required.
+            if (i == args.length) {
+
+                usage(args, "journal name is required.", 1/* exitCode */);
+                
+            }
+
             journalFile = new File(args[i++]);
 
             if (!journalFile.exists()) {
@@ -3645,18 +3984,6 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             while (i < args.length) {
 
                 names.add(args[i++]);
-
-            }
-
-            if (verify) {
-
-                /*
-                 * @todo Support optional verify. The necessary logic is in
-                 * the unit test suite.
-                 */
-                
-                throw new UnsupportedOperationException(
-                        "Verify is not supported yet.");
 
             }
 
@@ -3712,22 +4039,23 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     names.add(itr.next().getObject().name);
 
                 }
-                
+
             } else {
 
-                assert names.size() == 1;
-                
-                final String name = names.get(0);
+                // Verify named indices exist.
+                for (String name : names) {
 
-                if (journal.getIndex(name) == null) {
+                    if (journal.getIndex(name) == null) {
 
-                    throw new RuntimeException("Index not found: " + name);
+                        throw new RuntimeException("Index not found: " + name);
+
+                    }
 
                 }
 
             }
 
-            System.err.println("Will process " + names.size() + " indices.");
+            System.out.println("Will process " + names.size() + " indices.");
             
             final long beginAll = System.currentTimeMillis();
 
@@ -3757,17 +4085,21 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 case TwoPass:
                     builder = IndexSegmentBuilder.newInstanceTwoPass(btree,
                             outFile, tmpDir, m, compactingMerge, commitTime,
-                            null/* fromKey */, null/* toKey */);
+                            null/* fromKey */, null/* toKey */,
+                            bufferNodes);
                     break;
                 case FullyBuffered:
                     builder = IndexSegmentBuilder.newInstanceFullyBuffered(
                             btree, outFile, tmpDir, m, compactingMerge,
-                            commitTime, null/* fromKey */, null/* toKey */);
+                            commitTime, null/* fromKey */, null/* toKey */,
+                            bufferNodes);
                     break;
                 default:
                     throw new AssertionError(buildEnum.toString());
                 }
-                builder.call();
+
+                // Do the build.
+                final IndexSegmentCheckpoint checkpoint = builder.call();
 
                 // The total elapsed build time, including range count or
                 // pre-materialization of tuples.
@@ -3782,6 +4114,39 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
                 System.out.println(results);
 
+                if(verify) {
+
+                    /*
+                     * Verify the generated index segment against the source
+                     * B+Tree.
+                     */
+
+                    final IndexSegmentStore segStore = new IndexSegmentStore(
+                            outFile);
+
+                    try {
+
+                        final IndexSegment seg = segStore.loadIndexSegment();
+
+                        try {
+
+                            assertSameEntryIterator(name, btree.rangeIterator(),
+                                seg.rangeIterator());
+                            
+                        } finally {
+                            
+                            seg.close();
+                            
+                        }
+
+                    } finally {
+
+                        segStore.close();
+                        
+                    }
+
+                }
+                
             } // next source B+Tree.
             
             final long elapsedAll = System.currentTimeMillis() - beginAll;
@@ -3794,6 +4159,58 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             journal.close();
 
         }
+
+    }
+
+    /**
+     * Verifies that the iterators visit tuples having the same data in the same
+     * order.
+     * 
+     * @param expectedItr
+     * @param actualItr
+     */
+    private static void assertSameEntryIterator(
+            final String name,
+            final ITupleIterator<?> expectedItr,
+            final ITupleIterator<?> actualItr) {
+
+        long nvisited = 0L;
+
+        while (expectedItr.hasNext()) {
+
+            if (!actualItr.hasNext())
+                throw new RuntimeException(name
+                        + ":: Expecting another index entry: nvisited="
+                        + nvisited);
+
+            final ITuple<?> expectedTuple = expectedItr.next();
+
+            final ITuple<?> actualTuple = actualItr.next();
+
+            nvisited++;
+
+            if (!BytesUtil.bytesEqual(expectedTuple.getKey(), actualTuple
+                    .getKey())) {
+
+                throw new RuntimeException(name + ":: Wrong key: nvisited="
+                        + nvisited + ", expected=" + expectedTuple
+                        + ", actual=" + actualTuple);
+
+            }
+
+            if (!BytesUtil.bytesEqual(expectedTuple.getValue(), actualTuple
+                    .getValue())) {
+
+                throw new RuntimeException(name + ":: Wrong value: nvisited="
+                        + nvisited + ", expected=" + expectedTuple
+                        + ", actual=" + actualTuple);
+
+            }
+
+        }
+
+        if (actualItr.hasNext())
+            throw new RuntimeException(name + ":: Not expecting more tuples");
 
     }
 

@@ -35,6 +35,7 @@ import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -368,6 +369,8 @@ public class FileChannelUtility {
     static public int writeAll(final IReopenChannel<FileChannel> opener,
             final ByteBuffer data, final long pos) throws IOException {
 
+        final long begin = System.nanoTime();
+
         final int nbytes = data.remaining();
         
         int count = 0;
@@ -461,6 +464,15 @@ public class FileChannelUtility {
 
             throw new RuntimeException("Expecting to write " + nbytes
                     + " bytes, but wrote " + count + " bytes in " + nwrites);
+
+        }
+
+        final long elapsed = System.nanoTime() - begin;
+
+        if (log.isInfoEnabled()) {
+
+            log.info("wrote on disk: bytes=" + nbytes + ", elapsed="
+                    + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
 
         }
 

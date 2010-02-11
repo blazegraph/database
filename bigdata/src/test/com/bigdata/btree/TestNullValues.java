@@ -63,6 +63,8 @@ public class TestNullValues extends AbstractBTreeTestCase {
         super(name);
     }
 
+    private static final boolean bufferNodes = true;
+    
     /**
      * Tests the ability to store a <code>null</code> in a tuple of a
      * {@link BTree}, to reload the {@link BTree} and find the <code>null</code>
@@ -115,9 +117,10 @@ public class TestNullValues extends AbstractBTreeTestCase {
 
             final long commitTime = System.currentTimeMillis();
             
-            IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
-                    .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                    true/*compactingMerge*/).call();
+            IndexSegmentBuilder.newInstance(outFile, tmpDir,
+                    btree.getEntryCount(), btree.rangeIterator(), 3/* m */,
+                    btree.getIndexMetadata(), commitTime,
+                    true/* compactingMerge */, bufferNodes).call();
 
             /*
              * Verify can load the index file and that the metadata associated

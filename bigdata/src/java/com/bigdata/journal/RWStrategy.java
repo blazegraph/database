@@ -36,11 +36,9 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.CounterSet;
-import com.bigdata.io.FileChannelUtility;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawStore;
 import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumUtility;
 
@@ -209,9 +207,9 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		}		
 	}
 
-	public long allocate(int nbytes) {
-		return encodeAddr(m_store.alloc(nbytes), nbytes);
-	}
+//	public long allocate(int nbytes) {
+//		return encodeAddr(m_store.alloc(nbytes), nbytes);
+//	}
 
 	private long encodeAddr(long alloc, int nbytes) {
 		alloc <<= 32;
