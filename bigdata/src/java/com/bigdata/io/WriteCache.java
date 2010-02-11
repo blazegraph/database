@@ -29,7 +29,6 @@ package com.bigdata.io;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.Map;
@@ -46,7 +45,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -69,46 +67,32 @@ import com.bigdata.util.concurrent.Latch;
  * larger than the write cache.</li>
  * </ol>
  * The caller is responsible for managing which buffers are being written on and
- * read on, when they are flushed, and when they are reset.
+ * read on, when they are flushed, and when they are reset. It is perfectly
+ * reasonable to have more than one {@link WriteCache} and to read through on
+ * any {@link WriteCache} until it has been recycled. A {@link WriteCache} must
+ * be reset before it is put into play again for new writes.
+ * <p>
+ * Note: For an append-only model (WORM), the caller MUST serialize writes onto
+ * the {@link IRawStore} and the {@link WriteCache}. This is required in order
+ * to ensure that the records are laid out in a dense linear fashion on the
+ * {@link WriteCache} and permits the backing buffer to be transferred in a
+ * single IO to the backing file.
+ * <p>
+ * Note: For a {@link RWStore}, the caller must take more responsibility for
+ * managing the {@link WriteCache}(s) which are in play and scheduling their
+ * eviction onto the backing store. The caller can track the space remaining in
+ * each {@link WriteCache} and decide when to flush a {@link WriteCache} based
+ * on that information.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-abstract public class WriteCache<C extends Channel> {
+abstract public class WriteCache implements IWriteCache {
 
     protected static final Logger log = Logger.getLogger(WriteCache.class);
 
     /**
-     * The buffer used to absorb writes that are destined for the disk. Writes
-     * are simply appended into this buffer until it would overflow. On
-     * overflow, {@link #flushWriteCache()} is invoked to flush the data to the
-     * disk (without synchronizing the disk). If a record is too large to fit
-     * into this buffer, then the write cache is flushed and the record is
-     * written directly on the disk.
-     * <p>
-     * Note: We must clone the data since the
-     * {@link IRawStore#write(ByteBuffer)} contract says that the caller can
-     * reuse the buffer once we return. In order minimize heap churn we simply
-     * copy the data into {@link #buf}, a {@link ByteBuffer} that
-     * buffers recently written records. Writes are deferred until the buffer is
-     * would overflow and then all buffered are written at once onto the disk.
-     * <p>
-     * In order to ensure consistency we read through the {@link #buf} in
-     * {@link #read(long)}. Otherwise a {@link #write(ByteBuffer)} could return
-     * and a subsequent read on the record while it is in the
-     * {@link #buf} would "miss" causing us to read through to the disk
-     * (which would not have the correct data).
-     * <p>
-     * Note: The write cache design assumes an "append only" store. In
-     * particular, it assumes that the application data records are written in
-     * are purely sequential manner on the end of the file (the root blocks are
-     * outside of the application data). Either the write cache must be disabled
-     * or a different design must be used if you are using a store where records
-     * may be deleted and recycled.
-     * <p>
-     * The write cache offers a 27% performance gain when compared to the same
-     * condition without the write cache as measured by
-     * {@link AbstractMRMWTestCase}.
+     * The buffer used to absorb writes that are destined for some channel.
      */
     final private AtomicReference<ByteBuffer> buf;
 
@@ -710,7 +694,7 @@ abstract public class WriteCache<C extends Channel> {
      * @throws InterruptedException
      */
     public void flush(final boolean force) throws IOException,
-            InterruptedException, AssertionError {
+            InterruptedException {
 
         try {
             
@@ -987,26 +971,11 @@ abstract public class WriteCache<C extends Channel> {
      * as the {@link DiskOnlyStrategy} or the output file of the
      * {@link IndexSegmentBuilder}.
      * 
-     * FIXME Write unit tests.
-     * <p>
-     * Put it to use in the {@link IndexSegmentBuilder}.
-     * <p>
-     * Then backport this to the {@link DiskOnlyStrategy} (this will require
-     * working out an agreement for writing large records directly rather than
-     * buffering them, which could be done using a constructor variant to wrap
-     * the record and make the caller block).
-     * <p>
-     * Next, work out the {@link WriteCacheService} and backport that to the
-     * {@link DiskOnlyStrategy}.
-     * <p>
-     * Finally, work out a replication and resynchronization service with error
-     * handling for bad reads.
-     * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
      */
-    public static class FileChannelWriteCache extends WriteCache<FileChannel> {
+    public static class FileChannelWriteCache extends WriteCache {
 
         /**
          * An offset which will be applied to each record written onto the

@@ -31,6 +31,8 @@ package com.bigdata.rawstore;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.io.IWriteCache;
+import com.bigdata.rwstore.PSOutputStream;
 
 /**
  * This interface adds methods for allocating a record without writing any data
@@ -52,6 +54,13 @@ import com.bigdata.btree.IndexSegmentBuilder;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @deprecated I believe that we can safely get rid of this interface and its
+ *             functionality. The {@link IndexSegmentBuilder} will just buffer
+ *             the prior and current records itself and then write them onto an
+ *             {@link IWriteCache}. The blob stuff can be handled better by
+ *             writing into a file system (large blobs) or chaining together
+ *             blocks (small blobs ala the {@link PSOutputStream}).
  */
 public interface IUpdateStore extends IRawStore {
 

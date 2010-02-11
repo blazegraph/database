@@ -63,12 +63,17 @@ abstract public class AbstractRawStore implements IRawStore {
 
     }
 
+    /**
+     * The default implementation delegates to {@link #write(ByteBuffer)}.
+     */
     public long write(ByteBuffer data, long oldAddr) {
     	return write(data);
     }
 
+    /**
+     * The default implementation is a NOP.
+     */
 	public void delete(long addr) {
-		// TODO Auto-generated method stub
-		
+	    // NOP.
 	}
 }
