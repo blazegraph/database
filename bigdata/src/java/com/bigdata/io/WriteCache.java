@@ -657,7 +657,10 @@ abstract public class WriteCache implements IWriteCache {
 //	}
 
 	/**
-	 * Flush the writes to the backing channel.
+     * Flush the writes to the backing channel but DOES NOT sync the channel and
+     * DOES NOT {@link #reset()} the {@link WriteCache}. {@link #reset()} is a
+     * separate operation because a common use is to retain recently flushed
+     * instances for read-back.
 	 * 
 	 * @param force
 	 *            When <code>true</code>, the data will be forced to stable
@@ -684,17 +687,20 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * Flush the writes to the backing channel (does not sync the channel).
-	 * 
-	 * @param force
-	 *            When <code>true</code>, the data will be forced to stable
-	 *            media.
-	 * 
-	 * @throws IOException
-	 * @throws TimeoutException
-	 * @throws InterruptedException
-	 */
+    /**
+     * Flush the writes to the backing channel but DOES NOT sync the channel and
+     * DOES NOT {@link #reset()} the {@link WriteCache}. {@link #reset()} is a
+     * separate operation because a common use is to retain recently flushed
+     * instances for read-back.
+     * 
+     * @param force
+     *            When <code>true</code>, the data will be forced to stable
+     *            media.
+     * 
+     * @throws IOException
+     * @throws TimeoutException
+     * @throws InterruptedException
+     */
 	public boolean flush(final boolean force, final long timeout, final TimeUnit unit) throws IOException,
 			TimeoutException, InterruptedException {
 

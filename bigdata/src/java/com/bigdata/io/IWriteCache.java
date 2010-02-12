@@ -42,7 +42,7 @@ import java.util.concurrent.TimeoutException;
 public interface IWriteCache {
 
     /**
-     * Write the record on the cache. This interface DOES NOT provide any
+     * Write the records on the cache. This interface DOES NOT provide any
      * guarantee about the ordering of writes. Callers who require a specific
      * ordering must coordinate that ordering themselves, e.g., by synchronizing
      * across their writes onto the cache.
