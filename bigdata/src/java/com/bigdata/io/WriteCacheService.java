@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.util.Collections;
@@ -47,13 +46,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.io.WriteCache.RecordMetadata;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
@@ -73,10 +72,6 @@ import com.bigdata.util.concurrent.Latch;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @todo Write {@link #flush(boolean, long, TimeUnit)} and add some basic unit
- *       tests. Integrate into the {@link IndexSegmentBuilder} for improved IO
- *       (it uses a WORM model for both the nodes and the leaves)?
  * 
  * @todo Build out write cache service for WORM (serialize writes on the cache
  *       but the caller does not wait for the IO and readers are non-blocking).
@@ -159,7 +154,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * A list of dirty buffers. Writes from these may be combined, but not
      * across {@link #flush(boolean)}.
      */
-    final BlockingQueue<WriteCache> dirtyList;
+    final private BlockingQueue<WriteCache> dirtyList;
 
     /**
      * A list of clean buffers. By clean, we mean not needing to be written.
@@ -167,12 +162,12 @@ abstract public class WriteCacheService implements IWriteCache {
      * {@link #cleanList}. When the {@link #current} write cache buffer needs to
      * be replaced, one of the buffers from the {@link #cleanList} is recycled.
      */
-    final BlockingQueue<WriteCache> cleanList;
+    final private BlockingQueue<WriteCache> cleanList;
 
     /**
      * The current buffer.
      */
-    final AtomicReference<WriteCache> current = new AtomicReference<WriteCache>();
+    final private AtomicReference<WriteCache> current = new AtomicReference<WriteCache>();
 
     /**
      * The capacity of the cache buffers. This is assumed to be the same for
@@ -180,7 +175,10 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     final private int capacity;
 
-    private final IReopenChannel<? extends Channel> opener;
+    /**
+     * Object knows how to (re-)open the backing channel.
+     */
+    final private IReopenChannel<? extends Channel> opener;
 
     /**
      * A map from the offset of the record on the backing file to the cache
@@ -254,12 +252,28 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 try {
 
-                    final WriteCache cache = dirtyList.take();
+                    lock.readLock().lock();
 
-                    cache.flush(false/* force */);
+                    try {
 
-                    cleanList.add(cache);
+                        final WriteCache cache = dirtyList.take();
 
+                        cache.flush(false/* force */);
+
+                        cleanList.add(cache);
+                        
+                        if(dirtyList.isEmpty()) {
+                            
+                            dirtyListEmpty.signalAll();
+                            
+                        }
+                            
+                    } finally {
+
+                        lock.readLock().unlock();
+                        
+                    }
+                    
                 } catch (Throwable t) {
 
                     log.error(t, t);
@@ -361,6 +375,13 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
+    /**
+     * Condition signaled by the {@link WriteTask} when the {@link #dirtyList}
+     * becomes empty (but not until the last buffer drained from that list has
+     * been written through to the backing channel).
+     */
+    final private Condition dirtyListEmpty = lock.readLock().newCondition();
+    
     /**
      * @throws IllegalStateException
      *             if the service is closed.
@@ -473,40 +494,35 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @throws InterruptedException
      * 
-     * @todo This needs to create a definition of the write set by moving the
-     *       {@link #current} buffer to the {@link #dirtyList} and then waiting
-     *       until the set of buffers on the dirty list as of that moment have
-     *       been written to the backing channel. This will involve coordination
-     *       with {@link #writeOnChannel(WriteCache, ByteBuffer, Map, long)} and
-     *       the use of the write lock.
-     *       <p>
-     *       If a buffer is available on the {@link #cleanList} then it should
-     *       be taken and set on {@link #current}. Otherwise, the first buffer
-     *       to get written out by
-     *       {@link #writeOnChannel(WriteCache, ByteBuffer, Map, long)} must be
-     *       set on {@link #current}. The write lock must be held until
-     *       {@link #current} is non-null. It can be released after that so
-     *       threads waiting on {@link #acquire()} to read/write/update can
-     *       proceed.
-     *       <p>
-     *       Speaking of update, update can not be permitted for a buffer which
-     *       is being flush()ed. write() always writes on the {@link #current}
-     *       buffer, but {@link #update(long, int, ByteBuffer)} can write on a
-     *       dirty buffer UNLESS it is actively being written out. Thus we need
-     *       one more collection of buffers not available for update but which
-     *       are still dirty.
-     *       <p>
-     *       When an update comes through for a record on a buffer which can not
-     *       be updated in place, then we should copy the old record from the
-     *       buffer where it exists into the {@link #current} buffer and update
-     *       it there. This will save us a disk read.
-     *       <p>
-     *       Even better, {@link #update(long, int, ByteBuffer)} could be
-     *       completely unnecessary, even for the {@link RWStore}. It was
-     *       developed to support double-linked leaves in the
-     *       {@link IndexSegmentBuilder} and we are doing that differently. For
-     *       the {@link RWStore}, we actually write a new record and schedule
-     *       the old one for delete.
+     * @see #dirtyListEmpty
+     * 
+     *      FIXME This needs to create a definition of the write set by
+     *      acquiring the write lock, moving the {@link #current} buffer to the
+     *      {@link #dirtyList} and then waiting until the set of buffers on the
+     *      dirty list as of that moment have been written to the backing
+     *      channel. This will involve coordination with {@link WriteTask},
+     *      which needs to notify us when buffers are written up. So the write
+     *      task needs to acquire the read lock and we need a {@link Condition}
+     *      for waking up here and checking if our write set has become empty.
+     *      <p>
+     *      IF we guarantee that the buffers are written out in order THEN we
+     *      have satisfy this with a counter. We just note the current counter
+     *      value while holding a lock and wait until the counter is incremented
+     *      by the #of write blocks on the dirty list.
+     *      <p>
+     *      A somewhat safer alternative is to refuse to accept new buffers on
+     *      the dirty list until the flush has been satisfied. This way, we just
+     *      wait until the dirty list is empty, which is a simple
+     *      {@link Condition}. The only drawback is that the cache will stop
+     *      buffering writes as soon as the current buffer is full.
+     *      <p>
+     *      If we allow at most one outstanding flush, then we could introduce
+     *      another list of deferred dirty buffers. During a flush, full buffers
+     *      are transferred to the deferred list rather than the dirty list.
+     *      This lets us cache ahead as long as we have free buffers. Once the
+     *      flush is satisfied we need to transfer the buffers on the deferred
+     *      list to the dirty list (in order) so that they can be written onto
+     *      the channel.
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
@@ -555,6 +571,11 @@ abstract public class WriteCacheService implements IWriteCache {
             /*
              * Write the record onto the file at that offset. This operation is
              * synchronous. It will block until the record has been written.
+             * 
+             * @todo this should probably block if we are waiting for the dirty
+             * list to become empty (e.g., a flush). i can't see why this would
+             * matter much, but it seems better to give the disk over to the
+             * flush rather than having a concurrent write here.
              */
             try {
 
@@ -569,11 +590,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 return true;
 
-            } catch (IOException e) {
-
-                throw new RuntimeException(e);
-
-            } catch (TimeoutException e) {
+            } catch (Throwable e) {
 
                 throw new RuntimeException(e);
 
@@ -587,13 +604,14 @@ abstract public class WriteCacheService implements IWriteCache {
          */
         {
 
-            WriteCache cache = acquire();
+            final WriteCache cache = acquire();
 
             try {
 
                 // write on the cache.
                 if (cache.write(offset, data)) {
 
+                    // Done.
                     recordMap.put(offset, cache);
 
                     return true;
@@ -609,11 +627,13 @@ abstract public class WriteCacheService implements IWriteCache {
         }
 
         /*
-         * The record did not fit into the current write cache. Grab the write
-         * lock and then try again. If it still does not fit, then put the
-         * current cache buffer onto the dirty list and take a cache buffer from
-         * the clean list and then write the record onto the cache while we are
-         * holding the lock.
+         * The record did not fit into the current buffer but it is small enough
+         * to fit into an empty buffer. Grab the write lock and then try again.
+         * If it still does not fit, then put the current buffer onto the dirty
+         * list and take a buffer from the clean list and then write the record
+         * onto that buffer while we are holding the lock. This last step must
+         * succeed since the buffer will be empty and the record can fit into an
+         * empty buffer.
          */
         {
 
@@ -623,7 +643,15 @@ abstract public class WriteCacheService implements IWriteCache {
 
             try {
 
-                // Acquire a write cache. Maybe the same one, maybe different.
+                /*
+                 * While holding the write lock, see if the record can fit into
+                 * the current buffer. Note that the buffer we acquire here MAY
+                 * be a different buffer since a concurrent write could have
+                 * already switched us to a new buffer. In that case, the record
+                 * might fit into the new buffer.
+                 */
+
+                // Acquire a buffer. Maybe the same one, maybe different.
                 WriteCache cache = acquire();
 
                 try {
@@ -639,18 +667,30 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
 
                     /*
-                     * There is not enough room in the cache for this record, so
-                     * put the cache on the dirty list.
+                     * There is not enough room in the current buffer for this
+                     * record, so put the buffer onto the dirty list. Then take
+                     * a new buffer from the clean list, reset the buffer to
+                     * clear if
                      * 
                      * Note: When we take a cache instances from the cleanList
                      * we need to remove any entries in our recordMap which are
                      * in its record map.
+                     * 
+                     * Note: We move the current buffer to the dirty list before
+                     * we take a buffer from the clean list. This is absolutely
+                     * necessary since the code will otherwise deadlock if there
+                     * is only one buffer.
                      */
+
+                    final long permits = latch.get();
+
+                    assert permits == 1 : "There are " + permits
+                            + " outstanding permits (should be just one).";
 
                     // Move the current buffer to the dirty list.
                     dirtyList.add(cache);
 
-                    // Wait for a new buffer.
+                    // Take the first clean buffer (may block).
                     final WriteCache newBuffer = cleanList.take();
 
                     // Clear entries from our record map before reusing.
