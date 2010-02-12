@@ -175,8 +175,12 @@ abstract public class JoinTask implements Callable<Void> {
     /**
      * The {@link IRelation} view on which we are reading for this join
      * dimensions.
+     * <p>
+     * Note: This MUST NOT be set until the {@link JoinTask} begins to execute
+     * in {@link #call()} since it needs to be resolved against the evaluation
+     * time {@link IJoinNexus} for scale-out joins.
      */
-    final protected IRelation relation;
+    protected IRelation relation;
 
     /**
      * The index into the evaluation {@link #order} for the predicate on
@@ -448,7 +452,6 @@ abstract public class JoinTask implements Callable<Void> {
         this.tailIndex = getTailIndex(orderIndex);
         this.lastJoin = ((orderIndex + 1) == tailCount);
         this.predicate = rule.getTail(tailIndex);
-        this.relation = joinNexus.getTailRelationView(predicate);
         this.stats = new JoinStats(partitionId, orderIndex);
         this.masterProxy = masterProxy;
         this.masterUUID = masterUUID;
@@ -472,6 +475,8 @@ abstract public class JoinTask implements Callable<Void> {
 
         try {
 
+            this.relation = joinNexus.getTailRelationView(predicate);
+            
             /*
              * Consume bindingSet chunks from the source JoinTask(s).
              */
