@@ -2461,6 +2461,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 // leaf does not fit in the cache, so evict cache to the file.
                 leafWriteCache.flush(false/*force*/);
                 
+                // reset the cache!
+                leafWriteCache.reset();
+                
                 // write leaf on the cache.
                 if(!leafWriteCache.write(offset, data)) {
 
@@ -2903,6 +2906,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                             // cache is full, evict to file.
                             writeCache.flush(false/* force */);
                             
+                            // reset the cache!
+                            writeCache.reset();
+                            
                             // and write on the cache again.
                             if (!writeCache.write(offset, data)) {
 
@@ -2919,6 +2925,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     // force the last writes to the output file.
                     writeCache.flush(false/* force */);
 
+                    // reset the cache!
+                    writeCache.reset();
+                    
                     // #of bytes across all nodes.
                     extentNodes = nbytes;
 
