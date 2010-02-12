@@ -155,12 +155,17 @@ public class DistributedJoinTask extends JoinTask {
         if (dataService == null)
             throw new IllegalArgumentException();
 
+        // Note: This MUST be the index manager for the local data service.
+        if(joinNexus instanceof IBigdataFederation)
+            throw new IllegalArgumentException();
+        
         this.fed = fed;
 
         this.keyOrders = keyOrders;
 
         this.dataService = dataService;
         
+        // This is the index manager for the federation (scale-out indices).
         this.fedJoinNexus = joinNexus.getJoinNexusFactory().newInstance(fed);
 
         if (lastJoin) {
