@@ -1577,11 +1577,11 @@ public class RWStore implements IStore {
 	}
 
 	public int absoluteReadLong(long addr, int offset) {
-		throw new NotImplementedException();
+		throw new UnsupportedOperationException();
 	}
 
 	public void absoluteWriteLong(long addr, int threshold, long value) {
-		throw new NotImplementedException();
+		throw new UnsupportedOperationException();
 	}
 
 	public void absoluteWriteAddress(long addr, int threshold, long addr2) {
