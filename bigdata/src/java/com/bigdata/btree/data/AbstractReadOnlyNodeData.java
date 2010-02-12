@@ -77,7 +77,7 @@ abstract public class AbstractReadOnlyNodeData<U extends IAbstractNodeData> {
         case LINKED_LEAF:
             return false;
         default:
-            throw new AssertionError();
+            throw new AssertionError("Found" + b + " but expected {0,1,2}");
         }
 
     }
