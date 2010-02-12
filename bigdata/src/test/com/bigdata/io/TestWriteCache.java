@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -97,7 +99,6 @@ public class TestWriteCache extends TestCase2 {
         /*
          * Note: We need to assign the addresses in strictly increasing order
          * with the just like a WORM store with a known header length so we can
-         * read the data back from the file when we test flush through to the
          * disk and read back below.
          */
         final AtomicLong _addr = new AtomicLong(baseOffset);
@@ -477,7 +478,6 @@ public class TestWriteCache extends TestCase2 {
             final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
 
             final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
-
             try {
 
                 // The buffer size must be at least 1k for these tests.
@@ -801,7 +801,181 @@ public class TestWriteCache extends TestCase2 {
 
     }
 
+    /*
+     * Now generate randomviews, first an ordered view of 10000 random lengths
+     */
+    class AllocView {
+    	int addr;
+    	ByteBuffer buf;
+    	AllocView(int pa, int pos, int limit, ByteBuffer src) {
+    		addr = pa;
+//    		ByteBuffer vbuf = src.duplicate();
+//    		vbuf.position(pos);
+//    		vbuf.limit(pos + limit);
+//    		buf = ByteBuffer.allocate(limit);
+			// copy the data into [dst].
+			// buf.put(vbuf);
+
+    		buf = getRandomData(limit);
+    		buf.mark();
+
+    	}
+    };
+
     /**
+     * Generate large number of scattered writes to force flushing
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void test_writeCacheStressScatteredWrites() throws IOException, InterruptedException {
+
+        /*
+         * Whether or nor the write cache will force writes to the disk. For
+         * this test, force is false since it just does not matter whether the
+         * data are restart safe.
+         */
+        final boolean force = false;
+        
+        /*
+         * We will create a list of Random 0-1024 byte writes by creating single random buffer
+         * of 2K and generating random views of differing positions and lengths 
+         */
+        final ByteBuffer srcBuf = getRandomData(4096);
+        
+        final ByteBuffer buf = DirectBufferPool.INSTANCE.acquire();
+        
+        ArrayList<AllocView> allocs = new ArrayList<AllocView>();
+        int curAddr = 0;
+        for (int i = 0; i < 10000; i++) {
+        	int pos = r.nextInt(3072);
+        	int size = r.nextInt(1023)+1;
+        	allocs.add(new AllocView(curAddr, pos, size, srcBuf));
+        	curAddr += size;
+        }
+        
+        // Now randomize the array for writing
+        randomizeArray(allocs);
+        
+        final File file = File.createTempFile(getName(), ".tmp");
+        
+
+        try {
+
+            final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
+
+            // allocate write cache using our buffer.
+            final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
+                    buf, opener);
+
+            /*
+             * First write 500 records into the cache and confirm they can all be read okay
+             */
+            for (int i = 0; i < 500; i++) {
+            	AllocView v = allocs.get(i);
+            	writeCache.write(v.addr, v.buf);           	
+            }
+            for (int i = 0; i < 500; i++) {
+            	AllocView v = allocs.get(i);
+             	assertEquals(v.buf, writeCache.read(v.addr));     // expected, actual   	
+            }
+            /*
+             * Flush to disk and reset the cache
+             */
+            writeCache.flush(true);
+            writeCache.reset(); // clear cache
+            /*
+             * Now confirm that nothing is in cache and all on disk
+             */
+            for (int i = 0; i < 500; i++) {
+            	AllocView v = allocs.get(i);
+             	assertNull(writeCache.read(v.addr));     // should be nothing in cache   	
+            }
+            for (int i = 0; i < 500; i++) {
+            	AllocView v = allocs.get(i);
+            	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
+            }
+            /*
+             * Now add further 500 writes, flush and read full 1000 from disk
+             */
+            for (int i = 500; i < 1000; i++) {
+            	AllocView v = allocs.get(i);
+            	writeCache.write(v.addr, v.buf);           	
+            }
+            writeCache.flush(true);
+            for (int i = 0; i < 1000; i++) {
+            	AllocView v = allocs.get(i);
+             	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
+            }
+            /*
+             * Now reset and write full 10000 records, checking for write success and if fail then flush/reset and
+             * resubmit, asserting that resubmission is successful
+             */
+            writeCache.reset();
+            for (int i = 1000; i < 10000; i++) {
+            	AllocView v = allocs.get(i);
+            	if (!writeCache.write(v.addr, v.buf)) {
+            		log.info("flushing and resetting writeCache");
+            		writeCache.flush(false);
+            		writeCache.reset();
+            		assertTrue(writeCache.write(v.addr, v.buf));
+            	}
+            }
+            /*
+             * Now flush and check if we can read in all records
+             */
+            writeCache.flush(true);
+            for (int i = 0; i < 10000; i++) {
+            	AllocView v = allocs.get(i);
+             	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
+            }
+            
+            /*
+             * Now reset, reshuffle and write full 10000 records, checking for write success and if fail then flush/reset and
+             * resubmit, asserting that resubmission is successful
+             */
+            writeCache.reset();
+            randomizeArray(allocs);
+            for (int i = 0; i < 10000; i++) {
+            	AllocView v = allocs.get(i);
+            	v.buf.reset();
+            	if (!writeCache.write(v.addr, v.buf)) {
+            		log.info("flushing and resetting writeCache");
+            		writeCache.flush(false);
+            		writeCache.reset();
+            		assertTrue(writeCache.write(v.addr, v.buf));
+            	}
+            }
+            /*
+             * Now flush and check if we can read in all records
+             */
+            writeCache.flush(true);
+            for (int i = 0; i < 10000; i++) {
+            	AllocView v = allocs.get(i);
+             	assertEquals(v.buf, opener.read(v.addr, v.buf.capacity()));     // expected, actual   	
+            }
+        } finally {
+
+            if (file.exists() && !file.delete()) {
+
+                log.warn("Could not delete: file=" + file);
+
+            }
+
+        }
+    }
+    
+    private void randomizeArray(ArrayList<AllocView> allocs) {
+        for (int i = 0; i < 5000; i++) {
+        	int swap1 = r.nextInt(10000);
+        	int swap2 = r.nextInt(10000);
+        	AllocView v1 = allocs.get(swap1);
+        	AllocView v2 = allocs.get(swap2);
+        	allocs.set(swap1, v2);
+        	allocs.set(swap2, v1);
+        }
+	}
+	/**
      * Simple implementation for a {@link RandomAccessFile} with hook for
      * deleting the test file.
      */
