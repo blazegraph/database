@@ -132,6 +132,11 @@ public class TestIndexSegmentBuilderCacheInteraction extends
 
     }
     
+    /**
+     * Note: This unit test verifies that the cache is properly populated. Most
+     * of the unit tests actually discard the cache in order to verify that the
+     * data in the index segment is correct.
+     */
     public void test_buildOrder3() throws Exception {
 
         if (LRUNexus.INSTANCE == null) {
