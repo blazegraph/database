@@ -120,8 +120,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
      *             unless {@link IJoinNexus#getIndexManager()} reports an
      *             {@link AbstractScaleOutFederation}.
      */
-    public DistributedJoinMasterTask(IRule rule, IJoinNexus joinNexus,
-            IBuffer<ISolution[]> buffer) {
+    public DistributedJoinMasterTask(final IRule rule, final IJoinNexus joinNexus,
+            final IBuffer<ISolution[]> buffer) {
 
         super(rule, joinNexus, buffer);
 
