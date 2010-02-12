@@ -1256,7 +1256,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         this.compactingMerge = compactingMerge;
         
-        this.bufferNodes = false;// FIXME enable bufferNodes!!!;
+        this.bufferNodes = bufferNodes;
         
         /*
          * Override the branching factor on the index segment.
@@ -2870,6 +2870,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 /*
                  * Write the nodes onto the output file.
                  * 
+                 * Note: The addresses are relative to the start of the nodes
+                 * region, so we adjust the write cache using the offset to the
+                 * nodes region.
+                 * 
                  * FIXME Use a WriteCacheService which will hide this complexity
                  * and give better throughput.
                  */
@@ -2888,9 +2892,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
                         final long addr = md.addr;
                         
-                        // the adjusted offset to the node in the file.
-                        final long offset = offsetNodes
-                                + addressManager.getOffset(addr);
+                        // the offset relative to the start of the nodes region.
+                        final long offset = addressManager.getOffset(addr);
                         
                         final AbstractFixedByteArrayBuffer slice = md.data
                                 .data();
@@ -2913,8 +2916,8 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                             if (!writeCache.write(offset, data)) {
 
                                 // directly write onto the output file.
-                                FileChannelUtility.writeAll(writeCache.opener, data,
-                                        offset);
+                                FileChannelUtility.writeAll(writeCache.opener,
+                                        data, offset);
                                 
                             }
 
@@ -4051,15 +4054,29 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
             } else {
 
-                // Verify named indices exist.
+                // Some validation up front.
                 for (String name : names) {
 
+                    // Verify named indices exist.
                     if (journal.getIndex(name) == null) {
 
+                        // Index not found.
                         throw new RuntimeException("Index not found: " + name);
 
                     }
 
+                    // Verify output file does not exist or is empty.
+                    final File outFile = new File(outDir, name
+                            + Journal.Options.SEG);
+
+                    if (outFile.exists() && outFile.length() != 0) {
+
+                        throw new RuntimeException(
+                                "Output file exists and is non-empty: "
+                                        + outFile);
+
+                    }
+                    
                 }
 
             }
@@ -4130,6 +4147,22 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                      * B+Tree.
                      */
 
+                    if (LRUNexus.INSTANCE != null) {
+
+                        /*
+                         * Clear the records for the index segment from the
+                         * cache so we will read directly from the file. This is
+                         * necessary to ensure that the data on the file is good
+                         * rather than just the data in the cache.
+                         */
+                        
+                        System.out.println("Flushing index segment cache: "
+                                + builder.outFile);
+                        
+                        LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+
+                    }
+                    
                     final IndexSegmentStore segStore = new IndexSegmentStore(
                             outFile);
 
@@ -4138,6 +4171,9 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                         final IndexSegment seg = segStore.loadIndexSegment();
 
                         try {
+
+                            System.out.println("Verifying index segment: "
+                                    + builder.outFile);
 
                             assertSameEntryIterator(name, btree.rangeIterator(),
                                 seg.rangeIterator());
