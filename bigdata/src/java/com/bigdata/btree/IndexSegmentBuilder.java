@@ -1256,7 +1256,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         this.compactingMerge = compactingMerge;
         
-        this.bufferNodes = bufferNodes;
+        this.bufferNodes = false;// FIXME enable bufferNodes!!!;
         
         /*
          * Override the branching factor on the index segment.
