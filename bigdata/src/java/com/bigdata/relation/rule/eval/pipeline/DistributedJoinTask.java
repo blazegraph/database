@@ -83,7 +83,7 @@ public class DistributedJoinTask extends JoinTask {
     /**
      * The name of the scale-out index associated with the next
      * {@link IPredicate} in the evaluation order and <code>null</code>
-     * iff this is the last {@link IPredicate} in the evaluation order.
+     * iff this is the last {@link IPredicate} in the evaluation order [logging only.]
      */
     final private String nextScaleOutIndexName;
 
@@ -245,7 +245,7 @@ public class DistributedJoinTask extends JoinTask {
 
             final String namespace = nextPredicate.getOnlyRelationName();
 
-            nextScaleOutIndexName = namespace
+            nextScaleOutIndexName = namespace +"."
                     + keyOrders[order[orderIndex + 1]];
 
             solutionBuffer = null;

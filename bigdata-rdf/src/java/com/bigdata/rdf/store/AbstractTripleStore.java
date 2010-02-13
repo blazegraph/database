@@ -3789,7 +3789,7 @@ abstract public class AbstractTripleStore extends
 
         if (overrides != null) {
 
-            /*
+            /* FIXME overrides should apply to the properties above here as well!
              * Layer in the overrides.
              * 
              * Note: If the caller passes in a Properties object, then only the

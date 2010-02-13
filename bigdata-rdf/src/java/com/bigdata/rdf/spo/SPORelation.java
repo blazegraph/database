@@ -1128,7 +1128,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
              * the ConcurrencyManager to its tasks.
              */
             
-            throw new IllegalStateException();
+            throw new IllegalStateException("Expecting a local index manager, not: "+indexManager.getClass().toString());
             
         }
 
