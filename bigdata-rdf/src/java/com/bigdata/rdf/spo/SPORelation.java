@@ -75,12 +75,14 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Var;
@@ -1057,15 +1059,23 @@ public class SPORelation extends AbstractRelation<ISPO> {
          * on allocation costs, formatting the from/to keys, etc.
          */
 
-        if (predicate.getPartitionId() != -1) {
-
-            /*
-             * Note: This handles a read against a local index partition.
-             */
-
-            return getAccessPathForIndexPartition(predicate);
-
-        }
+//        if (predicate.getPartitionId() != -1) {
+//
+//            /*
+//             * Note: This handles a read against a local index partition.
+//             * 
+//             * Note: This does not work here because it has the federation's
+//             * index manager rather than the data service's index manager. That
+//             * is because we always resolve relations against the federation
+//             * since their metadata is stored in the global row store. Maybe
+//             * this could be changed if we developed the concept of a
+//             * "relation shard" accessed the metadata via a catalog and which
+//             * was aware that only one index shard could be resolved locally.
+//             */
+//
+//            return getAccessPathForIndexPartition(predicate);
+//
+//        }
 
         return _getAccessPath(predicate);
               
@@ -1091,7 +1101,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
-
     /**
      * This handles a request for an access path that is restricted to a
      * specific index partition.
@@ -1106,31 +1115,70 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * (presumably) an index manager that only sees the index partitions local
      * to a specific data service, we create an access path view for an index
      * partition without forcing the relation to be materialized.
+     * <p>
+     * Note: Expanders ARE NOT applied in this code path. Expanders require a
+     * total view of the relation, which is not available during scale-out
+     * pipeline joins.
      * 
-     * @todo caching for the access path?
+     * @param indexManager
+     *            This MUST be the data service local index manager so that the
+     *            returned access path will read against the local shard.
+     * @param predicate
+     *            The predicate.
+     * 
+     * @throws IllegalArgumentException
+     *             if either argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             unless the {@link IIndexManager} is a <em>local</em> index
+     *             manager providing direct access to the specified shard.
+     * @throws IllegalArgumentException
+     *             unless the predicate identifies a specific shard using
+     *             {@link IPredicate#getPartitionId()}.
+     * 
+     * @todo Raise this method into the {@link IRelation} interface.
      */
-    private IAccessPath<ISPO> getAccessPathForIndexPartition(
-            final IPredicate<ISPO> predicate) {
-        
-        final IIndexManager indexManager = getIndexManager();
+    public IAccessPath<ISPO> getAccessPathForIndexPartition(
+            final IIndexManager indexManager, //
+            final IPredicate<ISPO> predicate//
+            ) {
 
-        if (indexManager instanceof IBigdataFederation) {
-       
+// Note: This is the federation's index manager _always_.
+//        final IIndexManager indexManager = getIndexManager();
+
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+
+        if (indexManager instanceof IBigdataFederation<?>) {
+
             /*
-             * This will happen if you fail to re-create the JoinNexus
-             * within the target execution environment.
+             * This will happen if you fail to re-create the JoinNexus within
+             * the target execution environment.
              * 
              * This is disallowed because the predicate specifies an index
-             * partition and expects to have access to the local index
-             * objects for that index partition. However, the index
-             * partition is only available when running inside of the
-             * ConcurrencyManager and when using the IndexManager exposed by
-             * the ConcurrencyManager to its tasks.
+             * partition and expects to have access to the local index objects
+             * for that index partition. However, the index partition is only
+             * available when running inside of the ConcurrencyManager and when
+             * using the IndexManager exposed by the ConcurrencyManager to its
+             * tasks.
              */
-            
-            throw new IllegalStateException("Expecting a local index manager, not: "+indexManager.getClass().toString());
-            
+
+            throw new IllegalArgumentException(
+                    "Expecting a local index manager, not: "
+                            + indexManager.getClass().toString());
+
         }
+        
+        if (predicate == null)
+            throw new IllegalArgumentException();
+
+        final int partitionId = predicate.getPartitionId();
+
+        if (partitionId != -1)
+            throw new IllegalArgumentException();
+
+        // @todo This condition should probably be an error since the expander will be ignored.
+//        if (predicate.getSolutionExpander() != null)
+//            throw new IllegalArgumentException();
 
         if (predicate.getRelationCount() != 1) {
 
@@ -1173,8 +1221,6 @@ public class SPORelation extends AbstractRelation<ISPO> {
         final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;// | IRangeQuery.READONLY;
 
         final long timestamp = getTimestamp();//getReadTimestamp();
-        
-//        final IIndex ndx = indexManager.getIndex(name, timestamp);
         
         // MUST be a local index view.
         final ILocalBTreeView ndx = (ILocalBTreeView) indexManager

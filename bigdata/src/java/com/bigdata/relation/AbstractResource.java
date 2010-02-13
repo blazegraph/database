@@ -545,8 +545,18 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     /**
      * Return the object used to locate indices, relations, and relation
      * containers and to execute operations on those resources.
+     * <p>
+     * Note: For scale-out, this is <em>always</em> the federation's index
+     * manager NOT the data service local index manager. This is an artifact of
+     * how we resolve the metadata for the relation against the global row
+     * store.
      * 
      * @return The {@link IIndexManager}.
+     * 
+     * @todo If we support the notion of a "relation shard" then this could
+     *       become the shard's data service local index manager in that
+     *       instance but, regardless, we would need a means to resolve the
+     *       metadata for the relation against the federation's index manager
      */
     public IIndexManager getIndexManager() {
         

@@ -455,7 +455,7 @@ abstract public class JoinTask implements Callable<Void> {
 
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex + ", partitionId="
-                    + partitionId+", joinNexus.indexManager="+joinNexus.getIndexManager().getClass()+", relation="+relation);
+                    + partitionId);
 
     }
 
@@ -468,7 +468,7 @@ abstract public class JoinTask implements Callable<Void> {
 
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex + ", partitionId="
-                    + partitionId+", joinNexus.indexManager="+joinNexus.getIndexManager().getClass()+", relation="+relation);
+                    + partitionId);
 
         try {
 
@@ -1387,7 +1387,7 @@ abstract public class JoinTask implements Callable<Void> {
          * 
          * @return
          */
-        public int compareTo(AccessPathTask o) {
+        public int compareTo(final AccessPathTask o) {
 
             return BytesUtil.compareBytes(getFromKey(), o.getFromKey());
 
