@@ -68,7 +68,6 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
-import com.bigdata.relation.AbstractResource.Options;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -772,7 +771,12 @@ public class RDFJoinNexus implements IJoinNexus {
      * When {@link #backchain} is <code>true</code> and the tail predicate is
      * reading on the {@link SPORelation}, then the {@link IAccessPath} is
      * wrapped so that the iterator will visit the backchained inferences as
-     * well.
+     * well. On the other hand, if {@link IPredicate#getPartitionId()} is
+     * defined (not <code>-1</code>) then the returned access path will be for
+     * the specified shard using the data service local index manager (
+     * {@link #indexManager} MUST be the data service local index manager for
+     * this case) and expanders WILL NOT be applied (they require a view of the
+     * total relation, not just a shard).
      * 
      * @see InferenceEngine
      * @see BackchainAccessPath
@@ -785,32 +789,43 @@ public class RDFJoinNexus implements IJoinNexus {
     public IAccessPath getTailAccessPath(final IRelation relation,
             final IPredicate predicate) {
 
-//        if (predicate.getPartitionId() != -1) {
-//
-//            /*
-//             * Note: This handles a read against a local index partition.
-//             */
-//
-//            return getTailAccessPathForIndexPartition(relation, predicate);
-//
-//        }
-
-        // Find the best access path for the predicate for that relation.
-        // @todo hotspot: 75%
-        IAccessPath accessPath = relation.getAccessPath(predicate);
-
         if (predicate.getPartitionId() != -1) {
 
             /*
-             * Note: The expander can not run against a shard since it assumes
-             * access to the full key range of the index. Expanders are
-             * convenient and work well for stand alone indices, but they should
-             * be replaced by rule rewrites for scale-out.
+             * Note: This handles a read against a local index partition. For
+             * scale-out, the [indexManager] will be the data service's local
+             * index manager.
+             * 
+             * Note: Expanders ARE NOT applied in this code path. Expanders
+             * require a total view of the relation, which is not available
+             * during scale-out pipeline joins. Likewise, the [backchain]
+             * property will be ignored since it is handled by an expander.
+             * 
+             * @todo If getAccessPathForIndexPartition() is raised into the
+             * IRelation interface, then we can get rid of the cast to the
+             * SPORelation implementation.
              */
 
-            return accessPath;
-            
+            return ((SPORelation) relation).getAccessPathForIndexPartition(
+                    indexManager, predicate);
+
         }
+
+//        // Find the best access path for the predicate for that relation.
+        IAccessPath accessPath = relation.getAccessPath(predicate);
+//
+//        if (predicate.getPartitionId() != -1) {
+//
+//            /*
+//             * Note: The expander can not run against a shard since it assumes
+//             * access to the full key range of the index. Expanders are
+//             * convenient and work well for stand alone indices, but they should
+//             * be replaced by rule rewrites for scale-out.
+//             */
+//
+//            return accessPath;
+//            
+//        }
         
         final ISolutionExpander expander = predicate.getSolutionExpander();
         
@@ -855,8 +870,25 @@ public class RDFJoinNexus implements IJoinNexus {
 //     * (presumably) an index manager that only sees the index partitions local
 //     * to a specific data service, we create an access path view for an index
 //     * partition without forcing the relation to be materialized.
+//     * <p>
+//     * Note: This method MUST NOT be moved to the {@link SPORelation}!!! The
+//     * issue is that the relation is always resolved using the federation's
+//     * index manager in order to resolve the metadata for the relation against
+//     * the global row store. The {@link RDFJoinNexus} has been specifically
+//     * prepared during scale-out joins such that the {@link #indexManager} is
+//     * the data service's index manager NOT the federation's index manager. This
+//     * gives us access to the local B+Tree views, which are efficient for local
+//     * reads. If this method is moved to the {@link SPORelation} then the
+//     * relation must be handed the desired index manager since the one it
+//     * inherits from its base class will be the federation's index manager, not
+//     * the local data service's index manager.
 //     * 
-//     * @todo caching for the access path?
+//     * FIXME This COULD be moved into the {@link SPORelation} (and hence made
+//     * general purpose) if we passed through the local index manager and used
+//     * it consistently when obtaining the {@link IAccessPath}.
+//     * 
+//     * FIXME This is hardcoded for the {@link SPORelation} (it will not handle
+//     * joins against other relations).
 //     */
 //    private IAccessPath getTailAccessPathForIndexPartition(
 //            final IRelation relation, final IPredicate predicate) {
@@ -874,19 +906,19 @@ public class RDFJoinNexus implements IJoinNexus {
 //             * ConcurrencyManager and when using the IndexManager exposed by
 //             * the ConcurrencyManager to its tasks.
 //             */
-//            
-//            throw new IllegalStateException();
-//            
+//            throw new IllegalStateException(
+//                    "Expecting a local index manager, not: "
+//                            + indexManager.getClass().toString());
+//
 //        }
 //        
 //        final String namespace = predicate.getOnlyRelationName();
 //
 //        /*
 //         * Find the best access path for that predicate.
-//         * 
-//         * FIXME quads : hardcoded for triples and the SPORelation.
 //         */
-//        final IKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate, 3);
+//        final IKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate,
+//                ((SPORelation) relation).getKeyArity());
 //
 //        // The name of the desired index partition.
 //        final String name = DataService
@@ -912,7 +944,7 @@ public class RDFJoinNexus implements IJoinNexus {
 //                getChunkCapacity(), getFullyBufferedReadThreshold()).init();
 //
 //    }
-//    
+    
     public Iterator<PartitionLocator> locatorScan(
             final AbstractScaleOutFederation fed, final IPredicate predicate) {
 

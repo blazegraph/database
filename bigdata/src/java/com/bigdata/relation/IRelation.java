@@ -113,6 +113,9 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      */
     IAccessPath<E> getAccessPath(IPredicate<E> predicate);
 
+    // @todo raise this method into this interface. 
+//    IAccessPath<E> getAccessPathForIndexPartition(IIndexManager indexManager, IPredicate<E> predicate);
+
     /**
      * Return the fully qualified name of each index maintained by this
      * relation.
