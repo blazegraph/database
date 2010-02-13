@@ -455,7 +455,7 @@ abstract public class JoinTask implements Callable<Void> {
 
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex + ", partitionId="
-                    + partitionId);
+                    + partitionId+", joinNexus.indexManager="+joinNexus.getIndexManager().getClass()+", relation="+relation);
 
     }
 
@@ -468,7 +468,7 @@ abstract public class JoinTask implements Callable<Void> {
 
         if (DEBUG)
             log.debug("orderIndex=" + orderIndex + ", partitionId="
-                    + partitionId);
+                    + partitionId+", joinNexus.indexManager="+joinNexus.getIndexManager().getClass()+", relation="+relation);
 
         try {
 

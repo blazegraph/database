@@ -48,8 +48,8 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
     /**
      * Pipeline join strategy.
      * <p>
-     * Note: This join strategy was designed for scale-out evaluation but MAY
-     * also be used for local deployments. It starts a {@link JoinTask} per
+     * Note: This join strategy was designed for scale-out evaluation but does
+     * better for local deployments as well. It starts a {@link JoinTask} per
      * index partition on which the join must read while evaluating the rule.
      * This gives it access to the local index objects for each index partition
      * of interest. Intermediate {@link IBindingSet}s are streamed in chunks to
