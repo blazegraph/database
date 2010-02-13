@@ -1173,7 +1173,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final int partitionId = predicate.getPartitionId();
 
-        if (partitionId != -1)
+        if (partitionId == -1) // must be a valid partition identifier.
             throw new IllegalArgumentException();
 
         // @todo This condition should probably be an error since the expander will be ignored.
