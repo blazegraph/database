@@ -258,7 +258,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
 
         }
         
-        if (lastIndex != -1 && lastIndex + 1 < chunk.length) {
+        if (lastIndex != -1 && chunk!=null && lastIndex + 1 < chunk.length) {
 
             return true;
             
@@ -276,7 +276,7 @@ abstract public class AbstractChunkedResolverator<E,F,S> implements ICloseableIt
         if (!hasNext())
             throw new NoSuchElementException();
 
-        if (lastIndex == -1 || lastIndex + 1 == chunk.length) {
+        if (lastIndex == -1 || chunk!=null && lastIndex + 1 == chunk.length) {
 
             // get the next chunk of resolved BigdataStatements.
             chunk = resolvedItr.next();
