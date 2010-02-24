@@ -442,31 +442,31 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 .getPackage().getName()
                 + ".leafValuesCoder";
 
-        /**
-         * Option determines whether or not per-child locks are used by
-         * {@link Node} for a <em>read-only</em> {@link AbstractBTree} (default
-         * {@value #DEFAULT_CHILD_LOCKS}). This option effects synchronization
-         * in {@link Node#getChild(int)}. Synchronization is not required for
-         * mutable {@link BTree}s as they already impose the constraint that the
-         * caller is single threaded. Synchronization is required in this method
-         * to ensure that the data structure remains coherent when concurrent
-         * threads demand access to the same child of a given {@link Node}.
-         * Per-child locks have higher potential concurrency since locking is
-         * done on a distinct {@link Object} for each child rather than on a
-         * shared {@link Object} for all children of a given {@link Node}.
-         * However, per-child locks require more {@link Object} allocation (for
-         * the locks) and thus contribute to heap demand.
-         * <p>
-         * Note: While this can improve read concurrency, this option imposes
-         * additional RAM demands since there is on {@link Object} allocated for
-         * each {@link Node} in the {@link BTree}.  This is why it is turned off
-         * by default.
-         */
-        String CHILD_LOCKS = com.bigdata.btree.AbstractBTree.class.getPackage()
-                .getName()
-                + ".childLocks";
-
-        String DEFAULT_CHILD_LOCKS = "false";
+//        /**
+//         * Option determines whether or not per-child locks are used by
+//         * {@link Node} for a <em>read-only</em> {@link AbstractBTree} (default
+//         * {@value #DEFAULT_CHILD_LOCKS}). This option effects synchronization
+//         * in {@link Node#getChild(int)}. Synchronization is not required for
+//         * mutable {@link BTree}s as they already impose the constraint that the
+//         * caller is single threaded. Synchronization is required in this method
+//         * to ensure that the data structure remains coherent when concurrent
+//         * threads demand access to the same child of a given {@link Node}.
+//         * Per-child locks have higher potential concurrency since locking is
+//         * done on a distinct {@link Object} for each child rather than on a
+//         * shared {@link Object} for all children of a given {@link Node}.
+//         * However, per-child locks require more {@link Object} allocation (for
+//         * the locks) and thus contribute to heap demand.
+//         * <p>
+//         * Note: While this can improve read concurrency, this option imposes
+//         * additional RAM demands since there is on {@link Object} allocated for
+//         * each {@link Node} in the {@link BTree}.  This is why it is turned off
+//         * by default.
+//         */
+//        String CHILD_LOCKS = com.bigdata.btree.AbstractBTree.class.getPackage()
+//                .getName()
+//                + ".childLocks";
+//
+//        String DEFAULT_CHILD_LOCKS = "false";
         
         /*
          * Options that are valid for any AbstractBTree but which are not
@@ -1059,7 +1059,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private IRecordCompressorFactory<?> btreeRecordCompressorFactory;
     private IRecordCompressorFactory<?> indexSegmentRecordCompressorFactory;
     private IConflictResolver conflictResolver;
-    private boolean childLocks;
+//    private boolean childLocks;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
     private boolean versionTimestampFilters;
@@ -1421,16 +1421,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     public final IConflictResolver getConflictResolver() {return conflictResolver;}
     
-    /**
-     * @see Options#CHILD_LOCKS
-     */
-    public final boolean getChildLocks() {return childLocks;}
-    
-    public final void setChildLocks(final boolean newValue) {
-
-        this.childLocks = newValue;
-        
-    }
+//    /**
+//     * @see Options#CHILD_LOCKS
+//     */
+//    public final boolean getChildLocks() {return childLocks;}
+//    
+//    public final void setChildLocks(final boolean newValue) {
+//
+//        this.childLocks = newValue;
+//        
+//    }
 
     /**
      * When <code>true</code> the index will write a delete marker when an
@@ -2089,9 +2089,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         this.conflictResolver = null;
 
-        this.childLocks = Boolean.parseBoolean(getProperty(
-                indexManager, properties, namespace, Options.CHILD_LOCKS,
-                Options.DEFAULT_CHILD_LOCKS));
+//        this.childLocks = Boolean.parseBoolean(getProperty(
+//                indexManager, properties, namespace, Options.CHILD_LOCKS,
+//                Options.DEFAULT_CHILD_LOCKS));
         
         this.deleteMarkers = false;
         
@@ -2425,9 +2425,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private static transient final int VERSION8 = 0x08;
     
     /**
+     * The childLocks feature was dropped in this version.
+     */
+    private static transient final int VERSION9 = 0x09;
+    
+    /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION8;
+    private static transient final int CURRENT_VERSION = VERSION9;
     
     /**
      * @todo review generated record for compactness.
@@ -2447,6 +2452,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION6:
         case VERSION7:
         case VERSION8:
+        case VERSION9:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2507,13 +2513,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         conflictResolver = (IConflictResolver)in.readObject();
 
-        if (version < VERSION5) {
+        if (version < VERSION5 || version >= VERSION9) {
 
-            childLocks = true;
+//            childLocks = true;
             
         } else {
             
-            childLocks = in.readBoolean();
+//            childLocks = 
+                in.readBoolean();
             
         }
         
@@ -2709,9 +2716,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         out.writeObject(conflictResolver);
 
-        if (version >= VERSION5) {
+        if (version >= VERSION5 && version < VERSION9 ) {
 
-            out.writeBoolean(childLocks);
+//            out.writeBoolean(childLocks);
+            out.writeBoolean(false/* childLocks */);
             
         }
 
