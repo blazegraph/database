@@ -36,6 +36,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
+import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -83,6 +84,8 @@ import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Split;
+import com.bigdata.util.concurrent.Computable;
+import com.bigdata.util.concurrent.Memoizer;
 
 /**
  * <p>
@@ -255,6 +258,199 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * The branching factor for the btree.
      */
     final protected int branchingFactor;
+
+    /**
+     * Helper class models a request to load a child node.
+     * <p>
+     * Note: This class must implement equals() and hashCode() since it is used
+     * within the Memoizer pattern.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    static class LoadChildRequest {
+
+        /** The parent node. */
+        final Node parent;
+
+        /** The child index. */
+        final int index;
+
+        /**
+         * 
+         * @param parent
+         *            The parent node.
+         * @param index
+         *            The child index.
+         */
+        public LoadChildRequest(final Node parent, final int index) {
+    
+            this.parent = parent;
+            
+            this.index = index;
+            
+        }
+
+        /**
+         * Equals returns true iff parent == o.parent and index == o.index.
+         */
+        public boolean equals(final Object o) {
+
+            if (!(o instanceof LoadChildRequest))
+                return false;
+
+            final LoadChildRequest r = (LoadChildRequest) o;
+
+            return parent == r.parent && index == r.index;
+            
+        }
+
+        /**
+         * The hashCode() implementation assumes that the parent's hashCode() is
+         * well distributed and just adds in the index to that value to improve
+         * the chance of a distinct hash value.
+         */
+        public int hashCode() {
+            
+            return parent.hashCode() + index;
+            
+        }
+        
+    }
+
+    /**
+     * Helper loads a child node from the specified address by delegating to
+     * {@link Node#_getChild(int)}.
+     */
+    final private static Computable<LoadChildRequest, AbstractNode<?>> loadChild = new Computable<LoadChildRequest, AbstractNode<?>>() {
+
+        /**
+         * Loads a child node from the specified address.
+         * 
+         * @return A hard reference to that child node.
+         * 
+         * @throws IllegalArgumentException
+         *             if addr is <code>null</code>.
+         * @throws IllegalArgumentException
+         *             if addr is {@link IRawStore#NULL}.
+         */
+        public AbstractNode<?> compute(final LoadChildRequest req)
+                throws InterruptedException {
+
+            return req.parent._getChild(req.index, req);
+        
+        }
+        
+    };
+
+    /**
+     * A {@link Memoizer} subclass which exposes an additional method to remove
+     * a {@link FutureTask} from the internal cache. This is used as part of an
+     * explicit protocol in {@link Node#_getChild(int)} to clear out cache
+     * entries once the child reference has been set on {@link Node#childRefs}.
+     * This is package private since it must be visible to
+     * {@link Node#_getChild(int)}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    static class ChildMemoizer extends
+            Memoizer<LoadChildRequest/* request */, AbstractNode<?>/* child */> {
+
+        /**
+         * @param c
+         */
+        public ChildMemoizer(
+                final Computable<LoadChildRequest, AbstractNode<?>> c) {
+
+            super(c);
+
+        }
+
+//        /**
+//         * The approximate size of the cache (used solely for debugging to
+//         * detect cache leaks).
+//         */
+//        int size() {
+//            
+//            return cache.size();
+//            
+//        }
+        
+        /**
+         * Called by the thread which atomically sets the
+         * {@link AbstractNode#childRefs} element to the computed
+         * {@link AbstractNode}.
+         * 
+         * @param addr
+         */
+        void removeFromCache(final LoadChildRequest req) {
+
+            if (cache.remove(req) == null) {
+
+                throw new AssertionError();
+                
+            }
+
+        }
+
+//        /**
+//         * Called from {@link AbstractBTree#close()}.
+//         * 
+//         * @todo should we do this?  There should not be any reads against the
+//         * the B+Tree when it is close()d.  Therefore I do not believe there 
+//         * is any reason to clear the FutureTask cache.
+//         */
+//        void clear() {
+//            
+//            cache.clear();
+//            
+//        }
+        
+    };
+
+    /**
+     * Used to materialize children without causing concurrent threads passing
+     * through the same parent node to wait on the IO for the child. This is
+     * <code>null</code> for a mutable B+Tree since concurrent requests are not
+     * permitted for the mutable B+Tree.
+     * 
+     * @see Node#getChild(int)
+     */
+    final ChildMemoizer memo;
+
+    /**
+     * {@link Memoizer} pattern for non-blocking concurrent reads of child
+     * nodes. This is package private. Use {@link Node#getChild(int)} instead.
+     * 
+     * @param parent
+     *            The node whose child will be materialized.
+     * @param index
+     *            The index of that child.
+     * 
+     * @return The child and never <code>null</code>.
+     * 
+     * @see Node#getChild(int)
+     */
+    AbstractNode<?> loadChild(final Node parent, final int index) {
+
+        try {
+
+            return memo.compute(new LoadChildRequest(parent, index));
+
+        } catch (InterruptedException e) {
+
+            /*
+             * Note: This exception will be thrown iff interrupted while
+             * awaiting the FutureTask inside of the Memoizer.
+             */
+
+            throw new RuntimeException(e);
+
+        }
+        
+    }
 
     /**
      * The root of the btree. This is initially a leaf until the leaf is split,
@@ -669,6 +865,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         this.store = store;
 
+        /*
+         * The Memoizer is not used by the mutable B+Tree since it is not safe
+         * for concurrent operations.
+         */
+        memo = !readOnly ? null : new ChildMemoizer(loadChild);
+        
         /*
          * Setup buffer for Node and Leaf objects accessed via top-down
          * navigation. While a Node or a Leaf remains on this buffer the
@@ -3516,7 +3718,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     /**
      * Read a node or leaf from the store.
      * <p>
-     * Note: Callers SHOULD be synchronized in order to ensures that only one
+     * Note: Callers SHOULD be synchronized in order to ensure that only one
      * thread will read the desired node or leaf in from the store and attach
      * the reference to the newly read node or leaf as appropriate into the
      * existing data structures (e.g., as the root reference or as a child of a
@@ -3526,9 +3728,15 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      *            The address in the store.
      * 
      * @return The node or leaf.
+     * 
+     * @throws IllegalArgumentException
+     *             if the address is {@link IRawStore#NULL}.
      */
     protected AbstractNode<?> readNodeOrLeaf(final long addr) {
 
+        if (addr == IRawStore.NULL)
+            throw new IllegalArgumentException();
+        
         final Long addr2 = Long.valueOf(addr); 
 
         if (storeCache != null) {
@@ -3723,7 +3931,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
         final private T ref;
         
-        HardReference(T ref) {
+        HardReference(final T ref) {
 
             super(null);
             

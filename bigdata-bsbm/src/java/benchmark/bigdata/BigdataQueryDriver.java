@@ -20,7 +20,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class BigdataQueryDriver {
     /**
      * @param args
-     *            USAGE: -journal <journal file> -data <data file>
+     *            USAGE: [bsbm args...] -journal <journal file>
      *            
      * @see TestDriver for other options.
      */
@@ -34,7 +34,8 @@ public class BigdataQueryDriver {
         final String namespace = "kb";
         try {
             if (args.length < 2) {
-                System.err.println("USAGE: <bsbm args...> -journal <journal file>");
+                System.err.println("USAGE: [bsbm args...] -journal <journalFile>");
+                System.exit(1);
             }
             final String journal = args[args.length-1];
             final File file = new File(journal);

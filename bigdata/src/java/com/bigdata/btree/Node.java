@@ -31,15 +31,22 @@ import java.lang.ref.Reference;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import org.apache.log4j.Level;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.btree.AbstractBTree.ChildMemoizer;
+import com.bigdata.btree.AbstractBTree.LoadChildRequest;
 import com.bigdata.btree.data.DefaultNodeCoder;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
+import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.concurrent.Memoizer;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.Expander;
@@ -88,7 +95,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
      *       where necessary.
      */
     INodeData data;
-    
+
     /**
      * <p>
      * Weak references to child nodes (may be nodes or leaves). The capacity of
@@ -101,28 +108,37 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * forces the split may be inserted. This greatly simplifies the logic for
      * computing the split point and performing the split.
      * </p>
-     */
-    transient private volatile Reference<AbstractNode<?>>[] childRefs;
-
-    /**
-     * An array of objects used to provide a per-child lock in order to allow
-     * maximum concurrency in {@link #getChild(int)}.
      * <p>
-     * Note: this array is not allocated for a mutable btree since the caller
-     * will be single threaded and locking is therefore not required in
-     * {@link #getChild(int)}. We only need locking for read-only btrees since
-     * they allow concurrent readers.
+     * Note: This should not be marked as volatile. Volatile does not make the
+     * elements of the array volatile, only the array reference itself. The
+     * field would be final except that we clear the reference when stealing the
+     * array or deleting the node.
+     * </p>
      * 
-     * @todo There is a LOT of overhead to creating all these objects. They are
-     *       only really useful in high concurrent read scenarios such as highly
-     *       concurrent query against an index. However, those situations
-     *       typically have a lot of buffered B+Tree nodes so the in-memory
-     *       footprint for this array is not really worth it.
-     *       <p>
-     *       This might be viable if we had an AtomicBitVector class since we
-     *       could typically get by with 1-2 longs of data in that case.
+     * @todo document why package private (AbstractBTree.loadChild uses this but
+     *       maybe that method could be moved to Node).
      */
-    transient private Object[] childLocks;
+    transient /*volatile*/ Reference<AbstractNode<?>>[] childRefs;
+
+//    /**
+//     * An array of objects used to provide a per-child lock in order to allow
+//     * maximum concurrency in {@link #getChild(int)}.
+//     * <p>
+//     * Note: this array is not allocated for a mutable btree since the caller
+//     * will be single threaded and locking is therefore not required in
+//     * {@link #getChild(int)}. We only need locking for read-only btrees since
+//     * they allow concurrent readers.
+//     * 
+//     * @todo There is a LOT of overhead to creating all these objects. They are
+//     *       only really useful in high concurrent read scenarios such as highly
+//     *       concurrent query against an index. However, those situations
+//     *       typically have a lot of buffered B+Tree nodes so the in-memory
+//     *       footprint for this array is not really worth it.
+//     *       <p>
+//     *       This might be viable if we had an AtomicBitVector class since we
+//     *       could typically get by with 1-2 longs of data in that case.
+//     */
+//    transient private Object[] childLocks;
 
     /**
      * Return <code>((branchingFactor + 1) &lt;&lt; 1) - 1</code>
@@ -432,7 +448,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         childRefs = new Reference[branchingFactor + 1];
 
-        childLocks = newChildLocks(btree, data.getKeys().size());
+//        childLocks = newChildLocks(btree, data.getKeys().size());
 
 //        // must clear the dirty flag since we just de-serialized this node.
 //        setDirty(false);
@@ -454,7 +470,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         childRefs = new Reference[branchingFactor + 1];
 
-        childLocks = newChildLocks(btree, 0/* nkeys */);
+//        childLocks = newChildLocks(btree, 0/* nkeys */);
 
 //        nentries = 0;
 //
@@ -500,7 +516,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         // Note: child locks are only for read-only btrees and this ctor is only
         // for a split of the root leaf so we never use child locks for this case.
         assert !btree.isReadOnly(); 
-        childLocks = null; // newChildLocks(btree);
+//        childLocks = null; // newChildLocks(btree);
 
         final MutableNodeData data;
         this.data = data = new MutableNodeData(branchingFactor, btree
@@ -677,7 +693,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
         childRefs = src.childRefs; src.childRefs = null;
 
-        childLocks = src.childLocks; src.childLocks = null;
+//        childLocks = src.childLocks; src.childLocks = null;
 
         final int nkeys = data.getKeyCount();
         
@@ -727,7 +743,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
         
         // clear state.
         childRefs = null;
-        childLocks = null;
+//        childLocks = null;
         data = null;
         
     }
@@ -2423,17 +2439,31 @@ public class Node extends AbstractNode<Node> implements INodeData {
      * Return the child node or leaf at the specified index in this node. If the
      * node is not in memory then it is read from the store.
      * <p>
-     * Note: When concurrent callers are allowed, this is synchronized in order
-     * to make sure that concurrent readers are single-threaded at the point
-     * where they read a node or leaf which is the child of this {@link Node}
-     * from the store into the btree. This ensures that only one thread will
-     * read the missing child in from the store and that inconsistencies in the
-     * data structure can not arise from concurrent readers. (We are not
-     * required to synchronize for a mutable {@link BTree} since the contract
-     * for that class is that the caller is single-threaded.)
+     * Note: This implementation DOES NOT cause concurrent threads to block
+     * unless they are performing IO for the same child. A {@link Memoizer}
+     * pattern is used to assign each concurrent thread a {@link FutureTask} on
+     * which it waits for the result. Once the result is available, there is a
+     * small <code>synchronized</code> block during which the concurrent
+     * requests for a child will content to update the appropriate element in
+     * {@link #childRefs}.
+     * <p>
+     * I believe the contention to update {@link #childRefs} as unavoidable. If
+     * this object was made into an {@link AtomicReferenceArray} then we would
+     * have difficulty when inserting and removing tuples since the backing
+     * array is not visible. An array of {@link AtomicReference} objects would
+     * not help since it would not ensure "publication" when the element was
+     * changed from a <code>null</code> to an {@link AtomicReference}, only when
+     * {@link AtomicReference#compareAndSet(Object, Object)} was used. Thus it
+     * could only help if we pre-populated the array with
+     * {@link AtomicReference} objects, which seems wasteful.
+     * <p>
+     * As always, the mutable B+Tree is single threaded so there are not added
+     * synchronization costs. Concurrent readers can only arise for read-only
+     * {@link BTree}s and for {@link IndexSegment}s.</strong>
      * 
      * @param index
-     *            The index in [0:nkeys].
+     *            The index of the child to be read from the store (in
+     *            [0:nkeys]).
      * 
      * @return The child node or leaf and never null.
      * 
@@ -2458,228 +2488,282 @@ public class Node extends AbstractNode<Node> implements INodeData {
 //             */
 //            throw new RuntimeException(new InterruptedException());
 //        }
-        
+
         if (index < 0 || index > data.getKeyCount()) {
 
             throw new IndexOutOfBoundsException("index=" + index + ", nkeys="
                     + data.getKeyCount());
-            
+
         }
 
-        final Reference<AbstractNode<?>> childRef = childRefs[index];
-
-        final AbstractNode<?> child = childRef == null ? null : childRef.get();
-
-        if (child == null) {
+        if (!btree.isReadOnly()) {
 
             /*
-             * The child needs to be read from the backing store.
-             */
-            
-            if (!btree.isReadOnly()) {
-            
-                /*
-                 * The contract for the mutable B+Tree states that the caller is
-                 * single threaded. Therefore we do not need to synchronize for
-                 * this case.
-                 */
-
-                return _getChild(index);
-                
-            }
-
-            /*
-             * This case handles synchronization for concurrent readers.
+             * Optimization for the mutable B+Tree.
              * 
-             * FIXME This code path accounts for 8-10% of BSBM 100M with 4
-             * concurrent clients. It seems to me that we could use the Memoizer
-             * (FutureTask) pattern in Java Concurrency In Practice (page 108)
-             * to handle this in a manner which only causes the caller to block
-             * if they are awaiting a request for a specific child address. The
-             * Memoizer In
-             * order to do this we need a means to expire entries from the
-             * Memoizer's cache.  
+             * Note: Since the caller is single-threaded for the mutable B+Tree
+             * we do not need to use the Memoizer, which just delegates to
+             * _getChild(index). This saves us some object creation and overhead
+             * for this case.
+             */
+
+            return _getChild(index, null/* req */);
+
+        }
+
+        /*
+         * If we can resolve a hard reference to the child then we do not need
+         * to look any further.
+         */
+        synchronized (childRefs) {
+
+            /*
+             * Note: we need to synchronize on here to ensure visibility for
+             * childRefs[index] (in case it was updated in another thread). This
+             * is true even for the mutable B+Tree since the caller could use
+             * different threads for different operations. However, this
+             * synchronization will never be contended for the mutable B+Tree.
              */
             
-            if (childLocks != null) {
-            
-                /*
-                 * Synchronize on a per-child lock.
-                 * 
-                 * Note: We use a per-child index position lock in order to
-                 * allow the greatest possible concurrency and to reduce the
-                 * possibility of lock contention as much as possible.
-                 */
-                
-                final Object lock = childLocks[index];
-                
-                synchronized ( lock ) {
+            final Reference<AbstractNode<?>> childRef = childRefs[index];
 
-                    return _getChild(index);
-                    
-                }
+            final AbstractNode child = childRef == null ? null : childRef.get();
 
-            } else {
-            
-                /*
-                 * Synchronize on this node (the parent of the child). This case
-                 * is used if per-child locking is disabled -or- if the parent
-                 * had been read into memory before the BTree was marked as
-                 * read-only since, in this latter case, the per-child locks
-                 * were not allocated at the time that the parent was
-                 * materialized.
-                 */
-                
-                synchronized (this) {
-                    
-                    return _getChild(index);
-                    
-                }
-            
+            if (child != null) {
+
+                // Already materialized.
+                return child;
+
             }
-            
+
         }
-     
-        return child;
+
+        /*
+         * Otherwise we need to go through the Memoizer pattern to achieve
+         * non-blocking access. It will wind up delegating to _getChild(int),
+         * which is immediately below. However, it will ensure that one and only
+         * one thread executes _getChild(int) for a given parent and child
+         * index. That thread will update childRefs[index]. Any concurrent
+         * requests for the same child will wait for the FutureTask inside of
+         * the Memoizer and then return the new value of childRefs[index].
+         */
+
+        return btree.loadChild(this, index);
 
     }
 
     /**
-     * Read the child from the store, setting its parent and the reference in
-     * {@link #childRefs}. <strong>The caller MUST obtain any required
-     * synchronization locks before calling this method in order to prevent
-     * inconsistencies in the BTree structure arising from different threads
-     * reading the child into memory at the same time. This problem does NOT
-     * arise for the mutable {@link BTree} since it requires that its caller is
-     * already single-threaded, but it can arise for read-only {@link BTree}s
-     * and for {@link IndexSegment}s.</strong>
+     * Method conditionally reads the child at the specified index from the
+     * backing store and sets its reference on the appropriate element of
+     * {@link #childRefs}. This method assumes that external mechanisms
+     * guarantee that no other thread is requesting the same child via this
+     * method at the same time. For the mutable B+Tree, that guarantee is
+     * trivially given by its single-threaded constraint. For the read-only
+     * B+Tree, {@link AbstractBTree#loadChild(Node, int)} provides this
+     * guarantee using a {@link Memoizer} pattern. This method explicitly
+     * handshakes with the {@link ChildMemoizer} to clear the {@link FutureTask}
+     * from the memoizer's internal cache as soon as the reference to the child
+     * has been set on the appropriate element of {@link #childRefs}.
      * 
      * @param index
-     *            The index of the child to be read from the store.
+     *            The index of the child.
+     * @param req
+     *            The key we need to remove the request from the
+     *            {@link ChildMemoizer} cache (and <code>null</code> if this
+     *            method is not invoked by the memoizer pattern).
      *            
-     * @return The child.
+     * @return The child and never <code>null</code>.
      */
-    private final AbstractNode _getChild(final int index) {
-        
+    AbstractNode _getChild(final int index, final LoadChildRequest req) {
+
+        /*
+         * Make sure that the child is not reachable. It could have been
+         * concurrently set even if the caller had tested this and we do not
+         * want to read through to the backing store unless we need to.
+         */
+        AbstractNode child;
+        synchronized (childRefs) {
+
+            /*
+             * Note: we need to synchronize on here to ensure visibility for
+             * childRefs[index] (in case it was updated in another thread).
+             */
+            final Reference<AbstractNode<?>> childRef = childRefs[index];
+
+            child = childRef == null ? null : childRef.get();
+
+            if (child != null) {
+
+                // Already materialized.
+                return child;
+
+            }
+
+        }
+
+        /*
+         * The child needs to be read from the backing store.
+         */
+
         final long addr = data.getChildAddr(index);
 
-        if (addr == NULL) {
+        if (addr == IRawStore.NULL) {
 
-            // Note: Node/leaf underflow will not be supported.
-//            if (index == data.getKeyCount() && btree instanceof IndexSegment) {
-//
-//                final long priorAddr = data.getChildAddr(index - 1);
-//
-//                return new IndexSegment.ImmutableNodeFactory.ImmutableEmptyLastLeaf(
-//                        btree, priorAddr);
-//
-//            }
-            
-//                dump(Level.DEBUG, System.err);
+            // dump(Level.DEBUG, System.err);
             /*
-             * Note: It appears that this can be triggered by a full disk,
-             * but I am not quite certain how a full disk leads to this
-             * condition. Presumably the full disk would cause a write of
-             * the child to fail. In turn, that should cause the thread
-             * writing on the B+Tree to fail. If group commit is being used,
-             * the B+Tree should then be discarded and reloaded from its
-             * last commit point.
+             * Note: It appears that this can be triggered by a full disk, but I
+             * am not quite certain how a full disk leads to this condition.
+             * Presumably the full disk would cause a write of the child to
+             * fail. In turn, that should cause the thread writing on the B+Tree
+             * to fail. If group commit is being used, the B+Tree should then be
+             * discarded and reloaded from its last commit point.
              */
             throw new AssertionError(
                     "Child does not have persistent identity: this=" + this
                             + ", index=" + index);
+
         }
 
-        final AbstractNode child = btree.readNodeOrLeaf(addr);
+        /*
+         * Read the child from the backing store (potentially reads through to
+         * the disk).
+         * 
+         * Note: This is guaranteed to not do duplicate reads. There are two
+         * cases. (A) The mutable B+Tree. Since the mutable B+Tree is single
+         * threaded, this case is trivial. (B) The read-only B+Tree. Here our
+         * guarantee is that the caller is in ft.run() inside of the Memoizer,
+         * and that ensures that only one thread is executing for a given
+         * LoadChildRequest object (the input to the Computable). Note that
+         * LoadChildRequest MUST meet the criteria for a hash map for this
+         * guarantee to obtain.
+         */
+        child = btree.readNodeOrLeaf(addr);
 
-        // patch parent reference since loaded from store.
-//        child.parent = btree.newRef(this);
-        child.parent = this.self;
+        /*
+         * Update of the childRefs[index] element.
+         * 
+         * Note: This code block is synchronized in order to facilitate the safe
+         * publication of the change in childRefs[index] to other threads.
+         */
+        synchronized (childRefs) {
 
-        // patch the child reference.
-//        childRefs[index] = btree.newRef(child);
-        childRefs[index] = child.self;
+            /*
+             * Since the childRefs[index] element has not been updated we do so
+             * now while we are synchronized.
+             * 
+             * Note: This paranoia test could be tripped if the caller allowed
+             * concurrent requests to enter this method for the same child. In
+             * that case childRefs[index] could have an uncleared reference to
+             * the child. This would indicate a breakdown in the guarantee we
+             * require of the caller.
+             */
+            assert childRefs[index] == null || childRefs[index].get() == null : "Child is already set: this="
+                    + this + ", index=" + index;
+
+            // patch parent reference since loaded from store.
+            child.parent = this.self;
+
+            // patch the child reference.
+            childRefs[index] = child.self;
+
+        }
+
+        /*
+         * Clear the future task from the memoizer cache.
+         * 
+         * Note: This is necessary in order to prevent the cache from retaining
+         * a hard reference to each child materialized for the B+Tree.
+         * 
+         * Note: This does not depend on any additional synchronization. The
+         * Memoizer pattern guarantees that only one thread actually call
+         * ft.run() and hence runs this code.
+         */
+        if (req != null) {
+
+            btree.memo.removeFromCache(req);
+
+        }
 
         return child;
         
     }
-
-    /**
-     * Static helper method allocates the per-child lock objects.
-     * <p>
-     * Note that the mutable {@link BTree} imposes a single-threaded constraint
-     * on its API so we do not need to do any locking for that case and this
-     * method will therefore return <code>null</code> if the owning B+Tree is
-     * mutable.
-     * 
-     * @param btree
-     *            The owning B+Tree.
-     * 
-     * @param nkeys
-     *            The #of keys, which is used to dimension the array.
-     * 
-     * @return The array of lock objects -or- <code>null</code> if the btree is
-     *         mutable.
-     * 
-     * @see #childLocks
-     * 
-     * @todo Per-child locks will only be useful on nodes with a relatively high
-     *       probability of concurrent access. Therefore they should be
-     *       conditionally enabled only to a depth of 0 (for the root's direct
-     *       children) or 1 (for the children of the root's direct children).
-     *       There is just not going to be any utility to this beyond that
-     *       point, especially not on an {@link IndexSegment} with a relatively
-     *       high branching factor. We could directly compute the probability of
-     *       access to any given child based on the branching factor and the
-     *       depth of the node in the B+Tree and the assumption of a uniform
-     *       distribution of reads by concurrent threads [in fact, in many
-     *       benchmark situations we are more likely to content for the same
-     *       child unless the queries are parameterized].
-     */
-    static private final Object[] newChildLocks(final AbstractBTree btree,
-            final int nkeys) {
-        
-        /*
-         * Note: Uncommenting this has the effect of disabling per-child
-         * locking.
-         */
-        // if(true) return null;
-        
-        if (!btree.isReadOnly() || !btree.getIndexMetadata().getChildLocks()) {
-
-            /*
-             * Either The mutable B+Tree has a single threaded constraint so we
-             * do not need to do any locking for that case and therefore we do
-             * not allocate the per-child locks here -or- child locks were
-             * disabled as a configuration option.
-             */
-            
-            return null;
-            
-        }
-        
-        /*
-         * Note: The array is dimensioned to [branchingFactor] and not
-         * [branchingFactor+1]. The "overflow" slot of the various arrays are
-         * only used during node overflow/underflow operations. Those operations
-         * do not occur for a read-only B+Tree.
-         */
-//        final int n = btree.branchingFactor + 1;
-        
-        // Note: We only need locks for the child entries that exist!
-        final int n = nkeys + 1;
-        
-        final Object[] a = new Object[n];
-        
-        for (int i = 0; i < n; i++) {
-
-            a[i] = new Object();
-            
-        }
-        
-        return a;
-        
-    }
+    
+//    /**
+//     * Static helper method allocates the per-child lock objects.
+//     * <p>
+//     * Note that the mutable {@link BTree} imposes a single-threaded constraint
+//     * on its API so we do not need to do any locking for that case and this
+//     * method will therefore return <code>null</code> if the owning B+Tree is
+//     * mutable.
+//     * 
+//     * @param btree
+//     *            The owning B+Tree.
+//     * 
+//     * @param nkeys
+//     *            The #of keys, which is used to dimension the array.
+//     * 
+//     * @return The array of lock objects -or- <code>null</code> if the btree is
+//     *         mutable.
+//     * 
+//     * @see #childLocks
+//     * 
+//     * @todo Per-child locks will only be useful on nodes with a relatively high
+//     *       probability of concurrent access. Therefore they should be
+//     *       conditionally enabled only to a depth of 0 (for the root's direct
+//     *       children) or 1 (for the children of the root's direct children).
+//     *       There is just not going to be any utility to this beyond that
+//     *       point, especially not on an {@link IndexSegment} with a relatively
+//     *       high branching factor. We could directly compute the probability of
+//     *       access to any given child based on the branching factor and the
+//     *       depth of the node in the B+Tree and the assumption of a uniform
+//     *       distribution of reads by concurrent threads [in fact, in many
+//     *       benchmark situations we are more likely to content for the same
+//     *       child unless the queries are parameterized].
+//     */
+//    static private final Object[] newChildLocks(final AbstractBTree btree,
+//            final int nkeys) {
+//        
+//        /*
+//         * Note: Uncommenting this has the effect of disabling per-child
+//         * locking.
+//         */
+//        // if(true) return null;
+//        
+//        if (!btree.isReadOnly() || !btree.getIndexMetadata().getChildLocks()) {
+//
+//            /*
+//             * Either The mutable B+Tree has a single threaded constraint so we
+//             * do not need to do any locking for that case and therefore we do
+//             * not allocate the per-child locks here -or- child locks were
+//             * disabled as a configuration option.
+//             */
+//            
+//            return null;
+//            
+//        }
+//        
+//        /*
+//         * Note: The array is dimensioned to [branchingFactor] and not
+//         * [branchingFactor+1]. The "overflow" slot of the various arrays are
+//         * only used during node overflow/underflow operations. Those operations
+//         * do not occur for a read-only B+Tree.
+//         */
+////        final int n = btree.branchingFactor + 1;
+//        
+//        // Note: We only need locks for the child entries that exist!
+//        final int n = nkeys + 1;
+//        
+//        final Object[] a = new Object[n];
+//        
+//        for (int i = 0; i < n; i++) {
+//
+//            a[i] = new Object();
+//            
+//        }
+//        
+//        return a;
+//        
+//    }
 
     /**
      * Return the right-most child of this node.
