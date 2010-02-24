@@ -3349,7 +3349,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * information.
          */
 
-        assert ndistinctOnWriteRetentionQueue >= 0;
+        assert isReadOnly() || ndistinctOnWriteRetentionQueue > 0;
 
         node.referenceCount++;
 
