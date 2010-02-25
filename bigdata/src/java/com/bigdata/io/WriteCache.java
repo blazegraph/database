@@ -408,6 +408,9 @@ abstract public class WriteCache implements IWriteCache {
         // Note: The offset MAY be zero. This allows for stores without any
 		// header block.
 
+    	if (m_written) { // should be clean, NO WAY should this be written to!
+    		throw new RuntimeException("Writing to CLEAN cache: " + hashCode());
+    	}
 		if (data == null)
 			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
 
@@ -487,7 +490,9 @@ abstract public class WriteCache implements IWriteCache {
 				}
 
 				// copy the record into the cache, updating position() as we go.
+				int dpos = data.position();
 				tmp.put(data);
+				data.position(dpos); // restore buffer position TODO is this correct?
 
 				// set while synchronized since no contention.
 				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
@@ -496,6 +501,7 @@ abstract public class WriteCache implements IWriteCache {
 
 			// Add metadata for the record so it can be read back from the
 			// cache.
+			// System.out.println("WriteCache, to: " + pos + ", " + nbytes + ", thread: " + Thread.currentThread().getId());
 			recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, nbytes));
 
 			return true;
@@ -536,6 +542,7 @@ abstract public class WriteCache implements IWriteCache {
 			view.limit(pos + md.recordLength);
 			view.position(pos);
 
+			// System.out.println("WriteCache, addr: " + offset + ", from: " + pos + ", " + md.recordLength + ", thread: " + Thread.currentThread().getId());
 			/*
 			 * Copy the data into a newly allocated buffer. This is necessary
 			 * because our hold on the backing ByteBuffer for the WriteCache is
@@ -1051,6 +1058,10 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
+		/**
+		 * Called by WriteCacheService to process a direct write for large blocks and
+		 * also to flush data from dirty caches.
+		 */
 		@Override
         protected boolean writeOnChannel(final ByteBuffer data,
                 final Map<Long, RecordMetadata> recordMap, final long nanos)
@@ -1060,6 +1071,16 @@ abstract public class WriteCache implements IWriteCache {
 //
 //			final int nbytes = data.remaining();
 
+			if (m_written) {
+				throw new RuntimeException("DUPLICATE writeOnChannel for : " + this.hashCode());
+			} else {
+				m_written = true;
+//				try {
+//					throw new RuntimeException("GOOD writeOnChannel for : " + this.hashCode());
+//				} catch (RuntimeException re) {
+//					re.printStackTrace();
+//				}
+			}
 			/*
 			 * Retrieve the sorted write iterator and write each block to the
 			 * file
@@ -1088,5 +1109,41 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
+	}
+
+	/**
+	 * To support deletion we will remove any entries for the provided address
+	 * @param addr
+	 */
+	public void clearAddrMap(long addr) {
+		recordMap.remove(addr);
+	}
+
+	boolean m_written = false;
+
+	/**
+	 * Called to clear the WriteCacheService map of references to this WriteCache.
+	 * 
+	 * @param recordMap the map of the WriteCacheService that associates an address with a WriteCache
+	 * @throws InterruptedException 
+	 */
+	public void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap) throws InterruptedException {
+		Iterator<Long> entries = recordMap.keySet().iterator();
+		if (entries.hasNext()) {
+			if (log.isInfoEnabled())
+				log.info("resetting existing WriteCache: " + hashCode());
+		
+			while (entries.hasNext()) {
+				Long addr = entries.next();
+				// System.out.println("Removing address: " + addr + " from " + hashCode());
+				serviceRecordMap.remove(addr);
+			}
+			
+			reset();
+		} else {
+			if (log.isInfoEnabled())
+				log.info("clean WriteCache: " + hashCode()); // debug to see recycling
+		}
+		m_written = false;
 	}
 }

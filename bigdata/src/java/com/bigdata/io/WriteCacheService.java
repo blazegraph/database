@@ -27,8 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
+import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -49,6 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
@@ -154,15 +157,33 @@ abstract public class WriteCacheService implements IWriteCache {
      * A list of dirty buffers. Writes from these may be combined, but not
      * across {@link #flush(boolean)}.
      */
-    final private BlockingQueue<WriteCache> dirtyList;
+    final protected BlockingQueue<WriteCache> dirtyList;
 
+    /**
+     * The deferredList is used when WriteCaches should be added to the dirtyList
+     * but there is an ongoing {@link #flush(boolean)}. In this case the WriteCache is added to the deferredList
+     * and when the flush is complete, any members are transferred in order to the
+     * dirtyList.
+     */
+    final protected BlockingQueue<WriteCache> deferredDirtyList;
+
+    final private Latch deferredLatch = new Latch();
+    
     /**
      * A list of clean buffers. By clean, we mean not needing to be written.
      * Once a dirty write cache has been flushed, it is placed onto the
-     * {@link #cleanList}. When the {@link #current} write cache buffer needs to
-     * be replaced, one of the buffers from the {@link #cleanList} is recycled.
+     * {@link #cleanList}. Once a buffer has been placed on the list a
+     * low validation task will validate the buffer and move to the {@link #availList}.
      */
-    final private BlockingQueue<WriteCache> cleanList;
+    final protected BlockingQueue<WriteCache> cleanList;
+
+    /**
+     * A list of validated buffers. Clean buffers are moved from the {@link #cleanList} to the
+     * {@link #availList} once validated by read back. When the {@link #current} write cache buffer needs to
+     * be replaced, one of the buffers from the {@link #availList} is recycled. If none are available
+     * then a new buffer is created.
+     */
+    final protected BlockingQueue<WriteCache> availList;
 
     /**
      * The current buffer.
@@ -184,7 +205,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * A map from the offset of the record on the backing file to the cache
      * buffer on which that record was written.
      */
-    private final ConcurrentMap<Long/* offset */, WriteCache> recordMap;
+    protected final ConcurrentMap<Long/* offset */, WriteCache> recordMap;
 
     /**
      * Allocates N buffers from the {@link DirectBufferPool}.
@@ -210,8 +231,10 @@ abstract public class WriteCacheService implements IWriteCache {
         this.opener = opener;
 
         dirtyList = new LinkedBlockingQueue<WriteCache>();
+        deferredDirtyList = new LinkedBlockingQueue<WriteCache>();
 
         cleanList = new LinkedBlockingQueue<WriteCache>();
+        availList = new LinkedBlockingQueue<WriteCache>();
 
         for (int i = 0; i < nbuffers - 1; i++) {
 
@@ -252,21 +275,29 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 try {
 
-                    lock.readLock().lock();
+                    lock.readLock().lockInterruptibly(); // allows shutdown1
 
                     try {
 
+                        if (dirtyList.isEmpty()) {
+                        	continue;
+                        }
+                        
                         final WriteCache cache = dirtyList.take();
-
+                        
                         cache.flush(false/* force */);
 
                         cleanList.add(cache);
                         
-                        if(dirtyList.isEmpty()) {
-                            
-                            dirtyListEmpty.signalAll();
-                            
-                        }
+                        if (dirtyList.isEmpty()) {
+                        	try {
+                        		dllock.lock();
+                                dirtyListEmpty.signalAll();
+                        		
+                        	} finally {
+                        		dllock.unlock();
+                        	}
+                         }
                             
                     } finally {
 
@@ -304,6 +335,33 @@ abstract public class WriteCacheService implements IWriteCache {
             IReopenChannel<? extends Channel> opener)
             throws InterruptedException;
 
+    /**
+     * call reset on all dirtList objects and move to cleanList
+     * 
+     * @throws InterruptedException 
+     */
+    public void resetAll() throws InterruptedException {
+        final Lock readLock = lock.readLock();
+
+        readLock.lockInterruptibly();
+
+        try {
+
+            for (WriteCache t1 : dirtyList) {
+
+                t1.resetWith(recordMap);
+
+            }
+
+        	dirtyList.drainTo(cleanList);
+
+        } finally {
+
+            readLock.unlock();
+
+        }
+    }
+    
     public void close() throws InterruptedException {
 
         if (open.compareAndSet(true/* expect */, false/* update */)) {
@@ -380,7 +438,8 @@ abstract public class WriteCacheService implements IWriteCache {
      * becomes empty (but not until the last buffer drained from that list has
      * been written through to the backing channel).
      */
-    final private Condition dirtyListEmpty = lock.readLock().newCondition();
+    final private ReentrantLock dllock = new ReentrantLock();
+    final private Condition dirtyListEmpty = dllock.newCondition();
     
     /**
      * @throws IllegalStateException
@@ -526,9 +585,55 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
-
-        throw new UnsupportedOperationException();
-
+        final Lock writeLock = lock.writeLock();
+        boolean isLocked = false;
+        writeLock.lockInterruptibly();
+        isLocked = true;
+        try {
+        	deferredLatch.inc();
+        	
+            final WriteCache tmp = current.get();
+            final WriteCache nxt = cleanList.take();
+            nxt.resetWith(recordMap);
+            current.set(nxt); // 
+            if (tmp == null) {
+            	throw new RuntimeException();
+            }
+            dirtyList.add(tmp);
+            
+            // wait for dirtyList empty with signal from WriteTask
+            
+            try {
+                writeLock.unlock();
+                isLocked = false;
+	            dllock.lockInterruptibly();
+	            if (!dirtyList.isEmpty())
+	            	dirtyListEmpty.await(timeout, units);
+            } finally {
+            	dllock.unlock();
+            }
+            
+            // now check for deferredDirty, not allowing anything else to write to it!
+            
+            writeLock.lockInterruptibly();
+            isLocked = true;
+            if (log.isInfoEnabled())
+            	log.info("deferredDirtyList.isEmpty: " + deferredDirtyList.isEmpty());
+            deferredDirtyList.drainTo(dirtyList);
+            
+            if (true) {
+            	((FileChannel) opener.reopenChannel()).force(force);
+            }
+            
+                    	
+            return true;
+    	} catch (IOException e) {
+			throw new RuntimeException(e); // force reopen
+		} finally {
+        	deferredLatch.dec();
+        	if (isLocked)
+        		writeLock.unlock();
+    	}
     }
 
     /**
@@ -553,6 +658,9 @@ abstract public class WriteCacheService implements IWriteCache {
     public boolean write(final long offset, final ByteBuffer data)
             throws InterruptedException, IllegalStateException {
 
+    	if (log.isInfoEnabled()) {
+    		log.info("offset: " + offset + ", length: " + data.limit());
+    	}
         if (offset < 0)
             throw new IllegalArgumentException();
 
@@ -587,7 +695,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 // Write the record on the channel using write cache factory.
                 newWriteCache(data, opener).writeOnChannel(data, recordMap,
                         Long.MAX_VALUE/* nanos */);
-
+                
                 return true;
 
             } catch (Throwable e) {
@@ -688,33 +796,36 @@ abstract public class WriteCacheService implements IWriteCache {
                             + " outstanding permits (should be just one).";
 
                     // Move the current buffer to the dirty list.
-                    dirtyList.add(cache);
+                    if (deferredLatch.get() == 0)
+                    	dirtyList.add(cache);
+                    else 
+                    	deferredDirtyList.add(cache);
 
                     // Take the first clean buffer (may block).
                     final WriteCache newBuffer = cleanList.take();
 
-                    // Clear entries from our record map before reusing.
-                    {
+                    // Clear entries from our record map before reusing.                   
+//                    {
+//
+//                        final Iterator<Map.Entry<Long, WriteCache>> itr = recordMap
+//                                .entrySet().iterator();
+//
+//                        while (itr.hasNext()) {
+//
+//                            final Map.Entry<Long, WriteCache> e = itr.next();
+//
+//                            if (e.getValue() == newBuffer) {
+//
+//                                itr.remove();
+//
+//                            }
+//
+//                        }
+//
+//                    }
 
-                        final Iterator<Map.Entry<Long, WriteCache>> itr = recordMap
-                                .entrySet().iterator();
-
-                        while (itr.hasNext()) {
-
-                            final Map.Entry<Long, WriteCache> e = itr.next();
-
-                            if (e.getValue() == newBuffer) {
-
-                                itr.remove();
-
-                            }
-
-                        }
-
-                    }
-
-                    // Clear the state on the new buffer
-                    newBuffer.reset();
+                    // Clear the state on the new buffer and remove from cacheService map
+                    newBuffer.resetWith(recordMap);
 
                     // Set it as the new buffer.
                     current.set(cache = newBuffer);
