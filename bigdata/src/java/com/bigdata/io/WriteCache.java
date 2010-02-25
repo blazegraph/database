@@ -47,8 +47,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexSegmentBuilder;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
@@ -391,7 +394,7 @@ abstract public class WriteCache implements IWriteCache {
 	}
 
     /**
-     * Write the record on the cache.
+     * {@inheritDoc}
      * 
      * @throws IllegalStateException
      *             If the buffer is closed.
@@ -403,7 +406,7 @@ abstract public class WriteCache implements IWriteCache {
      *             the backing channel.
      */
     public boolean write(final long offset, final ByteBuffer data)
-            throws InterruptedException, IllegalStateException {
+            throws InterruptedException {
 
         // Note: The offset MAY be zero. This allows for stores without any
 		// header block.
@@ -414,6 +417,8 @@ abstract public class WriteCache implements IWriteCache {
 		if (data == null)
 			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
 
+		final WriteCacheCounters counters = this.counters.get();
+		
 		final ByteBuffer tmp = acquire();
 
 		try {
@@ -497,6 +502,9 @@ abstract public class WriteCache implements IWriteCache {
 				// set while synchronized since no contention.
 				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
 
+                counters.naccept++;
+                counters.bytesAccepted += nbytes;
+
 			}
 
 			// Add metadata for the record so it can be read back from the
@@ -515,12 +523,15 @@ abstract public class WriteCache implements IWriteCache {
 	}
 
     /**
+     * {@inheritDoc}
+     * 
      * @throws IllegalStateException
      *             If the buffer is closed.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException,
-            IllegalStateException {
+    public ByteBuffer read(final long offset) throws InterruptedException {
 
+        final WriteCacheCounters counters = this.counters.get(); 
+            
 		final ByteBuffer tmp = acquire();
 
 		try {
@@ -528,7 +539,10 @@ abstract public class WriteCache implements IWriteCache {
 			// Look up the metadata for that record in the cache.
 			final RecordMetadata md;
 			if ((md = recordMap.get(offset)) == null) {
+			    
 				// The record is not in this write cache.
+			    counters.nmiss++;
+			    
 				return null;
 			}
 
@@ -557,6 +571,8 @@ abstract public class WriteCache implements IWriteCache {
 			// flip buffer for reading.
 			dst.flip();
 
+			counters.nhit++;
+            
 			return dst;
 
 		} finally {
@@ -720,6 +736,8 @@ abstract public class WriteCache implements IWriteCache {
 		// remaining nanoseconds to wait.
 		long remaining = nanos;
 
+        final WriteCacheCounters counters = this.counters.get();
+        
 		final Lock writeLock = lock.writeLock();
 
 		if (!writeLock.tryLock(remaining, TimeUnit.NANOSECONDS)) {
@@ -730,6 +748,8 @@ abstract public class WriteCache implements IWriteCache {
 
 		try {
 
+		    counters.nflush++;
+		    
 			// remaining := (total - elapsed).
 			remaining = nanos - (System.nanoTime() - begin);
 
@@ -810,8 +830,9 @@ abstract public class WriteCache implements IWriteCache {
      *         within the time alloted.
      * 
      * @throws InterruptedException
-     * @throws TimeoutException
+     *             if the thread was interrupted.
      * @throws IOException
+     *             if there was an IO problem.
      */
     abstract protected boolean writeOnChannel(final ByteBuffer buf,
             final Map<Long, RecordMetadata> recordMap, final long nanos)
@@ -949,6 +970,212 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
+    /**
+     * The current performance counters.
+     */
+    protected final AtomicReference<WriteCacheCounters> counters = new AtomicReference<WriteCacheCounters>(
+            new WriteCacheCounters());
+
+    /**
+     * Sets the performance counters to be used by the write cache. A service
+     * should do this if you want to aggregate the performance counters across
+     * multiple {@link WriteCache} instances.
+     * 
+     * @param newVal
+     *            The shared performance counters.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     */
+    void setCounters(final WriteCacheCounters newVal) {
+        
+        if (newVal == null)
+            return;
+
+        this.counters.set(newVal);
+        
+    }
+
+    /**
+     * Return the performance counters for the write cacher.
+     */
+    public CounterSet getCounters() {
+
+        return counters.get().getCounters();
+
+    }
+
+    /**
+     * Performance counters for the {@link WriteCache}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * 
+     *         FIXME Counters should be thread-local or stripped with periodic
+     *         {@link #add(StoreCounters)} to the shared counters to provide
+     *         eventually consistent values with low-to-no
+     *         contention/synchronization.
+     *         <p>
+     *         Note: Some counters are going to be thread-safe automatically
+     *         when used in the context of a single {@link WriteCache} instance
+     *         (nhits, etc) and others are going to be safe when used in the
+     *         context of a single writer thread (all of the counters for
+     *         writing on the backing channel). So, different solutions might
+     *         work for different counters.
+     */
+    public static class WriteCacheCounters {
+
+        /*
+         * read on the cache.
+         */
+        
+        /**
+         * #of read requests that are satisfied by the write cache.
+         */
+        public long nhit;
+
+        /**
+         * The #of read requests that are not satisfied by the write cache.
+         */
+        public long nmiss;
+
+        /*
+         * write on the cache.
+         */
+        
+        /**
+         * #of records accepted for eventual write onto the backing channel.
+         */
+        public long naccept;
+
+        /**
+         * #of bytes accepted for eventual write onto the backing channel. 
+         */
+        public long bytesAccepted;
+
+        /*
+         * write on the channel.
+         */
+        
+        /**
+         * #of times {@link IWriteCache#flush(boolean)} was called.
+         */
+        public long nflush;
+
+        /**
+         * #of writes on the backing channel. Note that some write cache
+         * implementations do ordered writes and will therefore do one write per
+         * record while others do append only and therefore do one write per
+         * write cache flush. Note that in both cases we may have to redo a
+         * write if the backing channel was concurrently closed, so the value
+         * here can diverge from the #of accepted records and the #of requested
+         * flushes.
+         */
+        public long nwrite;
+        
+        /**
+         * #of bytes written onto the backing channel.
+         */
+        public long bytesWritten;
+        
+        /**
+         * Total elapsed time writing onto the backing channel.
+         */
+        public long elapsedWriteNanos;
+
+        public CounterSet getCounters() {
+
+            final CounterSet root = new CounterSet();
+
+            /*
+             * read on the cache.
+             */
+            
+            root.addCounter("nhit", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nhit);
+                }
+            });
+
+            root.addCounter("nmiss", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nmiss);
+                }
+            });
+
+            root.addCounter("hitRate", new Instrument<Double>() {
+                public void sample() {
+                    final long ntests = nhit + nmiss;
+                    final long nhits = nhit;
+                    setValue(ntests == 0L ? 0d : (double) nhits / ntests);
+                }
+            });
+
+            /*
+             * write on the cache.
+             */
+
+            // #of records accepted by the write cache.
+            root.addCounter("naccept", new Instrument<Long>() {
+                public void sample() {
+                    setValue(naccept);
+                }
+            });
+            
+            // #of bytes in records accepted by the write cache.
+            root.addCounter("bytesAccepted", new Instrument<Long>() {
+                public void sample() {
+                    setValue(bytesAccepted);
+                }
+            });
+
+            /*
+             * write on the channel.
+             */
+
+            // #of times the write cache was flushed to the backing channel.
+            root.addCounter("nflush", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nflush);
+                }
+            });
+
+            // #of writes onto the backing channel.
+            root.addCounter("nwrite", new Instrument<Long>() {
+                public void sample() {
+                    setValue(nwrite);
+                }
+            });
+
+            // #of bytes written onto the backing channel.
+            root.addCounter("bytesWritten", new Instrument<Long>() {
+                public void sample() {
+                    setValue(bytesWritten);
+                }
+            });
+
+            // average bytes per write (will under report if we must retry writes).
+            root.addCounter("bytesPerWrite", new Instrument<Double>() {
+                public void sample() {
+                    final double bytesPerWrite = (nwrite == 0 ? 0d
+                            : (bytesWritten / (double)nwrite));
+                    setValue(bytesPerWrite);
+                }
+            });
+            
+            // elapsed time writing on the backing channel.
+            root.addCounter("writeSecs", new Instrument<Double>() {
+                public void sample() {
+                    setValue(elapsedWriteNanos / 1000000000.);
+                }
+            });
+
+            return root;
+
+        } // getCounters()
+
+    } // class WriteCacheCounters
+	
 	/**
 	 * A {@link WriteCache} implementation suitable for an append-only file such
 	 * as the {@link DiskOnlyStrategy} or the output file of the
@@ -959,17 +1186,17 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	public static class FileChannelWriteCache extends WriteCache {
 
-		/**
-		 * An offset which will be applied to each record written onto the
-		 * backing {@link FileChannel}. The offset is generally the size of the
-		 * root blocks for a journal or the checkpoint record for an index
-		 * segment. It can be zero if you do not have anything at the head of
-		 * the file.
-		 * 
-		 * @todo This implies that writing the root blocks is done separately in
-		 *       the protocol since you can't write below this offset otherwise.
-		 */
-		final private long baseOffset;
+        /**
+         * An offset which will be applied to each record written onto the
+         * backing {@link FileChannel}. The offset is generally the size of the
+         * root blocks for a journal or the checkpoint record for an index
+         * segment. It can be zero if you do not have anything at the head of
+         * the file.
+         * <p>
+         * Note: This implies that writing the root blocks is done separately in
+         * the protocol since you can't write below this offset otherwise.
+         */
+		final protected long baseOffset;
 
 		/**
 		 * Used to re-open the {@link FileChannel} in this class.
@@ -1004,7 +1231,11 @@ abstract public class WriteCache implements IWriteCache {
         @Override
         protected boolean writeOnChannel(final ByteBuffer data,
                 final Map<Long, RecordMetadata> recordMap, final long nanos)
-                throws InterruptedException, TimeoutException, IOException {
+                throws InterruptedException, IOException {
+
+            final long begin = System.nanoTime();
+            
+            final int nbytes = data.remaining();
 
             /*
              * The position in the file at which the record will be written.
@@ -1016,7 +1247,12 @@ abstract public class WriteCache implements IWriteCache {
              * 
              * @todo This ignores the timeout.
              */
-            FileChannelUtility.writeAll(opener, data, pos);
+            final int nwrites = FileChannelUtility.writeAll(opener, data, pos);
+
+            final WriteCacheCounters counters = this.counters.get();
+            counters.nwrite += nwrites;
+            counters.bytesWritten += nbytes;
+            counters.elapsedWriteNanos += (System.nanoTime() - begin);
 
             return true;
 
@@ -1065,11 +1301,11 @@ abstract public class WriteCache implements IWriteCache {
 		@Override
         protected boolean writeOnChannel(final ByteBuffer data,
                 final Map<Long, RecordMetadata> recordMap, final long nanos)
-                throws InterruptedException, TimeoutException, IOException {
+                throws InterruptedException, IOException {
 
-//			final long begin = System.nanoTime();
-//
-//			final int nbytes = data.remaining();
+			final long begin = System.nanoTime();
+
+			final int nbytes = data.remaining();
 
 			if (m_written) {
 				throw new RuntimeException("DUPLICATE writeOnChannel for : " + this.hashCode());
@@ -1081,15 +1317,18 @@ abstract public class WriteCache implements IWriteCache {
 //					re.printStackTrace();
 //				}
 			}
+			
 			/*
 			 * Retrieve the sorted write iterator and write each block to the
 			 * file
 			 */
-			Iterator<Entry<Long, RecordMetadata>> entries = recordMap.entrySet().iterator();
+			int nwrites = 0;
+			final Iterator<Entry<Long, RecordMetadata>> entries = recordMap.entrySet().iterator();
 			while (entries.hasNext()) {
-				Entry<Long, RecordMetadata> entry = entries.next();
+				
+			    final Entry<Long, RecordMetadata> entry = entries.next();
 
-				RecordMetadata md = entry.getValue();
+				final RecordMetadata md = entry.getValue();
 
 				// create a view on record of interest.
 				final ByteBuffer view = data.duplicate();
@@ -1098,13 +1337,16 @@ abstract public class WriteCache implements IWriteCache {
 				view.position(pos);
 
 				final long offset = entry.getKey(); // offset in file to update
-				FileChannelUtility.writeAll(opener, view, offset);
+				nwrites += FileChannelUtility.writeAll(opener, view, offset);
 //				if (log.isInfoEnabled())
 //					log.info("writing to: " + offset);
 			}
 
-//			final long elapsed = System.nanoTime() - begin;
-
+			final WriteCacheCounters counters = this.counters.get();
+            counters.nwrite += nwrites;
+            counters.bytesWritten += nbytes;
+            counters.elapsedWriteNanos += (System.nanoTime() - begin);
+			
 			return true;
 
 		}
