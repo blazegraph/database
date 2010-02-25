@@ -73,7 +73,7 @@ public interface IWriteCache {
      *             the backing channel.
      */
     public boolean write(final long offset, final ByteBuffer data)
-            throws InterruptedException, IllegalStateException;
+            throws InterruptedException;
 
     /**
      * Read a record from the write cache.
@@ -95,8 +95,7 @@ public interface IWriteCache {
      * @throws IllegalStateException
      *             if the buffer is closed.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException,
-            IllegalStateException;
+    public ByteBuffer read(final long offset) throws InterruptedException;
 
 //    /**
 //     * Update a record in the write cache.
@@ -129,28 +128,32 @@ public interface IWriteCache {
 //            throws IllegalStateException, InterruptedException;
 
     /**
-     * Flush the writes to the backing channel.
-     * 
-     * @param force
-     *            When <code>true</code>, the data will be forced to stable
-     *            media.
+     * Flush the writes to the backing channel but does not force anything to
+     * the backing channel. The caller is responsible for managing when the
+     * channel is forced to the disk (if it is backed by disk) and whether file
+     * data or file data and file metadata are forced to the disk.
      * 
      * @throws IOException
      * @throws InterruptedException
+     * 
+     *             FIXME The [force] parameter is ignored and will be removed
+     *             shortly.
      */
     public void flush(final boolean force) throws IOException,
             InterruptedException;
 
     /**
-     * Flush the writes to the backing channel (does not sync the channel).
-     * 
-     * @param force
-     *            When <code>true</code>, the data will be forced to stable
-     *            media.
+     * Flush the writes to the backing channel but does not force anything to
+     * the backing channel. The caller is responsible for managing when the
+     * channel is forced to the disk (if it is backed by disk) and whether file
+     * data or file data and file metadata are forced to the disk.
      * 
      * @throws IOException
      * @throws TimeoutException
      * @throws InterruptedException
+     * 
+     *             FIXME The [force] parameter is ignored and will be removed
+     *             shortly.
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit unit) throws IOException, TimeoutException,
