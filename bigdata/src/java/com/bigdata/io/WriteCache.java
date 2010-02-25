@@ -495,9 +495,7 @@ abstract public class WriteCache implements IWriteCache {
 				}
 
 				// copy the record into the cache, updating position() as we go.
-				int dpos = data.position();
 				tmp.put(data);
-				data.position(dpos); // restore buffer position TODO is this correct?
 
 				// set while synchronized since no contention.
 				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
@@ -1174,6 +1172,12 @@ abstract public class WriteCache implements IWriteCache {
 
         } // getCounters()
 
+        public String toString() {
+            
+            return getCounters().toString();
+            
+        }
+        
     } // class WriteCacheCounters
 	
 	/**
