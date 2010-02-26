@@ -72,12 +72,13 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
         super.commit();
         
-        long commitTime= getIndexManager().commit();
+        final long commitTime= getIndexManager().commit();
         
         final long elapsed = System.currentTimeMillis() - begin;
 
         if (log.isInfoEnabled())
-            log.info("commit: commit latency="+elapsed+"ms");
+            log.info("commit: commit latency=" + elapsed + "ms");
+        
         return commitTime;
     }
 
