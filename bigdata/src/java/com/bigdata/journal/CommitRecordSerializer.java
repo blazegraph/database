@@ -88,13 +88,13 @@ public class CommitRecordSerializer {
         
     }
     
-    public ICommitRecord deserialize(ByteBuffer buf) {
+    public ICommitRecord deserialize(final ByteBuffer buf) {
 
         try {
 
-            ByteBufferInputStream bbis = new ByteBufferInputStream(buf);
+            final ByteBufferInputStream bbis = new ByteBufferInputStream(buf);
 
-            DataInputStream dis = new DataInputStream(bbis);
+            final DataInputStream dis = new DataInputStream(bbis);
 
             final int version = dis.readInt();
 
