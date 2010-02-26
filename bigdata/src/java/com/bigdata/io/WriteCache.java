@@ -393,6 +393,15 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
+	/**
+	 * The capacity of the buffer.
+	 */
+	final public boolean isEmpty() {
+
+		return recordMap.isEmpty();
+
+	}
+
     /**
      * {@inheritDoc}
      * 
