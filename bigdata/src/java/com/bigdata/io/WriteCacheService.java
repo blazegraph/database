@@ -585,6 +585,7 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
+    	synchronized (this) {
         final Lock writeLock = lock.writeLock();
         boolean isLocked = false;
         writeLock.lockInterruptibly();
@@ -593,13 +594,15 @@ abstract public class WriteCacheService implements IWriteCache {
         	deferredLatch.inc();
         	
             final WriteCache tmp = current.get();
-            final WriteCache nxt = cleanList.take();
-            nxt.resetWith(recordMap);
-            current.set(nxt); // 
-            if (tmp == null) {
-            	throw new RuntimeException();
+            if (!tmp.isEmpty()) {
+	            final WriteCache nxt = cleanList.take();
+	            nxt.resetWith(recordMap);
+	            current.set(nxt); // 
+	            if (tmp == null) {
+	            	throw new RuntimeException();
+	            }
+	            dirtyList.add(tmp);
             }
-            dirtyList.add(tmp);
             
             // wait for dirtyList empty with signal from WriteTask
             
@@ -633,6 +636,7 @@ abstract public class WriteCacheService implements IWriteCache {
         	deferredLatch.dec();
         	if (isLocked)
         		writeLock.unlock();
+    	}
     	}
     }
 
