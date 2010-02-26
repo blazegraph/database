@@ -1335,7 +1335,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return distinctTermScan(keyOrder,/* termIdFilter */null);
         
     }
-    
+
     /**
      * Efficient scan of the distinct term identifiers that appear in the first
      * position of the keys for the statement index corresponding to the
@@ -1347,6 +1347,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            The selected index order.
      * 
      * @return An iterator visiting the distinct term identifiers.
+     * 
+     * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
+     *       fast scans across multiple shards when chunk-wise order is Ok.
      */
     public IChunkedIterator<Long> distinctTermScan(
             final IKeyOrder<ISPO> keyOrder, final ITermIdFilter termIdFilter) {
