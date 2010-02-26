@@ -52,13 +52,16 @@ public class CommitRecord implements ICommitRecord {
         
     }
 
-    public CommitRecord(long timestamp, long commitCounter, long[] roots) {
-        
+    public CommitRecord(final long timestamp, final long commitCounter,
+            final long[] roots) {
+
 //        assert timestamp != 0L; // @todo what constraint?
         
         assert roots != null;
         
-        assert roots.length == ICommitRecord.MAX_ROOT_ADDRS;
+        assert roots.length == ICommitRecord.MAX_ROOT_ADDRS : "roots.length="
+                + roots.length + ", but expecting: "
+                + ICommitRecord.MAX_ROOT_ADDRS;
         
         this.timestamp = timestamp;
         
