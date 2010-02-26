@@ -47,7 +47,6 @@ import com.bigdata.cache.IGlobalLRU;
 import com.bigdata.cache.StoreAndAddressLRUCache;
 import com.bigdata.cache.WeakReferenceGlobalLRU;
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
-import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.TemporaryRawStore;
