@@ -338,4 +338,55 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
     }
 
+    /**
+     * Test of abort semantics.
+     */
+    public void test_abort() {
+
+        class AbortException extends RuntimeException {
+            private static final long serialVersionUID = 1L;
+        }
+
+        final IAtomicStore store = (IAtomicStore) getStore();
+
+        try {
+
+            // write some data onto the store.
+            for (int i = 0; i < 100; i++) {
+                
+                store.write(getRandomData());
+                
+            }
+
+            // trigger an abort.
+            throw new AbortException();
+
+        } catch (AbortException ex) {
+
+            // discard the write set.
+            store.abort();
+
+            /*
+             * write different data onto the store (just to verify that it is
+             * still functional).
+             */
+            for (int i = 0; i < 100; i++) {
+                store.write(getRandomData());
+            }
+            
+        } catch (Throwable t) {
+
+            // discard the write set.
+            store.abort();
+
+            fail("Unexpected exception: " + t, t);
+
+        } finally {
+
+            store.destroy();
+
+        }
+
+    }
+
 }
