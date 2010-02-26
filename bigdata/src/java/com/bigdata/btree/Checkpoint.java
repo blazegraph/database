@@ -340,7 +340,7 @@ public class Checkpoint implements Externalizable {
      *             if the {@link Checkpoint} record has already been
      *             written.
      */
-    final public void write(IRawStore store) {
+    final public void write(final IRawStore store) {
 
         if (addrCheckpoint != 0L) {
             
@@ -379,7 +379,7 @@ public class Checkpoint implements Externalizable {
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
         
         final int version = (int) LongPacker.unpackLong(in);
 
@@ -412,7 +412,7 @@ public class Checkpoint implements Externalizable {
 
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         LongPacker.packLong(out, VERSION1);
 
