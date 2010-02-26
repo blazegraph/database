@@ -327,7 +327,10 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             } catch (Throwable t) {
 
-                assertTrue(isInnerCause(t, ClosedByInterruptException.class));
+                if (!(isInnerCause(t, ClosedByInterruptException.class))) {
+                    fail("Expecting: inner cause"
+                            + ClosedByInterruptException.class.getName(), t);
+                }
 
                 // clear the interrupt.
                 assertTrue(Thread.interrupted());
@@ -390,7 +393,10 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             } catch (Throwable t) {
 
-                assertTrue(isInnerCause(t, ClosedByInterruptException.class));
+                if (!(isInnerCause(t, ClosedByInterruptException.class))) {
+                    fail("Expecting: inner cause"
+                            + ClosedByInterruptException.class.getName(), t);
+                }
 
                 // clear the interrupt.
                 assertTrue(Thread.interrupted());
