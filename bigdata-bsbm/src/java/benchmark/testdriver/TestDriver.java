@@ -28,6 +28,7 @@ import java.io.ObjectOutputStream;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Random;
 
 import org.apache.log4j.xml.DOMConfigurator;
 import org.apache.log4j.Logger;
@@ -501,9 +502,15 @@ public class TestDriver {
 					multithreading = true;
 					nrThreads = Integer.parseInt(args[i++ + 1]);
 				}
-				else if(args[i].equals("-seed")) {
-					seed = Long.parseLong(args[i++ + 1]);
-				}
+                else if(args[i].equals("-seed")) {
+                    final String s = args[i++ + 1];
+                    if(s.equals("random")) {
+                        seed = System.currentTimeMillis();
+                        System.out.println("random seed: "+seed);
+                    } else {
+                        seed = Long.parseLong(s);
+                    }
+                }
 				else if(args[i].equals("-t")) {
 					timeout = Integer.parseInt(args[i++ + 1]);
 				}
@@ -717,7 +724,7 @@ public class TestDriver {
 						"\t-mt <Number of clients>\n" +
 						"\t\tRun multiple clients concurrently.\n" +
 						"\t\tdefault: not set\n" +
-						"\t-seed <Long Integer>\n" +
+						"\t-seed (<Long Integer>|random)\n" +
 						"\t\tInit the Test Driver with another seed than the default.\n" +
 						"\t\tdefault: " + TestDriverDefaultValues.seed + "\n" +
 						"\t-t <timeout in ms>\n" +
