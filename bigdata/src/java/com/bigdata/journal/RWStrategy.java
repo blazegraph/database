@@ -395,6 +395,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		}
 	}
 	
+	// FIXME Martyn, please hook this in.  It should call writeCacheService.reset().
+	public void abort() {
+	    throw new UnsupportedOperationException();
+	}
+	
 	public void force(boolean metadata) {
 		try {
 			m_store.flushWrites(metadata);

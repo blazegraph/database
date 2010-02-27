@@ -32,7 +32,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -336,32 +335,32 @@ abstract public class WriteCacheService implements IWriteCache {
             throws InterruptedException;
 
     /**
-     * call reset on all dirtList objects and move to cleanList
+     * {@inheritDoc}
+     * <p>
+     * This implementation calls {@link IWriteCache#reset()} on all
+     * {@link #dirtyList} objects and moves those buffers to the
+     * {@link #availList}.
      * 
-     * @throws InterruptedException 
+     * FIXME This puts the buffers onto the cleanList for now. This should be
+     * changed to put them onto the availList as soon as that list is put into
+     * play.
      */
-    public void resetAll() throws InterruptedException {
-        final Lock readLock = lock.readLock();
+    public void reset() throws InterruptedException {
 
-        readLock.lockInterruptibly();
+        final List<WriteCache> c = new LinkedList<WriteCache>();
 
-        try {
+        dirtyList.drainTo(c);
 
-            for (WriteCache t1 : dirtyList) {
+        for (WriteCache t1 : dirtyList) {
 
-                t1.resetWith(recordMap);
+            t1.resetWith(recordMap);
 
-            }
-
-        	dirtyList.drainTo(cleanList);
-
-        } finally {
-
-            readLock.unlock();
+            cleanList.put(t1);
 
         }
+
     }
-    
+
     public void close() throws InterruptedException {
 
         if (open.compareAndSet(true/* expect */, false/* update */)) {
@@ -723,7 +722,21 @@ abstract public class WriteCacheService implements IWriteCache {
                 // write on the cache.
                 if (cache.write(offset, data)) {
 
-                    // Done.
+                    /*
+                     * Note: We MUST use put() here rather than putIfAbsent()
+                     * and the return value MAY be non-null. This condition
+                     * arises when there exists a record on a clean buffer which
+                     * was part of an aborted write set. Such records may be
+                     * rewritten following the abort. Since the record was
+                     * already laid down on the backing channel, there is no
+                     * point clearing it from the clean write cache buffers,
+                     * which would require us to track all records in a given
+                     * write set (not very scalable).
+                     * 
+                     * Note: put() SHOULD return non-null further down in this
+                     * method since we will always be looking at a new buffer in
+                     * those code paths.
+                     */
                     recordMap.put(offset, cache);
 
                     return true;
@@ -772,7 +785,10 @@ abstract public class WriteCacheService implements IWriteCache {
                     if (cache.write(offset, data)) {
 
                         // It fits: someone already changed to a new cache.
-                        recordMap.put(offset, cache);
+                        if (recordMap.put(offset, cache) != null) {
+                            throw new AssertionError(
+                                    "Record already in cache: offset=" + offset);
+                        }
 
                         return true;
 
@@ -808,26 +824,6 @@ abstract public class WriteCacheService implements IWriteCache {
                     // Take the first clean buffer (may block).
                     final WriteCache newBuffer = cleanList.take();
 
-                    // Clear entries from our record map before reusing.                   
-//                    {
-//
-//                        final Iterator<Map.Entry<Long, WriteCache>> itr = recordMap
-//                                .entrySet().iterator();
-//
-//                        while (itr.hasNext()) {
-//
-//                            final Map.Entry<Long, WriteCache> e = itr.next();
-//
-//                            if (e.getValue() == newBuffer) {
-//
-//                                itr.remove();
-//
-//                            }
-//
-//                        }
-//
-//                    }
-
                     // Clear the state on the new buffer and remove from cacheService map
                     newBuffer.resetWith(recordMap);
 
@@ -838,7 +834,10 @@ abstract public class WriteCacheService implements IWriteCache {
                     if (cache.write(offset, data)) {
 
                         // This should be the first record in the new cache.
-                        recordMap.put(offset, cache);
+                        if (recordMap.put(offset, cache) != null) {
+                            throw new AssertionError(
+                                    "Record already in cache: offset=" + offset);
+                        }
 
                         return true;
 

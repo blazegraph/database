@@ -440,7 +440,8 @@ public class FileMetadata {
                     
                 }
     
-                if( bufferMode != BufferMode.Disk ) {
+//              if( bufferMode != BufferMode.Disk ) {
+                if( bufferMode.isFullyBuffered() ) {
     
                     /*
                      * Verify that we can address this many bytes with this
@@ -581,6 +582,9 @@ public class FileMetadata {
                 case Disk:
                     buffer = null;
                     break;
+                case DiskWORM:
+                    buffer = null;
+                    break;
                 case DiskRW:
                     buffer = null;
                     break;
@@ -627,9 +631,10 @@ public class FileMetadata {
     
                 this.userExtent = extent - headerSize0;
                 
-                if (bufferMode != BufferMode.Disk
-                        && bufferMode != BufferMode.Temporary ) {
-    
+//                if (bufferMode != BufferMode.Disk
+//                        && bufferMode != BufferMode.Temporary ) {
+                if (bufferMode.isFullyBuffered()) {
+                
                     /*
                      * Verify that we can address this many bytes with this
                      * strategy. The strategies that rely on an in-memory buffer
@@ -683,6 +688,7 @@ public class FileMetadata {
                 final long commitRecordAddr = 0L;
                 final long commitRecordIndexAddr = 0L;
                 final UUID uuid = UUID.randomUUID(); // journal's UUID.
+                // FIXME This should be a property of BufferMode not a hard coded test.
                 final StoreTypeEnum stenum = bufferMode == BufferMode.DiskRW ? StoreTypeEnum.RW : StoreTypeEnum.WORM;
                 if(createTime == 0L) {
                     throw new IllegalArgumentException("Create time may not be zero.");
@@ -749,6 +755,9 @@ public class FileMetadata {
                     buffer = null;
                     break;
                 case Disk:
+                    buffer = null;
+                    break;
+                case DiskWORM:
                     buffer = null;
                     break;
                 case Temporary:

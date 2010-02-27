@@ -113,6 +113,24 @@ public enum BufferMode {
     /**
      * <p>
      * The journal is managed on disk. This option may be used with files of
+     * more than {@link Integer#MAX_VALUE} bytes in extent. Journal performance
+     * for large files should be fair on write, but performance will degrade as
+     * the journal is NOT optimized for random reads (poor locality).
+     * </p>
+     * 
+     * @see WORMStrategy
+     * 
+     * @deprecated This mode exists to test a new version of the
+     *             {@link DiskOnlyStrategy} which does not require
+     *             synchronization for disk read/write operations except when
+     *             the file size is being changed. Once this is working properly
+     *             it will replace the {@link DiskOnlyStrategy}.
+     */
+    DiskWORM(true/* stable */, false/* fullyBuffered */),
+
+    /**
+     * <p>
+     * The journal is managed on disk. This option may be used with files of
      * more than {@link Integer#MAX_VALUE} bytes in extent. RW indicates that
      * it is not a WORM with append only semantics but rather a disk alloc/realloc
      * mechanism that supports updates to values.  In general the store locality

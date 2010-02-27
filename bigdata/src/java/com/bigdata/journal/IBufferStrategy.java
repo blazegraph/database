@@ -218,6 +218,13 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
 	public void commit();
 
+    /**
+     * A method that requires the implementation to discard its buffered write
+     * set (if any). The caller is responsible for any necessary synchronization
+     * as part of the abort protocol.
+     */
+	public void abort();
+	
 	/**
 	 * The RWStrategy requires meta allocation info in the root block, this method is the hook to enable access.
 	 * The metaStartAddr is the address in the file where the allocation blocks are stored.

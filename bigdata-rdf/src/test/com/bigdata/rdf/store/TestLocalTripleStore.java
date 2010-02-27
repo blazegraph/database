@@ -119,7 +119,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
 
     }
     
-    protected AbstractTripleStore getStore(Properties properties) {
+    protected AbstractTripleStore getStore(final Properties properties) {
         
         return new LocalTripleStore( properties );
         

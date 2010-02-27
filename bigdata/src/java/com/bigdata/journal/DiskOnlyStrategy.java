@@ -1121,7 +1121,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         root.addCounter("nextOffset", new Instrument<Long>() {
             public void sample() {
-                setValue(nextOffset);
+                setValue(nextOffset.get());
             }
         });
 
@@ -1481,7 +1481,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
-        if (offset + nbytes > nextOffset) {
+        if (offset + nbytes > nextOffset.get()) {
 
             throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
 
@@ -1860,7 +1860,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * The offset at which the record will be written on the disk file
              * (not adjusted for the root blocks).
              */
-            final long offset = nextOffset;
+            final long offset = nextOffset.get();
 
             /*
              * Make sure that the allocated region of the file exists.
@@ -1876,7 +1876,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * Increment the offset of the next address to be assigned by the
              * #of bytes in the record.
              */
-            nextOffset += nbytes;
+            nextOffset.addAndGet(nbytes);
         
         }
 
