@@ -138,7 +138,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     }
     
-    public long write(ByteBuffer data) {
+    public long write(final ByteBuffer data) {
         
         if (data == null)
             throw new IllegalArgumentException(ERR_BUFFER_NULL);
@@ -159,11 +159,11 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
          */
         
         final long addr;
-        synchronized(this) 
+        synchronized(this) // @todo probably can be synchronized(nextOffset) 
         {
             
             // the next offset.
-            final long offset = nextOffset;
+            final long offset = nextOffset.get();
             
             // formulate the address that can be used to recover that record.
             addr = toAddr(nbytes, offset);
@@ -199,7 +199,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
             buffer.put(data);
 
             // increment by the #of bytes written.
-            nextOffset += nbytes;
+            nextOffset.addAndGet(nbytes);
 
         }
 
@@ -207,7 +207,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 
     }
 
-    public ByteBuffer read(long addr) {
+    public ByteBuffer read(final long addr) {
         
         if (addr == 0L)
             throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
@@ -222,7 +222,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
             
         }
         
-        if (offset + nbytes > nextOffset) {
+        if (offset + nbytes > nextOffset.get()) {
             
             throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
 
@@ -301,7 +301,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
         /*
          * Copy at most those bytes that have been written on.
          */
-        buffer.limit((int)Math.min(nextOffset,newCapacity));
+        buffer.limit((int)Math.min(nextOffset.get(),newCapacity));
         buffer.position(0);
         
         // Copy to the new buffer.
@@ -326,7 +326,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
     synchronized public long transferTo(final RandomAccessFile out)
             throws IOException {
         
-        final long count = nextOffset;
+        final long count = nextOffset.get();
         
         final FileChannel outChannel = out.getChannel();
         
@@ -346,7 +346,7 @@ abstract public class BasicBufferStrategy extends AbstractBufferStrategy {
 //        final long begin = System.currentTimeMillis();
         
         // setup the buffer for the operation.
-        buffer.limit((int)nextOffset);
+        buffer.limit((int)count);//nextOffset);
         buffer.position(0);
         
         FileChannelUtility.writeAll(outChannel, buffer, toPosition);

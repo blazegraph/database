@@ -102,12 +102,6 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final private AtomicReference<ByteBuffer> buf;
 
-	// /**
-	// * This field is used to assign the next offset in the buffer to which the
-	// * caller's data will be copied.
-	// */
-	// final private AtomicInteger nextPosition = new AtomicInteger();
-
 	/**
 	 * This latch tracks the number of read-locks on the buffer. It is
 	 * incremented by {@link #acquire()} and decremented by {@link #release()}.
@@ -304,11 +298,11 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	public WriteCache(final ByteBuffer buf) throws InterruptedException {
 	
-	    this(buf, false);
+        this(buf, false/* scatteredWrites */);
 
     }
 
-    public WriteCache(ByteBuffer buf, boolean scatteredWrites)
+    public WriteCache(ByteBuffer buf, final boolean scatteredWrites)
             throws InterruptedException {
 
         if (buf == null) {
@@ -366,6 +360,20 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
+    /**
+     * Adds some debugging information.
+     */
+    public String toString() { 
+
+        return super.toString()//
+        +"{size="+recordMap.size()//
+        +",firstOffset="+firstOffset//
+        +",releaseBuffer="+releaseBuffer//
+        +"}"
+        ;
+        
+    }
+    
 	/**
 	 * The offset of the first record written onto the {@link WriteCache}. This
 	 * information is used when {@link #appendOnly} is <code>true</code> as it
@@ -445,42 +453,6 @@ abstract public class WriteCache implements IWriteCache {
 				throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
 			/*
-			 * This does not work because it can extend the new position without
-			 * actually having room for the record at the adjusted position. We
-			 * have to serialize operations here in order to meet the necessary
-			 * criteria (sufficient room for the record in the cache).
-			 */
-			// /*
-			// * Note: This provides high concurrency by creating a view with
-			// its
-			// * own limit and position. This makes it possible to transfer data
-			// * into the write cache from concurrent threads without
-			// corruption.
-			// * However, the application may be required to serialize writes
-			// for
-			// * a variety of reasons. See the javadoc above.
-			// */
-			// final int pos = nextPosition.addAndGet(nbytes) - nbytes;
-			//
-			// if (pos + nbytes > tmp.capacity()) {
-			// /*
-			// * There is not enough room left in the write cache for this
-			// * record.
-			// */
-			// return false;
-			//                
-			// }
-			//            
-			// // create a view with same offset, limit and position.
-			// final ByteBuffer view = tmp.duplicate();
-			//
-			// // adjust the view to just the record of interest.
-			// view.limit(pos + nbytes);
-			// view.position(pos);
-			//
-			// // copy the record into the cache.
-			// view.put(data);
-			/*
 			 * Note: We need to be synchronized on the ByteBuffer here since
 			 * this operation relies on the position() being stable.
 			 * 
@@ -514,10 +486,24 @@ abstract public class WriteCache implements IWriteCache {
 
 			}
 
-			// Add metadata for the record so it can be read back from the
-			// cache.
+            /*
+             * Add metadata for the record so it can be read back from the
+             * cache.
+             */
 			// System.out.println("WriteCache, to: " + pos + ", " + nbytes + ", thread: " + Thread.currentThread().getId());
-			recordMap.put(Long.valueOf(offset), new RecordMetadata(offset, pos, nbytes));
+            if (recordMap.put(Long.valueOf(offset), new RecordMetadata(offset,
+                    pos, nbytes)) != null) {
+
+                /*
+                 * Note: This exception indicates that the abort protocol did
+                 * not reset() the current write cache before new writes were
+                 * laid down onto the buffer.
+                 */
+
+                throw new AssertionError(
+                        "Record exists for offset in cache: offset=" + offset);
+
+			}
 
 			return true;
 
@@ -590,102 +576,6 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-//	/**
-//	 * Update a record in the {@link WriteCache}.
-//	 * 
-//	 * @param addr
-//	 *            The address of the record.
-//	 * @param off
-//	 *            The byte offset of the update.
-//	 * @param data
-//	 *            The data to be written onto the record in the cache starting
-//	 *            at that byte offset. The bytes from the current
-//	 *            {@link ByteBuffer#position()} to the
-//	 *            {@link ByteBuffer#limit()} will be written and the
-//	 *            {@link ByteBuffer#position()} will be advanced to the
-//	 *            {@link ByteBuffer#limit()}. The caller may subsequently modify
-//	 *            the contents of the buffer without changing the state of the
-//	 *            cache (i.e., the data are copied into the cache).
-//	 * 
-//	 * @return <code>true</code> iff the record was updated and
-//	 *         <code>false</code> if no record for that address was found in the
-//	 *         cache.
-//	 * 
-//	 * @throws InterruptedException
-//	 * @throws IllegalStateException
-//	 * 
-//	 * @throws IllegalStateException
-//	 *             if the buffer is closed.
-//	 */
-//	public boolean update(final long addr, final int off, final ByteBuffer data) throws IllegalStateException,
-//			InterruptedException {
-//
-//		if (addr == 0L)
-//			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_ADDRESS_IS_NULL);
-//
-//		if (off < 0)
-//			throw new IllegalArgumentException("Offset is negative");
-//
-//		if (data == null)
-//			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
-//
-//		// #of bytes to be updated on the pre-existing record.
-//		final int nbytes = data.remaining();
-//
-//		if (nbytes == 0)
-//			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
-//
-//		/*
-//		 * Check the writeCache. If the record is found in the write cache then
-//		 * we just update the slice of the record corresponding to the caller's
-//		 * request. This is a common use case and results in no IO.
-//		 */
-//		final ByteBuffer tmp = acquire();
-//
-//		try {
-//
-//			// Look up the metadata for that record in the cache.
-//			final RecordMetadata md;
-//			if ((md = addrMap.get(addr)) == null) {
-//
-//				// The record is not in this write cache.
-//				return false;
-//
-//			}
-//
-//			if (off + nbytes > md.recordLength) {
-//
-//				// The update would overrun the record's extent in the cache.
-//				throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_OVERRUN);
-//
-//			}
-//
-//			// the start of the record in writeCache.
-//			final int pos = md.bufferOffset;
-//
-//			// create a view with same offset, limit and position.
-//			final ByteBuffer view = tmp.duplicate();
-//
-//			// adjust the limit on the record in the write cache.
-//			view.limit(pos + off + nbytes);
-//
-//			// adjust the position on the record in the write cache.
-//			view.position(pos + off);
-//
-//			// copy the caller's data onto the record in write cache.
-//			view.put(data);
-//
-//			// Done.
-//			return true;
-//
-//		} finally {
-//
-//			release();
-//
-//		}
-//
-//	}
-
 	/**
      * Flush the writes to the backing channel but DOES NOT sync the channel and
      * DOES NOT {@link #reset()} the {@link WriteCache}. {@link #reset()} is a
@@ -718,6 +608,28 @@ abstract public class WriteCache implements IWriteCache {
 	}
 
     /**
+     * Variant which resets the cache if it was successfully flushed.
+     */
+    public void flushAndReset(final boolean force) throws IOException, InterruptedException {
+
+        try {
+
+            if (!flushAndReset(force, true/* reset */, Long.MAX_VALUE,
+                    TimeUnit.NANOSECONDS)) {
+
+                throw new RuntimeException();
+
+            }
+
+        } catch (TimeoutException e) {
+
+            throw new RuntimeException(e);
+
+        }
+
+    }
+    
+    /**
      * Flush the writes to the backing channel but DOES NOT sync the channel and
      * DOES NOT {@link #reset()} the {@link WriteCache}. {@link #reset()} is a
      * separate operation because a common use is to retain recently flushed
@@ -731,8 +643,34 @@ abstract public class WriteCache implements IWriteCache {
      * @throws TimeoutException
      * @throws InterruptedException
      */
-	public boolean flush(final boolean force, final long timeout, final TimeUnit unit) throws IOException,
-			TimeoutException, InterruptedException {
+    public boolean flush(final boolean force, final long timeout,
+            final TimeUnit unit) throws IOException, TimeoutException,
+            InterruptedException {
+
+        return flushAndReset(force, false/* reset */, timeout, unit);
+        
+    }
+
+    /**
+     * Core impl.
+     * 
+     * @param forceIsIgnored
+     *            ignored (deprecated).
+     * @param reset
+     *            When <code>true</code>, does atomic reset IFF the flush was
+     *            successful in the allowed time while holding the lock to
+     *            prevent new records from being written onto the buffer
+     *            concurrently.
+     * @param timeout
+     * @param unit
+     * @return
+     * @throws IOException
+     * @throws TimeoutException
+     * @throws InterruptedException
+     */
+    private boolean flushAndReset(final boolean forceIsIgnored,
+            final boolean reset, final long timeout, final TimeUnit unit)
+            throws IOException, TimeoutException, InterruptedException {
 
 		// start time
 		final long begin = System.nanoTime();
@@ -795,9 +733,23 @@ abstract public class WriteCache implements IWriteCache {
 				view.limit(nbytes);
 				view.position(0);
 
-				// write the data on the disk file.
-				return writeOnChannel(view, Collections.unmodifiableMap(recordMap), remaining);
+                // write the data on the disk file.
+                final boolean ret = writeOnChannel(view, Collections
+                        .unmodifiableMap(recordMap), remaining);
 
+                if (ret && reset) {
+
+                    /*
+                     * Atomic reset while holding the lock to prevent new
+                     * records from being written onto the buffer concurrently.
+                     */
+                    
+                    reset();
+
+                }
+
+				return ret;
+				
 			}
 
 		} finally {
@@ -846,10 +798,12 @@ abstract public class WriteCache implements IWriteCache {
             throws InterruptedException, TimeoutException, IOException;
 
     /**
-     * Clear the buffer, the record map, and other internal metadata such that
-     * the {@link WriteCache} is prepared to receive new writes.
+     * {@inheritDoc}.
+     * <p>
+     * This implementation clears the buffer, the record map, and other internal
+     * metadata such that the {@link WriteCache} is prepared to receive new
+     * writes.
      * 
-     * @throws InterruptedException
      * @throws IllegalStateException
      *             if the write cache is closed.
      */
@@ -970,11 +924,12 @@ abstract public class WriteCache implements IWriteCache {
 		// clear to well known invalid offset.
 		firstOffset.set(-1L);
 
-		// nextPosition.set(0);
-
 		// position := 0; limit := capacity.
 		tmp.clear();
 
+		// Martyn: I moved your debug flag here so it is always cleared by reset().
+        m_written = false;
+        
 	}
 
     /**
@@ -1018,7 +973,7 @@ abstract public class WriteCache implements IWriteCache {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * 
-     *         FIXME Counters should be thread-local or stripped with periodic
+     *         FIXME Counters should be thread-local or striped with periodic
      *         {@link #add(StoreCounters)} to the shared counters to provide
      *         eventually consistent values with low-to-no
      *         contention/synchronization.
@@ -1366,10 +1321,17 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * To support deletion we will remove any entries for the provided address
-	 * @param addr
-	 */
+    /**
+     * To support deletion we will remove any entries for the provided address
+     * 
+     * @param addr
+     * 
+     * @todo This seems a bit odd to me. How does this propagate over a write
+     *       replication chain? Why not leave the old record in the cache? Or is
+     *       this just to yank something out of the cache which was created and
+     *       then immediately deleted on the RW store before it could be written
+     *       through to the disk? BT 2/26/2010
+     */
 	public void clearAddrMap(long addr) {
 		recordMap.remove(addr);
 	}
@@ -1383,13 +1345,13 @@ abstract public class WriteCache implements IWriteCache {
 	 * @throws InterruptedException 
 	 */
 	public void resetWith(final ConcurrentMap<Long, WriteCache> serviceRecordMap) throws InterruptedException {
-		Iterator<Long> entries = recordMap.keySet().iterator();
+	    final Iterator<Long> entries = recordMap.keySet().iterator();
 		if (entries.hasNext()) {
 			if (log.isInfoEnabled())
 				log.info("resetting existing WriteCache: " + hashCode());
 		
 			while (entries.hasNext()) {
-				Long addr = entries.next();
+				final Long addr = entries.next();
 				// System.out.println("Removing address: " + addr + " from " + hashCode());
 				serviceRecordMap.remove(addr);
 			}
@@ -1399,6 +1361,5 @@ abstract public class WriteCache implements IWriteCache {
 			if (log.isInfoEnabled())
 				log.info("clean WriteCache: " + hashCode()); // debug to see recycling
 		}
-		m_written = false;
 	}
 }

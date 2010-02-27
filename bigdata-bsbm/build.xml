@@ -160,10 +160,11 @@
 	          failonerror="true"
 	          dir="${build.dir}/bin"
 			  >
-			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint -journal ${bsbm.qualJournal}"/>
+			<arg line="-idir ${bsbm.qualDataDir}/td_data -q http://dummyendpoint journal.properties"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
+			<jvmarg value="-Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
 			<classpath>
 				<path refid="runtime.classpath" />
             </classpath>
@@ -214,10 +215,10 @@
 			<arg value="-o"/>
 			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml"/>
 			
-			<!-- The bigdata database instance. -->
-			<arg value="-journal"/><arg value="${bsbm.journalFile}"/>
+			<!-- The property file for the database instance. -->
+			<arg value="journal.properties"/>
             
-        	<jvmarg line="${queryJvmArgs}"/>
+        	<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
 			
 			<classpath>
 				<path refid="runtime.classpath" />
@@ -230,6 +231,7 @@
               fork="true"
               failonerror="true"
    			  >
+  	      <!--	  inputstring="com.bigdata.journal.AbstractJournal.bufferMode=Disk..." -->
         <!-- dir="${build.dir}/bin" -->
               <arg line="${bsbm.journalFile} LTS kb"/>
 	 		  <jvmarg value="-Dlog4j.configuration=log4j.properties"/>

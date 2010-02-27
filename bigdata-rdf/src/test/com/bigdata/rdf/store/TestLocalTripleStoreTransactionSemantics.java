@@ -107,6 +107,9 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
 
         final LocalTripleStore store = (LocalTripleStore) getStore();
 
+        // Should be a nop.
+        store.abort();
+        
         final long s = 1, p = 2, o = 3;
 
         try {
@@ -154,7 +157,7 @@ public class TestLocalTripleStoreTransactionSemantics extends ProxyTestCase {
      * @todo test ability to obtain read-only tx for specific historical commit
      *       points and query the kb.
      * 
-     * @todo test of isolatation of the kb create within the tx. should not be
+     * @todo test of isolation of the kb create within the tx. should not be
      *       visible until the commit in read-only, unisolated, or other tx. a
      *       concurrent create should fail in validation, not before.
      * 

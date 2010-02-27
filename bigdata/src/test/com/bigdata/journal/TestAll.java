@@ -110,6 +110,8 @@ public class TestAll extends TestCase {
 
         suite.addTest( TestDiskJournal.suite() );
 
+        suite.addTest( TestWORMStrategy.suite() );
+
         suite.addTest( com.bigdata.rwstore.TestAll.suite() );
 
         /*

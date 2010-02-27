@@ -1,6 +1,9 @@
 package benchmark.bigdata;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.StringWriter;
 import java.util.Properties;
 
@@ -10,6 +13,7 @@ import org.openrdf.rio.rdfxml.RDFXMLWriter;
 
 import benchmark.testdriver.TestDriver;
 
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -20,7 +24,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 public class BigdataQueryDriver {
     /**
      * @param args
-     *            USAGE: [bsbm args...] -journal <journal file>
+     *            USAGE: [bsbm args...] propertyFile
      *            
      * @see TestDriver for other options.
      */
@@ -33,18 +37,19 @@ public class BigdataQueryDriver {
          */
         final String namespace = "kb";
         try {
-            if (args.length < 2) {
-                System.err.println("USAGE: [bsbm args...] -journal <journalFile>");
+            if (args.length < 1) {
+                System.err.println("USAGE: [bsbm args...] propertyFile");
                 System.exit(1);
             }
-            final String journal = args[args.length-1];
-            final File file = new File(journal);
+            final String propertyFile = args[args.length - 1];
+            final File file = new File(propertyFile);
             if (!file.exists()) {
-                throw new RuntimeException("Could not find the journal: "+file);
+                throw new RuntimeException("Could not find propertyFile: "
+                        + file);
             }
-            System.out.println("journal: " + file);
+            System.out.println("propertyFile: " + file);
 
-            final String[] bsbmArgs = new String[args.length-2];
+            final String[] bsbmArgs = new String[args.length - 1];
             System.arraycopy(args, 0, bsbmArgs, 0, bsbmArgs.length);
 
             /*
@@ -53,7 +58,26 @@ public class BigdataQueryDriver {
              */
             final BigdataSail sail;
             {
+//                final File propertyFile = new File(args[0]);
+                
                 final Properties properties = new Properties();
+                {
+                    // Read the properties from the file.
+                    final InputStream is = new BufferedInputStream(
+                            new FileInputStream(propertyFile));
+                    try {
+                        properties.load(is);
+                    } finally {
+                        is.close();
+                    }
+                    if (System.getProperty(BigdataSail.Options.FILE) != null) {
+                        // Override/set from the environment.
+                        properties.setProperty(BigdataSail.Options.FILE, System
+                                .getProperty(BigdataSail.Options.FILE));
+                    }
+                }
+                
+//                final Properties properties = new Properties();
 //            properties.setProperty(
 //                    BigdataSail.Options.QUADS, "false");
 //            properties.setProperty(
@@ -62,9 +86,9 @@ public class BigdataQueryDriver {
 //                    BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
 //            properties.setProperty(
 //                    BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-                properties.setProperty(BigdataSail.Options.FILE, file
-                        .getAbsolutePath());
-
+//                properties.setProperty(BigdataSail.Options.FILE, file
+//                        .getAbsolutePath());
+                
                 jnl = new Journal(properties);
 
                 // resolve the kb instance of interest.

@@ -32,6 +32,8 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.journal.IAtomicStore;
+
 /**
  * Interface for a write cache with read back and the capability to update
  * records while they are still in the cache.
@@ -159,6 +161,20 @@ public interface IWriteCache {
             final TimeUnit unit) throws IOException, TimeoutException,
             InterruptedException;
 
+    /**
+     * Reset the write cache, discarding any writes which have not been written
+     * through to the backing channel yet. This method IS NOT responsible for
+     * discarding writes which have been written through since those are in
+     * general available for reading directly from the backing channel. The
+     * abort protocol at the {@link IAtomicStore} level is responsible for
+     * ensuring that processes do not see old data after an abort. This is
+     * generally handled by re-loading the appropriate root block and
+     * reinitializing various things from that root block.
+     * 
+     * @throws InterruptedException
+     */
+    public void reset() throws InterruptedException;
+    
     /**
      * Permanently take the {@link IWriteCache} out of service. Dirty records
      * are discarded, not flushed.

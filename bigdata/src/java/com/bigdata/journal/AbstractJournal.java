@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -67,7 +65,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
@@ -1087,6 +1084,32 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
         
+        case DiskWORM: {
+
+            /*
+             * Setup the buffer strategy.
+             */
+
+            fileMetadata = new FileMetadata(file, BufferMode.DiskWORM,
+                    useDirectBuffers, initialExtent, maximumExtent, create,
+                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    //readOnly ? null : writeCache,
+                    writeCacheEnabled,
+                    validateChecksum,
+                    createTime, checker, alternateRootBlock);
+
+            _bufferStrategy = new WORMStrategy(
+                    0L/* soft limit for maximumExtent */,
+                    minimumExtension,
+                    fileMetadata);
+
+            this._rootBlock = fileMetadata.rootBlock;
+
+            break;
+
+        }
+        
         case DiskRW: {
 
             /*
@@ -2009,6 +2032,25 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             }
 
             /*
+             * The buffer strategy has a hook which is used to discard buffered
+             * writes. This is both an optimization (it ensures that those
+             * writes are not asynchronously laid down on the disk) and a
+             * requirement for the WORM store.
+             * 
+             * Note: The WriteCache for the WORM store has internal state giving
+             * the firstOffset of the records in the internal buffer - if we do
+             * not call reset() on that write cache then the firstOffset will be
+             * incorrect and the records will be laid down on the wrong offsets
+             * on the store. This correctness issue does not arise for the RW
+             * store because the WriteCache has the actual offset at which each
+             * record will be written and ordered writes are used to lay down
+             * those records. However, for the WORM store we use a single large
+             * write and require that the data in the buffer exactly matches the
+             * target state on the backing file.
+             */
+            _bufferStrategy.abort();
+
+            /*
              * Discard hard references to any indices. The Name2Addr reference
              * will also be discarded below. This should be sufficient to ensure
              * that any index requested by the methods on the AbstractJournal
@@ -2288,10 +2330,12 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     .writeCheckpoint();
 
             /*
-             * Call to ensure strategy does everything required for itself before final root block commit
+             * Call to ensure strategy does everything required for itself
+             * before final root block commit.  At a minimum it must flush
+             * its write cache to the backing file (issue the writes).
              */
             _bufferStrategy.commit();
-            
+
             /*
              * Force application data to stable storage _before_ we update the
              * root blocks. This option guarantees that the application data is
@@ -2302,11 +2346,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * in the loss of application data addressed by the new root blocks
              * (data loss on restart).
              * 
-             * Note: We do not force the file metadata to disk
+             * Note: We do not force the file metadata to disk. If that is done,
+             * it will be done by a force() after we write the root block on the
+             * disk.
              */
             if (doubleSync) {
 
-                _bufferStrategy.force(false);
+                _bufferStrategy.force(false/* metadata */);
 
             }
 
@@ -2930,7 +2976,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             /*
              * Resolve the address of the historical Name2Addr object using the
              * canonicalizing object cache. This prevents multiple historical
-             * Name2Addr objects springing into existance for the same commit
+             * Name2Addr objects springing into existence for the same commit
              * record.
              */
             final Name2Addr name2Addr = (Name2Addr) getIndex(checkpointAddr);

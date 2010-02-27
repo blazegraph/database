@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -150,12 +151,12 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * The buffer strategy implemented by this class.
      */
     protected final BufferMode bufferMode;
-    
+
     /**
      * The next offset at which a data item would be written on the store as an
-     * offset into the <em>user extent</em> (offset zero(0) addresses the
-     * first byte after the root blocks). This is updated each time a new record
-     * is written on the store. On restart, the value is initialized from the
+     * offset into the <em>user extent</em> (offset zero(0) addresses the first
+     * byte after the root blocks). This is updated each time a new record is
+     * written on the store. On restart, the value is initialized from the
      * current root block. The current value is written as part of the new root
      * block during each commit.
      * <p>
@@ -166,8 +167,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * {@link ICommitter}s and therefore never make themselves restart safe.
      * However, you can not discard the writes of those objects unless the
      * entire store is being restarted, e.g., after a shutdown or a crash.
+     * <p>
+     * Note: An {@link AtomicLong} is used to provide an object on which we can
+     * lock when assigning the next record's address and synchronously updating
+     * the counter value. It also ensures that threads can not see a stale value
+     * for the counter.
      */
-    protected long nextOffset;
+    final protected AtomicLong nextOffset;
 
     static final NumberFormat cf;
     
@@ -214,7 +220,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     final public long getNextOffset() {
 
-        return nextOffset;
+        return nextOffset.get();
         
     }
 
@@ -256,7 +262,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         this.maximumExtent = maximumExtent; // MAY be zero!
         
-        this.nextOffset = nextOffset;
+        this.nextOffset = new AtomicLong(nextOffset);
         
         this.bufferMode = bufferMode;
         
@@ -268,7 +274,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     
     public final long size() {
         
-        return nextOffset;
+        return nextOffset.get();
         
     }
 
@@ -611,6 +617,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * which are NOPs for the WORM store.
      */
 
+    /** The default is a NOP. */
     @Override
     public void delete(long addr) {
 
@@ -618,12 +625,20 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     }
 
+    /** The default is a NOP. */
     public void commit() {
 
         // NOP for WORM.
 
     }
 
+    /** The default is a NOP. */
+    public void abort() {
+
+        // NOP
+        
+    }
+    
     public long getMetaBitsAddr() {
 
         // NOP for WORM.
