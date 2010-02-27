@@ -266,7 +266,7 @@ public class SimpleMemoryRawStore extends AbstractRawWormStore {
     
     public void destroy() {
         
-        close();
+        if(isOpen()) close();
         
         deleteResources();
         
