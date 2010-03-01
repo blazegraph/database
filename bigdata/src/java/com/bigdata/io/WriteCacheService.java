@@ -167,22 +167,14 @@ abstract public class WriteCacheService implements IWriteCache {
     final protected BlockingQueue<WriteCache> deferredDirtyList;
 
     final private Latch deferredLatch = new Latch();
-    
+
     /**
      * A list of clean buffers. By clean, we mean not needing to be written.
      * Once a dirty write cache has been flushed, it is placed onto the
-     * {@link #cleanList}. Once a buffer has been placed on the list a
-     * low validation task will validate the buffer and move to the {@link #availList}.
+     * {@link #cleanList}. Clean buffers can be taken at any time for us as the
+     * current buffer.
      */
     final protected BlockingQueue<WriteCache> cleanList;
-
-    /**
-     * A list of validated buffers. Clean buffers are moved from the {@link #cleanList} to the
-     * {@link #availList} once validated by read back. When the {@link #current} write cache buffer needs to
-     * be replaced, one of the buffers from the {@link #availList} is recycled. If none are available
-     * then a new buffer is created.
-     */
-    final protected BlockingQueue<WriteCache> availList;
 
     /**
      * The current buffer.
@@ -230,11 +222,11 @@ abstract public class WriteCacheService implements IWriteCache {
         this.opener = opener;
 
         dirtyList = new LinkedBlockingQueue<WriteCache>();
+
         deferredDirtyList = new LinkedBlockingQueue<WriteCache>();
 
         cleanList = new LinkedBlockingQueue<WriteCache>();
-        availList = new LinkedBlockingQueue<WriteCache>();
-
+        
         for (int i = 0; i < nbuffers - 1; i++) {
 
             cleanList.add(newWriteCache(null/* buf */, opener));

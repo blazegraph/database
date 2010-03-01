@@ -222,11 +222,16 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     final private ReentrantReadWriteLock extensionLock = new ReentrantReadWriteLock();
 
     /**
-     * Optional {@link WriteCache}.
+     * Optional {@link WriteCache}. This field is never <code>null</code>, but
+     * the reference MAY be <code>null</code>, in which case there is no write
+     * cache. {@link #closeForWrites()} will atomically clear this field, at
+     * which point readers will no longer be able to acquire the write cache.
+     * This should not be a performance hit since those records will generally
+     * be in the {@link LRUNexus} in any case.
      * 
-     * FIXME Replace with the {@link WriteCacheService}.
+     * FIXME Replace with the {@link WriteCacheService}
      */
-    private final WriteCache writeCache;
+    private final AtomicReference<WriteCache> writeCache;
 
     /**
      * Issues the disk writes for the write cache and recycles the write cache
@@ -237,6 +242,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * invoked by {@link #force(boolean)} and can be moved in line there.
      */
     private void flushWriteCache() {
+
+        final WriteCache writeCache = this.writeCache.get();
 
         if (writeCache == null)
             return;
@@ -804,17 +811,17 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         /*
          * Write cache.
          */
+        final WriteCache writeCache = WORMStrategy.this.writeCache.get();
+
         if (writeCache != null) {
 
-            final CounterSet writeCache = root.makePath("writeCache");
+            final CounterSet tmp = root.makePath("writeCache");
 
-            final WriteCache tmp = WORMStrategy.this.writeCache;
-
-            writeCache.attach(tmp.getCounters());
+            tmp.attach(writeCache.getCounters());
 
             // add counter for the write cache capacity.
-            writeCache.addCounter("capacity", new OneShotInstrument<Integer>(
-                    tmp.capacity()));
+            tmp.addCounter("capacity",
+                    new OneShotInstrument<Integer>(writeCache.capacity()));
 
         }
 
@@ -858,7 +865,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         this.userExtent = extent - headerSize;
 
         this.minimumExtension = minimumExtension;
-        
+
         /*
          * Enable the write cache?
          * 
@@ -873,23 +880,22 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * AND there is a bug in the release of those buffers. Therefore do NOT
          * pass in a heap byte buffer for the write cache!!!
          */
+        
+        this.writeCache = new AtomicReference<WriteCache>();
+        
         if (fileMetadata.writeCacheEnabled && !fileMetadata.readOnly
                 && fileMetadata.closeTime == 0L) {
 
             try {
 
-                writeCache = new WriteCacheImpl(0/* baseOffset */,
-                        null/* buf */, opener);
-                
-            } catch (InterruptedException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
+                this.writeCache.set(new WriteCacheImpl(0/* baseOffset */,
+                        null/* buf */, opener));
 
-        } else {
-            
-            writeCache = null;
+            } catch (InterruptedException e) {
+
+                throw new RuntimeException(e);
+
+            }
             
         }
 
@@ -1011,6 +1017,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      */
     public void abort() {
 
+        final WriteCache writeCache = this.writeCache.get();
+        
         if (writeCache == null)
             return;
 
@@ -1142,15 +1150,33 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         }
 
+        final WriteCache writeCache = this.writeCache.get();
+        
         if (writeCache != null) {
 
             /*
              * Test the write cache for a hit. The write cache handles
              * synchronization internally.
              */
-            final ByteBuffer tmp;
+            ByteBuffer tmp;
             try {
                 tmp = writeCache.read(offset);
+            } catch (IllegalStateException e) {
+                /*
+                 * This code does not guard against a concurrent close of the
+                 * write cache since we obtain the write cache reference above
+                 * without holding any locks. This is ok. We just need to handle
+                 * the IllegalStateException here.
+                 */
+                if (this.writeCache.get() == null) {
+                    if (log.isInfoEnabled())
+                        log
+                                .info("Concurrent close of write cache: will read through to the disk.");
+                    tmp = null;
+                    // fall through.
+                } else {
+                    throw e;
+                }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -1441,12 +1467,20 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                  * around that, but writes on the cache should be very fast
                  * (especially if the cache is a service since it will hand us a
                  * new buffer if the old one is full).
+                 * 
+                 * Note: We do not need to protect against concurrent close of
+                 * the write cache since it is only closed by close() and
+                 * closeForWrites() and the caller is responsible for ensuring
+                 * that there are no concurrent writes during those methods
+                 * (concurrent readers are allowed, but will be interrupted by
+                 * close()).
                  */
                 addr = allocate(nbytes);
 
                 offset = getOffset(addr);
 
                 boolean wroteOnCache = false;
+                final WriteCache writeCache = this.writeCache.get();
                 if (writeCache != null) {
                     if (nbytes <= writeCache.capacity()) {
                         // FIXME integrate with the writeCacheService
@@ -1520,37 +1554,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 }
 
             } // synchronized(writeOnCacheLock)
-
-//            if (!wroteOnCache) {
-//
-//                /*
-//                 * The writeCache is disabled or the record is too large for the
-//                 * write cache, so just write the record directly on the disk.
-//                 * 
-//                 * Note: At this point the backing file is already extended.
-//                 * 
-//                 * Note: Unlike writes on the cache, the order in which we lay
-//                 * down this write onto the disk does not matter. We have
-//                 * already made the allocation and now the caller will block
-//                 * until the record is on the disk.
-//                 */
-//
-//                final Lock readLock = extensionLock.readLock();
-//                readLock.lock();
-//                try {
-//
-//                    writeOnDisk(data, offset);
-//                    
-//                    if (log.isTraceEnabled())
-//                        log.trace("diskWrite: addr=" + toString(addr));
-//
-//                } finally {
-//                    
-//                    readLock.unlock();
-//                    
-//                }
-//
-//            }
 
         } catch(IOException ex) {
             
@@ -1985,11 +1988,29 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     
     private final void releaseWriteCache() {
 
+        final WriteCache writeCache = this.writeCache.get();
+
         if (writeCache == null) 
             return;
 
         try {
 
+            /*
+             * Clear the reference so new requests will not discover the write
+             * cache object.
+             */
+            this.writeCache.set(null);
+
+            /*
+             * Close the write cache (makes it invalid).
+             * 
+             * Note: This will not effect requests in progress against the write
+             * cache, but new requests will fail. Since concurrent write
+             * requests are not allowed during close() or closeForWrites(), this
+             * is only an issue for readers. read(long) has logic to handle the
+             * concurrent close of the write cache, passing through the
+             * operation to the disk.
+             */
             writeCache.close();
         
         } catch (InterruptedException e) {
@@ -1997,7 +2018,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             throw new RuntimeException(e);
             
         }
-
+            
     }
 
     /**

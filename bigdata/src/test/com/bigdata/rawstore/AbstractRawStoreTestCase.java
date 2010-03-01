@@ -76,7 +76,7 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
      * @todo optimize test helper when ByteBuffer is backed by an array, but
      *       also compensate for the arrayOffset.
      */
-    static public void assertEquals(byte[] expected, ByteBuffer actual ) {
+    static public void assertEquals(final byte[] expected, ByteBuffer actual) {
 
         if( expected == null ) throw new IllegalArgumentException();
         
@@ -102,6 +102,37 @@ abstract public class AbstractRawStoreTestCase extends TestCase2 {
         actual.get(actual2);
 
         assertEquals(expected,actual2);
+        
+    }
+
+    /**
+     * Helper method verifies that the contents of <i>actual</i> from position()
+     * to limit() are consistent with the expected byte[]. A read-only view of
+     * both <i>expected</i> and <i>actual</i> is used to avoid side effects on
+     * the position, mark or limit properties of the buffer.
+     * 
+     * @param expected
+     *            Non-null {@link ByteBuffer}.
+     * @param actual
+     *            A {@link ByteBuffer}.
+     */
+    static public void assertEquals(ByteBuffer expected, final ByteBuffer actual) {
+
+        if (expected == null)
+            throw new IllegalArgumentException();
+         
+        /* Create a read-only view on the buffer so that we do not mess with
+         * its position, mark, or limit.
+         */
+        expected = expected.asReadOnlyBuffer();
+        
+        final int len = expected.remaining();
+        
+        final byte[] expected2 = new byte[len];
+        
+        expected.get(expected2);
+
+        assertEquals(expected2,actual);
         
     }
 
