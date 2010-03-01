@@ -101,6 +101,8 @@ public class TestDriver {
 				server = new BigdataConnection(repo, defaultGraph, timeout);
 		} else if(multithreading) {
 			//do nothing
+		} else if(rampup) { // BBT 2/28/2010
+		    server = new BigdataConnection(repo, defaultGraph, timeout);
 		}
 		else {
 			printUsageInfos();

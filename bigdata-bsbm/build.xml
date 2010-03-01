@@ -187,6 +187,36 @@
 		</java>
 	</target>
 	
+	<target name="rampup" depends="compile" description="Runs the benchmark queries against the loaded data until system performance reaches a steady state as defined by the benchmark.">
+		<java classname="benchmark.bigdata.BigdataQueryDriver"
+	          fork="true"
+	          failonerror="true"
+			  dir="${build.dir}/bin" 
+			>
+
+			<arg value="-rampup"/>
+			
+			<!-- -idir dir is the test data directory (default td_data). -->
+			<arg value="-idir"/><arg value="${bsbm.dataDir}"/>
+			
+			<!-- The randomizer seed. -->
+			<arg value="-seed"/><arg value="random"/><!--<arg value="${bsbm.seed}"/>-->
+			
+			<!-- -o file is the name of the xml output file. -->
+			<arg value="-o"/>
+			<arg value="${bsbm.resultsDir}/benchmark_result_pc${bsbm.pc}_runs${bsbm.runs}_mt${bsbm.mt}.xml"/>
+			
+			<!-- The property file for the database instance. -->
+			<arg value="journal.properties"/>
+            
+        	<jvmarg line="${queryJvmArgs} -Dcom.bigdata.journal.AbstractJournal.file=${bsbm.journalFile}"/>
+			
+			<classpath>
+				<path refid="runtime.classpath" />
+            </classpath>
+		</java>
+	</target>
+	
 	<target name="run-query" depends="compile" description="Runs the benchmark queries against the loaded data.">
 		<java classname="benchmark.bigdata.BigdataQueryDriver"
 	          fork="true"
