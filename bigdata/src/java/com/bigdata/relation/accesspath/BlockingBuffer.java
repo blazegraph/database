@@ -313,8 +313,8 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      *            The desired minimum chunk size. When the elements stored in
      *            the buffer are chunks (i.e., arrays of some component type),
      *            elements will be combined together to form larger chunks until
-     *            this chunkSize is satisfied, the {@link #iterator()} is
-     *            exhausted, or the <i>chunkTime</i> is reached.
+     *            this minimumChunkSize is satisfied, the {@link #iterator()} is
+     *            exhausted, or the <i>chunkTimeout</i> is reached.
      * @param chunkTimeout
      *            The maximum time to wait in nanoseconds for another chunk to
      *            come along so that we can combine it with the current chunk
