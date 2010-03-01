@@ -1,0 +1,524 @@
+#!/usr/bin/python
+
+import os, sys, socket, getopt, fcntl, struct
+from os.path import dirname
+
+
+def usage():
+    print """Usage: pstart [options] <serviceName> [service args]
+
+    serviceName
+        The name of the service to run
+
+    [service args]
+        Optional arguments to the service. For Java services, these arguments
+        will be passed into the service constructors argument list. On most
+        services these are passed directly to the Configuration parser so
+        this is where configuration overrides can be specified.
+
+
+Options:
+  -D<name>=<value>                   
+        Define a Java system property. Values specified on the command line
+        will override the service's default values. See below for a short
+        list of useful properties.
+
+  --groups=group0[,group1[...]]
+        Set the list of Jini groups to join
+        [com.bigdata.group.0,com.bigdata.group.1]
+
+  --mGroups=group0[,group1[...]]
+        Set the list of Jini membership groups. This is only useful
+        when starting reggie, the Jini lookup service.
+        [com.bigdata.group.0,com.bigdata.group.1]
+
+  --nohttpd
+        Do not start a codebase server with the requested service.
+
+  --appHome=/path/to/release/directory
+        Set the path to the installed release directory where Jars, libraries,
+        and config files will be found.
+
+Useful properties:
+    log4j.primary.configuration=/path/to/bigdata.logging
+        The path to the log4j configuration file.
+
+    java.util.logging.config.file=/path/to/jini.logging
+        The path to the java.util.logging configuration file
+
+    exportNic=<interfacename>
+        Specifies the name of the network interface on which the Jini service
+        will be exported. This property takes precedence over exportHost.
+        The default value is "eth0".
+
+    exportHost=<ipaddress|hostname>
+        Specifies the IP address on which the Jini service(s) will be exported.
+        This property is not used unless exportNic is "".
+
+    bigdata.codebase.host=<interfacename|ipaddress|hostname>
+        Specifies the network address of the codebase HTTP server. If the
+        value is an interface name, the IP address assigned to that interface
+        will be used. If the value is an IP address or hostname, that value
+        will be used directly. The default value is "eth0".
+
+    bigdata.codebase.port=<n>
+        The port number on <bigdata.codebase.host> on which the HTTP class
+        server is running.
+
+"""
+    serviceNames = bigdataServiceMap.keys()
+    serviceNames.sort()
+    print "Services: \n  " + ", ".join(serviceNames)
+
+
+def get_interface_ipaddress(ifname):
+    """Gets the IP address assigned to a network interface.
+
+       Parameters:
+           ifname The name of he interface whose IP address to get
+
+       Returns:
+           A string contain the IP address of the interface
+    """
+    if sys.platform == "linux2":
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        return socket.inet_ntoa(fcntl.ioctl(
+            s.fileno(),
+            0x8915,  # SIOCGIFADDR
+            struct.pack('256s', ifname[:15])
+        )[20:24])
+    else:
+        raise NotImplementedError("Not implemented for " + sys.platform)
+
+
+class Params:
+    def __init__(self):
+        self.serviceName = None
+        self.groups = [ "com.bigdata.group.0", "com.bigdata.group.1" ]
+        self.mGroups = [ "com.bigdata.group.0", "com.bigdata.group.1" ]
+        self.lookupLocators = []
+        self.appHome = None
+        self.startCodebaseHttpd = True
+
+
+class BigdataServiceBase:
+    def __init__(self, serviceName, params):
+        # Keep a reference the the service parameters
+        self.params = params
+
+        # The name of the service
+        self.serviceName = serviceName
+
+        # appHome is the base directory of the Java applications. In the
+        # source tree this is the top-level "java" directory. This will
+        # always be valid.
+        self.appHome = params.appHome
+
+        # A dictionary containing all of the Java system properties to set
+        # at service startup time
+        self.properties = {}
+
+        # Command line arguments for ServiceStarter. Since ServiceStarter
+        # simply passes all of its arguments into the configuration file
+        # override mechanism, this is basically just a list of config
+        # overrides for the ServiceStarter config file.
+        self.serviceStarterArgs = []
+
+        # Start setting properties!
+        self.properties['java.protocol.handler.pkgs'] = "net.jini.url"
+        self.properties['java.net.preferIPv4Stack'] = "true"
+        self.setPathProperties()
+        self.setSecurityProperties()
+        self.setEntityProperties()
+        self.setGroupProperties()
+
+    def setPathProperties(self):
+        self.properties['appHome'] = self.appHome
+        self.properties['bigdata.logDir'] = os.path.join( \
+            self.appHome,  "var", "log")
+        # Paths to items in the release directory structure
+        appHome = self.appHome
+        self.properties['java.library.path'] = os.path.join(appHome, "lib")
+        self.properties['bigdata.codebase.rootDir'] = \
+            os.path.join(appHome, "lib-dl")
+
+    def setSecurityProperties(self):
+        self.properties['java.security.manager'] = ""
+        self.properties['java.security.policy'] = os.path.join(self.appHome, \
+            "var", "config", "policy", "policy.all")
+        self.properties['java.security.debug'] = "off"
+
+    def setEntityProperties(self):
+        self.properties['exportNic'] = "eth0"
+        self.properties['exportHost'] = socket.gethostname()
+        self.properties['exportPort'] = "0"
+        self.properties['bigdata.codebase.host'] = "eth0"
+        self.properties['bigdata.codebase.port'] = "8081"
+
+        self.properties['log4j.configuration'] = \
+            "src/resources/config/log4j.properties"
+        self.properties['log4j.primary.configuration'] = os.path.join( \
+            self.appHome,  "var", "config", "logging", \
+            serviceName + "-logging.properties")
+        self.properties['java.util.logging.manager'] = \
+            "com.sun.jini.logging.LogManager"
+        self.properties['java.util.logging.config.file'] = os.path.join( \
+            self.appHome,  "var", "config", "logging", \
+            "logging.properties")
+
+    def setGroupProperties(self):
+        """Using the params.groups, params.mGroups, and params.lookupLocators
+           lists, create Java system properties appropriate for the service to
+           convey it the information."""
+        if len(params.groups) > 0:
+            self.properties['groupsToJoin'] = \
+                "{\"" + "\",\"".join(params.groups) + "\"}"
+        else:
+            self.properties['groupsToJoin'] = "{}"
+        if len(params.lookupLocators) > 0:
+            self.properties['locsToJoin'] = "{new LookupLocator(\"" + \
+                "\"),new LookupLocator(\"".join(params.lookupLocators) + \
+                "\")}"
+        else:
+            self.properties['locsToJoin'] = "{}"
+
+    def setProperties(self, propList):
+        for k, v in propList:
+            self.properties[k] = v
+
+    def migrateProperties(self):
+        # entityCodebasePort -> bigdata.codebase.port
+        if self.properties.has_key("entityCodebasePort"):
+            self.properties["bigdata.codebase.port"] = \
+                self.properties["entityCodebasePort"]
+            del self.properties["entityCodebasePort"]
+        # entityCodebaseHost -> bigdata.codebase.host
+        if self.properties.has_key("entityCodebaseHost"):
+            self.properties["bigdata.codebase.host"] = \
+                self.properties["entityCodebaseHost"]
+            del self.properties["entityCodebaseHost"]
+
+    def start(self, args):
+        # Calculate the service starter classpath
+        starterClasspath = [
+            os.path.join(self.appHome, "lib", "start.jar"),
+            os.path.join(self.appHome, "lib", "log4j.jar"),
+            os.path.join(self.appHome, "lib", "bigdata.jar"),
+            os.path.join(self.appHome, "lib", "zookeeper.jar"),
+            os.path.join(self.appHome, "lib", "jsk-lib.jar") ]
+
+        if 'config' not in self.properties:
+            print "No ServiceStarter config found!"
+            sys.exit(2)
+
+        # Format args so that it can be passed through ServiceStarter
+        # to the application. The args are delimited by an RS character
+        self.properties['entityExtraArgs'] = "\036".join(args)
+
+        # Set the shared library path to the same as the Java library path
+        os.environ['LD_LIBRARY_PATH'] = self.properties['java.library.path']
+
+        # Migrate old property names to new
+        self.migrateProperties()
+
+        # Build the list of command line arguments
+        argList = [ "java", "-cp", ":".join(starterClasspath) ]
+        propNames = self.properties.keys()
+        propNames.sort()
+        for p in propNames:
+            argList.append("-D" + p + "=" + self.properties[p])
+        argList.append("com.sun.jini.start.ServiceStarter")
+        argList.append(self.properties['config'])
+        argList.extend(self.serviceStarterArgs)
+
+        # Display the command about to be run
+        for a in argList:
+            print a
+
+        #os.spawnvp(os.P_WAIT, argList[0], argList)
+
+        #pid = os.spawnvp(os.P_NOWAIT, argList[0], argList)
+        # TODO: write PID to file
+        #print "Process ID = " + str(pid)
+
+        os.execvp(argList[0], argList)
+
+
+class GenericBigdataService(BigdataServiceBase):
+    """This starts a generically implemented service that adheres to the
+       following rules:
+         * The implementation Jar file is named "${appHome}/lib/<service>.jar"
+         * The implementation is started by constructing an object of
+           the class "com.bigdata.<service>.ServiceImpl"
+         * The codebase Jar file is named "${appHome}/lib-dl/<service>-dl.jar"
+         * The service config file is named
+           "${appHome}/lib/com/bigdata/<service>/config/<service>.config"
+    """
+    def __init__(self, serviceName, params):
+        BigdataServiceBase.__init__(self, serviceName, params)
+
+        # Use the generic service template and fill in the fields
+        self.properties['entityType'] = self.serviceName
+        self.properties['entityClasspathJar'] = os.path.join(self.appHome, \
+            "lib", bigdata + ".jar")
+        self.properties['entityMain'] = "com.bigdata." + self.serviceName + \
+            ".ServiceImpl"
+        self.properties['entityCodebaseJar'] = self.serviceName + "-dl.jar"
+        self.properties['entityConfig'] = os.path.join(self.appHome, \
+            "var", "config", "jini", self.serviceName, + ".config")
+
+        self.properties['entityPolicy'] = os.path.join(self.appHome, \
+            "var", "config", "policy", "service.policy")
+        self.properties['config'] = os.path.join(self.appHome,
+             "var", "config", "jini", "serviceStarterOne.config")
+
+
+
+class BigdataService(BigdataServiceBase):
+    def __init__(self, serviceName, params):
+        BigdataServiceBase.__init__(self, serviceName, params)
+        self.properties['config'] = os.path.join(self.appHome, 
+            "var", "config", "jini", "serviceStarterAll.config")
+
+        # Construct the ServiceStarter Service Descriptor list
+        if params.startCodebaseHttpd and serviceName != "httpd":
+            self.serviceStarterArgs = [
+                "com.sun.jini.start.serviceDescriptors = " + \
+                "new ServiceDescriptor[] { httpdDescriptor, " + \
+                serviceName + "Descriptor }" ]
+        else:
+            self.serviceStarterArgs = [
+                "com.sun.jini.start.serviceDescriptors = " + \
+                "new ServiceDescriptor[] { " + serviceName + "Descriptor }" ]
+
+    def setGroupProperties(self):
+        BigdataServiceBase.setGroupProperties(self)
+        if len(params.mGroups) > 0:
+            self.properties['memberGroups'] = \
+                "{\"" + "\",\"".join(params.mGroups) + "\"}"
+        else:
+            self.properties['memberGroups'] = "{}"
+
+
+class BigdataMetaservice(BigdataService):
+    def __init__(self, serviceName, params):
+        BigdataService.__init__(self, serviceName, params)
+        if serviceName == "all":
+            services = [ "httpd", "reggie", "zookeeper", "dataserver",
+                         "metadataserver", "loadbalancer", "txnserver" ]
+            del self.properties['log4j.primary.configuration']
+            del self.properties['java.util.logging.config.file']
+        elif (serviceName == "jini" or serviceName == "reggie"):
+            services = [ "httpd", "reggie" ]
+            self.properties['log4j.primary.configuration'] = os.path.join( \
+                self.appHome,  "var", "config", "logging", \
+                "reggie-logging.properties")
+            self.properties['java.util.logging.config.file'] = os.path.join( \
+                self.appHome,  "var", "config", "logging", \
+                "reggie-logging.properties")
+        else:
+            # This should never happen
+            print "Invalid meta-service name"
+            sys.exit(1)
+
+        if not params.startCodebaseHttpd:
+            # Filter out the httpd service
+            for i in range(0, len(services)):
+                if services[i] == "httpd":
+                    del services[i]
+                    break
+
+        # Construct the ServiceStarter Service Descriptor list
+        self.serviceStarterArgs = [
+            "com.sun.jini.start.serviceDescriptors = " + \
+            "new ServiceDescriptor[] {" + \
+            "Descriptor, ".join(services) + "Descriptor}" ]
+
+
+class ZookeeperServer(BigdataServiceBase):
+    def __init__(self, serviceName, params):
+        BigdataServiceBase.__init__(self, serviceName, params)
+        self.properties['java.security.policy'] = os.path.join(self.appHome, \
+            "var", "config", "policy", "service.policy")
+        self.properties['java.rmi.server.RMIClassLoaderSpi'] = \
+            "com.bigdata.httpaccess.CustomClassProvider"
+        self.properties['com.bigdata.httpaccess.persistenceDirectory'] = \
+            os.path.join(".", "httpaccessState")
+
+    def start(self, args):
+        # Calculate the service classpath
+        classpath = [
+            os.path.join(self.appHome, "lib", "zookeeper.jar"),
+            os.path.join(self.appHome, "lib", "bigdata.jar"),
+            os.path.join(self.appHome, "lib", "jsk-lib.jar"),
+            os.path.join(self.appHome, "lib", "jsk-platform.jar"),
+            os.path.join(self.appHome, "lib", "jsk-resources.jar"),
+            os.path.join(self.appHome, "lib", "log4j.jar") ]
+        os.environ['CLASSPATH'] = ":".join(classpath)
+
+        # Set the library path
+        javahome = os.environ['JAVA_HOME']
+        arch = os.uname()[4]
+        if arch == "x86_64":
+            jvmArch = "amd64"
+        elif arch == "i586" or arch == "i686":
+            jvmArch = "i386"
+        else:
+            print "Unknown CPU architecture"
+            sys.exit(1)
+        os.environ['LD_LIBRARY_PATH'] = self.properties['java.library.path'] + \
+            ":" + os.path.join(javahome, "jre", "lib", jvmArch, "server") + \
+            ":" + os.path.join(javahome, "jre", "lib", jvmArch) + \
+            ":" + os.path.join(javahome, "lib", jvmArch)
+        del self.properties['java.library.path']
+
+        # Build the list of command line arguments
+        argList = []
+        argList.append(os.path.join(self.appHome,
+            "bin", "http_access_server"))
+
+        argList.extend([ "-s", os.path.join(self.appHome,
+             "lib", "com", "bigdata", self.serviceName,
+             "config", self.serviceName + ".config") ])
+
+        # Migrate old property names to new
+        self.migrateProperties()
+
+        # Convert the properties to command line arguments
+        propNames = self.properties.keys()
+        propNames.sort()
+        for p in propNames:
+            argList.append("-D" + p + "=" + self.properties[p])
+        argList.extend(args)
+
+        # Display the command about to be run
+        for a in argList:
+            print a
+
+        if os.environ.has_key('GDB'):
+            # Write the command line args to a file to pass to GDB
+            fp = file("gdbinit.autogen", "w")
+            fp.write("set args " + " ".join(argList[1:]))
+            fp.close()
+
+            # Modify the command to execute
+            argList = [ 'gdb', '-x', 'gdbinit.autogen', argList[0] ]
+
+        os.execvp(argList[0], argList)
+
+    def setGroupProperties(self):
+        # The HTTP server expects a comma-seperated list of group names
+        self.properties['groupsToJoin'] = ",".join(params.groups)
+        # XXX: the HTTP server doesn't use the locator list
+        #self.properties['locsToJoin'] = ",".join(params.lookupLocators)
+
+
+class BigdataServiceOldLog(BigdataService):
+    def __init__(self, serviceName, params):
+        BigdataService.__init__(self, serviceName, params)
+        del self.properties['log4j.primary.configuration']
+        del self.properties['java.util.logging.config.file']
+
+class JiniBrowser(BigdataService):
+    def __init__(self, serviceName, params):
+        BigdataService.__init__(self, serviceName, params)
+        self.properties['log4j.primary.configuration'] = os.path.join( \
+            self.appHome, "var", "config", "logging", \
+            "browser-logging.properties")
+        self.properties['java.util.logging.config.file'] = os.path.join( \
+            self.appHome, "var", "config", "logging", \
+            "browser-logging.properties")
+
+
+# This is a map from the service name to some of the most common service
+# parameters. The format is:
+#       "servicename" : (ClassName, codebasePort, exportPort)
+#
+# An entry in this map is not required. If one is not found, the default
+# 'GenericBigdataService' class will be used with the default codebase port
+# and default export port
+bigdataServiceMap = {
+    'jini'              : (BigdataMetaservice,      9010, 20010),
+    'reggie'            : (BigdataMetaservice,      9010, 20010),
+    'httpd'             : (BigdataServiceOldLog,    9010),
+    'browser'           : (JiniBrowser,             9020),
+    'zookeeper'         : (BigdataService,          9333, 20333),
+    'dataserver'        : (BigdataService,          9250, 21050),
+    'metadataserver'    : (BigdataService,          9251, 21051),
+    'loadbalancer'      : (BigdataService,          9252, 21052),
+    'txnserver'         : (BigdataService,          9253, 21053),
+    'clientserver'      : (BigdataService,          9254, 21054),
+
+    'all'               : (BigdataMetaservice,      9010, 20010),
+}
+
+
+if __name__ == '__main__':
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "D:", \
+            [ "help", "groups=", "mGroups=", "locators=", \
+              "appHome=", "nohttpd" ])
+    except getopt.GetoptError:
+        # print help information and exit:
+        usage()
+        sys.exit(1)
+
+    params = Params()
+    params.appHome = "NOT_SET"
+    propertyOverrides = []
+    for o, a in opts:
+        if o == '-D':
+            kv = a.split('=', 2)
+            if len(kv) != 2:
+                print "Invalid property definition: " + a
+                sys.exit(1)
+            propertyOverrides.append(kv)
+        elif o == "--help":
+            usage()
+            sys.exit(0)
+        elif o == "--groups":
+            params.groups = a.split(',')
+            print "groups set to",params.groups
+        elif o == "--mGroups":
+            params.mGroups = a.split(',')
+        elif o == "--locators":
+            params.lookupLocators = a.split(",")
+        elif o == "--appHome":
+            params.appHome = a
+        elif o == "--nohttpd":
+            params.startCodebaseHttpd = False
+
+    if len(args) < 1:
+        print "Error: missing service name"
+        usage()
+        sys.exit(1)
+    params.serviceName = args[0]
+
+    if params.appHome == "NOT_SET":
+        params.appHome = dirname(dirname( os.path.abspath(sys.argv[0])) )
+
+    # BTM - params.appHome = dirname(dirname( os.path.abspath(sys.argv[0])) )
+
+    print "appHome=" + params.appHome
+
+    # Instiantate the object for the service
+    serviceName = args[0]
+    try:
+        serviceTuple = bigdataServiceMap[serviceName]
+    except KeyError:
+        serviceTuple = (GenericBigdataService,)
+
+    # Create the service object
+    service = serviceTuple[0](serviceName, params)
+
+    # Apply the export and codebase port shortcut
+    if len(serviceTuple) > 1:
+        service.properties['bigdata.codebase.port'] = str(serviceTuple[1])
+    if len(serviceTuple) > 2:
+        service.properties['exportPort'] = str(serviceTuple[2])
+
+    # Apply property overrides from the command line
+    service.setProperties(propertyOverrides)
+
+    # Run the service
+    service.start(args[1:])
