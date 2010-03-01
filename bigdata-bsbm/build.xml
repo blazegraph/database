@@ -94,7 +94,6 @@
 		 file. -->
 	
 	<!-- @todo specify the kb namespace (default is "kb"). -->
-	<!-- Note: Can also load xxx.nt.zip and xxx.nt.gz files. -->
 	<!-- Note: split data files and use RDFDataLoadMaster for scale-out. -->
  	<target name="run-load" depends="compile">
  		<!-- delete file if it exists (@todo dangerous!). -->
@@ -104,7 +103,9 @@
 	          failonerror="true"
 			  dir="${build.dir}/bin"
 			  >
-			<arg line="journal.properties ${bsbm.outputFile}.${bsbm.outputType}.zip"/>
+        	<!-- Note: Can also load xxx.nt.zip and xxx.nt.gz files.  Just add
+        	     the file extension here. -->
+			<arg line="journal.properties ${bsbm.outputFile}.${bsbm.outputType}"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx${bsbm.maxMem}"/>
 			<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
