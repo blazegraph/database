@@ -33,7 +33,7 @@ public class BigdataQueryDriver {
         /*
          * @todo this is the default kb namespace. it should be a parameter to
          * the test harness since you can have multiple instances in a single
-         * journal.
+         * journal.  It could the the "SPARQL-Endpoint" parameter.
          */
         final String namespace = "kb";
         try {
