@@ -891,6 +891,9 @@ V extends Serializable//
             throws IOException {
 
         final JobState jobState = getJobState();
+
+        if (jobState.ontology == null)
+            return;
         
         if (log.isInfoEnabled())
             log.info("Loading ontology: " + jobState.ontology);
