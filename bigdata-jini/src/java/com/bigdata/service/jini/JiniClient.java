@@ -102,7 +102,7 @@ public class JiniClient<T> extends AbstractScaleOutClient<T> {
      * shutdown.
      * 
      * @param immediateShutdown
-     *            When <code>true</code> the shutdown is <em>abrubt</em>.
+     *            When <code>true</code> the shutdown is <em>abrupt</em>.
      *            You can expect to see messages about interrupted IO such as
      * 
      * <pre>
