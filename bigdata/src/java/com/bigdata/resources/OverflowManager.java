@@ -121,10 +121,10 @@ abstract public class OverflowManager extends IndexManager {
      */
     final protected double tailSplitThreshold;
 
-    /**
-     * @see Options#HOT_SPLIT_THRESHOLD
-     */
-    final protected double hotSplitThreshold;
+//    /**
+//     * @see Options#HOT_SPLIT_THRESHOLD
+//     */
+//    final protected double hotSplitThreshold;
 
     /**
      * @see Options#SCATTER_SPLIT_ENABLED
@@ -604,10 +604,10 @@ abstract public class OverflowManager extends IndexManager {
         /**
          * The minimum percentage (in [0:2]) of a nominal split before an index
          * partition will be "hot split" (default
-         * {@value #DEFAULT_HOT_SPLIT_THRESHOLD}). Hot splits are taken by
-         * hosts which are more heavily utilized than their peers but not
-         * heavily utilized in terms of their own resources. This is basically
-         * an acceleration factor for index partition splits when a host has a
+         * {@value #DEFAULT_HOT_SPLIT_THRESHOLD}). Hot splits are taken by hosts
+         * which are more heavily utilized than their peers but not heavily
+         * utilized in terms of their own resources. This is basically an
+         * acceleration factor for index partition splits when a host has a
          * relatively higher workload than its peers. The purpose of a "hot
          * split" is to increase the potential concurrency by breaking an active
          * index partition into two index partitions. If the writes on the index
@@ -616,11 +616,14 @@ abstract public class OverflowManager extends IndexManager {
          * the order of [.25:.75]. Hot splits may be effectively disabled by
          * raising the percent of split to GTE
          * {@value #PERCENT_OF_SPLIT_THRESHOLD}.
+         * 
+         * @deprecated Hot splits are not implemented and this option does not
+         *             do anything.  It will be going away soon.
          */
         String HOT_SPLIT_THRESHOLD = OverflowManager.class.getName()
                 + ".hotSplitThreshold";
         
-        String DEFAULT_HOT_SPLIT_THRESHOLD = ".4";
+        String DEFAULT_HOT_SPLIT_THRESHOLD = "2.0"; // was .4
         
         /**
          * Boolean option indicates whether or not scatter splits are allowed
@@ -695,6 +698,12 @@ abstract public class OverflowManager extends IndexManager {
          * to ZERO (0).
          * 
          * @see #DEFAULT_MAXIMUM_MOVES
+         * 
+         * @todo We need to do lots of moves if we are trying to rebalance a
+         *       cluster in response to a disk shortage, adding a new LDS, or
+         *       removing an existing LDS. Likewise, if a hot spare is recruited
+         *       into an existing LDS, we need to replicate the shards from the
+         *       other nodes in the same LDS onto the new node.
          */
         String MAXIMUM_MOVES = OverflowManager.class.getName()
                 + ".maximumMoves";
@@ -1298,25 +1307,25 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-        // hotSplitThreshold
-        {
-
-            hotSplitThreshold = Double.parseDouble(properties.getProperty(
-                    Options.HOT_SPLIT_THRESHOLD,
-                    Options.DEFAULT_HOT_SPLIT_THRESHOLD));
-
-            if (log.isInfoEnabled())
-                log.info(Options.HOT_SPLIT_THRESHOLD + "="
-                        + hotSplitThreshold);
-
-            if (hotSplitThreshold < 0 || hotSplitThreshold > 2) {
-
-                throw new RuntimeException(Options.HOT_SPLIT_THRESHOLD
-                        + " must be in [0:2]");
-
-            }
-
-        }
+//        // hotSplitThreshold
+//        {
+//
+//            hotSplitThreshold = Double.parseDouble(properties.getProperty(
+//                    Options.HOT_SPLIT_THRESHOLD,
+//                    Options.DEFAULT_HOT_SPLIT_THRESHOLD));
+//
+//            if (log.isInfoEnabled())
+//                log.info(Options.HOT_SPLIT_THRESHOLD + "="
+//                        + hotSplitThreshold);
+//
+//            if (hotSplitThreshold < 0 || hotSplitThreshold > 2) {
+//
+//                throw new RuntimeException(Options.HOT_SPLIT_THRESHOLD
+//                        + " must be in [0:2]");
+//
+//            }
+//
+//        }
 
         // scatterSplitEnabled
         {
