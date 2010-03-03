@@ -2048,27 +2048,40 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             final Runnable task = newSuccessTask(resource);
 
             if (task != null) {
-                
+
                 // increment before we submit the task.
                 guardLatch_notify.inc();
+                try {
 
-                // queue up success notice.
-                notifyService.submit(new Runnable() {
-                    public void run() {
-                        try {
-                            task.run();
-                        } finally {
-                            lock.lock();
+                    // queue up success notice.
+                    notifyService.submit(new Runnable() {
+                        public void run() {
                             try {
-                                // decrement after the task is done.
-                                guardLatch_notify.dec();
+                                task.run();
                             } finally {
-                                lock.unlock();
+                                lock.lock();
+                                try {
+                                    // decrement after the task is done.
+                                    guardLatch_notify.dec();
+                                } finally {
+                                    lock.unlock();
+                                }
                             }
                         }
+                    });
+
+                } catch (RejectedExecutionException ex) {
+                    // decrement latch since tasks did not run.
+                    lock.lock();
+                    try {
+                        guardLatch_notify.dec();
+                    } finally {
+                        lock.unlock();
                     }
-                });
-                
+                    // rethrow exception (will be logged below).
+                    throw ex;
+                }
+
             }
             
         } catch (Throwable t) {
@@ -2115,22 +2128,36 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 // increment before we submit the task.
                 guardLatch_notify.inc();
 
-                // queue up failure notice.
-                notifyService.submit(new Runnable() {
-                    public void run() {
-                        try {
-                            task.run();
-                        } finally {
-                            lock.lock();
+                try {
+
+                    // queue up failure notice.
+                    notifyService.submit(new Runnable() {
+                        public void run() {
                             try {
-                                // decrement after the task is done.
-                                guardLatch_notify.dec();
+                                task.run();
                             } finally {
-                                lock.unlock();
+                                lock.lock();
+                                try {
+                                    // decrement after the task is done.
+                                    guardLatch_notify.dec();
+                                } finally {
+                                    lock.unlock();
+                                }
                             }
                         }
+                    });
+
+                } catch (RejectedExecutionException ex) {
+                    // decrement latch since tasks did not run.
+                    lock.lock();
+                    try {
+                        guardLatch_notify.dec();
+                    } finally {
+                        lock.unlock();
                     }
-                });
+                    // rethrow exception (will be logged below).
+                    throw ex;
+                }
 
             }
 
