@@ -11,6 +11,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.load.RDFDataLoadMaster;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -18,21 +19,24 @@ import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Very simple loader that takes a journal file and a data file as input and
- * loads the data into the journal.  If the journal file exists, it will be
+ * loads the data into the journal. If the journal file exists, it will be
  * destroyed before the load so that the load takes place on a clean journal.
- * 
- * @todo Should be replaced with a bulk loader for scale out.
+ * <p>
+ * Note: For scale-out, use the {@link RDFDataLoadMaster} instead.
  * 
  * @author mike
+ * @author thompsonbry
  */
 public class BigdataLoader {
 
     /**
      * @param args
-     *            USAGE: <code>propertyFile dataFile</code><br>
-     *            where <i>propertyFile</i> contains the default properties which
-     *            will be used to initialize the database and knowledge base
-     *            instance<br>
+     *            USAGE: <code>namespace propertyFile dataFile</code><br>
+     *            where <i>namespace</i> is the namespace of the target KB
+     *            instance><br>
+     *            where <i>propertyFile</i> contains the default properties
+     *            which will be used to initialize the database and knowledge
+     *            base instance<br>
      *            where <i>dataFile</i> is the name of the file to be loaded.
      *            The file extensions <code>.gz</code> and <code>.zip</code> are
      *            supported.
@@ -43,14 +47,15 @@ public class BigdataLoader {
      *            All other arguments should be specified in the property file.
      */
     public static void main(final String[] args) {
+        if (args.length != 3) {
+            System.err.println("USAGE: namespace propertyFile dataFile");
+            System.exit(1);
+        }
         Journal jnl = null;
         try {
-            if (args.length != 2) {
-                System.err.println("USAGE: propertyFile dataFile");
-                System.exit(1);
-            }
-            final File propertyFile = new File(args[0]);
-            final String dataFile = args[1];
+            final String namespace = args[0];
+            final File propertyFile = new File(args[1]);
+            final String dataFile = args[2];
             
             final Properties properties = new Properties();
             {
@@ -69,22 +74,6 @@ public class BigdataLoader {
                 }
             }
             
-//            properties.setProperty(BigdataSail.Options.BUFFER_MODE,BufferMode.Disk.toString());// Disk is default.
-//            properties.setProperty(BigdataSail.Options.QUADS, "false");
-//            properties.setProperty(BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
-//            properties.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-//            properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-//            properties.setProperty(BigdataSail.Options.TEXT_INDEX, "false");
-//            properties.setProperty(BigdataSail.Options.TERM_CACHE_CAPACITY, "50000"); // 50000 default.
-//            properties.setProperty(BigdataSail.Options.BUFFER_CAPACITY, "100000"); // 10000 default.
-////            properties.setProperty(BigdataSail.Options.NESTED_SUBQUERY, "false"); // false is the pipeline join, which is much better.
-////            properties.setProperty(BigdataSail.Options.MAX_PARALLEL_SUBQUERIES, "5"); // 5 is default, only applies to nextedSubquery joins.
-//            properties.setProperty(BigdataSail.Options.CHUNK_CAPACITY,"100"); // 100 default.
-//            properties.setProperty(BigdataSail.Options.CHUNK_OF_CHUNKS_CAPACITY,"1000"); // 1000 default.
-//            properties.setProperty(com.bigdata.btree.IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY, "8000");
-//            properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT, ""+(1048576*200)); // 200M initial extent.
-////            properties.setProperty(BigdataSail.Options.FILE, journalFile.getAbsolutePath());
-
             final File journalFile = new File(properties.getProperty(BigdataSail.Options.FILE));
             if (journalFile.exists()) {
                 if(!journalFile.delete()) {
@@ -97,7 +86,6 @@ public class BigdataLoader {
             jnl = new Journal(properties);
             
             // Create the KB instance (we know that this is a new journal).
-            final String namespace = "kb";  // default namespace.
             final AbstractTripleStore kb = new LocalTripleStore(jnl, namespace, ITx.UNISOLATED, properties);
             kb.create();
             
