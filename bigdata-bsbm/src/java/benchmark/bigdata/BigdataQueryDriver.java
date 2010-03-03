@@ -13,41 +13,80 @@ import org.openrdf.rio.rdfxml.RDFXMLWriter;
 
 import benchmark.testdriver.TestDriver;
 
-import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.service.jini.JiniClient;
+import com.bigdata.service.jini.JiniFederation;
 
+/**
+ * A variation on the {@link TestDriver} which may be used to connect to either
+ * a standalone {@link Journal} or a {@link JiniFederation}. If you want to
+ * submit queries directly to a SPARQL endpoint, then use {@link TestDriver}
+ * instead.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @version $Id$
+ */
 public class BigdataQueryDriver {
     /**
+     * 
      * @param args
-     *            USAGE: [bsbm args...] propertyFile
-     *            
+     *            USAGE:
+     *            <code>[bsbm args...] <i>namespace</i> (propertyFile|configFile)</code>
+     *            , where
+     *            <dl>
+     *            <dt>namespace</dt>
+     *            <dd>The namespace of the target KB instance ("kb" is the
+     *            default namespace).</dd>
+     *            <dt>propertyFile</dt>
+     *            <dd>A java properties file for a standalone {@link Journal}</dd>
+     *            <dt>configFile</dt>
+     *            <dd>A jini configuration file for a bigdata federation</dd>
+     *            </dl>
+     * 
      * @see TestDriver for other options.
+     * 
+     * @todo introduce "-jnl" or "-fed" options to specify the standalone
+     *       journal or a jini federation?
      */
     public static void main(final String[] args) {
         Journal jnl = null;
-        /*
-         * @todo this is the default kb namespace. it should be a parameter to
-         * the test harness since you can have multiple instances in a single
-         * journal.  It could the the "SPARQL-Endpoint" parameter.
-         */
-        final String namespace = "kb";
+        JiniClient<?> jiniClient = null;
         try {
-            if (args.length < 1) {
-                System.err.println("USAGE: [bsbm args...] propertyFile");
+            if (args.length < 2) {
+                System.err.println("USAGE: [bsbm args...] namespace (propertyFile|configFile)");
                 System.exit(1);
             }
+            final String namespace = args[args.length - 2];
             final String propertyFile = args[args.length - 1];
             final File file = new File(propertyFile);
             if (!file.exists()) {
-                throw new RuntimeException("Could not find propertyFile: "
-                        + file);
+                throw new RuntimeException("Could not find file: " + file);
             }
-            System.out.println("propertyFile: " + file);
+            boolean isJini = false;
+            if (propertyFile.endsWith(".config")) {
+                isJini = true;
+            } else if (propertyFile.endsWith(".properties")) {
+                isJini = false;
+            } else {
+
+                /*
+                 * Note: This is a hack, but we are recognizing the jini
+                 * configuration file with a .config extension and the journal
+                 * properties file with a .properties extension.
+                 */
+                System.err
+                        .println("File should have '.config' or '.properties' extension: "
+                                + file);
+                System.exit(1);
+            }
+            System.out.println("namespace: " + namespace);
+            System.out.println("file: " + file);
 
             final String[] bsbmArgs = new String[args.length - 1];
             System.arraycopy(args, 0, bsbmArgs, 0, bsbmArgs.length);
@@ -58,41 +97,43 @@ public class BigdataQueryDriver {
              */
             final BigdataSail sail;
             {
-//                final File propertyFile = new File(args[0]);
+
+                final IIndexManager indexManager;
                 
-                final Properties properties = new Properties();
-                {
-                    // Read the properties from the file.
-                    final InputStream is = new BufferedInputStream(
-                            new FileInputStream(propertyFile));
-                    try {
-                        properties.load(is);
-                    } finally {
-                        is.close();
+                if (isJini) {
+
+                    jiniClient = new JiniClient(new String[]{propertyFile});
+                    
+                    indexManager = jiniClient.connect();
+                    
+                } else {
+
+                    final Properties properties = new Properties();
+                    {
+                        // Read the properties from the file.
+                        final InputStream is = new BufferedInputStream(
+                                new FileInputStream(propertyFile));
+                        try {
+                            properties.load(is);
+                        } finally {
+                            is.close();
+                        }
+                        if (System.getProperty(BigdataSail.Options.FILE) != null) {
+                            // Override/set from the environment.
+                            properties
+                                    .setProperty(
+                                            BigdataSail.Options.FILE,
+                                            System
+                                                    .getProperty(BigdataSail.Options.FILE));
+                        }
                     }
-                    if (System.getProperty(BigdataSail.Options.FILE) != null) {
-                        // Override/set from the environment.
-                        properties.setProperty(BigdataSail.Options.FILE, System
-                                .getProperty(BigdataSail.Options.FILE));
-                    }
+
+                    indexManager = jnl = new Journal(properties);
+                    
                 }
-                
-//                final Properties properties = new Properties();
-//            properties.setProperty(
-//                    BigdataSail.Options.QUADS, "false");
-//            properties.setProperty(
-//                    BigdataSail.Options.STATEMENT_IDENTIFIERS, "false");
-//            properties.setProperty(
-//                    BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
-//            properties.setProperty(
-//                    BigdataSail.Options.TRUTH_MAINTENANCE, "false");
-//                properties.setProperty(BigdataSail.Options.FILE, file
-//                        .getAbsolutePath());
-                
-                jnl = new Journal(properties);
 
                 // resolve the kb instance of interest.
-                final AbstractTripleStore tripleStore = (AbstractTripleStore) jnl
+                final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
                         .getResourceLocator().locate(namespace, ITx.UNISOLATED);
 
                 if (tripleStore == null) {
@@ -105,12 +146,8 @@ public class BigdataQueryDriver {
                 sail = new BigdataSail(tripleStore);
                 
             }
-//            final BigdataSail sail = new BigdataSail(properties);
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
             repo.initialize();
-            
-            // take the repository for a test spin
-            // testRepo(repo);
             
             // run TestDriver with bsbmArgs, repo
             TestDriver.main(bsbmArgs, repo);
@@ -120,6 +157,9 @@ public class BigdataQueryDriver {
         } finally {
             if(jnl!=null) {
                 jnl.close();
+            }
+            if(jiniClient!=null) {
+                jiniClient.disconnect(true/*immediateShutdown*/);
             }
         }
     }
