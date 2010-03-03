@@ -995,9 +995,10 @@ ${postInstallMessage}</echo>
 		<jvmarg value="-Xmx200m" />
 		<jvmarg value="-showversion"/>
 		<!-- The name of the federation instance. -->
-		<jvmarg value="-Dbigdata.fedname=testFed"/>
+		<jvmarg value="-Dbigdata.fedname=${standalone.fed}"/>
 		<jvmarg value="-Djava.security.policy=policy.all"/>
 		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dsystat.home=${SYSSTAT_HOME}" />
 		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
@@ -1010,9 +1011,10 @@ ${postInstallMessage}</echo>
 		<jvmarg value="-Xmx200m" />
 		<jvmarg value="-showversion"/>
 		<!-- The name of the federation instance. -->
-		<jvmarg value="-Dbigdata.fedname=testFed"/>
+		<jvmarg value="-Dbigdata.fedname=${standalone.fed}"/>
 		<jvmarg value="-Djava.security.policy=policy.all"/>
 		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dsystat.home=${SYSSTAT_HOME}" />
 		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
@@ -1027,9 +1029,10 @@ ${postInstallMessage}</echo>
 		<jvmarg value="-Xmx200m" />
 		<jvmarg value="-showversion"/>
 		<!-- The name of the federation instance. -->
-		<jvmarg value="-Dbigdata.fedname=testFed"/>
+		<jvmarg value="-Dbigdata.fedname=${standalone.fed}"/>
 		<jvmarg value="-Djava.security.policy=policy.all"/>
 		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dsystat.home=${SYSSTAT_HOME}" />
 		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
 		<!--                    -->
 		<!-- Per job parameters -->
