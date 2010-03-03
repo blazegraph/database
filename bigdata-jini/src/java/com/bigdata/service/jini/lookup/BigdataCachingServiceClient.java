@@ -29,8 +29,7 @@ package com.bigdata.service.jini.lookup;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
-
-import com.bigdata.service.jini.JiniFederation;
+import java.util.UUID;
 
 import net.jini.core.lookup.ServiceTemplate;
 import net.jini.lookup.ServiceDiscoveryEvent;
@@ -38,13 +37,28 @@ import net.jini.lookup.ServiceDiscoveryListener;
 import net.jini.lookup.ServiceDiscoveryManager;
 import net.jini.lookup.ServiceItemFilter;
 
+import com.bigdata.service.IDataService;
+import com.bigdata.service.jini.JiniFederation;
+
 /**
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class BigdataCachingServiceClient<S extends Remote> extends
         AbstractCachingServiceClient<S> {
 
+    /**
+     * The {@link UUID} of the service owing this cache instance.
+     */
+    protected final UUID thisServiceUUID;
+    
+    /**
+     * The service owning this cache instance. For standard bigdata services
+     * this will be the {@link IDataService}, etc.
+     */
+    protected final Object thisService;
+    
     /**
      * {@inheritDoc}
      * 
@@ -63,6 +77,10 @@ public class BigdataCachingServiceClient<S extends Remote> extends
         super(fed.getServiceDiscoveryManager(),
                 fed/* serviceDiscoveryListener */, serviceIface, template,
                 filter, timeout);
+
+        thisServiceUUID = fed.getClient().getDelegate().getServiceUUID();
+
+        thisService = fed.getClient().getDelegate().getService();
 
     }
 
