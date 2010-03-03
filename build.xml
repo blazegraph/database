@@ -986,7 +986,82 @@ ${postInstallMessage}</echo>
 	</java>
 	
 </target>
+
+<!-- @todo this should explicitly start/stop zookeeper and jini. -->
+<target name="standalone-start" description="Start the standalone federation.">
+	<java classname="com.bigdata.jini.start.ServicesManagerServer"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="runtime.classpath" />
+		<jvmarg value="-Xmx200m" />
+		<jvmarg value="-showversion"/>
+		<!-- The name of the federation instance. -->
+		<jvmarg value="-Dbigdata.fedname=testFed"/>
+		<jvmarg value="-Djava.security.policy=policy.all"/>
+		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
+		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
+	</java>
+</target>
+	
+<target name="standalone-stop" description="Stop the standalone federation.">
+	<java classname="com.bigdata.service.jini.util.ShutdownFederation"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="runtime.classpath" />
+		<jvmarg value="-Xmx200m" />
+		<jvmarg value="-showversion"/>
+		<!-- The name of the federation instance. -->
+		<jvmarg value="-Dbigdata.fedname=testFed"/>
+		<jvmarg value="-Djava.security.policy=policy.all"/>
+		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
+		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
+	</java>
+</target>
+
+<!-- @todo Add target to stand up a SPARQL endpoint for a KB namespace. Could be
+     Sesame Server or bigdata REST API. -->
+<target name="standalone-bulk-load" description="Bulk load RDF data into the standalone federation.">
+	<java classname="com.bigdata.rdf.load.MappedRDFDataLoadMaster"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="runtime.classpath" />
+		<jvmarg value="-Xmx200m" />
+		<jvmarg value="-showversion"/>
+		<!-- The name of the federation instance. -->
+		<jvmarg value="-Dbigdata.fedname=testFed"/>
+		<jvmarg value="-Djava.security.policy=policy.all"/>
+		<jvmarg value="-Dcom.bigdata.jmx.log4j.disable=true" />
+		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
+		<!--                    -->
+		<!-- Per job parameters -->
+		<!--                    -->
+		<!-- The KB namespace ("kb" is a common default). -->
+		<jvmarg value="-Dbigdata.rdf.namespace=U10"/>
+		<!-- The job name (same as the KB namespace is a common default). -->
+		<jvmarg value="-Dbigdata.rdf.job.name=bulk-load-kb"/>
+		<!-- The file or directory containing RDF data to be loaded. 
 		
+		     Possible interesting data:
+		
+		     d:/bigdata-perf-analysis/lubm/U10
+		     d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt
+		-->
+		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt"/>
+		<!-- The file or directory containing zero or more RDF ontology files to be loaded.
+		
+			 Note: If you do not want to load any "ontology" data you can point this at an
+			 empty directory.  "ontology" data is loaded once - when a new KB instance is
+			 created.
+
+			 Possible interesting ontologies:
+		
+			bigdata-rdf/src/resources/data/lehigh/univ-bench.owl
+			d:/bigdata-perf-analysis/emptyDir
+		 -->
+		<jvmarg value="-Dbigdata.rdf.ontology=d:/bigdata-perf-analysis/emptyDir"/>
+		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
+	</java>
+</target>
+
 <target name="scale-out-sample" description="Run the scale-out sample code.">
 
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
