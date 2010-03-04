@@ -888,6 +888,31 @@ public class SplitUtility {
                          * No separator key could be identified. The rest of the
                          * data in the segment will all go into this split.
                          */
+
+                        final double overextension = ((double) seg.getStore()
+                                .size())
+                                / nominalShardSize;
+
+                        if (splits.isEmpty() && overextension > 2d) {
+
+                            /*
+                             * Log, but keep going.
+                             * 
+                             * Note: An application with poorly written override
+                             * logic could cause an index segment to fail to
+                             * split. This has an extreme negative impact on
+                             * performance once the segment grows to 1G or more.
+                             * The DataService SHOULD refuse writes for shards
+                             * which refuse splits, which pushes the problem
+                             * back to the application where it belongs.
+                             */
+                            log.error("Segment overextended: "
+                                            + overextension
+                                            + "x : application refuses to split shard: "
+                                            + scaleOutIndexName + "#"
+                                            + oldpmd.getPartitionId());
+
+                        }
                         
                         toKey = oldpmd.getRightSeparatorKey();
                         
