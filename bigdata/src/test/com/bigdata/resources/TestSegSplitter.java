@@ -1,44 +1,25 @@
-/**
+/*
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
-License:
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
 
-  http://www.CognitiveWeb.org/legal/license/
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
-
-Copyrights:
-
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
-
-  http://www.CognitiveWeb.org
-
-Portions Copyright (c) 2002-2003 Bryan Thompson.
-
-Acknowledgements:
-
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
-
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
-
-Modifications:
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 /*
@@ -49,12 +30,19 @@ package com.bigdata.resources;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.UUID;
 
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
 
+import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -83,6 +71,28 @@ import com.bigdata.sparse.SparseRowStore;
  * @version $Id$
  * 
  * @see src/architecture/SplitMath.xls
+ * 
+ *      FIXME Test with application constraint on the choice of the separator
+ *      keys.
+ *      <p>
+ *      Note: the SPO index can have a constraint imposed which makes a star
+ *      join trivial -- just truncate the selected separator key to 8 bytes. If
+ *      the resulting key is less than the last/left separator key then use its
+ *      successor. If the resulting key is greater than the right separator key,
+ *      then no split is possible. (That would imply 200MB of attribute values
+ *      for a single subject which is pretty unlikely!).
+ *      <p>
+ *      Note: The {@link SparseRowStore} constraint is also easy. We just need
+ *      to find/create a separator key which is equal to some
+ *      {schema+primaryKey}. The same concerns about the left/right separator
+ *      keys apply. Again, it is very unlikely to have 200MB of data for a
+ *      specific schema and primary key!
+ *      <p>
+ *      Test when the application rejects some tuple ranges and verify that the
+ *      application is able to make a split decision in terms of an expanded
+ *      tuple range if more data are available to be split.
+ * 
+ * @todo verify correct rejection of non-compact segment.
  */
 public class TestSegSplitter extends TestCase2 {
 
@@ -119,8 +129,9 @@ public class TestSegSplitter extends TestCase2 {
      * 
      * @return The {@link IndexSegmentBuilder}.
      */
-    public IndexSegmentBuilder doBuild(final BTree src, final long commitTime,
-            final byte[] fromKey, final byte[] toKey) throws Exception {
+    public IndexSegmentBuilder doBuild(final ILocalBTreeView src,
+            final long commitTime, final byte[] fromKey, final byte[] toKey)
+            throws Exception {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -267,76 +278,37 @@ public class TestSegSplitter extends TestCase2 {
         }
 
     }
-    
-    /**
-     * A basic test of the ability to split an {@link IndexSegment}.
-     * 
-     * @todo test when not large enough for a split.
-     * 
-     * @todo test when large enough to create two splits.
-     * 
-     * @todo test when large enough to create three splits.
-     * 
-     * @todo test various fence posts.
-     * 
-     * @todo test with fromKey/toKey=([],null), which spans all keys. When
-     *       testing with constraints on the fromKey or toKey the generated
-     *       BTree must have keys lying within the constrained key range.
-     * 
-     * @todo test with fromKey=[] and non-null toKey.
-     * 
-     * @todo test with non-empty fromKey and null toKey.
-     * 
-     * @todo test with non-empty fromKey and non-null toKey.
-     * 
-     * @todo Test with application constraint on the choice of the separator
-     *       keys.
-     *       <p>
-     *       Note: the SPO index can have a constraint imposed which makes a
-     *       star join trivial -- just truncate the selected separator key to 8
-     *       bytes. If the resulting key is less than the last/left separator
-     *       key then use its successor. If the resulting key is greater than
-     *       the right separator key, then no split is possible. (That would
-     *       imply 200MB of attribute values for a single subject which is
-     *       pretty unlikely!).
-     *       <p>
-     *       Note: The {@link SparseRowStore} constraint is also easy. We just
-     *       need to find/create a separator key which is equal to some
-     *       {schema+primaryKey}. The same concerns about the left/right
-     *       separator keys apply. Again, it is very unlikely to have 200MB of
-     *       data for a specific schema and primary key!
-     */
-    public void test_split01() throws Exception {
 
-        /*
-         * Test parameters.
-         * 
-         * @todo things will have to be done a bit differently to test when the
-         * expectation is that no split is possible either because there is not
-         * enough data or because the application constraint on the separator
-         * key would be violated.
-         * 
-         * @todo to test with fractional splits we really need to control for
-         * the size on disk.
-         */
+    /**
+     * Unit test the edge cases surrounding when an index partition is split.
+     * 
+     * @see src/architecture/SplitMath.xls, for the math concerning the #of
+     *      splits to be generated from an index segment file of a given size.
+     * 
+     * @throws Exception
+     */
+    public void test_split_segment_underflow() throws Exception {
+
         final byte[] fromKey = new byte[0];
         final byte[] toKey = null;
-        final int expectedSplitCount = 2;
         final ISimpleSplitHandler splitHandler = null;
 
-        final IJournal store = getStore();
         final int ntuples = 1000;
-        final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
-                pidFactory.nextPartitionId(getName()),//
-                -1, // sourcePartitionId
-                fromKey, //
-                toKey,//
-                new IResourceMetadata[] { store.getResourceMetadata() }, //
-                null, // cause
-                null // history
-        );
+        
         IndexSegmentBuilder builder = null;
+        final IJournal store = getStore();
+        
         try {
+
+            final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
+                    pidFactory.nextPartitionId(getName()),//
+                    -1, // sourcePartitionId
+                    fromKey, //
+                    toKey,//
+                    new IResourceMetadata[] { store.getResourceMetadata() }, //
+                    null, // cause
+                    null // history
+            );
 
             // Generates BTree w/ constrained keys and commits to store.
             final BTree src = generateData(store, ntuples, pmd);
@@ -347,9 +319,150 @@ public class TestSegSplitter extends TestCase2 {
             final IndexSegmentStore segStore = new IndexSegmentStore(
                     builder.outFile);
 
-            final long nominalShardSize = segStore.size() / expectedSplitCount;
-
+            /*
+             * (A) The segment has one byte less than the maximum so it MUST NOT
+             * be split.
+             */
             try {
+
+                final long nominalShardSize = segStore.size() + 1;
+
+                final IndexSegment seg = segStore.loadIndexSegment();
+
+                // Compute splits.
+                final Split[] splits = SplitUtility.getSplits(pidFactory, pmd,
+                        seg, nominalShardSize, splitHandler);
+
+                assertNull("Not expecting any splits: "
+                        + Arrays.toString(splits), splits);
+
+            } finally {
+
+                segStore.close();
+
+            }
+
+            /*
+             * (B) This is the fence post case where segment is exactly at the
+             * maximum size on the disk and MUST be split.
+             * 
+             * @see src/architecture/SplitMath.xls
+             */
+            try {
+
+                final long nominalShardSize = segStore.size();
+
+                final IndexSegment seg = segStore.loadIndexSegment();
+
+                // Compute splits.
+                final Split[] splits = SplitUtility.getSplits(pidFactory, pmd,
+                        seg, nominalShardSize, splitHandler);
+
+                assertNotNull(splits);
+
+                assertEquals("#splits", 2, splits.length);
+
+                // Validate splits.
+                SplitUtility.validateSplits(pmd, splits, true/* checkStuff */);
+
+            } finally {
+
+                segStore.close();
+
+            }
+
+            /*
+             * (C) Just like (B) above really.
+             */
+            try {
+
+                final long nominalShardSize = segStore.size() - 1;
+
+                final IndexSegment seg = segStore.loadIndexSegment();
+
+                // Compute splits.
+                final Split[] splits = SplitUtility.getSplits(pidFactory, pmd,
+                        seg, nominalShardSize, splitHandler);
+
+                assertNotNull(splits);
+
+                assertEquals("#splits", 2, splits.length);
+
+                // Validate splits.
+                SplitUtility.validateSplits(pmd, splits, true/* checkStuff */);
+            
+            } finally {
+
+                segStore.close();
+
+            }
+
+        } finally {
+
+            if (builder != null) {
+
+                // delete the generated index segment.
+                if (!builder.outFile.delete()) {
+
+                    log.warn("Could not delete: " + builder.outFile);
+
+                }
+
+            }
+
+            store.destroy();
+
+        }
+
+    }
+
+    /**
+     * A unit test when the split would create two or three index segments (both
+     * cases are tested here to cover the lower bound and the near lower bound).
+     */
+    public void test_split_lower_bounds() throws Exception {
+
+        /*
+         * Test parameters.
+         */
+        final byte[] fromKey = new byte[0];
+        final byte[] toKey = null;
+        final ISimpleSplitHandler splitHandler = null;
+
+        final int ntuples = 1000;
+        
+        IndexSegmentBuilder builder = null;
+        final IJournal store = getStore();
+        
+        try {
+
+            final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
+                    pidFactory.nextPartitionId(getName()),//
+                    -1, // sourcePartitionId
+                    fromKey, //
+                    toKey,//
+                    new IResourceMetadata[] { store.getResourceMetadata() }, //
+                    null, // cause
+                    null // history
+            );
+
+            // Generates BTree w/ constrained keys and commits to store.
+            final BTree src = generateData(store, ntuples, pmd);
+
+            // Build the index segment (a compacting merge).
+            builder = doBuild(src, src.getLastCommitTime(), fromKey, toKey);
+
+            final IndexSegmentStore segStore = new IndexSegmentStore(
+                    builder.outFile);
+
+            /*
+             * Test ability to create two splits from the data.
+             */
+            try {
+
+                final int expectedSplitCount = 2;
+
+                final long nominalShardSize = (long) (segStore.size() / (expectedSplitCount / 2.));
 
                 final IndexSegment seg = segStore.loadIndexSegment();
 
@@ -358,16 +471,407 @@ public class TestSegSplitter extends TestCase2 {
                         seg, nominalShardSize, splitHandler);
 
                 // Validate splits.
-                SplitUtility.validateSplits(pmd, splits, true/*checkStuff*/);
-            
+                SplitUtility.validateSplits(pmd, splits, true/* checkStuff */);
+
+                assertEquals("#splits", expectedSplitCount, splits.length);
+
             } finally {
-                
+
                 segStore.close();
-                
+
+            }
+
+            /*
+             * Test ability to create three splits from the data.
+             */
+            try {
+
+                final int expectedSplitCount = 3;
+
+                final long nominalShardSize = (long) (segStore.size() / (expectedSplitCount / 2.));
+
+                final IndexSegment seg = segStore.loadIndexSegment();
+
+                // Compute splits.
+                final Split[] splits = SplitUtility.getSplits(pidFactory, pmd,
+                        seg, nominalShardSize, splitHandler);
+
+                // Validate splits.
+                SplitUtility.validateSplits(pmd, splits, true/* checkStuff */);
+
+                assertEquals("#splits", expectedSplitCount, splits.length);
+
+            } finally {
+
+                segStore.close();
+
             }
             
         } finally {
 
+            if (builder != null) {
+
+                // delete the generated index segment.
+                if(!builder.outFile.delete()) {
+
+                    log.warn("Could not delete: "+builder.outFile);
+                    
+                }
+                
+            }
+            
+            store.destroy();
+
+        }
+        
+    }
+
+    /**
+     * A unit test for fence posts when nominal shard size is so small that we
+     * will get only one tuple into each generated split.
+     */
+    public void test_split_upper_bound() throws Exception {
+
+        /*
+         * Test parameters.
+         */
+        final byte[] fromKey = new byte[0];
+        final byte[] toKey = null;
+        final ISimpleSplitHandler splitHandler = null;
+
+        final int ntuples = 1000;
+        
+        IndexSegmentBuilder builder = null;
+        final IJournal store = getStore();
+        
+        try {
+
+            final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
+                    pidFactory.nextPartitionId(getName()),//
+                    -1, // sourcePartitionId
+                    fromKey, //
+                    toKey,//
+                    new IResourceMetadata[] { store.getResourceMetadata() }, //
+                    null, // cause
+                    null // history
+            );
+
+            // Generates BTree w/ constrained keys and commits to store.
+            final BTree src = generateData(store, ntuples, pmd);
+
+            // Build the index segment (a compacting merge).
+            builder = doBuild(src, src.getLastCommitTime(), fromKey, toKey);
+
+            final IndexSegmentStore segStore = new IndexSegmentStore(
+                    builder.outFile);
+
+            /*
+             * Test ability to create splits, each of which has two tuples.
+             */
+            try {
+
+                final int expectedSplitCount = ntuples;
+
+                final long nominalShardSize = segStore.size()
+                        / expectedSplitCount;
+
+                final IndexSegment seg = segStore.loadIndexSegment();
+
+                // Compute splits.
+                final Split[] splits = SplitUtility.getSplits(pidFactory, pmd,
+                        seg, nominalShardSize, splitHandler);
+
+                // Validate splits.
+                SplitUtility.validateSplits(pmd, splits, true/* checkStuff */);
+
+                assertEquals("#splits", expectedSplitCount, ntuples);
+
+                for (Split split : splits) {
+
+                    assertEquals("#tuples", 1, split.ntuples);
+
+                }
+
+            } finally {
+
+                segStore.close();
+
+            }
+
+            
+        } finally {
+
+            if (builder != null) {
+
+                // delete the generated index segment.
+                if(!builder.outFile.delete()) {
+
+                    log.warn("Could not delete: "+builder.outFile);
+                    
+                }
+                
+            }
+            
+            store.destroy();
+
+        }
+        
+    }
+
+    /**
+     * A stress test which increases the target number of splits until each
+     * split would have only one tuple.
+     * 
+     * @throws Exception
+     */
+    public void test_split_stress() throws Exception {
+
+        /*
+         * Test parameters.
+         */
+        final byte[] fromKey = new byte[0];
+        final byte[] toKey = null;
+        final ISimpleSplitHandler splitHandler = null;
+
+        final int ntuples = 1000;
+        
+        IndexSegmentBuilder builder = null;
+        final IJournal store = getStore();
+        
+        try {
+
+            final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
+                    pidFactory.nextPartitionId(getName()),//
+                    -1, // sourcePartitionId
+                    fromKey, //
+                    toKey,//
+                    new IResourceMetadata[] { store.getResourceMetadata() }, //
+                    null, // cause
+                    null // history
+            );
+
+            // Generates BTree w/ constrained keys and commits to store.
+            final BTree src = generateData(store, ntuples, pmd);
+
+            // Build the index segment (a compacting merge).
+            builder = doBuild(src, src.getLastCommitTime(), fromKey, toKey);
+
+            final IndexSegmentStore segStore = new IndexSegmentStore(
+                    builder.outFile);
+
+            /*
+             * Test ability to create N splits from the data. This does not test
+             * each possible value since we cover the edge cases in other unit
+             * tests in this test suite. It just advances randomly through the
+             * possible interval.
+             */
+            final Random r = new Random();
+            for (int expectedSplitCount = 2; expectedSplitCount <= ntuples; expectedSplitCount += (r
+                    .nextInt(20) + 1)) {
+
+                try {
+
+                    final long nominalShardSize = segStore.size()
+                            / expectedSplitCount;
+
+                    final IndexSegment seg = segStore.loadIndexSegment();
+
+                    // Compute splits.
+                    final Split[] splits = SplitUtility.getSplits(pidFactory,
+                            pmd, seg, nominalShardSize, splitHandler);
+
+                    // Validate splits.
+                    SplitUtility
+                            .validateSplits(pmd, splits, true/* checkStuff */);
+
+                    /*
+                     * Note: This is not trying to validate that
+                     * nsplits==expectedSplitCount. Should it?
+                     */ 
+                    
+                } finally {
+
+                    segStore.close();
+
+                }
+            }
+
+        } finally {
+
+            if (builder != null) {
+
+                // delete the generated index segment.
+                if(!builder.outFile.delete()) {
+
+                    log.warn("Could not delete: "+builder.outFile);
+                    
+                }
+                
+            }
+            
+            store.destroy();
+
+        }
+
+    }
+
+    /**
+     * A unit test which examines correctness when the fromKey and/or toKey are
+     * non-<code>null</code>. This models the normal case when the index segment
+     * is part of any shard except the first shard of the scale-out index.
+     * 
+     * @throws Exception
+     */
+    public void test_split_fromToKeyConstraints() throws Exception {
+
+        /*
+         * Test parameters.
+         */
+        final ISimpleSplitHandler splitHandler = null;
+
+        final int ntuples = 1000;
+
+        // any builders/segments we create for the 3 output segments below.
+        final List<IndexSegmentBuilder> builders = new LinkedList<IndexSegmentBuilder>();
+        final List<IndexSegment> segments = new LinkedList<IndexSegment>();
+
+        IndexSegmentBuilder builder = null;
+        final IJournal store = getStore();
+        
+        try {
+
+            final byte[] fromKey = new byte[0];
+            final byte[] toKey = null;
+            final LocalPartitionMetadata pmd = new LocalPartitionMetadata(
+                    pidFactory.nextPartitionId(getName()),//
+                    -1, // sourcePartitionId
+                    fromKey, //
+                    toKey,//
+                    new IResourceMetadata[] { store.getResourceMetadata() }, //
+                    null, // cause
+                    null // history
+            );
+
+            // Generates BTree w/ constrained keys and commits to store.
+            final BTree src = generateData(store, ntuples, pmd);
+
+            // Build the index segment (a compacting merge).
+            builder = doBuild(src, src.getLastCommitTime(), fromKey, toKey);
+
+            final IndexSegmentStore segStore = new IndexSegmentStore(
+                    builder.outFile);
+
+            final IndexSegment seg = segStore.loadIndexSegment();
+            try {
+
+                /*
+                 * Create three splits from the data. The first will have an
+                 * empty byte[] as its leftSeparator. The second will have
+                 * non-null left and right separator keys. The last will have a
+                 * null-right separator key. These are our three test
+                 * conditions.
+                 */
+
+                // Generate and verify the splits.
+                final Split[] splits;
+                {
+                    final int expectedSplitCount = 3;
+
+                    final long nominalShardSize = (long) (segStore.size() / (expectedSplitCount / 2.));
+
+                    // Compute splits.
+                    splits = SplitUtility.getSplits(pidFactory, pmd, seg,
+                            nominalShardSize, splitHandler);
+
+                    // Validate splits.
+                    SplitUtility
+                            .validateSplits(pmd, splits, true/* checkStuff */);
+
+                    assertEquals("#splits", 3, splits.length);
+                    
+                    // 1st.
+                    assertEquals(new byte[0], splits[0].pmd
+                            .getLeftSeparatorKey());
+                    assertNotNull(splits[0].pmd.getRightSeparatorKey());
+
+                    // 2nd.
+                    assertNotNull(splits[1].pmd.getLeftSeparatorKey());
+                    assertNotNull(splits[1].pmd.getRightSeparatorKey());
+
+                    // 3rd.
+                    assertNull(splits[2].pmd.getRightSeparatorKey());
+                    
+                }
+
+                /*
+                 * Generate an index segment from each of those splits.
+                 */
+                for (int i = 0; i < 3; i++) {
+
+                    // The split for this build.
+                    final Split split = splits[i];
+
+                    final byte[] aFromKey = src.keyAt(split.fromIndex);
+                    final byte[] aToKey = src.keyAt(split.toIndex);
+                    
+                    // Build the index segment (a compacting merge).
+                    final IndexSegmentBuilder aBuilder;
+                    builders.add(aBuilder = doBuild(src, src
+                            .getLastCommitTime(), aFromKey, aToKey));
+
+                    final IndexSegmentStore aSegStore = new IndexSegmentStore(
+                            aBuilder.outFile);
+
+                    final IndexSegment aSeg;
+                    segments.add(aSeg = aSegStore.loadIndexSegment());
+                    
+
+                    /*
+                     * Verify that the entry iterator for the key range on the
+                     * source B+Tree is the same as the entry iterator for the
+                     * generated index segment.
+                     */
+                    try {
+                        AbstractBTreeTestCase.assertSameEntryIterator(src
+                                .rangeIterator(aFromKey, aToKey), aSeg
+                                .rangeIterator());
+                    } catch (AssertionFailedError ex) {
+                        fail("Validation failed: split#=" + i + ", split="
+                                + split, ex);
+                    } finally {
+                        aSeg.close();
+                        aSegStore.close();
+                    }
+
+                }
+                
+            } finally {
+
+                segStore.close();
+
+            }
+            
+        } finally {
+
+            for (IndexSegment tmp : segments) {
+
+                // Close open segment files.
+                if (tmp.isOpen())
+                    tmp.close();
+
+            }
+
+            for (IndexSegmentBuilder tmp : builders) {
+
+                // delete the generated index segment.
+                if (!tmp.outFile.delete()) {
+
+                    log.warn("Could not delete: " + tmp.outFile);
+
+                }
+                
+            }
+            
             if (builder != null) {
 
                 // delete the generated index segment.

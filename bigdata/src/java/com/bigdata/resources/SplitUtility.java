@@ -124,7 +124,7 @@ public class SplitUtility {
             throw new IllegalArgumentException();
     
         if (splits == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("splits[] is null.");
     
         final int nsplits = splits.length;
     
@@ -707,7 +707,9 @@ public class SplitUtility {
      * @return A {@link Split}[] array contains everything that we need to
      *         define the new index partitions -or- <code>null</code> if a more
      *         detailed examination reveals that the index SHOULD NOT be split
-     *         at this time.
+     *         at this time. The returned array MUST containing at least two
+     *         elements. If the {@link IndexSegment} CAN NOT be split, this MUST
+     *         return <code>null</code> rather than array with a single element.
      * 
      * @see src/architecture/SplitMath.xls
      */
@@ -717,39 +719,113 @@ public class SplitUtility {
             final long nominalShardSize,
             final ISimpleSplitHandler splitHandler) {
 
-        final String scaleOutIndexName = seg.getIndexMetadata().getName();
-        
-        // The target #of splits.
-        final int N = (int) (seg.getStore().size() / (nominalShardSize / 2));
+        if (partitionIdFactory == null)
+            throw new IllegalArgumentException();
 
-        if (log.isInfoEnabled()) {
+        if (oldpmd == null)
+            throw new IllegalArgumentException();
 
-            log.info("segSize=" + seg.getStore().size() + ", nominalShardSize="
-                    + nominalShardSize + ", N=" + N);
+        if (seg == null)
+            throw new IllegalArgumentException();
+
+        if (nominalShardSize <= 0)
+            throw new IllegalArgumentException();
+
+        if(!seg.getStore().getCheckpoint().compactingMerge) {
+            /*
+             * Note: You can only do this after a compacting merge since that is
+             * the only time we have perfect information about the size on disk
+             * of the shard's segments and a guarantee that there are no deleted
+             * tuples in the index segment. Both of those assumptions greatly
+             * simplify the logic here and the logic surrounding dynamic
+             * sharding in general.
+             */
+            throw new IllegalArgumentException();
             
         }
+
+        /*
+         * Compute the target #of splits based on the size on disk without
+         * regard to the #of tuples present in the index segment.
+         * 
+         * @see src/architecture/SplitMath.xls for this formula.
+         */
+//        final int N1 = (int) (seg.getStore().size() / ((nominalShardSize+1) / 2));
+        final int N1 = (int) (seg.getStore().size() / (nominalShardSize / 2));
         
+        if (N1 < 2) {
+
+            /*
+             * There is not enough data on the disk to split this index segment.
+             */
+
+            return null;
+            
+        }
+
+        /*
+         * This is the actual number of tuples in the index segment.
+         * 
+         * Note: These will all be non-deleted tuples since we verified that
+         * this is a compact segment above.
+         */
+        final int entryCount = seg.getEntryCount();
+
+        /*
+         * This adjusts the #of splits if there are not enough tuples to
+         * generate that many splits.
+         * 
+         * Note: This should only happen if you really, really dial down the
+         * [nominalShardSize]. That case is exercised by the test suite.
+         */
+        final int N = (entryCount < N1) ? entryCount : N1;
+
+        final String scaleOutIndexName = seg.getIndexMetadata().getName();
+        
+        if (log.isInfoEnabled()) {
+
+            log.info("segSize="
+                    + seg.getStore().size()
+                    + ", nominalShardSize="
+                    + nominalShardSize
+                    + ", N1="
+                    + N1
+                    + ", entryCount="
+                    + entryCount
+                    + ", N="
+                    + N
+                    + (N != N1 ? " [#splits adjusted down to the entryCount]."
+                            : ""));
+
+        }
+
         // The splits (may be fewer than N).
         final List<Split> splits = new ArrayList<Split>(N);
 
         // the index of the inclusive lower bound.
         int low = 0;
         // the index of the _inclusive_ upper bound.
-        final int high = seg.getEntryCount() - 1;
+        final int high = entryCount - 1;
         // the next key to use as the left separator key.
         byte[] lastSeparatorKey = oldpmd.getLeftSeparatorKey();
+        // false until we use the rightSeparatorKey in the last split.
+        boolean didLastSplit = false;
 
-        // do until done.
+        /*
+         * do until done.
+         * 
+         * @see src/architecture/SplitMath.xls for the math in this loop.
+         */
         while (low < high) {
+
+            // The #of tuples in [low:high].
+            final int rangeCount = high - low + 1;
 
             // The #of splits already decided.
             final int splitCount = splits.size();
-            
+
             // The #of splits that we will still create.
             final int remainingSplits = N - splitCount;
-            
-            // The #of tuples in [low:high].
-            final int rangeCount = high - low + 1;
 
             // inclusive lower bound of the split.
             final int fromIndex = low;
@@ -777,11 +853,17 @@ public class SplitUtility {
                 
                 toIndex = high;
                 
+                didLastSplit = true;
+                
             } else {
                 
                 // The index of recommended separatorKey.
                 final int splitAt = (rangeCount / remainingSplits) + low;
-                
+
+                assert splitAt > low && splitAt <= high : "low=" + low
+                        + ", high=" + high + ", splitAt=" + splitAt;
+                ;
+
                 if (splitHandler != null) {
                 
                     /*
@@ -811,23 +893,23 @@ public class SplitUtility {
                         
                         toIndex = high;
 
+                        didLastSplit = true;
+
                     } else {
 
-                        // We will use the chosen key.
-                        toKey = chosenKey;
-
                         // Lookup key in the index.
-                        final int pos = seg.indexOf(toKey);
+                        final int pos = seg.indexOf(chosenKey);
 
                         // If key not found, convert pos to the insertion point.
                         toIndex = pos < 0 ? -(pos + 1) : pos;
 
-                        if (toIndex < fromIndex || toIndex > high) {
+                        if (toIndex < low || toIndex > high) {
 
                             /*
                              * The override did not return a separator key
                              * within the key range which we instructed it to
-                             * use. This is a bug in the override code.
+                             * use. This is a bug in the application's override
+                             * code.
                              */
 
                             throw new RuntimeException(
@@ -841,25 +923,60 @@ public class SplitUtility {
 
                         }
 
+                        if (toIndex == high) {
+
+                            /*
+                             * If they choose the last allowed index then all
+                             * tuples have been consumed and we are done. In
+                             * this case we use the rightSeparator rather than
+                             * the chosen key in order to enforce the constraint
+                             * that the last split has the same rightSeparator
+                             * as the source index segment.
+                             */
+                            
+                            toKey = oldpmd.getRightSeparatorKey();
+
+                            didLastSplit = true;
+                            
+                        } else {
+                            
+                            // We will use the chosen key.
+                            toKey = chosenKey;
+
+                        }
+
                     }
 
                 } else {
 
-                    /*
-                     * Take whatever key is at the recommended split index and
-                     * use that as the separator key for this split.
-                     */
-                    
-                    toKey = seg.keyAt(splitAt);
+                    if (splitAt == high) {
+
+                        /*
+                         * Enforce the constraint that the last split has the
+                         * same rightSeparator as the source index segment.
+                         */
+                        toKey = oldpmd.getRightSeparatorKey();
+                        
+                        didLastSplit = true;
+                        
+                    } else {
+
+                        /*
+                         * Take whatever key is at the recommended split index and
+                         * use that as the separator key for this split.
+                         */
+                        toKey = seg.keyAt(splitAt);
+                        
+                    }
                     
                     toIndex = splitAt;
-                    
+
                 }
                 
             }
 
-            if (log.isInfoEnabled()) {
-                log.info("splitCount=" + splitCount + ", remainingSplits="
+            if (log.isDebugEnabled()) {
+                log.debug("splitCount=" + splitCount + ", remainingSplits="
                         + remainingSplits + ", low=" + low + ", high=" + high
                         + ", rangeCount=" + rangeCount + ", fromIndex="
                         + fromIndex + ", toIndex=" + toIndex + ", ntuples="
@@ -913,6 +1030,17 @@ public class SplitUtility {
 
         }
 
+        if(!didLastSplit) {
+            
+            /*
+             * This catches logic errors where we have failed to assign the
+             * rightSeparatorKey explicitly to the last split.
+             */
+
+            throw new AssertionError();
+            
+        }
+        
         return splits.toArray(new Split[splits.size()]);
 
     }
