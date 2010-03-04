@@ -72,7 +72,7 @@ public interface BD {
      * PREFIX BIGDATA_QUERY_HINTS: &lt;http://www.bigdata.com/queryHints#com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.nestedSubquery=true&amp;com.bigdata.fullScanTreshold=1000&gt;
      * </code>
      */
-    String QUERY_HINTS_PREFIX = "BIGDATA_QUERY_HINTS";
+    String QUERY_HINTS_NAMESPACE = "BIGDATA_QUERY_HINTS";
 
     /**
      * The name of a per-statement attribute whose value is recognized in
@@ -167,6 +167,14 @@ public interface BD {
      */
     URI NULL_GRAPH = new URIImpl(NAMESPACE + "nullGraph");
     
+    /**
+     * We need the abiltiy to do atomic add+drop in one operation via the
+     * remoting interface.  Thus we need the ability to place 
+     * statements to add and to delete in the same serialized document sent
+     * across the wire.  This separator key, when included in a comment, will
+     * mark the separation point between statements to drop (above the 
+     * separator) and statements to add (below the separator).
+     */
+    URI ATOMIC_UPDATE_SEPARATOR_KEY = new URIImpl(NAMESPACE + "atomicUpdateSeparatorKey");
     
-
 }

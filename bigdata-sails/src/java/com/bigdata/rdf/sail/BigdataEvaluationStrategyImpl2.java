@@ -335,7 +335,7 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
      * This is the top-level method called by the SAIL to evaluate a query.
      * The TupleExpr parameter here is guaranteed to be the root of the operator
      * tree for the query.  Query hints are parsed by the SAIL from the
-     * namespaces in the original query.  See {@link BD#QUERY_HINTS_PREFIX}.
+     * namespaces in the original query.  See {@link BD#QUERY_HINTS_NAMESPACE}.
      */
     public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
             TupleExpr expr, BindingSet bindings, Properties queryHints)

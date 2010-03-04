@@ -2462,7 +2462,7 @@ public class BigdataSail extends SailBase implements Sail {
          * {@link Options#QUERY_TIME_EXPANDER}, but not on a per-query basis.
          * <p>
          * QueryHints are a set of properties that are parsed from a SPARQL 
-         * query.  See {@link BD#QUERY_HINTS_PREFIX} for more information.
+         * query.  See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
          * 
          * @todo The [bindings] are supposed to be inputs to the query
          *       evaluation, but I am still not quite clear what the role of the
@@ -2531,7 +2531,8 @@ public class BigdataSail extends SailBase implements Sail {
                 // caller's bindingSet.
                 final CloseableIteration<BindingSet, QueryEvaluationException> itr = strategy
                         .evaluate(tupleExpr,
-                                org.openrdf.query.impl.EmptyBindingSet.getInstance(),
+                                // org.openrdf.query.impl.EmptyBindingSet.getInstance(),
+                                bindings,
                                 queryHints);
 
                 return itr;
