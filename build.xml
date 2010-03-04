@@ -1481,7 +1481,7 @@ ${postInstallMessage}</echo>
         <manifest>
           <attribute name="Manifest-Version" value="1.0"/>
           <attribute name="Class-Path" value="log4j.jar jsk-platform.jar jsk-lib.jar start.jar bigdata.jar"/>
-          <attribute name="Main-Class" value="com.bigdata.service.jini.util.LookupStarter"/>
+          <attribute name="Main-Class" value="com.bigdata.util.jini.LookupStarter"/>
         </manifest>
 
         <fileset dir="${classes.test.dir}">
