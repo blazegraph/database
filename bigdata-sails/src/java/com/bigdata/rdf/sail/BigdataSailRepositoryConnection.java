@@ -43,7 +43,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Overriden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
     public SailGraphQuery prepareGraphQuery(QueryLanguage ql,
@@ -57,7 +57,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Overriden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
     public SailTupleQuery prepareTupleQuery(QueryLanguage ql,
@@ -71,7 +71,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Overriden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
     public SailBooleanQuery prepareBooleanQuery(QueryLanguage ql,
@@ -85,7 +85,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Overriden to capture query hints from SPARQL queries. Query hints are
      * embedded in query strings as namespaces.  
-     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     @Override
     public SailQuery prepareQuery(QueryLanguage ql, String queryString,
@@ -221,7 +221,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     /**
      * Parse query hints from a query string.  Query hints are embedded in the 
      * query string via special namespaces.      
-     * See {@link BD#QUERY_HINTS_PREFIX} for more information.
+     * See {@link BD#QUERY_HINTS_NAMESPACE} for more information.
      */
     private Properties parseQueryHints(QueryLanguage ql, String queryString, 
             String baseURI) 
@@ -240,7 +240,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
                 for (Map.Entry<String, String> prefix : prefixes.entrySet()) {
                     // if we see one that matches the magic namespace, try
                     // to parse it
-                    if (prefix.getKey().equalsIgnoreCase(BD.QUERY_HINTS_PREFIX)) {
+                    if (prefix.getKey().equalsIgnoreCase(BD.QUERY_HINTS_NAMESPACE)) {
                         String hints = prefix.getValue();
                         // has to have a # and it can't be at the end
                         int i = hints.indexOf('#');
