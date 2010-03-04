@@ -103,7 +103,7 @@ public class TestQueryHints extends QuadsTestCase {
             {
                 
                 String query = 
-                    "PREFIX "+BD.QUERY_HINTS_PREFIX+": " +
+                    "PREFIX "+BD.QUERY_HINTS_NAMESPACE+": " +
                     "  <http://www.bigdata.com/queryOption#com.bigdata.relation.rule.eval.DefaultRuleTaskFactory.nestedSubquery=true&com.bigdata.fullScanTreshold=1000> " +
                     "SELECT * " +
                     "WHERE { " +
