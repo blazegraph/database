@@ -914,6 +914,22 @@ public class SplitUtility {
 
                         }
                         
+                        if(splits.isEmpty()) {
+                            
+                            /*
+                             * Since no splits have been chosen we can not
+                             * return everything in a single split. Instead we
+                             * return null and the source WILL NOT be split.
+                             */
+ 
+                            return null;
+
+                        }
+
+                        /*
+                         * Everything remaining goes into this split.
+                         */
+                        
                         toKey = oldpmd.getRightSeparatorKey();
                         
                         toIndex = high;
