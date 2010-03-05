@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 
-package com.bigdata.util.jini;
+package com.bigdata.service.jini.util;
 
 import com.bigdata.util.config.ConfigurationUtil;
 import com.bigdata.util.config.LogUtil;
