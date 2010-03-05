@@ -588,7 +588,12 @@ sun.misc;resolution:=optional
 	</java>
 
 </target>
-			
+
+
+	<!--                                                                   -->
+	<!--                    CLUSTER INSTALL TARGETS                        -->
+	<!--                                                                   -->
+	
 <!--
 
 This is the cluster-based install.  You need to edit build.properties, decide
@@ -827,9 +832,9 @@ ${postInstallMessage}</echo>
 	
 </target>
 
-<!--                                            -->
-<!-- Targets for the optional LUBM integration. -->
-<!--                                            -->
+	<!--                                                                   -->
+	<!--                    LUBM TARGETS (OPTIONAL)                        -->
+	<!--                                                                   -->
 	
 <target name="lubm-clean" description="Clean the lubm-integration from the build directory.">
 	<delete dir="${build.dir}/lubm" />
@@ -987,8 +992,34 @@ ${postInstallMessage}</echo>
 	
 </target>
 
-<!-- @todo this should explicitly start/stop zookeeper and jini. -->
+	<!--                                                                   -->
+	<!--                    STANDALONE FEDERATION TARGETS                  -->
+	<!--                                                                   -->
+		
+<!-- @todo this should explicitly start jini. The problem is metavariables
+     in the jini script.  We can not just use the unit test startLookup
+     target because it has different assumptions about how jar versions
+     are treated.  This could also be addressed by using system properties
+     instead of metavariable substution in startAll.config or by cloning
+     all of the jini config files for standalone. 
+<target name="standalone-start-jini" description="Start the jini services.">
+	<java classname="com.sun.jini.start.ServiceStarter"
+		failonerror="true" fork="true" logerror="true">
+		<classpath refid="runtime.classpath" />
+		<jvmarg value="-Xmx200m" />
+		<jvmarg value="-showversion"/>
+		<jvmarg value="-Djava.security.policy=policy.all"/>
+		<arg value="src/resources/config/jini/startAll.config" />
+	</java>
+</target>
+-->
+
+<!-- Note: You should 'nohup' this, e.g., "nohup ant standalone-start" to 
+     avoid taking down the ServicesManagerServer if you are disconnected
+     from a terminal. -->
 <target name="standalone-start" description="Start the standalone federation.">
+	<!-- @todo start jini automatically. -->
+    <!--<antcall target="standalone-start-jini" />-->
 	<java classname="com.bigdata.jini.start.ServicesManagerServer"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1003,8 +1034,10 @@ ${postInstallMessage}</echo>
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
 </target>
-	
+
 <target name="standalone-stop" description="Stop the standalone federation.">
+	<!-- @todo stop jini automatically. -->
+    <!--<antcall target="standalone-start-jini" />-->
 	<java classname="com.bigdata.service.jini.util.ShutdownFederation"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1022,6 +1055,22 @@ ${postInstallMessage}</echo>
 
 <!-- @todo Add target to stand up a SPARQL endpoint for a KB namespace. Could be
      Sesame Server or bigdata REST API. -->
+	
+<!-- Note: The source files must be "reasonable" for the bulk loader.  Each file
+     will be fully parsed into memory before writing onto the database.  Very
+     large source files must be split into smaller files.  See the 'split'
+     command under unix, but be aware that it will not generate more than 576
+     output files (24 x 24 = 576) and only 100 if you are using number suffixes.
+     For example, split an NT file into files of 200000 lines each: 
+     
+     split -l 200000 ../dataset.nt dataset
+     
+     You will also have to fix up the file extensions.  You can do this using
+     bash as follows:
+     
+     for file in *; do mv $file $file.nt; done
+     
+     -->
 <target name="standalone-bulk-load" description="Bulk load RDF data into the standalone federation.">
 	<java classname="com.bigdata.rdf.load.MappedRDFDataLoadMaster"
 		failonerror="true" fork="true" logerror="true">
@@ -1065,6 +1114,10 @@ ${postInstallMessage}</echo>
 	</java>
 </target>
 
+	<!--                                                                   -->
+	<!--                    MISC. UTILITY TARGETS                          -->
+	<!--                                                                   -->
+		
 <target name="scale-out-sample" description="Run the scale-out sample code.">
 
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
@@ -1147,6 +1200,10 @@ ${postInstallMessage}</echo>
     </java>
 </target>
 
+	<!--                                                                   -->
+	<!--                    UNIT TESTS ONLY BELOW HERE                     -->
+	<!--                                                                   -->
+	
     <target name="stage"
             description="stages resources (jar, config, policy, logging files) needed to package or execute the bigdata distribution."
             depends="jar">
@@ -1481,7 +1538,7 @@ ${postInstallMessage}</echo>
         <manifest>
           <attribute name="Manifest-Version" value="1.0"/>
           <attribute name="Class-Path" value="log4j.jar jsk-platform.jar jsk-lib.jar start.jar bigdata.jar"/>
-          <attribute name="Main-Class" value="com.bigdata.util.jini.LookupStarter"/>
+          <attribute name="Main-Class" value="com.bigdata.service.jini.util.LookupStarter"/>
         </manifest>
 
         <fileset dir="${classes.test.dir}">
