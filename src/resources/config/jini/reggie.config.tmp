@@ -1,0 +1,48 @@
+
+import java.net.NetworkInterface;
+
+import com.sun.jini.config.ConfigUtil;
+import net.jini.constraint.BasicMethodConstraints;
+import net.jini.core.constraint.ConnectionRelativeTime;
+import net.jini.core.constraint.InvocationConstraints;
+import net.jini.jeri.BasicILFactory;
+import net.jini.jeri.BasicJeriExporter;
+import net.jini.jeri.tcp.TcpServerEndpoint;
+import net.jini.core.discovery.LookupLocator;
+
+import com.bigdata.util.config.NicUtil;
+
+com.sun.jini.reggie {
+
+    private static exportNic = "${exportNic}";
+    private static exportIpAddr = NicUtil.getIpAddress("${exportNic}",0,"${exportHost}",true);
+    private static exportPort = Integer.parseInt("${exportPort}");
+
+    private static serverILFactory =
+        new BasicILFactory(
+            new BasicMethodConstraints(
+                new InvocationConstraints(
+                    new ConnectionRelativeTime(10000), null)),
+            null);
+
+    serverExporter = new BasicJeriExporter(TcpServerEndpoint.getInstance(exportIpAddr,exportPort),
+                                           serverILFactory,
+                                           false,
+                                           true);
+
+    initialMemberGroups = new String[] { System.getProperty("user.name") + "InstallVerifyGroup" };
+
+    unicastDiscoveryHost = exportIpAddr;
+    multicastInterfaces = new NetworkInterface[] {
+        NicUtil.getNetworkInterface(exportNic)
+    };
+
+    minMaxServiceLease = 60000L;
+}
+
+net.jini.discovery.LookupDiscovery {
+    multicastRequestHost = com.sun.jini.reggie.exportIpAddr;
+    multicastInterfaces = new NetworkInterface[] {
+        NicUtil.getNetworkInterface(com.sun.jini.reggie.exportNic)
+    };
+}
