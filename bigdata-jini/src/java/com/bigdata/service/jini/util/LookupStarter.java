@@ -65,17 +65,17 @@ public class LookupStarter extends Thread {
     private String userDir = System.getProperty("user.dir");
 
     //set on command line
-    private String testHome = System.getProperty("test.home");
+    private String appHome = System.getProperty("app.home");
     private String jiniLib = System.getProperty("jini.lib");
     private String jiniLibDl = System.getProperty("jini.lib.dl");
     private String localPolicy = System.getProperty("java.security.policy");
 
     private static String thisHost = NicUtil.getIpAddress("eth0");
-    private static String defaultGroup = "bigdata.test.group-"+thisHost;
+    private static String defaultGroup = "bigdata.fedname-"+thisHost;
     private static String defaultCodebasePort = "23333";
 
     private static String group = 
-        System.getProperty("bigdata.test.fed", defaultGroup);
+        System.getProperty("bigdata.fedname", defaultGroup);
     private static String codebasePortStr = 
         System.getProperty("codebase.port", defaultCodebasePort);
     private static int codebasePort = Integer.parseInt(codebasePortStr);
@@ -91,9 +91,10 @@ public class LookupStarter extends Thread {
     private String lookupClasspath = jiniLib+fSep+"reggie.jar";
     private String lookupImplName =
                                 "com.sun.jini.reggie.TransientRegistrarImpl";
-    private String lookupConfig = testHome
-                                  +fSep+"com"+fSep+"bigdata"+fSep+"util"
-                                  +fSep+"jini"+fSep+"config"
+    private String lookupConfig = appHome
+                                  +fSep+"bigdata-jini"+fSep+"src"+fSep+"java"
+                                  +fSep+"com"+fSep+"bigdata"+fSep+"service"
+                                  +fSep+"jini"+fSep+"util"+fSep+"config"
                                   +fSep+"lookup.config";
     private static HashSet<ServiceRegistrar> proxySet = 
         new HashSet<ServiceRegistrar>();

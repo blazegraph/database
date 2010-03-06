@@ -1582,7 +1582,7 @@ ${postInstallMessage}</echo>
         outputproperty="this.hostname">
       </exec>
 
-      <property name="test.home" location="${bigdata.dir}/bigdata/src/test" />
+      <property name="app.home" location="${bigdata.dir}" />
 
       <property name="test.codebase.port" value="23333"/>
       <property name="test.codebase.dir" value="${dist.lib.dl}"/>
@@ -1591,7 +1591,7 @@ ${postInstallMessage}</echo>
       <property name="java.security.policy" value="${dist.var.config.policy}/policy.all"/>
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}"/>
       <property name="java.net.preferIPv4Stack" value="true"/>
-      <property name="bigdata.test.fed" value="bigdata.test.group-${this.hostname}"/>
+      <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}"/>
 
       <delete file="${build.properties.test.to.file}" quiet="true"/>
       <copy file="${build.properties.from.file}"
@@ -1633,14 +1633,15 @@ ${postInstallMessage}</echo>
     </target>
 
     <target name="startLookup">
-      <echo>java -Dtest.home=${test.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.test.fed=${bigdata.test.fed} -jar ${bigdata-test.lib}/lookupstarter.jar
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -jar ${bigdata-test.lib}/lookupstarter.jar
 </echo>
       <echo>
 </echo>
+
       <java jar="${bigdata-test.lib}/lookupstarter.jar"
             fork="true"
             spawn="true">
-        <sysproperty key="test.home" value="${test.home}"/>
+        <sysproperty key="app.home" value="${app.home}"/>
         <sysproperty key="jini.lib" value="${dist.lib}"/>
         <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
         <sysproperty key="java.security.policy" value="${java.security.policy}"/>
@@ -1649,25 +1650,25 @@ ${postInstallMessage}</echo>
         <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
         <sysproperty key="codebase.port" value="${test.codebase.port}"/>
         <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
-        <sysproperty key="bigdata.test.fed" value="${bigdata.test.fed}"/>
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
       </java>
     </target>
 
     <target name="stopLookup">
-      <echo>java -Dtest.home=${test.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Dlog4j.configuration=${log4j.configuration} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.test.fed=${bigdata.test.fed} -jar ${bigdata-test.lib}/lookupstarter.jar -stop
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Dlog4j.configuration=${log4j.configuration} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -jar ${bigdata-test.lib}/lookupstarter.jar -stop
 </echo>
       <echo>
 </echo>
       <java jar="${bigdata-test.lib}/lookupstarter.jar"
             fork="true"
             failonerror="true">
-        <sysproperty key="test.home" value="${test.home}"/>
+        <sysproperty key="app.home" value="${app.home}"/>
         <sysproperty key="jini.lib" value="${dist.lib}"/>
         <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
         <sysproperty key="java.security.policy" value="${java.security.policy}"/>
         <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
         <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
-        <sysproperty key="bigdata.test.fed" value="${bigdata.test.fed}"/>
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
         <arg value="-stop" />
       </java>
     </target>
@@ -1708,7 +1709,7 @@ ${postInstallMessage}</echo>
 </echo>
       <echo>    log4j.abs:    ${bigdata.test.log4j.abs}
 </echo>
-      <echo>    test.home:    ${test.home}
+      <echo>    app.home:     ${app.home}
 </echo>
       <echo>    jini.lib:     ${dist.lib}
 </echo>
@@ -1720,7 +1721,7 @@ ${postInstallMessage}</echo>
 </echo>
       <echo>    preferIPv4:   ${java.net.preferIPv4Stack}
 </echo>
-      <echo>    federation:   ${bigdata.test.fed}
+      <echo>    federation:   ${bigdata.fedname}
 </echo>
       <echo>
 </echo>
@@ -1794,7 +1795,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="zookeeper.jar" value="${dist.lib}/zookeeper.jar" />
 
         <!-- Jini group name -->
-        <sysproperty key="bigdata.test.fed" value="${bigdata.test.fed}"/>
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
 
         <classpath refid="run.class.path.id"/>
 
