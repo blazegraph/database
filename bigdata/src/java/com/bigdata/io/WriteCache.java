@@ -422,14 +422,14 @@ abstract public class WriteCache implements IWriteCache {
      *             large records. For example, they can be written directly onto
      *             the backing channel.
      */
-    public boolean write(final long offset, final ByteBuffer data)
+    public boolean writeChk(final long offset, final ByteBuffer data, int chk)
             throws InterruptedException {
 
         // Note: The offset MAY be zero. This allows for stores without any
 		// header block.
 
     	if (m_written) { // should be clean, NO WAY should this be written to!
-    		throw new RuntimeException("Writing to CLEAN cache: " + hashCode());
+    		log.warn("Writing to CLEAN cache: " + hashCode());
     	}
 		if (data == null)
 			throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_NULL);
@@ -441,7 +441,7 @@ abstract public class WriteCache implements IWriteCache {
 		try {
 
 			// The #of bytes to transfer into the write cache.
-			final int nbytes = data.remaining();
+			final int nbytes = data.remaining() + (chk == 0 ? 0 : 4);
 
 			if (nbytes > tmp.capacity()) {
 
@@ -477,6 +477,10 @@ abstract public class WriteCache implements IWriteCache {
 
 				// copy the record into the cache, updating position() as we go.
 				tmp.put(data);
+				// write checksum - if any
+				if (chk != 0) {
+					tmp.putInt(chk);
+				}
 
 				// set while synchronized since no contention.
 				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
@@ -515,7 +519,11 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-    /**
+	public boolean write(long offset, ByteBuffer data) throws InterruptedException {
+		return writeChk(offset, data, 0);
+	}
+
+	/**
      * {@inheritDoc}
      * 
      * @throws IllegalStateException
@@ -1276,14 +1284,11 @@ abstract public class WriteCache implements IWriteCache {
 			final int nbytes = data.remaining();
 
 			if (m_written) {
-				throw new RuntimeException("DUPLICATE writeOnChannel for : " + this.hashCode());
+				log.warn("DUPLICATE writeOnChannel for : " + this.hashCode());
 			} else {
+				assert !this.isEmpty();
+				
 				m_written = true;
-//				try {
-//					throw new RuntimeException("GOOD writeOnChannel for : " + this.hashCode());
-//				} catch (RuntimeException re) {
-//					re.printStackTrace();
-//				}
 			}
 			
 			/*
@@ -1356,10 +1361,14 @@ abstract public class WriteCache implements IWriteCache {
 				serviceRecordMap.remove(addr);
 			}
 			
-			reset();
 		} else {
 			if (log.isInfoEnabled())
 				log.info("clean WriteCache: " + hashCode()); // debug to see recycling
+			if (m_written) {
+				log.warn("Written WriteCache but with no records");
+			}
 		}
+		
+		reset(); // must ensure reset state even if cache already empty
 	}
 }
