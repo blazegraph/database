@@ -252,8 +252,10 @@ abstract public class WriteCacheService implements IWriteCache {
 
     }
 
-    /**
+	/**
      * The task responsible for writing dirty buffers onto the backing channel.
+     * 
+     * There should be only one of these
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -261,11 +263,15 @@ abstract public class WriteCacheService implements IWriteCache {
     private class WriteTask implements Callable<Void> {
 
         public Void call() throws Exception {
-
             while (true) {
 
                 try {
 
+                    if (dirtyList.isEmpty()) {
+                    	Thread.sleep(50);
+                    	continue;
+                    }
+                    
                     lock.readLock().lockInterruptibly(); // allows shutdown1
 
                     try {
@@ -627,11 +633,15 @@ abstract public class WriteCacheService implements IWriteCache {
         	deferredLatch.dec();
         	if (isLocked)
         		writeLock.unlock();
-    	}
+    		}
     	}
     }
 
-    /**
+	public boolean write(long offset, ByteBuffer data) throws IllegalStateException, InterruptedException {
+		return writeChk(offset, data, 0);
+	}
+	
+   /**
      * Write the record onto the cache. If the record is too large for the cache
      * buffers, then it is written synchronously onto the backing channel.
      * Otherwise it is written onto a cache buffer which is lazily flushed onto
@@ -650,7 +660,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
      */
-    public boolean write(final long offset, final ByteBuffer data)
+    public boolean writeChk(final long offset, final ByteBuffer data, final int chk)
             throws InterruptedException, IllegalStateException {
 
     	if (log.isInfoEnabled()) {
@@ -712,7 +722,7 @@ abstract public class WriteCacheService implements IWriteCache {
             try {
 
                 // write on the cache.
-                if (cache.write(offset, data)) {
+                if (cache.writeChk(offset, data, chk)) {
 
                     /*
                      * Note: We MUST use put() here rather than putIfAbsent()
@@ -774,7 +784,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 try {
 
                     // While holding the write lock, see if the record fits.
-                    if (cache.write(offset, data)) {
+                    if (cache.writeChk(offset, data, chk)) {
 
                         // It fits: someone already changed to a new cache.
                         if (recordMap.put(offset, cache) != null) {
@@ -813,8 +823,17 @@ abstract public class WriteCacheService implements IWriteCache {
                     else 
                     	deferredDirtyList.add(cache);
 
-                    // Take the first clean buffer (may block).
-                    final WriteCache newBuffer = cleanList.take();
+                    // Take the first clean buffer (may block) - but must NOT block with WriteLock
+//                    if (cleanList.isEmpty()) {
+//                    	writeLock.unlock();
+//                        while (cleanList.isEmpty()) {
+//                        	Thread.sleep(50);
+//                        }
+//                        
+//                        writeLock.lockInterruptibly();
+//                   }
+                    
+                    final WriteCache newBuffer = takeFromCleanWithLock(writeLock);
 
                     // Clear the state on the new buffer and remove from cacheService map
                     newBuffer.resetWith(recordMap);
@@ -823,7 +842,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     current.set(cache = newBuffer);
 
                     // Try to write on the new buffer.
-                    if (cache.write(offset, data)) {
+                    if (cache.writeChk(offset, data, chk)) {
 
                         // This should be the first record in the new cache.
                         if (recordMap.put(offset, cache) != null) {
@@ -847,13 +866,26 @@ abstract public class WriteCacheService implements IWriteCache {
                 }
 
             } finally {
-
                 writeLock.unlock();
-
             }
 
         }
 
+    }
+    
+    private WriteCache takeFromCleanWithLock(final Lock writeLock) throws InterruptedException {
+	    if (cleanList.isEmpty()) {
+	    	writeLock.unlock();
+	        while (cleanList.isEmpty()) {
+	        	Thread.sleep(50);
+	        }
+	        
+	        writeLock.lockInterruptibly();
+	        
+	        return takeFromCleanWithLock(writeLock);
+	   }
+	    
+	   return cleanList.take();
     }
 
     /**
