@@ -493,8 +493,10 @@ public class DirectBufferPool {
 
         } catch (OutOfMemoryError err) {
 
+
             log.error("Not enough native memory - will await a free buffer: "
                     + err, err);
+            log.error("allocated: " + allocated.size());
 
             awaitFreeBuffer(timeout, unit);
 
