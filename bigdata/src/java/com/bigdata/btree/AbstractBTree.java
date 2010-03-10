@@ -3653,6 +3653,11 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
             // wrap as ByteBuffer and write on the store.
             addr = store.write(slice.asByteBuffer());
+            
+            // now we have a new address, delete previous identity if any
+            if (node.isPersistent()) {
+            	store.delete(node.getIdentity());
+            }
 
             btreeCounters.writeNanos += System.nanoTime() - begin;
     
