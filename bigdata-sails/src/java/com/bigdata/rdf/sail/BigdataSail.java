@@ -717,7 +717,8 @@ public class BigdataSail extends SailBase implements Sail {
      * @throws IllegalStateException
      *             if the sail is already open.
      */
-    public void initialize() throws SailException {
+    @Override
+    protected void initializeInternal() throws SailException {
 
         if (open)
             throw new IllegalStateException();
