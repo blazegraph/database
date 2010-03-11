@@ -103,6 +103,9 @@
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
+	            <include name="META-INF/**"/>
+			</fileset>
 		</copy>
 	</target>
 
@@ -1844,5 +1847,31 @@ ${postInstallMessage}</echo>
       </junitreport>
 
     </target>
+
+	<target name="install-sesame-server" depends="jar">
+	
+		<!-- copy resources to Sesame webapp. -->
+		<copy toDir="${sesame.server.dir}/WEB-INF/lib" 
+				file="${build.dir}/${version}.jar"/>
+				
+		<copy toDir="${sesame.server.dir}/WEB-INF/lib" flatten="true">
+			<fileset dir="${bigdata.dir}/bigdata/lib">
+			    <include name="**/*.jar" />
+			</fileset>
+		</copy>
+		
+		<!-- copy template resources to ADUNA_DATA dir -->
+		<copy toDir="${aduna.data.dir}">
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
+	            <include name="templates/**"/>
+			</fileset>
+		</copy>
+		
+		<!-- copy bigdata jar to Sesame installation. -->
+		<copy toDir="${sesame.dir}/lib" 
+				file="${build.dir}/${version}.jar"/>
+				
+	</target>
+
 
 </project>

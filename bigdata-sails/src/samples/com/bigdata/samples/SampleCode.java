@@ -651,7 +651,7 @@ public class SampleCode {
             repo.initialize();
             
             // demonstrate some basic functionality
-            /*URI MIKE = new URIImpl("http://www.bigdata.com/rdf#Mike");
+            URI MIKE = new URIImpl("http://www.bigdata.com/rdf#Mike");
             sampleCode.loadSomeData(repo);
             System.out.println("Loaded sample data.");
             sampleCode.readSomeData(repo, MIKE);
@@ -662,7 +662,7 @@ public class SampleCode {
             sampleCode.executeFreeTextQuery(repo);
             System.out.println("Did free text query.");
             sampleCode.executeProvenanceQuery(repo);
-            System.out.println("Did provenance query.");*/
+            System.out.println("Did provenance query.");
             sampleCode.executeHistoricalQuery(repo);
             System.out.println("Did historical query.");
             
