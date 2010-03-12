@@ -30,7 +30,9 @@ package com.bigdata.rwstore;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Properties;
+import java.util.TreeMap;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -321,6 +323,142 @@ public class TestRWJournal extends AbstractJournalTestCase {
         public void test_write_plus_update() {}
         
         /**
+         * Ensures the allocation of unique addresses by mapping allocated address with uniqueness 
+         * assertion against physical address.
+         */
+        public void test_addressing() {
+            
+            final Journal store = (Journal) getStore();
+
+            try {
+
+                RWStrategy bufferStrategy = (RWStrategy) store
+                        .getBufferStrategy();
+
+                RWStore rw = bufferStrategy.getRWStore();
+                ArrayList<Integer> sizes = new ArrayList<Integer>();
+                TreeMap<Long, Integer> paddrs = new TreeMap<Long, Integer>();
+                for (int i = 0; i < 1000000; i++) {
+                	int s = r.nextInt(250);
+                	sizes.add(s);
+                	int a = rw.alloc(s);
+                	long pa = rw.physicalAddress(a);
+                	assertTrue(paddrs.get(pa) == null);
+                	paddrs.put(pa, a);
+                }
+                
+                for (int i = 0; i < 50; i++) {
+                	int s = r.nextInt(500);
+                	sizes.add(s);
+                	int a = rw.alloc(s);
+                	long pa = rw.physicalAddress(a);
+                	paddrs.put(pa, a);
+                	System.out.println("Physical Address: " + pa + ", size: " + s);
+                }
+                
+            } finally {
+
+                store.destroy();
+            
+            }
+
+        	
+        }
+        
+        /**
+         * Basic allocation test to ensure the FixedAllocators are operating efficiently.
+         * 
+         * A 90 byte allocation is expected to fit in a 128byte block.  If we only allocate
+         * this fixed block size, then we would expect the physical address to increase by 128 bytes
+         * for each allocation.
+         */
+        public void test_allocations() {
+            
+            final Journal store = (Journal) getStore();
+
+            try {
+
+                RWStrategy bufferStrategy = (RWStrategy) store
+                        .getBufferStrategy();
+
+                RWStore rw = bufferStrategy.getRWStore();
+                long numAllocs = rw.getTotalAllocations();
+                long startAllocations = rw.getTotalAllocationsSize();
+                long faddr = allocBatch(rw, 1000, 275, 320);
+                faddr = allocBatch(rw, 10000, 90, 128);
+                faddr = allocBatch(rw, 20000, 45, 64);
+                
+                System.out.println("Final allocation: " + faddr 
+                		+ ", allocations: " + (rw.getTotalAllocations() - numAllocs)
+                		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations));
+            } finally {
+
+                store.destroy();
+            
+            }
+
+        	
+        }
+        
+        long allocBatch(RWStore rw, int bsize, int asze, int ainc) {
+	        long curAddress = rw.physicalAddress(rw.alloc(asze));
+	        for (int i = 1; i < bsize; i++) {
+	        	int a = rw.alloc(asze);
+	        	long nxt = rw.physicalAddress(a);
+	        	assertTrue("Problem with index: " + i, (curAddress+ainc) == nxt || (nxt % 8192 == 0));
+	        	curAddress = nxt;
+	        }
+	        
+	        return curAddress;
+        }
+
+        
+        /**
+         * Reallocation tests the freeing of allocated address and the re-use within a transaction.
+         */
+        public void test_reallocation() {
+            
+            final Journal store = (Journal) getStore();
+
+            try {
+
+                RWStrategy bufferStrategy = (RWStrategy) store
+                        .getBufferStrategy();
+
+                RWStore rw = bufferStrategy.getRWStore();
+                long numAllocs = rw.getTotalAllocations();
+                long startAllocations = rw.getTotalAllocationsSize();
+                reallocBatch(rw, 10000, 275, 10000);
+                reallocBatch(rw, 10000, 860, 10000);
+                System.out.println("Final allocations: " + (rw.getTotalAllocations() - numAllocs)
+                		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations)
+                 + ", file length: " + rw.getStoreFile().length());
+            } finally {
+
+                store.destroy();
+            
+            }
+
+        	
+        }
+
+        private long reallocBatch(RWStore rw, int tsts, int sze, int grp) {
+        	long[] addr = new long[grp];
+        	for (int i = 0; i < grp; i++) {
+        		addr[i] = rw.alloc(sze);
+        	}
+        	for (int t = 0; t < tsts; t++) {
+            	for (int i = 0; i < grp; i++) {
+            		long old = addr[i];
+            		addr[i] = rw.alloc(sze);
+            		rw.free(old);
+            	}       		
+        	}
+	        
+	        return 0L;
+		}
+
+		/**
          * Ttest write() + flush() + update() - for this case the data have been
          * flushed from the write cache so the update will be a random write on
          * the file rather than being buffered by the write cache.
