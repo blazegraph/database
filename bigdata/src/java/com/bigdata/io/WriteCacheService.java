@@ -303,8 +303,9 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
                     
                 } catch (Throwable t) {
-
-                    log.error(t, t);
+                	if (!m_closing) {
+                		log.error(t, t); // will be interrupted in close, so not necessarily a problem
+                	}
 
                 }
 
@@ -359,12 +360,15 @@ abstract public class WriteCacheService implements IWriteCache {
 
     }
 
+    private boolean m_closing = false;
+    
     public void close() throws InterruptedException {
 
         if (open.compareAndSet(true/* expect */, false/* update */)) {
 
             try {
-
+            	m_closing = true;
+            	
                 // Interrupt the write task.
                 writeFuture.cancel(true/* mayInterruptIfRunning */);
 
@@ -380,6 +384,8 @@ abstract public class WriteCacheService implements IWriteCache {
                 final List<WriteCache> c = new LinkedList<WriteCache>();
 
                 dirtyList.drainTo(c);
+                
+                cleanList.drainTo(c);
 
                 final WriteCache t = current.getAndSet(null);
 
@@ -394,6 +400,8 @@ abstract public class WriteCacheService implements IWriteCache {
                     t1.close();
 
                 }
+                
+                m_closing = false;
 
             }
 
