@@ -33,7 +33,7 @@ public class BigdataSailGraphQuery extends SailGraphQuery {
      * Allow clients to bypass the native construct iterator, which resolves
      * binding sets into SPOs into BigdataStatements.
      */
-    private boolean useNativeConstruct = true;
+    private boolean useNativeConstruct = false;
     
     public BigdataSailGraphQuery(ParsedGraphQuery tupleQuery,
             SailRepositoryConnection con, Properties queryHints) {
