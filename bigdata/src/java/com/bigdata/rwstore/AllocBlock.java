@@ -32,10 +32,10 @@ public class AllocBlock {
   int m_commit[];
   int m_bits[];
   int m_transients[];
-  WriteBlock m_writes;
+  RWWriteCacheService m_writeCache;
 
-  AllocBlock(int addr, int bitSize, WriteBlock writes) {
-  	m_writes = writes;
+  AllocBlock(int addr, int bitSize, RWWriteCacheService cache) {
+  	m_writeCache = cache;
     m_longs = bitSize;
     m_commit = new int[bitSize];
     m_bits = new int[bitSize];
@@ -77,7 +77,7 @@ public class AllocBlock {
     RWStore.clrBit(m_bits, bit);
     
     if (!RWStore.tstBit(m_commit, bit)) {
-      m_writes.removeWriteToAddr(addr);
+      m_writeCache.clearWrite(addr);
 
       RWStore.clrBit(m_transients, bit);
       
