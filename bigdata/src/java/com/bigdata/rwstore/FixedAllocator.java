@@ -29,6 +29,8 @@ import java.io.*;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.util.ChecksumUtility;
+
 /**
  * FixedAllocator
  * 
@@ -37,7 +39,7 @@ import org.apache.log4j.Logger;
 public class FixedAllocator implements Allocator {
     protected static final Logger log = Logger.getLogger(FixedAllocator.class);
 
-	private WriteBlock m_writes = null;
+	private RWWriteCacheService m_writeCache = null;
 	private int m_freeBits;
 	private int m_freeTransients;
 
@@ -86,8 +88,12 @@ public class FixedAllocator implements Allocator {
 		m_diskAddr = addr;
 	}
 
+	/**
+	 * The tweek of 3 to the offset is to ensure 1, that no address is zero and 2 to enable
+	 * the values 1 & 2 to be special cased (this aspect is now historical).
+	 */
 	public long getPhysicalAddress(int offset) {
-		offset -= 3;
+	  	offset -= 3;
 
 		int allocBlockRange = 32 * m_bitSize;
 
@@ -95,7 +101,7 @@ public class FixedAllocator implements Allocator {
 		int bit = offset % allocBlockRange;
 		
 		if (RWStore.tstBit(block.m_bits, bit)) {		
-			return RWStore.convertAddr(block.m_addr) + (m_size * bit);
+			return RWStore.convertAddr(block.m_addr) + m_size * bit;
 		} else {
 			return 0L;
 		}
@@ -144,6 +150,9 @@ public class FixedAllocator implements Allocator {
 
 				block.m_commit = (int[]) block.m_bits.clone();
 			}
+			// add checksum
+			int chk = ChecksumUtility.getCHK().checksum(buf, str.size());
+			str.writeInt(chk);
 
 			if (!m_preserveSession) {
 				m_freeBits += m_freeTransients;
@@ -220,24 +229,35 @@ public class FixedAllocator implements Allocator {
 
 	ArrayList m_allocBlocks;
 
-	FixedAllocator(int size, boolean preserveSessionData, WriteBlock writes) {
+	/**
+	 * Calculating the number of ints (m_bitSize) cannot rely on a power of 2.  Previously this
+	 * assumption was sufficient to guarantee a rounding on to an 64k boundary.  However, now
+	 * nints * 32 * 64 = 64K, so need multiple of 32 ints
+	 * 
+	 * So, whatever multiple of 64, if we allocate a multiple of 32 ints we are guaranteed to be 
+	 * on an 64K boundary.
+	 * 
+	 * This does mean that for the largest blocks of ~256K, we are allocating 256Mb of space
+	 * 
+	 * @param size
+	 * @param preserveSessionData
+	 * @param cache
+	 */
+	FixedAllocator(int size, boolean preserveSessionData, RWWriteCacheService cache) {
 		m_diskAddr = 0;
 
 		m_size = size;
 
-		m_bitSize = (int) (512L / m_size);
-		if (m_bitSize == 0) {
-			m_bitSize = 1;
-		}
+		m_bitSize = 32;
 
-		m_writes = writes;
+		m_writeCache = cache;
 
-		// number of blocks in this allocator
+		// number of blocks in this allocator, bitSize plus 1 for start address
 		int numBlocks = 255 / (m_bitSize + 1);
 
 		m_allocBlocks = new ArrayList(numBlocks);
 		for (int i = 0; i < numBlocks; i++) {
-			m_allocBlocks.add(new AllocBlock(0, m_bitSize, m_writes));
+			m_allocBlocks.add(new AllocBlock(0, m_bitSize, m_writeCache));
 		}
 
 		m_freeTransients = 0;
@@ -294,12 +314,14 @@ public class FixedAllocator implements Allocator {
 
 	public boolean free(int addr) {
 		if (addr < 0) {
-			int offset = ((-addr) & 0xFFFF) - 3;
+			int offset = ((-addr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
 
 			int nbits = 32 * m_bitSize;
 
-			if (((AllocBlock) m_allocBlocks.get(offset / nbits))
-					.freeBit(offset % nbits, getPhysicalAddress(offset + 3))) {
+			int block = offset/nbits;
+			
+			if (((AllocBlock) m_allocBlocks.get(block))
+					.freeBit(offset % nbits, getPhysicalAddress(offset + 3))) { // bit adjust
 				if (m_freeBits++ == 0) {
 					m_freeList.add(this);
 				}
@@ -335,10 +357,11 @@ public class FixedAllocator implements Allocator {
 			AllocBlock block = (AllocBlock) iter.next();
 			if (block.m_addr == 0) {
 				int blockSize = 32 * m_bitSize * m_size;
-				blockSize >>= 13;
+				blockSize >>= RWStore.ALLOCATION_SCALEUP;
+
 				block.m_addr = store.allocBlock(blockSize);
-				if (log.isDebugEnabled())
-					log.debug("Allocation block at " + block.m_addr + " of " + (blockSize << 13) + " bytes");
+				if (log.isInfoEnabled())
+					log.info("Allocation block at " + block.m_addr + " of " + (blockSize << 16) + " bytes");
 
 				if (m_startAddr == 0) {
 					m_startAddr = block.m_addr;
@@ -349,15 +372,15 @@ public class FixedAllocator implements Allocator {
 		}
 
 		if (addr != -1) {
-			addr += 3;
+	    	addr += 3; // tweek to ensure non-zero address for offset 0
 
-			if (--m_freeBits == 0) {
+	    	if (--m_freeBits == 0) {
 				m_freeList.remove(this);
 			}
 
 			addr += (count * 32 * m_bitSize);
 
-			int value = -((m_index << 16) + addr);
+			int value = -((m_index << RWStore.OFFSET_BITS) + addr);
 
 			return value;
 		} else {
@@ -372,7 +395,8 @@ public class FixedAllocator implements Allocator {
 	public void addAddresses(ArrayList addrs) {
 		Iterator blocks = m_allocBlocks.iterator();
 
-		int baseAddr = -((m_index << 16) + 3);
+		// FIXME int baseAddr = -((m_index << 16) + 4); // bit adjust
+		int baseAddr = -(m_index << 16); // bit adjust??
 
 		while (blocks.hasNext()) {
 			AllocBlock block = (AllocBlock) blocks.next();
