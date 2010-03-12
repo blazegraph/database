@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.UUID;
 
@@ -45,6 +46,8 @@ import com.bigdata.util.ChecksumUtility;
 /**
  * The hook that accesses the RWStore to provide read/write services as opposed
  * to the WORM characteristics of the DiskOnlyStrategy AddressManager
+ * 
+ * TODO: Implement use of IByteArraySlice as alternative to ByteBuffer
  * 
  * @author mgc
  */
@@ -194,16 +197,30 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 			throw new IllegalArgumentException();
 		}
 		
-		long rwaddr = m_store.alloc(data.array(), nbytes);
-		data.position(nbytes); // update position to end of buffer
+		try {
+			long rwaddr = m_store.alloc(data.array(), nbytes);
+			data.position(nbytes); // update position to end of buffer
+	
+			long retaddr =  encodeAddr(rwaddr, nbytes);
 
-		return encodeAddr(rwaddr, nbytes);
+			return retaddr;
+		} catch (RuntimeException re) {
+			m_needsReopen = true;			
+			
+			reopen(); // FIXME
+
+			throw re;
+		}
 	}
 
 	private void checkReopen() {
 		if (m_needsReopen) {
-			reopen();
-			m_needsReopen = false;
+			assert false;
+			
+			if (m_needsReopen) {
+				// reopen(); // should be handled by RWStore
+				m_needsReopen = false;
+			}
 		}		
 	}
 
@@ -229,7 +246,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 	}
 
 	public void delete(long addr) {
-		m_store.free(addr);
+		m_store.free(decodeAddr(addr));
 	}
 
 	public static class RWAddressManager implements IAddressManager {
@@ -342,6 +359,8 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		catch (IOException ex) {
 			m_needsReopen = true;
 			
+			reopen(); // force immediate reopen
+			
 			throw new RuntimeException(ex);
 
 		}
@@ -360,7 +379,6 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 			m_fileMetadata.raf.close();
 			m_fileMetadata.raf = null;
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -395,9 +413,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		}
 	}
 	
-	// FIXME Martyn, please hook this in.  It should call writeCacheService.reset().
+	/**
+	 * Calls through to store and then to WriteCacheService.reset
+	 */
 	public void abort() {
-	    throw new UnsupportedOperationException();
+	    m_store.reset();
 	}
 	
 	public void force(boolean metadata) {
@@ -406,17 +426,25 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		} catch (IOException e) {
 			m_needsReopen = true;
 			
+			reopen(); // FIXME
+			
 			throw new RuntimeException(e);
 		}
 	}
 	
+	/**
+	 * Must ensure that the writeCacheService is reset and direct buffers released.
+	 * TODO: Modify so that current WriteCacheService is reset and re-used by new
+	 * store.
+	 */
 	protected void reopen() {
 		try {
 			log.warn("Request to reopen store after interrupt");
-			
+
 			m_store.close();
 			m_fileMetadata.raf = new RandomAccessFile(m_fileMetadata.file, m_fileMetadata.fileMode);
-			m_store = new RWStore(m_fmv, false); // not read-only for now
+			m_store = new RWStore(m_fmv, false); // never read-only for now
+			m_needsReopen = false;
 		} catch (Throwable t) {
 			t.printStackTrace();
 			
@@ -523,6 +551,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 	 */
 	public int getOffsetBits() {
 		return 0;
+	}
+	
+	/**
+	 * Used for unit tests, could also be used to access raw statistics.
+	 * 
+	 * @return the associated RWStore
+	 */
+	public RWStore getRWStore() {
+		return m_store;
 	}
 
 }
