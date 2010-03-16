@@ -35,15 +35,15 @@ public class TestManagedReads extends TestCase {
     
     RandomAccessFile m_raf = null;
     byte[] m_data = null;
-    static class Record implements Comparable {
+    static class Record implements Comparable<Record> {
     	public long pos;
     	public int size;
     	public Record(long ppos, int psize) {
     		pos = ppos;
     		size = psize;
     	}
-		@Override
-		public int compareTo(Object o) {
+//		@Override
+		public int compareTo(Record o) {
 			return pos < ((Record) o).pos ? -1 : 1;
 		}
     }
