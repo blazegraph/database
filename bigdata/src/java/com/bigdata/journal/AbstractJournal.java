@@ -2255,16 +2255,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             if (log.isInfoEnabled())
                 log.info("commitTime=" + commitTime);
 
-            if (commitTime <= _rootBlock.getLastCommitTime()) {
-
-                /*
-                 * The commit times must strictly advance.
-                 */
-
-                throw new IllegalArgumentException();
-
-            }
-
+            assertCommitTimeAdvances(commitTime);
+            
             /*
              * First, run each of the committers accumulating the updated root
              * addresses in an array. In general, these are btrees and they may
@@ -2441,6 +2433,31 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         } finally {
 
             lock.unlock();
+
+        }
+
+    }
+
+    /**
+     * Method verifies that the commit time strictly advances on the local store
+     * by checking against the current root block.
+     * 
+     * @param commitTime
+     *            The proposed commit time.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>commitTime</i> is LTE the value reported by
+     *             {@link IRootBlockView#getLastCommitTime()}.
+     */
+    protected void assertCommitTimeAdvances(final long commitTime) {
+
+        if (commitTime <= _rootBlock.getLastCommitTime()) {
+
+            /*
+             * The commit times must strictly advance.
+             */
+
+            throw new IllegalArgumentException();
 
         }
 
