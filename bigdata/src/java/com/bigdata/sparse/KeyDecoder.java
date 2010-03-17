@@ -441,6 +441,19 @@ public class KeyDecoder {
         return b;
         
     }
+
+    /**
+     * Returns the length of the prefix corresponding to the encoded schema
+     * name, the primary key's {@link KeyType}, and the primary key (including
+     * any terminating <code>nul</code> byte).
+     * 
+     * @return
+     */
+    public int getPrefixLength() {
+        
+        return columnNameOffset;
+        
+    }
     
     /**
      * Shows some of the data that is extracted.
