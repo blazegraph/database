@@ -51,13 +51,13 @@
 	<classpathentry path="bigdata-jini/lib/jini/lib/tools.jar" exported="true" kind="lib"/>
 	<classpathentry sourcepath="/dsiutils-1.0.10/src" path="bigdata/lib/unimi/dsiutils-1.0.10.jar" exported="true" kind="lib"/>
 	<classpathentry path="bigdata/lib/unimi/fastutil-5.1.5.jar" exported="true" kind="lib"/>
-	<classpathentry path="bigdata-sails/lib/sesame-sparql-testsuite-2.2.4.jar" kind="lib"/>
-	<classpathentry path="bigdata-sails/lib/sesame-store-testsuite-2.2.4.jar" kind="lib"/>
 	<classpathentry path="bigdata-bsbm/lib/jdom.jar" kind="lib"/>
 	<classpathentry path="bigdata-bsbm/lib/ssj.jar" kind="lib"/>
 	<classpathentry path="bigdata/lib/lucene/lucene-analyzers-3.0.0.jar" kind="lib"/>
 	<classpathentry path="bigdata/lib/lucene/lucene-core-3.0.0.jar" kind="lib"/>
 	<classpathentry path="org.eclipse.jdt.launching.JRE_CONTAINER" kind="con"/>
 	<classpathentry path="bigdata-rdf/lib/openrdf-sesame-2.3.0-onejar.jar" kind="lib"/>
+	<classpathentry path="bigdata-sails/lib/sesame-sparql-testsuite-2.3.0.jar" kind="lib"/>
+	<classpathentry path="bigdata-sails/lib/sesame-store-testsuite-2.3.0.jar" kind="lib"/>
 	<classpathentry path="bin" kind="output"/>
 </classpath>
