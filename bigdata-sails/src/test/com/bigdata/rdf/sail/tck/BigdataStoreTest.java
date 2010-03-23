@@ -27,15 +27,31 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.tck;
 
+import info.aduna.iteration.CloseableIteration;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.impl.MapBindingSet;
+import org.openrdf.query.parser.ParsedTupleQuery;
+import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.sail.RDFStoreTest;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.btree.keys.CollatorEnum;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -61,8 +77,6 @@ public class BigdataStoreTest extends RDFStoreTest {
             final Properties p = new Properties(super.getProperties());
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
-            
-            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
             
             return p;
             
@@ -90,8 +104,6 @@ public class BigdataStoreTest extends RDFStoreTest {
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
        
-            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
-            
             return p;
             
         }
@@ -142,21 +154,21 @@ public class BigdataStoreTest extends RDFStoreTest {
      *       by supporting full transactions in the sail or by allowing more
      *       than one connection but having them interleave their incremental
      *       writes.
-     */
     @Override
     public void testDualConnections(){
         fail("Not supported yet.");
     }
+     */
 
     /**
      * This unit test has been disabled. Sesame 2.x assumes that two blank nodes
      * are the same if they have the same identifier. bigdata does not have
      * those semantics. Neither does RDF. Sesame 3.x has the standard behavior
      * and does not run this unit test either.
-     */
     public void testStatementSerialization() {
         
     }
+     */
     
     protected Properties getProperties() {
         
@@ -165,18 +177,35 @@ public class BigdataStoreTest extends RDFStoreTest {
         final File journal = createTempFile();
         
         props.setProperty(BigdataSail.Options.FILE, journal.getAbsolutePath());
-/*        
-        props.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
+
+        // use told bnode mode
+        props.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
         
-        props.setProperty(Options.QUADS, "true");
-        
-        props.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
-*/
+        // quads mode: quads=true, sids=false, axioms=NoAxioms, vocab=NoVocabulary
         props.setProperty(Options.QUADS_MODE, "true");
+
+        // no justifications
+        props.setProperty(Options.JUSTIFY, "false");
         
+        // no query time inference
+        props.setProperty(Options.QUERY_TIME_EXPANDER, "false");
+        
+        // auto-commit only there for TCK
         props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
         
+        // exact size only there for TCK
         props.setProperty(Options.EXACT_SIZE, "true");
+        
+        props.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());
+        
+//      Force identical unicode comparisons (assuming default COLLATOR setting).
+        props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
+        
+        // enable read/write transactions
+        props.setProperty(Options.ISOLATABLE_INDICES, "true");
+        
+        // disable truth maintenance in the SAIL
+        props.setProperty(Options.TRUTH_MAINTENANCE, "false");
         
         return props;
         
@@ -209,4 +238,50 @@ public class BigdataStoreTest extends RDFStoreTest {
         
     }
 
+    /**
+     * This one is failing because of this code:
+     * <code>
+     * bindings.addBinding("Y", painter);
+     * iter = con.evaluate(tupleExpr, null, bindings, false);
+     * resultCount = verifyQueryResult(iter, 1);
+     * </code>
+     * Adding a binding for the "Y" variable causes that binding to appear in
+     * the result set, even though "Y" is not one of the selected variables. 
+     * 
+     * @todo FIXME
+     */
+    @Override
+    public void testQueryBindings()
+        throws Exception
+    {
+        fail("FIXME");
+    }
+
+    /**
+     * This one is failing because we cannot handle literals longer than
+     * 65535 characters.
+     * 
+     * @todo FIXME
+     */
+    @Override
+    public void testReallyLongLiteralRoundTrip()
+        throws Exception
+    {
+        fail("FIXME");
+    }
+    
+    /**
+     * This one fails because Sesame assumes "read-committed" transaction
+     * semantics, which are incompatible with bigdata's MVCC transaction 
+     * semantics.
+     * 
+     * @todo FIXME
+     */
+    @Override
+    public void testDualConnections()
+        throws Exception
+    {
+        fail("FIXME");
+    }
+    
 }

@@ -196,7 +196,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             doSearchTest(((BigdataSail) sail).getConnection());
 
-            doSearchTest(((BigdataSail) sail).asReadCommittedView());
+            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
 
             if (log.isInfoEnabled())
                 log
@@ -217,7 +217,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             doSearchTest(((BigdataSail) sail).getConnection());
 
-            doSearchTest(((BigdataSail) sail).asReadCommittedView());
+            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
             
         } finally {
 

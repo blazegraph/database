@@ -29,14 +29,29 @@ package com.bigdata.rdf.sail.tck;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
 import java.util.Properties;
+import java.util.TimeZone;
+import javax.xml.datatype.DatatypeFactory;
+import javax.xml.datatype.XMLGregorianCalendar;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
+import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnectionTest;
 
+import com.bigdata.btree.keys.CollatorEnum;
+import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -69,8 +84,6 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"true");
             
-            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
-            
             return p;
             
         }
@@ -96,8 +109,6 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
             
             p.setProperty(AbstractResource.Options.NESTED_SUBQUERY,"false");
             
-            p.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
-
             return p;
             
         }
@@ -118,11 +129,33 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
         
         props.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
 */
+        props.setProperty(BigdataSail.Options.STORE_BLANK_NODES,"true");
+        
+        // quads mode: quads=true, sids=false, axioms=NoAxioms, vocab=NoVocabulary
         props.setProperty(Options.QUADS_MODE, "true");
 
+        // no justifications
+        props.setProperty(Options.JUSTIFY, "false");
+        
+        // no query time inference
+        props.setProperty(Options.QUERY_TIME_EXPANDER, "false");
+        
+        // auto-commit only there for TCK
         props.setProperty(Options.ALLOW_AUTO_COMMIT, "true");
         
+        // exact size only there for TCK
         props.setProperty(Options.EXACT_SIZE, "true");
+        
+        props.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());
+        
+//      Force identical unicode comparisons (assuming default COLLATOR setting).
+        props.setProperty(Options.STRENGTH, StrengthEnum.Identical.toString());
+        
+        // enable read/write transactions
+        props.setProperty(Options.ISOLATABLE_INDICES, "true");
+        
+        // disable truth maintenance in the SAIL
+        props.setProperty(Options.TRUTH_MAINTENANCE, "false");
         
         return props;
 	    
@@ -156,6 +189,60 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
         if (backend != null)
             backend.destroy();
 
+    }
+
+    /**
+     * Unclear why we are failing this one.
+     * 
+     * @todo FIXME
+     */
+    @Override
+    public void testXmlCalendarZ()
+        throws Exception
+    {
+        fail("FIXME");
+    }
+
+    /**
+     * This one fails because Sesame assumes "read-committed" transaction
+     * semantics, which are incompatible with bigdata's MVCC transaction 
+     * semantics.
+     * 
+     * @todo FIXME
+     */
+    @Override
+    public void testEmptyCommit()
+        throws Exception
+    {
+        fail("FIXME");
+    }
+    
+    /**
+     * This one fails because Sesame assumes "read-committed" transaction
+     * semantics, which are incompatible with bigdata's MVCC transaction 
+     * semantics.
+     * 
+     * @todo FIXME
+     */
+    @Override
+    public void testSizeCommit()
+        throws Exception
+    {
+        fail("FIXME");
+    }
+
+    /**
+     * This one fails because Sesame assumes "read-committed" transaction
+     * semantics, which are incompatible with bigdata's MVCC transaction 
+     * semantics.
+     * 
+     * @todo FIXME
+     */
+    @Override
+    public void testTransactionIsolation()
+        throws Exception
+    {
+        fail("FIXME");
     }
     
 }

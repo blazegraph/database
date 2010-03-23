@@ -154,7 +154,7 @@ public class SampleCode {
          */
         RepositoryConnection cxn;
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -208,7 +208,7 @@ public class SampleCode {
          */
         RepositoryConnection cxn;
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -249,7 +249,7 @@ public class SampleCode {
          */
         RepositoryConnection cxn;
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -345,7 +345,7 @@ public class SampleCode {
          * gives you a view of the repository at the last commit point.
          */
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -411,7 +411,7 @@ public class SampleCode {
             cxn.commit();
             
             RepositoryConnection history = 
-                ((BigdataSailRepository) repo).getQueryConnection(time);
+                ((BigdataSailRepository) repo).getReadOnlyConnection(time);
             
             String query = 
                 "select ?s " +
