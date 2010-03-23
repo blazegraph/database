@@ -1046,7 +1046,7 @@ public class BigdataRepository implements Repository {
         final long timestamp = sail.getDatabase().getIndexManager()
                 .getLastCommitTime();
         
-        return sail.getReadHistoricalView(timestamp);
+        return sail.getReadOnlyConnection(timestamp);
         
     }
     

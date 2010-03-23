@@ -306,7 +306,7 @@ public class GraphRepositoryServlet extends HttpServlet {
     public String read(String queryString, QueryLanguage ql, 
             boolean includeInferred) throws Exception {
         
-        RepositoryConnection cxn = repo.getQueryConnection();
+        RepositoryConnection cxn = repo.getReadOnlyConnection();
         
         try {
 

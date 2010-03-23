@@ -245,7 +245,7 @@ public class TestBootstrapBigdataSail extends TestCase {
         
         final SailConnection conn = sail.getConnection();
         
-        final SailConnection readConn = sail.asReadCommittedView();
+        final SailConnection readConn = sail.getReadOnlyConnection();
         
         try {
 

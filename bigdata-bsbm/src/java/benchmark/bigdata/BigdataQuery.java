@@ -92,7 +92,7 @@ public class BigdataQuery {
 	}
     
     protected InputStream execTupleQuery() throws Exception {
-        SailRepositoryConnection cxn = repo.getQueryConnection();
+        SailRepositoryConnection cxn = repo.getReadOnlyConnection();
         try {
             StringWriter writer = new StringWriter();
             TupleQuery query = 
@@ -106,7 +106,7 @@ public class BigdataQuery {
     }
     
     protected InputStream execGraphQuery() throws Exception {
-        SailRepositoryConnection cxn = repo.getQueryConnection();
+        SailRepositoryConnection cxn = repo.getReadOnlyConnection();
         try {
             StringWriter writer = new StringWriter();
             BigdataSailGraphQuery query = (BigdataSailGraphQuery) 

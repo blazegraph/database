@@ -1125,7 +1125,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         final long timestamp = sail.getDatabase().getIndexManager()
                 .getLastCommitTime();
         
-        return sail.getReadHistoricalView(timestamp);
+        return sail.getReadOnlyConnection(timestamp);
         
     }
 

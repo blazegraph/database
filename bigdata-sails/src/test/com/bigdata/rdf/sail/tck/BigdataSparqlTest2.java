@@ -18,15 +18,6 @@ public class BigdataSparqlTest2 extends TestCase {
     
     protected static final Logger log = Logger.getLogger(BigdataSparqlTest2.class);
     
-    static final private String failure = 
-        "graph: file:/C:/DOCUME~1/mike/LOCALS~1/Temp/sparql5850/testcases-dawg/data-r2/optional/complex-data-1.ttl\n" +
-        "graph: file:/C:/DOCUME~1/mike/LOCALS~1/Temp/sparql5850/testcases-dawg/data-r2/optional/complex-data-2.ttl\n" +
-        "queryFile: file:/C:/DOCUME~1/mike/LOCALS~1/Temp/sparql5850/testcases-dawg/data-r2/optional/q-opt-complex-3.rq\n" +
-        "resultFile: file:/C:/DOCUME~1/mike/LOCALS~1/Temp/sparql5850/testcases-dawg/data-r2/optional/result-opt-complex-3.ttl";
-    
-    static final private String testURI =
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/open-world/manifest#open-eq-12";
-    
     static final private Collection<String> testURIs = Arrays.asList(new String[] {
 /*
 //      busted with EvalStrategy1
@@ -47,14 +38,14 @@ public class BigdataSparqlTest2 extends TestCase {
 //      Dataset crap
         // "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/i18n/manifest#normalization-1"
             
-        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/construct/manifest#construct-1"
+        "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#dawg-dataset-01"
         
     });
     
     protected static BigdataSparqlTest getSingleTest(String testURI) throws Exception {
         
         BigdataSparqlTest test = null;
-        TestSuite suite = (TestSuite) BigdataSparqlTest.suite();
+        TestSuite suite = (TestSuite) BigdataSparqlTest.suite(false);
         Enumeration e1 = suite.tests();
         while (e1.hasMoreElements()) {
             suite = (TestSuite) e1.nextElement();

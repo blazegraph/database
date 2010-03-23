@@ -66,7 +66,7 @@ public class TestNamedGraphs extends SampleCode {
         try {
 
 //            final RepositoryConnection cxn = repo.getConnection();
-            final RepositoryConnection cxn = repo.getQueryConnection();
+            final RepositoryConnection cxn = repo.getReadOnlyConnection();
             
             // fast range count!
             long stmtCount = sail.getDatabase().getStatementCount();
