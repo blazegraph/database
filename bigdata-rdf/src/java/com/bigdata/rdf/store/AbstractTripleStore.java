@@ -848,6 +848,34 @@ abstract public class AbstractTripleStore extends
         
     }
     
+    protected Class determineVocabularyClass() {
+        
+        // vocabularyClass
+        {
+
+            final String className = getProperty(Options.VOCABULARY_CLASS,
+                    Options.DEFAULT_VOCABULARY_CLASS);
+
+            final Class cls;
+            try {
+                cls = Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Bad option: "
+                        + Options.VOCABULARY_CLASS, e);
+            }
+
+            if (!BaseVocabulary.class.isAssignableFrom(cls)) {
+                throw new RuntimeException(Options.VOCABULARY_CLASS
+                        + ": Must extend: "
+                        + BaseVocabulary.class.getName());
+            }
+            
+            return cls;
+
+        }
+        
+    }
+    
     /**
      * Ctor specified by {@link DefaultResourceLocator}.
      * 
@@ -896,6 +924,7 @@ abstract public class AbstractTripleStore extends
                 this.quads = false;
                 this.statementIdentifiers = false;
                 this.axiomClass = determineAxiomClass();
+                this.vocabularyClass = determineVocabularyClass();
                 properties.setProperty(Options.QUADS, "false");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
                 break;
@@ -904,6 +933,7 @@ abstract public class AbstractTripleStore extends
                 this.quads = false;
                 this.statementIdentifiers = true;
                 this.axiomClass = determineAxiomClass();
+                this.vocabularyClass = determineVocabularyClass();
                 properties.setProperty(Options.QUADS, "false");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
                 break;
@@ -912,9 +942,11 @@ abstract public class AbstractTripleStore extends
                 this.quads = true;
                 this.statementIdentifiers = false;
                 this.axiomClass = NoAxioms.class;
+                this.vocabularyClass = NoVocabulary.class;
                 properties.setProperty(Options.QUADS, "true");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
                 properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+                properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
                 break;
             }
             default:
@@ -931,7 +963,8 @@ abstract public class AbstractTripleStore extends
 
             if (lexicon) {
                 
-                this.axiomClass = determineAxiomClass();
+                axiomClass = determineAxiomClass();
+                vocabularyClass = determineVocabularyClass();
                 
             } else {
                 
@@ -941,6 +974,7 @@ abstract public class AbstractTripleStore extends
                  */
 
                 axiomClass = NoAxioms.class;
+                vocabularyClass = NoVocabulary.class;
 
             }
             
@@ -958,37 +992,6 @@ abstract public class AbstractTripleStore extends
                     + " does not support the provenance mode ("
                     + Options.STATEMENT_IDENTIFIERS + ")");
             
-        }
-
-        if (lexicon) {
-
-            // vocabularyClass
-            {
-
-                final String className = getProperty(Options.VOCABULARY_CLASS,
-                        Options.DEFAULT_VOCABULARY_CLASS);
-
-                final Class cls;
-                try {
-                    cls = Class.forName(className);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException("Bad option: "
-                            + Options.VOCABULARY_CLASS, e);
-                }
-
-                if (!BaseVocabulary.class.isAssignableFrom(cls)) {
-                    throw new RuntimeException(Options.VOCABULARY_CLASS
-                            + ": Must extend: "
-                            + BaseVocabulary.class.getName());
-                }
-                vocabularyClass = cls;
-
-            }
-
-        } else {
-
-            vocabularyClass = NoVocabulary.class;
-
         }
 
         // closureClass
