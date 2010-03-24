@@ -507,7 +507,7 @@ abstract public class JoinTask implements Callable<Void> {
             
             /*
              * This is used for processing errors and also if this task is
-             * interrupted (because a SLICE has been satisified).
+             * interrupted (because a SLICE has been satisfied).
              * 
              * @todo For a SLICE, consider that the query solution buffer
              * proxy could return the #of solutions added so far so that we

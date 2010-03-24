@@ -47,7 +47,6 @@ Modifications:
 
 package com.bigdata.btree;
 
-import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 
 /**
@@ -77,12 +76,21 @@ public class ViewStatistics {
      * The sum of the size on disk across the index segments in the view.
      */
     public final long sumSegBytes;
-    
+
+    /**
+     * Collects some statistics about the view.
+     * <p>
+     * Note: If the view is assembled solely from the {@link BTree} on a journal
+     * rather than from all sources in its {@link LocalPartitionMetadata} then
+     * statistics about any {@link IndexSegment}s in the view WILL NOT be
+     * reported.
+     * 
+     * @param view
+     *            The view.
+     */
     public ViewStatistics(final ILocalBTreeView view) {
 
         // #of sources in the view (very fast).
-        int sourceCount = 0, sourceJournalCount = 0, sourceSegmentCount = 0;
-        long sumSegBytes = 0L;
         final LocalPartitionMetadata pmd = view.getIndexMetadata().getPartitionMetadata();
         if (pmd == null) {
             /*
@@ -100,14 +108,39 @@ public class ViewStatistics {
              * This is a view comprised (at least logically) of multiple source
              * B+Tree components.
              */
-            for (IResourceMetadata x : pmd.getResources()) {
-                sourceCount++;
-                if (x.isJournal()) {
-                    sourceJournalCount++;
-                } else {
+            final AbstractBTree[] sources = view.getSources();
+//            final IResourceMetadata[] resources = pmd.getResources();
+//            if (sources.length != resources.length) {
+//                /*
+//                 * The probable cause here is passing in a BTree object from the
+//                 * live journal rather than the FusedView assembled from the
+//                 * live journal and some historical journals or index segments.
+//                 */
+//                throw new IllegalStateException();
+//            }
+            int sourceCount = 0, sourceJournalCount = 0, sourceSegmentCount = 0;
+            long sumSegBytes = 0L;
+//            for (IResourceMetadata x : resources) {
+            for(AbstractBTree btree : sources) {
+                if (btree instanceof IndexSegment) {
                     sourceSegmentCount++;
-                    sumSegBytes += x.getFile().length();
-                }
+                    /*
+                     * Note: This uses the index segment size as self-reported
+                     * by the segStore since the IResourceMetadata#getFile()
+                     * object can not be safely resolved to the backing file in
+                     * the file system (it is not an absolute file path).
+                     */
+//                    if (sourceCount >= sources.length) {
+//                        throw new AssertionError("sourceCount=" + sourceCount
+//                                + ", sources=" + Arrays.toString(sources)
+//                                + ", pmd.getResources()="
+//                                + Arrays.toString(pmd.getResources()));
+//                    }
+                    sumSegBytes += sources[sourceCount].getStore().size();
+                } else {
+                    sourceJournalCount++;
+                }                
+                sourceCount++;
             }
             this.sourceCount = sourceCount;
             this.sourceJournalCount = sourceJournalCount;
