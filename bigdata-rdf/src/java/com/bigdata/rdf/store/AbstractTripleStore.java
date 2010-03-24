@@ -924,7 +924,11 @@ abstract public class AbstractTripleStore extends
                 this.quads = false;
                 this.statementIdentifiers = false;
                 this.axiomClass = determineAxiomClass();
-                this.vocabularyClass = determineVocabularyClass();
+                if (lexicon) {
+                    this.vocabularyClass = determineVocabularyClass();
+                } else {
+                    this.vocabularyClass = NoVocabulary.class;
+                }
                 properties.setProperty(Options.QUADS, "false");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
                 break;
@@ -933,7 +937,11 @@ abstract public class AbstractTripleStore extends
                 this.quads = false;
                 this.statementIdentifiers = true;
                 this.axiomClass = determineAxiomClass();
-                this.vocabularyClass = determineVocabularyClass();
+                if (lexicon) {
+                    this.vocabularyClass = determineVocabularyClass();
+                } else {
+                    this.vocabularyClass = NoVocabulary.class;
+                }
                 properties.setProperty(Options.QUADS, "false");
                 properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
                 break;
