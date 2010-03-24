@@ -87,7 +87,7 @@ import com.bigdata.util.CSVReader;
 public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
         IRowStoreConstants {
 
-    protected IIndex getIndex(IIndexManager store) {
+    protected IIndex getIndex(final IIndexManager store) {
 
         // name by the unit test.
         final String name = getName();
@@ -101,7 +101,18 @@ public class TestSparseRowStore extends ProxyTestCase<IIndexManager> implements
             if (INFO)
                 log.info("Registering index: " + name);
             
-            store.registerIndex(new IndexMetadata(name, UUID.randomUUID()));
+            /*
+             * Note: This specifies an split handler that keeps the logical
+             * row together. This is a hard requirement. The atomic
+             * read/update guarantee depends on this.
+             */
+
+            final IndexMetadata md = new IndexMetadata(name, UUID.randomUUID());
+
+            // Ensure that splits do not break logical rows.
+            md.setSplitHandler(LogicalRowSplitHandler.INSTANCE);
+
+            store.registerIndex(md);
 
             ndx = store.getIndex(name, timestamp);
             

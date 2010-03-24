@@ -8,11 +8,9 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.service.Event;
-import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Params;
 import com.bigdata.util.InnerCause;
 
@@ -38,24 +36,34 @@ class ViewMetadata extends BTreeMetadata implements Params {
      * obtained data.
      */
     private boolean initView = false;
-    
+
     /**
      * Cached fast range count once initialized from view.
      */
-    private long rangeCount;
+    private volatile long rangeCount;
     
     /**
      * Cached index partition count once initialized from the view.
      */
-    private long npartitions;
-    
+    private volatile long partitionCount;
+
     /**
-     * Cached adjusted split handler once initialized from view.
+     * The adjusted nominal size of an index partition. Index partitions are
+     * split once {@link #sumSegBytes} is GT this value. This value MAY be
+     * adjusted down by an "acceleration" factor.
+     * 
+     * @see OverflowManager.Options#NOMINAL_SHARD_SIZE
      */
-    private ISplitHandler adjustedSplitHandler;
+    private volatile long adjustedNominalShardSize;
 
     /**
      * Cached estimated percentage of a split once initialized from the view.
+     * <p>
+     * Note: the percentOfSplit when based on sumSegBytes is not 100% predictive
+     * unless we have a compact view since the size on disk of the compact
+     * segment can be much less. This is especially true when many deleted
+     * tuples are purged by the compacting merge, in which case the segment
+     * could shrink to zero during the merge.
      */
     private volatile double percentOfSplit;
 
@@ -221,35 +229,63 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
             }
 
-            this.npartitions = npartitions;
+            this.partitionCount = npartitions;
 
         }
 
         /*
-         * Handler decides when and where to split an index partition.
-         * 
-         * Note: This is deferred since it requires RMI to the metadata service.
-         * Even though that RMI is heavily cached it still makes sense to do
-         * this outside of synchronous overflow.
+         * This computes the target size on the disk for a compact index segment
+         * for the shard. The calculation concerns an acceleration factor based
+         * on some desired minimum number of shards for the index and uses the
+         * nominalShardSize if the minimum has been satisfied.
          */
-        this.adjustedSplitHandler = getSplitHandler();
+        {
+
+            final int accelerateSplitThreshold = resourceManager.accelerateSplitThreshold;
+
+            if (accelerateSplitThreshold == 0) {
+
+                this.adjustedNominalShardSize = resourceManager.nominalShardSize;
+
+            } else {
+
+                // discount: given T=100, will be 1 when N=100; 10 when N=10,
+                // and
+                // 100 when N=1.
+                final double d = (double) partitionCount
+                        / accelerateSplitThreshold;
+
+                this.adjustedNominalShardSize = (long) (resourceManager.nominalShardSize * d);
+
+                if (log.isInfoEnabled())
+                    log.info("npartitions=" + partitionCount + ", discount=" + d
+                            + ", threshold=" + accelerateSplitThreshold
+                            + ", adjustedNominalShardSize="
+                            + this.adjustedNominalShardSize
+                            + ", nominalShardSize="
+                            + resourceManager.nominalShardSize);
+            }
+
+        }
 
         /*
-         * range count for the view (fast, but slower when an index segment is
-         * used by more than one index since the partition bounds are a subset
-         * of the index segment key range).
+         * Range count for the view (fast.
          */
         this.rangeCount = view.rangeCount();
 
-        this.percentOfSplit = adjustedSplitHandler.percentOfSplit(rangeCount);
+        /*
+         * The percentage of a full index partition fulfilled by this view.
+         * 
+         * Note: the percentOfSplit when based on sumSegBytes is not 100%
+         * predictive unless we have a compact view since the size on disk of
+         * the compact segment can be much less. This is especially true when
+         * many deleted tuples are purged by the compacting merge, in which case
+         * the segment could shrink to zero during the merge.
+         */
+        this.percentOfSplit = super.sumSegBytes / (double) adjustedNominalShardSize;
 
         /*
          * true iff this is a good candidate for a tail split.
-         * 
-         * @todo this does not pay attention to the #of tuples at which the
-         * index partition would underflow. instead it assumes that underflow is
-         * a modest distance from a full split. for example, we could also test
-         * NOT(isJoinCandidate) to determine if the tail split would underflow.
          */
         this.tailSplit = //
         this.percentOfSplit > resourceManager.percentOfSplitThreshold && //
@@ -292,29 +328,39 @@ class ViewMetadata extends BTreeMetadata implements Params {
             
         }
         
-        return npartitions;
+        return partitionCount;
         
     }
 
     /**
-     * The adjusted split handler (cached).
+     * The adjusted nominal size on disk of a shard after a compacting merge
+     * (cached). This factors in an optional acceleration factor which causes
+     * shards to be split when they are smaller unless a minimum #of shards
+     * exist for that index.
      * 
-     * @throws IllegalStateException
-     *             unless {@link #getView()} has been invoked.
+     * @see OverflowManager.Options#NOMINAL_SHARD_SIZE
      */
-    public ISplitHandler getAdjustedSplitHandler() {
+    public long getAdjustedNominalShardSize() {
 
         if(!initView) {
-
-            // materialize iff never initialized.
+            
+            // materialize iff never initialized
             getView();
             
         }
         
-        return adjustedSplitHandler;
-
+        return adjustedNominalShardSize;
+        
     }
-
+    
+    /**
+     * Estimated percentage of a split based on the size on disk (cached).
+     * <p>
+     * Note: the percentOfSplit is not 100% predictive unless we have a compact
+     * view since the size on disk of the compact segment can be much less. This
+     * is especially true when many deleted tuples are purged by the compacting
+     * merge, in which case the segment could shrink to zero during the merge.
+     */
     public double getPercentOfSplit() {
         
         if (!initView) {
@@ -372,9 +418,13 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
             sb.append(", rangeCount=" + rangeCount);
 
+            sb.append(", partitionCount=" + partitionCount);
+
+            sb.append(", adjustedNominalShardSize=" + adjustedNominalShardSize);
+
             sb.append(", percentOfSplit=" + percentOfSplit);
 
-            sb.append(", adjustedSplitHandler=" + adjustedSplitHandler);
+            sb.append(", tailSplit=" + tailSplit);
 
         }
 
@@ -388,9 +438,13 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
         final Map<String, Object> m = new HashMap<String, Object>();
 
+        /*
+         * Fields from the BTreeMetadata class.
+         */
+
         m.put("name", name);
 
-        m.put("action", action);
+        m.put("action", getAction());
 
         m.put("entryCount", entryCount);
 
@@ -402,7 +456,7 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
         m.put("mergePriority", mergePriority);
 
-        m.put("splitPriority", splitPriority);
+//        m.put("splitPriority", splitPriority);
 
         m.put("manditoryMerge", mandatoryMerge);
 
@@ -416,61 +470,22 @@ class ViewMetadata extends BTreeMetadata implements Params {
 
         m.put("percentTailSplits", percentTailSplits);
 
+        /*
+         * Fields from the ViewMetadata class.
+         */
+        
         m.put("rangeCount", rangeCount);
+
+        m.put("partitionCount", partitionCount);
+
+        m.put("adjustedNominalShardSize", adjustedNominalShardSize);
 
         m.put("percentOfSplit", percentOfSplit);
 
-        m.put("adjustedSplitHandler", adjustedSplitHandler);
+        m.put("tailSplit", tailSplit);
 
         return m;
         
     }
     
-    /**
-     * Return an adjusted split handler.
-     * 
-     * @param indexMetadata
-     *            The {@link IndexMetadata} for an index partition being
-     *            considered for a split or join.
-     * @param commitTime
-     *            The commit time that is used to query the
-     *            {@link IMetadataService} for the index partition count.
-     * 
-     * @return The adjusted split handler.
-     * 
-     * @todo only supports the {@link DefaultSplitHandler}.
-     */
-    private ISplitHandler getSplitHandler() {
-
-        if (resourceManager == null)
-            throw new IllegalArgumentException();
-
-        if (indexMetadata == null)
-            throw new IllegalArgumentException();
-
-        final ISplitHandler splitHandler = indexMetadata.getSplitHandler();
-
-        if (splitHandler == null)
-            return splitHandler;
-
-        if (!(splitHandler instanceof DefaultSplitHandler)) {
-            
-            return splitHandler;
-            
-        }
-        
-        final int accelerateSplitThreshold = resourceManager.accelerateSplitThreshold;
-
-        if (accelerateSplitThreshold == 0) {
-
-            // feature is disabled.
-            return splitHandler;
-            
-        }
-        
-        return ((DefaultSplitHandler) splitHandler).getAdjustedSplitHandler(
-                accelerateSplitThreshold, npartitions);
-        
-    }
-
 }

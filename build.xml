@@ -1020,7 +1020,7 @@ ${postInstallMessage}</echo>
 <!-- Note: You should 'nohup' this, e.g., "nohup ant standalone-start" to 
      avoid taking down the ServicesManagerServer if you are disconnected
      from a terminal. -->
-<target name="standalone-start" description="Start the standalone federation.">
+<target name="standalone-start" depends="jar" description="Start the standalone federation.">
 	<!-- @todo start jini automatically. -->
     <!--<antcall target="standalone-start-jini" />-->
 	<java classname="com.bigdata.jini.start.ServicesManagerServer"
@@ -1038,7 +1038,7 @@ ${postInstallMessage}</echo>
 	</java>
 </target>
 
-<target name="standalone-stop" description="Stop the standalone federation.">
+<target name="standalone-stop" depends="jar" description="Stop the standalone federation.">
 	<!-- @todo stop jini automatically. -->
     <!--<antcall target="standalone-start-jini" />-->
 	<java classname="com.bigdata.service.jini.util.ShutdownFederation"
@@ -1074,7 +1074,7 @@ ${postInstallMessage}</echo>
      for file in *; do mv $file $file.nt; done
      
      -->
-<target name="standalone-bulk-load" description="Bulk load RDF data into the standalone federation.">
+<target name="standalone-bulk-load" depends="jar" description="Bulk load RDF data into the standalone federation.">
 	<java classname="com.bigdata.rdf.load.MappedRDFDataLoadMaster"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1100,7 +1100,7 @@ ${postInstallMessage}</echo>
 		     d:/bigdata-perf-analysis/lubm/U10
 		     d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt
 		-->
-		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/bsbm/bsbm_2785/dataset.nt"/>
+		<jvmarg value="-Dbigdata.rdf.data=d:/bigdata-perf-analysis/lubm/U10"/>
 		<!-- The file or directory containing zero or more RDF ontology files to be loaded.
 		
 			 Note: If you do not want to load any "ontology" data you can point this at an
@@ -1112,7 +1112,8 @@ ${postInstallMessage}</echo>
 			bigdata-rdf/src/resources/data/lehigh/univ-bench.owl
 			d:/bigdata-perf-analysis/emptyDir
 		 -->
-		<jvmarg value="-Dbigdata.rdf.ontology=d:/bigdata-perf-analysis/emptyDir"/>
+		<jvmarg value="-Dbigdata.rdf.ontology=bigdata-rdf/src/resources/data/lehigh/univ-bench.owl"/>
+		<!-- The main configuration file. -->
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
 </target>
