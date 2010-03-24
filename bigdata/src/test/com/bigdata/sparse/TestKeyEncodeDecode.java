@@ -57,8 +57,6 @@ public class TestKeyEncodeDecode extends TestCase2 {
         
     }
 
-    IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance(); 
-    
     /**
      * Test for primitive data types where we can round trip the primary key
      * value.
@@ -73,6 +71,8 @@ public class TestKeyEncodeDecode extends TestCase2 {
      */
     public void test_primitive_long() {
 
+        final IKeyBuilder keyBuilder = KeyBuilder.newUnicodeInstance(); 
+        
         final Schema schema = new Schema("Employee", "Id", KeyType.Long);
         
         final Long primaryKey = 1L;

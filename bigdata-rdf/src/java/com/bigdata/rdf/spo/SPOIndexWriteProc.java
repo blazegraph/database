@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.spo;
 
 import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
@@ -80,7 +82,9 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     private static final long serialVersionUID = 3969394126242598370L;
 
-    private transient final long NULL = IRawTripleStore.NULL;
+    private static transient final long NULL = IRawTripleStore.NULL;
+
+    private transient boolean reportMutation;
     
     public final boolean isReadOnly() {
 
@@ -102,21 +106,44 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      * @param keys
      * @param vals
      */
-    protected SPOIndexWriteProc(IRabaCoder keySer, IRabaCoder valSer,
-            int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
+    protected SPOIndexWriteProc(final IRabaCoder keySer,
+            final IRabaCoder valSer, final int fromIndex, final int toIndex,
+            final byte[][] keys, final byte[][] vals,
+            final boolean reportMutation) {
 
         super(keySer, valSer, fromIndex, toIndex, keys, vals);
 
         assert vals != null;
+        
+        this.reportMutation = reportMutation;
 
     }
 
     public static class IndexWriteProcConstructor extends
             AbstractKeyArrayIndexProcedureConstructor<SPOIndexWriteProc> {
 
-        public static IndexWriteProcConstructor INSTANCE = new IndexWriteProcConstructor();
+        final boolean reportMutation;
 
-        private IndexWriteProcConstructor() {
+        /**
+         * Instance reports back which statements were modified (inserted into
+         * the index or updated on the index). The return value of the procedure
+         * is a {@link ResultBitBuffer}.  The mutation count 
+         */
+        public static IndexWriteProcConstructor REPORT_MUTATION = new IndexWriteProcConstructor(
+                true/* reportMutation */);
+
+        /**
+         * Instance does not report by which statements were modified (inserted
+         * into the index or updated on the index). The return value of the RPC
+         * is a {@link Long} mutation count.
+         */
+        public static IndexWriteProcConstructor INSTANCE = new IndexWriteProcConstructor(
+                false/* reportMutation */);
+
+        private IndexWriteProcConstructor(final boolean reportMutation) {
+            
+            this.reportMutation = reportMutation;
+            
         }
 
         /**
@@ -128,26 +155,27 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
         
-        public SPOIndexWriteProc newInstance(IRabaCoder keySer,
-                IRabaCoder valSer, int fromIndex, int toIndex, byte[][] keys,
-                byte[][] vals) {
+        public SPOIndexWriteProc newInstance(final IRabaCoder keySer,
+                final IRabaCoder valSer, final int fromIndex,
+                final int toIndex, final byte[][] keys, final byte[][] vals) {
 
             return new SPOIndexWriteProc(keySer, valSer, fromIndex, toIndex,
-                    keys, vals);
+                    keys, vals, reportMutation);
 
         }
         
     }
-    
+
     /**
      * 
      * @return The #of statements actually written on the index as an
-     *         {@link Long}.
+     *         {@link Long} -or- a {@link ResultBitBuffer} IFF
+     *         <code>reportMutations := true</code>.
      */
     public Object apply(final IIndex ndx) {
 
         // #of statements actually written on the index partition.
-        long writeCount = 0;
+        int writeCount = 0;
 
         final IRaba keys = getKeys();
         
@@ -163,6 +191,9 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 //        final boolean isPrimaryIndex = INFO ? ndx.getIndexMetadata().getName()
 //                .endsWith(SPOKeyOrder.SPO.getIndexName()) : false;
 
+        // Array used to report by which statements were modified by this operation.
+        final boolean[] modified = reportMutation ? new boolean[n] : null;
+                
         for (int i = 0; i < n; i++) {
 
             // the key encodes the {s:p:o} of the statement.
@@ -223,6 +254,9 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                 
                 writeCount++;
 
+                if (reportMutation)
+                    modified[i] = true;
+
             } else {
 
                 /*
@@ -255,6 +289,9 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
                         }
 
                         writeCount++;
+
+                        if (reportMutation)
+                            modified[i] = true;
 
                     }
 
@@ -299,6 +336,9 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
                         writeCount++;
 
+                        if (reportMutation)
+                            modified[i] = true;
+
                     }
 
                 }
@@ -311,7 +351,8 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
             log.info("Wrote " + writeCount + " SPOs on ndx="
                     + ndx.getIndexMetadata().getName());
 
-        return Long.valueOf(writeCount);
+        return reportMutation ? new ResultBitBuffer(n, modified, writeCount)
+                : Long.valueOf(writeCount);
 
     }
 
@@ -377,5 +418,24 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     private transient final DataInputBuffer vbuf = new DataInputBuffer(
             new byte[] {});
+
+    @Override
+    protected void writeMetadata(final ObjectOutput out) throws IOException {
+
+        super.writeMetadata(out);
+
+        out.writeBoolean(reportMutation);
+
+    }
+
+    @Override
+    protected void readMetadata(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
+        super.readMetadata(in);
+
+        reportMutation = in.readBoolean();
+
+    }
 
 }

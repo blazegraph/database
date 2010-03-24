@@ -285,6 +285,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         }
         long minJoinCardinality = Long.MAX_VALUE;
         long minTailCardinality = Long.MAX_VALUE;
+        long minOtherTailCardinality = Long.MAX_VALUE;
         Tail minT1 = null;
         Tail minT2 = null;
         for (int i = 0; i < tailCount; i++) {
@@ -303,11 +304,13 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 long t2Cardinality = cardinality(j);
                 long joinCardinality = computeJoinCardinality(t1, t2);
                 long tailCardinality = Math.min(t1Cardinality, t2Cardinality);
+                long otherTailCardinality = Math.max(t1Cardinality, t2Cardinality);
                 if(DEBUG) log.debug("evaluating " + i + " X " + j + ": cardinality= " + joinCardinality);
                 if (joinCardinality < minJoinCardinality) {
                     if(DEBUG) log.debug("found a new min: " + joinCardinality);
                     minJoinCardinality = joinCardinality;
                     minTailCardinality = tailCardinality;
+                    minOtherTailCardinality = otherTailCardinality;
                     minT1 = t1;
                     minT2 = t2;
                 } else if (joinCardinality == minJoinCardinality) {
@@ -315,8 +318,18 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                         if(DEBUG) log.debug("found a new min: " + joinCardinality);
                         minJoinCardinality = joinCardinality;
                         minTailCardinality = tailCardinality;
+                        minOtherTailCardinality = otherTailCardinality;
                         minT1 = t1;
                         minT2 = t2;
+                    } else if (tailCardinality == minTailCardinality) {
+                        if (otherTailCardinality < minOtherTailCardinality) {
+                            if(DEBUG) log.debug("found a new min: " + joinCardinality);
+                            minJoinCardinality = joinCardinality;
+                            minTailCardinality = tailCardinality;
+                            minOtherTailCardinality = otherTailCardinality;
+                            minT1 = t1;
+                            minT2 = t2;
+                        }
                     }
                 }
             }
@@ -341,7 +354,8 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         if (DEBUG) {
             log.debug("evaluating next join");
         }
-        long minCardinality = Long.MAX_VALUE;
+        long minJoinCardinality = Long.MAX_VALUE;
+        long minTailCardinality = Long.MAX_VALUE;
         Tail minTail = null;
         for (int i = 0; i < tailCount; i++) {
             // only check unused tails
@@ -349,17 +363,26 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 continue;
             }
             Tail tail = new Tail(i, rangeCount(i), getVars(i));
+            long tailCardinality = cardinality(i);
             long joinCardinality = computeJoinCardinality(d1, tail);
             if(DEBUG) log.debug("evaluating " + d1.toJoinString() + " X " + i + ": cardinality= " + joinCardinality);
-            if (joinCardinality < minCardinality) {
+            if (joinCardinality < minJoinCardinality) {
                 if(DEBUG) log.debug("found a new min: " + joinCardinality);
-                minCardinality = joinCardinality;
+                minJoinCardinality = joinCardinality;
+                minTailCardinality = tailCardinality;
                 minTail = tail;
+            } else if (joinCardinality == minJoinCardinality) {
+                if (tailCardinality < minTailCardinality) {
+                    if(DEBUG) log.debug("found a new min: " + joinCardinality);
+                    minJoinCardinality = joinCardinality;
+                    minTailCardinality = tailCardinality;
+                    minTail = tail;
+                }
             }
         }
         // if we are at the "no shared variables" tails, order by range count
-        if (minCardinality == NO_SHARED_VARS) {
-            minCardinality = Long.MAX_VALUE;
+        if (minJoinCardinality == NO_SHARED_VARS) {
+            minJoinCardinality = Long.MAX_VALUE;
             for (int i = 0; i < tailCount; i++) {
                 // only check unused tails
                 if (used[i]) {
@@ -367,9 +390,9 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                 }
                 Tail tail = new Tail(i, rangeCount(i), getVars(i));
                 long tailCardinality = cardinality(i);
-                if (tailCardinality < minCardinality) {
+                if (tailCardinality < minJoinCardinality) {
                     if(DEBUG) log.debug("found a new min: " + tailCardinality);
-                    minCardinality = tailCardinality;
+                    minJoinCardinality = tailCardinality;
                     minTail = tail;
                 }
             }            
@@ -378,7 +401,7 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
         Set<String> vars = new HashSet<String>();
         vars.addAll(d1.getVars());
         vars.addAll(minTail.getVars());
-        return new Join(d1, minTail, minCardinality, vars);
+        return new Join(d1, minTail, minJoinCardinality, vars);
     }
     
     /**
@@ -486,8 +509,44 @@ public class DefaultEvaluationPlan2 implements IEvaluationPlan {
                     Math.min(d1.getCardinality(), d2.getCardinality());
             } else {
                 // shared vars and unshared vars - take the max
+                /*
+                 * This modification to the join planner results in
+                 * significantly faster queries for the bsbm benchmark (3x - 5x
+                 * overall). It takes a more optimistic perspective on the
+                 * intersection of two statement patterns, predicting that this
+                 * will constraint, rather than increase, the multiplicity of
+                 * the solutions. However, this COULD lead to pathological cases
+                 * where the resulting join plan is WORSE than it would have
+                 * been otherwise. For example, this change produces a 3x to 5x
+                 * improvement in the BSBM benchmark results. However, it has a
+                 * negative effect on LUBM Q2.
+                 * 
+                 * Update: Ok so just to go into a little detail - yesterday's
+                 * change means we choose the join ordering based on an
+                 * optimistic view of the cardinality of any particular join. If
+                 * you have two triple patterns that share variables but that
+                 * also have unshared variables, then technically the maximum
+                 * cardinality of the join is the maximum range count of the two
+                 * tails. But often the true cardinality of the join is closer
+                 * to the minimum range count than the maximum. So yesterday we
+                 * started assigning an expected cardinality for the join of the
+                 * minimum range count rather than the maximum. What this means
+                 * is that a lot of the time when those joins move toward the
+                 * front of the line the query will do a lot better, but
+                 * occasionally (LUBM 2), the query will do much much worse
+                 * (when the true cardinality is closer to the max range count).
+                 * 
+                 * Today we put in an extra tie-breaker condition. We already
+                 * had one tie-breaker - if two joins have the same expected
+                 * cardinality we chose the one with the lower minimum range
+                 * count. But the new tie-breaker is that if two joins have the
+                 * same expected cardinality and minimum range count, we now
+                 * chose the one that has the minimum range count on the other
+                 * tail (the minimum maximum if that makes sense).
+                 */
                 joinCardinality = 
-                    Math.max(d1.getCardinality(), d2.getCardinality());
+                    Math.min(d1.getCardinality(), d2.getCardinality());
+//                    Math.max(d1.getCardinality(), d2.getCardinality());
             }
         }
         return joinCardinality;

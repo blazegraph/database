@@ -66,9 +66,9 @@ public class CommitTimeIndex extends BTree {
      *            The metadata record for the index.
      */
     public CommitTimeIndex(final IRawStore store, final Checkpoint checkpoint,
-            final IndexMetadata metadata) {
+            final IndexMetadata metadata, boolean readOnly) {
 
-        super(store, checkpoint, metadata);
+        super(store, checkpoint, metadata, readOnly);
 
     }
     

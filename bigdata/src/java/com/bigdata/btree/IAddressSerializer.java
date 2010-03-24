@@ -31,30 +31,18 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.io.Serializable;
 
-import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IAddressManager;
-import com.bigdata.rawstore.IRawStore;
 
 /**
  * Interface for (de-)serialization of addresses of child nodes and leaves as
  * recorded on a {@link Node}.
- * <p>
- * Note: it is possible to use additional information from the
- * {@link IAddressManager} associated with an {@link IRawStore} to decide how to
- * (de-)serialize the addresses. This does have the effect of making the binary
- * format of the serialized addresses different from store to store, e.g., if
- * the #of offset bits is different on the two stores. However, we do NOT copy
- * index nodes using a binary format from one store to another. Instead,
- * overflow processing uses an {@link ITupleIterator} to visit the keys and
- * values and replicate them onto the new store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  * 
- * @see NodeSerializer
- * 
- * @deprecated Along with {@link NodeSerializer} by the {@link IRabaCoder}
+ * @deprecated This interface is no longer used. It exists solely to facilitate
+ *             de-serialization of older {@link IndexMetadata} record versions.
  */
 public interface IAddressSerializer extends Serializable {
 

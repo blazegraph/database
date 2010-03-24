@@ -182,7 +182,7 @@ public class RingBuffer<T> implements Queue<T> {
 
         beforeOffer( ref );
 
-        if (isFull())
+        if (size == capacity/* isFull() inlined */)
             return false;
 
         refs[head] = ref;

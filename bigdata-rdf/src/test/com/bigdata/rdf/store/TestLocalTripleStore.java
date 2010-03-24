@@ -64,7 +64,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
          * Use a proxy test suite and specify the delegate.
          */
 
-        ProxyTestSuite suite = new ProxyTestSuite(delegate,
+        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
                 "Local Triple Store With Provenance Test Suite");
 
         /*
@@ -111,11 +111,15 @@ public class TestLocalTripleStore extends AbstractTestCase {
                 com.bigdata.rdf.store.AbstractTripleStore.Options.QUADS,
                 "false");
 
+//        properties.setProperty(
+//                com.bigdata.rdf.store.AbstractTripleStore.Options.NESTED_SUBQUERY,
+//                "true");
+
         return properties;
 
     }
     
-    protected AbstractTripleStore getStore(Properties properties) {
+    protected AbstractTripleStore getStore(final Properties properties) {
         
         return new LocalTripleStore( properties );
         

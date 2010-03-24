@@ -236,7 +236,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
              * IndexMetadata is not on hand locally?
              */
             dataService.submit(timestamp, name,
-                    BatchRemoveConstructor.RETURN_NO_VALUES
+                    BatchRemoveConstructor.RETURN_MUTATION_COUNT
                             .newInstance(0/* fromIndex */, n/* toIndex */, keys,
                                     null/*vals*/)).get();
 
@@ -255,7 +255,7 @@ public class RawDataServiceTupleIterator<E> extends AbstractChunkedTupleIterator
             
             // Note: default key serializer is used.
             dataService.submit(timestamp, name,
-                    BatchRemoveConstructor.RETURN_NO_VALUES.newInstance(
+                    BatchRemoveConstructor.RETURN_MUTATION_COUNT.newInstance(
                             0/* fromIndex */, 1/* toIndex */,
                             new byte[][] { key }, null/*vals*/)).get();
 

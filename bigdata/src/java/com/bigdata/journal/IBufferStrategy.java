@@ -28,6 +28,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
 import com.bigdata.counters.CounterSet;
+import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
 
@@ -183,7 +184,7 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
     /**
      * Seals the store against further writes and discards any write caches
      * since they will no longer be used. Buffered writes are NOT forced to the
-     * disk so the caller SHOULD be able to guarentee that concurrent writers
+     * disk so the caller SHOULD be able to guarantee that concurrent writers
      * are NOT running. The method should be implemented such that concurrent
      * readers are NOT disturbed.
      * 
@@ -199,4 +200,53 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
      */
     public CounterSet getCounters();
     
+    public IAddressManager getAddressManager();
+
+    /**
+     * A method that removes assumptions of how a specific strategy determines whether a transaction commit is required.
+     * 
+     * @param block
+     * 			The root block held by the client, can be checked against the state of the Buffer Strategy
+     * @return whether any modification has occurred.
+     */
+	public boolean requiresCommit(IRootBlockView block);
+
+    /**
+     * A method that removes assumptions of how a specific strategy commits data.  For most strategies the action is void
+     * since the client WORM DISK strategy writes data as allocated.  For the Read Write Strategy more data must be managed
+     * as part of the protocol outside of the RootBlock, and this is the method that triggers that management.
+     */
+	public void commit();
+
+    /**
+     * A method that requires the implementation to discard its buffered write
+     * set (if any). The caller is responsible for any necessary synchronization
+     * as part of the abort protocol.
+     */
+	public void abort();
+	
+	/**
+	 * The RWStrategy requires meta allocation info in the root block, this method is the hook to enable access.
+	 * The metaStartAddr is the address in the file where the allocation blocks are stored.
+	 * 
+	 * @return the metaStartAddr for the root block if any
+	 */
+	 public long getMetaStartAddr();
+		/**
+		 * The RWStrategy requires meta allocation info in the root block, this method is the hook to enable access.
+		 * The metaBitsAddr is the address in the file where the metaBits that control the allocation of the allocation
+		 * blocks themselves is stored.
+		 * 
+		 * @return the metaBitsAddr for the root block if any
+		 */
+	 public long getMetaBitsAddr();
+		/**
+		 * @return the number of bits available in the address to define offset
+		 */
+
+	 public int getOffsetBits();
+		/**
+		 * @return the maximum record size supported by this strategy
+		 */
+	 public int getMaxRecordSize();
 }

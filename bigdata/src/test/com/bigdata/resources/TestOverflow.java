@@ -82,18 +82,18 @@ public class TestOverflow extends AbstractResourceManagerTestCase {
 //        return properties;
 //        
 //    }
-    
+
     /**
-     * A test for overflow of the {@link ResourceManager}. We begin with a
-     * blank slate, so the {@link ResourceManager} creates an initial
-     * {@link Journal} for us and put it into play. The test then registers an
-     * initial partition of scale-out index on that journal and some data is
-     * written on that index. An overflow operation is executed, which causes a
-     * new {@link Journal} to be created and brought into play. The index is
-     * re-defined on the new journal such that its view includes the data on the
-     * old journal as well.
+     * A test for overflow of the {@link ResourceManager}. We begin with a blank
+     * slate, so the {@link ResourceManager} creates an initial {@link Journal}
+     * for us and then puts it into play. The test then registers an initial
+     * partition of scale-out index on that journal and some data is written on
+     * that index. An overflow operation is executed, which causes a new
+     * {@link Journal} to be created and brought into play. The test then
+     * verifies that the index is re-defined on the new journal such that its
+     * view includes the data on the old journal as well.
      * 
-     * @throws IOException 
+     * @throws IOException
      */
     public void test_overflow() throws IOException {
 

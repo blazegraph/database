@@ -32,9 +32,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,7 +51,6 @@ import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.BufferedDiskStrategy;
 import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
@@ -120,10 +121,10 @@ abstract public class OverflowManager extends IndexManager {
      */
     final protected double tailSplitThreshold;
 
-    /**
-     * @see Options#HOT_SPLIT_THRESHOLD
-     */
-    final protected double hotSplitThreshold;
+//    /**
+//     * @see Options#HOT_SPLIT_THRESHOLD
+//     */
+//    final protected double hotSplitThreshold;
 
     /**
      * @see Options#SCATTER_SPLIT_ENABLED
@@ -250,7 +251,7 @@ abstract public class OverflowManager extends IndexManager {
      * The elapsed milliseconds for asynchronous overflow processing to date.  
      */
     protected final AtomicLong asynchronousOverflowMillis = new AtomicLong(0L);
-    
+
     /**
      * A flag that may be set to force the next overflow to perform a compacting
      * merge for all indices that are not simply copied over to the new journal.
@@ -259,6 +260,11 @@ abstract public class OverflowManager extends IndexManager {
      * to purge any unused resources after the compacting merge overflow in
      * order to regain storage associated with views older than the current
      * releaseTime.
+     * 
+     * @deprecated This can impose too much load on the data service. For HA, a
+     *             pool of nodes may be allocated to run a distributed job which
+     *             quickly processes all index partitions waiting in the
+     *             {@link #mergeQueue}.
      */
     public final AtomicBoolean compactingMerge = new AtomicBoolean(false);
     
@@ -352,6 +358,70 @@ abstract public class OverflowManager extends IndexManager {
 //        return purgeResourcesTimeout;
 //        
 //    }
+
+    /**
+     * A service used to run index partition build tasks.
+     * 
+     * @see Options#BUILD_SERVICE_CORE_POOL_SIZE
+     * 
+     *      FIXME What about MOVE choices?
+     * 
+     *      FIXME Do not do a build for any index partitions whose buffered
+     *      writes were simply copied to the new journal.
+     * 
+     * @todo If we handle the builds and an overflow latch appropriately then we
+     *       will no need the {@link #overflowService}. The trick is
+     *       decrementing the latch back to zero regardless of whether a build
+     *       or merge was taken for a scheduled build.
+     */
+    private final ExecutorService buildService;
+
+    /**
+     * A service used to run index partition merge tasks. Splits are executed as
+     * an after action for a merge if the size on disk for the index partition
+     * its GTE the {@link #nominalShardSize}.
+     * 
+     * @see Options#MERGE_SERVICE_CORE_POOL_SIZE
+     */
+    private final ExecutorService mergeService;
+
+    /**
+     * The set of currently running {build, merge, split, etc} tasks for index
+     * partitions. The key is the index partition name. The value is the kind of
+     * task. This map is used to allow us to queue both build and merge requests
+     * for the same shard, but to have the first task to start be the only one
+     * that runs.
+     */
+    private final ConcurrentHashMap<String, OverflowActionEnum> shardTasks;
+
+    /**
+     * A priority queue for index partitions. The priority is a function of the
+     * view complexity and the sum of the index segment bytes on the disk. To
+     * avoid needless merge operations, a view must have a minimum priority to
+     * be on this queue.
+     * 
+     * FIXME If a build is started for an index partition on this queue, then we
+     * need to remove the element for that index partition from this queue. This
+     * is awkward as the queue is not based on a hash map.
+     * 
+     * FIXME The size of the merge queue (or its sum of priorities) should be an
+     * indication of the load of the node. This can be used to decide that index
+     * partitions should be shed/moved.
+     * 
+     * @todo For HA, this needs to be a shared priority queue using zk or the
+     *       like.
+     */
+    private final PriorityBlockingQueue<Priority<ViewMetadata>> mergeQueue;
+
+    /**
+     * Index partitions are split when they approach this size on the disk.
+     * 
+     * @see Options#NOMINAL_SHARD_SIZE
+     * 
+     * @todo Encapsulate with split accelerator factor when this is the first
+     *       index partition for some scale-out index.
+     */
+    public final long nominalShardSize;
     
     /**
      * #of synchronous overflows that have taken place. This counter is
@@ -534,10 +604,10 @@ abstract public class OverflowManager extends IndexManager {
         /**
          * The minimum percentage (in [0:2]) of a nominal split before an index
          * partition will be "hot split" (default
-         * {@value #DEFAULT_HOT_SPLIT_THRESHOLD}). Hot splits are taken by
-         * hosts which are more heavily utilized than their peers but not
-         * heavily utilized in terms of their own resources. This is basically
-         * an acceleration factor for index partition splits when a host has a
+         * {@value #DEFAULT_HOT_SPLIT_THRESHOLD}). Hot splits are taken by hosts
+         * which are more heavily utilized than their peers but not heavily
+         * utilized in terms of their own resources. This is basically an
+         * acceleration factor for index partition splits when a host has a
          * relatively higher workload than its peers. The purpose of a "hot
          * split" is to increase the potential concurrency by breaking an active
          * index partition into two index partitions. If the writes on the index
@@ -546,11 +616,14 @@ abstract public class OverflowManager extends IndexManager {
          * the order of [.25:.75]. Hot splits may be effectively disabled by
          * raising the percent of split to GTE
          * {@value #PERCENT_OF_SPLIT_THRESHOLD}.
+         * 
+         * @deprecated Hot splits are not implemented and this option does not
+         *             do anything.  It will be going away soon.
          */
         String HOT_SPLIT_THRESHOLD = OverflowManager.class.getName()
                 + ".hotSplitThreshold";
         
-        String DEFAULT_HOT_SPLIT_THRESHOLD = ".4";
+        String DEFAULT_HOT_SPLIT_THRESHOLD = "2.0"; // was .4
         
         /**
          * Boolean option indicates whether or not scatter splits are allowed
@@ -625,6 +698,12 @@ abstract public class OverflowManager extends IndexManager {
          * to ZERO (0).
          * 
          * @see #DEFAULT_MAXIMUM_MOVES
+         * 
+         * @todo We need to do lots of moves if we are trying to rebalance a
+         *       cluster in response to a disk shortage, adding a new LDS, or
+         *       removing an existing LDS. Likewise, if a hot spare is recruited
+         *       into an existing LDS, we need to replicate the shards from the
+         *       other nodes in the same LDS onto the new node.
          */
         String MAXIMUM_MOVES = OverflowManager.class.getName()
                 + ".maximumMoves";
@@ -858,14 +937,43 @@ abstract public class OverflowManager extends IndexManager {
 
         String DEFAULT_OVERFLOW_CANCELLED_WHEN_JOURNAL_FULL = "true";
 
-        /**
-         * The timeout in milliseconds that we will await an exclusive lock on
-         * the {@link WriteExecutorService} in order to release unused resources
-         * (journals and segment files).
-         */
-        String PURGE_RESOURCES_TIMEOUT = "purgeResourcesTimeout";
+//        /**
+//         * The timeout in milliseconds that we will await an exclusive lock on
+//         * the {@link WriteExecutorService} in order to release unused resources
+//         * (journals and segment files).
+//         */
+//        String PURGE_RESOURCES_TIMEOUT = OverflowManager.class.getName() + "purgeResourcesTimeout";
+//
+//        String DEFAULT_PURGE_RESOURCES_TIMEOUT = "" + (1000 * 60L);
 
-        String DEFAULT_PURGE_RESOURCES_TIMEOUT = "" + (1000 * 60L);
+        /**
+         * The #of threads in the pool handling index segment builds from the
+         * old journal.
+         */
+        String BUILD_SERVICE_CORE_POOL_SIZE = OverflowManager.class.getName()
+                + ".buildService.corePoolSize";
+
+        // @todo or (ncores/2)-1?
+        String DEFAULT_BUILD_SERVICE_CORE_POOL_SIZE = "3";
+
+        /**
+         * The #of threads in the pool handling index partition merges.
+         */
+        String MERGE_SERVICE_CORE_POOL_SIZE = OverflowManager.class.getName()
+                + ".mergeService.corePoolSize";
+
+        String DEFAULT_MERGE_SERVICE_CORE_POOL_SIZE = "1";
+
+        /**
+         * The nominal size on the size of a full index partition (~200MB).
+         * Index partitions are split once they reach or exceed this size. The
+         * space on the journal is not considered when making this decision
+         * since it can not readily be attributed to any given index partition.
+         */
+        String NOMINAL_SHARD_SIZE = OverflowManager.class.getName()
+                + ".nominalShardSize";
+
+        String DEFAULT_NOMINAL_SHARD_SIZE = "" + (200 * Bytes.megabyte);
         
     }
 
@@ -987,6 +1095,18 @@ abstract public class OverflowManager extends IndexManager {
          * an index partition move from another data service.
          */
         String ReceiveCount = "Receive Count";
+
+        /**
+         * The #of index partitions build tasks that are executing concurrently
+         * on this data service.
+         */
+        String ConcurrentBuildCount = "Concurrent Build Count";
+
+        /**
+         * The #of index partitions merge tasks that are executing concurrently
+         * on this data service.
+         */
+        String ConcurrentMergeCount = "Concurrent Merge Count";
 
         /**
          * The running index partition builds for this service. The vast
@@ -1187,25 +1307,25 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
-        // hotSplitThreshold
-        {
-
-            hotSplitThreshold = Double.parseDouble(properties.getProperty(
-                    Options.HOT_SPLIT_THRESHOLD,
-                    Options.DEFAULT_HOT_SPLIT_THRESHOLD));
-
-            if (log.isInfoEnabled())
-                log.info(Options.HOT_SPLIT_THRESHOLD + "="
-                        + hotSplitThreshold);
-
-            if (hotSplitThreshold < 0 || hotSplitThreshold > 2) {
-
-                throw new RuntimeException(Options.HOT_SPLIT_THRESHOLD
-                        + " must be in [0:2]");
-
-            }
-
-        }
+//        // hotSplitThreshold
+//        {
+//
+//            hotSplitThreshold = Double.parseDouble(properties.getProperty(
+//                    Options.HOT_SPLIT_THRESHOLD,
+//                    Options.DEFAULT_HOT_SPLIT_THRESHOLD));
+//
+//            if (log.isInfoEnabled())
+//                log.info(Options.HOT_SPLIT_THRESHOLD + "="
+//                        + hotSplitThreshold);
+//
+//            if (hotSplitThreshold < 0 || hotSplitThreshold > 2) {
+//
+//                throw new RuntimeException(Options.HOT_SPLIT_THRESHOLD
+//                        + " must be in [0:2]");
+//
+//            }
+//
+//        }
 
         // scatterSplitEnabled
         {
@@ -1503,6 +1623,18 @@ abstract public class OverflowManager extends IndexManager {
 
         }
 
+        // nominalShardSize
+        {
+
+            nominalShardSize = Long.parseLong(properties.getProperty(
+                    Options.NOMINAL_SHARD_SIZE,
+                    Options.DEFAULT_NOMINAL_SHARD_SIZE));
+
+            if (log.isInfoEnabled())
+                log.info(Options.NOMINAL_SHARD_SIZE + "=" + nominalShardSize);
+
+        }
+
         if(overflowEnabled) {
 
             /*
@@ -1532,10 +1664,55 @@ abstract public class OverflowManager extends IndexManager {
              */
             
             ((ThreadPoolExecutor) overflowService).prestartCoreThread();
+
+            // buildService
+            {
+
+                final int corePoolSize = Integer.parseInt(properties
+                        .getProperty(Options.BUILD_SERVICE_CORE_POOL_SIZE,
+                                Options.DEFAULT_BUILD_SERVICE_CORE_POOL_SIZE));
+
+                if (log.isInfoEnabled())
+                    log.info(Options.BUILD_SERVICE_CORE_POOL_SIZE + "="
+                            + corePoolSize);
+
+                buildService = Executors.newFixedThreadPool(corePoolSize,
+                        new DaemonThreadFactory((serviceName == null ? ""
+                                : serviceName + "-")
+                                + "buildService"));
+
+            }
+            
+            // mergeService
+            {
+
+                final int corePoolSize = Integer.parseInt(properties
+                        .getProperty(Options.MERGE_SERVICE_CORE_POOL_SIZE,
+                                Options.DEFAULT_MERGE_SERVICE_CORE_POOL_SIZE));
+
+                if (log.isInfoEnabled())
+                    log.info(Options.MERGE_SERVICE_CORE_POOL_SIZE + "="
+                            + corePoolSize);
+
+                mergeService = Executors.newFixedThreadPool(corePoolSize,
+                        new DaemonThreadFactory((serviceName == null ? ""
+                                : serviceName + "-")
+                                + "mergeService"));
+
+                shardTasks = new ConcurrentHashMap<String, OverflowActionEnum>();
+                
+                mergeQueue = new PriorityBlockingQueue<Priority<ViewMetadata>>(
+                        100/* initialCapacity */);
+                
+            }
             
         } else {
             
             overflowService = null;
+            buildService = null;
+            mergeService = null;
+            shardTasks = null;
+            mergeQueue = null;
             
         }
 
@@ -1867,12 +2044,6 @@ abstract public class OverflowManager extends IndexManager {
         if (log.isInfoEnabled())
             log.info("begin");
         
-        final OverflowMetadata overflowMetadata = new OverflowMetadata(
-                (ResourceManager) this);
-
-        final AbstractJournal oldJournal = getLiveJournal();
-        final ManagedJournal newJournal;
-
         /*
          * Note: We assign the same timestamp to the createTime of the new
          * journal and the closeTime of the old journal.
@@ -1881,71 +2052,15 @@ abstract public class OverflowManager extends IndexManager {
         final long closeTime = createTime;
 
         /*
-         * Close out the old journal.
-         * 
-         * Note: closeForWrites() does NOT "close" the old journal in order to
-         * avoid disturbing concurrent readers (we only have an exclusive lock
-         * on the writeService, NOT the readService or the txWriteService).
-         * 
-         * Note: The old journal MUST be closed out before we open the new
-         * journal since the journal will use the SAME direct ByteBuffer
-         * instance for their write cache.
-         * 
-         * FIXME Change this to use a direct buffer pool so we can prepare the
-         * new journal entirely before we close out the old one and thereby
-         * avoid burning the bridge (closing the old journal) before we cross it
-         * (onto the new journal). Do this when changing the buffer pool
-         * allocation strategy to support a direct buffers for the Direct and
-         * BufferedDisk modes. Update the comments inline above when making this
-         * change.
-         * 
-         * FIXME The current approach opens a hole during synchronous overflow
-         * when there are NO indices defined on the (new) live journal. This has
-         * not shown up as a problem primarily because I have not been testing
-         * with writes with concurrent read during synchronous overflow, but
-         * closure might provoke this error.
-         * 
-         * @todo The logic to report the #of index partitions on the data
-         * services in ResourceManager has been hacked to work around this hole.
-         * Simplify that logic once this hole is fixed.
-         */
-        {
-
-            // writes no longer accepted.
-            oldJournal.closeForWrites(closeTime);
-
-            // // remove from list of open journals.
-            // storeCache.remove(oldJournal.getRootBlockView().getUUID());
-
-            if (log.isInfoEnabled())
-                log.info("Closed out the old journal.");
-
-            if (maximumJournalSizeAtOverflow < oldJournal.size()) {
-
-                maximumJournalSizeAtOverflow = oldJournal.getBufferStrategy()
-                        .getExtent();
-                
-            }
-            
-        }
-
-        /*
          * Create the new journal.
-         * 
-         * @todo this is not using the temp filename mechanism in a manner that
-         * truly guarantees an atomic file create. The CREATE_TEMP_FILE option
-         * should probably be extended with a CREATE_DIR option that allows you
-         * to override the directory in which the journal is created. That will
-         * allow the atomic creation of the journal in the desired directory
-         * without changing the existing semantics for CREATE_TEMP_FILE.
-         * 
-         * See StoreFileManager#start() which has very similar logic with the
-         * same problem.
          */
+        final AbstractJournal oldJournal = getLiveJournal();
+        final ManagedJournal newJournal;
         {
 
             final File file;
             try {
+                // create an empty file.  it will be initialized as a new jnl.
                 file = File.createTempFile("journal", // prefix
                         Options.JNL,// suffix
                         journalsDir // directory
@@ -1953,8 +2068,6 @@ abstract public class OverflowManager extends IndexManager {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-
-            file.delete();
 
             final Properties p = getProperties();
 
@@ -1965,14 +2078,6 @@ abstract public class OverflowManager extends IndexManager {
              */
             p.setProperty(Options.CREATE_TIME, Long.toString(createTime));
 
-            /*
-             * Note: the new journal will be handed the write cache from the old
-             * journal so the old journal MUST have been closed for writes
-             * before this point in order to ensure that it can no longer write
-             * on that write cache.
-             */
-            assert oldJournal.getRootBlockView().getCloseTime() != 0L : "Old journal has not been closed for writes";
-
             newJournal = new ManagedJournal(p);
 
             assert createTime == newJournal.getRootBlockView().getCreateTime();
@@ -1980,12 +2085,40 @@ abstract public class OverflowManager extends IndexManager {
         }
 
         /*
+         * Note: The constructor assumes that the live journal is the one that
+         * we want so we need to do this before we cut over to the new journal.
+         */
+        final OverflowMetadata overflowMetadata = new OverflowMetadata(
+                (ResourceManager) this);
+
+        // The first commit time on the new journal.
+        final long firstCommitTime;
+        try {
+            
+            /*
+             * Propagate the index declarations to the new journal. If an error
+             * arises during overflow then the new journal is deleted and the old
+             * journal remains in place so that we continue to run against a known
+             * good state.
+             */
+
+            propagateIndexDecls(oldJournal, newJournal, overflowMetadata);
+
+            // make the index declarations restart safe on the new journal.
+            firstCommitTime = newJournal.commit();
+
+        } catch (Throwable t) {
+
+            // Destroy the new journal.
+            newJournal.destroy();
+            
+            // Rethrow the exception - it will be logged by the writeService.
+            throw new RuntimeException(t);
+            
+        }
+        
+        /*
          * Cut over to the new journal.
-         * 
-         * @todo Once the direct buffer allocation issue is resolved, refactor
-         * this into a private method, perhaps combined with the close out of
-         * the old journal and the propagation of the performance counters. That
-         * will simply this code and make easier to understand.
          */
         {
 
@@ -1994,7 +2127,6 @@ abstract public class OverflowManager extends IndexManager {
             
             // add to the cache.
             storeCache.put(newJournal.getRootBlockView().getUUID(), newJournal);
-//                    false/* dirty */);
 
             // atomic cutover.
             this.liveJournalRef.set( newJournal );
@@ -2019,31 +2151,28 @@ abstract public class OverflowManager extends IndexManager {
         }
 
         /*
-         * Propagate the index declarations to the new journal. If an error
-         * arises during overflow then the new journal is deleted and the old
-         * journal remains in place so that we continue to run against a known
-         * good state.
+         * Close out the old journal.
          * 
-         * FIXME In order to handle an error in this manner we need to make the
-         * change in how the direct buffers are allocated for the new journal so
-         * we can keep the old journal open for writes until the atomic cutover.
-         * At it stands, we have already closed out the old journal for writes
-         * so error handling here WILL NOT permit the application to continue
-         * writing on the old journal. 
+         * Note: closeForWrites() does NOT "close" the old journal in order to
+         * avoid disturbing concurrent readers (we only have an exclusive lock
+         * on the writeService, NOT the readService or the txWriteService).
          */
-//        try {
-            propagateIndexDecls(oldJournal, newJournal, overflowMetadata);
-//        } catch (Throwable t) {
-//            log.error("Overflow error (continuing with the old journal): " + t,
-//                    t);
-//            newJournal.destroy();
-//            // @todo rethrow the exception or just return?
-//            throw t;
-//        }
-        
-        // make the index declarations restart safe on the new journal.
-        final long firstCommitTime = newJournal.commit();
-        // @todo atomic cutover really belongs here.
+        {
+
+            // writes no longer accepted.
+            oldJournal.closeForWrites(closeTime);
+
+            if (log.isInfoEnabled())
+                log.info("Closed old journal against further writes.");
+
+            if (maximumJournalSizeAtOverflow < oldJournal.size()) {
+
+                maximumJournalSizeAtOverflow = oldJournal.getBufferStrategy()
+                        .getExtent();
+                
+            }
+            
+        }
 
         /*
          * Change over the counter set to the new live journal.
@@ -2142,6 +2271,12 @@ abstract public class OverflowManager extends IndexManager {
              * for asynchronous overflow in order to avoid the throughput hit.
              * As a consequence, the data service tends to retain slightly more
              * persistent state than it would otherwise need.
+             * 
+             * @todo HA: Purging resources might become a distributed job run
+             * against the DS or CS nodes. In particular, for HA it is possible
+             * to shutdown all DS nodes while retaining the data and it is
+             * possible for some shards to not be mapped onto any DS while the
+             * federation is up.
              */
 
           purgeOldResources();
@@ -2232,13 +2367,15 @@ abstract public class OverflowManager extends IndexManager {
                      * registered as partitioned indices so this condition
                      * SHOULD NOT arise.
                      * 
-                     * @todo probably overflow the entire index, but it is a
-                     * problem to have an unpartitioned index if you are
-                     * expecting to do overflows since the index can never be
-                     * broken down and can't be moved around.
+                     * This runtime check now occurs before we close the old
+                     * journal so the exception is handled by continuing on with
+                     * the old journal. However, that will not work for long
+                     * since the journal will just grow without bound.
                      * 
-                     * @todo move runtime check to before we close the old
-                     * journal.
+                     * @todo Dealing with this condition requires operator
+                     * intervention. And about all they can do is delete the
+                     * index. Making an index into a scale-out index requires
+                     * registering it through the MDS in the first place.
                      */
 
                     throw new RuntimeException("Not a partitioned index: "
@@ -2282,7 +2419,7 @@ abstract public class OverflowManager extends IndexManager {
                         || ((copyIndexThreshold > 0 && entryCount <= copyIndexThreshold) //
                                 && numIndicesNonZeroCopy < maxNonZeroCopy //
                                 && !hasOverflowHandler // must be applied
-                        && !bm.manditoryMerge // 
+                        && !bm.mandatoryMerge // 
                         );
 
                 if (copyIndex) {
@@ -2398,8 +2535,6 @@ abstract public class OverflowManager extends IndexManager {
                         log.info("Re-defining view on new journal"//
                                 + ": name=" + bm.name //
                                 + ", copyIndex=" + copyIndex//
-                                // + ", copyIndexThreashold=" +
-                                // copyIndexThreshold //
                                 + ", entryCount=" + entryCount//
                                 + ", counter=" + oldCounter//
                                 + ", partitionId=" + oldpmd.getPartitionId()//
@@ -2454,7 +2589,6 @@ abstract public class OverflowManager extends IndexManager {
                                 .rangeCopy(oldBTree, null, null, true/* overflow */);
 
                         // Note that index partition was copied for the caller.
-                        // overflowMetadata.copied.add(bm.name);
                         overflowMetadata.setAction(bm.name,
                                 OverflowActionEnum.Copy);
                         ncopy++;
@@ -2486,9 +2620,6 @@ abstract public class OverflowManager extends IndexManager {
                 }
 
                 numIndicesProcessed++;
-
-                // log.info("Did overflow: " + noverflow + " of " + nindices
-                // + " : " + entry.name);
 
             }
 

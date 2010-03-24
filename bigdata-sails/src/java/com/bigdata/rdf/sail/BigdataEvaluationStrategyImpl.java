@@ -4,10 +4,13 @@ import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.EmptyIteration;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
@@ -30,6 +33,7 @@ import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.Compare.CompareOp;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.algebra.evaluation.impl.EvaluationStrategyImpl;
 import org.openrdf.query.algebra.evaluation.iterator.FilterIterator;
 
@@ -43,9 +47,10 @@ import com.bigdata.rdf.spo.DefaultGraphSolutionExpander;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.NamedGraphSolutionExpander;
+import com.bigdata.rdf.spo.SPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -169,12 +174,12 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
  * </dl>
  * <h2>Magic predicates</h2>
  * <p>
- * {@link BNS#SEARCH} is the only magic predicate at this time. When the object
+ * {@link BD#SEARCH} is the only magic predicate at this time. When the object
  * position is bound to a constant, the magic predicate is evaluated once and
  * the result is used to generate a set of term identifiers that are matches for
  * the token(s) extracted from the {@link Literal} in the object position. Those
  * term identifiers are then used to populate an {@link IN} constraint. The
- * object position in the {@link BNS#SEARCH} MUST be bound to a constant.
+ * object position in the {@link BD#SEARCH} MUST be bound to a constant.
  * </p>
  * 
  * FIXME We are not in fact rewriting the query operation at all, simply
@@ -227,13 +232,6 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
     protected static final boolean DEBUG = log.isDebugEnabled();
 
-    /**
-     * The magic predicate for text search.
-     * 
-     * @see BNS#SEARCH
-     */
-    static private final URI MAGIC_SEARCH = new URIImpl(BNS.SEARCH);
-
     private final long NULL = IRawTripleStore.NULL;
 
     protected final BigdataTripleSource tripleSource;
@@ -279,6 +277,24 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         this.nativeJoins = nativeJoins;
         // this.nativeJoins = false;
 
+    }
+
+    /**
+     * Eventually we will want to translate the entire operator tree into a
+     * native bigdata program. For now this is just a means of inspecting it.
+     */
+    @Override
+    public CloseableIteration<BindingSet, QueryEvaluationException> evaluate(
+            TupleExpr expr, BindingSet bindings)
+            throws QueryEvaluationException {
+        
+        // spit out the whole operator tree
+        if (INFO) {
+            log.info("tuple expr:\n" + expr);
+        }
+        
+        return super.evaluate(expr, bindings);
+        
     }
 
     // @Override
@@ -339,7 +355,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
         final Value predValue = getVarValue(predVar, bindings);
 
-        if (MAGIC_SEARCH.equals(predValue)) {
+        if (BD.SEARCH.equals(predValue)) {
 
             final Var ovar = sp.getObjectVar();
 
@@ -347,14 +363,14 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             if (oval == null) {
 
-                throw new QueryEvaluationException(MAGIC_SEARCH
+                throw new QueryEvaluationException(BD.SEARCH
                         + " : object must be bound.");
 
             }
 
             if (!(oval instanceof Literal)) {
 
-                throw new QueryEvaluationException(MAGIC_SEARCH
+                throw new QueryEvaluationException(BD.SEARCH
                         + " : object must be literal.");
 
             }
@@ -363,14 +379,14 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
 
             if (lit.getDatatype() != null) {
 
-                throw new QueryEvaluationException(MAGIC_SEARCH
+                throw new QueryEvaluationException(BD.SEARCH
                         + " : object is datatype literal.");
 
             }
 
             return search(sp.getSubjectVar(), lit.getLanguage(),
-                    lit.getLabel(), bindings);
-
+                    lit.getLabel(), bindings, sp.getScope());
+            
         }
 
         return super.evaluate(sp, bindings);
@@ -378,7 +394,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
     }
 
     /**
-     * Evaluates the {@link BNS#SEARCH} magic predicate as a full-text search
+     * Evaluates the {@link BD#SEARCH} magic predicate as a full-text search
      * against the index literal in the database, binding <i>svar</i> to each
      * matched literal in turn.
      * <p>
@@ -394,7 +410,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      * 
      * @param svar
      *            The variable from the subject position of the
-     *            {@link StatementPattern} in which the {@link BNS#SEARCH} magic
+     *            {@link StatementPattern} in which the {@link BD#SEARCH} magic
      *            predicate appears.
      * @param languageCode
      *            An optional language code from the bound literal appearing in
@@ -404,6 +420,10 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      *            object position of that {@link StatementPattern}.
      * @param bindings
      *            The current bindings.
+     * @param scope
+     *            The scope of the statement pattern when in quads mode.  The
+     *            bound values for the text search must appear in a statement
+     *            in the scope of the statement pattern.
      * 
      * @return Iteration visiting the bindings obtained by the search.
      * 
@@ -422,7 +442,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
      */
     protected CloseableIteration<BindingSet, QueryEvaluationException> search(
             final Var svar, final String languageCode, final String label,
-            final BindingSet bindings) throws QueryEvaluationException {
+            final BindingSet bindings, final Scope scope) throws QueryEvaluationException {
 
         if (INFO)
             log.info("languageCode=" + languageCode + ", label=" + label);
@@ -430,8 +450,31 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final Iterator<IHit> itr = database.getSearchEngine().search(label,
                 languageCode, 0d/* minCosine */, 10000/* maxRank */);
 
+        Set<URI> graphs = null;
+        if (database.isQuads() && dataset != null) {
+            switch (scope) {
+            case DEFAULT_CONTEXTS: {
+                /*
+                 * Query against the RDF merge of zero or more source
+                 * graphs.
+                 */
+                graphs = dataset.getDefaultGraphs();
+                break;
+            }
+            case NAMED_CONTEXTS: {
+                /*
+                 * Query against zero or more named graphs.
+                 */
+                graphs = dataset.getNamedGraphs();
+                break;
+            }
+            default:
+                throw new AssertionError();
+            }
+        }
+        
         // Return an iterator that converts the term identifiers to var bindings
-        return new HitConvertor(database, itr, svar, bindings);
+        return new HitConvertor(database, itr, svar, bindings, graphs);
 
     }
 
@@ -514,13 +557,100 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         }
 
         // generate tails
+        final Map<IPredicate, StatementPattern> searches = new HashMap<IPredicate, StatementPattern>();
         final Collection<IPredicate> tails = new LinkedList<IPredicate>();
         for (Map.Entry<StatementPattern, Boolean> entry : stmtPatterns.entrySet()) {
-            IPredicate tail = generateTail(entry.getKey(), entry.getValue());
+            StatementPattern sp = entry.getKey();
+            IPredicate tail = generateTail(sp, entry.getValue());
             if (tail == null) {
                 return new EmptyIteration<BindingSet, QueryEvaluationException>();
             }
+            if (tail.getSolutionExpander() instanceof FreeTextSearchExpander) {
+                searches.put(tail, sp);
+            }
             tails.add(tail);
+        }
+        /*
+         * When in quads mode, we need to go through the free text searches
+         * and make sure that they are properly filtered for the dataset where
+         * needed.  Joins will take care of this, so we only need to add a
+         * filter when a search variable does not appear in any other tails
+         * that are non-optional.
+         * 
+         * @todo Bryan seems to think this can be fixed with a DISTINCT JOIN
+         * mechanism in the rule evaluation.
+         */ 
+        if (database.isQuads() && dataset != null) {
+            for (IPredicate search : searches.keySet()) {
+                final Set<URI> graphs;
+                StatementPattern sp = searches.get(search);
+                switch (sp.getScope()) {
+                case DEFAULT_CONTEXTS: {
+                    /*
+                     * Query against the RDF merge of zero or more source
+                     * graphs.
+                     */
+                    graphs = dataset.getDefaultGraphs();
+                    break;
+                }
+                case NAMED_CONTEXTS: {
+                    /*
+                     * Query against zero or more named graphs.
+                     */
+                    graphs = dataset.getNamedGraphs();
+                    break;
+                }
+                default:
+                    throw new AssertionError();
+                }
+                if (graphs == null) {
+                    continue;
+                }
+                
+                // why would we use a constant with a free text search???
+                if (search.get(0).isConstant()) {
+                    throw new AssertionError();
+                }
+                // get ahold of the search variable
+                com.bigdata.relation.rule.Var searchVar = 
+                    (com.bigdata.relation.rule.Var) search.get(0);
+                if (INFO) log.info(searchVar);
+                // start by assuming it needs filtering, guilty until proven
+                // innocent
+                boolean needsFilter = true;
+                // check the other tails one by one
+                for (IPredicate<ISPO> tail : tails) {
+                    ISolutionExpander<ISPO> expander = tail.getSolutionExpander();
+                    // only concerned with non-optional tails that are not
+                    // themselves magic searches
+                    if (expander instanceof FreeTextSearchExpander || 
+                            tail.isOptional()) {
+                        continue;
+                    }
+                    // see if the search variable appears in this tail
+                    boolean appears = false;
+                    for (int i = 0; i < tail.arity(); i++) {
+                        IVariableOrConstant term = tail.get(i);
+                        if (INFO) log.info(term);
+                        if (term.equals(searchVar)) {
+                            appears = true;
+                            break;
+                        }
+                    }
+                    // if it appears, we don't need a filter
+                    if (appears) {
+                        needsFilter = false;
+                        break;
+                    }
+                }
+                // if it needs a filter, add it to the expander
+                if (needsFilter) {
+                    if (INFO) log.info("needs filter: " + searchVar);
+                    FreeTextSearchExpander expander = (FreeTextSearchExpander) 
+                        search.getSolutionExpander();
+                    expander.addNamedGraphsFilter(graphs);
+                }
+            }
         }
 
         // generate constraints
@@ -650,7 +780,7 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
         final Value predValue = stmtPattern.getPredicateVar().getValue();
         if (DEBUG)
             log.debug(predValue);
-        if (predValue != null && MAGIC_SEARCH.equals(predValue)) {
+        if (predValue != null && BD.SEARCH.equals(predValue)) {
             final Value objValue = stmtPattern.getObjectVar().getValue();
             if (DEBUG)
                 log.debug(objValue);
@@ -747,69 +877,73 @@ public class BigdataEvaluationStrategyImpl extends EvaluationStrategyImpl {
                  * @todo can this happen? If it does then we need to look at how
                  * to layer the expanders.
                  */
-                throw new AssertionError("expander already set");
-            }
-            final Var cvar = stmtPattern.getContextVar();
-            if (dataset == null) {
-                if (cvar == null) {
-                    /*
-                     * There is no dataset and there is no graph variable, so
-                     * the default graph will be the RDF Merge of ALL graphs in
-                     * the quad store.
-                     * 
-                     * This code path uses an "expander" which strips off the
-                     * context information and filters for the distinct (s,p,o)
-                     * triples to realize the RDF Merge of the source graphs for
-                     * the default graph.
-                     */
-                    c = null;
-                    expander = new DefaultGraphSolutionExpander(null/* ALL */);
-                } else {
-                    /*
-                     * There is no data set and there is a graph variable, so
-                     * the query will run against all named graphs and [cvar]
-                     * will be to the context of each (s,p,o,c) in turn. This
-                     * handles constructions such as:
-                     * 
-                     * "SELECT * WHERE {graph ?g {?g :p :o } }"
-                     */
-                    expander = new NamedGraphSolutionExpander(null/* ALL */);
-                    c = generateVariableOrConstant(cvar);
-                }
-            } else { // dataset != null
-                switch (stmtPattern.getScope()) {
-                case DEFAULT_CONTEXTS: {
-                    /*
-                     * Query against the RDF merge of zero or more source
-                     * graphs.
-                     */
-                    expander = new DefaultGraphSolutionExpander(dataset
-                            .getDefaultGraphs());
-                    /*
-                     * Note: cvar can not become bound since context is stripped
-                     * for the default graph.
-                     */
-                    if (cvar == null)
+                // throw new AssertionError("expander already set");
+                // we are doing a free text search, no need to do any named or
+                // default graph expansion work
+                c = null;
+            } else {
+                final Var cvar = stmtPattern.getContextVar();
+                if (dataset == null) {
+                    if (cvar == null) {
+                        /*
+                         * There is no dataset and there is no graph variable, so
+                         * the default graph will be the RDF Merge of ALL graphs in
+                         * the quad store.
+                         * 
+                         * This code path uses an "expander" which strips off the
+                         * context information and filters for the distinct (s,p,o)
+                         * triples to realize the RDF Merge of the source graphs for
+                         * the default graph.
+                         */
                         c = null;
-                    else
-                        c = generateVariableOrConstant(cvar);
-                    break;
-                }
-                case NAMED_CONTEXTS: {
-                    /*
-                     * Query against zero or more named graphs.
-                     */
-                    expander = new NamedGraphSolutionExpander(dataset
-                            .getNamedGraphs());
-                    if (cvar == null) {// || !cvar.hasValue()) {
-                        c = null;
+                        expander = new DefaultGraphSolutionExpander(null/* ALL */);
                     } else {
+                        /*
+                         * There is no data set and there is a graph variable, so
+                         * the query will run against all named graphs and [cvar]
+                         * will be to the context of each (s,p,o,c) in turn. This
+                         * handles constructions such as:
+                         * 
+                         * "SELECT * WHERE {graph ?g {?g :p :o } }"
+                         */
+                        expander = new NamedGraphSolutionExpander(null/* ALL */);
                         c = generateVariableOrConstant(cvar);
                     }
-                    break;
-                }
-                default:
-                    throw new AssertionError();
+                } else { // dataset != null
+                    switch (stmtPattern.getScope()) {
+                    case DEFAULT_CONTEXTS: {
+                        /*
+                         * Query against the RDF merge of zero or more source
+                         * graphs.
+                         */
+                        expander = new DefaultGraphSolutionExpander(dataset
+                                .getDefaultGraphs());
+                        /*
+                         * Note: cvar can not become bound since context is stripped
+                         * for the default graph.
+                         */
+                        if (cvar == null)
+                            c = null;
+                        else
+                            c = generateVariableOrConstant(cvar);
+                        break;
+                    }
+                    case NAMED_CONTEXTS: {
+                        /*
+                         * Query against zero or more named graphs.
+                         */
+                        expander = new NamedGraphSolutionExpander(dataset
+                                .getNamedGraphs());
+                        if (cvar == null) {// || !cvar.hasValue()) {
+                            c = null;
+                        } else {
+                            c = generateVariableOrConstant(cvar);
+                        }
+                        break;
+                    }
+                    default:
+                        throw new AssertionError();
+                    }
                 }
             }
         }

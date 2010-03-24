@@ -120,8 +120,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
      *             unless {@link IJoinNexus#getIndexManager()} reports an
      *             {@link AbstractScaleOutFederation}.
      */
-    public DistributedJoinMasterTask(IRule rule, IJoinNexus joinNexus,
-            IBuffer<ISolution[]> buffer) {
+    public DistributedJoinMasterTask(final IRule rule, final IJoinNexus joinNexus,
+            final IBuffer<ISolution[]> buffer) {
 
         super(rule, joinNexus, buffer);
 
@@ -328,8 +328,8 @@ public class DistributedJoinMasterTask extends JoinMasterTask implements
         final AbstractScaleOutFederation<?> fed = (AbstractScaleOutFederation<?>) joinNexus
                 .getIndexManager();
 
-        // the scale out index on which this predicate must read.
-        final String scaleOutIndexName = predicate.getOnlyRelationName()
+        // the scale out index on which this predicate must read (logging only).
+        final String scaleOutIndexName = predicate.getOnlyRelationName()+"."
                 + ruleState.getKeyOrder()[order[0]];
 
         final Iterator<PartitionLocator> itr = joinNexus.locatorScan(fed,

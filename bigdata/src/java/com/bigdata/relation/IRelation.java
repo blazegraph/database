@@ -82,7 +82,7 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * Return the best {@link IAccessPath} for a relation given a predicate with
      * zero or more unbound variables.
      * <p>
-     * If there is an {@link IIndex} that directly corresponeds to the natural
+     * If there is an {@link IIndex} that directly corresponds to the natural
      * order implied by the variable pattern on the predicate then the access
      * path should use that index. Otherwise you should choose the best index
      * given the constraints and make sure that the {@link IAccessPath}
@@ -91,7 +91,7 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * the index is remote!
      * <p>
      * If there are any {@link IElementFilter}s then the access path MUST
-     * incorporate those constraints such that only elements that satisify the
+     * incorporate those constraints such that only elements that satisfy the
      * constraints may be visited.
      * <p>
      * Whether the constraints arise because of the lack of a perfect index for
@@ -101,7 +101,7 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * with it to be evaluated local to the data.
      * <p>
      * Note: Filters should be specified when the {@link IAccessPath} is
-     * constructed so that they will be evalated on the data service rather than
+     * constructed so that they will be evaluated on the data service rather than
      * materializing the elements and then filtering then. This can be
      * accomplished by adding the filter as a constraint on the predicate when
      * specifying the access path.
@@ -112,6 +112,9 @@ public interface IRelation<E> extends ILocatableResource<IRelation<E>>{
      * @return The best {@link IAccessPath} for that {@link IPredicate}.
      */
     IAccessPath<E> getAccessPath(IPredicate<E> predicate);
+
+    // @todo raise this method into this interface. 
+//    IAccessPath<E> getAccessPathForIndexPartition(IIndexManager indexManager, IPredicate<E> predicate);
 
     /**
      * Return the fully qualified name of each index maintained by this

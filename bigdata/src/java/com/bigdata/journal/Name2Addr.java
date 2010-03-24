@@ -346,9 +346,9 @@ public class Name2Addr extends BTree {
      * @param metadata
      *            The metadata record for the index.
      */
-    public Name2Addr(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+    public Name2Addr(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
 
-        super(store, checkpoint, metadata);
+        super(store, checkpoint, metadata, readOnly);
         
     }
 
@@ -738,7 +738,7 @@ public class Name2Addr extends BTree {
 //        btree = journal.getIndex(entry.addr);
         
         // re-load btree from the store.
-        btree = BTree.load(this.store, entry.checkpointAddr);
+        btree = BTree.load(this.store, entry.checkpointAddr, false/*readOnly*/);
         
         // set the lastCommitTime on the index.
         btree.setLastCommitTime(entry.commitTime);

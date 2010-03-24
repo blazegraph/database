@@ -92,9 +92,6 @@ public class TestAll_BTreeBasics extends TestCase {
         suite.addTestSuite(TestTouch.class);
         // stress test basic tree operations w/o IO.
         suite.addTestSuite(TestBTree.class);
-        // @todo test child address serialization (keep or discard?).
-        suite.addTestSuite(TestAddressSerializer.class);
-        suite.addTestSuite(TestPackedAddressSerializer.class);
         // test node/leaf serialization.
 //        suite.addTestSuite( TestNodeSerializer.class );
         

@@ -14,6 +14,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc.Id2TermWriteProcConstructor;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.spo.ISPO;
 
@@ -33,12 +34,14 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
     private final IIndex idTermIndex;
 
-    private final BigdataValueSerializer<BigdataValue> ser;
+    private final BigdataValueSerializer<BigdataValueImpl> ser;
 
     private final KVO<BigdataValue>[] a;
 
     private final int ndistinct;
 
+    private final boolean storeBlankNodes;
+    
     /**
      * 
      * @param idTermIndex
@@ -53,7 +56,8 @@ public class ReverseIndexWriterTask implements Callable<Long> {
      */
     public ReverseIndexWriterTask(final IIndex idTermIndex,
             final BigdataValueFactoryImpl valueFactory,
-            final KVO<BigdataValue>[] a, final int ndistinct) {
+            final KVO<BigdataValue>[] a, final int ndistinct,
+            final boolean storeBlankNodes) {
 
         if (idTermIndex == null)
             throw new IllegalArgumentException();
@@ -74,6 +78,8 @@ public class ReverseIndexWriterTask implements Callable<Long> {
         this.a = a;
 
         this.ndistinct = ndistinct;
+        
+        this.storeBlankNodes = storeBlankNodes;
 
     }
 
@@ -103,9 +109,9 @@ public class ReverseIndexWriterTask implements Callable<Long> {
 
             for (int i = 0; i < ndistinct; i++) {
 
-                final BigdataValue x = a[i].obj;
+                final BigdataValueImpl x = (BigdataValueImpl) a[i].obj;
 
-                if (x instanceof BNode) {
+                if (!storeBlankNodes && x instanceof BNode) {
 
                     // Blank nodes are not entered into the reverse index.
                     continue;

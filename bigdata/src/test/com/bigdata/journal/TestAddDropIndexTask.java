@@ -296,14 +296,8 @@ public class TestAddDropIndexTask extends ProxyTestCase {
         }
 
         } finally {
-        // shutdown again.
-        journal.shutdown();
-        
-        /*
-         * Delete the backing store to clean up after the test.
-         */
-        
-        journal.deleteResources();
+            
+            journal.destroy();
         
         }
         

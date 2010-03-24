@@ -34,6 +34,7 @@ import junit.framework.TestSuite;
 
 import com.bigdata.journal.AbstractIndexManagerTestCase;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.resources.TestSegSplitter;
 import com.bigdata.service.TestJournal;
 import com.bigdata.service.TestLDS;
 
@@ -60,6 +61,10 @@ public class TestAll extends TestCase {
     /**
      * Returns a test that will run each of the implementation specific test
      * suites in turn.
+     * 
+     * @see TestSegSplitter, which tests the constraint imposed in the separator
+     *      key during an index partition split for a {@link SparseRowStore}
+     *      index.
      */
     public static Test suite()
     {

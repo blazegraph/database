@@ -55,6 +55,11 @@ import com.bigdata.io.DataOutputBuffer;
 public class DefaultNodeCoder implements IAbstractNodeDataCoder<INodeData>,
         Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 3998574101917337169L;
+
     protected static final byte VERSION0 = 0x00;
     private IRabaCoder keysCoder;
 

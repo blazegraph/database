@@ -38,6 +38,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
@@ -1216,10 +1217,6 @@ abstract public class IndexManager extends StoreManager {
                     
                 }
 
-                /*
-                 * Interpret UNISOLATED and READ_COMMITTED for a historical
-                 * store as the last committed data on that store.
-                 */
                 final long ts;
                 if (timestamp == ITx.UNISOLATED
                         || timestamp == ITx.READ_COMMITTED) {
@@ -1229,15 +1226,22 @@ abstract public class IndexManager extends StoreManager {
                         // there is only one timestamp for an index segment store.
                         ts = ((IndexSegmentStore) store).getCheckpoint().commitTime;
 
-                    } else {
+                    } else if (resource.getCommitTime() == 0L) {
 
-                        // the live journal should never appear in the 2nd+ position of a view.
-                        assert store != getLiveJournal();
+                        /*
+                         * Interpret for a historical store as the last
+                         * committed data on that store.
+                         */
                         
                         // the last commit time on the historical journal.
                         ts = ((AbstractJournal) store).getRootBlockView()
                                 .getLastCommitTime();
 
+                    } else {
+                        
+                        // The specific commit time on which to read.
+                        ts = resource.getCommitTime();
+                        
                     }
                     
                 } else {
@@ -1726,6 +1730,22 @@ abstract public class IndexManager extends StoreManager {
             m.put("name", indexPartitionName);
             m.put("merge", compactingMerge);
             m.put("#sources", src.getSourceCount());
+            
+            // #of MBs of source index segment data. 
+            long sumSegBytes = 0L;
+            for (AbstractBTree tmp : src.getSources()) {
+                if (tmp instanceof IndexSegment) {
+                    sumSegBytes += ((IndexSegment) tmp).getStore().size();
+                }
+            }
+            m.put("MB(in)", fpf
+                    .format(((double) sumSegBytes / Bytes.megabyte32)));
+
+            // #of concurrent index segment build tasks.
+            m.put("#build", concurrentBuildTaskCount.get() + 1);
+
+            // #of concurrent index segment merge tasks.
+            m.put("#merge", concurrentMergeTaskCount.get() + 1);
 
             e = parentEvent.newSubEvent(EventType.IndexSegmentBuild, m).start();
         }
@@ -1745,12 +1765,18 @@ abstract public class IndexManager extends StoreManager {
                 outFile = getIndexSegmentFile(indexMetadata);
 
                 // new builder.
-                builder = IndexSegmentBuilder.newInstance(indexPartitionName, src, outFile,
+                builder = IndexSegmentBuilder.newInstance(/*indexPartitionName,*/ src, outFile,
                         tmpDir, compactingMerge, commitTime, fromKey, toKey);
 
                 try {
+                    
                     // place on the active tasks lists.
                     buildTasks.put(outFile, builder);
+                    
+                    if(compactingMerge)
+                        concurrentMergeTaskCount.incrementAndGet();
+                    else
+                        concurrentBuildTaskCount.incrementAndGet();
                     
                     // build the index segment.
                     builder.call();
@@ -1760,14 +1786,17 @@ abstract public class IndexManager extends StoreManager {
                     // remove from the active tasks list.
                     buildTasks.remove(outFile);
                     
+                    if(compactingMerge)
+                        concurrentMergeTaskCount.decrementAndGet();
+                    else
+                        concurrentBuildTaskCount.decrementAndGet();
+
                 }
 
                 /*
                  * Report on a bulk merge/build of an {@link IndexSegment}.
                  */
                 {
-
-                    final int nentries = builder.plan.nentries;
 
                     final long nbytes = builder.getCheckpoint().length;
                     
@@ -1776,7 +1805,12 @@ abstract public class IndexManager extends StoreManager {
 
                     // add more event details.
                     e.addDetail("filename", outFile);
-                    e.addDetail("nentries", nentries);
+                    e.addDetail("expectedNodeCount", builder.plan.nnodes);
+                    e.addDetail("expectedLeafCount", builder.plan.nleaves);
+                    e.addDetail("expectedRangeCount", builder.plan.nentries);
+                    e.addDetail("actualNodeCount", builder.getCheckpoint().nnodes);
+                    e.addDetail("actualLeafCount", builder.getCheckpoint().nleaves);
+                    e.addDetail("actualRangeCount", builder.getCheckpoint().nentries);
                     e.addDetail("commitTime", commitTime);
                     e.addDetail("elapsed", +builder.elapsed);
                     e.addDetail("MB", fpf
@@ -1889,6 +1923,16 @@ abstract public class IndexManager extends StoreManager {
      */
     protected final ConcurrentHashMap<File,IndexSegmentBuilder> buildTasks = 
         new ConcurrentHashMap<File, IndexSegmentBuilder>();
+
+    /**
+     * The #of build tasks which are executing concurrently.
+     */
+    protected final AtomicInteger concurrentBuildTaskCount = new AtomicInteger();
+
+    /**
+     * The #of merge tasks which are executing concurrently.
+     */
+    protected final AtomicInteger concurrentMergeTaskCount = new AtomicInteger();
 
     /*
      * Per index counters.

@@ -610,7 +610,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                     // re-load btree from the store.
                     btree = BTree.load(//
                             resourceManager.getLiveJournal(),//
-                            entry.checkpointAddr//
+                            entry.checkpointAddr,//
+                            false// readOnly
                             );
 
                     // set the lastCommitTime on the index.
@@ -2375,18 +2376,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.getKeyBuilder();
 //        }
         
-        public Object deserialize(byte[] b, int off, int len) {
-            return delegate.deserialize(b, off, len);
-        }
-
-        public Object deserialize(byte[] b) {
-            return delegate.deserialize(b);
-        }
-
-        public Object deserialize(ByteBuffer buf) {
-            return delegate.deserialize(buf);
-        }
-
         public void force(boolean metadata) {
             delegate.force(metadata);
         }
@@ -2451,16 +2440,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.isStable();
         }
 
-        public void packAddr(DataOutput out, long addr) throws IOException {
-            delegate.packAddr(out, addr);
-        }
+//        public void packAddr(DataOutput out, long addr) throws IOException {
+//            delegate.packAddr(out, addr);
+//        }
 
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
-        }
-
-        public byte[] serialize(Object obj) {
-            return delegate.serialize(obj);
         }
 
         public long size() {
@@ -2475,13 +2460,22 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-        public long unpackAddr(DataInput in) throws IOException {
-            return delegate.unpackAddr(in);
-        }
+//        public long unpackAddr(DataInput in) throws IOException {
+//            return delegate.unpackAddr(in);
+//        }
 
         public long write(ByteBuffer data) {
             return delegate.write(data);
         }
+
+        public long write(ByteBuffer data, long oldAddr) {
+        	return write(data);
+        }
+
+		public void delete(long addr) {
+			// void
+			
+		}
 
     }
 
@@ -2754,6 +2748,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         public long write(ByteBuffer data) {
             throw new UnsupportedOperationException();
+        }       
+
+        public long write(ByteBuffer data, long oldAddr) {
+            throw new UnsupportedOperationException();
         }
         
         /*
@@ -2764,18 +2762,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //            return delegate.getKeyBuilder();
 //        }
         
-        public Object deserialize(byte[] b, int off, int len) {
-            return delegate.deserialize(b, off, len);
-        }
-
-        public Object deserialize(byte[] b) {
-            return delegate.deserialize(b);
-        }
-
-        public Object deserialize(ByteBuffer buf) {
-            return delegate.deserialize(buf);
-        }
-
         public int getByteCount(long addr) {
             return delegate.getByteCount(addr);
         }
@@ -2836,16 +2822,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.isStable();
         }
 
-        public void packAddr(DataOutput out, long addr) throws IOException {
-            delegate.packAddr(out, addr);
-        }
+//        public void packAddr(DataOutput out, long addr) throws IOException {
+//            delegate.packAddr(out, addr);
+//        }
 
         public ByteBuffer read(long addr) {
             return delegate.read(addr);
-        }
-
-        public byte[] serialize(Object obj) {
-            return delegate.serialize(obj);
         }
 
         public long size() {
@@ -2860,9 +2842,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.toString(addr);
         }
 
-        public long unpackAddr(DataInput in) throws IOException {
-            return delegate.unpackAddr(in);
-        }
+//        public long unpackAddr(DataInput in) throws IOException {
+//            return delegate.unpackAddr(in);
+//        }
+
+		public void delete(long addr) {
+			// TODO Auto-generated method stub
+			
+		}
 
     }
 

@@ -102,6 +102,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
@@ -2047,27 +2048,40 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
             final Runnable task = newSuccessTask(resource);
 
             if (task != null) {
-                
+
                 // increment before we submit the task.
                 guardLatch_notify.inc();
+                try {
 
-                // queue up success notice.
-                notifyService.submit(new Runnable() {
-                    public void run() {
-                        try {
-                            task.run();
-                        } finally {
-                            lock.lock();
+                    // queue up success notice.
+                    notifyService.submit(new Runnable() {
+                        public void run() {
                             try {
-                                // decrement after the task is done.
-                                guardLatch_notify.dec();
+                                task.run();
                             } finally {
-                                lock.unlock();
+                                lock.lock();
+                                try {
+                                    // decrement after the task is done.
+                                    guardLatch_notify.dec();
+                                } finally {
+                                    lock.unlock();
+                                }
                             }
                         }
+                    });
+
+                } catch (RejectedExecutionException ex) {
+                    // decrement latch since tasks did not run.
+                    lock.lock();
+                    try {
+                        guardLatch_notify.dec();
+                    } finally {
+                        lock.unlock();
                     }
-                });
-                
+                    // rethrow exception (will be logged below).
+                    throw ex;
+                }
+
             }
             
         } catch (Throwable t) {
@@ -2114,22 +2128,36 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                 // increment before we submit the task.
                 guardLatch_notify.inc();
 
-                // queue up failure notice.
-                notifyService.submit(new Runnable() {
-                    public void run() {
-                        try {
-                            task.run();
-                        } finally {
-                            lock.lock();
+                try {
+
+                    // queue up failure notice.
+                    notifyService.submit(new Runnable() {
+                        public void run() {
                             try {
-                                // decrement after the task is done.
-                                guardLatch_notify.dec();
+                                task.run();
                             } finally {
-                                lock.unlock();
+                                lock.lock();
+                                try {
+                                    // decrement after the task is done.
+                                    guardLatch_notify.dec();
+                                } finally {
+                                    lock.unlock();
+                                }
                             }
                         }
+                    });
+
+                } catch (RejectedExecutionException ex) {
+                    // decrement latch since tasks did not run.
+                    lock.lock();
+                    try {
+                        guardLatch_notify.dec();
+                    } finally {
+                        lock.unlock();
                     }
-                });
+                    // rethrow exception (will be logged below).
+                    throw ex;
+                }
 
             }
 
@@ -2973,7 +3001,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
         public Void call() throws Exception {
 
             // used to serialize the Values for the BTree.
-            final BigdataValueSerializer<BigdataValue> ser = valueFactory
+            final BigdataValueSerializer<BigdataValueImpl> ser = valueFactory
                     .getValueSerializer();
 
             // thread-local key builder removes single-threaded constraint.
@@ -3015,7 +3043,7 @@ public class AsynchronousStatementBufferFactory<S extends BigdataStatement, R>
                                 .getKey();
 
                         // Serialize the term.
-                        final byte[] val = ser.serialize(v, out.reset());
+                        final byte[] val = ser.serialize((BigdataValueImpl)v, out.reset());
 
                         /*
                          * Note: The BigdataValue instance is NOT supplied to

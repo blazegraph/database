@@ -110,12 +110,89 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
                     .createURI("http://www.w3.org/2001/XMLSchema#float")));
 
             /*
-             * @todo Blank nodes will not round trip through the lexicon without
-             * reference to a blank node cache. However, even a blank node cache
-             * will not survive restart.
+             * Note: Blank nodes will not round trip through the lexicon unless
+             * the "told bnodes" is enabled.
              */
 //            terms.add(f.createBNode());
 //            terms.add(f.createBNode("a"));
+
+            final Map<Long, BigdataValue> ids = doAddTermsTest(store, terms);
+
+            if (store.isStable()) {
+                
+                store.commit();
+                
+                store = reopenStore(store);
+
+                // verify same reverse mappings.
+
+                final Map<Long, BigdataValue> ids2 = store.getLexiconRelation()
+                        .getTerms(ids.keySet());
+
+                assertEquals(ids.size(),ids2.size());
+                
+                for (Long id : ids.keySet()) {
+
+                    assertEquals("Id mapped to a different term? : termId="
+                            + id, ids.get(id), ids2.get(id));
+
+                }
+
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+
+    }
+
+    /**
+     * The "told bnodes" mode uses the blank node ID as specified rather than
+     * assigning one based on a UUID. For this case, we need to store the blank
+     * nodes in the reverse index (T2ID) so we can translate a blank node back
+     * to a specific identifier.
+     */
+    public void test_toldBNodes() {
+
+        final Properties properties = getProperties();
+        
+        // test w/o predefined vocab.
+        properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class
+                .getName());
+
+        // test w/o axioms - they imply a predefined vocab.
+        properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+        
+        // test w/o the full text index.
+        properties.setProperty(Options.TEXT_INDEX, "false");
+
+        // this is the "told bnodes" mode.
+        properties.setProperty(Options.STORE_BLANK_NODES, "true");
+
+        AbstractTripleStore store = getStore(properties);
+        
+        try {
+
+            if (!store.isStable()) {
+
+                /*
+                 * We need a restart safe store to test this since otherwise a
+                 * term cache could give us a false positive.
+                 */
+
+                return;
+                
+            }
+
+            final Collection<BigdataValue> terms = new HashSet<BigdataValue>();
+
+            // lookup/add some values.
+            final BigdataValueFactory f = store.getValueFactory();
+
+            terms.add(f.createBNode());
+            terms.add(f.createBNode("a"));
 
             final Map<Long, BigdataValue> ids = doAddTermsTest(store, terms);
 
@@ -154,8 +231,9 @@ public class TestAddTerms extends AbstractTripleStoreTestCase {
      * @param terms
      * @return
      */
-    private Map<Long, BigdataValue> doAddTermsTest(AbstractTripleStore store,
-            Collection<BigdataValue> terms) {
+    private Map<Long, BigdataValue> doAddTermsTest(
+            final AbstractTripleStore store,
+            final Collection<BigdataValue> terms) {
 
         final int size = terms.size();
 

@@ -33,7 +33,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.LRUNexus;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
@@ -119,21 +119,21 @@ public class FileMetadata {
      */
     final int offsetBits;
 
-    /**
-     * The #of records to be buffered in an optional read cache -or- ZERO(0) to
-     * disable the read cache.
-     */
-    final int readCacheCapacity;
+//    /**
+//     * The #of records to be buffered in an optional read cache -or- ZERO(0) to
+//     * disable the read cache.
+//     */
+//    final int readCacheCapacity;
+//    
+//    /**
+//     * The maximum size of a record that will be allowed into the read cache.
+//     */
+//    final int readCacheMaxRecordSize;
     
     /**
-     * The maximum size of a record that will be allowed into the read cache.
+     * When <code>true</code> the write cache will be enabled.
      */
-    final int readCacheMaxRecordSize;
-    
-    /**
-     * The optional {@link ByteBuffer} to be used as the write cache.
-     */
-    final ByteBuffer writeCache;
+    final boolean writeCacheEnabled;
     
     /**
      * The next offset at which a record would be written on the store.  The
@@ -244,30 +244,13 @@ public class FileMetadata {
      *            The #of bits out of a 64-bit long integer that are used to
      *            encode the byte offset as an unsigned integer. The remaining
      *            bits are used to encode the byte count (aka record length) as
-     *            an unsigned integer.
-     * @param readCacheCapacity
-     *            The capacity of an optional read cache. When ZERO(0) the read
-     *            cache will be disabled. The capacity specifies the #of records
-     *            that will be retained by an LRU style cache. Note that this
-     *            option is only supported by the {@link DiskOnlyStrategy}.
-     *            Further note that most of the other {@link IBufferStrategy}s
-     *            are already fully buffered and hence can not benefit from a
-     *            read cache. Finally, note that the higher-level data
-     *            structures use the {@link LRUNexus}, which provides a read
-     *            cache of the decompressed records. For these reasons there is
-     *            little reason to enable this lower-level read cache.
-     * @param readCacheMaxRecordSize
-     *            The maximum size of a record that will be allowed into the
-     *            optional read cache.
-     * @param writeCache
-     *            A direct {@link ByteBuffer} to be used as the write cache
-     *            (optional). Note that this write cache is only used by the
-     *            {@link DiskOnlyStrategy}. Further note that this MUST be a
-     *            direct {@link ByteBuffer} in order to avoid potential memory
-     *            leaks since NIO will otherwise force the allocation of a
-     *            "temporary" direct {@link ByteBuffer} and there is a known bug
-     *            from 1.4 through at least 1.6 with the release of such
-     *            temporary buffers.
+     *            an unsigned integer. This value is <em>ignored</em> if the
+     *            journal is being reopened, in which case the real offset bits
+     *            is read from the root block of the journal.
+     * @param writeCacheEnabled
+     *            When <code>true</code>, the {@link DiskOnlyStrategy} will
+     *            allocate a direct {@link ByteBuffer} from the
+     *            {@link DirectBufferPool} to service as a write cache.
      * @param createTime
      *            The create time to be assigned to the root block iff a new
      *            file is created.
@@ -293,13 +276,30 @@ public class FileMetadata {
      *             if there is a problem preparing the file for use by the
      *             journal.
      */
-    FileMetadata(File file, BufferMode bufferMode, boolean useDirectBuffers,
-            long initialExtent, long maximumExtent, boolean create,
-            boolean isEmptyFile, boolean deleteOnExit, boolean readOnly,
-            ForceEnum forceWrites, int offsetBits, int readCacheCapacity,
-            int readCacheMaxRecordSize, ByteBuffer writeCache,
-            boolean validateChecksum, final long createTime,
-            ChecksumUtility checker, boolean alternateRootBlock) throws RuntimeException {
+//    * @param readCacheCapacity
+//    *            The capacity of an optional read cache. When ZERO(0) the read
+//    *            cache will be disabled. The capacity specifies the #of records
+//    *            that will be retained by an LRU style cache. Note that this
+//    *            option is only supported by the {@link DiskOnlyStrategy}.
+//    *            Further note that most of the other {@link IBufferStrategy}s
+//    *            are already fully buffered and hence can not benefit from a
+//    *            read cache. Finally, note that the higher-level data
+//    *            structures use the {@link LRUNexus}, which provides a read
+//    *            cache of the decompressed records. For these reasons there is
+//    *            little reason to enable this lower-level read cache.
+//    * @param readCacheMaxRecordSize
+//    *            The maximum size of a record that will be allowed into the
+//    *            optional read cache.
+    FileMetadata(final File file, final BufferMode bufferMode, final boolean useDirectBuffers,
+            final long initialExtent, final long maximumExtent, final boolean create,
+            final boolean isEmptyFile, boolean deleteOnExit, final boolean readOnly,
+            final ForceEnum forceWrites, final int offsetBits, 
+//            final int readCacheCapacity,
+//            final int readCacheMaxRecordSize, 
+            final boolean writeCacheEnabled,
+            final boolean validateChecksum, final long createTime,
+            final ChecksumUtility checker, final boolean alternateRootBlock)
+            throws RuntimeException {
 
         if (file == null)
             throw new IllegalArgumentException();
@@ -330,17 +330,18 @@ public class FileMetadata {
 
         }
 
+        // check the argument.  the value is only used if we are creating a new journal.
         WormAddressManager.assertOffsetBits(offsetBits);
         
         this.bufferMode = bufferMode;
 
-        this.offsetBits = offsetBits;
+//        this.offsetBits = offsetBits;
 
-        this.readCacheCapacity = readCacheCapacity;
+//        this.readCacheCapacity = readCacheCapacity;
+//        
+//        this.readCacheMaxRecordSize = readCacheMaxRecordSize;
         
-        this.readCacheMaxRecordSize = readCacheMaxRecordSize;
-        
-        this.writeCache = writeCache;
+        this.writeCacheEnabled = writeCacheEnabled;
         
         this.fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
@@ -412,11 +413,13 @@ public class FileMetadata {
             }
                 
             if (exists && !temporary) {
-    
+
                 /*
                  * The file already exists (but not for temporary files).
+                 * 
+                 * Note: this next line will throw IOException if there is a
+                 * file lock contention.
                  */
-    
                 this.extent = raf.length();
                 
                 this.userExtent = extent - headerSize0;
@@ -437,7 +440,8 @@ public class FileMetadata {
                     
                 }
     
-                if( bufferMode != BufferMode.Disk ) {
+//              if( bufferMode != BufferMode.Disk ) {
+                if( bufferMode.isFullyBuffered() ) {
     
                     /*
                      * Verify that we can address this many bytes with this
@@ -518,6 +522,9 @@ public class FileMetadata {
                         ? (alternateRootBlock ?rootBlock1 :rootBlock0)
                         : (alternateRootBlock ?rootBlock0 :rootBlock1)
                         );
+
+                // use the offset bits from the root block.
+                this.offsetBits = rootBlock.getOffsetBits();
                 
                 /*
                  * The offset into the user extent at which the next record will be
@@ -538,18 +545,6 @@ public class FileMetadata {
                 }
                 
                 switch (bufferMode) {
-                case BufferedDisk: {
-                    /*
-                     * FIXME read the data from the disk into the buffer, but
-                     * only up to the maximum extent of the buffer. Perhaps do
-                     * this lazily in the BufferedDiskStrategy so that we can
-                     * avoid reading in the data when scanning the dataDir
-                     * during StoreManager startup.
-                     */
-                    if(true)
-                        throw new UnsupportedOperationException();
-                    break;
-                }
                 case Direct: {
                     // Allocate the buffer buffer.
                     buffer = (useDirectBuffers ? ByteBuffer
@@ -585,6 +580,12 @@ public class FileMetadata {
                     break;
                 }
                 case Disk:
+                    buffer = null;
+                    break;
+                case DiskWORM:
+                    buffer = null;
+                    break;
+                case DiskRW:
                     buffer = null;
                     break;
                 default:
@@ -630,9 +631,10 @@ public class FileMetadata {
     
                 this.userExtent = extent - headerSize0;
                 
-                if (bufferMode != BufferMode.Disk
-                        && bufferMode != BufferMode.Temporary ) {
-    
+//                if (bufferMode != BufferMode.Disk
+//                        && bufferMode != BufferMode.Temporary ) {
+                if (bufferMode.isFullyBuffered()) {
+                
                     /*
                      * Verify that we can address this many bytes with this
                      * strategy. The strategies that rely on an in-memory buffer
@@ -675,15 +677,19 @@ public class FileMetadata {
 
                 /*
                  * Generate the root blocks. They are for all practical purposes
-                 * identical (in fact, their timestamps will be distict). The root
+                 * identical (in fact, their timestamps will be distinct). The root
                  * block are then written into their locations in the file.
                  */
+                // use the caller's value for offsetBits.
+                this.offsetBits = offsetBits;
                 final long commitCounter = 0L;
                 final long firstCommitTime = 0L;
                 final long lastCommitTime = 0L;
                 final long commitRecordAddr = 0L;
                 final long commitRecordIndexAddr = 0L;
                 final UUID uuid = UUID.randomUUID(); // journal's UUID.
+                // FIXME This should be a property of BufferMode not a hard coded test.
+                final StoreTypeEnum stenum = bufferMode == BufferMode.DiskRW ? StoreTypeEnum.RW : StoreTypeEnum.WORM;
                 if(createTime == 0L) {
                     throw new IllegalArgumentException("Create time may not be zero.");
                 }
@@ -691,12 +697,14 @@ public class FileMetadata {
                 this.closeTime = 0L;
                 final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                         nextOffset, firstCommitTime, lastCommitTime,
-                        commitCounter, commitRecordAddr, commitRecordIndexAddr,
-                        uuid, createTime, closeTime, checker);
+                        commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, 
+                        0L, 0L, stenum,
+                        createTime, closeTime, checker);
                 final IRootBlockView rootBlock1 = new RootBlockView(false,
                         offsetBits, nextOffset, firstCommitTime,
-                        lastCommitTime, commitCounter, commitRecordAddr,
-                        commitRecordIndexAddr, uuid, createTime, closeTime,
+                        lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid,
+                        0L, 0L, stenum,
+                        createTime, closeTime,
                         checker);
                 
                 if(!temporary) {
@@ -743,7 +751,13 @@ public class FileMetadata {
                     buffer = opener.reopenChannel().map(FileChannel.MapMode.READ_WRITE,
                             headerSize0, userExtent);
                     break;
+                case DiskRW:
+                    buffer = null;
+                    break;
                 case Disk:
+                    buffer = null;
+                    break;
+                case DiskWORM:
                     buffer = null;
                     break;
                 case Temporary:
@@ -766,7 +780,7 @@ public class FileMetadata {
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
-    private final IReopenChannel opener = new IReopenChannel() {
+    private final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
 
         public String toString() {
             

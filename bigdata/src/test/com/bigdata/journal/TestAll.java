@@ -59,7 +59,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("journal");
+        final TestSuite suite = new TestSuite("journal");
 
         // test ability of the platform to synchronize writes to disk.
         suite.addTestSuite( TestRandomAccessFileSynchronousWrites.class );
@@ -109,6 +109,10 @@ public class TestAll extends TestCase {
         }
 
         suite.addTest( TestDiskJournal.suite() );
+
+        suite.addTest( TestWORMStrategy.suite() );
+
+        suite.addTest( com.bigdata.rwstore.TestAll.suite() );
 
         /*
          * FIXME enable this test suite once the journal mode is ready.

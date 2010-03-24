@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.btree;
 
-import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.IHardReferenceQueue;
 
 /**
  * Hard reference cache eviction listener writes a dirty node or leaf onto the
@@ -38,13 +38,18 @@ import com.bigdata.cache.HardReferenceQueue;
 public class DefaultEvictionListener implements
         IEvictionListener {
 
-    public void evicted(final HardReferenceQueue<PO> cache, final PO ref) {
+    public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
 
         final AbstractNode<?> node = (AbstractNode<?>) ref;
 
         /*
          * Decrement the reference counter. When it reaches zero (0) we will
          * evict the node or leaf iff it is dirty.
+         * 
+         * Note: The reference counts and the #of distinct nodes or leaves on
+         * the writeRetentionQueue are not exact for a read-only B+Tree because
+         * neither synchronization nor atomic counters are used to track that
+         * information.
          */
 
         if (--node.referenceCount > 0) {
@@ -56,10 +61,12 @@ public class DefaultEvictionListener implements
 
         final AbstractBTree btree = node.btree;
 
-        assert btree.ndistinctOnWriteRetentionQueue > 0;
+        // Note: This assert can be violated for a read-only B+Tree since there
+        // is less synchronization.
+        assert btree.isReadOnly() || btree.ndistinctOnWriteRetentionQueue > 0;
 
         btree.ndistinctOnWriteRetentionQueue--;
-
+        
         if (node.deleted) {
 
             /*

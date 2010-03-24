@@ -1,0 +1,47 @@
+<!-- $Id: build.xml 2266 2009-10-26 18:21:50Z mrpersonick $ -->
+<project name="rest" default="install" basedir=".">
+ 
+	<property file="build.properties" />
+
+	<target name="clean" description="cleans everything in [install.dir]">
+		<delete dir="${install.dir}" />
+	</target>
+
+	<target name="prepare">
+		<!-- create directories. -->
+		<mkdir dir="${install.dir}" />
+		<mkdir dir="${install.dir}/WEB-INF" />
+		<mkdir dir="${install.dir}/WEB-INF/lib" />
+		<mkdir dir="${install.dir}/WEB-INF/classes" />
+	</target>
+
+	<!-- Note: This depends on the bundleJar target of the top-level bigdata ant script. -->
+	<target name="install" depends="prepare">
+	
+		<!-- copy resources. -->
+		<copy toDir="${install.dir}/WEB-INF">
+			<fileset dir="${src.dir}">
+				<include name="bigdata.properties" />
+				<include name="web.xml" />
+			</fileset>
+		</copy>
+		<copy toDir="${install.dir}/WEB-INF/classes">
+			<fileset dir="${classes.dir}"/>
+		</copy>
+		<copy toDir="${install.dir}/WEB-INF/lib" flatten="true">
+			<fileset dir="${base.dir}/bigdata/lib">
+			    <include name="**/*.jar" />
+			    <include name="**/*.so" />
+			    <include name="**/*.dll" />
+			</fileset>
+			<fileset dir="${base.dir}/bigdata-rdf/lib">
+			    <include name="**/*.jar" />
+			</fileset>
+			<fileset dir="${base.dir}/bigdata-sails/lib">
+			    <exclude name="servlet-api.jar" />
+			</fileset>
+		</copy>
+
+	</target>
+
+</project>

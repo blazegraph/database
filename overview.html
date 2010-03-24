@@ -37,8 +37,8 @@
 
           A deployment is made up of a transaction service, a load
 	  balancer service, and a metadata service (with failover
-	  redundency) and many data service instances.  bigdata can
-	  provide data redundency internally (by pipelining writes
+	  redundancy) and many data service instances.  bigdata can
+	  provide data redundancy internally (by pipelining writes
 	  bound for a partition across primary, secondary, ... data
 	  service instances for that partition) or it can be deployed
 	  over NAS/SAN.  bigdata itself is 100% Java and requires a
@@ -96,7 +96,9 @@
   <p>
   
   	  The main building blocks for the bigdata architecture are
-  	  the journal (append-only persistence store), the mutable
+  	  the journal (both an append-only persistence store and a recently
+  	  introduced read/write store with the ability to recycle historical
+  	  commit points), the mutable
   	  B+Tree (used to absorb writes), and the read-optimized
   	  immutable B+Tree (aka the index segment).  Highly efficient
   	  bulk index builds are used to transfer data absorbed by a
@@ -133,6 +135,11 @@
 	  retained and you can query any historical commit point of
 	  the database at any time.
   
+  </p><p>
+  	  
+  	  An detailed architecture whitepaper for bigdata is posted only and
+  	  linked from our <a href="www.bigdata.com/blog">blog</a>.
+  	  
   </p>
   
   <h2>Sparse row store</h2>
@@ -279,7 +286,7 @@
   
   <p>
   
-  	  While bigdata&#174; is targetted at scale-out federations,
+  	  While bigdata&#174; is targeted at scale-out federations,
   	  it can also be deployed as simple persistence store using
   	  just the <code>com.bigdata.journal.Journal</code> API or as
   	  an <em>embedded federation</em>.
@@ -290,19 +297,32 @@
 	  Once Read Many) aka also known as an immortal database or a
 	  log-structured store.  This works great for some
 	  applications, and it is used for the data service write
-	  buffers.  We will probably do a read-write (RW) version of
-	  the journal at some point which is capable of reclaiming
-	  storage, but that is not necessary for the scale-out
-	  architecture which uses index segments builds and compacting
-	  merges to clear the old write buffers.
+	  buffers.  There is also a read-write (RW) version of the journal which is
+	  capable of reclaiming storage by releasing historical commit points, aging
+	  them out of the backing file in a manner very similar to how the scale-out
+	  database releases historical commit points.  The read/write store is good
+	  for standalone database instances, especially when the data have a lot of
+	  skew and when the new data are arriving continually while older data should
+	  be periodically released (for example, in a monitoring application where
+	  historical events may be released after 30 days).  The read/write store is
+	  also used in the scale-out architecture for the transaction manager and the
+	  aggregated performance counters.  However, the data services use a WORM
+	  store to buffer writes, asynchronously migrate the buffered writes onto
+	  read-optimized B+Tree files using index segments builds and compacting.
+	  One an index partition (aka shard) reaches ~ 200MB on the disk (dynamic
+	  sharding).  Index partitions are moved from time to time to load balance
+	  the cluster.
 
   </p><p> 
 
-	  The embedded federation can be used to test things out on a
-  	  single machine.  It will start instances of each of the
-  	  services, and also start N data services.  We use this to
-  	  write unit tests for the federation, and it can make testing
-  	  your application easier as well.
+	  Either the standalone database or the embedded federation may be used to test
+	  things out on a single machine.  The standalone database is backed by a 
+	  single journal (either a WORM or read/write store).  The embedded federation
+	  starts instances of each of the services, and also starts N data services,
+	  all running in the same JVM.  You can use the embedded federation to write
+	  unit tests for federation specific behaviors (those which depend on dynamically
+	  partitioned indices), but it is easier to prototype against a standalone database
+	  instance.
   
   </p>
   
@@ -310,42 +330,38 @@
   
   <p>
 
-          bigdata&#174; has been tested on clusters of up to 15 nodes.
-	  We have loaded data sets of 10B+ rows, at rates of over
-	  300,000 rows per second.  Overall, 100s of billions of rows
-	  have been put down safe on disk.  People should be able to
-	  reach petabyte scale today, and exabyte scale once we
-	  introduce a partitioned metadata service (data service
-	  locators).  In theory, the architecture can scale to ~ 400
-	  exabytes per scale-out index.
+      bigdata&#174; is a petabyte scale database architecture.  It has been
+      tested on clusters of up to 16 nodes.  We have loaded data sets of 10B+
+      rows, at rates of over 300,000 rows per second.  Overall, 100s of billions
+      of rows have been put down safely on disk.
 
    </p><p>
 
-          The following features are not finished yet: <ul>
+          We are actively working on HA support and plan to have a fully tested
+          HA solution and a greatly simplified HA install available in Q2, 2010.
+          The initial HA solution will be based on a shared nothing architecture,
+          but can be deployed against either local disk or shared disk systems.
+          HA will be available for both the standalone database (based on 
+          replicated writes across a failover chain) and the clustered database.
+   
+   </p><p>
+   
+      <ul>
 
-	  <li>HA architecture. Alternative 2 is the easiest to realize
-	  and many organizations perfer to manage storage separately
-	  from servers. Alternative 1 probably has the best
-	  price/performance for deployments since it can use local
-	  disk.  Let us know what you think.</li>
+	  <li>Hadoop integration points, including a REST API for the sparse row
+	  store and scanners for HDFS files making easier to target bigdata 
+	  distributed jobs from Hadoop map/reduce jobs.</li>
 
-	  <li>REST API for the sparse row store (this is a Hadoop
-	  integration point).</li>
+	  <li>Online backup and point in time recovery.</li>
 
-	  <li>Bigdata has distributed job support for clients writing
-	  on scale-out indices and distributed query support, neither
-	  of which uses the map/reduce model.  The map/reduce services
-	  are slated for a refactor or might be deprecated entirely in
-	  favor of a Hadoop integration.</li>
+	  <li>Full distributed read/write transaction support (read-only transaction
+	  support is done, but we still have some work to do on the commit protocol
+	  for read-write transactions).</li>
 
-	  <li>Backup and recovery.</li>
-
-	  <li>Full transactions.  Read-only transaction support is
-	  done, but we still have some work to do on the commit
-	  protocol for read-write transactions.</li>
-
-	  <li>OODBMS.  We have plans for an OODBM layer based on the
-	  Generic Object Model.</li>
+	  <li>OODBMS.  We will be introducing an OODBM layer based on the
+	  Generic Object Model shortly.  This will be layered over the RDF
+	  database and will have bindings and clients for Java, JSON, and
+	  other client environments.</li>
 
 	  </ul>
   	  
@@ -405,7 +421,7 @@
   </p><p>
 
           Please let us know if you need specific feature development
-  	  or help in applying bigdataa&#174; to your problem.  We are
+  	  or help in applying bigdata&#174; to your problem.  We are
   	  especially interested in working directly with people who
   	  are trying to handle massive data, especially for the
   	  semantic web.  Please <a

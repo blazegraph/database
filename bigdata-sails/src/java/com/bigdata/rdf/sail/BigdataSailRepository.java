@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sail;
 
+import java.io.IOException;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sail.SailRepository;
 import org.openrdf.repository.sail.SailRepositoryConnection;
@@ -43,14 +44,44 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
-    public SailRepositoryConnection getQueryConnection() throws RepositoryException {
+    /**
+     * Obtain a read-only connection to the database at the last commit point.
+     * This connection should be used for all pure-readers, as the connection
+     * will not be blocked by concurrent writers.
+     * 
+     * @return a read-only connection to the database
+     */
+    public SailRepositoryConnection getReadOnlyConnection() 
+        throws RepositoryException {
+        
+        return new BigdataSailRepositoryConnection(this, 
+            getBigdataSail().getReadOnlyConnection());
+    }
+    
+    /**
+     * Obtain a read-only connection to the database from a historical commit 
+     * point. This connection should be used for all pure-readers, as the 
+     * connection will not be blocked by concurrent writers.
+     * 
+     * @return a read-only connection to the database
+     */
+    public SailRepositoryConnection getReadOnlyConnection(long timestamp) 
+        throws RepositoryException {
+        
+        return new BigdataSailRepositoryConnection(this, 
+            getBigdataSail().getReadOnlyConnection(timestamp));
+        
+    }
+    
+    public SailRepositoryConnection getReadWriteConnection() 
+        throws RepositoryException {
         
         try {
             
             return new BigdataSailRepositoryConnection(this, 
-                getBigdataSail().getQueryConnection());
+                getBigdataSail().getReadWriteConnection());
             
-        } catch (SailException e) {
+        } catch (IOException e) {
             
             throw new RepositoryException(e);
             
@@ -58,4 +89,20 @@ public class BigdataSailRepository extends SailRepository {
         
     }
     
+    public SailRepositoryConnection getUnisolatedConnection() 
+        throws RepositoryException {
+        
+        try {
+            
+            return new BigdataSailRepositoryConnection(this, 
+                getBigdataSail().getUnisolatedConnection());
+            
+        } catch (InterruptedException e) {
+            
+            throw new RepositoryException(e);
+            
+        }
+        
+    }
+
 }

@@ -127,8 +127,10 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
       
         super.setUp();
         
-        // flush everything before/after a unit test.
-        LRUNexus.INSTANCE.discardAllCaches();
+        if (LRUNexus.INSTANCE != null) {
+            // flush everything before/after a unit test.
+            LRUNexus.INSTANCE.discardAllCaches();
+        }
 
         dataDir = new File( getName() );
         
@@ -176,8 +178,10 @@ abstract public class AbstractEmbeddedFederationTestCase extends AbstractBTreeTe
             
         }
         
-        // flush everything before/after a unit test.
-        LRUNexus.INSTANCE.discardAllCaches();
+        if (LRUNexus.INSTANCE != null) {
+            // flush everything before/after a unit test.
+            LRUNexus.INSTANCE.discardAllCaches();
+        }
 
         super.tearDown();
 

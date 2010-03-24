@@ -35,7 +35,6 @@ import junit.framework.TestSuite;
  * @version $Id$
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-
 public class TestAll extends TestCase {
 
     /**
@@ -59,6 +58,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestRingBuffer.class);
         
         suite.addTestSuite(TestHardReferenceQueue.class);
+
+        suite.addTestSuite(TestHardReferenceQueueWithBatchingUpdates.class);
         
 //        // Test all ICacheEntry implementations.
 //        retval.addTestSuite( TestCacheEntry.class );
@@ -68,6 +69,10 @@ public class TestAll extends TestCase {
 
         // Test cache semantics with weak/soft reference values.
         suite.addTestSuite(TestWeakValueCache.class);
+
+        suite.addTestSuite(TestStoreAndAddressLRUCache.class);
+
+        suite.addTestSuite(TestBCHMGlobalLRU.class);
 
         suite.addTestSuite(TestHardReferenceGlobalLRU.class);
 

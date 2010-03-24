@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
@@ -55,6 +56,9 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * @todo explore different error rates, including Fast.mostSignificantBit( n ) +
  *       1 which would provide an expectation of no false positives.
  * 
+ * @todo Compare for each build algorithm, just like
+ *       {@link TestIndexSegmentBuilderWithLargeTrees}.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
@@ -67,6 +71,8 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         super(name);
     }
 
+    private static final boolean bufferNodes = true;
+    
     public Properties getProperties() {
 
         if (properties == null) {
@@ -176,12 +182,15 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
         for(int i=0; i<branchingFactors.length; i++) {
             
             int m = branchingFactors[i];
-            
-            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m,trace));
-            
-            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m,trace) );
 
-            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m,trace) );
+            doBuildIndexSegmentAndCompare(doInsertRandomSparseKeySequenceTest(
+                    getBTree(m), m, trace));
+
+            doBuildIndexSegmentAndCompare(doInsertRandomSparseKeySequenceTest(
+                    getBTree(m), m * m, trace));
+
+            doBuildIndexSegmentAndCompare(doInsertRandomSparseKeySequenceTest(
+                    getBTree(m), m * m * m, trace));
 
             //@todo overflows the initial journal extent.
 //            doBuildIndexSegmentAndCompare( doInsertRandomSparseKeySequenceTest(m,m*m*m*m,trace) );
@@ -228,12 +237,25 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
 
         final long commitTime = System.currentTimeMillis();
         
-        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
-                tmpDir, btree.getEntryCount(), btree.rangeIterator(), m, btree
-                        .getIndexMetadata(), commitTime, true/* compactingMerge */);
+        final IndexSegmentBuilder builder2 = IndexSegmentBuilder.newInstance(
+                outFile2, tmpDir, btree.getEntryCount(), btree.rangeIterator(),
+                m, btree.getIndexMetadata(), commitTime,
+                true/* compactingMerge */, bufferNodes);
+
+        final IndexSegmentCheckpoint checkpoint = builder2.call();
         
-        builder2.call();
-        
+        if (LRUNexus.INSTANCE != null) {
+
+            /*
+             * Clear the records for the index segment from the cache so we will
+             * read directly from the file. This is necessary to ensure that the
+             * data on the file is good rather than just the data in the cache.
+             */
+            
+            LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+
+        }
+
 //        IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
 //                tmpDir, btree, m, 1/64.);
 
@@ -305,10 +327,12 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
      * 
      * @param btree The source btree.
      */
-    public void doBuildIndexSegmentAndCompare(BTree btree) throws Exception {
-        
+    public void doBuildIndexSegmentAndCompare(final BTree btree)
+            throws Exception {
+
         // branching factors used for the index segment.
-        final int branchingFactors[] = new int[]{3,4,5,10,20,60,100,256,1024,4096,8192};
+        final int branchingFactors[] = new int[] { 3, 4, 5, 10, 20, 60, 100,
+                256, 1024, 4096, 8192 };
         
         for( int i=0; i<branchingFactors.length; i++ ) {
         
@@ -343,9 +367,9 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                 
                 metadata.setBloomFilterFactory(null/*disable*/);
 
-                new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(),
+                IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(),
                         btree.rangeIterator(), m, metadata, commitTime,
-                        true/*compactingMerge*/).call();
+                        true/*compactingMerge*/,bufferNodes).call();
                 
 //              new IndexSegmentBuilder(outFile, tmpDir, btree, m, 0.);
                 
@@ -358,7 +382,7 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                         + btree.getBranchingFactor() + ", nentries=" + btree.getEntryCount()
                         + "), out(m=" + m + ")");
             
-                IndexMetadata metadata = btree.getIndexMetadata().clone();
+                final IndexMetadata metadata = btree.getIndexMetadata().clone();
                 
                 /*
                  * Note: Since we know the exact #of index entries in an index
@@ -367,11 +391,12 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
                  */
                 metadata.setBloomFilterFactory(new BloomFilterFactory(
                         1/* n */, 1 / 64d/* p */, 1 / 32d/* maxP */));
-                
-                builder2 = new IndexSegmentBuilder(outFile2, tmpDir, btree
-                        .getEntryCount(), btree.rangeIterator(), m, metadata,
-                        commitTime, true/* compactingMerge */);
-                
+
+                builder2 = IndexSegmentBuilder.newInstance(outFile2, tmpDir,
+                        btree.getEntryCount(), btree.rangeIterator(), m,
+                        metadata, commitTime, true/* compactingMerge */,
+                        bufferNodes);
+
                 builder2.call();
             
 //            IndexSegmentBuilder builder2 = new IndexSegmentBuilder(outFile2,
@@ -468,16 +493,17 @@ public class TestIndexSegmentWithBloomFilter extends AbstractBTreeTestCase {
     protected void doBloomFilterTest(String label, IBloomFilter bloomFilter, byte[][] keys) {
         
         System.err.println("\ncondition: "+label);//+", size="+bloomFilter.size());
-        
-        int[] order = getRandomOrder(keys.length);
 
-        for(int i=0; i<order.length; i++) {
-            
-            byte[] key = keys[order[i]];
-            
-            boolean found = bloomFilter.contains(key);
-            
-            assertTrue("false negative: i="+i+", key="+key, found);
+        final int[] order = getRandomOrder(keys.length);
+
+        for (int i = 0; i < order.length; i++) {
+
+            final byte[] key = keys[order[i]];
+
+            final boolean found = bloomFilter.contains(key);
+
+            assertTrue("false negative: i=" + i + ", key="
+                    + BytesUtil.toString(key), found);
             
         }
  

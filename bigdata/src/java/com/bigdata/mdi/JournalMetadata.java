@@ -64,7 +64,7 @@ public class JournalMetadata extends AbstractResourceMetadata {
      *
      * @return The file.
      */
-    private static String getFileString(IJournal journal) {
+    private static String getFileString(final IJournal journal) {
     
         final File file = journal.getFile();
 
@@ -83,9 +83,9 @@ public class JournalMetadata extends AbstractResourceMetadata {
     }
 
     /**
-     * The {@link JournalMetadata} state will not change as writes are made on
-     * the journal since it does not reflect anything exception the {@link UUID},
-     * the filename, and the create time.
+     * The description of a journal. The {@link JournalMetadata} state will not
+     * change as writes are made on the journal since it does not reflect
+     * anything exception the {@link UUID}, the filename, and the create time.
      * 
      * @param journal
      *            The journal.
@@ -93,20 +93,58 @@ public class JournalMetadata extends AbstractResourceMetadata {
     public JournalMetadata(final AbstractJournal journal) {
 
         this(getFileString(journal), //journal.getBufferStrategy().getExtent(),
-                journal.getRootBlockView().getUUID(), journal
-                        .getRootBlockView().getCreateTime());
+                journal.getRootBlockView().getUUID(), //
+                journal.getRootBlockView().getCreateTime(), // createTime.
+                0L // commitTime
+                );
 
     }
 
-    public JournalMetadata(File file, /*long nbytes,*/ UUID uuid, long createTime) {
-        
-        this(file.getName()/*,nbytes*/,uuid,createTime);
-        
+    /**
+     * Constructor variant used to indicate a read from a specific commitTime on
+     * a journal.
+     * 
+     * @param journal
+     *            The journal.
+     * @param commitTime
+     *            The commitTime.
+     */
+    public JournalMetadata(final AbstractJournal journal, final long commitTime) {
+     
+        this(getFileString(journal), //journal.getBufferStrategy().getExtent(),
+                journal.getRootBlockView().getUUID(),//
+                journal.getRootBlockView().getCreateTime(),//
+                commitTime
+                );
+
     }
 
-    JournalMetadata(String file, /*long nbytes, */UUID uuid, long createTime) {
+    /**
+     * Data only constructor used by some unit tests.
+     * 
+     * @param file
+     * @param uuid
+     * @param createTime
+     */
+    public JournalMetadata(final File file, /* long nbytes, */final UUID uuid,
+            final long createTime, final long commitTime) {
 
-        super(file, /*nbytes, */ uuid, createTime);
+        this(file.getName()/* ,nbytes */, uuid, createTime, commitTime);
+
+    }
+
+    /**
+     * Package private constructor used by the other constructors and when
+     * deserializing records.
+     * 
+     * @param file
+     * @param uuid
+     * @param createTime
+     */
+    JournalMetadata(final String file, /* long nbytes, */final UUID uuid,
+            final long createTime, final long commitTime) {
+
+        super(file, /*nbytes, */ uuid, createTime, commitTime);
 
     }
 

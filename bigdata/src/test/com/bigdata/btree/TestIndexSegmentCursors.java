@@ -107,10 +107,17 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
     protected IndexSegment buildIndexSegment(final BTree btree)
             throws Exception {
 
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 30/* m */, btree.getIndexMetadata(), System
-                .currentTimeMillis()/* commitTime */, true/* compactingMerge */)
-                .call();
+        return buildIndexSegment(btree, 30/* m */);
+        
+    }
+
+    protected IndexSegment buildIndexSegment(final BTree btree, final int m)
+        throws Exception {
+
+        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(),
+                btree.rangeIterator(), m, btree.getIndexMetadata(),
+                System.currentTimeMillis()/* commitTime */,
+                true/* compactingMerge */, true/* bufferNodes */).call();
 
         IndexSegmentStore segStore = new IndexSegmentStore(outFile);
 
@@ -171,7 +178,7 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
      * @throws Exception
      * @throws IOException
      */
-    public void test_baseCase() throws IOException, Exception {
+    public void test_baseCase() throws Exception {
 
         final BTree btree = getBaseCaseBTree();
 
@@ -189,5 +196,32 @@ public class TestIndexSegmentCursors extends AbstractTupleCursorTestCase {
         }
 
     }
+
+    /*
+     * Note: This unit test does not work for the IndexSegment because the
+     * IndexSegmentBuilder will fill up each leaf in turn, so the first leaf
+     * winds up with 3 tuples and the second with only 2 rather than it being
+     * the other way around.
+     */
+//    public void test_reverseTraversal() throws Exception {
+//
+//        final BTree btree = getReverseTraversalBTree();
+//
+//        // Note: This MUST use the same branching factor for the segment.
+//        final IndexSegment seg = buildIndexSegment(btree, btree
+//                .getIndexMetadata().getIndexSegmentBranchingFactor());
+//
+//        try {
+//
+//            doReverseTraversalTest(seg);
+//
+//        } finally {
+//
+//            // close so it can be deleted by tearDown().
+//            seg.close();
+//
+//        }
+//
+//    }
 
 }

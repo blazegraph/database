@@ -56,7 +56,7 @@ import com.bigdata.rawstore.IRawStore;
  *       class which uses a single {@link ConcurrentHashMap} but also maintains
  *       the linked-list LRU ordering.
  */
-public class StoreAndAddressLRUCache<V> implements IGlobalLRU<Long,V> {
+public class StoreAndAddressLRUCache<V> implements IHardReferenceGlobalLRU<Long,V> {
 
     /**
      * Keys of the map combine the store's {@link UUID} and the within store
@@ -227,6 +227,39 @@ public class StoreAndAddressLRUCache<V> implements IGlobalLRU<Long,V> {
 
     }
     
+    public int getRecordCount() {
+
+        // FIXME Is this constant time or near constant time?
+        return map.size();
+
+    }
+
+    public long getEvictionCount() {
+
+        return counters.evictionCount.get();
+        
+    }
+
+    public long getEvictionByteCount() {
+
+        // FIXME getEvictionByteCount
+        return 0L;
+//        return counters.evictionByteCount.get();
+        
+    }
+    
+    public long getBytesInMemory() {
+
+        return counters.bytesInMemory.get();
+        
+    }
+    
+    public int getCacheSetSize() {
+        
+        return cacheSet.size();
+        
+    }
+        
     /**
      * Return the #of entries in the backing LRU across all {@link IRawStore}s.
      */
@@ -640,5 +673,5 @@ public class StoreAndAddressLRUCache<V> implements IGlobalLRU<Long,V> {
         }
         
     }
-    
+
 }

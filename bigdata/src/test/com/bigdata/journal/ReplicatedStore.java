@@ -433,6 +433,12 @@ public class ReplicatedStore implements IRawStore {
         return addr;
         
     }
+    /**
+     * FIXME: Not sure if replication makes sense for re-allocation (mgc)
+     */
+    public long write(ByteBuffer data, long oldAddr) {
+    	return write(data);
+    }
 
     public long getNextOffset() {
 
@@ -540,18 +546,6 @@ public class ReplicatedStore implements IRawStore {
         localStore.deleteResources();
     }
 
-    public Object deserialize(byte[] b, int off, int len) {
-        return localStore.deserialize(b, off, len);
-    }
-
-    public Object deserialize(byte[] b) {
-        return localStore.deserialize(b);
-    }
-
-    public Object deserialize(ByteBuffer buf) {
-        return localStore.deserialize(buf);
-    }
-
     public int getByteCount(long addr) {
         return localStore.getByteCount(addr);
     }
@@ -588,16 +582,12 @@ public class ReplicatedStore implements IRawStore {
         return localStore.getResourceMetadata();
     }
     
-    public void packAddr(DataOutput out, long addr) throws IOException {
-        localStore.packAddr(out, addr);
-    }
+//    public void packAddr(DataOutput out, long addr) throws IOException {
+//        localStore.packAddr(out, addr);
+//    }
 
     public ByteBuffer read(long addr) {
         return localStore.read(addr);
-    }
-
-    public byte[] serialize(Object obj) {
-        return localStore.serialize(obj);
     }
 
     public long size() {
@@ -612,12 +602,16 @@ public class ReplicatedStore implements IRawStore {
         return localStore.toString(addr);
     }
 
-    public long unpackAddr(DataInput in) throws IOException {
-        return localStore.unpackAddr(in);
-    }
+//    public long unpackAddr(DataInput in) throws IOException {
+//        return localStore.unpackAddr(in);
+//    }
 
     public CounterSet getCounters() {
         return localStore.getCounters();
     }
+	public void delete(long addr) {
+		// TODO Auto-generated method stub
+		
+	}
 
 }

@@ -288,7 +288,7 @@ public class SuccessorUtil {
      * See <a
      * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
      * Comparing floating point numbers </a> by Bruce Dawson. The Java
-     * {@link Float} and {@link Double} clases provide the static methods
+     * {@link Float} and {@link Double} classes provide the static methods
      * required to convert a float or double into its IEEE 754 floating point
      * bit layout, which can be treated as an int (for floats) or a long (for
      * doubles). By testing for the sign, you can just add (or subtract) one (1)
@@ -377,7 +377,7 @@ public class SuccessorUtil {
      * See <a
      * href="http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm">
      * Comparing floating point numbers </a> by Bruce Dawson. The Java
-     * {@link Float} and {@link Double} clases provide the static methods
+     * {@link Float} and {@link Double} classes provide the static methods
      * required to convert a float or double into its IEEE 754 floating point
      * bit layout, which can be treated as an int (for floats) or a long (for
      * doubles). By testing for the sign, you can just add (or subtract) one (1)

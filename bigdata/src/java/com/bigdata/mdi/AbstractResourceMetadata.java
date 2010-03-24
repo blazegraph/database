@@ -41,6 +41,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.Journal;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.service.Params;
 
 /**
@@ -79,6 +80,11 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
      */
     private long createTime;
 
+    /**
+     * @see #VERSION1
+     */
+    private long commitTime;
+
     public Map<String, Object> getParams() {
 
         final Map<String, Object> v = new HashMap<String, Object>();
@@ -100,8 +106,8 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
         
     }
 
-    protected AbstractResourceMetadata(String filename, //long nbytes,
-            UUID uuid, long createTime) {
+    protected AbstractResourceMetadata(final String filename, //long nbytes,
+            final UUID uuid, final long createTime, final long commitTime) {
 
         if (filename == null || uuid == null)
             throw new IllegalArgumentException();
@@ -123,6 +129,8 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
             throw new IllegalArgumentException("Create time is zero? : " + this);
           
         }
+        
+        this.commitTime = commitTime;
       
     }
 
@@ -136,7 +144,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
      * Note: The JDK {@link HashMap} implementation requires that we define this
      * method in order for {@link HashMap#get(Object)} to work correctly!
      */
-    final public boolean equals(Object o) {
+    final public boolean equals(final Object o) {
         
         return equals((IResourceMetadata)o);
         
@@ -145,7 +153,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
     /**
      * Compares two resource metadata objects for consistent state.
      */
-    final public boolean equals(IResourceMetadata o) {
+    final public boolean equals(final IResourceMetadata o) {
         
         if (this == o)
             return true;
@@ -187,15 +195,39 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
         return createTime;
         
     }
-    
-    private static transient short VERSION0 = 0x0;
-    
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+
+    final public long getCommitTime() {
         
+        return commitTime;
+        
+    }
+    
+    /**
+     * The original version.
+     */
+    private static final transient short VERSION0 = 0x0;
+
+    /**
+     * This version supports a commitTime field. That field is used when a view
+     * must be defined which reads on a specific commit record in a journal. For
+     * VERSION0, this field was not defined. Prior to version1, all references to
+     * a historical journal were interpreted as references to the lastCommitTime
+     * in the journal by the {@link IndexManager}.
+     */
+    private static final transient short VERSION1 = 0x1;
+    
+    public void readExternal(final ObjectInput in) throws IOException,
+            ClassNotFoundException {
+
         final short version = ShortPacker.unpackShort(in);
-        
-        if (version != 0x0)
+
+        switch (version) {
+        case VERSION0:
+        case VERSION1:
+            break;
+        default:
             throw new IOException("Unknown version: " + version);
+        }
 
 //        nbytes = LongPacker.unpackLong(in);
         
@@ -203,13 +235,30 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
         
         createTime = in.readLong();
         
-        filename = in.readUTF();
+        if (version >= VERSION1) {
+
+            // the specified value.
+            commitTime = in.readLong();
+            
+        } else if(this instanceof SegmentMetadata) {
+            
+            // these are the always the same for an index segment.
+            commitTime = createTime;
+            
+        } else {
+            
+            // no value was specified.
+            commitTime = 0L;
+            
+        }
         
+        filename = in.readUTF();
+
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
-        ShortPacker.packShort(out, VERSION0);
+        ShortPacker.packShort(out, VERSION1);
         
 //        LongPacker.packLong(out, nbytes);
         
@@ -218,6 +267,8 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
         out.writeLong(uuid.getLeastSignificantBits());
 
         out.writeLong(createTime);
+        
+        out.writeLong(commitTime);
         
         out.writeUTF(filename);
         
@@ -232,6 +283,7 @@ abstract public class AbstractResourceMetadata implements IResourceMetadata,
         "{filename="+getFile()+
         ",uuid="+getUUID()+
         ",createTime="+getCreateTime()+
+        ",commitTime="+getCommitTime()+
         "}";
         
     }

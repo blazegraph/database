@@ -92,13 +92,13 @@ public interface ISplitHandler extends Serializable {
      * @return <code>true</code> if the index partition should be joined.
      */
     public boolean shouldJoin(long rangeCount);
-    
+
     /**
      * Choose a set of splits that completely span the key range of the index
      * view. The first split MUST use the leftSeparator of the index view as its
      * leftSeparator. The last split MUST use the rightSeparator of the index
-     * view as its rightSeparator. The #of splits SHOULD be choosen such that
-     * the resulting index partitions are each at least 50% full.
+     * view as its rightSeparator. The #of splits SHOULD be chosen such that the
+     * resulting index partitions are each at least 50% full.
      * 
      * @param partitionIdFactory
      * 
@@ -106,10 +106,9 @@ public interface ISplitHandler extends Serializable {
      *            The source index partition.
      * 
      * @return A {@link Split}[] array contains everything that we need to
-     *         define the new index partitions <em>except</em> the partition
-     *         identifiers -or- <code>null</code> if a more detailed
-     *         examination reveals that the index SHOULD NOT be split at this
-     *         time.
+     *         define the new index partitions -or- <code>null</code> if a more
+     *         detailed examination reveals that the index SHOULD NOT be split
+     *         at this time.
      */
 //    * @param btreeCounters
 //    *            Performance counters for the index partition view collected

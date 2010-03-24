@@ -54,6 +54,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.rdf.spo.SPOIndexWriteProc.IndexWriteProcConstructor;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -85,6 +87,8 @@ public class SPOIndexWriter implements Callable<Long> {
     private final IIndex ndx;
 
     private final SPOKeyOrder keyOrder;
+    
+    private final boolean reportMutation;
 
     /**
      * Writes statements on a statement index (batch api).
@@ -117,12 +121,17 @@ public class SPOIndexWriter implements Callable<Long> {
      *            actually written on the SPO index (the counter is only
      *            incremented when writing on the SPO index to avoid double
      *            counting).
+     * @param reportMutations
+     *            When <code>true</code>, an indication will be reported for
+     *            each statement whose state in the index was changed as a 
+     *            result of this operation.
      */
     public SPOIndexWriter(final SPORelation spoRelation, final ISPO[] a,
             final int numStmts, final boolean clone,
             final SPOKeyOrder keyOrder, final IElementFilter<ISPO> filter,
             final AtomicLong sortTime, final AtomicLong insertTime,
-            final AtomicLong numWritten) {
+            final AtomicLong numWritten,
+            final boolean reportMutations) {
 
         if (spoRelation == null)
             throw new IllegalArgumentException();
@@ -136,9 +145,9 @@ public class SPOIndexWriter implements Callable<Long> {
         
         if (clone) {
 
-            // copy the caller's data.
+            // Copy the caller's data (cloning the array, not its contents).
             
-            this.stmts = new SPO[numStmts];
+            this.stmts = new ISPO[numStmts];
 
             System.arraycopy(a, 0, this.stmts, 0, numStmts);
 
@@ -160,6 +169,8 @@ public class SPOIndexWriter implements Callable<Long> {
         
         this.comparator = keyOrder.getComparator();
 
+        this.reportMutation = reportMutations;
+        
         // Note: Use the index on [statementStore]!
         this.ndx = spoRelation.getIndex(keyOrder);
         
@@ -212,9 +223,14 @@ public class SPOIndexWriter implements Callable<Long> {
 
         ISPO last = null;
 
+        // dense array of keys.
         final byte[][] keys = new byte[numStmts][];
 
+        // dense array of values.
         final byte[][] vals = new byte[numStmts][];
+        
+        // dense array of statements to write.
+        final ISPO[] denseStmts = reportMutation ? new ISPO[numStmts] : null;
 
         final ByteArrayBuffer vbuf = new ByteArrayBuffer(1+8/*max length*/);
         
@@ -250,6 +266,9 @@ public class SPOIndexWriter implements Callable<Long> {
             // generate value for the index.
             vals[numToAdd] = spo.serializeValue(vbuf);
 
+            if(reportMutation)
+                denseStmts[numToAdd] = spo;
+            
             last = spo;
 
             numToAdd++;
@@ -261,24 +280,67 @@ public class SPOIndexWriter implements Callable<Long> {
          */
         final long _begin = System.currentTimeMillis();
         
-        final LongAggregator aggregator = new LongAggregator();
-        
-        ndx.submit(0/* fromIndex */, numToAdd/* toIndex */,
-                keys, vals, IndexWriteProcConstructor.INSTANCE,
-                aggregator);
-        
-        final long writeCount = aggregator.getResult();
+        final long writeCount;
+        if (reportMutation) {
 
+            /*
+             * The IResultHandler obtains from the RPC an indication of each
+             * statement whose state was changed by this operation. We use that
+             * information to set the metadata on the corresponding ISPO in the
+             * caller's array.
+             */
+
+            final ResultBitBufferHandler aggregator = new ResultBitBufferHandler(
+                    numToAdd);
+
+            ndx.submit(0/* fromIndex */, numToAdd/* toIndex */, keys, vals,
+                    IndexWriteProcConstructor.REPORT_MUTATION, aggregator);
+
+            final ResultBitBuffer modified = aggregator.getResult();
+
+            final boolean[] bits = modified.getResult();
+            
+            writeCount = modified.getOnCount();
+
+            for (int i = 0; i < numToAdd; i++) {
+
+                if (bits[i]) {
+
+                    /*
+                     * Note: This only turns on the modified flag. It will not
+                     * clear it if it is already set. The caller has to take
+                     * responsibility for that. This way if the statement is
+                     * written twice and the 2nd time the indices are not
+                     * updated we still report the statement as modified since
+                     * its flag has not been cleared (unless the caller
+                     * explicitly cleared it in between those writes).
+                     */
+                    
+                    denseStmts[i].setModified(bits[i]);
+
+                }
+
+            }
+
+        } else {
+
+            final LongAggregator aggregator = new LongAggregator();
+
+            ndx.submit(0/* fromIndex */, numToAdd/* toIndex */, keys, vals,
+                    IndexWriteProcConstructor.INSTANCE, aggregator);
+
+            writeCount = aggregator.getResult();
+
+        }
+        
         insertTime.addAndGet(System.currentTimeMillis() - _begin);
 
         if (keyOrder.isPrimaryIndex()) {
-//        if (keyOrder == SPOKeyOrder.SPO) {
 
             /*
-             * Note: Only the task writing on the SPO index takes responsibility
-             * for reporting the #of statements that were written on the
-             * indices.  This avoids double counting.  We use the SPO index since
-             * it is always defined, even when just one access path is used.
+             * Note: Only the task writing on the primary index takes
+             * responsibility for reporting the #of statements that were written
+             * on the indices. This avoids double counting.
              */
 
             numWritten.addAndGet(writeCount);

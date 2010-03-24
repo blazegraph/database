@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISplitHandler;
+import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractTask;
@@ -51,7 +52,39 @@ import com.bigdata.sparse.SparseRowStore;
  *      {@link MetadataIndex} as an atomic operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: SplitIndexPartitionTask.java 2265 2009-10-26 12:51:06Z
+ *          thompsonbry $
+ * 
+ *          FIXME Refactor: Task splits an index partition which is a compact
+ *          view (no more than one journal and one index segment) and should be
+ *          invoked when the size of the index segment on the disk exceeds the
+ *          nominal size of an index partition. The index partition is the
+ *          result of a compacting merge, which could have been created by
+ *          {@link IncrementalBuildTask} or {@link CompactingMergeTask}. The
+ *          index partition is passed into this task because it is not yet part
+ *          of the view. Based on the nominal size of the index partition and
+ *          the size of the segment, N=segSize/nominalSize splits will be
+ *          generated, requiring N-1 separator keys.
+ *          <p>
+ *          The task uses the linear list API to identify N-1 separator key
+ *          which would split the index segment and assumes that the data is
+ *          evenly distributed across the keys within the index segment. The
+ *          buffered writes are ignored when determining the separator keys
+ *          (most data will be on the index segment if the journal extent
+ *          roughly the same as the nominal index segment extent and multiple
+ *          index partitions are registered on the journal). Application
+ *          constraints on the choice of the separator keys will be honored and
+ *          can result in fewer splits being generated.
+ *          <p>
+ *          Once the N-1 split points have been selected, N index segments are
+ *          built - one from each of the N key ranges which those N-1 split
+ *          points define. Once the index segment for each split has been built,
+ *          an {@link AtomicUpdateSplitIndexPartitionTask} will atomically
+ *          re-define the source index partition as N new index partition and
+ *          copy the buffered writes into the appropriate index partition.
+ *          During the atomic update the original index partition becomes
+ *          un-defined and new index partitions are defined in its place which
+ *          span the same total key range and have the same data.
  */
 public class SplitIndexPartitionTask extends
         AbstractPrepareTask<AbstractResult> {
@@ -59,11 +92,17 @@ public class SplitIndexPartitionTask extends
     protected final ViewMetadata vmd;
 
     protected final UUID[] moveTargets;
-    
+
     /**
-     * The split handler to be applied. Note that this MAY have been overriden
+     * The split handler to be applied. Note that this MAY have been overridden
      * in order to promote a split so you MUST use this instance and NOT the one
      * in the {@link IndexMetadata} object.
+     * 
+     * @todo Refactor as just a constraint on the separatorKey choice. hand the
+     *       application the recommended separatorKey and the
+     *       {@link IndexSegment} and let it do whatever it needs to do.
+     *       Typically, just use an {@link ITupleCursor} to locate the closest
+     *       valid separatorKey for the application semantics.
      */
     private final ISplitHandler splitHandler;
     
@@ -97,9 +136,6 @@ public class SplitIndexPartitionTask extends
         super(vmd.resourceManager, TimestampUtility
                 .asHistoricalRead(vmd.commitTime), vmd.name);
 
-        if (vmd == null)
-            throw new IllegalArgumentException(); 
-        
         this.vmd = vmd;
 
         if (vmd.pmd == null) {
@@ -192,7 +228,7 @@ public class SplitIndexPartitionTask extends
 
                 // Note: fused view for the source index partition.
                 final ILocalBTreeView src = vmd.getView();
-
+                
                 /*
                  * Get the split points for the index. Each split point
                  * describes a new index partition. Together the split points
@@ -204,7 +240,36 @@ public class SplitIndexPartitionTask extends
                 Split[] splits;
                 try {
 
-                    splits = splitHandler.getSplits(resourceManager, src);
+                    final boolean compactView = src.getSourceCount() == 2
+                            && (src.getSources()[1] instanceof IndexSegment);
+
+                    if (compactView && false) {
+
+                        /*
+                         * FIXME Choose splits using the linear-list API based
+                         * on the index segment data only. Eventually this will
+                         * become the only way to do a split.
+                         * 
+                         * FIXME Write ISimpleSplitHandler for SparseRowStore
+                         * and unit tests for that impl.
+                         */
+
+                        splits = SplitUtility.getSplits(resourceManager,
+                                vmd.pmd, (IndexSegment) src.getSources()[1],
+                                resourceManager.nominalShardSize, null/*
+                                                                       * FIXME
+                                                                       * splitHandler
+                                                                       * from
+                                                                       * the
+                                                                       * IndexMetadata
+                                                                       * .
+                                                                       */);
+
+                    } else {
+
+                        splits = splitHandler.getSplits(resourceManager, src);
+                        
+                    }
 
                 } catch (Throwable t) {
 
@@ -243,7 +308,7 @@ public class SplitIndexPartitionTask extends
                 if (splits == null) {
 
                     /*
-                     * No splits were choosen so the index will not be split at
+                     * No splits were chosen so the index will not be split at
                      * this time.
                      */
 
@@ -256,9 +321,9 @@ public class SplitIndexPartitionTask extends
                         return concurrencyManager.submit(
                                 new MoveTask(vmd, moveTargets[0])).get();
 
-                    } else if (vmd.manditoryMerge) {
+                    } else if (vmd.mandatoryMerge) {
 
-                        // Manditory compacting merge.
+                        // Mandatory compacting merge.
 
                         log.warn("No splits identified: will merge: " + vmd);
 

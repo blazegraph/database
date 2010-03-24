@@ -72,6 +72,8 @@ public class TestAll extends TestCase {
         
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStore.suite() );
 
+        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWORM.suite() );
+
         suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithoutStatementIdentifiers.suite() );
 
 //        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithIsolatableIndices.suite() );

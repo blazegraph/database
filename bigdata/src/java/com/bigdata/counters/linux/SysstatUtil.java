@@ -34,7 +34,6 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Map;
 
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.counters.AbstractStatisticsCollector;
@@ -51,20 +50,8 @@ public class SysstatUtil {
             .getLogger(AbstractStatisticsCollector.class);
 
     /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.getEffectiveLevel().toInt() <= Level.DEBUG
-            .toInt();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
-            .toInt();
-    
-    /**
      * Returns the path to the sysstat utilities (pidstat, sar, etc). The
-     * default is <code>/usr/bin</code>. This may be overriden using the
+     * default is <code>/usr/bin</code>. This may be overridden using the
      * <code>com.bigdata.counters.linux.sysstat.path</code> property.
      * 
      * @return The path.
@@ -75,7 +62,7 @@ public class SysstatUtil {
 
         final File file = new File(System.getProperty(PATH, "/usr/bin/"));
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info(PATH + "=" + file);
 
         return file;
@@ -99,7 +86,7 @@ public class SysstatUtil {
      * 
      * @return The fields.
      */
-    static public String[] splitDataLine(String data) {
+    static public String[] splitDataLine(final String data) {
         
         final String t = data.substring(11);
         
@@ -111,7 +98,7 @@ public class SysstatUtil {
         // the first field is empty, so we put the data in there.
         fields[0] = data.substring(0,11);
         
-        if(DEBUG) {
+        if(log.isDebugEnabled()) {
             
             log.debug("fields="+Arrays.toString(fields));
             

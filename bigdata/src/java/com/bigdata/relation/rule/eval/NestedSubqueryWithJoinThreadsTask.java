@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -84,12 +85,12 @@ import com.bigdata.util.concurrent.ExecutionHelper;
  *       generalization of the binding set and its serialization and a mix up of
  *       that with the iterators on the {@link IAccessPath}.
  * 
- * @todo support foreign key joins.
- * 
- * @see JoinMasterTask, which is designed for scale-out federations.
+ * @see JoinMasterTask, which is designed for scale-out federations but is also
+ *      much faster under heavy query workloads for scale-up query as well.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: NestedSubqueryWithJoinThreadsTask.java 2372 2010-02-01
+ *          16:19:39Z thompsonbry $
  */
 public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
@@ -114,6 +115,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
     protected final IRuleState ruleState;
     protected final RuleStats ruleStats;
     protected final int tailCount;
+    protected final IRelation[] tailRelations;
     
     /**
      * The evaluation order.
@@ -269,9 +271,22 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
         
         this.joinHelper = joinService == null ? null
                 : new ExecutionHelper<Void>(joinService);
+
+        /*
+         * Fill in the tail relation views for reuse during evaluation. Note
+         * that the array is in tail order, not evaluation order.
+         */
         
+        tailRelations = new IRelation[tailCount];
+
+        for (int i = 0; i < tailCount; i++) {
+
+            tailRelations[i] = joinNexus.getTailRelationView(rule.getTail(i));
+
+        }
+
     }
-    
+
     /**
      * Recursively evaluate the subqueries.
      */
@@ -549,7 +564,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
     /**
      * Method to be invoked IFF there were no solutions in the data that
-     * satisified the constraints on the rule. If the tail is optional, then
+     * satisfied the constraints on the rule. If the tail is optional, then
      * subquery evaluation will simply skip the tail and proceed with the
      * successor of the tail in the evaluation order. If the tail is the last
      * tail in the evaluation order, then a solution will be emitted for the
@@ -620,10 +635,13 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
 
         final int tailIndex = getTailIndex(orderIndex);
 
+        final IRelation relation = tailRelations[tailIndex];
+        
         final IPredicate predicate = rule.getTail(tailIndex)
                 .asBound(bindingSet);
 
-        final IAccessPath accessPath = joinNexus.getTailAccessPath(predicate);
+        final IAccessPath accessPath = joinNexus.getTailAccessPath(relation,
+                predicate);
 
         if (DEBUG) {
 
@@ -792,7 +810,7 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
      * The {@link #joinService} will decide for each task whether to allocate a
      * new thread, to run it on an existing thread, to leave it on the work
      * queue for a while, or to execute it in the caller's thread (the latter is
-     * selected via a rejected exection handler option).
+     * selected via a rejected exception handler option).
      * <p>
      * Note: This requires that we clone the {@link IBindingSet} so that each
      * parallel task will have its own state.
@@ -997,9 +1015,6 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                     log.debug("solution: " + bindingSet);
                 }
 
-                final ISolution solution = joinNexus.newSolution(rule,
-                        bindingSet);
-
                 final long solutionCount = ruleStats.solutionCount.incrementAndGet();
                 
                 if (last > 0 && solutionCount > last) {
@@ -1010,6 +1025,9 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
                 }
 
                 if (solutionCount > offset) {
+
+                    final ISolution solution = joinNexus.newSolution(rule,
+                            bindingSet);
 
                     // add the solution to the buffer.
                     buffer.add(solution);

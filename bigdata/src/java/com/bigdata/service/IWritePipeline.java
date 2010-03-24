@@ -29,14 +29,14 @@ package com.bigdata.service;
 
 import java.util.UUID;
 
+import com.bigdata.io.IWriteCache;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.IUpdateStore;
 
 /**
  * Replicates writes against a primary store by pipelining them onto one or more
  * secondary stores in order to provide high availability and failover.
- * Replication is handled at the level of the {@link IRawStore} and
- * {@link IUpdateStore} APIs so that it may be tested in a local environment and
+ * Replication is handled at the level of the {@link IRawStore} (or perhaps the
+ * {@link IWriteCache}) APIs so that it may be tested in a local environment and
  * even used to provide media failover. However, the primary use case is state
  * replication, high availability, and failover for {@link DataService}s.
  * <p>

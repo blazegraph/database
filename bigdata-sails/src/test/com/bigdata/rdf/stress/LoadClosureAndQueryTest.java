@@ -1028,16 +1028,9 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         final AbstractTripleStore db = sail.getDatabase();
 
-        /*
-         * @todo should be a parameter for the experimental configuration. the
-         * writeBuffer must be closed during normal shutdown and we must await
-         * its Future. for abnormal shutdown the Future should be cancelled.
-         */
-        final BlockingBuffer<ISPO[]> writeBuffer = null;
-        
         final RDFLoadTaskFactory loadTaskFactory = //
-        new RDFLoadTaskFactory(db, bufferCapacity, writeBuffer,
-                verifyRDFSourceData, false/*deleteAfter*/, fallback);
+        new RDFLoadTaskFactory(db, bufferCapacity, verifyRDFSourceData,
+                false/* deleteAfter */, fallback);
 
         final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,
                 nthreads);
@@ -1132,7 +1125,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         final long timestamp = sail.getDatabase().getIndexManager()
                 .getLastCommitTime();
         
-        return sail.getReadHistoricalView(timestamp);
+        return sail.getReadOnlyConnection(timestamp);
         
     }
 
@@ -2173,7 +2166,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          */
 //        properties.setProperty(Options.FORCE_SERIAL_EXECUTION, "false");
         
-//      properties.setProperty(Options.MUTATION_BUFFER_CAPACITY, "20000");
+//      properties.setProperty(Options.BUFFER_CAPACITY, "20000");
         properties.setProperty(Options.CHUNK_CAPACITY, "100");
 //      properties.setProperty(Options.QUERY_BUFFER_CAPACITY, "10000");
 //      properties.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "10000");

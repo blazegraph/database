@@ -285,11 +285,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * avoid cache evictions of the leaves participating in a split.
          */
         int MIN_WRITE_RETENTION_QUEUE_CAPACITY = 2;
-        
+
         /**
-         * A reasonable maximum write retention queue capacity.
+         * A large maximum write retention queue capacity. A reasonable value
+         * with a large heap is generally in 8000 to 50000. The larger values
+         * are of benefit only if you are doing sustained writes on the index
+         * and have a large java heap.
          */
-        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 20000;
+        int MAX_WRITE_RETENTION_QUEUE_CAPACITY = 500000;
         
          /*
          * Options that apply to FusedViews as well as to AbstractBTrees.
@@ -302,7 +305,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * maintained (default {@value #DEFAULT_BLOOM_FILTER}). When enabled,
          * the bloom filter is effective up to ~ 2M entries per index
          * (partition). For scale-up, the bloom filter is automatically disabled
-         * after its error rate would be too large given the #of index enties.
+         * after its error rate would be too large given the #of index entries.
          * For scale-out, as the index grows we keep splitting it into more and
          * more index partitions, and those index partitions are comprised of
          * both views of one or more {@link AbstractBTree}s. While the mutable
@@ -368,6 +371,15 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
          * {@link IndexSegment}. Any touched node or leaf is placed onto this
          * queue. As nodes and leaves are evicted from this queue, they are then
          * placed onto the optional read-retention queue.
+         * <p>
+         * The default value is a function of the JVM heap size. For small
+         * heaps, it is {@value #DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY}. For
+         * larger heaps the value may be 8000 (1G), or 20000 (10G). These larger
+         * defaults are heuristics. Values larger than 8000 benefit the size of
+         * disk of the journal, while values up to 8000 can also improve
+         * throughput dramatically. Larger values are ONLY useful if the
+         * application is performing sustained writes on the index (hundreds of
+         * thousands to millions of records).
          */
         String WRITE_RETENTION_QUEUE_CAPACITY = com.bigdata.btree.AbstractBTree.class
                 .getPackage().getName()
@@ -430,31 +442,31 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 .getPackage().getName()
                 + ".leafValuesCoder";
 
-        /**
-         * Option determines whether or not per-child locks are used by
-         * {@link Node} for a <em>read-only</em> {@link AbstractBTree} (default
-         * {@value #DEFAULT_CHILD_LOCKS}). This option effects synchronization
-         * in {@link Node#getChild(int)}. Synchronization is not required for
-         * mutable {@link BTree}s as they already impose the constraint that the
-         * caller is single threaded. Synchronization is required in this method
-         * to ensure that the data structure remains coherent when concurrent
-         * threads demand access to the same child of a given {@link Node}.
-         * Per-child locks have higher potential concurrency since locking is
-         * done on a distinct {@link Object} for each child rather than on a
-         * shared {@link Object} for all children of a given {@link Node}.
-         * However, per-child locks require more {@link Object} allocation (for
-         * the locks) and thus contribute to heap demand.
-         * <p>
-         * Note: While this can improve read concurrency, this option imposes
-         * additional RAM demands since there is on {@link Object} allocated for
-         * each {@link Node} in the {@link BTree}.  This is why it is turned off
-         * by default.
-         */
-        String CHILD_LOCKS = com.bigdata.btree.AbstractBTree.class.getPackage()
-                .getName()
-                + ".childLocks";
-
-        String DEFAULT_CHILD_LOCKS = "false";
+//        /**
+//         * Option determines whether or not per-child locks are used by
+//         * {@link Node} for a <em>read-only</em> {@link AbstractBTree} (default
+//         * {@value #DEFAULT_CHILD_LOCKS}). This option effects synchronization
+//         * in {@link Node#getChild(int)}. Synchronization is not required for
+//         * mutable {@link BTree}s as they already impose the constraint that the
+//         * caller is single threaded. Synchronization is required in this method
+//         * to ensure that the data structure remains coherent when concurrent
+//         * threads demand access to the same child of a given {@link Node}.
+//         * Per-child locks have higher potential concurrency since locking is
+//         * done on a distinct {@link Object} for each child rather than on a
+//         * shared {@link Object} for all children of a given {@link Node}.
+//         * However, per-child locks require more {@link Object} allocation (for
+//         * the locks) and thus contribute to heap demand.
+//         * <p>
+//         * Note: While this can improve read concurrency, this option imposes
+//         * additional RAM demands since there is on {@link Object} allocated for
+//         * each {@link Node} in the {@link BTree}.  This is why it is turned off
+//         * by default.
+//         */
+//        String CHILD_LOCKS = com.bigdata.btree.AbstractBTree.class.getPackage()
+//                .getName()
+//                + ".childLocks";
+//
+//        String DEFAULT_CHILD_LOCKS = "false";
         
         /*
          * Options that are valid for any AbstractBTree but which are not
@@ -1041,13 +1053,13 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private LocalPartitionMetadata pmd;
     private String btreeClassName;
     private String checkpointClassName;
-    private IAddressSerializer addrSer;
+//    private IAddressSerializer addrSer;
     private IRabaCoder nodeKeysCoder;
     private ITupleSerializer<?, ?> tupleSer;
     private IRecordCompressorFactory<?> btreeRecordCompressorFactory;
     private IRecordCompressorFactory<?> indexSegmentRecordCompressorFactory;
     private IConflictResolver conflictResolver;
-    private boolean childLocks;
+//    private boolean childLocks;
     private boolean deleteMarkers;
     private boolean versionTimestamps;
     private boolean versionTimestampFilters;
@@ -1362,10 +1374,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    /**
-     * Object used to (de-)serialize the addresses of the children of a node.
-     */
-    public final IAddressSerializer getAddressSerializer() {return addrSer;}
+//    /**
+//     * Object used to (de-)serialize the addresses of the children of a node.
+//     */
+//    public final IAddressSerializer getAddressSerializer() {return addrSer;}
 
     /**
      * Object used to code (compress) the keys in a node.
@@ -1409,16 +1421,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     public final IConflictResolver getConflictResolver() {return conflictResolver;}
     
-    /**
-     * @see Options#CHILD_LOCKS
-     */
-    public final boolean getChildLocks() {return childLocks;}
-    
-    public final void setChildLocks(final boolean newValue) {
-
-        this.childLocks = newValue;
-        
-    }
+//    /**
+//     * @see Options#CHILD_LOCKS
+//     */
+//    public final boolean getChildLocks() {return childLocks;}
+//    
+//    public final void setChildLocks(final boolean newValue) {
+//
+//        this.childLocks = newValue;
+//        
+//    }
 
     /**
      * When <code>true</code> the index will write a delete marker when an
@@ -1440,16 +1452,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      */
     public final boolean getDeleteMarkers() {return deleteMarkers;}
     
-    public final void setDeleteMarkers(boolean deleteMarkers) {
+    public final void setDeleteMarkers(final boolean deleteMarkers) {
 
         this.deleteMarkers = deleteMarkers;
         
     }
 
     /**
-     * When <code>true</code> the index will maintain a per-index entry
+     * When <code>true</code> the index will maintain a per-index entry revision
      * timestamp. The primary use of this is in support of transactional
-     * isolation.
+     * isolation. Delete markers MUST be enabled when using revision timestamps.
      * 
      * @see #getVersionTimestampFilters()
      */
@@ -1521,8 +1533,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     }
 
     /**
-     * Convenience method sets both {@link #getDeleteMarkers()} and
-     * {@link #getVersionTimestamps()} at the same time.
+     * Convenience method sets both {@link #setDeleteMarkers(boolean)} and
+     * {@link #setVersionTimestamps(boolean)} at the same time.
      * 
      * @param isolatable
      *            <code>true</code> if delete markers and version timestamps
@@ -1543,14 +1555,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-    public void setAddressSerializer(final IAddressSerializer addrSer) {
-        
-        if (addrSer == null)
-            throw new IllegalArgumentException();
-        
-        this.addrSer = addrSer;
-        
-    }
+//    public void setAddressSerializer(final IAddressSerializer addrSer) {
+//        
+//        if (addrSer == null)
+//            throw new IllegalArgumentException();
+//        
+//        this.addrSer = addrSer;
+//        
+//    }
 
     public void setNodeKeySerializer(final IRabaCoder nodeKeysCoder) {
         
@@ -1800,8 +1812,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Constructor used to configure a new <em>unnamed</em> B+Tree. The index
      * UUID is set to the given value and all other fields are defaulted as
      * explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
-     * defaults may be overriden using the various setter methods, but some
-     * values can not be safely overriden after the index is in use.
+     * defaults may be overridden using the various setter methods, but some
+     * values can not be safely overridden after the index is in use.
      * 
      * @param indexUUID
      *            The indexUUID.
@@ -1819,8 +1831,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Constructor used to configure a new <em>named</em> B+Tree. The index
      * UUID is set to the given value and all other fields are defaulted as
      * explained at {@link #IndexMetadata(Properties, String, UUID)}. Those
-     * defaults may be overriden using the various setter methods, but some
-     * values can not be safely overriden after the index is in use.
+     * defaults may be overridden using the various setter methods, but some
+     * values can not be safely overridden after the index is in use.
      * 
      * @param name
      *            The index name. When this is a scale-out index, the same
@@ -1845,7 +1857,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * Constructor used to configure a new <em>named</em> B+Tree. The index
      * UUID is set to the given value and all other fields are defaulted as
      * explained at {@link #getProperty(Properties, String, String, String)}.
-     * Those defaults may be overriden using the various setter methods.
+     * Those defaults may be overridden using the various setter methods.
      * 
      * @param indexManager
      *            Optional. When given and when the {@link IIndexManager} is a
@@ -1853,7 +1865,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      *            used to interpret the {@link Options#INITIAL_DATA_SERVICE}
      *            property.
      * @param properties
-     *            Properties object used to overriden the default values for
+     *            Properties object used to overridden the default values for
      *            this {@link IndexMetadata} instance.
      * @param namespace
      *            The index name. When this is a scale-out index, the same
@@ -1946,11 +1958,40 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
                 new IntegerRangeValidator(Options.MIN_BRANCHING_FACTOR,
                         Options.MAX_BTREE_BRANCHING_FACTOR));
 
-        this.writeRetentionQueueCapacity = getProperty(indexManager,
-                properties, namespace, Options.WRITE_RETENTION_QUEUE_CAPACITY,
-                Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
-                new IntegerRangeValidator(Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY,
-                        Options.MAX_WRITE_RETENTION_QUEUE_CAPACITY));
+        {
+            /*
+             * The default capacity is set dynamically based on the maximum java
+             * heap as specified by -Xmx on the command line. This provides
+             * better ergonomics, but the larger write retention queue capacity
+             * will only benefit applications which perform sustained writes on
+             * the index.
+             * 
+             * Note: For now I am turning off the write retention queue capacity
+             * "ergonomics". I am exploring whether or not this is too
+             * aggressive. The advantage of the ergonomics is that it
+             * automatically tunes the indices for a store used for a single
+             * purpose, such as a KB. However, if you have a lot of open
+             * indices, then this is not a good idea as each open index will
+             * allocate a ring buffer of that capacity.
+             */
+            final String defaultCapacity;
+//            final long maxMemory = Runtime.getRuntime().maxMemory();
+//            if (maxMemory >= Bytes.gigabyte * 10) {
+//                defaultCapacity = "20000";
+//            } else if (maxMemory >= Bytes.gigabyte * 1) {
+//                defaultCapacity = "8000";
+//            } else {
+                defaultCapacity = Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY;
+//            }
+            this.writeRetentionQueueCapacity = getProperty(indexManager,
+                    properties, namespace,
+                    Options.WRITE_RETENTION_QUEUE_CAPACITY,
+                    defaultCapacity,
+//                    Options.DEFAULT_WRITE_RETENTION_QUEUE_CAPACITY,
+                    new IntegerRangeValidator(
+                            Options.MIN_WRITE_RETENTION_QUEUE_CAPACITY,
+                            Options.MAX_WRITE_RETENTION_QUEUE_CAPACITY));
+        }
 
         this.writeRetentionQueueScan = getProperty(indexManager,
                 properties, namespace, Options.WRITE_RETENTION_QUEUE_SCAN,
@@ -2010,13 +2051,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         this.checkpointClassName = Checkpoint.class.getName();
         
-        /*
-         * FIXME Experiment with performance using a packed address serializer
-         * (or a nibble-based one). This effects how we serialize the child
-         * addresses for a Node. (PackedAddressSerialized appears to be broken
-         * - see the NodeSerialier test suite).
-         */
-        this.addrSer = AddressSerializer.INSTANCE;
+//        this.addrSer = AddressSerializer.INSTANCE;
         
 //        this.nodeKeySer = PrefixSerializer.INSTANCE;
         this.nodeKeysCoder = newInstance(getProperty(indexManager, properties,
@@ -2054,9 +2089,9 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         this.conflictResolver = null;
 
-        this.childLocks = Boolean.parseBoolean(getProperty(
-                indexManager, properties, namespace, Options.CHILD_LOCKS,
-                Options.DEFAULT_CHILD_LOCKS));
+//        this.childLocks = Boolean.parseBoolean(getProperty(
+//                indexManager, properties, namespace, Options.CHILD_LOCKS,
+//                Options.DEFAULT_CHILD_LOCKS));
         
         this.deleteMarkers = false;
         
@@ -2290,7 +2325,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         sb.append(", pmd=" + pmd);
         sb.append(", class=" + btreeClassName);
         sb.append(", checkpointClass=" + checkpointClassName);
-        sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
+//        sb.append(", childAddrSerializer=" + addrSer.getClass().getName());
         sb.append(", nodeKeysCoder=" + nodeKeysCoder.getClass().getName());
         sb.append(", btreeRecordCompressorFactory="
                 + (btreeRecordCompressorFactory == null ? "N/A"
@@ -2383,9 +2418,21 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
     private static transient final int VERSION7 = 0x07;
     
     /**
+     * This version gets rid of the IAddressSerializer interface used by the
+     * older {@link NodeSerializer} class to (de-)serialize the child addresses
+     * for a {@link Node}.
+     */
+    private static transient final int VERSION8 = 0x08;
+    
+    /**
+     * The childLocks feature was dropped in this version.
+     */
+    private static transient final int VERSION9 = 0x09;
+    
+    /**
      * The version that will be serialized by this class.
      */
-    private static transient final int CURRENT_VERSION = VERSION7;
+    private static transient final int CURRENT_VERSION = VERSION9;
     
     /**
      * @todo review generated record for compactness.
@@ -2404,6 +2451,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         case VERSION5:
         case VERSION6:
         case VERSION7:
+        case VERSION8:
+        case VERSION9:
             break;
         default:
             throw new IOException("Unknown version: version=" + version);
@@ -2440,7 +2489,12 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         checkpointClassName = in.readUTF();
 
-        addrSer = (IAddressSerializer) in.readObject();
+        if (version < VERSION8) {
+
+            // Read and discard the IAddressSerializer object.
+            in.readObject();
+            
+        }
 
         nodeKeysCoder = (IRabaCoder) in.readObject();
 
@@ -2459,13 +2513,14 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
         conflictResolver = (IConflictResolver)in.readObject();
 
-        if (version < VERSION5) {
+        if (version < VERSION5 || version >= VERSION9) {
 
-            childLocks = true;
+//            childLocks = true;
             
         } else {
             
-            childLocks = in.readBoolean();
+//            childLocks = 
+                in.readBoolean();
             
         }
         
@@ -2646,7 +2701,8 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         out.writeUTF(checkpointClassName);
         
-        out.writeObject(addrSer);
+        // Note: This field was dropped as of VERSION8.
+//        out.writeObject(addrSer);
         
         out.writeObject(nodeKeysCoder);
         
@@ -2660,9 +2716,10 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
         out.writeObject(conflictResolver);
 
-        if (version >= VERSION5) {
+        if (version >= VERSION5 && version < VERSION9 ) {
 
-            out.writeBoolean(childLocks);
+//            out.writeBoolean(childLocks);
+            out.writeBoolean(false/* childLocks */);
             
         }
 

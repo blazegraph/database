@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
+import java.util.Iterator;
+
 import org.apache.log4j.Level;
 
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
@@ -62,26 +64,33 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
      */
     protected void dumpIndexSegment(final IndexSegment seg) {
 
+        if (log.isInfoEnabled())
+            log.info("file=" + seg.getStore().getFile());
+
         // materialize the leaves.
-        
-        final ILeafCursor<?> cursor = seg.newLeafCursor(SeekEnum.First);
+        {
 
-        int n = 0;
-        while (cursor.next() != null) {
-            n++;
+            int n = 0, m = 0;
+
+            final ILeafCursor<?> cursor = seg.newLeafCursor(SeekEnum.First);
+
+            while (cursor.next() != null) {
+                n++;
+            }
+
+            cursor.last();
+            while (cursor.prior() != null) {
+                m++;
+            }
+
+            /*
+             * Note: n == m iff the same number of leaves were visited in each
+             * direction.
+             */
+            assertEquals(n, m);
+
         }
 
-        cursor.last();
-        while (cursor.prior() != null) {
-            n--;
-        }
-
-        /*
-         * Note: n will be zero if the same number of leaves were visited in
-         * each direction.
-         */
-        assertEquals(0, n);
-        
         /*
          * Dump the tree to validate it.
          * 
@@ -89,22 +98,86 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
          * IndexSegment does not materialize the intermediate nodes and dump()
          * only dumps those nodes and leaves which are already materialized.
          */
+        {
 
-        System.err.println("dumping index segment");
+            log.info("dumping root");
 
-        assert seg.dump(Level.DEBUG, System.err);
+            assertTrue(seg.getRoot().toShortString(), seg.dump(Level.DEBUG,
+                    System.err));
 
-        // dump the leaves in forward order.
-        cursor.first().dump(Level.DEBUG, System.err);
-        while(cursor.next()!=null) {
-            cursor.leaf().dump(Level.DEBUG, System.err);
         }
+
+        /*
+         * Dump the root, nodes, and leaves using the post-order iterator.
+         */
+        {
+
+            log.info("dumping nodes");
+
+            final Iterator<AbstractNode> itr = seg.getRoot()
+                    .postOrderNodeIterator();
+
+            while (itr.hasNext()) {
+
+                final AbstractNode node = itr.next();
+
+                assertTrue(node.toShortString(), node.dump(Level.DEBUG,
+                        System.err));
+
+            }
+
+        }
+
+        /*
+         * Dump the leaves in forward order using the tuple cursor.
+         */
+        {
+
+            log.info("dumping leaves (forward tuple cursor)");
+
+            final ILeafCursor<?> cursor = seg.newLeafCursor(SeekEnum.First);
+
+            Leaf leaf = cursor.leaf();
+
+            assertTrue(leaf.toShortString(), leaf.dump(Level.DEBUG, System.err));
+
+            while ((leaf = cursor.next()) != null) {
+
+                assertTrue(leaf.toShortString(), leaf.dump(Level.DEBUG,
+                        System.err));
+
+            }
+
+        }
+
+        /*
+         * Dump the leaves in reverse order using the tuple cursor.
+         */
+        {
+
+            log.info("dumping leaves (reverse tuple cursor)");
+
+            final ILeafCursor<?> cursor = seg.newLeafCursor(SeekEnum.Last);
+
+            Leaf leaf = cursor.leaf();
+
+            assertTrue(leaf.toShortString(), leaf.dump(Level.DEBUG, System.err));
+
+            while ((leaf = cursor.prior()) != null) {
+
+                assertTrue(leaf.toShortString(), leaf.dump(Level.DEBUG,
+                        System.err));
+
+            }
+
+        }
+
     }
     
     /**
      * Test forward leaf scan.
      */
-    public void testForwardScan(final IndexSegment seg)
+    static public void testForwardScan(final IndexSegment seg)
     {
 
         final int nleaves = seg.getStore().getCheckpoint().nleaves;
@@ -153,7 +226,7 @@ public class AbstractIndexSegmentTestCase extends AbstractBTreeTestCase {
      * Note: the scan starts with the last leaf in the key order and then
      * proceeds in reverse key order.
      */
-    public void testReverseScan(final IndexSegment seg) {
+    static public void testReverseScan(final IndexSegment seg) {
 
         final int nleaves = seg.getStore().getCheckpoint().nleaves;
 

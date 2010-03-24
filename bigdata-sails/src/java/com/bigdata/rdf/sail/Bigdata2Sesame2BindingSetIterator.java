@@ -5,15 +5,20 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Value;
+import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
+import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.MapBindingSet;
 
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IVariable;
+import com.bigdata.relation.rule.Var;
 import com.bigdata.striterator.ICloseableIterator;
 
 /**
@@ -71,7 +76,7 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
     /**
      * Aligns a bigdata {@link IBindingSet} with the Sesame 2 {@link BindingSet}.
      * 
-     * @param sourceBindingSet
+     * @param src
      *            A bigdata {@link IBindingSet} containing only
      *            {@link BigdataValue}s.
      * 
@@ -82,16 +87,16 @@ public class Bigdata2Sesame2BindingSetIterator<E extends Exception> implements
      * @throws ClassCastException
      *             if a bound value is not a {@link BigdataValue}.
      */
-    protected BindingSet getBindingSet(IBindingSet sourceBindingSet) {
+    protected BindingSet getBindingSet(final IBindingSet src) {
 
-        if (sourceBindingSet == null)
+        if (src == null)
             throw new IllegalArgumentException();
-        
-        final int n = sourceBindingSet.size();
+
+        final int n = src.size();
 
         final MapBindingSet bindingSet = new MapBindingSet(n /* capacity */);
 
-        final Iterator<Map.Entry<IVariable,IConstant>> itr = sourceBindingSet.iterator();
+        final Iterator<Map.Entry<IVariable,IConstant>> itr = src.iterator();
 
         while(itr.hasNext()) {
 

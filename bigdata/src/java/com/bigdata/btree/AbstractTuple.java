@@ -389,7 +389,7 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      * @param key
      * @param val
      */
-    public void copyTuple(byte[] key, byte[] val) {
+    public void copyTuple(final byte[] key, final byte[] val) {
         
         copyTuple(key, val, false/* deleted */, 0L/* timestamp */);
         
@@ -403,8 +403,9 @@ public abstract class AbstractTuple<E> implements ITuple<E> {
      * @param deleted
      * @param timestamp
      */
-    public void copyTuple(byte[] key, byte[] val, boolean deleted, long timestamp) {
-        
+    public void copyTuple(final byte[] key, final byte[] val,
+            final boolean deleted, final long timestamp) {
+
         this.nvisited++;
         
         this.versionDeleted = deleted;

@@ -103,12 +103,12 @@ public class TestBTree extends AbstractBTreeTestCase {
      */
     public void test_errorSequence001() {
 
-        int m = 3;
+        final int m = 3;
         
-        int[] order = new int[] { 0, 1, 6, 3, 7, 2, 4, 5, 8 };
+        final int[] order = new int[] { 0, 1, 6, 3, 7, 2, 4, 5, 8 };
 
-        doKnownKeySequenceTest( m, order, 3 );
-        
+        doKnownKeySequenceTest(getBTree(m), order, 3);
+
     }
     
     /**

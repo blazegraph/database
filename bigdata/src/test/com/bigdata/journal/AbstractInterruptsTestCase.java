@@ -32,7 +32,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.BTree;
@@ -74,7 +73,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
     }
 
     /**
-     * Runs {@link #doChannelOpenAfterInterrupt(Properties)} N times.
+     * Runs {@link #doChannelOpenAfterInterrupt()} N times.
      * 
      * @throws InterruptedException
      * @throws ExecutionException
@@ -103,20 +102,25 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      */
     public void doChannelOpenAfterInterrupt() throws InterruptedException {
 
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
+        
+        try {
 
         // Note: This test requires a journal backed by stable storage.
         
         if(store.isStable() && store instanceof IJournal) {
 
-            Journal journal = (Journal)store;
+            final Journal journal = (Journal)store;
             
             final String[] resource = new String[]{"foo"};//,"bar","baz"};
             
             // register the indices.
-            for(int i=0; i<resource.length; i++){
+            for (int i = 0; i < resource.length; i++) {
+             
                 journal.registerIndex(resource[i]);
+                
             }
+
             // and commit (but NOT using the writeService).
             journal.commit();
 
@@ -206,7 +210,11 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
         }
 
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
 
     }
     
@@ -230,7 +238,7 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
         protected Object doTask() throws Exception {
             
             // Get the live version of the named index.
-            BTree ndx = (BTree) getIndex(getOnlyResource());
+            final BTree ndx = (BTree) getIndex(getOnlyResource());
 
             // write on the index.
             ndx.insert(new byte[]{},new byte[]{});
@@ -277,29 +285,36 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * The test uses the {@link IRawStore} API. It writes an initial record on
      * the store and commits. It then interrupts the main thread and then
      * performs another low level write on the store. The store is then forced
-     * to disk to ensure that a {@link ClosedByInterruptException} is triggered,
-     * so this second record is never written.
+     * to disk to ensure that a {@link ClosedByInterruptException} is triggered
+     * (during an IO), (alternatively, an {@link InterruptedException} can be
+     * triggered when we try to acquire a lock). Either way this second record
+     * is never written.
      * <p>
-     * Once the {@link ClosedByInterruptException} has been triggered, we then
-     * attempt to re-read the 1st record, which was made restart safe by the
-     * commit.
+     * Once the {@link ClosedByInterruptException} or
+     * {@link InterruptedException} has been triggered, we then attempt to
+     * re-read the 1st record, which was made restart safe by the commit.
      * <p>
      * Note: This test is only for {@link IDiskBasedStrategy} implementations.
      */
     public void test_reopenAfterInterrupt() {
         
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
 
+        try {
+        
         if (store.isStable()) {
 
             final ByteBuffer rec1 = getRandomData();
 
             final long addr1 = store.write(rec1);
 
-            if(store instanceof IAtomicStore) {
+            if (store instanceof IAtomicStore) {
                 
                 assertNotSame(0L, ((IAtomicStore)store).commit());
                 
+            } else if (store instanceof RWStrategy) {
+            	RWStrategy rws = (RWStrategy)store;
+            	rws.commit();
             }
 
             try {
@@ -314,23 +329,43 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             } catch (Throwable t) {
 
-                assertTrue(isInnerCause(t, ClosedByInterruptException.class));
-
-                // clear the interrupt.
-                assertTrue(Thread.interrupted());
-                
+                    boolean expectedException = false;
+                    
+                    if (isInnerCause(t, ClosedByInterruptException.class)) {
+                        // Interrupt during an IO.
+                        expectedException = true;
+                        // clear the interrupt.
+                        assertTrue(Thread.interrupted());
+                    }
+                    
+                    if (isInnerCause(t, InterruptedException.class)) {
+                        // Interrupt while acquiring a lock.
+                        expectedException = true;
+                    }
+                    
+                    if (!expectedException) {
+                        fail("Expecting: inner cause"
+                                + ClosedByInterruptException.class.getName()
+                                + " -or- "
+                                + InterruptedException.class.getName(), t);
+                    }
+                    
             }
 
-            ByteBuffer actual = store.read(addr1);
+            final ByteBuffer actual = store.read(addr1);
             
             AbstractRawStoreTestCase.assertEquals(rec1.array(),actual);
             
         }
 
-        store.destroy();
+        } finally {
+
+            store.destroy();
+            
+        }
         
     }
-    
+
     /**
      * A simple test verifies that a read will transparently re-open the backing
      * {@link FileChannel} after a {@link ClosedByInterruptException}.
@@ -338,23 +373,28 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * The test uses the {@link IRawStore} API. It writes an initial record on
      * but does NOT force the store to the backing file. It then interrupts the
      * main thread and issues a request to force the store to disk. This request
-     * triggers a {@link ClosedByInterruptException}. At this point nothing has
-     * been written on the file.
+     * triggers a {@link ClosedByInterruptException} (during an IO) -or- an
+     * {@link InterruptedException} (when trying to acquire a lock). At this
+     * point nothing has been written on the file.
      * <p>
-     * Once the {@link ClosedByInterruptException} has been triggered, we then
-     * attempt to re-read the record that was written. If the store buffers
-     * writes then this operation will succeed.
+     * Once the {@link ClosedByInterruptException} or
+     * {@link InterruptedException} has been triggered, we then attempt to
+     * re-read the record that was written. If the store buffers writes then
+     * this operation will succeed.
      * <p>
      * Note: Both the {@link DirectBufferStrategy} and the
      * {@link DiskOnlyStrategy} buffer writes, so both should pass this test.
      * <p>
      * Note: This test is only for {@link IDiskBasedStrategy} implementations.
+     * Note: This test is not relevant for RWStrategy since it does not buffer
+     * writes in a reliable way, and furthermore will invalidate the store after
+     * an interrupt.
      */
     public void test_reopenAfterInterrupt_checkWriteBuffer() {
         
-        IRawStore store = getStore();
-
-        if (store.isStable()) {
+        final IRawStore store = getStore();
+        try {
+        if (store.isStable() && !(store instanceof RWStrategy)) {
 
             final ByteBuffer rec1 = getRandomData();
 
@@ -370,20 +410,40 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
 
             } catch (Throwable t) {
 
-                assertTrue(isInnerCause(t, ClosedByInterruptException.class));
-
-                // clear the interrupt.
-                assertTrue(Thread.interrupted());
+                boolean expectedException = false;
+                
+                if (isInnerCause(t, ClosedByInterruptException.class)) {
+                    // Interrupt during an IO.
+                    expectedException = true;
+                    // clear the interrupt.
+                    assertTrue(Thread.interrupted());
+                }
+                
+                if (isInnerCause(t, InterruptedException.class)) {
+                    // Interrupt while acquiring a lock.
+                    expectedException = true;
+                }
+                
+                if (!expectedException) {
+                    fail("Expecting: inner cause"
+                            + ClosedByInterruptException.class.getName()
+                            + " -or- "
+                            + InterruptedException.class.getName(), t);
+                }
 
             }
 
-            ByteBuffer actual = store.read(addr1);
+            final ByteBuffer actual = store.read(addr1);
             
             AbstractRawStoreTestCase.assertEquals(rec1.array(),actual);
             
         }
+        
+        } finally {
 
-        store.destroy();
+            store.destroy();
+            
+        }
         
     }
     

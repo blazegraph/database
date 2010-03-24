@@ -515,7 +515,7 @@ public class TestHardReferenceQueue extends TestCase2 {
          *             if the evicted reference is not the next expected
          *             eviction reference or if no eviction is expected.
          */
-        public void evicted(final HardReferenceQueue<T> cache, final T ref) {
+        public void evicted(final IHardReferenceQueue<T> cache, final T ref) {
 
             assertNotNull("cache", cache);
             assertNotNull("ref", ref);

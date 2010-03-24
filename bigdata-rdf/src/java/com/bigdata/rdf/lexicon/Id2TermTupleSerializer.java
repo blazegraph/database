@@ -57,13 +57,12 @@ import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.ConditionalRabaCoder;
-import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.model.BigdataValueImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
 
 /**
@@ -88,7 +87,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
      * A (de-)serialized backed by a {@link BigdataValueFactoryImpl} for the
      * {@link #namespace} of the owning {@link LexiconRelation}.
      */
-    transient private BigdataValueSerializer<BigdataValue> valueSer;
+    transient private BigdataValueSerializer<BigdataValueImpl> valueSer;
     
     /**
      * Used to serialize RDF {@link Value}s.
@@ -200,7 +199,7 @@ public class Id2TermTupleSerializer extends DefaultTupleSerializer<Long, Bigdata
         
         buf.reset();
         
-        return valueSer.serialize(obj, buf);
+        return valueSer.serialize((BigdataValueImpl)obj, buf);
 
     }
 

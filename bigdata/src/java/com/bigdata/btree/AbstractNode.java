@@ -558,9 +558,9 @@ public abstract class AbstractNode<T extends AbstractNode
     }
 
     /**
-     * Post-order traveral of nodes and leaves in the tree. For any given
+     * Post-order traversal of nodes and leaves in the tree. For any given
      * node, its children are always visited before the node itself (hence
-     * the node occurs in the post-order position in the traveral). The
+     * the node occurs in the post-order position in the traversal). The
      * iterator is NOT safe for concurrent modification.
      * 
      * @param dirtyNodesOnly
@@ -720,36 +720,37 @@ public abstract class AbstractNode<T extends AbstractNode
      */
     protected final void assertInvariants() {
 
-//        try {
+        /*
+         * Either the root or the parent is reachable.
+         */
+        final IAbstractNode root = btree.root;
 
-            /*
-             * either the root or the parent is reachable.
-             */
-            final IAbstractNode root = btree.root;
-            
-            assert root == this
-                    || (this.parent != null && this.parent.get() != null);
+        assert root == this
+                || (this.parent != null && this.parent.get() != null);
 
-            if (root != this) {
+        if (root != this) {
+
+            if ((btree instanceof IndexSegment)) {
+
+                /*
+                 * @todo back out underflow support.
+                 * The leaves and nodes of an IndexSegment are allowed to
+                 * underflow down to one key when the IndexSegment was generated
+                 * using an overestimate of the actual tuple count.
+                 */
+                assert getKeyCount() >= 1;
+
+            } else {
 
                 // not the root, so the min #of keys must be observed.
                 assert getKeyCount() >= minKeys();
 
             }
 
-            // max #of keys.
-            assert getKeyCount() <= maxKeys();
+        }
 
-//        } catch (AssertionError ex) {
-//
-//            log.fatal("Invariants failed\n"
-//                    + ex.getStackTrace()[0].toString());
-//            
-//            dump(Level.FATAL, System.err);
-//            
-//            throw ex;
-//            
-//        }
+        // max #of keys.
+        assert getKeyCount() <= maxKeys();
 
     }
     

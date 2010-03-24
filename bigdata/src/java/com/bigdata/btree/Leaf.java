@@ -87,6 +87,8 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
 
     /**
      * Return <code>(branchingFactor + 1) &lt;&lt; 1</code>
+     * <p>
+     * Note: the root may have fewer keys.
      */
     protected final int minKeys() {
 
@@ -275,7 +277,7 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
                 .getVersionTimestamps();
 
         setIdentity(addr);
-
+        
         this.data = data;
         
 //        // must clear the dirty since we just de-serialized this leaf.
@@ -1746,7 +1748,11 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
         final int maxKeys = this.maxKeys();
         
         if ((btree.root != this) && (nkeys < minKeys)) {
-            // min keys failure (the root may have fewer keys).
+            /*
+             * Min keys failure.
+             * 
+             * Note: the root may have fewer keys.
+             */
             out.println(indent(height) + "ERROR: too few keys: m="
                     + branchingFactor + ", minKeys=" + minKeys + ", nkeys="
                     + nkeys + ", isLeaf=" + isLeaf());

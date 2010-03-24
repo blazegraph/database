@@ -1,30 +1,25 @@
-/*
- * Copyright SYSTAP, LLC 2006-2008.  All rights reserved.
- * 
- * Contact:
- *      SYSTAP, LLC
- *      4501 Tower Road
- *      Greensboro, NC 27410
- *      phone: +1 202 462 9888
- *      email: licenses@bigdata.com
- *
- *      http://www.systap.com/
- *      http://www.bigdata.com/
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
+/**
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 /*
  * Created on Apr 15, 2008
  */
@@ -35,15 +30,21 @@ import info.aduna.iteration.CloseableIteration;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.Properties;
 import java.util.Set;
 
+import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
+import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.GraphImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
@@ -54,10 +55,13 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQuery;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.Var;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.rio.RDFHandlerException;
@@ -68,7 +72,7 @@ import org.openrdf.sail.SailException;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Test suite for high-level query against a graph containing statements about
@@ -192,7 +196,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             doSearchTest(((BigdataSail) sail).getConnection());
 
-            doSearchTest(((BigdataSail) sail).asReadCommittedView());
+            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
 
             if (log.isInfoEnabled())
                 log
@@ -213,7 +217,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             doSearchTest(((BigdataSail) sail).getConnection());
 
-            doSearchTest(((BigdataSail) sail).asReadCommittedView());
+            doSearchTest(((BigdataSail) sail).getReadOnlyConnection());
             
         } finally {
 
@@ -225,7 +229,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
     /**
      * This runs a hand-coded query corresponding to a SPARQL query using the
-     * {@link BNS#SEARCH} magic predicate.
+     * {@link BD#SEARCH} magic predicate.
      * 
      * <pre>
      * select ?evidence
@@ -243,7 +247,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             final TupleExpr tupleExpr = new StatementPattern(//
                     new Var("X"),//
-                    new Var("1", new URIImpl(BNS.SEARCH)),//
+                    new Var("1", BD.SEARCH),//
                     new Var("2", new LiteralImpl("Yellow"))//
                     );
 
@@ -347,7 +351,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
         {
             
             test_restart_2
-                    .add(new StatementImpl(SYSTAP, RDF.TYPE, ORGANIZATION));
+                    .add(new StatementImpl(SYSTAP, RDF.TYPE, ENTITY));
          
             test_restart_2.add(new StatementImpl(SYSTAP, RDFS.LABEL,
                     new LiteralImpl("SYSTAP")));
@@ -420,7 +424,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     final String query = "construct { ?s <" + RDF.TYPE + "> <"
                             + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
                             + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
-                            + BNS.SEARCH + "> \"systap\" . }";
+                            + BD.SEARCH + "> \"systap\" . }";
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         // silly construct queries, can't guarantee distinct
@@ -463,7 +467,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     final String query = "construct { ?s <" + RDF.TYPE + "> <"
                             + ENTITY + "> . } " + "where     { ?s <" + RDF.TYPE
                             + "> <" + ENTITY + "> . ?s ?p ?lit . ?lit <"
-                            + BNS.SEARCH + "> \"systap\" . }";
+                            + BD.SEARCH + "> \"systap\" . }";
                     final RepositoryConnection cxn = repo.getConnection();
                     try {
                         // silly construct queries, can't guarantee distinct
@@ -492,6 +496,168 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
         }
 
+    }
+    
+    public void testWithNamedGraphs() throws Exception {
+        
+        final BigdataSail sail = getSail();
+        if (sail.getDatabase().isQuads() == false) {
+            return;
+        }
+        
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        final BigdataSailRepositoryConnection cxn = 
+            (BigdataSailRepositoryConnection) repo.getConnection();
+        cxn.setAutoCommit(false);
+        
+        try {
+            
+            final BNode a = new BNodeImpl("_:a");
+            final BNode b = new BNodeImpl("_:b");
+            final Literal alice = new LiteralImpl("Alice");
+            final Literal bob = new LiteralImpl("Bob");
+            final URI graphA = new URIImpl("http://www.bigdata.com/graphA");
+            final URI graphB = new URIImpl("http://www.bigdata.com/graphB");
+            
+/**/            
+            cxn.add(
+                    a,
+                    RDFS.LABEL,
+                    alice,
+                    graphA
+                    );
+            
+            /*
+             * Graph B.
+             */
+            cxn.add(
+                    b,
+                    RDFS.LABEL,
+                    bob,
+                    graphB
+                    );
+/**/
+
+            /*
+             * Note: The either flush() or commit() is required to flush the
+             * statement buffers to the database before executing any operations
+             * that go around the sail.
+             */
+            cxn.flush();//commit();
+            
+/**/            
+            if (log.isInfoEnabled()) {
+                log.info("\n" + sail.getDatabase().dumpStore());
+            }
+            
+            { // run the query with no graphs specified
+                final String query = 
+                    "select ?s " + 
+                    "from <"+graphA+"> " +
+                    "where " +
+                    "{ " +
+                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                answer.add(createBindingSet(new BindingImpl("s", alice)));
+                
+                compare(result, answer);
+            }
+
+            { // run the query with graphA specified as the default graph
+                final String query = 
+                    "select ?s " + 
+                    "from <"+graphA+"> " +
+                    "where " +
+                    "{ " +
+                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                answer.add(createBindingSet(new BindingImpl("s", alice)));
+                
+                compare(result, answer);
+            }
+
+            { // run the query with graphB specified as the default graph
+                final String query = 
+                    "select ?s " + 
+                    "from <"+graphB+"> " +
+                    "where " +
+                    "{ " +
+                    "    ?s <"+BD.SEARCH+"> \"Alice\" . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                //answer.add(createBindingSet(new BindingImpl("s", alice)));
+                
+                compare(result, answer);
+            }
+
+            { // run the query with graphB specified as the default graph
+                final String query = 
+                    "select ?s ?o " + 
+                    "from <"+graphB+"> " +
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o . " +
+                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                //answer.add(createBindingSet(new BindingImpl("s", alice)));
+                
+                compare(result, answer);
+            }
+
+            { // run the query with graphB specified as the default graph
+                final String query = 
+                    "select ?s ?o " + 
+                    "from <"+graphB+"> " +
+                    "where " +
+                    "{ " +
+                    "    ?s <"+RDFS.LABEL+"> ?o1 . " +
+                    "    ?o <"+BD.SEARCH+"> \"Alice\" . " +
+                    "}";
+                
+                final TupleQuery tupleQuery = 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(true /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                //answer.add(createBindingSet(new BindingImpl("s", alice)));
+                
+                compare(result, answer);
+            }
+
+        } finally {
+            cxn.close();
+            sail.__tearDownUnitTest();
+        }
+        
     }
 
 }

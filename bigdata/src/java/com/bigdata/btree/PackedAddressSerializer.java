@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
@@ -44,7 +43,10 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * @deprecated Along with {@link NodeSerializer} by the {@link IRabaCoder}
+ * 
+ * @deprecated This class is no longer used. The implementation exists solely to
+ *             facilitate de-serialization of older {@link IndexMetadata} record
+ *             versions.
  */
 public class PackedAddressSerializer implements IAddressSerializer, Externalizable {
 
@@ -53,7 +55,7 @@ public class PackedAddressSerializer implements IAddressSerializer, Externalizab
      */
     private static final long serialVersionUID = 7533128830948670801L;
     
-    public static final IAddressSerializer INSTANCE = new PackedAddressSerializer();
+//    public static final IAddressSerializer INSTANCE = new PackedAddressSerializer();
 
     public PackedAddressSerializer() {
         
@@ -62,43 +64,47 @@ public class PackedAddressSerializer implements IAddressSerializer, Externalizab
     public void putChildAddresses(IAddressManager addressManager, DataOutputBuffer os,
             long[] childAddr, int nchildren) throws IOException {
 
-        for (int i = 0; i < nchildren; i++) {
-
-            final long addr = childAddr[i];
-
-            /*
-             * Children MUST have assigned persistent identity.
-             */
-            if (addr == 0L) {
-
-                throw new RuntimeException("Child is not persistent: index="
-                        + i);
-
-            }
-
-            addressManager.packAddr(os, addr);
-
-        }
+        throw new UnsupportedOperationException();
+        
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long addr = childAddr[i];
+//
+//            /*
+//             * Children MUST have assigned persistent identity.
+//             */
+//            if (addr == 0L) {
+//
+//                throw new RuntimeException("Child is not persistent: index="
+//                        + i);
+//
+//            }
+//
+//            addressManager.packAddr(os, addr);
+//
+//        }
 
     }
 
     public void getChildAddresses(IAddressManager addressManager, DataInput is,
             long[] childAddr, int nchildren) throws IOException {
 
-        for (int i = 0; i < nchildren; i++) {
-
-            final long addr = addressManager.unpackAddr(is);
-
-            if (addr == 0L) {
-
-                throw new RuntimeException(
-                        "Child does not have persistent address: index=" + i);
-
-            }
-
-            childAddr[i] = addr;
-
-        }
+        throw new UnsupportedOperationException();
+        
+//        for (int i = 0; i < nchildren; i++) {
+//
+//            final long addr = addressManager.unpackAddr(is);
+//
+//            if (addr == 0L) {
+//
+//                throw new RuntimeException(
+//                        "Child does not have persistent address: index=" + i);
+//
+//            }
+//
+//            childAddr[i] = addr;
+//
+//        }
 
     }
 

@@ -31,6 +31,7 @@ import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AbstractAccessPath;
 import com.bigdata.relation.accesspath.AbstractUnsynchronizedArrayBuffer;
 import com.bigdata.relation.accesspath.BlockingBuffer;
@@ -170,6 +171,12 @@ abstract public class JoinTask implements Callable<Void> {
      * dimension.
      */
     final protected IPredicate predicate;
+
+    /**
+     * The {@link IRelation} view on which we are reading for this join
+     * dimensions.
+     */
+    final protected IRelation relation;
 
     /**
      * The index into the evaluation {@link #order} for the predicate on
@@ -411,7 +418,7 @@ abstract public class JoinTask implements Callable<Void> {
      * 
      * @see JoinTaskFactoryTask
      */
-    public JoinTask(final String indexName, final IRule rule,
+    public JoinTask(/*final String indexName,*/ final IRule rule,
             final IJoinNexus joinNexus, final int[] order,
             final int orderIndex, final int partitionId,
             final IJoinMaster masterProxy, final UUID masterUUID) {
@@ -441,6 +448,7 @@ abstract public class JoinTask implements Callable<Void> {
         this.tailIndex = getTailIndex(orderIndex);
         this.lastJoin = ((orderIndex + 1) == tailCount);
         this.predicate = rule.getTail(tailIndex);
+        this.relation = joinNexus.getTailRelationView(predicate);
         this.stats = new JoinStats(partitionId, orderIndex);
         this.masterProxy = masterProxy;
         this.masterUUID = masterUUID;
@@ -1221,7 +1229,7 @@ abstract public class JoinTask implements Callable<Void> {
          * 
          * @return if the as bound predicate is equals().
          */
-        public boolean equals(AccessPathTask o) {
+        public boolean equals(final AccessPathTask o) {
 
             return accessPath.getPredicate()
                     .equals(o.accessPath.getPredicate());
@@ -1267,7 +1275,7 @@ abstract public class JoinTask implements Callable<Void> {
             if (n == 0)
                 throw new IllegalArgumentException();
 
-            this.accessPath = joinNexus.getTailAccessPath(predicate);
+            this.accessPath = joinNexus.getTailAccessPath(relation, predicate);
 
             if (DEBUG)
                 log.debug("orderIndex=" + orderIndex + ", tailIndex="
@@ -1379,7 +1387,7 @@ abstract public class JoinTask implements Callable<Void> {
          * 
          * @return
          */
-        public int compareTo(AccessPathTask o) {
+        public int compareTo(final AccessPathTask o) {
 
             return BytesUtil.compareBytes(getFromKey(), o.getFromKey());
 

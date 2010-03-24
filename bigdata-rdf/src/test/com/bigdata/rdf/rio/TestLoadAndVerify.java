@@ -132,13 +132,13 @@ public class TestLoadAndVerify extends AbstractRIOTestCase {
     }
    
     /**
-     * @todo use some modest to largish RDF/XML that we can pack with the
-     *       distribution.
+     * Uses a modest (40k statements) file.
      */
     public void test_loadAndVerify_modest() throws Exception {
         
 //      final String file = "../rdf-data/nciOncology.owl";
-        final String file = "../rdf-data/alibaba_v41.rdf";
+//        final String file = "../rdf-data/alibaba_v41.rdf";
+        final String file = "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt";
 
         if (!new File(file).exists()) {
 

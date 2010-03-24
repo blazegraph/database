@@ -57,9 +57,9 @@ public class BloomFilter implements IBloomFilter, Externalizable {
 
     protected static final transient Logger log = Logger.getLogger(BloomFilter.class);
 
-    protected static final transient boolean INFO = log.isInfoEnabled();
-
-    protected static final transient boolean DEBUG = log.isDebugEnabled();
+//    protected static final transient boolean INFO = log.isInfoEnabled();
+//
+//    protected static final transient boolean DEBUG = log.isDebugEnabled();
     
     /**
      * 
@@ -210,7 +210,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
         
         filter = new it.unimi.dsi.util.BloomFilter2(n, d);
 
-        if (DEBUG)
+        if (log.isDebugEnabled())
             log.debug("n=" + n + ", p=" + p + ", d=" + d + ", m=" + filter.m());
 
         this.n = n;
@@ -340,7 +340,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
 
         final double n = -m * Math.log(1 - Math.pow(p, 1d / k)) / k;
 
-        if(DEBUG)
+        if(log.isDebugEnabled())
             log.debug("p=" + p + ", m=" + m + ", k=" + k + ", n=" + n);
 
         return (int) n;
@@ -483,7 +483,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
         // save the address from which the record was loaded.
         filter.addr = addr;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Read bloom filter: bytesOnDisk="
                     + store.getByteCount(addr) + ": " + filter);
 
@@ -545,7 +545,7 @@ public class BloomFilter implements IBloomFilter, Externalizable {
 
         dirty = false;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Wrote bloom filter: bytesOnDisk="
                     + store.getByteCount(addr) + ": " + filter);
 

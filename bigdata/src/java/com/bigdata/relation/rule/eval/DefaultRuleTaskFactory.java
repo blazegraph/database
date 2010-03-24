@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.rule.IBindingSet;
@@ -24,6 +26,8 @@ import com.bigdata.service.ndx.ClientIndexView;
  */
 public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable {
 
+    static protected final Logger log = Logger.getLogger(DefaultRuleTaskFactory.class);
+    
     /**
      * 
      */
@@ -44,8 +48,8 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
     /**
      * Pipeline join strategy.
      * <p>
-     * Note: This join strategy was designed for scale-out evaluation but MAY
-     * also be used for local deployments. It starts a {@link JoinTask} per
+     * Note: This join strategy was designed for scale-out evaluation but does
+     * better for local deployments as well. It starts a {@link JoinTask} per
      * index partition on which the join must read while evaluating the rule.
      * This gives it access to the local index objects for each index partition
      * of interest. Intermediate {@link IBindingSet}s are streamed in chunks to
@@ -82,9 +86,11 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
         final IIndexManager indexManager = joinNexus.getIndexManager();
         
         if(subquery) {
-            
-//            System.err.println("subquery: "+rule);
-            
+
+            if (log.isDebugEnabled())
+                log.debug("local nested subquery joins: indexManager="
+                        + indexManager.getClass() + ", rule=" + rule);
+
             return new NestedSubqueryWithJoinThreadsTask(rule, joinNexus, buffer);
 
         }
@@ -92,8 +98,6 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
         /*
          * pipeline join.
          */
-        
-//        System.err.println("pipeline: "+rule);
 
         if (indexManager instanceof IBigdataFederation) {
             
@@ -101,10 +105,18 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
             
             if(fed.isScaleOut()) {
 
+                if (log.isDebugEnabled())
+                    log.debug("scale-out pipeline joins: indexManager="
+                            + indexManager.getClass() + ", rule=" + rule);
+
                 // scale-out join using a pipeline strategy.
                 return new DistributedJoinMasterTask(rule, joinNexus, buffer);
 
             } else {
+
+                if (log.isDebugEnabled())
+                    log.debug("local pipeline joins: indexManager="
+                            + indexManager.getClass() + ", rule=" + rule);
 
                 // local joins using a pipeline strategy.
                 return new LocalJoinMasterTask(rule, joinNexus, buffer);
@@ -112,6 +124,10 @@ public class DefaultRuleTaskFactory implements IRuleTaskFactory, Externalizable 
             }
             
         }
+
+        if (log.isDebugEnabled())
+            log.debug("local pipeline joins: indexManager="
+                    + indexManager.getClass() + ", rule=" + rule);
 
         // local joins using a pipeline strategy.
         return new LocalJoinMasterTask(rule, joinNexus, buffer);

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.cache.IHardReferenceQueue;
 
 /**
  * A listener that does nothing.
@@ -44,7 +44,7 @@ public class NOPEvictionListener implements IEvictionListener {
         
     }
     
-    public void evicted(HardReferenceQueue<PO> cache, PO ref) {
+    public void evicted(IHardReferenceQueue<PO> cache, PO ref) {
    
     }
 

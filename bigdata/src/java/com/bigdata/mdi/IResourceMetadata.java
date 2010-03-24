@@ -26,6 +26,7 @@ package com.bigdata.mdi;
 import java.io.Serializable;
 import java.util.UUID;
 
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
@@ -96,6 +97,20 @@ public interface IResourceMetadata extends Serializable, Cloneable {
      * assign commit timestamps.
      */
     public long getCreateTime();
+
+    /**
+     * The commit time of the view from which the caller should read. For an
+     * {@link IndexSegment}, this is always the same as {@link #getCreateTime()}
+     * . For a {@link Journal}, this may be a specific commit time for a source
+     * in an {@link ILocalBTreeView}. A value of <code>0L</code> indicates that
+     * no specific commit time is indicated. For historical journals, this
+     * implies a read from the lastCommitTime on the journal in order to
+     * constitute the view. For the current journal, this implies a read at
+     * whatever timestamp the caller desires.
+     * 
+     * @see IndexManager
+     */
+    public long getCommitTime();
     
     /**
      * The hash code of the {@link #getUUID() resource UUID}.

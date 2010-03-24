@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rawstore.IRawStore;
@@ -63,6 +64,8 @@ public class TestNullValues extends AbstractBTreeTestCase {
         super(name);
     }
 
+    private static final boolean bufferNodes = true;
+    
     /**
      * Tests the ability to store a <code>null</code> in a tuple of a
      * {@link BTree}, to reload the {@link BTree} and find the <code>null</code>
@@ -93,7 +96,7 @@ public class TestNullValues extends AbstractBTreeTestCase {
         
         final long addrCheckpoint1 = btree.writeCheckpoint();
         
-        btree = BTree.load(store, addrCheckpoint1);
+        btree = BTree.load(store, addrCheckpoint1, true/*readOnly*/);
         
         assertNull(btree.lookup(k1));
         assertTrue(btree.contains(k1));
@@ -115,9 +118,23 @@ public class TestNullValues extends AbstractBTreeTestCase {
 
             final long commitTime = System.currentTimeMillis();
             
-            new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                    .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                    true/*compactingMerge*/).call();
+            final IndexSegmentCheckpoint checkpoint = IndexSegmentBuilder
+                    .newInstance(outFile, tmpDir, btree.getEntryCount(),
+                            btree.rangeIterator(), 3/* m */,
+                            btree.getIndexMetadata(), commitTime,
+                            true/* compactingMerge */, bufferNodes).call();
+
+            if (LRUNexus.INSTANCE != null) {
+
+                /*
+                 * Clear the records for the index segment from the cache so we will
+                 * read directly from the file. This is necessary to ensure that the
+                 * data on the file is good rather than just the data in the cache.
+                 */
+                
+                LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+
+            }
 
             /*
              * Verify can load the index file and that the metadata associated

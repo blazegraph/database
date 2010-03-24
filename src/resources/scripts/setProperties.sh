@@ -14,7 +14,7 @@ if [ -z "$1" ]; then
     exit 1;
 fi
 
-namespace = $1
+namespace=$1
 
 java ${JAVA_OPTS} -Xmx400m \
 	 -cp ${CLASSPATH} \

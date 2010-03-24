@@ -19,27 +19,18 @@ public class LoadStatementBufferFactory<S extends Statement> implements
 
     private final int bufferCapacity;
 
-    private final BlockingBuffer<ISPO[]> writeBuffer;
-    
     /**
      * 
      * @param db
      * @param bufferCapacity
-     * @param writeBuffer
-     *            An optional buffer for asynchronous writes on the statement
-     *            indices.
-     * 
-     * @todo drop the writeBuffer arg.
      */
     public LoadStatementBufferFactory(final AbstractTripleStore db,
-            final int bufferCapacity, final BlockingBuffer<ISPO[]> writeBuffer) {
+            final int bufferCapacity) {
 
         this.db = db;
-       
+
         this.bufferCapacity = bufferCapacity;
     
-        this.writeBuffer = writeBuffer;
-        
     }
     
     /**
@@ -48,8 +39,8 @@ public class LoadStatementBufferFactory<S extends Statement> implements
     public StatementBuffer<S> newStatementBuffer() {
 
         return new StatementBuffer<S>(null/* statementStore */, db,
-                bufferCapacity, writeBuffer);
-        
+                bufferCapacity);
+
     }
     
 //    /**

@@ -228,8 +228,11 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
             store.__tearDownUnitTest();
             
             if (BigdataStatics.debug)
-                System.err.println("\n-------LRUNexus after test:" + getName()
-                        + "--------" + LRUNexus.INSTANCE.toString());
+                System.err.println("\n-------LRUNexus after test:"
+                        + getName()
+                        + "--------"
+                        + (LRUNexus.INSTANCE == null ? "" : LRUNexus.INSTANCE
+                                .toString()));
 
         }
 
@@ -261,8 +264,11 @@ public class TestTripleStoreLoadRateLocal extends ProxyTestCase {
             store.__tearDownUnitTest();
 
             if (BigdataStatics.debug)
-                System.err.println("\n-------LRUNexus after test:" + getName()
-                        + "--------" + LRUNexus.INSTANCE.toString());
+                System.err.println("\n-------LRUNexus after test:"
+                        + getName()
+                        + "--------"
+                        + (LRUNexus.INSTANCE == null ? "" : LRUNexus.INSTANCE
+                                .toString()));
             
         }
 

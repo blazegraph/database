@@ -28,7 +28,6 @@
 package com.bigdata.rdf.store;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -46,7 +45,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -59,7 +57,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.rio.rdfxml.RDFXMLParser;
-
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BytesUtil;
@@ -416,35 +413,50 @@ abstract public class AbstractTripleStore extends
         /**
          * Boolean option (default <code>true</code>) enables support for the
          * lexicon (the forward and backward term indices). When
-         * <code>false</code>, the lexicon indices are not registered. This
-         * can be safely turned off for the {@link TempTripleStore} when only
-         * the statement indices are to be used.
+         * <code>false</code>, the lexicon indices are not registered. This can
+         * be safely turned off for the {@link TempTripleStore} when only the
+         * statement indices are to be used.
+         * <p>
+         * You can control how the triple store will interpret the RDF URIs, and
+         * literals using the {@link KeyBuilder.Options}. For example:
+         * 
+         * <pre>
+         * // Force ASCII key comparisons.
+         * properties.setProperty(Options.COLLATOR, CollatorEnum.ASCII.toString());
+         * </pre>
+         * 
+         * or
+         * 
+         * <pre>
+         * // Force identical unicode comparisons (assuming default COLLATOR setting).
+         * properties.setProperty(Options.STRENGTH, StrengthEnum.IDENTICAL.toString());
+         * </pre>
          * 
          * @see LexiconRelation
+         * @see KeyBuilder.Options
          */
         String LEXICON = AbstractTripleStore.class.getName() + ".lexicon";
 
         String DEFAULT_LEXICON = "true";
 
         /**
-         * Boolean option (default {@value #DEFAULT_STORE_BLANK_NODES})
-         * controls whether or not we store blank nodes in the forward mapping
-         * of the lexicon.
+         * Boolean option (default {@value #DEFAULT_STORE_BLANK_NODES}) controls
+         * whether or not we store blank nodes in the forward mapping of the
+         * lexicon (this is also known as the "told bnodes" mode).
          * <p>
          * When <code>false</code> blank node semantics are enforced, you CAN
          * NOT unify blank nodes based on their IDs in the lexicon, and
          * {@link AbstractTripleStore#getBNodeCount()} is disabled.
          * <p>
-         * When <code>true</code>, you are able to violate blank node
-         * semantics and force unification of blank nodes by assigning the ID
-         * from the RDF interchange syntax to the blank node. RIO has an option
-         * that will allow you to do this. When this option is also
-         * <code>true</code>, then you will in fact be able to resolve
-         * pre-existing blank nodes using their identifiers. The tradeoff is
-         * time and space : if you have a LOT of document using blank nodes then
-         * you might want to disable this option in order to spend less time
-         * writing the forward lexicon index (and it will also take up less
-         * space).
+         * When <code>true</code>, you are able to violate blank node semantics
+         * and force unification of blank nodes by assigning the ID from the RDF
+         * interchange syntax to the blank node. RIO has an option that will
+         * allow you to do this. When this option is also <code>true</code>,
+         * then you will in fact be able to resolve pre-existing blank nodes
+         * using their identifiers. The tradeoff is time and space : if you have
+         * a LOT of document using blank nodes then you might want to disable
+         * this option in order to spend less time writing the forward lexicon
+         * index (and it will also take up less space).
          */
         String STORE_BLANK_NODES = AbstractTripleStore.class.getName() + ".storeBlankNodes";
         
@@ -533,6 +545,16 @@ abstract public class AbstractTripleStore extends
                 + ".textIndex.datatypeLiterals";
 
         String DEFAULT_TEXT_INDEX_DATATYPE_LITERALS = "true";
+        
+        /**
+         * Integer option whose value is the capacity of the term cache. This
+         * cache provides fast lookup of frequently used RDF {@link Value}s by
+         * their term identifier.
+         */
+        String TERM_CACHE_CAPACITY = AbstractTripleStore.class.getName()
+                + ".termCache.capacity";
+        
+        String DEFAULT_TERM_CACHE_CAPACITY = "50000";
         
         /**
          * The name of the class that will establish the pre-defined
@@ -691,7 +713,7 @@ abstract public class AbstractTripleStore extends
          * <p>
          * bigdata supports an RDF/XML interchange extension for the interchange
          * of <em>triples</em> with statement identifiers that may be used as
-         * blank nodes to make statements about statements. See {@link BNS} and
+         * blank nodes to make statements about statements. See {@link BD} and
          * {@link RDFXMLParser}.
          * <p>
          * Statement identifiers add some latency when loading data since it
@@ -731,8 +753,129 @@ abstract public class AbstractTripleStore extends
         
         String DEFAULT_QUADS = "false";
         
+        /**
+         * Set up database in triples mode, no provenance.  This is equivalent
+         * to setting the following options:
+         * <p>
+         * <ul>
+         * <li>{@link AbstractTripleStore.Options#QUADS} 
+         *          = <code>false</code></li>
+         * <li>{@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} 
+         *          = <code>false</code></li>
+         * </ul> 
+         */
+        String TRIPLES_MODE = AbstractTripleStore.class.getName()
+                + ".triplesMode";
+        
+        String DEFAULT_TRIPLES_MODE = "false";
+
+        /**
+         * Set up database in triples mode with provenance.  This is equivalent
+         * to setting the following options:
+         * <p>
+         * <ul>
+         * <li>{@link AbstractTripleStore.Options#QUADS} 
+         *          = <code>false</code></li>
+         * <li>{@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} 
+         *          = <code>true</code></li>
+         * </ul> 
+         */
+        String TRIPLES_MODE_WITH_PROVENANCE = AbstractTripleStore.class.getName()
+                + ".triplesModeWithProvenance";
+        
+        String DEFAULT_TRIPLES_MODE_WITH_PROVENANCE = "false";
+
+        
+        /**
+         * Set up database in quads mode.  Quads mode means no provenance,
+         * no inference.  This is equivalent to setting the following options:
+         * <p>
+         * <ul>
+         * <li>{@link AbstractTripleStore.Options#QUADS} 
+         *          = <code>true</code></li>
+         * <li>{@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} 
+         *          = <code>false</code></li>
+         * <li>{@link AbstractTripleStore.Options#AXIOMS_CLASS} 
+         *          = <code>com.bigdata.rdf.store.AbstractTripleStore.NoAxioms</code></li>
+         * </ul> 
+         */
+        String QUADS_MODE = AbstractTripleStore.class.getName()
+                + ".quadsMode";
+        
+        String DEFAULT_QUADS_MODE = "false";
+
+        
     }
 
+    protected Class determineAxiomClass() {
+        
+        // axiomsClass
+        {
+
+            /*
+             * Note: axioms may not be defined unless the lexicon is enabled
+             * since the axioms require the lexicon in order to resolve
+             * their expression as Statements into their expression as SPOs.
+             */
+
+            final String className = getProperty(Options.AXIOMS_CLASS,
+                    Options.DEFAULT_AXIOMS_CLASS);
+
+            final Class cls;
+            try {
+                cls = Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Bad option: "
+                        + Options.AXIOMS_CLASS, e);
+            }
+
+            if (!BaseAxioms.class.isAssignableFrom(cls)) {
+                throw new RuntimeException(Options.AXIOMS_CLASS
+                        + ": Must extend: " + BaseAxioms.class.getName());
+            }
+
+            if (cls != NoAxioms.class && quads) {
+
+                throw new UnsupportedOperationException(Options.QUADS
+                        + " does not support inference ("
+                        + Options.AXIOMS_CLASS + ")");
+
+            }
+
+            return cls;
+
+        }
+        
+    }
+    
+    protected Class determineVocabularyClass() {
+        
+        // vocabularyClass
+        {
+
+            final String className = getProperty(Options.VOCABULARY_CLASS,
+                    Options.DEFAULT_VOCABULARY_CLASS);
+
+            final Class cls;
+            try {
+                cls = Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Bad option: "
+                        + Options.VOCABULARY_CLASS, e);
+            }
+
+            if (!BaseVocabulary.class.isAssignableFrom(cls)) {
+                throw new RuntimeException(Options.VOCABULARY_CLASS
+                        + ": Must extend: "
+                        + BaseVocabulary.class.getName());
+            }
+            
+            return cls;
+
+        }
+        
+    }
+    
     /**
      * Ctor specified by {@link DefaultResourceLocator}.
      * 
@@ -752,20 +895,104 @@ abstract public class AbstractTripleStore extends
          * corresponding statements is retracted.
          */
 
-        this.justify = Boolean.parseBoolean(getProperty(Options.JUSTIFY,
-                Options.DEFAULT_JUSTIFY));
-
         this.lexicon = Boolean.parseBoolean(getProperty(Options.LEXICON,
                 Options.DEFAULT_LEXICON));
 
-        this.quads = Boolean.valueOf(getProperty(Options.QUADS,
-                Options.DEFAULT_QUADS));
+        DatabaseMode mode = null;
+        if (Boolean.parseBoolean(getProperty(Options.TRIPLES_MODE,
+                Options.DEFAULT_TRIPLES_MODE))) {
+            mode = DatabaseMode.TRIPLES;
+        } else if (Boolean.parseBoolean(getProperty(Options.TRIPLES_MODE_WITH_PROVENANCE,
+                Options.DEFAULT_TRIPLES_MODE_WITH_PROVENANCE))) {
+            if (mode != null) {
+                throw new UnsupportedOperationException(
+                        "please select only one of triples, provenance, or quads modes");
+            }
+            mode = DatabaseMode.PROVENANCE;
+        } else if (Boolean.parseBoolean(getProperty(Options.QUADS_MODE,
+                Options.DEFAULT_QUADS_MODE))) {
+            if (mode != null) {
+                throw new UnsupportedOperationException(
+                        "please select only one of triples, provenance, or quads modes");
+            }
+            mode = DatabaseMode.QUADS;
+        } 
+        
+        if (mode != null) {
+            switch (mode) {
+            case TRIPLES: {
+                this.quads = false;
+                this.statementIdentifiers = false;
+                this.axiomClass = determineAxiomClass();
+                if (lexicon) {
+                    this.vocabularyClass = determineVocabularyClass();
+                } else {
+                    this.vocabularyClass = NoVocabulary.class;
+                }
+                properties.setProperty(Options.QUADS, "false");
+                properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
+                break;
+            }
+            case PROVENANCE: {
+                this.quads = false;
+                this.statementIdentifiers = true;
+                this.axiomClass = determineAxiomClass();
+                if (lexicon) {
+                    this.vocabularyClass = determineVocabularyClass();
+                } else {
+                    this.vocabularyClass = NoVocabulary.class;
+                }
+                properties.setProperty(Options.QUADS, "false");
+                properties.setProperty(Options.STATEMENT_IDENTIFIERS, "true");
+                break;
+            }
+            case QUADS: {
+                this.quads = true;
+                this.statementIdentifiers = false;
+                this.axiomClass = NoAxioms.class;
+                this.vocabularyClass = NoVocabulary.class;
+                properties.setProperty(Options.QUADS, "true");
+                properties.setProperty(Options.STATEMENT_IDENTIFIERS, "false");
+                properties.setProperty(Options.AXIOMS_CLASS, NoAxioms.class.getName());
+                properties.setProperty(Options.VOCABULARY_CLASS, NoVocabulary.class.getName());
+                break;
+            }
+            default:
+                throw new AssertionError();
+            }
+        } else {
+            
+            this.quads = Boolean.valueOf(getProperty(Options.QUADS,
+                    Options.DEFAULT_QUADS));
+
+            this.statementIdentifiers = Boolean.parseBoolean(getProperty(
+                    Options.STATEMENT_IDENTIFIERS,
+                    Options.DEFAULT_STATEMENT_IDENTIFIERS));
+
+            if (lexicon) {
+                
+                axiomClass = determineAxiomClass();
+                vocabularyClass = determineVocabularyClass();
+                
+            } else {
+                
+                /*
+                 * no axioms if no lexicon (the lexicon is required to write the
+                 * axioms).
+                 */
+
+                axiomClass = NoAxioms.class;
+                vocabularyClass = NoVocabulary.class;
+
+            }
+            
+        }
+        
+        
+        this.justify = Boolean.parseBoolean(getProperty(Options.JUSTIFY,
+                Options.DEFAULT_JUSTIFY));
 
         this.spoKeyArity = quads ? 4 : 3;
-
-        this.statementIdentifiers = Boolean.parseBoolean(getProperty(
-                Options.STATEMENT_IDENTIFIERS,
-                Options.DEFAULT_STATEMENT_IDENTIFIERS));
 
         if (statementIdentifiers && quads) {
 
@@ -773,81 +1000,6 @@ abstract public class AbstractTripleStore extends
                     + " does not support the provenance mode ("
                     + Options.STATEMENT_IDENTIFIERS + ")");
             
-        }
-
-        if (lexicon) {
-
-            // vocabularyClass
-            {
-
-                final String className = getProperty(Options.VOCABULARY_CLASS,
-                        Options.DEFAULT_VOCABULARY_CLASS);
-
-                final Class cls;
-                try {
-                    cls = Class.forName(className);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException("Bad option: "
-                            + Options.VOCABULARY_CLASS, e);
-                }
-
-                if (!BaseVocabulary.class.isAssignableFrom(cls)) {
-                    throw new RuntimeException(Options.VOCABULARY_CLASS
-                            + ": Must extend: "
-                            + BaseVocabulary.class.getName());
-                }
-                vocabularyClass = cls;
-
-            }
-
-            // axiomsClass
-            {
-
-                /*
-                 * Note: axioms may not be defined unless the lexicon is enabled
-                 * since the axioms require the lexicon in order to resolve
-                 * their expression as Statements into their expression as SPOs.
-                 */
-
-                final String className = getProperty(Options.AXIOMS_CLASS,
-                        Options.DEFAULT_AXIOMS_CLASS);
-
-                final Class cls;
-                try {
-                    cls = Class.forName(className);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException("Bad option: "
-                            + Options.AXIOMS_CLASS, e);
-                }
-
-                if (!BaseAxioms.class.isAssignableFrom(cls)) {
-                    throw new RuntimeException(Options.AXIOMS_CLASS
-                            + ": Must extend: " + BaseAxioms.class.getName());
-                }
-
-                if (cls != NoAxioms.class && quads) {
-
-                    throw new UnsupportedOperationException(Options.QUADS
-                            + " does not support inference ("
-                            + Options.AXIOMS_CLASS + ")");
-
-                }
-
-                axiomClass = cls;
-
-            }
-
-        } else {
-
-            /*
-             * no axioms if no lexicon (the lexicon is required to write the
-             * axioms).
-             */
-
-            axiomClass = NoAxioms.class;
-
-            vocabularyClass = NoVocabulary.class;
-
         }
 
         // closureClass
@@ -1467,7 +1619,7 @@ abstract public class AbstractTripleStore extends
      * @throws IllegalStateException
      *             if the view is read only.
      */
-    public void commit() {
+    public long commit() {
         
         if (isReadOnly())
             throw new IllegalStateException();
@@ -1476,7 +1628,7 @@ abstract public class AbstractTripleStore extends
          * Clear the reference since it was as of the last commit point.
          */
         readCommittedRef = null;
-
+        return 0l;
     }
     
     /**
@@ -1612,7 +1764,8 @@ abstract public class AbstractTripleStore extends
      */
 
     /**
-     * Delegates to the batch API.
+     * This method delegates to the batch API, but it is extremely inefficient
+     * for scale-out as it does one RMI per request!
      */
     public long addTerm(final Value value) {
 
@@ -1628,12 +1781,20 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public BigdataValue getTerm(final long id) {
 
         return getLexiconRelation().getTerm(id);
 
     }
 
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public long getTermId(final Value value) {
 
         return getLexiconRelation().getTermId(value);
@@ -1843,6 +2004,10 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public boolean hasStatement(final Resource s, final URI p,
             final Value o) {
 
@@ -1850,6 +2015,10 @@ abstract public class AbstractTripleStore extends
 
     }
     
+    /**
+     * This method is extremely inefficient for scale-out as it does one RMI per
+     * request!
+     */
     final public boolean hasStatement(Resource s, URI p, Value o, Resource c) {
 
         /*
@@ -2174,7 +2343,20 @@ abstract public class AbstractTripleStore extends
         return getSPORelation().getAccessPath(s, p, o, NULL/* c */, filter);
 
     }
+	final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
+            final long o,final long c) {
 
+        return getSPORelation()
+                .getAccessPath(s, p, o, c, null/* filter */);
+
+    }
+
+    final public IAccessPath<ISPO> getAccessPath(final long s, final long p,
+            final long o,final long c, final IElementFilter<ISPO> filter) {
+
+        return getSPORelation().getAccessPath(s, p, o, c, filter);
+
+    }
     final public IAccessPath<ISPO> getAccessPath(final IKeyOrder<ISPO> keyOrder) {
 
         return getAccessPath(keyOrder, null/* filter */);
@@ -3461,6 +3643,34 @@ abstract public class AbstractTripleStore extends
             final boolean justify, final boolean backchain,
             final IEvaluationPlanFactory planFactory) {
         
+        return newJoinNexusFactory(ruleContext, action, solutionFlags, filter,
+                justify, backchain, planFactory, null/*overrides*/);
+        
+    }
+
+    /**
+     * 
+     * @param solutionFlags
+     *            See {@link IJoinNexus#ELEMENT} and friends.
+     * @param filter
+     *            Optional filter.
+     * @param overrides
+     *            Optional overrides of the properties controlling the rule
+     *            execution layer. When given, the property values will override
+     *            those inherited from {@link AbstractResource}.
+     * @return
+     */
+    public IJoinNexusFactory newJoinNexusFactory(
+            final RuleContextEnum ruleContext, //
+            final ActionEnum action,//
+            final int solutionFlags,//
+            final IElementFilter filter,//
+            final boolean justify, //
+            final boolean backchain,//
+            final IEvaluationPlanFactory planFactory,//
+            final Properties overrides//
+            ) {
+        
         if (ruleContext == null)
             throw new IllegalArgumentException();
 
@@ -3585,17 +3795,40 @@ abstract public class AbstractTripleStore extends
                 : DefaultRuleTaskFactory.PIPELINE//
                 ;
 
+        // Note: returns a Properties wrapping the resource's properties.
+        final Properties tmp = getProperties();
+
+        if (overrides != null) {
+
+            /* FIXME overrides should apply to the properties above here as well!
+             * Layer in the overrides.
+             * 
+             * Note: If the caller passes in a Properties object, then only the
+             * top level of that properties object will be copied in.  This can
+             * be "fixed" by the caller using PropertyUtil.flatten(Properties).
+             */
+            tmp.putAll(overrides);
+
+        }
+        
         return new RDFJoinNexusFactory(
-                ruleContext,
+                ruleContext,//
                 action, //
-                writeTimestamp,
+                writeTimestamp,//
                 readTimestamp, //
-                isForceSerialExecution(),
-                getMaxParallelSubqueries(), //
-                justify, backchain, isOwlSameAsUsed,
-                getChunkOfChunksCapacity(), getChunkCapacity(),
-                getChunkTimeout(), getFullyBufferedReadThreshold(),
-                solutionFlags, filter, planFactory, defaultRuleTaskFactory);
+//                isForceSerialExecution(),
+//                getMaxParallelSubqueries(), //
+                justify,//
+                backchain, //
+                isOwlSameAsUsed,//
+                tmp,//
+//                getChunkOfChunksCapacity(), getChunkCapacity(),
+//                getChunkTimeout(), getFullyBufferedReadThreshold(),
+                solutionFlags, //
+                filter, //
+                planFactory, //
+                defaultRuleTaskFactory//
+                );
 
     }
 

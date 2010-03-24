@@ -31,7 +31,6 @@ package com.bigdata.resources;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,7 +51,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
 
 import com.bigdata.LRUNexus;
@@ -469,6 +467,9 @@ abstract public class StoreManager extends ResourceEvents implements
      * {@link IResourceMetadata} object describing that index segment. This map
      * is used to provide some basic reporting but is primarily used to delete
      * index segment resources once they are no longer required.
+     * 
+     * @todo Is this strictly necessary? Do we have all the necessary
+     *       information in the journals?  Review the logic and decide.
      */
     final private IndexSegmentIndex segmentIndex;
 
@@ -596,22 +597,22 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     private final boolean isTransient;
 
-    /**
-     * A direct {@link ByteBuffer} that will be used as the write cache for the
-     * live journal and which will be handed off from live journal to live
-     * journal during overflow processing which is allocated iff
-     * {@link BufferMode#Disk} is choosen.
-     * <p>
-     * Note: This design is motivated by by JVM bug <a
-     * href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
-     * 6210541</a> which describes a failure by
-     * <code>releaseTemporaryDirectBuffer()</code> to release temporary direct
-     * {@link ByteBuffer}s that are allocated for channel IO.
-     * 
-     * @see com.bigdata.journal.Options#WRITE_CACHE_CAPACITY
-     * @see DiskOnlyStrategy
-     */
-    private ByteBuffer writeCache;
+//    /**
+//     * A direct {@link ByteBuffer} that will be used as the write cache for the
+//     * live journal and which will be handed off from live journal to live
+//     * journal during overflow processing which is allocated iff
+//     * {@link BufferMode#Disk} is chosen.
+//     * <p>
+//     * Note: This design is motivated by by JVM bug <a
+//     * href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
+//     * 6210541</a> which describes a failure by
+//     * <code>releaseTemporaryDirectBuffer()</code> to release temporary direct
+//     * {@link ByteBuffer}s that are allocated for channel IO.
+//     * 
+//     * @see com.bigdata.journal.Options#WRITE_CACHE_CAPACITY
+//     * @see DiskOnlyStrategy
+//     */
+//    private ByteBuffer writeCache;
 
     /**
      * A atomic hard reference to the live journal.
@@ -915,10 +916,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
     /**
      * Return the free space in bytes on the volume hosting some directory.
-     * <p>
-     * Note: This uses the apache IO commons {@link FileSystemUtils} to report
-     * the free space on the volume hosting the directory and then converts kb
-     * to bytes.
      * 
      * @param dir
      *            A directory hosted on some volume.
@@ -926,15 +923,36 @@ abstract public class StoreManager extends ResourceEvents implements
      * @return The #of bytes of free space remaining for the volume hosting the
      *         directory -or- <code>-1L</code> if the free space could not be
      *         determined.
+     */
+    /*
+     * Note: This was written using Apache FileSystemUtil originally. That would
+     * shell out "df" under un*x. Unfortunately, shelling out a child process
+     * requires a commitment from the OS to support a process with as much
+     * process space as the parent. For the data service, that is a lot of RAM.
+     * In general, the O/S allows "over committment" of the available swap
+     * space, but you can run out of swap and then you have a problem. If the
+     * host was configured with scanty swap, then this problem could be
+     * triggered very easily and would show up as "Could not allocate memory".
      * 
-     * @see http://commons.apache.org/io/api-release/org/apache/commons/io/FileSystemUtils.html
+     * See http://forums.sun.com/thread.jspa?messageID=9834041#9834041
      */
     private long getFreeSpace(final File dir) {
         
         try {
 
-            return FileSystemUtils.freeSpaceKb(dir.toString())
-                    * Bytes.kilobyte;
+            if(!dir.exists()) {
+                
+                return -1;
+                
+            }
+
+            /*
+             * Note: This return 0L if there is no free space or if the File
+             * does not "name" a partition in the file system semantics. That
+             * is why we check dir.exists() above.
+             */
+
+            return dir.getUsableSpace();
             
         } catch(Throwable t) {
             
@@ -947,6 +965,41 @@ abstract public class StoreManager extends ResourceEvents implements
         }
 
     }
+
+//    /**
+//     * Return the free space in bytes on the volume hosting some directory.
+//     * <p>
+//     * Note: This uses the apache IO commons {@link FileSystemUtils} to report
+//     * the free space on the volume hosting the directory and then converts kb
+//     * to bytes.
+//     * 
+//     * @param dir
+//     *            A directory hosted on some volume.
+//     * 
+//     * @return The #of bytes of free space remaining for the volume hosting the
+//     *         directory -or- <code>-1L</code> if the free space could not be
+//     *         determined.
+//     * 
+//     * @see http://commons.apache.org/io/api-release/org/apache/commons/io/FileSystemUtils.html
+//     */
+//    private long getFreeSpace(final File dir) {
+//        
+//        try {
+//
+//            return FileSystemUtils.freeSpaceKb(dir.toString())
+//                    * Bytes.kilobyte;
+//            
+//        } catch(Throwable t) {
+//            
+//            log.error("Could not get free space: dir=" + dir + " : "
+//                            + t, t);
+//            
+//            // the error is logger and ignored.
+//            return -1L;
+//            
+//        }
+//
+//    }
     
     /**
      * An object wrapping the {@link Properties} given to the ctor.
@@ -1074,15 +1127,15 @@ abstract public class StoreManager extends ResourceEvents implements
 
         }
         
-        /*
-         * Allocate an optional write cache that will be passed from live
-         * journal to live journal during overflow.
-         */
-        {
-
-            writeCache = AbstractJournal.getWriteCache(properties);
-
-        }
+//        /*
+//         * Allocate an optional write cache that will be passed from live
+//         * journal to live journal during overflow.
+//         */
+//        {
+//
+//            writeCache = AbstractJournal.getWriteCache(properties);
+//
+//        }
 
         /*
          * Create the _transient_ index in which we will store the mapping from
@@ -1518,18 +1571,8 @@ abstract public class StoreManager extends ResourceEvents implements
                 /*
                  * There are no existing journal files. Create new journal using
                  * a unique filename in the appropriate subdirectory of the data
-                 * directory.
-                 * 
-                 * @todo this is not using the temp filename mechanism in a
-                 * manner that truly guarantees an atomic file create. The
-                 * CREATE_TEMP_FILE option should probably be extended with a
-                 * CREATE_DIR option that allows you to override the directory
-                 * in which the journal is created. That will allow the atomic
-                 * creation of the journal in the desired directory without
-                 * changing the existing semantics for CREATE_TEMP_FILE.
-                 * 
-                 * See OverflowManager#doOverflow() which has very similar logic
-                 * with the same problem.
+                 * directory.  Since the file is empty, it will be initialized 
+                 * as a new Journal.
                  */
 
                 if (log.isInfoEnabled())
@@ -1554,9 +1597,6 @@ abstract public class StoreManager extends ResourceEvents implements
                         throw new RuntimeException(e);
 
                     }
-
-                    // delete temp file.
-                    file.delete();
 
                 }
 
@@ -1846,8 +1886,8 @@ abstract public class StoreManager extends ResourceEvents implements
 //            log.warn(ex.getMessage(), ex);
 //        }
 
-        // release the write cache.
-        writeCache = null;
+//        // release the write cache.
+//        writeCache = null;
         
     }
 
@@ -1889,8 +1929,8 @@ abstract public class StoreManager extends ResourceEvents implements
 //            log.warn(ex.getMessage(), ex);
 //        }
 
-        // release the write cache.
-        writeCache = null;
+//        // release the write cache.
+//        writeCache = null;
 
     }
 
@@ -2387,18 +2427,18 @@ abstract public class StoreManager extends ResourceEvents implements
      */
     public class ManagedJournal extends AbstractJournal {
 
-        /**
-         * Note: Each instance of the {@link ManagedJournal} reuses the SAME
-         * {@link StoreManager#writeCache}. Therefore you MUST close out writes
-         * on the old journal BEFORE you may allocate a new journal.
-         * 
-         * @param properties
-         * 
-         * @see AbstractJournal#closeForWrites(long)
-         */
+//        /**
+//         * Note: Each instance of the {@link ManagedJournal} reuses the SAME
+//         * {@link StoreManager#writeCache}. Therefore you MUST close out writes
+//         * on the old journal BEFORE you may allocate a new journal.
+//         * 
+//         * @param properties
+//         * 
+//         * @see AbstractJournal#closeForWrites(long)
+//         */
         protected ManagedJournal(final Properties properties) {
 
-            super(properties, writeCache);
+            super(properties);//, writeCache);
 
             /*
              * Set the performance counters on the new store so that we have a
@@ -4346,7 +4386,8 @@ abstract public class StoreManager extends ResourceEvents implements
                                 .load(
                                         journal,
                                         commitRecord
-                                                .getRootAddr(AbstractJournal.ROOT_NAME2ADDR));
+                                                .getRootAddr(AbstractJournal.ROOT_NAME2ADDR),
+                                        true/* readOnly */);
                         
                         @SuppressWarnings("unchecked")
                         final ITupleIterator<Name2Addr.Entry> itr3 = name2addr.rangeIterator();

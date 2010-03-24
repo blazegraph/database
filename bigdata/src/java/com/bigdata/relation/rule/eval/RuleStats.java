@@ -547,7 +547,7 @@ public class RuleStats {
                     
                     sb.append(sep+i);
                     
-                    sb.append(sep+"\""+toString(r.getTail(i))+"\"");
+                    sb.append(sep+"\""+toString(r.getTail(i)).replace(",", " ")+"\"");
                     
                 }
                 

@@ -159,14 +159,14 @@ public class SerializerUtil {
     };
     
     /**
-     * Serialize an object using the Java serialization mechansims.
+     * Serialize an object using the Java serialization mechanisms.
      * 
      * @param obj
      *            A {@link Serializable} object.
      * 
      * @return The serialized object state.
      */
-    static final public byte[] serialize(Object obj) {
+    static final public byte[] serialize(final Object obj) {
 
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -191,7 +191,7 @@ public class SerializerUtil {
     }
 
     /**
-     * De-serialize an object using the Java serialization mechansisms.
+     * De-serialize an object using the Java serialization mechanisms.
      * 
      * @param b
      *            A byte[] containing a serialized object.
@@ -243,14 +243,14 @@ public class SerializerUtil {
     }
 
     /**
-     * De-serialize an object using the Java serialization mechansisms.
+     * De-serialize an object using the Java serialization mechanisms.
      * 
      * @param is
      *            The input stream from which to read the serialized data.
      * 
      * @return The de-serialized object.
      */
-    static final public Object deserialize(InputStream is) {
+    static final public Object deserialize(final InputStream is) {
 
         try {
 
@@ -267,7 +267,7 @@ public class SerializerUtil {
     }
 
     /**
-     * De-serialize an object using the Java serialization mechansisms.
+     * De-serialize an object using the Java serialization mechanisms.
      * 
      * @param buf
      *            A buffer containing a serialized object. The bytes from
@@ -285,7 +285,7 @@ public class SerializerUtil {
 
             final int len = buf.remaining();
 
-            Object ret = deserialize(buf.array(), off, len);
+            final Object ret = deserialize(buf.array(), off, len);
             
             buf.position(buf.limit());
             

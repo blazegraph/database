@@ -70,11 +70,9 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.IBigdataFederation;
 
@@ -797,16 +795,9 @@ public class BigdataRepository implements Repository {
 //            
         // }
 
-        /*
-         * @todo should be a configuration parameter.
-         */
-        final BlockingBuffer<ISPO[]> writeBuffer = null;
-//        final BlockingBuffer<ISPO[]> writeBuffer = db.getSPORelation()
-//                .newWriteBuffer(chunkSize);
-
         final RDFLoadTaskFactory loadTaskFactory = //
-        new RDFLoadTaskFactory(db, bufferCapacity, writeBuffer,
-                verifyRDFSourceData, deleteAfter, fallback);
+        new RDFLoadTaskFactory(db, bufferCapacity, verifyRDFSourceData,
+                deleteAfter, fallback);
 
         final ConcurrentDataLoader service = new ConcurrentDataLoader(fed,
                 nthreads);
@@ -865,19 +856,6 @@ public class BigdataRepository implements Repository {
             // shutdown the load service (a memory leak otherwise!)
             service.shutdown();
   
-            if (writeBuffer != null) {
-
-                writeBuffer.close();
-
-                try {
-                    // await the future.
-                    writeBuffer.getFuture().get();
-                } catch (Exception ex) {
-                    throw new RuntimeException(ex);
-                }
-                
-            }
-            
         }
 
         // notify did run tasks.
@@ -956,11 +934,13 @@ public class BigdataRepository implements Repository {
         System.out.println(verifyTaskFactory.reportTotals());
         
     }
-    
+
     /**
      * Loads the files using the {@link DataLoader}.
      * <p>
-     * Note: this does not handle recursion into subdirectories.
+     * Note: the parsing of files does NOT proceed in parallel with index writes
+     * which limits the throughput of this loader. The scale-out bulk loader
+     * does not have that limitation.
      * 
      * @param dataDir
      *            The directory containing the files.
@@ -1025,9 +1005,9 @@ public class BigdataRepository implements Repository {
         try {
 
             final String filename = ontology;
-            
-            System.out.print("Loading ontology: "+ontology+"...");
-            
+
+            System.out.print("Loading ontology: " + ontology + "...");
+
             final String baseURI = new File(filename).toURI().toString();
             
             final RDFFormat rdfFormat = RDFFormat.forFileName(filename);
@@ -1066,7 +1046,7 @@ public class BigdataRepository implements Repository {
         final long timestamp = sail.getDatabase().getIndexManager()
                 .getLastCommitTime();
         
-        return sail.getReadHistoricalView(timestamp);
+        return sail.getReadOnlyConnection(timestamp);
         
     }
     
