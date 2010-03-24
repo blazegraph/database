@@ -130,13 +130,7 @@ public class StressTestConcurrentUnisolatedIndices extends ProxyTestCase impleme
         
         } finally {
             
-            if(journal.isOpen()) {
-                
-                journal.shutdownNow();
-                
-            }
-            
-            journal.deleteResources();
+            journal.destroy();
             
         }
         

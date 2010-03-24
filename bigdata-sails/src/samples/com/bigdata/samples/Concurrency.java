@@ -370,7 +370,7 @@ public class Concurrency {
          */
         private void doQuery() throws Exception {
            
-            RepositoryConnection cxn = repo.getQueryConnection();
+            RepositoryConnection cxn = repo.getReadOnlyConnection();
             try {
 
                 final TupleQuery tupleQuery = 

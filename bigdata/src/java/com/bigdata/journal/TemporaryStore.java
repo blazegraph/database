@@ -195,8 +195,9 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
         
         if (checkpointAddr != 0L) {
 
-            name2Addr = (Name2Addr) Name2Addr.load(this, checkpointAddr);
-            
+            name2Addr = (Name2Addr) Name2Addr
+                    .load(this, checkpointAddr, false/* readOnly */);
+
         } else {
             
             setupName2AddrBTree();

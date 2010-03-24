@@ -28,6 +28,7 @@ import java.io.IOException;
 
 import org.apache.log4j.Level;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.btree.IndexSegment.ImmutableLeafCursor;
 import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -43,6 +44,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
     File outFile;
 
     File tmpDir;
+
+    final boolean bufferNodes = true;
 
     public TestIndexSegmentBuilderWithSmallTree() {
     }
@@ -114,11 +117,12 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         final BTree btree = getProblem1();
 
-        final long commitTime = System.currentTimeMillis();
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+        final IndexSegmentCheckpoint checkpoint = doBuildAndDiscardCache(btree, 3/*m*/);
+//        final long commitTime = System.currentTimeMillis();
+//        
+//        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
+//                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
+//                true/*compactingMerge*/, bufferNodes).call();
 
          /*
           * Verify can load the index file and that the metadata
@@ -130,7 +134,7 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         
         final IndexSegmentStore segStore = new IndexSegmentStore(outFile);
         
-        assertEquals(commitTime,segStore.getCheckpoint().commitTime);
+        assertEquals(checkpoint.commitTime,segStore.getCheckpoint().commitTime);
         assertEquals(2,segStore.getCheckpoint().height);
         assertEquals(4,segStore.getCheckpoint().nleaves);
         assertEquals(3,segStore.getCheckpoint().nnodes);
@@ -208,14 +212,14 @@ public class TestIndexSegmentBuilderWithSmallTree extends
     public void test_buildOrder9() throws Exception {
         
         final BTree btree = getProblem1();
-        
-        final long commitTime = System.currentTimeMillis();
-        
-//        IndexSegmentBuilder.log.setLevel(Level.DEBUG); 
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 9/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+
+        doBuildAndDiscardCache(btree, 9/*m*/);
+
+//        final long commitTime = System.currentTimeMillis();
+//
+//        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
+//                .rangeIterator(), 9/* m */, btree.getIndexMetadata(), commitTime,
+//                true/*compactingMerge*/,bufferNodes).call();
 
         /*
          * Verify that we can load the index file and that the metadata
@@ -335,12 +339,8 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         
         final BTree btree = getProblem1();
 
-        final long commitTime = System.currentTimeMillis();
+        doBuildAndDiscardCache(btree, 10/* m */);
         
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 10/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
-
         /*
          * Verify that we can load the index file and that the metadata
          * associated with the index file is correct (we are only checking those
@@ -443,13 +443,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         
         btree.dump(Level.DEBUG,System.err);        
 
-        final long commitTime = System.currentTimeMillis();
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
-        
-//        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
+        doBuildAndDiscardCache(btree, 3/* m */);
+
+//        final long commitTime = System.currentTimeMillis();
+//
+//        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
+//                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
+//                true/*compactingMerge*/,bufferNodes).call();
 
          /*
           * Verify can load the index file and that the metadata
@@ -547,13 +547,13 @@ public class TestIndexSegmentBuilderWithSmallTree extends
 
         btree.dump(Level.DEBUG,System.err);
 
-        final long commitTime = System.currentTimeMillis();
-        
-        new IndexSegmentBuilder(outFile, tmpDir, btree.getEntryCount(), btree
-                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
-                true/*compactingMerge*/).call();
+        doBuildAndDiscardCache(btree, 3/*m*/);
 
-//        new IndexSegmentBuilder(outFile,tmpDir,btree,3,0.);
+//        final long commitTime = System.currentTimeMillis();
+//
+//        IndexSegmentBuilder.newInstance(outFile, tmpDir, btree.getEntryCount(), btree
+//                .rangeIterator(), 3/* m */, btree.getIndexMetadata(), commitTime,
+//                true/*compactingMerge*/,bufferNodes).call();
 
          /*
           * Verify can load the index file and that the metadata
@@ -628,5 +628,32 @@ public class TestIndexSegmentBuilderWithSmallTree extends
         }
         
     }
-    
+
+    protected IndexSegmentCheckpoint doBuildAndDiscardCache(final BTree btree,
+            final int m) throws IOException, Exception {
+
+        final long commitTime = System.currentTimeMillis();
+
+        final IndexSegmentCheckpoint checkpoint = IndexSegmentBuilder
+                .newInstance(outFile, tmpDir, btree.getEntryCount(),
+                        btree.rangeIterator(), m, btree.getIndexMetadata(),
+                        commitTime, true/* compactingMerge */, bufferNodes)
+                .call();
+
+        if (LRUNexus.INSTANCE != null) {
+
+            /*
+             * Clear the records for the index segment from the cache so we will
+             * read directly from the file. This is necessary to ensure that the
+             * data on the file is good rather than just the data in the cache.
+             */
+            
+            LRUNexus.INSTANCE.deleteCache(checkpoint.segmentUUID);
+
+        }
+        
+        return checkpoint;
+
+    }
+
 }

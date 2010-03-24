@@ -79,6 +79,8 @@ public class SPO implements ISPO, Comparable<SPO> {
      * Override flag used for downgrading statements during truth maintenance.
      */
     private transient boolean override = false;
+    
+    private transient boolean modified = false;
 
     final public long get(final int index) {
         switch(index) {
@@ -238,7 +240,8 @@ public class SPO implements ISPO, Comparable<SPO> {
      * @param c
      * @param type
      */
-    public SPO(long s, long p, long o, long c, StatementEnum type) {
+    public SPO(final long s, final long p, final long o, final long c,
+            final StatementEnum type) {
 
         if (type == null)
             throw new IllegalArgumentException();
@@ -533,8 +536,6 @@ public class SPO implements ISPO, Comparable<SPO> {
      * <p>
      * Note: By design, this does NOT differentiate between statements with the
      * different {@link StatementEnum} values.
-     * 
-     * FIXME quads : compare [c]?
      */
     public int compareTo(final SPO stmt2) {
 
@@ -586,8 +587,6 @@ public class SPO implements ISPO, Comparable<SPO> {
      * Note: This is NOT the same test as
      * {@link BigdataStatementImpl#equals(Object)} since the latter is
      * implemented per the {@link Statement} interface.
-     * 
-     * FIXME quads : compare [c]?
      */
     public boolean equals(final ISPO stmt2) {
 
@@ -614,7 +613,8 @@ public class SPO implements ISPO, Comparable<SPO> {
         return ("< " + toString(s) + ", " + toString(p) + ", " + toString(o))
                 + (c == NULL ? "" : ", " + toString(c))
                 + (type == null ? "" : " : " + type
-                        + (override ? ", override" : "")) + " >";
+                        + (override ? ", override" : ""))
+                + (modified ? ", modified" : "") + " >";
 
     }
 
@@ -675,9 +675,10 @@ public class SPO implements ISPO, Comparable<SPO> {
             } else {
                 t = "Unknown     ";
             }
-            
-            return t +" : " + store.toString(s, p, o, c);
-            
+
+            return t + (modified ? "(*)" : "") + " : "
+                    + store.toString(s, p, o, c);
+
         } else {
             
             return toString();
@@ -714,6 +715,18 @@ public class SPO implements ISPO, Comparable<SPO> {
         
         return type != null;
         
+    }
+
+    public boolean isModified() {
+        
+        return modified;
+        
+    }
+
+    public void setModified(final boolean modified) {
+
+        this.modified = modified;
+
     }
 
 }

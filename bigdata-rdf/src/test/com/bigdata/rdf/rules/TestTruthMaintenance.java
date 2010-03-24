@@ -917,29 +917,32 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
 //        fail("enable test");
         
-        final String[] resource = new String[] {
-                "../rdf-data/alibaba_data.rdf",
-                "../rdf-data/alibaba_schema.rdf" };
+        final String ontology = "bigdata-rdf/src/resources/data/lehigh/univ-bench.owl";
+        final String resource =
+                "bigdata-rdf/src/resources/data/lehigh/U1";
+//                "../rdf-data/alibaba_data.rdf",
+//                "../rdf-data/alibaba_schema.rdf"
+//                };
 
-        final String[] baseURL = new String[] { "", "" 
-                };
-
-        final RDFFormat[] format = new RDFFormat[] {
-                RDFFormat.RDFXML,
-                RDFFormat.RDFXML
-                };
-
-        for(String r : resource) {
-            
-            if(!new File(r).exists()) {
-                
-                System.err.println("Resource not found: "+r+", test="+getName()+" skipped.");
-                
-                return;
-                
-            }
-            
-        }
+//        final String[] baseURL = new String[] { "", "" 
+//                };
+//
+//        final RDFFormat[] format = new RDFFormat[] {
+//                RDFFormat.RDFXML,
+//                RDFFormat.RDFXML
+//                };
+//
+//        for(String r : resource) {
+//            
+//            if(!new File(r).exists()) {
+//                
+//                System.err.println("Resource not found: "+r+", test="+getName()+" skipped.");
+//                
+//                return;
+//                
+//            }
+//            
+//        }
 
         final Properties properties = getProperties();
 
@@ -957,8 +960,11 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
             
             final DataLoader dataLoader = store.getDataLoader();
 
-            // load and close using an incremental approach.
-            dataLoader.loadData(resource, baseURL, format);
+            final String baseURI = new File(resource).toURI().toString();
+            
+            dataLoader.loadData(ontology, baseURI, RDFFormat.RDFXML);
+
+            dataLoader.loadData(resource, baseURI, RDFFormat.RDFXML);
 
             /*
              * Compute the closure of the database.

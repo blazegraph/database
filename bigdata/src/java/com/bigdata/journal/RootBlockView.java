@@ -37,6 +37,7 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -64,6 +65,9 @@ public class RootBlockView implements IRootBlockView {
      * are allocated from time to time.
      */
     static final transient short SIZEOF_UNUSED = 256 - (//
+            Bytes.SIZEOF_LONG + // metaBitsAddr since version 0x01.
+            Bytes.SIZEOF_LONG + // metaStartAddr since version 0x01.
+            Bytes.SIZEOF_BYTE + // storeType since version 0x01.  assume zero before that.
             Bytes.SIZEOF_UUID + // uuid
             Bytes.SIZEOF_BYTE + // offsetBits
             SIZEOF_TIMESTAMP  + // createTime
@@ -85,7 +89,10 @@ public class RootBlockView implements IRootBlockView {
     static final transient short OFFSET_CLOSE_TIME = OFFSET_CREATE_TIME + SIZEOF_TIMESTAMP;
     static final transient short OFFSET_UNUSED     = OFFSET_CLOSE_TIME  + SIZEOF_TIMESTAMP;
 //    static final transient short OFFSET_UNUSED     = OFFSET_COMMIT_NDX  + SIZEOF_ADDR;
-    static final transient short OFFSET_UUID       = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_META_BITS  = OFFSET_UNUSED      + SIZEOF_UNUSED;
+    static final transient short OFFSET_META_START = OFFSET_META_BITS   + SIZEOF_ADDR;
+    static final transient short OFFSET_STORETYPE  = OFFSET_META_START  + SIZEOF_ADDR;
+    static final transient short OFFSET_UUID       = OFFSET_STORETYPE   + Bytes.SIZEOF_BYTE;
     static final transient short OFFSET_CHALLIS1   = OFFSET_UUID        + Bytes.SIZEOF_UUID;
     static final transient short OFFSET_CHECKSUM   = OFFSET_CHALLIS1    + SIZEOF_TIMESTAMP;  
     static final transient short SIZEOF_ROOT_BLOCK = OFFSET_CHECKSUM    + SIZEOF_CHECKSUM;
@@ -99,8 +106,53 @@ public class RootBlockView implements IRootBlockView {
      * Original version.
      */
     final int VERSION0 = 0x0;
-    
-    final int currentVersion = VERSION0;
+
+    /**
+     * This version supports the {@link RWStore} as well as the log-structured
+     * journal store. The {@link RWStore} includes meta-allocation blocks,
+     * allocation blocks, and delete blocks (chains of addresses which can be
+     * freed in the allocation blocks when the corresponding commit record is
+     * discarded).
+     * <p>
+     * The new fields for this version include:
+     * <dl>
+     * <dt>storeType</dt>
+     * <dd>A byte value which specifies whether the backing store is a journal
+     * (log-structured store or WORM) or a read-write store. Only two values are
+     * defined at present. See {@link StoreTypeEnum}.</dd>
+     * <dt>metaBitsAddr</dt>
+     * <dd>Where we will read the metadata bits from. When we start the store up
+     * we need to retrieve the metabits from this address. This is a byte offset
+     * into the file and is stored as a long integer. Normal addresses are
+     * calculated with reference to the allocation blocks.</dd>
+     * <dt>metaStartAddr</dt>
+     * <dd>The start of the area of the file where the allocation blocks are
+     * allocated. This is also a byte offset into the file and is stored as a
+     * 64-bit integer. It is called metaStartAddr because that is the offset
+     * that is used with the metaBitsAddr to determine how to find the
+     * allocation blocks.</dd>
+     * </dl>
+     * In addition, the semantics of the following fields are different for the
+     * {@link RWStore}
+     * <dl>
+     * <dt>nextOffset</dt>
+     * <dd>For the {@link RWStore}, this the next offset in file from which a
+     * large chunk would be allocated in order to obtain space for additional
+     * allocation blocks. This field does not change when user level allocations
+     * are made.</dd>
+     * <dt>offsetBits</dt>
+     * <dd>This field is ignored by the {@link RWStore}.</dd>
+     * </dl>
+     * The head of the delete block chain is stored in the {@link ICommitRecord}
+     * so we know the address of the start of each delete block chain for each
+     * commit point on the store, which is why it is not stored in the root
+     * blocks.
+     * 
+     * @todo allocation block sizes to allocate?
+     */
+    final int VERSION1 = 0x1;
+
+    final int currentVersion;
     
     /**
      * The buffer holding the backing data.
@@ -124,7 +176,7 @@ public class RootBlockView implements IRootBlockView {
     /**
      * Used for assertion testing in the constructor and by {@link #toString()}.
      */
-    private final WormAddressManager am;
+    private final IAddressManager am;
     
     public boolean isRootBlock0() {
         
@@ -150,10 +202,13 @@ public class RootBlockView implements IRootBlockView {
      *            An address to be checked for validity (may be
      *            {@link IAddressManager#NULL}).
      */
-    static private void assertLegalAddr(WormAddressManager am, long nextOffset,
-            long addr, String label) {
+    static private void assertLegalAddr(final IAddressManager am,
+            final long nextOffset, final long addr, final String label) {
 
         if(addr==0L) return;
+        
+        // TODO develop protocol to support address checking
+        if (am instanceof RWStrategy.RWAddressManager) return;
         
         final long offset = am.getOffset(addr);
         
@@ -224,21 +279,47 @@ public class RootBlockView implements IRootBlockView {
      *            that disallowed further writes on this journal. This is mainly
      *            used by the {@link ResourceManager} to indicate that a journal
      *            is no longer available for writing (because it has been
-     *            superceded by another journal).
+     *            superseded by another journal).
      */
     RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
             long firstCommitTime, long lastCommitTime, long commitCounter,
             long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
             long createTime, long closeTime, ChecksumUtility checker) {
+        this(rootBlock0, offsetBits, nextOffset,
+                firstCommitTime, lastCommitTime, commitCounter,
+                commitRecordAddr, commitRecordIndexAddr, uuid,
+                0L, 0L, StoreTypeEnum.WORM,
+                createTime, closeTime, checker);
+    }
 
+    RootBlockView(boolean rootBlock0, int offsetBits, long nextOffset,
+            long firstCommitTime, long lastCommitTime, long commitCounter,
+            long commitRecordAddr, long commitRecordIndexAddr, UUID uuid,
+            long metaStartAddr, long metaBitsAddr, StoreTypeEnum storeTypeEnum,
+            long createTime, long closeTime, ChecksumUtility checker)
+    {
         assert SIZEOF_UNUSED > 0 : "Out of unused space in the root block? : "+SIZEOF_UNUSED;
 
         WormAddressManager.assertOffsetBits(offsetBits);
 
         // Note: used for assertions only and by toString().
-        am = new WormAddressManager(offsetBits);
+        if (StoreTypeEnum.RW == storeTypeEnum) {
+        	am = new RWStrategy.RWAddressManager();
+        	currentVersion = VERSION1;
+        } else {
+        	am = new WormAddressManager(offsetBits);
+        	currentVersion = VERSION0;
+        }
 
-        am.assertOffset(nextOffset);
+        if (am instanceof WormAddressManager) {
+         
+            /*
+             * FIXME Use RW vs WORM address manager and check this based on the
+             * StoreType, not the interface.
+             */
+            ((WormAddressManager) am).assertOffset(nextOffset);
+
+        }
         
         if( firstCommitTime == 0L && lastCommitTime != 0L) {
          
@@ -382,6 +463,9 @@ public class RootBlockView implements IRootBlockView {
         buf.putLong(createTime);
         buf.putLong(closeTime);
         buf.position(buf.position()+SIZEOF_UNUSED); // skip unused region.
+        buf.putLong(metaBitsAddr);
+        buf.putLong(metaStartAddr);
+        buf.put(storeTypeEnum.getType());
         buf.putLong(uuid.getMostSignificantBits());
         buf.putLong(uuid.getLeastSignificantBits());
         buf.putLong(challisField);
@@ -391,7 +475,6 @@ public class RootBlockView implements IRootBlockView {
         assert buf.limit() == SIZEOF_ROOT_BLOCK;
 
         buf.position(0);
-        
     }
 
     public ByteBuffer asReadOnlyBuffer() {
@@ -443,13 +526,15 @@ public class RootBlockView implements IRootBlockView {
          */
         this.buf = buf.asReadOnlyBuffer();
         
+        currentVersion = getVersion();
+        
         this.rootBlock0 = rootBlock0;
 
         final int offsetBits = getOffsetBits();
 
-        am = new WormAddressManager(offsetBits);
+        am = currentVersion == VERSION1 ? new RWStrategy.RWAddressManager() : new WormAddressManager(offsetBits);
 
-        if(checker == null) {
+        if (checker == null) {
             
             log.warn("Checksum will not be validated");
             
@@ -485,7 +570,7 @@ public class RootBlockView implements IRootBlockView {
      * {@link System#currentTimeMillis()} or the time at which the store was
      * created iff there have been no commits. Unlike
      * {@link #getFirstCommitTime()} and {@link #getLastCommitTime()} this field
-     * does NOT provide a guarentee that time is strictly increasing.
+     * does NOT provide a guarantee that time is strictly increasing.
      * <p>
      * Note: This field is stored for post-mortem purposes and is NOT used
      * internally.
@@ -569,11 +654,13 @@ public class RootBlockView implements IRootBlockView {
         }
 
         final int version = buf.getInt(OFFSET_VERSION);
-        
-        if( version != VERSION0 ) {
-            
-            throw new RootBlockException("Unknown version: "+version);
-            
+
+        switch (version) {
+        case VERSION0:
+        case VERSION1:
+            break;
+        default:
+            throw new RootBlockException("Unknown version: " + version);
         }
         
         // test that the store checksum field can be validated against the stored data.
@@ -627,7 +714,7 @@ public class RootBlockView implements IRootBlockView {
      *                with the checksum computed by
      *                {@link #calcChecksum(ChecksumUtility)}.
      */
-    public int getChecksum(ChecksumUtility checker) throws RootBlockException {
+    public int getChecksum(final ChecksumUtility checker) throws RootBlockException {
 
         // the value stored in the root block.
         final int storedChecksum = buf.getInt(OFFSET_CHECKSUM);
@@ -661,7 +748,7 @@ public class RootBlockView implements IRootBlockView {
      * Compute the checksum of the root block (excluding only the field
      * including the checksum value itself).
      */
-    public int calcChecksum(ChecksumUtility checker) {
+    public int calcChecksum(final ChecksumUtility checker) {
         
         if (checker == null)
             throw new IllegalArgumentException();
@@ -686,6 +773,9 @@ public class RootBlockView implements IRootBlockView {
         sb.append(", commitCounter="+getCommitCounter());
         sb.append(", commitRecordAddr="+am.toString(getCommitRecordAddr()));
         sb.append(", commitRecordIndexAddr="+am.toString(getCommitRecordIndexAddr()));
+        sb.append(", metaBitsAddr="+getMetaBitsAddr());
+        sb.append(", metaStartAddr="+getMetaStartAddr());
+        sb.append(", storeType="+getStoreType().getType());
         sb.append(", uuid="+getUUID());
         sb.append(", offsetBits="+getOffsetBits());
         sb.append(", checksum="+(checker==null?"N/A":""+calcChecksum(checker)));
@@ -697,5 +787,24 @@ public class RootBlockView implements IRootBlockView {
         return sb.toString();
         
     }
-    
+
+    public long getMetaBitsAddr() {
+        return buf.getLong(OFFSET_META_BITS);
+    }
+
+    public long getMetaStartAddr() {
+        return buf.getLong(OFFSET_META_START);
+    }
+
+    public StoreTypeEnum getStoreType() {
+        switch (getVersion()) {
+        case VERSION0:
+            return StoreTypeEnum.WORM;
+        case VERSION1:
+            return StoreTypeEnum.RW;
+        default:
+            return StoreTypeEnum.valueOf(buf.get(OFFSET_STORETYPE));
+        }
+    }
+
 }

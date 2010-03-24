@@ -70,30 +70,6 @@ public class HardReferenceQueue<T> extends RingBuffer<T> implements IHardReferen
      */
     private final HardReferenceQueueEvictionListener<T> listener;
 
-//    /**
-//     * The capacity of the cache.
-//     */
-//    protected final int capacity;
-//    /**
-//     * The hard references. There is no guarantee that the references are
-//     * distinct. Unused entries are cleared to null so that we do not hold onto
-//     * hard references after they have been evicted.
-//     */
-//    protected final T[] refs;
-//    /**
-//     * The head (the insertion point for the next reference).
-//     */
-//    protected int head = 0;
-//    /**
-//     * The tail (LRU position).
-//     */
-//    protected int tail = 0;
-//    /**
-//     * The #of references in the cache. The cache is empty when this field is
-//     * zero. The cache is full when this field equals the {@link #capacity}.
-//     */
-//    protected int count = 0;
-
     /**
      * The #of references to scan backwards from the LRU position when testing
      * for whether or not a reference is already in the cache.

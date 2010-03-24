@@ -15,15 +15,15 @@ public abstract class AbstractProcessReader implements Runnable {
     static protected final Logger log = Logger
             .getLogger(AbstractProcessReader.class);
 
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected static boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final protected static boolean INFO = log.isInfoEnabled();
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected static boolean DEBUG = log.isDebugEnabled();
+//
+//    /**
+//     * True iff the {@link #log} level is INFO or less.
+//     */
+//    final protected static boolean INFO = log.isInfoEnabled();
 
     /**
      * The {@link InputStream} from which the output of the process will be
@@ -38,9 +38,9 @@ public abstract class AbstractProcessReader implements Runnable {
      *            The input stream from which the output of the process will
      *            be read.
      */
-    public void start(InputStream is) {
+    public void start(final InputStream is) {
 
-        if(INFO) 
+        if(log.isInfoEnabled()) 
             log.info("");
 
         if (is == null)

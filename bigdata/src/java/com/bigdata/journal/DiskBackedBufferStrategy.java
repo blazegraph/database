@@ -102,6 +102,10 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
         
     }
 
+    public void delete(long addr) {
+    	// void
+    }
+    
     /**
      * Forces the data to disk.
      */
@@ -322,7 +326,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
-    protected final IReopenChannel opener = new IReopenChannel() {
+    protected final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
 
         public String toString() {
             

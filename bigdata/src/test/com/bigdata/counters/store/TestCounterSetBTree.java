@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.store;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
@@ -37,7 +38,6 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import junit.framework.TestCase2;
 
-import org.apache.commons.io.FileSystemUtils;
 import org.xml.sax.SAXException;
 
 import com.bigdata.counters.CounterSet;
@@ -49,7 +49,6 @@ import com.bigdata.counters.IHistoryEntry;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.History.SampleIterator;
-import com.bigdata.rawstore.Bytes;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -98,12 +97,13 @@ public class TestCounterSetBTree extends TestCase2 {
         final ICounter disk = root.addCounter("/www.bigdata.com/disk",
                 new Instrument<Long>() {
                     public void sample() {
-                        try {
-                        setValue(FileSystemUtils.freeSpaceKb(".")
-                                * Bytes.kilobyte);
-                        } catch(IOException ex) {
-                            log.error(ex,ex);
-                        }
+                        setValue(new File(".").getUsableSpace());
+//                        try {
+//                        setValue(FileSystemUtils.freeSpaceKb(".")
+//                                * Bytes.kilobyte);
+//                        } catch(IOException ex) {
+//                            log.error(ex,ex);
+//                        }
                     }
                 });
 

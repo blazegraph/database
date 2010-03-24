@@ -352,7 +352,7 @@ public class JoinStats implements Serializable {
             sb.append(Long.toString(s.bindingSetChunksOut)+sep);
             sb.append(Long.toString(s.mutationCount.get())+sep);
             sb.append(Integer.toString(tailIndex)+sep);
-            sb.append(rule.getTail(tailIndex).toString().replace(sep, "")+"\n\n");
+            sb.append(rule.getTail(tailIndex).toString().replace(sep, " ")+"\n");
             
         }
         

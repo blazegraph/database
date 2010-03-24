@@ -74,6 +74,9 @@ public class TestTripleStoreBasics extends TestCase2 {
         // test adding terms and statements.
         suite.addTestSuite(TestTripleStore.class);
 
+        // test the ISPO#isModified() API (low-level API).
+        suite.addTestSuite(TestIsModified.class);
+
         // test adding terms and statements is restart safe.
         suite.addTestSuite(TestRestartSafe.class);
 

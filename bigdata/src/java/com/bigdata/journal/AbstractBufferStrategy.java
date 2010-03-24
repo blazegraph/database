@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.NumberFormat;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -50,7 +51,7 @@ import com.bigdata.resources.ResourceManager;
 public abstract class AbstractBufferStrategy extends AbstractRawWormStore implements IBufferStrategy {
     
     /**
-     * Log for btree operations.
+     * Log for buffer operations.
      */
     protected static final Logger log = Logger.getLogger(AbstractBufferStrategy.class);
     
@@ -61,13 +62,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * Text of the error message used when a {@link ByteBuffer} with zero bytes
      * {@link ByteBuffer#remaining()} is passed to {@link #write(ByteBuffer)}.
      */
-    protected static final String ERR_BUFFER_EMPTY = "Zero bytes remaining in buffer";
+    public static final String ERR_BUFFER_EMPTY = "Zero bytes remaining in buffer";
     
     /**
      * Text of the error message used when a <code>null</code> reference is
      * provided for a {@link ByteBuffer}.
      */
-    protected static final String ERR_BUFFER_NULL = "Buffer is null";
+    public static final String ERR_BUFFER_NULL = "Buffer is null";
 
     /**
      * Text of the error message used when an address is given has never been
@@ -82,7 +83,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * to {@link IRawStore#read(long)} or similar methods. This value 0L is
      * reserved to indicate a persistent null reference and may never be read.
      */
-    protected static final String ERR_ADDRESS_IS_NULL = "Address is 0L";
+    public static final String ERR_ADDRESS_IS_NULL = "Address is 0L";
     
     /**
      * Text of the error message used when an address provided to
@@ -90,7 +91,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * of zero (0). Empty records are not permitted on write and addresses with
      * a zero length are rejected on read.
      */
-    protected static final String ERR_RECORD_LENGTH_ZERO = "Record length is zero";
+    public static final String ERR_RECORD_LENGTH_ZERO = "Record length is zero";
     
     /**
      * Text of the error message used when a write operation would exceed the
@@ -123,7 +124,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     /**
      * Error message used when the store is closed. 
      */
-    protected static final String ERR_NOT_OPEN = "Not open";
+    public static final String ERR_NOT_OPEN = "Not open";
+
+    /**
+     * Error message used when an operation would write more data than would be
+     * permitted onto a buffer.
+     */
+    public static final String ERR_BUFFER_OVERRUN = "Would overrun buffer";
     
     /**
      * <code>true</code> iff the {@link IBufferStrategy} is open.
@@ -144,12 +151,12 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * The buffer strategy implemented by this class.
      */
     protected final BufferMode bufferMode;
-    
+
     /**
      * The next offset at which a data item would be written on the store as an
-     * offset into the <em>user extent</em> (offset zero(0) addresses the
-     * first byte after the root blocks). This is updated each time a new record
-     * is written on the store. On restart, the value is initialized from the
+     * offset into the <em>user extent</em> (offset zero(0) addresses the first
+     * byte after the root blocks). This is updated each time a new record is
+     * written on the store. On restart, the value is initialized from the
      * current root block. The current value is written as part of the new root
      * block during each commit.
      * <p>
@@ -160,8 +167,13 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
      * {@link ICommitter}s and therefore never make themselves restart safe.
      * However, you can not discard the writes of those objects unless the
      * entire store is being restarted, e.g., after a shutdown or a crash.
+     * <p>
+     * Note: An {@link AtomicLong} is used to provide an object on which we can
+     * lock when assigning the next record's address and synchronously updating
+     * the counter value. It also ensures that threads can not see a stale value
+     * for the counter.
      */
-    protected long nextOffset;
+    final protected AtomicLong nextOffset;
 
     static final NumberFormat cf;
     
@@ -191,6 +203,15 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
     }
     
+    /**
+     * The minimum amount to extend the backing storage when it overflows.
+     */
+    protected long getMinimumExtension() {
+        
+        return Bytes.megabyte * 32;
+        
+    }
+    
     final public BufferMode getBufferMode() {
 
         return bufferMode;
@@ -199,7 +220,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     final public long getNextOffset() {
 
-        return nextOffset;
+        return nextOffset.get();
         
     }
 
@@ -241,7 +262,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         this.maximumExtent = maximumExtent; // MAY be zero!
         
-        this.nextOffset = nextOffset;
+        this.nextOffset = new AtomicLong(nextOffset);
         
         this.bufferMode = bufferMode;
         
@@ -253,7 +274,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
     
     public final long size() {
         
-        return nextOffset;
+        return nextOffset.get();
         
     }
 
@@ -292,7 +313,8 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
 
     final public void destroy() {
         
-        close();
+        if (open)
+            close();
 
         deleteResources();
         
@@ -352,7 +374,7 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
          */
         long newExtent = userExtent
                 + Math.max(needed, Math.max(initialExtent,
-                                Bytes.megabyte * 32));
+                                getMinimumExtension()));
         
         if (newExtent > Integer.MAX_VALUE && bufferMode.isFullyBuffered()) {
 
@@ -452,14 +474,24 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         // the current file position on the output channel.
         final long outPosition = outChannel.position();
         
+//        final long outSize = outChannel.size();
+//        
+//        final long outRemaining = outSize - outPosition;
+
         /*
          * Transfer the user extent from the source channel onto the output
-         * channel starting at its current file position.
+         * channel starting at its current file position. The output channel
+         * will be transparently extended if necessary.
          * 
          * Note: this has a side-effect on the position for both the source and
          * output channels.
+         * 
+         * Note: If the last record on the source was allocated but not written
+         * then the data transfer operation will fail since the source channel
+         * will not have enough data.
          */
-        FileChannelUtility.transferAll(srcChannel, fromPosition, count, out, outPosition);
+        FileChannelUtility.transferAll(srcChannel, fromPosition, count, out,
+                outPosition);
         
         return count;
 
@@ -578,6 +610,53 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         
         readOnly = true;
         
+    }
+
+    /*
+     * These are default implementations of methods defined for the R/W store
+     * which are NOPs for the WORM store.
+     */
+
+    /** The default is a NOP. */
+    @Override
+    public void delete(long addr) {
+
+        // NOP for WORM.
+
+    }
+
+    /** The default is a NOP. */
+    public void commit() {
+
+        // NOP for WORM.
+
+    }
+
+    /** The default is a NOP. */
+    public void abort() {
+
+        // NOP
+        
+    }
+    
+    public long getMetaBitsAddr() {
+
+        // NOP for WORM.
+        return 0;
+    }
+
+    public long getMetaStartAddr() {
+        // NOP for WORM.
+        return 0;
+    }
+
+    public boolean requiresCommit(IRootBlockView block) {
+        return getNextOffset() > block.getNextOffset();
+    }
+
+    public int getMaxRecordSize() {
+        return getAddressManager().getMaxByteCount();
+
     }
 
 }

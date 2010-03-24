@@ -94,17 +94,17 @@ public class Configuration {
      * 
      * <li>Default values are generally described in the javadoc for
      * <code>Options</code> interfaces. The specific default is supplied by
-     * the caller and will be used if the value is not overriden using any of
+     * the caller and will be used if the value is not overridden using any of
      * the other methods.</li>
      * 
-     * <li>The default value may be globally overriden using the property name.
+     * <li>The default value may be globally overridden using the property name.
      * For example, you can override the default branching factor for all
      * {@link BTree}s by specifying a value for
      * {@link IndexMetadata.Options#BTREE_BRANCHING_FACTOR}. In general, the
      * name of the property is declared by an interface along with its default
      * value. </li>
      * 
-     * <li>Any value may be overriden by a value that is specific to the
+     * <li>Any value may be overridden by a value that is specific to the
      * <i>namespace</i> (or to any prefix of that <i>namespace</i> which can
      * be formed by chopping off the namespace at a {@link #DOT}). For example,
      * you can override the branching factor property for an index named
@@ -113,7 +113,7 @@ public class Configuration {
      * is the {@link #NAMESPACE} prefix for overrides, <code>foo.myIndex</code>
      * is the name of the index, and
      * {@value IndexMetadata.Options#BTREE_BRANCHING_FACTOR} is the name of the
-     * property that will be overriden for that index). Alternatively you can
+     * property that will be overridden for that index). Alternatively you can
      * override the branching factor for all indices in the "foo" relation by
      * specifying a value for the property name
      * <code>com.bigdata.namespace.foo.com.bigdata.btree.BTree.branchingFactor</code>.
@@ -135,7 +135,7 @@ public class Configuration {
      *            (without the namespace).
      * @param defaultValue
      *            The value for that property that will be returned if the
-     *            default has not been overriden as described above (optional).
+     *            default has not been overridden as described above (optional).
      * 
      * @return The resolved value for the property.
      * 
@@ -394,7 +394,7 @@ public class Configuration {
     }
 
     /**
-     * Return the name that can be used to overrride the specified property for
+     * Return the name that can be used to override the specified property for
      * the given namespace.
      * 
      * @param namespace

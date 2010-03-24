@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -967,18 +965,18 @@ public class IndexSegmentStore extends AbstractRawStore {
             
             counters.nodesRead++;
             
-            synchronized (this) {
+            synchronized (this) { // @todo Why is this synchronized here?
 
                 if (buf_nodes != null) {
 
-                    counters.nodesReadFromDisk++;
-                    
                     return readFromBuffer(offset, length);
 
                 }
 
             }
 
+            counters.nodesReadFromDisk++;
+            
             // The data need to be read from the file.
             return readFromFile(offset, length);
 
@@ -1071,7 +1069,7 @@ public class IndexSegmentStore extends AbstractRawStore {
 
     }
     
-    private final IReopenChannel opener = new IReopenChannel() {
+    private final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
 
         public String toString() {
             
@@ -1525,9 +1523,9 @@ public class IndexSegmentStore extends AbstractRawStore {
         return addressManager.getOffset(addr);
     }
 
-    final public void packAddr(DataOutput out, long addr) throws IOException {
-        addressManager.packAddr(out, addr);
-    }
+//    final public void packAddr(DataOutput out, long addr) throws IOException {
+//        addressManager.packAddr(out, addr);
+//    }
 
     final public long toAddr(int nbytes, long offset) {
         return addressManager.toAddr(nbytes, offset);
@@ -1537,8 +1535,8 @@ public class IndexSegmentStore extends AbstractRawStore {
         return addressManager.toString(addr);
     }
 
-    final public long unpackAddr(DataInput in) throws IOException {
-        return addressManager.unpackAddr(in);
-    }
+//    final public long unpackAddr(DataInput in) throws IOException {
+//        return addressManager.unpackAddr(in);
+//    }
 
 }

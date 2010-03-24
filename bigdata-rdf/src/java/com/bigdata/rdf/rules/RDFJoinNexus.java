@@ -39,12 +39,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.keys.DelegateSortKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.config.Configuration;
+import com.bigdata.config.IValidator;
+import com.bigdata.config.IntegerValidator;
+import com.bigdata.config.LongValidator;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ConcurrencyManager;
@@ -59,11 +61,10 @@ import com.bigdata.rdf.magic.MagicTuple;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
-import com.bigdata.rdf.spo.SPOAccessPath;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.spo.SPOSortKeyBuilder;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -119,7 +120,6 @@ import com.bigdata.striterator.ChunkedConvertingIterator;
 import com.bigdata.striterator.DistinctFilter;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
-import com.bigdata.striterator.IKeyOrder;
 
 /**
  * {@link IProgram} execution support for the RDF DB.
@@ -139,7 +139,7 @@ import com.bigdata.striterator.IKeyOrder;
  * <p>
  * There is a pragmatic limit on the #of concurrent threads for a single host.
  * When those threads target a blocking queue, then thread contention becomes
- * very high and throughput drops drammatically. We can reduce this problem by
+ * very high and throughput drops dramatically. We can reduce this problem by
  * allocating a distinct {@link UnsynchronizedArrayBuffer} to each task. The
  * task collects a 'chunk' in the {@link UnsynchronizedArrayBuffer}. When full,
  * the buffer propagates onto a thread-safe buffer of chunks which flushes
@@ -185,10 +185,6 @@ public class RDFJoinNexus implements IJoinNexus {
     
     private final long readTimestamp;
 
-    private final boolean forceSerialExecution;
-    
-    private final int maxParallelSubqueries;
-    
     private final boolean justify;
     
     /**
@@ -197,15 +193,23 @@ public class RDFJoinNexus implements IJoinNexus {
      */
     private final boolean backchain;
 
+    private final int chunkCapacity;
     private final int chunkOfChunksCapacity;
+    private final boolean forceSerialExecution;
+    private final int maxParallelSubqueries;
+    private final int fullyBufferedReadThreshold;
+    private final long chunkTimeout;
+
+    /**
+     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
+     */
+    private static final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
 
     public int getChunkOfChunksCapacity() {
 
         return chunkOfChunksCapacity;
         
     }
-    
-    private final int chunkCapacity;
 
     public int getChunkCapacity() {
 
@@ -213,21 +217,31 @@ public class RDFJoinNexus implements IJoinNexus {
         
     }
     
-    private final long chunkTimeout;
-
-    /**
-     * The {@link TimeUnit}s in which the {@link #chunkTimeout} is measured.
-     */
-    private final TimeUnit chunkTimeoutUnit = TimeUnit.MILLISECONDS;
-    
-    private final int fullyBufferedReadThreshold;
-
     public int getFullyBufferedReadThreshold() {
         
         return fullyBufferedReadThreshold;
         
     }
-    
+
+    public String getProperty(final String name, final String defaultValue) {
+
+        // @todo pass namespace in with the RDFJoinNexusFactory?
+        return Configuration.getProperty(indexManager,
+                joinNexusFactory.properties, null/* namespace */, name,
+                defaultValue);
+
+    }
+
+    public <T> T getProperty(final String name, final String defaultValue,
+            final IValidator<T> validator) {
+
+        // @todo pass namespace in with the RDFJoinNexusFactory?
+        return Configuration.getProperty(indexManager,
+                joinNexusFactory.properties, null/* namespace */, name,
+                defaultValue, validator);
+
+    }
+
     private final int solutionFlags;
     
     @SuppressWarnings("unchecked")
@@ -316,13 +330,13 @@ public class RDFJoinNexus implements IJoinNexus {
          * 
          * @param indexManager
          *            When non-<code>null</code>, this is used to resolve
-         *            the term identifers in the {@link IPredicate}s in the
+         *            the term identifiers in the {@link IPredicate}s in the
          *            tail of the rule to {@link BigdataValue}s.
          * 
          * @param ruleState
          */
-        public RDFRuleStats(IIndexManager indexManager, long timestamp,
-                IRuleState ruleState) {
+        public RDFRuleStats(final IIndexManager indexManager,
+                final long timestamp, final IRuleState ruleState) {
 
             super(ruleState);
 
@@ -432,22 +446,64 @@ public class RDFJoinNexus implements IJoinNexus {
 
         this.readTimestamp = joinNexusFactory.readTimestamp;
 
-        this.forceSerialExecution = joinNexusFactory.forceSerialExecution;
-        
-        this.maxParallelSubqueries = joinNexusFactory.maxParallelSubqueries;
-        
         this.justify = joinNexusFactory.justify;
- 
+        
         this.backchain = joinNexusFactory.backchain;
         
-        this.chunkOfChunksCapacity = joinNexusFactory.chunkOfChunksCapacity;
-        
-        this.chunkCapacity = joinNexusFactory.chunkCapacity;
+//        this.forceSerialExecution = joinNexusFactory.forceSerialExecution;
+//        
+//        this.maxParallelSubqueries = joinNexusFactory.maxParallelSubqueries;
+//        
+//        this.chunkOfChunksCapacity = joinNexusFactory.chunkOfChunksCapacity;
+//        
+//        this.chunkCapacity = joinNexusFactory.chunkCapacity;
+//
+//        this.chunkTimeout = joinNexusFactory.chunkTimeout;
+//        
+//        this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
 
-        this.chunkTimeout = joinNexusFactory.chunkTimeout;
-        
-        this.fullyBufferedReadThreshold = joinNexusFactory.fullyBufferedReadThreshold;
-        
+        forceSerialExecution = Boolean.parseBoolean(getProperty(
+                AbstractResource.Options.FORCE_SERIAL_EXECUTION,
+                AbstractResource.Options.DEFAULT_FORCE_SERIAL_EXECUTION));
+
+        maxParallelSubqueries = getProperty(
+                AbstractResource.Options.MAX_PARALLEL_SUBQUERIES,
+                AbstractResource.Options.DEFAULT_MAX_PARALLEL_SUBQUERIES,
+                IntegerValidator.GTE_ZERO);
+
+        /*
+         * FIXME You can not override the rule execution model yet
+         * (nestedSubquery vs pipeline). This is currently a separate field on
+         * RDFJoinNexus. However, this will give way to a different approach all
+         * together with the rule execution refactor to support things like star
+         * joins.
+         */
+////        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
+////                .isScaleOut());
+//
+//        nestedSubquery = Boolean.parseBoolean(getProperty(
+//                AbstractResource.Options.NESTED_SUBQUERY, Boolean.FALSE);
+////        Boolean
+////                        .toString(!pipelineIsBetter)));
+
+        chunkOfChunksCapacity = getProperty(
+                AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY,
+                AbstractResource.Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY,
+                IntegerValidator.GT_ZERO);
+
+        chunkCapacity = getProperty(AbstractResource.Options.CHUNK_CAPACITY,
+                AbstractResource.Options.DEFAULT_CHUNK_CAPACITY,
+                IntegerValidator.GT_ZERO);
+
+        chunkTimeout = getProperty(AbstractResource.Options.CHUNK_TIMEOUT,
+                AbstractResource.Options.DEFAULT_CHUNK_TIMEOUT,
+                LongValidator.GTE_ZERO);
+
+        fullyBufferedReadThreshold = getProperty(
+                AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD,
+                AbstractResource.Options.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD,
+                IntegerValidator.GT_ZERO);
+
         this.solutionFlags = joinNexusFactory.solutionFlags;
 
         this.filter = joinNexusFactory.filter;
@@ -606,10 +662,12 @@ public class RDFJoinNexus implements IJoinNexus {
 //        
 //    }
 
-	/**
-	 * The head relation is what we write on for mutation operations and is also
-	 * responsible for minting new elements from computed {@link ISolution}s.
-	 */
+    /**
+     * The head relation is what we write on for mutation operations and is also
+     * responsible for minting new elements from computed {@link ISolution}s.
+     * This method depends solely on the name of the head relation and the
+     * timestamp of interest for the view.
+     */
     public IRelation getHeadRelationView(final IPredicate pred) {
         
 //        if (pred == null)
@@ -635,9 +693,14 @@ public class RDFJoinNexus implements IJoinNexus {
         return relation;
         
     }
-    
+
     /**
-     * The tail relations are the views from which we read.
+     * The tail relations are the views from which we read. This method depends
+     * solely on the name(s) of the relation(s) and the timestamp of interest
+     * for the view.
+     * 
+     * @todo we can probably get rid of the cache used by this method now that
+     *       calling this method has been factored out of the join loops.
      */
     @SuppressWarnings("unchecked")
     public IRelation getTailRelationView(final IPredicate pred) {
@@ -653,34 +716,9 @@ public class RDFJoinNexus implements IJoinNexus {
 
             final String relationName = pred.getOnlyRelationName();
 
-            synchronized (relationLock) {
-                /*
-                 * Cache optimization for the last relation returned.
-                 * 
-                 * @todo could scan list of up to N ~= 7 relations and that
-                 * might also beat the hash map. Could also optimize for the
-                 * case with two relations in the view (truth maintenance). also
-                 * explore optimizing this call out of the caller since they
-                 * should be able to reuse the result in a given join context.
-                 */
-                if (relationName == lastRelationName
-                        || relationName.equals(lastRelationName))
-                    return lastRelation;
-
-//              final long timestamp = getReadTimestamp(/*relationName*/);
-
-                // hotspot on locate(name,ts)
-                relation = (IRelation) resourceLocator.locate(relationName,
-                        readTimestamp);
+            relation = (IRelation) resourceLocator.locate(relationName,
+                    readTimestamp);
                 
-//                System.err.println(pred.toString());
-                
-                lastRelationName = relationName;
-                
-                lastRelation = relation;
-
-            }
-            
         } else if (nsources == 2) {
 
             final String relationName0 = pred.getRelationName(0);
@@ -714,16 +752,31 @@ public class RDFJoinNexus implements IJoinNexus {
         return relation;
         
     }
-    // FIXME we need to cache at least 2 relations for truth maintenance.
-    private transient final Object relationLock = new Object();
-    private transient String lastRelationName = null;
-    private transient IRelation lastRelation = null;
+
+    /**
+     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)}
+     * 
+     * @see #getTailAccessPath(IRelation, IPredicate).
+     */
+    public IAccessPath getTailAccessPath(final IPredicate predicate) {
+     
+        // Resolve the relation name to the IRelation object.
+        final IRelation relation = getTailRelationView(predicate);
+
+        return getTailAccessPath(relation, predicate);
+
+    }
 
     /**
      * When {@link #backchain} is <code>true</code> and the tail predicate is
      * reading on the {@link SPORelation}, then the {@link IAccessPath} is
      * wrapped so that the iterator will visit the backchained inferences as
-     * well.
+     * well. On the other hand, if {@link IPredicate#getPartitionId()} is
+     * defined (not <code>-1</code>) then the returned access path will be for
+     * the specified shard using the data service local index manager (
+     * {@link #indexManager} MUST be the data service local index manager for
+     * this case) and expanders WILL NOT be applied (they require a view of the
+     * total relation, not just a shard).
      * 
      * @see InferenceEngine
      * @see BackchainAccessPath
@@ -733,22 +786,47 @@ public class RDFJoinNexus implements IJoinNexus {
      *       make it slightly harder to write the unit tests for the
      *       {@link IEvaluationPlanFactory}
      */
-    public IAccessPath getTailAccessPath(final IPredicate predicate) {
+    public IAccessPath getTailAccessPath(final IRelation relation,
+            final IPredicate predicate) {
 
         if (predicate.getPartitionId() != -1) {
 
-            return getTailAccessPathForIndexPartition(predicate);
+            /*
+             * Note: This handles a read against a local index partition. For
+             * scale-out, the [indexManager] will be the data service's local
+             * index manager.
+             * 
+             * Note: Expanders ARE NOT applied in this code path. Expanders
+             * require a total view of the relation, which is not available
+             * during scale-out pipeline joins. Likewise, the [backchain]
+             * property will be ignored since it is handled by an expander.
+             * 
+             * @todo If getAccessPathForIndexPartition() is raised into the
+             * IRelation interface, then we can get rid of the cast to the
+             * SPORelation implementation.
+             */
+
+            return ((SPORelation) relation).getAccessPathForIndexPartition(
+                    indexManager, predicate);
 
         }
-        
-        // Resolve the relation name to the IRelation object.
-        // @todo hotspot: 24%
-        final IRelation relation = getTailRelationView(predicate);
-        
-        // Find the best access path for the predicate for that relation.
-        // @todo hotspot: 75%
-        IAccessPath accessPath = relation.getAccessPath(predicate);
 
+//        // Find the best access path for the predicate for that relation.
+        IAccessPath accessPath = relation.getAccessPath(predicate);
+//
+//        if (predicate.getPartitionId() != -1) {
+//
+//            /*
+//             * Note: The expander can not run against a shard since it assumes
+//             * access to the full key range of the index. Expanders are
+//             * convenient and work well for stand alone indices, but they should
+//             * be replaced by rule rewrites for scale-out.
+//             */
+//
+//            return accessPath;
+//            
+//        }
+        
         final ISolutionExpander expander = predicate.getSolutionExpander();
         
         if (expander != null) {
@@ -778,77 +856,94 @@ public class RDFJoinNexus implements IJoinNexus {
 
     }
 
-    /**
-     * This handles a request for an access path that is restricted to a
-     * specific index partition.
-     * <p>
-     * Note: This path is used with the scale-out JOIN strategy, which
-     * distributes join tasks onto each index partition from which it needs to
-     * read. Those tasks constrain the predicate to only read from the index
-     * partition which is being serviced by that join task.
-     * <p>
-     * Note: Since the relation may materialize the index views for its various
-     * access paths, and since we are restricted to a single index partition and
-     * (presumably) an index manager that only sees the index partitions local
-     * to a specific data service, we create an access path view for an index
-     * partition without forcing the relation to be materialized.
-     * 
-     * @todo caching for the access path?
-     */
-    private IAccessPath getTailAccessPathForIndexPartition(
-            final IPredicate predicate) {
-
-        if (indexManager instanceof IBigdataFederation) {
-       
-            /*
-             * This will happen if you fail to re-create the JoinNexus
-             * within the target execution environment.
-             * 
-             * This is disallowed because the predicate specifies an index
-             * partition and expects to have access to the local index
-             * objects for that index partition. However, the index
-             * partition is only available when running inside of the
-             * ConcurrencyManager and when using the IndexManager exposed by
-             * the ConcurrencyManager to its tasks.
-             */
-            
-            throw new IllegalStateException();
-            
-        }
-        
-        final String namespace = predicate.getOnlyRelationName();
-
-        /*
-         * Find the best access path for that predicate.
-         * 
-         * FIXME quads : hardcoded for triples and the SPORelation.
-         */
-        final IKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate, 3);
-
-        // The name of the desired index partition.
-        final String name = DataService
-                .getIndexPartitionName(namespace + "."
-                        + keyOrder.getIndexName(), predicate
-                        .getPartitionId());
-        
-        /*
-         * @todo whether or not we need both keys and values depends on the
-         * specific index/predicate.
-         * 
-         * Note: We can specify READ_ONLY here since the tail predicates are
-         * not mutable for rule execution.
-         */
-        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS | IRangeQuery.READONLY;
-
-        final long timestamp = getReadTimestamp();
-        
-        final IIndex ndx = indexManager.getIndex(name, timestamp);
-        
-        return new SPOAccessPath(indexManager, timestamp, predicate,
-                keyOrder, ndx, flags, getChunkOfChunksCapacity(),
-                getChunkCapacity(), getFullyBufferedReadThreshold()).init();
-
-    }
+//    /**
+//     * This handles a request for an access path that is restricted to a
+//     * specific index partition.
+//     * <p>
+//     * Note: This path is used with the scale-out JOIN strategy, which
+//     * distributes join tasks onto each index partition from which it needs to
+//     * read. Those tasks constrain the predicate to only read from the index
+//     * partition which is being serviced by that join task.
+//     * <p>
+//     * Note: Since the relation may materialize the index views for its various
+//     * access paths, and since we are restricted to a single index partition and
+//     * (presumably) an index manager that only sees the index partitions local
+//     * to a specific data service, we create an access path view for an index
+//     * partition without forcing the relation to be materialized.
+//     * <p>
+//     * Note: This method MUST NOT be moved to the {@link SPORelation}!!! The
+//     * issue is that the relation is always resolved using the federation's
+//     * index manager in order to resolve the metadata for the relation against
+//     * the global row store. The {@link RDFJoinNexus} has been specifically
+//     * prepared during scale-out joins such that the {@link #indexManager} is
+//     * the data service's index manager NOT the federation's index manager. This
+//     * gives us access to the local B+Tree views, which are efficient for local
+//     * reads. If this method is moved to the {@link SPORelation} then the
+//     * relation must be handed the desired index manager since the one it
+//     * inherits from its base class will be the federation's index manager, not
+//     * the local data service's index manager.
+//     * 
+//     * FIXME This COULD be moved into the {@link SPORelation} (and hence made
+//     * general purpose) if we passed through the local index manager and used
+//     * it consistently when obtaining the {@link IAccessPath}.
+//     * 
+//     * FIXME This is hardcoded for the {@link SPORelation} (it will not handle
+//     * joins against other relations).
+//     */
+//    private IAccessPath getTailAccessPathForIndexPartition(
+//            final IRelation relation, final IPredicate predicate) {
+//
+//        if (indexManager instanceof IBigdataFederation) {
+//       
+//            /*
+//             * This will happen if you fail to re-create the JoinNexus
+//             * within the target execution environment.
+//             * 
+//             * This is disallowed because the predicate specifies an index
+//             * partition and expects to have access to the local index
+//             * objects for that index partition. However, the index
+//             * partition is only available when running inside of the
+//             * ConcurrencyManager and when using the IndexManager exposed by
+//             * the ConcurrencyManager to its tasks.
+//             */
+//            throw new IllegalStateException(
+//                    "Expecting a local index manager, not: "
+//                            + indexManager.getClass().toString());
+//
+//        }
+//        
+//        final String namespace = predicate.getOnlyRelationName();
+//
+//        /*
+//         * Find the best access path for that predicate.
+//         */
+//        final IKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate,
+//                ((SPORelation) relation).getKeyArity());
+//
+//        // The name of the desired index partition.
+//        final String name = DataService
+//                .getIndexPartitionName(namespace + "."
+//                        + keyOrder.getIndexName(), predicate
+//                        .getPartitionId());
+//        
+//        /*
+//         * @todo whether or not we need both keys and values depends on the
+//         * specific index/predicate.
+//         * 
+//         * Note: We can specify READ_ONLY here since the tail predicates are
+//         * not mutable for rule execution.
+//         */
+//        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS | IRangeQuery.READONLY;
+//
+//        final long timestamp = getReadTimestamp();
+//        
+//        final IIndex ndx = indexManager.getIndex(name, timestamp);
+//        
+//        return new SPOAccessPath(indexManager, timestamp, predicate,
+//                keyOrder, ndx, flags, getChunkOfChunksCapacity(),
+//                getChunkCapacity(), getFullyBufferedReadThreshold()).init();
+//
+//    }
     
     public Iterator<PartitionLocator> locatorScan(
             final AbstractScaleOutFederation fed, final IPredicate predicate) {
@@ -1036,8 +1131,8 @@ public class RDFJoinNexus implements IJoinNexus {
     }
 
     final private static transient IConstant<Long> fakeTermId = new Constant<Long>(-1L);
-    
-    public ISolution newSolution(IRule rule, IBindingSet bindingSet) {
+
+    public ISolution newSolution(final IRule rule, final IBindingSet bindingSet) {
 
         final Solution solution = new Solution(this, rule, bindingSet);
         

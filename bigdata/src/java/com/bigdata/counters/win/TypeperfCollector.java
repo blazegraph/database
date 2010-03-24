@@ -435,7 +435,7 @@ public class TypeperfCollector extends AbstractProcessCollector {
 
                         final String value = "" + entry.getValue();
 
-                        if(DEBUG)
+                        if(log.isDebugEnabled())
                             log.debug(path + "=" + value);
 
                         // update the value from which the counter reads.

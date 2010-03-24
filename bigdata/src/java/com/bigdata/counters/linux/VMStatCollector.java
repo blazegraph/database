@@ -326,19 +326,19 @@ public class VMStatCollector extends AbstractProcessCollector implements
         @Override
         protected void readProcess() throws Exception {
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("begin");
 
             for(int i=0; i<10 && !getActiveProcess().isAlive(); i++) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("waiting for the readerFuture to be set.");
 
                 Thread.sleep(100/*ms*/);
                 
             }
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("running");
 
             // skip 1st header.
@@ -346,7 +346,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
                 final String header = readLine();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("header: " + header);
             }
 
@@ -356,7 +356,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
 
                 header = readLine();
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("header: " + header);
 
             }
@@ -393,7 +393,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
                     final String iowait = fields[15];
                     // final String steal = fields[16];
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("\nswpd=" + swpd + ", free=" + free + ", si="
                                 + si + ", so=" + so + ", bi=" + bi + ", bo="
                                 + bo + ", %user=" + user + ", %system="

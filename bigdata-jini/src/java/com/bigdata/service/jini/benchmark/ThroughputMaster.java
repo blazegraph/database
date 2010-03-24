@@ -614,7 +614,7 @@ public class ThroughputMaster
                 removeBuffer = ndx.newWriteBuffer(//
                         (IResultHandler<Void, Void>) null,// resultHandler
                         duplicateRemover,//
-                        BatchRemoveConstructor.RETURN_NO_VALUES);
+                        BatchRemoveConstructor.RETURN_MUTATION_COUNT);
             } else {
                 duplicateRemover = null;
                 insertBuffer = removeBuffer = null;
@@ -869,7 +869,7 @@ public class ThroughputMaster
                     // synchronous RPC
                     ndx.submit(0/* fromIndex */, nops/* toIndex */, KVO
                             .getKeys(a), KVO.getVals(a),
-                            BatchRemoveConstructor.RETURN_NO_VALUES,//
+                            BatchRemoveConstructor.RETURN_MUTATION_COUNT,//
                             null// handler
                             );
 

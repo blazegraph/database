@@ -27,7 +27,7 @@ public class TermFrequencyData {
      */
     final public HashMap<String,TermMetadata> terms = new HashMap<String,TermMetadata>(); 
     
-    public TermFrequencyData(long docId, int fieldId, Token token) {
+    public TermFrequencyData(long docId, int fieldId, String token) {
         
         this.docId = docId;
         
@@ -45,9 +45,9 @@ public class TermFrequencyData {
      * 
      * @return true iff the termText did not previously exist for this {@link TermFrequencyData}.
      */
-    public boolean add(Token token) {
+    public boolean add(String token) {
         
-        final String termText = token.termText();
+        final String termText = token;
         
         final boolean newTerm;
         

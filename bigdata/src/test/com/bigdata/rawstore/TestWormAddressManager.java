@@ -27,11 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rawstore;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.TestCase;
@@ -255,39 +250,39 @@ public class TestWormAddressManager extends TestCase {
 
     }
 
-    /**
-     * Test of packing and unpacking addresses with a small set of addresses
-     * using 32 bit offsets.
-     */
-    public void test_packUnpack_32() throws IOException {
-
-        doTestPackUnpack(32, 100);
-
-    }
-
-    /**
-     * Test of packing and unpacking addresses with a small set of addresses
-     * using 48 bit offsets.
-     */
-    public void test_packUnpack_48() throws IOException {
-
-        doTestPackUnpack(48, 100);
-
-    }
-
-    /**
-     * Test of packing and unpacking addresses with a set of addresses selected
-     * from each of the legal values of the offsetBits.
-     */
-    public void test_packUnpack() throws IOException {
-
-        for (int i = WormAddressManager.MIN_OFFSET_BITS; i <= WormAddressManager.MAX_OFFSET_BITS; i++) {
-
-            doTestPackUnpack(i, 10000);
-
-        }
-
-    }
+//    /**
+//     * Test of packing and unpacking addresses with a small set of addresses
+//     * using 32 bit offsets.
+//     */
+//    public void test_packUnpack_32() throws IOException {
+//
+//        doTestPackUnpack(32, 100);
+//
+//    }
+//
+//    /**
+//     * Test of packing and unpacking addresses with a small set of addresses
+//     * using 48 bit offsets.
+//     */
+//    public void test_packUnpack_48() throws IOException {
+//
+//        doTestPackUnpack(48, 100);
+//
+//    }
+//
+//    /**
+//     * Test of packing and unpacking addresses with a set of addresses selected
+//     * from each of the legal values of the offsetBits.
+//     */
+//    public void test_packUnpack() throws IOException {
+//
+//        for (int i = WormAddressManager.MIN_OFFSET_BITS; i <= WormAddressManager.MAX_OFFSET_BITS; i++) {
+//
+//            doTestPackUnpack(i, 10000);
+//
+//        }
+//
+//    }
     
     /**
      * Helper performs random tests of {@link WormAddressManager#toAddr(int, long)}
@@ -348,108 +343,108 @@ public class TestWormAddressManager extends TestCase {
         
     }
 
-    /**
-     * Helper method verifies (de-)serialization of addresses.
-     * 
-     * @param offsetBits
-     * 
-     * @throws IOException
-     */
-    public void doTestPackUnpack(int offsetBits,int limit) throws IOException {
-
-        WormAddressManager am = new WormAddressManager(offsetBits);
-        
-        /*
-         * Generate an array of valid encoded addresses, including a bunch that
-         * are NULLs.
-         */
-        long[] addrs = new long[limit];
-        
-        for(int i=0; i<limit; i++) {
-            
-            long addr;
-
-            if (r.nextInt(100) < 5) {
-
-                // 5% are NULLs.
-                addr = 0L;
-
-            } else {
-
-                addr = nextAddr(r,am);
-                
-//                System.err.print(".");
-
-            }
-
-            addrs[i] = addr;
-            
-        }
-        
-//        System.err.println("Generated "+limit+" addresses.");
-        
-        /*
-         * Pack the generated addresses.
-         */
-        final byte[] packed;
-        {
-
-            /*
-             * The result should tend to be significantly smaller than directly
-             * writing 8 bytes per address into the store, but of course that
-             * depends on the actual addresses.
-             */
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(limit*Bytes.SIZEOF_LONG);
-
-            DataOutputStream os = new DataOutputStream(baos);
-
-            for (int i = 0; i < limit; i++) {
-
-                long addr = addrs[i];
-                
-                try {
-
-                    am.packAddr(os, addr);
-                    
-                } catch(IllegalArgumentException ex) {
-                    
-                    fail("Could not pack addr="+addr+"("+am.toString(addr)+") : "+ex);
-                    
-                }
-
-            }
-
-            os.flush();
-
-            packed = baos.toByteArray();
-            
-        }
-
-        /*
-         * @todo compute and show the compression ratio but note that it will
-         * not be good when the addresses are choosen randomly.
-         */
-//        System.err.println("Compression ratio: "+(limit))
-        
-        /*
-         * Verify that the addresses unpack correctly.
-         */
-        {
-            
-            DataInputStream in = new DataInputStream(new ByteArrayInputStream(
-                    packed));
-
-            for (int i = 0; i < limit; i++) {
-
-                long addr = am.unpackAddr(in);
-
-                assertEquals(addrs[i],addr);
-                
-            }
-            
-        }
-
-    }
+//    /**
+//     * Helper method verifies (de-)serialization of addresses.
+//     * 
+//     * @param offsetBits
+//     * 
+//     * @throws IOException
+//     */
+//    public void doTestPackUnpack(int offsetBits,int limit) throws IOException {
+//
+//        WormAddressManager am = new WormAddressManager(offsetBits);
+//        
+//        /*
+//         * Generate an array of valid encoded addresses, including a bunch that
+//         * are NULLs.
+//         */
+//        long[] addrs = new long[limit];
+//        
+//        for(int i=0; i<limit; i++) {
+//            
+//            long addr;
+//
+//            if (r.nextInt(100) < 5) {
+//
+//                // 5% are NULLs.
+//                addr = 0L;
+//
+//            } else {
+//
+//                addr = nextAddr(r,am);
+//                
+////                System.err.print(".");
+//
+//            }
+//
+//            addrs[i] = addr;
+//            
+//        }
+//        
+////        System.err.println("Generated "+limit+" addresses.");
+//        
+//        /*
+//         * Pack the generated addresses.
+//         */
+//        final byte[] packed;
+//        {
+//
+//            /*
+//             * The result should tend to be significantly smaller than directly
+//             * writing 8 bytes per address into the store, but of course that
+//             * depends on the actual addresses.
+//             */
+//            ByteArrayOutputStream baos = new ByteArrayOutputStream(limit*Bytes.SIZEOF_LONG);
+//
+//            DataOutputStream os = new DataOutputStream(baos);
+//
+//            for (int i = 0; i < limit; i++) {
+//
+//                long addr = addrs[i];
+//                
+//                try {
+//
+//                    am.packAddr(os, addr);
+//                    
+//                } catch(IllegalArgumentException ex) {
+//                    
+//                    fail("Could not pack addr="+addr+"("+am.toString(addr)+") : "+ex);
+//                    
+//                }
+//
+//            }
+//
+//            os.flush();
+//
+//            packed = baos.toByteArray();
+//            
+//        }
+//
+//        /*
+//         * @todo compute and show the compression ratio but note that it will
+//         * not be good when the addresses are choosen randomly.
+//         */
+////        System.err.println("Compression ratio: "+(limit))
+//        
+//        /*
+//         * Verify that the addresses unpack correctly.
+//         */
+//        {
+//            
+//            DataInputStream in = new DataInputStream(new ByteArrayInputStream(
+//                    packed));
+//
+//            for (int i = 0; i < limit; i++) {
+//
+//                long addr = am.unpackAddr(in);
+//
+//                assertEquals(addrs[i],addr);
+//                
+//            }
+//            
+//        }
+//
+//    }
 
     /**
      * Returns a legal random address and NULL 5% of the time.

@@ -39,7 +39,7 @@ import org.xml.sax.XMLReader;
 
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
@@ -79,7 +79,7 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  * 
  * <p>
  * <strong> This parser has been modified to support the exchange of statement
- * identifiers and {@link StatementEnum} metadata as described in {@link BNS}
+ * identifiers and {@link StatementEnum} metadata as described in {@link BD}
  * and {@link Options#STATEMENT_IDENTIFIERS}. </strong>
  * </p>
  * 
@@ -118,7 +118,7 @@ public class RDFXMLParser extends RDFParserBase {
 	private String xmlLang;
     
     /**
-     * The context for statements can be specified using the {@link BNS#SID}
+     * The context for statements can be specified using the {@link BD#SID}
      * attribute. This is set within {@link SAXFilter} in a manner that closely
      * parallels how {@link #xmlLang} is handled by that class.
      */
@@ -126,7 +126,7 @@ public class RDFXMLParser extends RDFParserBase {
 
     /**
      * Whether the current statement is an axiom, an inference, or an explicit
-     * statement as reported by the {@link BNS#STATEMENT_TYPE} attribute. This is set
+     * statement as reported by the {@link BD#STATEMENT_TYPE} attribute. This is set
      * within {@link SAXFilter} in a manner that closely parallels how
      * {@link #xmlLang} is handled by that class.
      */
@@ -346,7 +346,7 @@ public class RDFXMLParser extends RDFParserBase {
     }
 
     /**
-     * Set the statement identifier as reported by {@link BNS#SID}.
+     * Set the statement identifier as reported by {@link BD#SID}.
      * 
      * @param context
      *            The statement identifier (a blank node).
@@ -372,7 +372,7 @@ public class RDFXMLParser extends RDFParserBase {
     }
 
     /**
-     * Set the statement type as reported by {@link BNS#STATEMENT_TYPE}.
+     * Set the statement type as reported by {@link BD#STATEMENT_TYPE}.
      * 
      * @param typeStr
      *            The statement type (Axiom, Inferred, or Explicit) or "".
@@ -1077,7 +1077,7 @@ public class RDFXMLParser extends RDFParserBase {
 			while (iter.hasNext()) {
 				Att att = iter.next();
 
-                if(BNS.NAMESPACE.equals(att.getNamespace())) {
+                if(BD.NAMESPACE.equals(att.getNamespace())) {
                     /*
                      * Ignore bigdata namespace attributes - they can not be
                      * expected to validate as RDF/XML.
@@ -1096,10 +1096,7 @@ public class RDFXMLParser extends RDFParserBase {
     private void reportStatement(Resource subject, URI predicate, Value object, Resource context)
         throws RDFParseException, RDFHandlerException
     {
-        if(BNS.NAMESPACE.equals(predicate.getNamespace())
-                &&(BNS.SID.equals(predicate.getLocalName())||
-                        BNS.STATEMENT_TYPE.equals(predicate.getLocalName())
-                )) {
+        if(BD.SID.equals(predicate) || BD.STATEMENT_TYPE.equals(predicate)) {    
             /*
              * Avoid asserting statements for various bigdata:foo attributes.
              */
@@ -1128,10 +1125,7 @@ public class RDFXMLParser extends RDFParserBase {
 	private void reportStatement(Resource subject, URI predicate, Value object)
 		throws RDFParseException, RDFHandlerException
 	{ // FIXME locate all callers and verify that NO context is appropriate since none will be reported.
-        if(BNS.NAMESPACE.equals(predicate.getNamespace())
-                &&(BNS.SID.equals(predicate.getLocalName())||
-                        BNS.STATEMENT_TYPE.equals(predicate.getLocalName())
-                )) {
+        if(BD.SID.equals(predicate) || BD.STATEMENT_TYPE.equals(predicate)) {    
             /*
              * Avoid asserting statements for various bigdata:foo attributes.
              */

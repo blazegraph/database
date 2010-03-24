@@ -118,6 +118,8 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
         
         Journal store = (Journal) getStore();
         
+        if (! (store.getBufferStrategy() instanceof AbstractBufferStrategy)) return;
+        
         try {
         
         AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
@@ -182,8 +184,11 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
         try {
         
-        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
-                .getBufferStrategy();
+        IBufferStrategy bufferStrategy = store.getBufferStrategy();
+        
+        if (bufferStrategy.getBufferMode() == BufferMode.DiskRW) {
+        	return;
+        }
 
         final long userExtent = bufferStrategy.getUserExtent();
         
@@ -288,11 +293,10 @@ abstract public class AbstractBufferStrategyTestCase extends AbstractRawStoreTes
 
         try {
         
-        AbstractBufferStrategy bufferStrategy = (AbstractBufferStrategy) store
-                .getBufferStrategy();
+        IBufferStrategy bufferStrategy = store.getBufferStrategy();
 
-        if(bufferStrategy.getBufferMode()==BufferMode.Mapped) {
-            
+        BufferMode bm = bufferStrategy.getBufferMode();
+        if (bm == BufferMode.DiskRW || bm == BufferMode.Mapped) {          
             return;
             
         }

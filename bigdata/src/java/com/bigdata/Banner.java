@@ -121,7 +121,7 @@ public class Banner {
 
                 } catch (Throwable t) {
 
-                    log.error("Problem registering log4j mbean?", t);
+                    log.info("Problem registering log4j mbean?", t);
 
                 }
 
@@ -151,7 +151,7 @@ public class Banner {
         "\n                  Affordable"+//
         "\n      Web-Scale Computing for the Enterprise"+//
         "\n"+//
-        "\nCopyright SYSTAP, LLC 2006-2009.  All rights reserved."+//
+        "\nCopyright SYSTAP, LLC 2006-2010.  All rights reserved."+//
         "\n"+//
         "\n"+AbstractStatisticsCollector.fullyQualifiedHostName+//
         "\n"+new Date()+//

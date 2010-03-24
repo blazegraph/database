@@ -30,15 +30,19 @@ package com.bigdata.relation.rule.eval;
 
 import java.io.Serializable;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 
 import com.bigdata.btree.keys.ISortKeyBuilder;
+import com.bigdata.config.Configuration;
+import com.bigdata.config.IValidator;
 import com.bigdata.io.IStreamSerializer;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IMutableRelation;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.RelationFusedView;
@@ -48,6 +52,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
+import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IConstraint;
@@ -144,9 +149,38 @@ public interface IJoinNexus {
      * This value should on the order of {@link #getChunkCapacity()}.
      * 
      * @see IAccessPath#iterator(int, int)
+     * @see AbstractResource.Options#FULLY_BUFFERED_READ_THRESHOLD
      */
     int getFullyBufferedReadThreshold();
-    
+
+    /**
+     * Resolve the property value using the {@link IIndexManager}, the namespace
+     * of the resource, and the {@link Properties} instance to be tested as
+     * hidden parameters.
+     * 
+     * @param name
+     *            The property name.
+     * @param defaultValue
+     *            The default.
+     * 
+     * @return The resolved property value.
+     * 
+     * @see Configuration
+     */
+    String getProperty(final String name, final String defaultValue);
+
+    /**
+     * Resolves, parses, and validates the property value.
+     * 
+     * @param name
+     *            The property name.
+     * @param defaultValue
+     *            The default value.
+     * @return
+     */
+    <T> T getProperty(final String name, final String defaultValue,
+            IValidator<T> validator);
+
     /**
      * Binds variables from a visited element.
      * <p>
@@ -400,16 +434,41 @@ public interface IJoinNexus {
      */
     IRelation getTailRelationView(IPredicate pred);
 
-	/**
-	 * Obtain an access path reading from the view for the relation associated
-	 * with the specified predicate (from the tail of some rule).
-	 * 
-	 * @param pred
-	 *            The predicate.
-	 * 
-	 * @return The access path.
-	 */
+    /**
+     * Obtain an access path reading from the view for the relation associated
+     * with the specified predicate (from the tail of some rule).
+     * 
+     * @param pred
+     *            The predicate.
+     * 
+     * @return The access path.
+     * 
+     * @deprecated by {@link #getTailAccessPath(IRelation, IPredicate)} which
+     *             factors out obtaining the {@link IRelation} view into the
+     *             caller, which turns out to be a significant cost savings.
+     */
     IAccessPath getTailAccessPath(IPredicate pred);
+
+    /**
+     * Obtain an access path reading from relation for the specified predicate
+     * (from the tail of some rule).
+     * <p>
+     * Note that passing in the {@link IRelation} is important since it
+     * otherwise must be discovered using the {@link IResourceLocator}. By
+     * requiring the caller to resolve it before hand and pass it into this
+     * method the contention and demand on the {@link IResourceLocator} cache is
+     * reduced.
+     * 
+     * @param relation
+     *            The relation.
+     * @param pred
+     *            The predicate. When {@link IPredicate#getPartitionId()} is
+     *            set, the returned {@link IAccessPath} MUST read on the
+     *            identified local index partition (directly, not via RMI).
+     * 
+     * @return The access path.
+     */
+    IAccessPath getTailAccessPath(IRelation relation, IPredicate pred);
     
     /**
      * Return an iterator visiting the {@link PartitionLocator} for the index

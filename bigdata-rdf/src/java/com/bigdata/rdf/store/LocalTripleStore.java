@@ -66,19 +66,20 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
     /**
      * Delegates the operation to the backing store.
      */
-    synchronized public void commit() {
+    synchronized public long commit() {
      
         final long begin = System.currentTimeMillis();
 
         super.commit();
         
-        getIndexManager().commit();
+        final long commitTime= getIndexManager().commit();
         
         final long elapsed = System.currentTimeMillis() - begin;
 
         if (log.isInfoEnabled())
-            log.info("commit: commit latency="+elapsed+"ms");
-
+            log.info("commit: commit latency=" + elapsed + "ms");
+        
+        return commitTime;
     }
 
     public void abort() {
@@ -159,6 +160,12 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
      */
     public LocalTripleStore(Properties properties) {
 
+        /*
+         * FIXME This should pass up the existing properties for the KB instance
+         * when the KB instance is pre-existing.  Really though, you should first
+         * obtain the Journal and then attempt to locate the KB and create it if
+         * it does not exist.
+         */
         this(new Journal(properties), "kb"/* namespace */, ITx.UNISOLATED,
                 properties);
         

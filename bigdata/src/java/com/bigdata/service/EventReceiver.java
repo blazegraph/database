@@ -178,9 +178,9 @@ public class EventReceiver implements IEventReceivingService,
          * @param checkpoint
          * @param metadata
          */
-        public EventBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+        public EventBTree(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata, boolean readOnly) {
 
-            super(store, checkpoint, metadata);
+            super(store, checkpoint, metadata, readOnly);
             
         }
         

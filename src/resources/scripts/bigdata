@@ -315,6 +315,23 @@ case "$1" in
 	    echo $"`date` : `hostname` : ntp commands not enabled."
 	    exit 1;
 	fi
+# Conditionally replace the ntp configuration on the master and clients.  If
+# you need to do this more than once you will have to change the name of the
+# backup file.
+    if [ ! -f /etc/ntp.conf.backup ]; then
+        cp /etc/ntp.conf /etc/ntp.conf.backup
+	    if [ "@NTP_MASTER@" != "`hostname`" ]; then
+   		   cp --backup --update $configDir/ntpd/ntp.conf /etc/ntp.conf
+       else
+   	 	   cp --backup --update $configDir/ntpd/ntp-client.conf /etc/ntp.conf
+        fi
+        chown root.root /etc/ntp.conf
+        chmod u+rw,go+r-wx /etc/ntp.conf
+    fi
+# Uncomment if you need to put everyone into the same timezone.
+# See http://www.cyberciti.biz/faq/howto-linux-unix-change-setup-timezone-tz-variable/
+# See http://www.wikihow.com/Change-the-Timezone-in-Linux
+#   pushd /etc && ln -sf /usr/share/zoneinfo/UTC localtime && popd
 	if [ "@NTP_MASTER@" != "`hostname`" ]; then
 	    action $"`date` : `hostname` : stopping ntpd: " /etc/init.d/ntpd stop
 	    action $"`date` : `hostname` : setting clock: " /usr/sbin/ntpdate "@NTP_MASTER@"
@@ -331,23 +348,6 @@ case "$1" in
 	    action $"`date` : `hostname` : starting ntpd: " /etc/init.d/ntpd start
 	fi
 	;;
-# @todo edit the following which can be used to install the sample ntp config
-# file on the hosts in the cluster.
-#	if [ -z "@NTP_MASTER@" ]; then
-#	    echo $"`date` : `hostname` : ntp commands not enabled."
-#	    exit 1;
-#	fi
-#   if [ ! -f /etc/ntp.conf.backup ]; then
-#       cp /etc/ntp.conf /etc/ntp.conf.backup
-#	    if [ "@NTP_MASTER@" != "`hostname`" ]; then
-#   		cp --backup --update $configDir/ntpd/ntp.conf /etc/ntp.conf
-#       else
-#   		cp --backup --update $configDir/ntpd/ntp-client.conf /etc/ntp.conf
-#       fi
-#       chown root.root /etc/ntp.conf
-#       chmod u+rw,go+r-wx /etc/ntp.conf
-#   fi
-#   ;;
 #    restart)
 # Note: DO NOT enable [restart].  It will kill and restart the
 # services each time the script is read so you can not reach a stable

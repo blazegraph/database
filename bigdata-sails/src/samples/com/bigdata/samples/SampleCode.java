@@ -9,7 +9,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.Properties;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -25,11 +28,15 @@ import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQuery;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.query.impl.BindingImpl;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
@@ -42,7 +49,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 
 /**
  * Demonstrate how to use bigdata.  You are free to use this code for whatever
@@ -147,7 +154,7 @@ public class SampleCode {
          */
         RepositoryConnection cxn;
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -201,7 +208,7 @@ public class SampleCode {
          */
         RepositoryConnection cxn;
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -242,7 +249,7 @@ public class SampleCode {
          */
         RepositoryConnection cxn;
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -294,7 +301,7 @@ public class SampleCode {
             cxn.close();
         }
         
-        String query = "select ?x where { ?x <"+BNS.SEARCH+"> \"Yell\" . }";
+        String query = "select ?x where { ?x <"+BD.SEARCH+"> \"Yell\" . }";
         executeSelectQuery(repo, query, QueryLanguage.SPARQL);
         // will match A, C, and D
         
@@ -338,7 +345,7 @@ public class SampleCode {
          * gives you a view of the repository at the last commit point.
          */
         if (repo instanceof BigdataSailRepository) { 
-            cxn = ((BigdataSailRepository) repo).getQueryConnection();
+            cxn = ((BigdataSailRepository) repo).getReadOnlyConnection();
         } else {
             cxn = repo.getConnection();
         }
@@ -369,6 +376,77 @@ public class SampleCode {
         executeConstructQuery(repo, query, QueryLanguage.SPARQL);
         // should see the provenance information for { Mike loves RDF }
         
+    }
+
+    /**
+     * Demonstrate execution of historical query using a read-only transaction.
+     * 
+     * @param repo
+     * @throws Exception
+     */
+    public void executeHistoricalQuery(Repository repo) throws Exception {
+
+        if (!(repo instanceof BigdataSailRepository)) {
+            return;
+        }
+        
+        URI MIKE = new URIImpl(BD.NAMESPACE+"Mike");
+        URI BRYAN = new URIImpl(BD.NAMESPACE+"Bryan");
+        URI PERSON = new URIImpl(BD.NAMESPACE+"Person");
+        
+        RepositoryConnection cxn = repo.getConnection();
+        cxn.setAutoCommit(false);
+        try {
+            cxn.remove((Resource)null, (URI)null, (Value)null);
+            cxn.commit();
+            
+            cxn.add(MIKE, RDF.TYPE, PERSON);
+            cxn.commit();
+
+            long time = System.currentTimeMillis();
+            
+            Thread.sleep(1000);
+            
+            cxn.add(BRYAN, RDF.TYPE, PERSON);
+            cxn.commit();
+            
+            RepositoryConnection history = 
+                ((BigdataSailRepository) repo).getReadOnlyConnection(time);
+            
+            String query = 
+                "select ?s " +
+                "where { " +
+                "  ?s <"+RDF.TYPE+"> <"+PERSON+"> " +
+                "}";
+            
+            try {
+
+                final TupleQuery tupleQuery = 
+                    history.prepareTupleQuery(QueryLanguage.SPARQL, query);
+                tupleQuery.setIncludeInferred(false /* includeInferred */);
+                TupleQueryResult result = tupleQuery.evaluate();
+
+                Collection<BindingSet> answer = new LinkedList<BindingSet>();
+                answer.add(createBindingSet(
+                        new BindingImpl("s", MIKE)));
+                
+                compare(result, answer);
+                
+            } finally {
+                // close the repository connection
+                history.close();
+            }
+
+            // should see only Mike, not Bryan
+            
+        } catch (Exception ex) {
+            cxn.rollback();
+            throw ex;
+        } finally {
+            // close the repository connection
+            cxn.close();
+        }
+
     }
 
     /**
@@ -585,6 +663,8 @@ public class SampleCode {
             System.out.println("Did free text query.");
             sampleCode.executeProvenanceQuery(repo);
             System.out.println("Did provenance query.");
+            sampleCode.executeHistoricalQuery(repo);
+            System.out.println("Did historical query.");
             
             System.out.println("done.");
             
@@ -597,6 +677,74 @@ public class SampleCode {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+    }
+    
+    protected BindingSet createBindingSet(final Binding... bindings) {
+        final QueryBindingSet bindingSet = new QueryBindingSet();
+        if (bindings != null) {
+            for (Binding b : bindings) {
+                bindingSet.addBinding(b);
+            }
+        }
+        return bindingSet;
+    }
+    
+    protected void compare(final TupleQueryResult result,
+            final Collection<BindingSet> answer)
+            throws QueryEvaluationException {
+
+        try {
+            
+            final Collection<BindingSet> extraResults = new LinkedList<BindingSet>();
+            Collection<BindingSet> missingResults = new LinkedList<BindingSet>();
+    
+            int resultCount = 0;
+            int nmatched = 0;
+            while (result.hasNext()) {
+                BindingSet bindingSet = result.next();
+                resultCount++;
+                boolean match = false;
+                if(log.isInfoEnabled())
+                    log.info(bindingSet);
+                Iterator<BindingSet> it = answer.iterator();
+                while (it.hasNext()) {
+                    if (it.next().equals(bindingSet)) {
+                        it.remove();
+                        match = true;
+                        nmatched++;
+                        break;
+                    }
+                }
+                if (match == false) {
+                    extraResults.add(bindingSet);
+                }
+            }
+            missingResults = answer;
+    
+            for (BindingSet bs : extraResults) {
+                if (log.isInfoEnabled()) {
+                    log.info("extra result: " + bs);
+                }
+            }
+            
+            for (BindingSet bs : missingResults) {
+                if (log.isInfoEnabled()) {
+                    log.info("missing result: " + bs);
+                }
+            }
+            
+            if (!extraResults.isEmpty() || !missingResults.isEmpty()) {
+                throw new RuntimeException("matchedResults=" + nmatched + ", extraResults="
+                        + extraResults.size() + ", missingResults="
+                        + missingResults.size());
+            }
+
+        } finally {
+            
+            result.close();
+            
+        }
+        
     }
     
 }

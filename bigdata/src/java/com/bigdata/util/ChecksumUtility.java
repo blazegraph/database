@@ -31,6 +31,8 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.zip.Adler32;
 
+import com.bigdata.io.IByteArraySlice;
+
 /**
  * Utility class for computing the {@link Adler32} checksum of a buffer.  This
  * class is NOT thread-safe.
@@ -39,6 +41,23 @@ import java.util.zip.Adler32;
  * @version $Id$
  */
 public class ChecksumUtility {
+	
+	private static ThreadLocal threadChk = new ThreadLocal();
+	/**
+	 * static access to a ThreadLocal Checksum utility
+	 * 
+	 * @return the ChecksumUtility
+	 */
+	public static ChecksumUtility getCHK() {
+		ChecksumUtility chk = (ChecksumUtility) threadChk.get();
+		
+		if (chk == null) {
+			chk = new ChecksumUtility();
+			threadChk.set(chk);
+		}
+		
+		return chk;
+	}
 
     /**
      * Private helper object.
@@ -104,4 +123,36 @@ public class ChecksumUtility {
         
     }
 
+    public int checksum(final IByteArraySlice slice) {
+        
+        assert slice != null;
+
+        // reset before computing the checksum.
+        chk.reset();
+    
+        chk.update(slice.array(), slice.off(), slice.len());
+            
+        /*
+         * The Adler checksum is a 32-bit value.
+         */
+        
+        return (int) chk.getValue();
+        
+    }
+
+    public int checksum(final byte[] buf, int sze) {
+        
+        assert buf != null;
+
+        // reset before computing the checksum.
+        chk.reset();
+    
+        chk.update(buf, 0, sze);
+            
+        /*
+         * The Adler checksum is a 32-bit value.
+         */
+        
+        return (int) chk.getValue();
+    }
 }

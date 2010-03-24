@@ -118,14 +118,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
     public void tearDownComparisonTest() throws Exception {
         
         if (journal != null) {
-            
-            if (journal.isOpen()) {
 
-                journal.shutdownNow();
-
-            }
-            
-            journal.deleteResources();
+            journal.destroy();
             
         }
 
@@ -154,21 +148,19 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
             }
 
-            doConcurrentClientTest(journal, 10, 20, 1000, 3, 100, .10);
+            doConcurrentClientTest(//
+                    journal, //
+                    10,// timeout
+                    20,// nclients
+                    1000, // ntrials
+                    3,// keylen
+                    100,// nops
+                    .10// abortRate
+            );
 
         } finally {
-         
-            if (journal != null) {
 
-                if (journal.isOpen()) {
-
-                    journal.shutdownNow();
-
-                }
-
-                journal.deleteResources();
-
-            }
+            journal.destroy();
 
         }
     }
@@ -230,8 +222,9 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      * 
      * @todo factor out the operation to be run as a test parameter?
      */
-    static public Result doConcurrentClientTest(Journal journal, long timeout,
-            int nclients, int ntrials, int keyLen, int nops, double abortRate)
+    static public Result doConcurrentClientTest(final Journal journal,
+            final long timeout, final int nclients, final int ntrials,
+            final int keyLen, final int nops, final double abortRate)
             throws InterruptedException {
         
         final String name = "abc";
@@ -283,7 +276,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         while(itr.hasNext()) {
 
-            Future<Long> future = itr.next();
+            final Future<Long> future = itr.next();
             
             if(future.isCancelled()) {
                 
@@ -315,7 +308,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                 
                     nfailed++;
 
-                    log.info(getInnerCause(ex, ValidationError.class));
+                    if(log.isInfoEnabled())
+                        log.info(getInnerCause(ex, ValidationError.class));
 
 //                } else if(isInnerCause(ex,RetryException.class)){
 //
@@ -327,7 +321,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
                     ninterrupt++;
 
-                    log.info(getInnerCause(ex, InterruptedException.class));
+                    if(log.isInfoEnabled())
+                        log.info(getInnerCause(ex, InterruptedException.class));
 
                 } else {
                 
@@ -361,7 +356,6 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         ret.put("nfailed",""+nfailed);
         ret.put("naborted",""+naborted);
         ret.put("ncommitted",""+ncommitted);
-        ret.put("ncommitted",""+ncommitted);
         ret.put("nuncommitted", ""+nuncommitted);
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("tps", ""+(ncommitted * 1000 / elapsed));
@@ -370,7 +364,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         
         System.err.println(ret.toString(true/*newline*/));
 
-        journal.deleteResources();
+        // Note: This is done by the caller using journal#destroy().
+//        journal.deleteResources();
         
         return ret;
        
@@ -633,8 +628,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
         final double abortRate = Double.parseDouble(properties.getProperty(TestOptions.ABORT_RATE));
         
-        Result result = doConcurrentClientTest(journal, timeout, nclients, ntrials,
-                keyLen, nops, abortRate);
+        final Result result = doConcurrentClientTest(journal, timeout,
+                nclients, ntrials, keyLen, nops, abortRate);
 
         return result;
 

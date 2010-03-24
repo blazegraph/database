@@ -101,10 +101,10 @@ public class TestTouch extends AbstractBTreeTestCase {
             
             checkpoint.write(store);
 
-            btree = new BTree(store,checkpoint,metadata) {
+            btree = new BTree(store,checkpoint,metadata,false/*readOnly*/) {
               
                 @Override
-                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+                protected HardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
                     
                     return leafQueue;
                     
@@ -207,10 +207,10 @@ public class TestTouch extends AbstractBTreeTestCase {
             
             checkpoint.write(store);
             
-            btree = new BTree(store,checkpoint,metadata) {
+            btree = new BTree(store,checkpoint,metadata, false/*readOnly*/) {
                 
                 @Override
-                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+                protected HardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
                     
                     return leafQueue;
                     
@@ -313,10 +313,10 @@ public class TestTouch extends AbstractBTreeTestCase {
             
             checkpoint.write(store);
             
-            btree = new BTree(store,checkpoint,metadata) {
+            btree = new BTree(store, checkpoint, metadata, false/* readOnly */) {
                 
                 @Override
-                protected HardReferenceQueue<PO> newWriteRetentionQueue() {
+                protected HardReferenceQueue<PO> newWriteRetentionQueue(final boolean readOnly) {
                     
                     return leafQueue;
                     

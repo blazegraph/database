@@ -1,46 +1,27 @@
-/**
+/*
 
-The Notice below must appear in each file of the Source Code of any
-copy you distribute of the Licensed Product.  Contributors to any
-Modifications may add their own copyright notices to identify their
-own contributions.
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
 
-License:
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
 
-The contents of this file are subject to the CognitiveWeb Open Source
-License Version 1.1 (the License).  You may not copy or use this file,
-in either source code or executable form, except in compliance with
-the License.  You may obtain a copy of the License from
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
 
-  http://www.CognitiveWeb.org/legal/license/
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-Software distributed under the License is distributed on an AS IS
-basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.  See
-the License for the specific language governing rights and limitations
-under the License.
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-Copyrights:
-
-Portions created by or assigned to CognitiveWeb are Copyright
-(c) 2003-2003 CognitiveWeb.  All Rights Reserved.  Contact
-information for CognitiveWeb is available at
-
-  http://www.CognitiveWeb.org
-
-Portions Copyright (c) 2002-2003 Bryan Thompson.
-
-Acknowledgements:
-
-Special thanks to the developers of the Jabber Open Source License 1.0
-(JOSL), from which this License was derived.  This License contains
-terms that differ from JOSL.
-
-Special thanks to the CognitiveWeb Open Source Contributors for their
-suggestions and support of the Cognitive Web.
-
-Modifications:
-
-*/
+ */
 /*
  * Created on Jul 9, 2008
  */
@@ -49,6 +30,7 @@ package com.bigdata.rdf.rules;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.util.Properties;
 import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -92,7 +74,7 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      * 
      */
     private static final long serialVersionUID = 8270873764858640472L;
-   
+
     final RuleContextEnum ruleContext;
     final ActionEnum action;
     final long writeTimestamp;
@@ -100,12 +82,13 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final boolean justify;
     final boolean backchain;
     final boolean isOwlSameAsUsed;
-    final boolean forceSerialExecution;
-    final int maxParallelSubqueries;
-    final int chunkOfChunksCapacity;
-    final int chunkCapacity;
-    final long chunkTimeout;
-    final int fullyBufferedReadThreshold;
+//    final boolean forceSerialExecution;
+//    final int maxParallelSubqueries;
+//    final int chunkOfChunksCapacity;
+//    final int chunkCapacity;
+//    final long chunkTimeout;
+//    final int fullyBufferedReadThreshold;
+    final Properties properties;
     final int solutionFlags;
     @SuppressWarnings("unchecked")
 	final IElementFilter filter;
@@ -113,50 +96,53 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
     final IRuleTaskFactory defaultRuleTaskFactory;
 
     public String toString() {
-        
-        StringBuilder sb = new StringBuilder();
-        
+
+        final StringBuilder sb = new StringBuilder();
+
         sb.append(getClass().getSimpleName());
-        
-        sb.append("{ ruleContext="+ruleContext);
 
-        sb.append(", action="+action);
+        sb.append("{ ruleContext=" + ruleContext);
 
-        sb.append(", writeTime="+writeTimestamp);
-        
-        sb.append(", readTime="+readTimestamp);
-        
-        sb.append(", justify="+justify);
-        
-        sb.append(", backchain="+backchain);
-        
-        sb.append(", isOwlSameAsUsed="+isOwlSameAsUsed);
-        
-        sb.append(", forceSerialExecution="+forceSerialExecution);
-        
-        sb.append(", maxParallelSubqueries="+maxParallelSubqueries);
-        
-        sb.append(", chunkOfChunksCapacity="+chunkOfChunksCapacity);
-        
-        sb.append(", chunkCapacity="+chunkCapacity);
+        sb.append(", action=" + action);
 
-        sb.append(", chunkTimeout="+chunkTimeout);
+        sb.append(", writeTime=" + writeTimestamp);
 
-        sb.append(", fullyBufferedReadThreshold="+fullyBufferedReadThreshold);
-        
-        sb.append(", solutionFlags="+solutionFlags);
-        
-        sb.append(", filter="+(filter==null?"N/A":filter.getClass().getName()));
+        sb.append(", readTime=" + readTimestamp);
 
-        sb.append(", planFactory="+planFactory.getClass().getName());
+        sb.append(", justify=" + justify);
+
+        sb.append(", backchain=" + backchain);
+
+        sb.append(", isOwlSameAsUsed=" + isOwlSameAsUsed);
+
+        sb.append(", properties=" + properties);
+        
+//        sb.append(", forceSerialExecution="+forceSerialExecution);
+//        
+//        sb.append(", maxParallelSubqueries="+maxParallelSubqueries);
+//        
+//        sb.append(", chunkOfChunksCapacity="+chunkOfChunksCapacity);
+//        
+//        sb.append(", chunkCapacity="+chunkCapacity);
+//
+//        sb.append(", chunkTimeout="+chunkTimeout);
+//
+//        sb.append(", fullyBufferedReadThreshold="+fullyBufferedReadThreshold);
+        
+        sb.append(", solutionFlags=" + solutionFlags);
+
+        sb.append(", filter="
+                + (filter == null ? "N/A" : filter.getClass().getName()));
+
+        sb.append(", planFactory=" + planFactory.getClass().getName());
 
         sb.append(", defaultRuleTaskFactory="
                 + defaultRuleTaskFactory.getClass().getName());
 
         sb.append("}");
-        
+
         return sb.toString();
-        
+
     }
 
 	/**
@@ -224,18 +210,26 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
      * @param defaultRuleTaskFactory
      *            The factory that will be used to generate the
      *            {@link IStepTask} to execute an {@link IRule} unless the
-     *            {@link IRule} explictly specifies a factory object using
+     *            {@link IRule} explicitly specifies a factory object using
      *            {@link IRule#getTaskFactory()}.
      */
-	public RDFJoinNexusFactory(RuleContextEnum ruleContext, ActionEnum action,
-            long writeTimestamp, long readTimestamp,//
-            boolean forceSerialExecution, int maxParallelSubqueries,//
-            boolean justify, boolean backchain, boolean isOwlSameAsUsed, 
-            int chunkOfChunksCapacity, int chunkCapacity, long chunkTimeout,
-            int fullyBufferedReadThreshold,
-            int solutionFlags, IElementFilter filter,
-            IEvaluationPlanFactory planFactory,
-            IRuleTaskFactory defaultRuleTaskFactory) {
+	public RDFJoinNexusFactory(//
+	        final RuleContextEnum ruleContext,//
+	        final ActionEnum action,//
+            final long writeTimestamp,//
+            final long readTimestamp,//
+//            boolean forceSerialExecution, int maxParallelSubqueries,//
+            final boolean justify, //
+            final boolean backchain, //
+            final boolean isOwlSameAsUsed, 
+//            int chunkOfChunksCapacity, int chunkCapacity, long chunkTimeout,
+//            int fullyBufferedReadThreshold,
+            final Properties properties,//
+            final int solutionFlags, //
+            final IElementFilter filter,//
+            final IEvaluationPlanFactory planFactory,//
+            final IRuleTaskFactory defaultRuleTaskFactory
+            ) {
 
         if (ruleContext == null)
             throw new IllegalArgumentException();
@@ -243,8 +237,8 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         if (action == null)
             throw new IllegalArgumentException();
 
-        if (maxParallelSubqueries < 0)
-            throw new IllegalArgumentException();
+//        if (maxParallelSubqueries < 0)
+//            throw new IllegalArgumentException();
 
         if (planFactory == null)
             throw new IllegalArgumentException();
@@ -266,17 +260,19 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
 
         this.isOwlSameAsUsed = isOwlSameAsUsed;
         
-        this.forceSerialExecution = forceSerialExecution;
-        
-        this.maxParallelSubqueries = maxParallelSubqueries;
-        
-        this.chunkOfChunksCapacity = chunkOfChunksCapacity;
-        
-        this.chunkCapacity = chunkCapacity;
-        
-        this.chunkTimeout = chunkTimeout;
-        
-        this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
+//        this.forceSerialExecution = forceSerialExecution;
+//        
+//        this.maxParallelSubqueries = maxParallelSubqueries;
+//        
+//        this.chunkOfChunksCapacity = chunkOfChunksCapacity;
+//        
+//        this.chunkCapacity = chunkCapacity;
+//        
+//        this.chunkTimeout = chunkTimeout;
+//        
+//        this.fullyBufferedReadThreshold = fullyBufferedReadThreshold;
+
+        this.properties = properties;
         
         this.solutionFlags = solutionFlags;
 
@@ -289,9 +285,10 @@ public class RDFJoinNexusFactory implements IJoinNexusFactory {
         joinNexusCache = new WeakHashMap<IIndexManager, WeakReference<IJoinNexus>>();
 
     }
-
-    //@todo refactor singleton factory into base class or utility class.
-    public IJoinNexus newInstance(IIndexManager indexManager) {
+    
+    // @todo refactor singleton factory into base class or utility class.
+	// @todo assumes one "central" relation (SPORelation).
+    public IJoinNexus newInstance(final IIndexManager indexManager) {
 
         synchronized (joinNexusCache) {
 

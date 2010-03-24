@@ -119,9 +119,10 @@ public class CommitRecordIndex extends BTree {
      * @param metadataId
      *            The metadata record for the index.
      */
-    public CommitRecordIndex(IRawStore store, Checkpoint checkpoint, IndexMetadata metadata) {
+    public CommitRecordIndex(IRawStore store, Checkpoint checkpoint,
+            IndexMetadata metadata, boolean readOnly) {
 
-        super(store, checkpoint, metadata);
+        super(store, checkpoint, metadata, readOnly);
 
         this.ser = new Entry.EntrySerializer();
         

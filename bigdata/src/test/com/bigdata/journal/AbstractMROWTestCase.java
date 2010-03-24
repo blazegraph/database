@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.IMROW;
@@ -88,26 +89,33 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
      */
     public void testMROW() throws Exception {
 
-        IRawStore store = getStore();
-        
-        final long timeout = 5;
-        
-        final int nclients = 20;
-        
-        final int nwrites = 10000;
+        final IRawStore store = getStore();
+        try {
 
-        final int writeDelayMillis = 1;
-        
-        final int ntrials = 10000;
-        
-        final int reclen = 128;
-        
-        final int nreads = 100;
-        
-        doMROWTest(store, nwrites, writeDelayMillis, timeout,
-                nclients, ntrials, reclen, nreads);
-        
-        store.destroy();
+            final long timeout = 20;
+
+            final int nclients = 20;
+
+            final int nwrites = 10000;
+
+            final int writeDelayMillis = 1;
+
+            final int ntrials = 10000;
+
+            final int reclen = 128;
+
+            final int nreads = 100;
+
+            final AtomicInteger nerr = new AtomicInteger();
+
+            doMROWTest(store, nwrites, writeDelayMillis, timeout, nclients,
+                    ntrials, reclen, nreads, nerr);
+
+        } finally {
+
+            store.destroy();
+
+        }
         
     }
 
@@ -142,10 +150,13 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
      * 
      * @param nreads
      *            The #of operations to be performed in each transaction.
+     * 
+     * @param nerr
+     *            Used to report the #of errors back as a side-effect.
      */
     static public void doMROWTest(IRawStore store,
             int nwrites, long writeDelayMillis, long timeout, int nclients,
-            int ntrials, int reclen, int nreads) 
+            int ntrials, int reclen, int nreads, final AtomicInteger nerr) 
         throws Exception
     {
 
@@ -229,7 +240,7 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
         
         int nok = 0; // #of trials that successfully committed.
         int ncancelled = 0; // #of trials that did not complete in time.
-        int nerr = 0;
+//        int nerr = 0;
         Throwable[] errors = new Throwable[ntrials];
         
         while(itr.hasNext()) {
@@ -253,7 +264,7 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
             } catch(ExecutionException ex ) {
 
                 System.err.println("Not expecting: "+ex);
-                errors[nerr++] = ex.getCause();
+                errors[nerr.incrementAndGet()] = ex.getCause();
                 
             }
             
@@ -261,7 +272,7 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
         
         System.err.println("#clients=" + nclients + ", ntrials=" + ntrials
                 + ", nok=" + nok + ", ncancelled=" + ncancelled + ", nerrors="
-                + nerr + " in " + elapsed + "ms (" + nok * 1000 / elapsed
+                + nerr.get() + " in " + elapsed + "ms (" + nok * 1000 / elapsed
                 + " reads per second); nwritten=" + nwritten);
        
     }
@@ -494,7 +505,7 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
         
         final int nreads = 100;
         
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
 //      properties.setProperty(Options.USE_DIRECT_BUFFERS,"false");
 //      properties.setProperty(Options.BUFFER_MODE, BufferMode.Transient.toString());
@@ -514,15 +525,21 @@ abstract public class AbstractMROWTestCase extends AbstractRawStoreTestCase {
 
         properties.setProperty(Options.CREATE_TEMP_FILE,"true");
         
-        Journal journal = new Journal(properties);
-        
-        doMROWTest(journal.getBufferStrategy(), nwrites,
-                writeDelayMillis, timeout, nclients, ntrials, reclen, nreads);
-        
-        journal.shutdown();
-        
-        journal.deleteResources();
-        
+        final Journal journal = new Journal(properties);
+
+        try {
+
+            final AtomicInteger nerr = new AtomicInteger();
+
+            doMROWTest(journal.getBufferStrategy(), nwrites, writeDelayMillis,
+                    timeout, nclients, ntrials, reclen, nreads, nerr);
+
+        } finally {
+
+            journal.destroy();
+
+        }
+
     }
 
 }

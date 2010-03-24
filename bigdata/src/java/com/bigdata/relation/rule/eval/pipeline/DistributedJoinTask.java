@@ -83,7 +83,7 @@ public class DistributedJoinTask extends JoinTask {
     /**
      * The name of the scale-out index associated with the next
      * {@link IPredicate} in the evaluation order and <code>null</code>
-     * iff this is the last {@link IPredicate} in the evaluation order.
+     * iff this is the last {@link IPredicate} in the evaluation order [logging only.]
      */
     final private String nextScaleOutIndexName;
 
@@ -127,23 +127,23 @@ public class DistributedJoinTask extends JoinTask {
     final private Map<PartitionLocator, JoinTaskSink> sinkCache;
 
     public DistributedJoinTask(
-            final String scaleOutIndexName,
-            final IRule rule,
-            final IJoinNexus joinNexus,
-            final int[] order,
-            final int orderIndex,
-            final int partitionId,
-            final AbstractScaleOutFederation fed,
-            final IJoinMaster master,
-            final UUID masterUUID,
-            final IAsynchronousIterator<IBindingSet[]> src,
-            final IKeyOrder[] keyOrders,
-            final DataService dataService
+//            final String scaleOutIndexName,
+            final IRule rule,//
+            final IJoinNexus joinNexus,//
+            final int[] order,//
+            final int orderIndex,//
+            final int partitionId,//
+            final AbstractScaleOutFederation fed,//
+            final IJoinMaster master,//
+            final UUID masterUUID,//
+            final IAsynchronousIterator<IBindingSet[]> src,//
+            final IKeyOrder[] keyOrders,//
+            final DataService dataService//
             ) {
 
         super(
-                DataService.getIndexPartitionName(scaleOutIndexName,
-                        partitionId), rule, joinNexus, order, orderIndex,
+                /*DataService.getIndexPartitionName(scaleOutIndexName,
+                        partitionId),*/ rule, joinNexus, order, orderIndex,
                 partitionId, master, masterUUID);
 
         if (fed == null)
@@ -155,12 +155,17 @@ public class DistributedJoinTask extends JoinTask {
         if (dataService == null)
             throw new IllegalArgumentException();
 
+        // Note: This MUST be the index manager for the local data service.
+        if(joinNexus instanceof IBigdataFederation)
+            throw new IllegalArgumentException();
+        
         this.fed = fed;
 
         this.keyOrders = keyOrders;
 
         this.dataService = dataService;
         
+        // This is the index manager for the federation (scale-out indices).
         this.fedJoinNexus = joinNexus.getJoinNexusFactory().newInstance(fed);
 
         if (lastJoin) {
@@ -240,7 +245,7 @@ public class DistributedJoinTask extends JoinTask {
 
             final String namespace = nextPredicate.getOnlyRelationName();
 
-            nextScaleOutIndexName = namespace
+            nextScaleOutIndexName = namespace +"."
                     + keyOrders[order[orderIndex + 1]];
 
             solutionBuffer = null;

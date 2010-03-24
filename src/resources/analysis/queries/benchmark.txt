@@ -130,6 +130,8 @@ http://localhost:8080/?filter=hosts/scores&correlated=true&depth=7&file=service/
 # Live Journal
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/readSecs&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/readSecs
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/writeSecs&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/writeSecs
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/bytesReadPerSec&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/bytesReadPerSec
+http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/disk/bytesWrittenPerSec&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/bytesWrittenPerSec
 http://localhost:8080/?regex=/([^/]*)/.*/Live%20Journal/extent&depth=18&correlated=true&period=Minutes&file=service/ds/LiveJournal/extent
 
 # OverflowManager
@@ -167,8 +169,6 @@ http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Store%20Manager/resourceS
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/IndexCount
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/IndexCacheSize
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Cache%20Size&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/IndexSegmentCacheSize
-http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/OpenLeafCount
-http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Index%20Manager/Index%20Segment%20Open%20Leaf%20Byte%20Count&depth=12&period=Minutes&correlated=true&file=service/ds/IndexManager/OpenLeafByteCount
 
 # UnisolatedWriteService
 http://localhost:8080/?regex=/([^/]*)/.*IDataService/.*Unisolated%20Write%20Service/Average%20Arrival%20Rate&depth=9&correlated=true&period=Minutes&file=service/ds/WriteService/AverageArrivalRate

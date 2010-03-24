@@ -108,18 +108,18 @@ abstract public class AbstractRawWormStore extends AbstractRawStore implements I
         
     }
 
-    final public void packAddr(final DataOutput out, final long addr)
-            throws IOException {
-
-        am.packAddr(out, addr);
-
-    }
-
-    final public long unpackAddr(final DataInput in) throws IOException {
-
-        return am.unpackAddr(in);
-
-    }
+//    final public void packAddr(final DataOutput out, final long addr)
+//            throws IOException {
+//
+//        am.packAddr(out, addr);
+//
+//    }
+//
+//    final public long unpackAddr(final DataInput in) throws IOException {
+//
+//        return am.unpackAddr(in);
+//
+//    }
 
     final public String toString(final long addr) {
 

@@ -7,6 +7,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.proc.LongAggregator;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBufferHandler;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.rdf.inf.Justification;
 
@@ -36,21 +39,28 @@ public class SPOIndexRemover implements Callable<Long> {
 
 //    final AbstractTripleStore db;
 
-    final SPORelation spoRelation;
+    final private SPORelation spoRelation;
     
-    final SPOKeyOrder keyOrder;
+    final private SPOKeyOrder keyOrder;
 
-    final ISPO[] a;
+    final private ISPO[] a;
 
-    final int numStmts;
+    final private int numStmts;
 
-    final AtomicLong sortTime;
+    final private AtomicLong sortTime;
 
-    final AtomicLong writeTime;
+    final private AtomicLong writeTime;
 
-    public SPOIndexRemover(SPORelation spoRelation, ISPO[] stmts, int numStmts,
-            SPOKeyOrder keyOrder, boolean clone, AtomicLong sortTime,
-            AtomicLong writeTime) {
+    final private AtomicLong mutationCount;
+    
+    final private boolean reportMutations;
+    
+    public SPOIndexRemover(final SPORelation spoRelation, final ISPO[] stmts,
+            final int numStmts, final SPOKeyOrder keyOrder,
+            final boolean clone, final AtomicLong sortTime,
+            final AtomicLong writeTime,
+            final AtomicLong mutationCount, 
+            final boolean reportMutations) {
 
         if (spoRelation == null)
             throw new IllegalArgumentException();
@@ -70,7 +80,7 @@ public class SPOIndexRemover implements Callable<Long> {
 
         if (clone) {
 
-            this.a = new SPO[numStmts];
+            this.a = new ISPO[numStmts];
 
             System.arraycopy(stmts, 0, a, 0, numStmts);
 
@@ -85,6 +95,10 @@ public class SPOIndexRemover implements Callable<Long> {
         this.sortTime = sortTime;
 
         this.writeTime = writeTime;
+
+        this.mutationCount = mutationCount;
+        
+        this.reportMutations = reportMutations;
 
     }
 
@@ -134,30 +148,89 @@ public class SPOIndexRemover implements Callable<Long> {
 
             }
 
-            final byte[] key = tupleSer.serializeKey(spo);
-
-            // if (ndx.remove(key) == null) {
-            //
-            // throw new AssertionError("Missing statement: keyOrder="
-            // + keyOrder + ", spo=" + spo + ", key="
-            // + Arrays.toString(key));
-            //
-            // }
-
-            keys[i] = key;
+            keys[i] = tupleSer.serializeKey(spo);
 
         }
 
-        // batch remove.
-        ndx.submit(//
-                0,// fromIndex,
-                numStmts, // toIndex,
-                keys,//
-                null, // vals
-                BatchRemoveConstructor.RETURN_NO_VALUES,//
-                null // handler
-                );
+        final long writeCount;
+        if (reportMutations) {
+            
+            /*
+             * The IResultHandler obtains from the RPC an indication of each
+             * statement whose state was changed by this operation. We use that
+             * information to set the metadata on the corresponding ISPO in the
+             * caller's array.
+             */
 
+            final ResultBitBufferHandler aggregator = new ResultBitBufferHandler(
+                    numStmts);
+
+            // batch remove.
+            ndx.submit(//
+                    0,// fromIndex,
+                    numStmts, // toIndex,
+                    keys,//
+                    null, // vals
+                    BatchRemoveConstructor.RETURN_BIT_MASK,//
+                    aggregator // handler
+                    );
+
+            final ResultBitBuffer modified = aggregator.getResult();
+
+            final boolean[] bits = modified.getResult();
+            
+            writeCount = modified.getOnCount();
+
+            for (int i = 0; i < numStmts; i++) {
+
+                if (bits[i]) {
+
+                    /*
+                     * Note: This only turns on the modified flag. It will not
+                     * clear it if it is already set. The caller has to take
+                     * responsibility for that. This way if the statement is
+                     * written twice and the 2nd time the indices are not
+                     * updated we still report the statement as modified since
+                     * its flag has not been cleared (unless the caller
+                     * explicitly cleared it in between those writes).
+                     */
+                    
+                    a[i].setModified(bits[i]);
+
+                }
+
+            }
+
+        } else {
+            
+            final LongAggregator aggregator = new LongAggregator();
+
+            // batch remove.
+            ndx.submit(//
+                    0,// fromIndex,
+                    numStmts, // toIndex,
+                    keys,//
+                    null, // vals
+                    BatchRemoveConstructor.RETURN_MUTATION_COUNT,//
+                    aggregator // handler
+                    );
+
+            writeCount = aggregator.getResult();
+
+        }
+        
+        if (keyOrder.isPrimaryIndex()) {
+
+            /*
+             * Note: Only the task writing on the primary index takes
+             * responsibility for reporting the #of statements that were removed
+             * from the indices. This avoids double counting.
+             */
+
+            mutationCount.addAndGet(writeCount);
+
+        }
+        
         final long elapsed = System.currentTimeMillis() - beginWrite;
 
         writeTime.addAndGet(elapsed);

@@ -1127,6 +1127,31 @@ public class HardReferenceGlobalLRURecycler<K, V> implements
 //
 //            }
 
+            /*
+             * FIXME Obtaining the lock here is a hot spot under reasonable
+             * concurrent workloads.  Fix with BCHM.
+             * 
+             * One solution would be to collect the "touches" on a thread-local
+             * array and then batch them through when the array is 50% full
+             * (tryLock()) or 100% (lock()) full. We are currently doing this
+             * for the writeRetentionQueue on the AbstractBTree, which works
+             * fine. However, the BTree is used to scope a ConcurrentHashMap
+             * from Thread to the thread-local array and those arrays are
+             * discarded if the BTree is closed. We do not have that context
+             * here, so it is possible for the thread-local arrays to "leak".
+             * 
+             * The danger with a true thread-local design is that a thread can
+             * come in and do some work, get some updates buffered in its
+             * thread-local array, and then never visit again. In this case
+             * those updates would remain buffered on the thread and would not
+             * in fact cause the access order to be updated in a timely manner.
+             * Worse, if you are relying on WeakReference semantics, the
+             * buffered updates would remain strongly reachable and the
+             * corresponding objects would be wired into the cache.
+             * 
+             * Regardless, also update the "with explicit delete required"
+             * version of this class.
+             */
             globalLRU.lock.lock();
 
             try {
@@ -1163,7 +1188,7 @@ public class HardReferenceGlobalLRURecycler<K, V> implements
                 globalLRU.lock.unlock();
                 
             }
-
+                        
         }
 
         public V remove(final K key) {

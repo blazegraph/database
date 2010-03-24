@@ -456,6 +456,17 @@ public class IndexSegment extends AbstractBTree {
         
     }
     
+    /**
+     * @throws UnsupportedOperationException
+     *             always since the {@link IndexSegment} is read-only.
+     */
+    final public long getRevisionTimestamp() {
+        
+        throw new UnsupportedOperationException(ERROR_READ_ONLY);
+        
+    }
+    
+    
     /*
      * ISimpleBTree (disallows mutation operations, applies the optional bloom
      * filter when present).
@@ -744,11 +755,13 @@ public class IndexSegment extends AbstractBTree {
         }
 
         /**
-         * A double-linked, read-only, empty leaf. This is used for the root leaf of an
-         * empty {@link IndexSegment}.
+         * A double-linked, read-only, empty leaf. This is used for the root
+         * leaf of an empty {@link IndexSegment}.
          * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         * @version $Id: IndexSegment.java 2265 2009-10-26 12:51:06Z thompsonbry
+         *          $
          */
         private static class EmptyReadOnlyLeafData implements ILeafData {
 
@@ -839,8 +852,8 @@ public class IndexSegment extends AbstractBTree {
                 return FixedByteArrayBuffer.EMPTY;
             }
 
-        }
-
+        } // class EmptyReadOnlyLeaf
+        
         /**
          * Immutable leaf throws {@link UnsupportedOperationException} for the
          * public mutator API but does not try to override all low-level
@@ -964,9 +977,62 @@ public class IndexSegment extends AbstractBTree {
 
             }
 
-        }
+        } // class ImmutableLeaf
 
-    }
+//        /**
+//         * An immutable empty leaf used as the right-most child of an
+//         * {@link IndexSegment} {@link Node} when the right-most child was not
+//         * emitted by the {@link IndexSegmentBuilder}. Normally the builder will
+//         * assign tuples to the nodes and leaves in the {@link IndexSegmentPlan}
+//         * such that each separatorKey in a {@link Node} has a left and a right
+//         * child. When the {@link IndexSegmentPlan} was based on an overestimate
+//         * of the actual range count, then the right child for a separatorKey in
+//         * a {@link Node} is sometimes not populated and will have the address
+//         * 0L. When that address is dereferenced an instance of this class is
+//         * transparently materialized which gives the {@link Node} the
+//         * appearence of having both a left- and right-child for that
+//         * separatorKey.
+//         * <p>
+//         * Nodes other than those immediately dominating leaves can have a mock
+//         * rightmost leaf as a child. This means that the rightSibling of a Node
+//         * can be a Leaf!
+//         * 
+//         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//         *         Thompson</a>
+//         * @version $Id$
+//         */
+//        static public class ImmutableEmptyLastLeaf extends ImmutableLeaf {
+//
+//            /**
+//             * @param btree
+//             *            The owning {@link IndexSegment}.
+//             * @param priorAddr
+//             *            The address of the previous leaf in the natural
+//             *            traversal order or 0L if there is no prior leaf.
+//             */
+//            public ImmutableEmptyLastLeaf(final AbstractBTree btree,
+//                    final long priorAddr) {
+//
+//                super(  (IndexSegment) btree,
+//                        0L/* selfAddr */,
+//                        new EmptyReadOnlyLeafData(//
+//                                btree.getIndexMetadata().getDeleteMarkers(), //
+//                                btree.getIndexMetadata().getVersionTimestamps()) {
+//                            /**
+//                             * Overridden to use the priorAddr field passed to
+//                             * the constructor.
+//                             */
+//                    @Override
+//                    public long getPriorAddr() {
+//                        return priorAddr;
+//                    }
+//                });
+//
+//            }
+//
+//        } // class ImmutableEmptyLastLeaf
+        
+    } // class ImmutableNodeFactory
 
     /**
      * A position for the {@link IndexSegmentTupleCursor}.
@@ -1035,8 +1101,8 @@ public class IndexSegment extends AbstractBTree {
     public static class IndexSegmentTupleCursor<E> extends
             AbstractBTreeTupleCursor<IndexSegment, ImmutableLeaf, E> {
 
-        public IndexSegmentTupleCursor(IndexSegment btree, Tuple<E> tuple,
-                byte[] fromKey, byte[] toKey) {
+        public IndexSegmentTupleCursor(final IndexSegment btree,
+                final Tuple<E> tuple, final byte[] fromKey, final byte[] toKey) {
 
             super(btree, tuple, fromKey, toKey);
 
@@ -1044,90 +1110,61 @@ public class IndexSegment extends AbstractBTree {
 
         @Override
         final protected CursorPosition<E> newPosition(
-                ILeafCursor<ImmutableLeaf> leafCursor, int index, byte[] key) {
+                final ILeafCursor<ImmutableLeaf> leafCursor, final int index,
+                final byte[] key) {
 
-            CursorPosition<E> pos = new CursorPosition<E>(this, leafCursor, index, key);
+            final CursorPosition<E> pos = new CursorPosition<E>(this,
+                    leafCursor, index, key);
 
             return pos;
 
         }
 
         @Override
-        protected CursorPosition<E> newTemporaryPosition(ICursorPosition<ImmutableLeaf, E> p) {
+        protected CursorPosition<E> newTemporaryPosition(
+                final ICursorPosition<ImmutableLeaf, E> p) {
 
             return new CursorPosition<E>((CursorPosition<E>)p );
             
         }
 
-        /**
-         * The {@link IndexSegmentStore} backing the {@link IndexSegment} for
-         * that is being traversed by the {@link ITupleCursor}.
+        /*
+         * The methods below are apparently never used. BBT 12/29/2009.
          */
-        protected IndexSegmentStore getStore() {
-            
-            return btree.getStore();
-            
-        }
-
-        /**
-         * Return the leaf that spans the optional {@link #getFromKey()}
-         * constraint and the first leaf if there is no {@link #getFromKey()}
-         * constraint.
-         * 
-         * @return The leaf that spans the first tuple that can be visited by
-         *         this cursor.
-         * 
-         * @see Leaf#getKeys()
-         * @see IKeyBuffer#search(byte[])
-         */
-        protected ImmutableLeaf getLeafSpanningFromKey() {
-            
-            final long addr;
-            
-            if (fromKey == null) {
-
-                addr = getStore().getCheckpoint().addrFirstLeaf;
-
-            } else {
-
-                // find leaf for fromKey
-                addr = getIndex().findLeafAddr(fromKey);
-
-            }
-
-            assert addr != 0L;
-            
-            final ImmutableLeaf leaf = getIndex().readLeaf(addr);
-
-            assert leaf != null;
-            
-            return leaf;
-
-        }
-
+        
 //        /**
-//         * Return the leaf that spans the optional {@link #getToKey()}
-//         * constraint and the last leaf if there is no {@link #getFromKey()}
+//         * The {@link IndexSegmentStore} backing the {@link IndexSegment} for
+//         * that is being traversed by the {@link ITupleCursor}.
+//         */
+//        protected IndexSegmentStore getStore() {
+//            
+//            return btree.getStore();
+//            
+//        }
+//
+//        /**
+//         * Return the leaf that spans the optional {@link #getFromKey()}
+//         * constraint and the first leaf if there is no {@link #getFromKey()}
 //         * constraint.
 //         * 
-//         * @return The leaf that spans the first tuple that can NOT be visited
-//         *         by this cursor (exclusive upper bound).
+//         * @return The leaf that spans the first tuple that can be visited by
+//         *         this cursor.
 //         * 
 //         * @see Leaf#getKeys()
 //         * @see IKeyBuffer#search(byte[])
 //         */
-//        protected ImmutableLeaf getLeafSpanningToKey() {
+//        protected ImmutableLeaf getLeafSpanningFromKey() {
 //            
 //            final long addr;
 //            
-//            if (toKey == null) {
+//            if (fromKey == null) {
 //
-//                addr = getStore().getCheckpoint().addrLastLeaf;
+//                addr = getStore().getCheckpoint().addrFirstLeaf;
 //
 //            } else {
 //
-//                // find leaf for toKey
-//                addr = getIndex().findLeafAddr(toKey);
+//                // find leaf for fromKey
+//                addr = getIndex().findLeafAddr(fromKey);
 //
 //            }
 //
@@ -1140,29 +1177,65 @@ public class IndexSegment extends AbstractBTree {
 //            return leaf;
 //
 //        }
-
-        /**
-         * Return the leaf that spans the key.  The caller must check to see
-         * whether the key actually exists in the leaf.
-         * 
-         * @param key
-         *            The key.
-         *            
-         * @return The leaf spanning that key.
-         */
-        protected ImmutableLeaf getLeafSpanningKey(byte[] key) {
-            
-            final long addr = getIndex().findLeafAddr(key);
-
-            assert addr != 0L;
-
-            final ImmutableLeaf leaf = getIndex().readLeaf(addr);
-
-            assert leaf != null;
-
-            return leaf;
-
-        }
+//
+////        /**
+////         * Return the leaf that spans the optional {@link #getToKey()}
+////         * constraint and the last leaf if there is no {@link #getFromKey()}
+////         * constraint.
+////         * 
+////         * @return The leaf that spans the first tuple that can NOT be visited
+////         *         by this cursor (exclusive upper bound).
+////         * 
+////         * @see Leaf#getKeys()
+////         * @see IKeyBuffer#search(byte[])
+////         */
+////        protected ImmutableLeaf getLeafSpanningToKey() {
+////            
+////            final long addr;
+////            
+////            if (toKey == null) {
+////
+////                addr = getStore().getCheckpoint().addrLastLeaf;
+////
+////            } else {
+////
+////                // find leaf for toKey
+////                addr = getIndex().findLeafAddr(toKey);
+////
+////            }
+////
+////            assert addr != 0L;
+////            
+////            final ImmutableLeaf leaf = getIndex().readLeaf(addr);
+////
+////            assert leaf != null;
+////            
+////            return leaf;
+////
+////        }
+//
+//        /**
+//         * Return the leaf that spans the key.  The caller must check to see
+//         * whether the key actually exists in the leaf.
+//         * 
+//         * @param key
+//         *            The key.
+//         *            
+//         * @return The leaf spanning that key.
+//         */
+//        protected ImmutableLeaf getLeafSpanningKey(final byte[] key) {
+//            
+//            final long addr = getIndex().findLeafAddr(key);
+//
+//            assert addr != 0L;
+//
+//            final ImmutableLeaf leaf = getIndex().readLeaf(addr);
+//
+//            assert leaf != null;
+//
+//            return leaf;
+//
+//        }
 
     }
 
@@ -1213,7 +1286,7 @@ public class IndexSegment extends AbstractBTree {
          * 
          * @param src
          */
-        private ImmutableLeafCursor(ImmutableLeafCursor src) {
+        private ImmutableLeafCursor(final ImmutableLeafCursor src) {
             
             if (src == null)
                 throw new IllegalArgumentException();
@@ -1222,7 +1295,7 @@ public class IndexSegment extends AbstractBTree {
             
         }
         
-        public ImmutableLeafCursor(SeekEnum where) {
+        public ImmutableLeafCursor(final SeekEnum where) {
 
             switch (where) {
 

@@ -43,6 +43,7 @@ import com.bigdata.rdf.lexicon.LexiconKeyOrder;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
@@ -215,7 +216,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
          */
 //        properties.setProperty(Options.FORCE_SERIAL_EXECUTION, "false");
         
-//      properties.setProperty(Options.MUTATION_BUFFER_CAPACITY, "20000");
+//      properties.setProperty(Options.BUFFER_CAPACITY, "20000");
         properties.setProperty(Options.CHUNK_CAPACITY, "100");
 //      properties.setProperty(Options.QUERY_BUFFER_CAPACITY, "10000");
 //      properties.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "10000");
@@ -283,14 +284,14 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
 //        properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "5");
         properties.setProperty(Options.MAX_PARALLEL_SUBQUERIES, "0");
 
-        /*
-         * Choice of the join algorithm.
-         * 
-         * false is pipeline.
-         * 
-         * true is nested, which is also the default right now.
-         */
-        properties.setProperty(Options.NESTED_SUBQUERY, "true");
+//        /*
+//         * Choice of the join algorithm.
+//         * 
+//         * false is pipeline.
+//         * 
+//         * true is nested.
+//         */
+//        properties.setProperty(Options.NESTED_SUBQUERY, "false");
         
         {
          
@@ -340,10 +341,34 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
 //            properties.setProperty(IndexMetadata.Options.SPLIT_HANDLER_MIN_ENTRY_COUNT, ""+1 * Bytes.kilobyte32);
 //            properties.setProperty(IndexMetadata.Options.SPLIT_HANDLER_ENTRY_COUNT_PER_SPLIT, ""+5 * Bytes.kilobyte32);
 
-//            // write retention queue (default is 500).
-//            properties.setProperty(
-//                    IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
-//                    "8000");
+            // write retention queue (default is 500).
+            properties.setProperty(
+                    IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
+                    "8000");
+
+            if(false){ // custom OSP index override
+                final String namespace = getNamespace();
+                final String overrideValue = "200000";
+                final String overrideProperty = com.bigdata.config.Configuration
+                        .getOverrideProperty(
+                                namespace + "." + SPORelation.NAME_SPO_RELATION
+                                        + "." + SPOKeyOrder.OSP,
+                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
+                properties.setProperty(overrideProperty, overrideValue);
+                System.err.println(overrideProperty + "=" + overrideValue);
+            }
+            if(false){ // custom POS index override
+                final String namespace = getNamespace();
+                final String overrideValue = "200000";
+                final String overrideProperty = com.bigdata.config.Configuration
+                        .getOverrideProperty(
+                                namespace + "." + SPORelation.NAME_SPO_RELATION
+                                        + "." + SPOKeyOrder.POS,
+                                IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY);
+                properties.setProperty(overrideProperty, overrideValue);
+                System.err.println(overrideProperty + "=" + overrideValue);
+            }
+              
 //
 //            properties.setProperty(
 //                    IndexMetadata.Options.BTREE_BRANCHING_FACTOR,

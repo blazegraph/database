@@ -184,8 +184,11 @@ abstract public class AbstractMRMWTestCase
         
         final int nreadsPerTask = Integer.parseInt(properties.getProperty(TestOptions.NREADS));
 
-        Result result = doMRMWTest(store, timeout, ntrials, nclients,
-                percentReaders, percentWritersWillFlush, reclen, nwritesPerTask, nreadsPerTask);
+        final AtomicInteger nerr = new AtomicInteger();
+        
+        final Result result = doMRMWTest(store, timeout, ntrials, nclients,
+                percentReaders, percentWritersWillFlush, reclen,
+                nwritesPerTask, nreadsPerTask, nerr);
 
         return result;
 
@@ -200,35 +203,65 @@ abstract public class AbstractMRMWTestCase
     }
 
     public void tearDownComparisonTest() throws Exception {
+
+        if (store != null) {
+
+            store.destroy();
+            
+        }
         
     }
 
     /**
      * Correctness/stress test verifies that the implementation supports
-     * Multiple Readers, Multiple Writers
+     * Multiple Readers, Multiple Writers.
+     * <p>
+     * Note: You may have to run this test several times to detect some rare
+     * problems. For example, there is a Sun bug which can arise when a read
+     * operation runs concurrent with a change in the size of the file under
+     * Windows. This bug is not demonstrated each time, so you may need to run
+     * the test more than once if you suspect this issue. The problem is being
+     * addressed by the introduction of a read-write lock to restrict readers
+     * when we need to extend the backing store (unfortunately, that does not
+     * seem to do the trick).
+     * 
+     * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
      */
     public void testMRMW() throws Exception {
 
-        IRawStore store = getStore();
+        final IRawStore store = getStore();
 
-        final long timeout = 5;
-        
-        final int ntrials = 10000;
+        try {
 
-        final int nclients = 20;
-        
-        final double percentReaders = .70d;
-        
-        final double percentWriterWillFlush = .10d;
-        
-        final int reclen = 128;
-        
-        final int nwrites = 100;
+            final long timeout = 20;
 
-        final int nreads = 100;
-        
-        doMRMWTest(store, timeout, ntrials, nclients, percentReaders, percentWriterWillFlush, reclen, nwrites, nreads);
-        
+            final int ntrials = 10000;
+
+            final int nclients = 20;
+
+            final double percentReaders = .70d;
+
+            final double percentWriterWillFlush = .10d;
+
+            final int reclen = 128;
+
+            final int nwrites = 100;
+
+            final int nreads = 100;
+
+            final AtomicInteger nerr = new AtomicInteger();
+
+            doMRMWTest(store, timeout, ntrials, nclients, percentReaders,
+                    percentWriterWillFlush, reclen, nwrites, nreads, nerr);
+
+            assertEquals("nerrors", 0L, nerr.get());
+
+        } finally {
+
+            store.destroy();
+
+        }
+
     }
 
     /**
@@ -270,10 +303,13 @@ abstract public class AbstractMRMWTestCase
      * 
      * @param nreadsPerTask
      *            The #of records to read per {@link ReaderTask}.
+     * 
+     * @param nerr
+     *            Used to count and report back the errors as a side-effect.
      */
     static public Result doMRMWTest(IRawStore store, long timeout, int ntrials,
             int nclients, double percentReaders, double percentWriterWillFlush, int reclen,
-            int nwritesPerTask, int nreadsPerTask) throws Exception {
+            int nwritesPerTask, int nreadsPerTask, final AtomicInteger nerr) throws Exception {
 
         if (store == null)
             throw new IllegalArgumentException();
@@ -282,7 +318,7 @@ abstract public class AbstractMRMWTestCase
             throw new IllegalArgumentException();
         
         // Provides ground truth for the store under test.
-        GroundTruth groundTruth = new GroundTruth();
+        final GroundTruth groundTruth = new GroundTruth();
         
         /*
          * Pre-write 5000 records so that readers have something to choose from
@@ -299,15 +335,15 @@ abstract public class AbstractMRMWTestCase
         }
         
         // Used to execute concurrent clients.
-        ExecutorService clientService = Executors.newFixedThreadPool(
+        final ExecutorService clientService = Executors.newFixedThreadPool(
                 nclients, DaemonThreadFactory.defaultThreadFactory());
 
         // Setup client task queue.
-        Collection<Callable<Integer>> tasks = new LinkedList<Callable<Integer>>(); 
+        final Collection<Callable<Integer>> tasks = new LinkedList<Callable<Integer>>(); 
         
         {
             
-            Random r = new Random();
+            final Random r = new Random();
 
             int nreaders = 0;
             int nwriters = 0;
@@ -356,8 +392,8 @@ abstract public class AbstractMRMWTestCase
         
         System.err.println("Starting clients.");
         
-        List<Future<Integer>> results = clientService.invokeAll(tasks, timeout,
-                TimeUnit.SECONDS);
+        final List<Future<Integer>> results = clientService.invokeAll(tasks,
+                timeout, TimeUnit.SECONDS);
 
         final long elapsed = System.currentTimeMillis() - begin;
         
@@ -393,11 +429,11 @@ abstract public class AbstractMRMWTestCase
         // #of records that were verified.
         final int nverified = groundTruth.getVerifiedCount();
         
-        Iterator<Future<Integer>> itr = results.iterator();
+        final Iterator<Future<Integer>> itr = results.iterator();
         
         int nsuccess = 0; // #of trials that successfully committed.
         int ncancelled = 0; // #of trials that did not complete in time.
-        int nerr = 0;
+//        int nerr = 0;
         Throwable[] errors = new Throwable[ntrials];
         
         while(itr.hasNext()) {
@@ -431,12 +467,12 @@ abstract public class AbstractMRMWTestCase
                     
                 }
                 
-                if(nerr<10) {
+                if(nerr.get()<10) {
                     
                     // show the first N stack traces.
                     ex.printStackTrace(System.err);
                     
-                } else if(nerr<500) {
+                } else if(nerr.get()<500) {
 
                     System.err.println("Not expecting: "+ex);
 
@@ -446,7 +482,7 @@ abstract public class AbstractMRMWTestCase
                     
                 }
                 
-                errors[nerr++] = ex.getCause();
+                errors[nerr.incrementAndGet()] = ex.getCause();
                 
             }
             
@@ -456,12 +492,12 @@ abstract public class AbstractMRMWTestCase
 //        final NumberFormat bytesFormat = NumberFormat.getNumberInstance();
 //        bytesFormat.setGroupingUsed(true);
 
-        long seconds = TimeUnit.SECONDS.convert(elapsed, TimeUnit.MILLISECONDS);
+        final long seconds = TimeUnit.SECONDS.convert(elapsed, TimeUnit.MILLISECONDS);
         
-        long bytesWrittenPerSecond = groundTruth.bytesWritten.get()
+        final long bytesWrittenPerSecond = groundTruth.bytesWritten.get()
                 / (seconds == 0 ? 1 : seconds);
 
-        long bytesVerifiedPerSecond = groundTruth.bytesVerified.get()
+        final long bytesVerifiedPerSecond = groundTruth.bytesVerified.get()
                 / (seconds == 0 ? 1 : seconds);
         
 //        System.err.println("#clients=" + nclients + ", ntrials=" + ntrials
@@ -477,7 +513,7 @@ abstract public class AbstractMRMWTestCase
 //                + bytesFormat.format(groundTruth.bytesVerified.get()) + ", bytes/sec="
 //                + bytesFormat.format(bytesVerifiedPerSecond));
         
-        Result ret = new Result();
+        final Result ret = new Result();
         
         // these are the results.
         ret.put("nsuccess",""+nsuccess);
@@ -494,8 +530,9 @@ abstract public class AbstractMRMWTestCase
         System.err.println(ret.toString(true/*newline*/));
         
         System.out.println(store.getCounters().toString());
-        
-        store.destroy();
+  
+        // Caller will destroy.
+//        store.destroy();
 
         return ret;
 

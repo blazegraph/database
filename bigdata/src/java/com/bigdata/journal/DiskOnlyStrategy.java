@@ -38,18 +38,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree.Counter;
-import com.bigdata.cache.LRUCache;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 
 /**
@@ -159,7 +157,7 @@ import com.bigdata.resources.StoreManager.ManagedJournal;
  * @see BufferMode#Temporary
  */
 public class DiskOnlyStrategy extends AbstractBufferStrategy implements
-        IDiskBasedStrategy, IUpdateStore {
+        IDiskBasedStrategy {
     
     /**
      * The file.
@@ -211,25 +209,25 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
     private long userExtent;
 
-    /**
-     * Optional read cache.
-     * <p>
-     * Note: When enabled, records are entered iff there is a miss on a read.
-     * Written records are NOT entered into the read cache since (when the
-     * {@link #writeCache} is enabled), recently written records are already in
-     * the {@link #writeCache}.
-     * <p>
-     * Note: The higher-level data structures use the {@link LRUNexus}, which
-     * provides a read cache of the decompressed records. For this reason there
-     * is little reason to enable this lower-level read cache.
-     */
-    private LRUCache<Long, byte[]> readCache = null;
-    
-    /**
-     * The maximum size of a record that may enter the {@link #readCache}.
-     * Records larger than this are not cached.
-     */
-    private int readCacheMaxRecordSize = 0;
+//    /**
+//     * Optional read cache.
+//     * <p>
+//     * Note: When enabled, records are entered iff there is a miss on a read.
+//     * Written records are NOT entered into the read cache since (when the
+//     * {@link #writeCache} is enabled), recently written records are already in
+//     * the {@link #writeCache}.
+//     * <p>
+//     * Note: The higher-level data structures use the {@link LRUNexus}, which
+//     * provides a read cache of the decompressed records. For this reason there
+//     * is little reason to enable this lower-level read cache.
+//     */
+//    private LRUCache<Long, byte[]> readCache = null;
+//    
+//    /**
+//     * The maximum size of a record that may enter the {@link #readCache}.
+//     * Records larger than this are not cached.
+//     */
+//    private int readCacheMaxRecordSize = 0;
     
     /**
      * Optional {@link WriteCache}.
@@ -322,7 +320,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * 
          * @param capacity
          */
-        public WriteCache(ByteBuffer writeCache) {
+        public WriteCache(final ByteBuffer writeCache) {
             
             if (writeCache == null)
                 throw new IllegalArgumentException();
@@ -942,7 +940,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     disk.addCounter("bytesPerRead", new Instrument<Double>() {
                         public void sample() {
                             final double bytesPerDiskRead = (ndiskRead == 0 ? 0d
-                                    : (bytesReadFromDisk / ndiskRead));
+                                    : (bytesReadFromDisk / (double)ndiskRead));
                             setValue(bytesPerDiskRead);
                         }
                     });
@@ -992,7 +990,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
                     disk.addCounter("bytesPerWrite", new Instrument<Double>() {
                         public void sample() {
                             final double bytesPerDiskWrite = (ndiskWrite == 0 ? 0d
-                                    : (bytesWrittenOnDisk / ndiskWrite));
+                                    : (bytesWrittenOnDisk / (double)ndiskWrite));
                             setValue(bytesPerDiskWrite);
                         }
                     });
@@ -1123,7 +1121,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         root.addCounter("nextOffset", new Instrument<Long>() {
             public void sample() {
-                setValue(nextOffset);
+                setValue(nextOffset.get());
             }
         });
 
@@ -1153,83 +1151,83 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
-        /*
-         * read cache.
-         */
-        {
-
-            final CounterSet readCache = root.makePath("readCache");
-
-            {
-
-                final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-
-                readCache.addCounter("capacity", new OneShotInstrument<Long>(
-                        (long) (tmp == null ? 0 : tmp.capacity())));
-
-            }
-
-            readCache.addCounter("testCount", new Instrument<Long>() {
-
-                @Override
-                protected void sample() {
-
-                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-
-                    if (tmp == null)
-                        return;
-
-                    setValue(tmp.getTestCount());
-
-                }
-            });
-
-            readCache.addCounter("successCount", new Instrument<Long>() {
-
-                @Override
-                protected void sample() {
-
-                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-
-                    if (tmp == null)
-                        return;
-
-                    setValue(tmp.getSuccessCount());
-
-                }
-            });
-
-            readCache.addCounter("insertCount", new Instrument<Long>() {
-
-                @Override
-                protected void sample() {
-
-                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-
-                    if (tmp == null)
-                        return;
-
-                    setValue(tmp.getInsertCount());
-
-                }
-            });
-
-            readCache.addCounter("hitRatio", new Instrument<Double>() {
-
-                @Override
-                protected void sample() {
-
-                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
-
-                    if (tmp == null)
-                        return;
-
-                    setValue(tmp.getHitRatio());
-
-                }
-            });
-
-        }
+//        /*
+//         * read cache.
+//         */
+//        {
+//
+//            final CounterSet readCache = root.makePath("readCache");
+//
+//            {
+//
+//                final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+//
+//                readCache.addCounter("capacity", new OneShotInstrument<Long>(
+//                        (long) (tmp == null ? 0 : tmp.capacity())));
+//
+//            }
+//
+//            readCache.addCounter("testCount", new Instrument<Long>() {
+//
+//                @Override
+//                protected void sample() {
+//
+//                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+//
+//                    if (tmp == null)
+//                        return;
+//
+//                    setValue(tmp.getTestCount());
+//
+//                }
+//            });
+//
+//            readCache.addCounter("successCount", new Instrument<Long>() {
+//
+//                @Override
+//                protected void sample() {
+//
+//                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+//
+//                    if (tmp == null)
+//                        return;
+//
+//                    setValue(tmp.getSuccessCount());
+//
+//                }
+//            });
+//
+//            readCache.addCounter("insertCount", new Instrument<Long>() {
+//
+//                @Override
+//                protected void sample() {
+//
+//                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+//
+//                    if (tmp == null)
+//                        return;
+//
+//                    setValue(tmp.getInsertCount());
+//
+//                }
+//            });
+//
+//            readCache.addCounter("hitRatio", new Instrument<Double>() {
+//
+//                @Override
+//                protected void sample() {
+//
+//                    final LRUCache tmp = DiskOnlyStrategy.this.readCache;
+//
+//                    if (tmp == null)
+//                        return;
+//
+//                    setValue(tmp.getHitRatio());
+//
+//                }
+//            });
+//
+//        }
 
         return root;
 
@@ -1283,15 +1281,26 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
          * AND there is a bug in the release of those buffers. Therefore do NOT
          * pass in a heap byte buffer for the write cache!!!
          */
-        if (fileMetadata.writeCache != null && !fileMetadata.readOnly
+        if (fileMetadata.writeCacheEnabled && !fileMetadata.readOnly
                 && fileMetadata.closeTime == 0L) {
 
-            if(log.isInfoEnabled())
-                log.info("Enabling writeCache: capacity="
-                    + fileMetadata.writeCache.capacity());
+            final ByteBuffer tmp;
+            try {
+                /*
+                 * Note: a timeout here is not such a good idea. It could be
+                 * triggered by a GC pause with the resulting temp store then
+                 * lacking a write cache.
+                 */
+                tmp = DirectBufferPool.INSTANCE.acquire();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
 
-            writeCache = new WriteCache( fileMetadata.writeCache );
-            
+            if (log.isInfoEnabled())
+                log.info("Enabling writeCache: capacity=" + tmp.capacity());
+
+            writeCache = new WriteCache(tmp);
+
         } else {
             
             writeCache = null;
@@ -1301,22 +1310,22 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         // the offset at which the next record would be written on the file.
         writeCacheOffset = fileMetadata.nextOffset;
 
-        if (fileMetadata.readCacheCapacity > 0) {
-
-            if(log.isInfoEnabled())
-                log.info("Enabling read cache: capacity="
-                    + fileMetadata.readCacheCapacity + ", maxRecordSize="
-                    + fileMetadata.readCacheMaxRecordSize);
-
-            if (fileMetadata.readCacheMaxRecordSize <= 0)
-                throw new IllegalArgumentException();
-
-            this.readCacheMaxRecordSize = fileMetadata.readCacheMaxRecordSize;
-            
-            this.readCache = new LRUCache<Long, byte[]>(
-                    fileMetadata.readCacheCapacity);
-            
-        }
+//        if (fileMetadata.readCacheCapacity > 0) {
+//
+//            if(log.isInfoEnabled())
+//                log.info("Enabling read cache: capacity="
+//                    + fileMetadata.readCacheCapacity + ", maxRecordSize="
+//                    + fileMetadata.readCacheMaxRecordSize);
+//
+//            if (fileMetadata.readCacheMaxRecordSize <= 0)
+//                throw new IllegalArgumentException();
+//
+//            this.readCacheMaxRecordSize = fileMetadata.readCacheMaxRecordSize;
+//            
+//            this.readCache = new LRUCache<Long, byte[]>(
+//                    fileMetadata.readCacheCapacity);
+//            
+//        }
         
     }
    
@@ -1379,17 +1388,17 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         super.close();
 
         // Release the write cache.
-        writeCache = null;
+        releaseWriteCache();
         
-        if(readCache != null) {
-
-            if (log.isInfoEnabled())
-                log.info("readCache: " + readCache.getStatistics());
-            
-            // Discard the LRU cache.
-            readCache = null;
-            
-        }
+//        if(readCache != null) {
+//
+//            if (log.isInfoEnabled())
+//                log.info("readCache: " + readCache.getStatistics());
+//            
+//            // Discard the LRU cache.
+//            readCache = null;
+//            
+//        }
         
         try {
 
@@ -1472,28 +1481,28 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
 
         }
 
-        if (offset + nbytes > nextOffset) {
+        if (offset + nbytes > nextOffset.get()) {
 
             throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
 
         }
 
-        if (readCache != null) {
-            
-            /*
-             * Test the read cache first and return the record from the read
-             * cache if it is found there.
-             */
-            
-            final byte[] data = readCache.get(addr);
-
-            if (data != null) {
-
-                return ByteBuffer.wrap(data).asReadOnlyBuffer();
-                
-            }
-            
-        }
+//        if (readCache != null) {
+//            
+//            /*
+//             * Test the read cache first and return the record from the read
+//             * cache if it is found there.
+//             */
+//            
+//            final byte[] data = readCache.get(addr);
+//
+//            if (data != null) {
+//
+//                return ByteBuffer.wrap(data).asReadOnlyBuffer();
+//                
+//            }
+//            
+//        }
         
         /*
          * Allocate a new buffer of the exact capacity.
@@ -1683,34 +1692,34 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
             storeCounters.elapsedReadNanos+=(System.nanoTime()-begin);
             storeCounters.elapsedDiskReadNanos+=(System.nanoTime()-beginDisk);
 
-            if (readCache != null && nbytes < readCacheMaxRecordSize) {
-
-                /*
-                 * Note: make sure that the record is not in the cache (we have
-                 * to do this again since we were not synchronized on [this]
-                 * when we tested at the start of this method).
-                 */
-                if (readCache.get(addr) == null) {
-
-                    /*
-                     * Put a copy of the record in the read cache.
-                     */
-
-                    // new byte[] for the read cache.
-                    final byte[] data = new byte[nbytes];
-
-                    // copy contents into the new byte[].
-                    dst.get(data);
-
-                    // flip the buffer again so that it is read for re-reading.
-                    dst.flip();
-
-                    // put the record into the read cache.
-                    readCache.put(addr, data, false/* dirty */);
-
-                }
-                
-            }
+//            if (readCache != null && nbytes < readCacheMaxRecordSize) {
+//
+//                /*
+//                 * Note: make sure that the record is not in the cache (we have
+//                 * to do this again since we were not synchronized on [this]
+//                 * when we tested at the start of this method).
+//                 */
+//                if (readCache.get(addr) == null) {
+//
+//                    /*
+//                     * Put a copy of the record in the read cache.
+//                     */
+//
+//                    // new byte[] for the read cache.
+//                    final byte[] data = new byte[nbytes];
+//
+//                    // copy contents into the new byte[].
+//                    dst.get(data);
+//
+//                    // flip the buffer again so that it is read for re-reading.
+//                    dst.flip();
+//
+//                    // put the record into the read cache.
+//                    readCache.put(addr, data, false/* dirty */);
+//
+//                }
+//                
+//            }
             
             // return the buffer.
             return dst;
@@ -1722,7 +1731,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
     /**
      * Used to re-open the {@link FileChannel} in this class.
      */
-    private final IReopenChannel opener = new IReopenChannel() {
+    private final IReopenChannel<FileChannel> opener = new IReopenChannel<FileChannel>() {
 
         public String toString() {
             
@@ -1835,7 +1844,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
-    public long allocate(final int nbytes) {
+    private long allocate(final int nbytes) {
         
         if (isReadOnly())
             throw new IllegalStateException(ERR_READ_ONLY);
@@ -1851,7 +1860,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * The offset at which the record will be written on the disk file
              * (not adjusted for the root blocks).
              */
-            final long offset = nextOffset;
+            final long offset = nextOffset.get();
 
             /*
              * Make sure that the allocated region of the file exists.
@@ -1867,145 +1876,156 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
              * Increment the offset of the next address to be assigned by the
              * #of bytes in the record.
              */
-            nextOffset += nbytes;
+            nextOffset.addAndGet(nbytes);
         
         }
 
         return addr;
         
     }
-    
-    public void update(final long addr, final int off, final ByteBuffer data) {
 
-        if (addr == 0L)
-            throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
-
-        if (off < 0)
-            throw new IllegalArgumentException("Offset is negative");
-        
-        if (data == null)
-            throw new IllegalArgumentException(ERR_BUFFER_NULL);
-
-        if (isReadOnly())
-            throw new IllegalStateException(ERR_READ_ONLY);
-        
-        // The offset of the record in the store (not adjusted for the root blocks).
-        final long addrOffset = getOffset(addr);
-
-        // The size of the record (NOT the #of bytes to be written).
-        final int addrByteCount = getByteCount(addr);
-        
-        if (addrOffset + addrByteCount > nextOffset) {
-
-            throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
-
-        }
-
-        // #of bytes to be updated on the pre-existing record.
-        final int nbytes = data.remaining();
-        
-        if (nbytes == 0)
-            throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
-        
-        if (off + nbytes > addrByteCount) {
-
-            throw new IllegalArgumentException("Would overrun record");
-
-        }
-        
-        final long begin = System.nanoTime();
-        
-        synchronized(this) {
-
-            try {
-
-                if (writeCache != null) {
-
-                    /*
-                     * Check the writeCache. If the record is found in the write
-                     * cache then we just update the slice of the record
-                     * corresponding to the caller's request. This is a common
-                     * use case and results in no IO.
-                     */
-
-                    final long beginCache = System.nanoTime();
-
-                    try {
-
-                        final ByteBuffer view = writeCache.read(addr,addrByteCount);
-
-                        if (view != null) {
-
-                            // adjust the limit on the record in the write
-                            // cache.
-                            view.limit(off + nbytes);
-
-                            // adjust the position on the record in the write
-                            // cache.
-                            view.position(off);
-
-                            // copy the caller's data onto the record in the
-                            // write
-                            // cache.
-                            view.put(data);
-
-                            // count this as a cache write.
-                            storeCounters.ncacheWrite++;
-
-                            // Done.
-                            return;
-
-                        }
-
-                    } finally {
-
-                        // track the write cache time.
-                        storeCounters.elapsedCacheWriteNanos += (System.nanoTime() - beginCache);
-
-                    }
-
-                }
-
-                /*
-                 * Either the writeCache is disabled or the record was not found
-                 * in the write cache so just write the record directly on the
-                 * disk.
-                 * 
-                 * Note: for this case we might be able to move the write
-                 * outside of the synchronized() block IFF we also cloned the
-                 * data (since the caller is allowed to modify the buffer as
-                 * soon as write() returns).
-                 * 
-                 * Note: We MUST NOT update the writeCacheOffset since we are
-                 * probably writing behind the end of the file (this is contrary
-                 * to a normal write write is an append at the end of the file).
-                 */
-
-                writeOnDisk(data, addrOffset + off/* adjustedOffset */, false/* append */);
-
-            } finally {
-
-                /*
-                 * Update counters while we are synchronized. If done outside of
-                 * the synchronization block then we need to use AtomicLongs
-                 * rather than primitive longs.
-                 */
-
-                storeCounters.nwrites++;
-                storeCounters.bytesWritten += nbytes;
-                storeCounters.elapsedWriteNanos += (System.nanoTime() - begin);
-
-                if(nbytes > storeCounters.maxWriteSize) {
-                    
-                    storeCounters.maxWriteSize = nbytes;
-                    
-                }
-                
-            }
-            
-        } // synchronized
-        
-    }
+//    /**
+//     * FIXME The {@link #update(long, int, ByteBuffer)} API was introduced to
+//     * support touch ups of the leaves generated by the
+//     * {@link IndexSegmentBuilder} and the notional support for writable blocks,
+//     * which was never realized (blobs should be send to the file system). At
+//     * this time, update() is only used by that class and the
+//     * {@link IndexSegmentBuilder} could use double-buffer the leaves or just
+//     * write them out directly onto the output store. Update SHOULD BE REMOVED
+//     * from the API since it allows non-append semantics and thus makes it much
+//     * more complicated to implement write pipelines for journal level failover.
+//     */
+//    public void update(final long addr, final int off, final ByteBuffer data) {
+//
+//        if (addr == 0L)
+//            throw new IllegalArgumentException(ERR_ADDRESS_IS_NULL);
+//
+//        if (off < 0)
+//            throw new IllegalArgumentException("Offset is negative");
+//        
+//        if (data == null)
+//            throw new IllegalArgumentException(ERR_BUFFER_NULL);
+//
+//        if (isReadOnly())
+//            throw new IllegalStateException(ERR_READ_ONLY);
+//        
+//        // The offset of the record in the store (not adjusted for the root blocks).
+//        final long addrOffset = getOffset(addr);
+//
+//        // The size of the record (NOT the #of bytes to be written).
+//        final int addrByteCount = getByteCount(addr);
+//        
+//        if (addrOffset + addrByteCount > nextOffset) {
+//
+//            throw new IllegalArgumentException(ERR_ADDRESS_NOT_WRITTEN);
+//
+//        }
+//
+//        // #of bytes to be updated on the pre-existing record.
+//        final int nbytes = data.remaining();
+//        
+//        if (nbytes == 0)
+//            throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
+//        
+//        if (off + nbytes > addrByteCount) {
+//
+//            throw new IllegalArgumentException(ERR_BUFFER_OVERRUN);
+//
+//        }
+//        
+//        final long begin = System.nanoTime();
+//        
+//        synchronized(this) {
+//
+//            try {
+//
+//                if (writeCache != null) {
+//
+//                    /*
+//                     * Check the writeCache. If the record is found in the write
+//                     * cache then we just update the slice of the record
+//                     * corresponding to the caller's request. This is a common
+//                     * use case and results in no IO.
+//                     */
+//
+//                    final long beginCache = System.nanoTime();
+//
+//                    try {
+//
+//                        final ByteBuffer view = writeCache.read(addr,addrByteCount);
+//
+//                        if (view != null) {
+//
+//                            // adjust the limit on the record in the write
+//                            // cache.
+//                            view.limit(off + nbytes);
+//
+//                            // adjust the position on the record in the write
+//                            // cache.
+//                            view.position(off);
+//
+//                            // copy the caller's data onto the record in the
+//                            // write
+//                            // cache.
+//                            view.put(data);
+//
+//                            // count this as a cache write.
+//                            storeCounters.ncacheWrite++;
+//
+//                            // Done.
+//                            return;
+//
+//                        }
+//
+//                    } finally {
+//
+//                        // track the write cache time.
+//                        storeCounters.elapsedCacheWriteNanos += (System.nanoTime() - beginCache);
+//
+//                    }
+//
+//                }
+//
+//                /*
+//                 * Either the writeCache is disabled or the record was not found
+//                 * in the write cache so just write the record directly on the
+//                 * disk.
+//                 * 
+//                 * Note: for this case we might be able to move the write
+//                 * outside of the synchronized() block IFF we also cloned the
+//                 * data (since the caller is allowed to modify the buffer as
+//                 * soon as write() returns).
+//                 * 
+//                 * Note: We MUST NOT update the writeCacheOffset since we are
+//                 * probably writing behind the end of the file (this is contrary
+//                 * to a normal write write is an append at the end of the file).
+//                 */
+//
+//                writeOnDisk(data, addrOffset + off/* adjustedOffset */, false/* append */);
+//
+//            } finally {
+//
+//                /*
+//                 * Update counters while we are synchronized. If done outside of
+//                 * the synchronization block then we need to use AtomicLongs
+//                 * rather than primitive longs.
+//                 */
+//
+//                storeCounters.nwrites++;
+//                storeCounters.bytesWritten += nbytes;
+//                storeCounters.elapsedWriteNanos += (System.nanoTime() - begin);
+//
+//                if(nbytes > storeCounters.maxWriteSize) {
+//                    
+//                    storeCounters.maxWriteSize = nbytes;
+//                    
+//                }
+//                
+//            }
+//            
+//        } // synchronized
+//        
+//    }
     
     public long write(final ByteBuffer data) {
 
@@ -2178,7 +2198,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         }
 
     }
-    
+
     /**
      * Write the data on the disk (synchronous).
      * <p>
@@ -2206,6 +2226,10 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
      * @param append
      *            <code>true</code> iff the write is an append (most record
      *            writes are appends).
+     * 
+     * @todo When integrating the new WriteCache, this method will still have to
+     *       make sure that the backing file exists and handle overflow of the
+     *       file (file extension).
      */
     private void writeOnDisk(final ByteBuffer data, final long offset, final boolean append) {
 
@@ -2287,7 +2311,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         try {
 
             /*
-             * Note: Synchronized on [this] to pervent concurrent NIO requests
+             * Note: Synchronized on [this] to prevent concurrent NIO requests
              * which might lead to the channel being closed asynchronously.
              */
 //            synchronized (this) {
@@ -2447,7 +2471,7 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         
     }
 
-    synchronized public long transferTo(RandomAccessFile out)
+    synchronized public long transferTo(final RandomAccessFile out)
             throws IOException {
         
         if (out == null)
@@ -2480,8 +2504,36 @@ public class DiskOnlyStrategy extends AbstractBufferStrategy implements
         super.closeForWrites();
 
         // discard the write cache.
-        writeCache = null;
+        releaseWriteCache();
         
     }
+    
+    synchronized private final void releaseWriteCache() {
+
+        final ByteBuffer tmp = writeCache == null ? null : writeCache.buf;
+
+        if (tmp == null)
+            return;
+
+        try {
+            
+            DirectBufferPool.INSTANCE.release(tmp);
+            
+        } catch (InterruptedException e) {
+        
+            throw new RuntimeException(e);
+
+        } finally {
+
+            writeCache.buf = null;
+            
+        }
+        
+    }
+
+	@Override
+	public void delete(long addr) {
+		// void behaviour
+	}
     
 }

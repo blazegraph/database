@@ -36,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.BigdataStatics;
+import com.bigdata.btree.IndexSegment;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.OneShotInstrument;
@@ -52,8 +53,19 @@ import com.bigdata.rawstore.IRawStore;
  * holding the lock. This allows us to use a {@link LinkedHashMap}, which has a
  * faster iterator, but requiring the lock to test the inner cache limits
  * concurrency and has been observed to limit throughput by about 10%.
+ * <p>
+ * The "explicit delete required" refers to the {@link #cacheSet}, which uses
+ * hard references to the per-{@link IRawStore} cache instances. Those cache
+ * instances must therefore be explicitly deleted using
+ * {@link #deleteCache(UUID)} rather than relying on weak references to the
+ * {@link IRawStore} instances to remove entries from the {@link #cacheSet}.
+ * This allows us to retain items in the cache for closed {@link IndexSegment}s
+ * which stand a reasonable likelihood of being reopened in a timely manner.
+ * Cache instances are deleted only when the corresponding {@link IRawStore} is
+ * itself deleted.
  * 
- * @version $Id$
+ * @version $Id: HardReferenceGlobalLRURecyclerExplicitDeleteRequired.java 2265
+ *          2009-10-26 12:51:06Z thompsonbry $
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson
  *         </a>
  * @param <K>

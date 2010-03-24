@@ -24,9 +24,6 @@ public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
      * 
      * @param db
      * @param bufferCapacity
-     * @param writeBuffer
-     *            An optional buffer for asynchronous writes on the statement
-     *            indices.
      * @param verifyData
      * @param deleteAfter
      *            if the file should be deleted once it has been loaded.
@@ -40,12 +37,11 @@ public class RDFLoadTaskFactory<S extends Statement,T extends Runnable> extends
      * @todo drop the writeBuffer arg.
      */
     public RDFLoadTaskFactory(final AbstractTripleStore db,
-            final int bufferCapacity, final BlockingBuffer<ISPO[]> writeBuffer,
-            final boolean verifyData, final boolean deleteafter,
-            final RDFFormat fallback) {
+            final int bufferCapacity, final boolean verifyData,
+            final boolean deleteafter, final RDFFormat fallback) {
 
         this(db, verifyData, deleteafter, fallback,
-                new LoadStatementBufferFactory<S>(db, bufferCapacity, writeBuffer));
+                new LoadStatementBufferFactory<S>(db, bufferCapacity));
 
     }
 

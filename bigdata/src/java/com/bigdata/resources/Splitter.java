@@ -146,7 +146,7 @@ class Splitter {
          * tuples. However, it MAY have more (or fewer) tuples. For example, if
          * the separator key for the split would violate an application
          * constraint, then the separator key could be moved in either direction
-         * so as to satisify that constraint. The other case where more tuples
+         * so as to satisfy that constraint. The other case where more tuples
          * may are often present is the last split where more tuples are
          * incorporated into the split in order to prevent the creation of
          * another split which would be "too small".

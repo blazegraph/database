@@ -43,6 +43,7 @@ import net.jini.lookup.entry.Name;
 import org.apache.log4j.MDC;
 
 import com.bigdata.btree.proc.IIndexProcedure;
+import com.bigdata.journal.ITx;
 import com.bigdata.service.DataService;
 import com.bigdata.service.DataService.DataServiceFederationDelegate;
 import com.sun.jini.start.LifeCycle;
@@ -181,13 +182,12 @@ public class DataServer extends AbstractServer {
             return server.proxy;
             
         }
-        
+
         /**
          * Adds the following parameters to the {@link MDC}
          * <dl>
          * 
-         * <dt>clientname
-         * <dt>
+         * <dt>clientname</dt>
          * <dd>The hostname or IP address of the client making the request.</dd>
          * 
          * </dl>
@@ -300,6 +300,61 @@ public class DataServer extends AbstractServer {
         @Override
         public Future submit(final long tx, final String name,
                 final IIndexProcedure proc) {
+
+//            setupLoggingContext();
+//
+//            try {
+//
+//                if (tx == ITx.UNISOLATED && !proc.isReadOnly()) {
+//
+//                    /*
+//                     * Hack to slow down the clients when the data service is
+//                     * busy servicing asynchronous overflow tasks. This only
+//                     * interferes with unisolated write tasks since they are the
+//                     * ones which drive the size of the journal.
+//                     * 
+//                     * FIXME Atomically test this condition and AWAIT the end of
+//                     * asynchronous overflow.
+//                     * 
+//                     * @todo make this a configuration parameter.
+//                     */
+//
+//                    int i = 0;
+//                    double overextension;
+//                    while ((overextension = getConcurrencyManager()
+//                            .getJournalOverextended()) > 1.5) {
+//
+//                        if (i == 0) {
+//
+//                            log.error("Task blocked: overextension="
+//                                    + overextension + ", task=" + proc);
+//
+//                        }
+//
+//                        try {
+//                            Thread.sleep(1000L/* ms */);
+//                        } catch (InterruptedException e) {
+//                            throw new RuntimeException(e);
+//                        }
+//
+//                    }
+//
+//                    if (i > 0) {
+//
+//                        log.error("Task released: overextension="
+//                                + overextension + ", task=" + proc);
+//
+//                    }
+//
+//                }
+//
+//                return getFederation().getProxy(super.submit(tx, name, proc));
+//
+//            } finally {
+//
+//                clearLoggingContext();
+//
+//            }
 
             return getFederation().getProxy(super.submit(tx, name, proc));
 

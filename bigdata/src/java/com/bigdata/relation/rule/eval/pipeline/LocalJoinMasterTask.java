@@ -36,8 +36,8 @@ public class LocalJoinMasterTask extends JoinMasterTask {
      * @param joinNexus
      * @param buffer
      */
-    public LocalJoinMasterTask(IRule rule, IJoinNexus joinNexus,
-            IBuffer<ISolution[]> buffer) {
+    public LocalJoinMasterTask(final IRule rule, final IJoinNexus joinNexus,
+            final IBuffer<ISolution[]> buffer) {
 
         super(rule, joinNexus, buffer);
 
@@ -91,10 +91,6 @@ public class LocalJoinMasterTask extends JoinMasterTask {
 
             // the predicate for this join dimension.
             final IPredicate predicate = rule.getTail(orderIndex);
-            
-            // the index on which that predicate must read.
-            final String indexName = predicate.getOnlyRelationName()
-                    + ruleState.getKeyOrder()[order[orderIndex]];
 
             // source for this join dimension.
             final IAsynchronousIterator<IBindingSet[]> src = sources[orderIndex];
@@ -103,7 +99,7 @@ public class LocalJoinMasterTask extends JoinMasterTask {
                     + ", tailCount=" + tailCount + ", rule=" + rule;
             
             // create the local join task.
-            final LocalJoinTask joinTask = new LocalJoinTask(indexName, rule,
+            final LocalJoinTask joinTask = new LocalJoinTask(/*indexName, */rule,
                     joinNexus, order, orderIndex, this/* master */,
                     masterUUID, src, getSolutionBuffer());
 

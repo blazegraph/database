@@ -382,7 +382,7 @@ public class SparseRowStore implements IRowStoreConstants {
      *         logical row (including no deleted property values, no property
      *         values that are excluded due to their timestamps, and no property
      *         values that are excluded due to a property name filter). A
-     *         <code>null</code> return is a strong guarentee that NO data
+     *         <code>null</code> return is a strong guarantee that NO data
      *         existed in the row store and that time of the read for the given
      *         <i>schema</i> and <i>primaryKey</i>.
      */
@@ -416,7 +416,7 @@ public class SparseRowStore implements IRowStoreConstants {
      *         logical row (including no deleted property values, no property
      *         values that are excluded due to their timestamps, and no property
      *         values that are excluded due to a property name filter). A
-     *         <code>null</code> return is a strong guarentee that NO data
+     *         <code>null</code> return is a strong guarantee that NO data
      *         existed in the row store and that time of the read for the given
      *         <i>schema</i> and <i>primaryKey</i>.
      */
@@ -460,7 +460,7 @@ public class SparseRowStore implements IRowStoreConstants {
      *         property values, no property values that are excluded due to
      *         their timestamps, and no property values that are excluded due to
      *         a property name filter). A <code>null</code> return is a strong
-     *         guarentee that NO data existed in the row store and that time of
+     *         guarantee that NO data existed in the row store and that time of
      *         the read for the given <i>schema</i> and <i>primaryKey</i>.
      * 
      * @throws IllegalArgumentException
@@ -612,7 +612,7 @@ public class SparseRowStore implements IRowStoreConstants {
      *         <i>primaryKey</i> (per the contract for an atomic read).
      *         <p>
      *         If an optional {@link IPrecondition} was specified and the
-     *         {@link IPrecondition} was NOT satisified, then the write
+     *         {@link IPrecondition} was NOT satisfied, then the write
      *         operation was NOT performed and the result is the pre-condition
      *         state of the logical row (which, again, will be <code>null</code>
      *         IFF there is NO data for the <i>primaryKey</i>).

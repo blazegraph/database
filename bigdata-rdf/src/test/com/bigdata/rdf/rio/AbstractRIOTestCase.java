@@ -670,9 +670,12 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                 final IRioLoader loader = new StatementVerifier(store,
                         capacity, nerrs, maxerrors);
 
+                final RDFFormat rdfFormat = RDFFormat.forFileName(resource,
+                        RDFFormat.RDFXML);
+
                 loader.loadRdf(new BufferedReader(new InputStreamReader(
-                        new FileInputStream(resource))), baseURI,
-                        RDFFormat.RDFXML, false/* verify */);
+                        new FileInputStream(resource))), baseURI, rdfFormat,
+                        false/* verify */);
 
                 log.info("End of reparse: nerrors=" + nerrs + ", file="
                         + resource);

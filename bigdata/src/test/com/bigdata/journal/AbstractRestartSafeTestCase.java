@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -85,11 +86,20 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
      */
     protected IRawStore reopenStore(final IRawStore store) {
 
+        boolean closedForWrites = false;
+        
+        if (store.isReadOnly() && store instanceof Journal
+                && ((Journal) store).getRootBlockView().getCloseTime() != 0L) {
+
+            closedForWrites = true;
+            
+        }
+
         // close the store.
         store.close();
         
         // Note: Clone to avoid modifying!!!
-        Properties properties = (Properties)getProperties().clone();
+        final Properties properties = (Properties)getProperties().clone();
         
         // Turn this off now since we want to re-open the same store.
         properties.setProperty(Options.CREATE_TEMP_FILE,"false");
@@ -99,8 +109,18 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
         assertNotNull(file);
         
-        // Set the file property explictly.
+        // Set the file property explicitly.
         properties.setProperty(Options.FILE,file.toString());
+        
+        if(closedForWrites) {
+
+            /*
+             * This supports unit tests which use closeForWrites() and then
+             * reopen the journal.
+             */
+            properties.setProperty(Options.READ_ONLY,"true");
+            
+        }
         
         return new Journal( properties );
         
@@ -338,4 +358,150 @@ abstract public class AbstractRestartSafeTestCase extends AbstractBufferStrategy
         
     }
 
+    /**
+     * Test of abort semantics.
+     */
+    public void test_abort() {
+
+        class AbortException extends RuntimeException {
+            private static final long serialVersionUID = 1L;
+        }
+
+        final IAtomicStore store = (IAtomicStore) getStore();
+
+        try {
+
+            // write some data onto the store.
+            for (int i = 0; i < 100; i++) {
+                
+                store.write(getRandomData());
+                
+            }
+
+            // trigger an abort.
+            throw new AbortException();
+
+        } catch (AbortException ex) {
+
+            // discard the write set.
+            store.abort();
+
+            /*
+             * write different data onto the store (just to verify that it is
+             * still functional).
+             */
+            for (int i = 0; i < 100; i++) {
+                store.write(getRandomData());
+            }
+            
+        } catch (Throwable t) {
+
+            // discard the write set.
+            store.abort();
+
+            fail("Unexpected exception: " + t, t);
+
+        } finally {
+
+            store.destroy();
+
+        }
+
+    }
+
+    /**
+     * Unit tests writes some data, commits, and closes the journal against
+     * future writes. The {@link LRUNexus} is then cleared and we verify that we
+     * can still read data back from the store. Finally, we close and then
+     * reopen the store in a read-only mode and verify that we can still read on
+     * the store.
+     * <p>
+     * This test was written to verify that closing the journal against future
+     * writes does not leave the write cache in an unusable state (e.g., if it
+     * is discarded, then we do not attempt to read against the write cache).
+     * Since {@link AbstractJournal#closeForWrites(long)} does not interfere
+     * with existing readers, care must be exercised if we are to release the
+     * write cache atomically.
+     * 
+     * @todo test also with a concurrent reader since concurrent close of the
+     *       write cache could be a problem.
+     */
+    public void test_closeForWrites() {
+        
+        Journal store = (Journal) getStore();
+
+        try {
+
+            final int nrecs = 1000;
+            final ByteBuffer[] recs = new ByteBuffer[nrecs];
+            final long addrs[] = new long[nrecs];
+
+            // Write a bunch of data onto the store.
+            for (int i = 0; i < nrecs; i++) {
+
+                recs[i] = getRandomData();
+
+                addrs[i] = store.write(recs[i]);
+
+            }
+
+            // commit
+            final long lastCommitTime = store.commit();
+
+            // close against further writes.
+            store.closeForWrites(lastCommitTime/* closeTime */);
+
+            if (LRUNexus.INSTANCE != null) {
+
+                // discard the record level cache so we will read through.
+                LRUNexus.INSTANCE.deleteCache(store.getUUID());
+
+            }
+
+            // Verify read back.
+            for (int i = 0; i < nrecs; i++) {
+
+                final long addr = addrs[i];
+
+                final ByteBuffer expected = recs[i];
+
+                // position := 0, limit := capacity;
+                expected.clear();
+
+                final ByteBuffer actual = store.read(addr);
+
+                assertEquals(expected, actual);
+
+            }
+            
+            if(store.isStable()) {
+                
+                store = (Journal) reopenStore(store);
+
+                // Verify read back after re-open.
+                for (int i = 0; i < nrecs; i++) {
+
+                    final long addr = addrs[i];
+
+                    final ByteBuffer expected = recs[i];
+
+                    // position := 0, limit := capacity;
+                    expected.clear();
+
+                    final ByteBuffer actual = store.read(addr);
+
+                    assertEquals(expected, actual);
+
+                }
+                
+            }
+            
+        } finally {
+            
+            store.destroy();
+            
+        }
+        
+    }
+    
 }

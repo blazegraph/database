@@ -356,9 +356,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
 
         /**
          * Boolean option controls the JOIN evaluation strategy. When
-         * <code>true</code>, {@link NestedSubqueryWithJoinThreadsTask} is
-         * used to compute joins. When <code>false</code>,
-         * {@link JoinMasterTask} is used instead (aka pipeline joins).
+         * <code>true</code>, {@link NestedSubqueryWithJoinThreadsTask} is used
+         * to compute joins. When <code>false</code>, {@link JoinMasterTask} is
+         * used instead (aka pipeline joins).
          * <p>
          * Note: The default depends on the deployment mode. Nested subquery
          * joins are somewhat faster for local data (temporary stores, journals,
@@ -371,8 +371,9 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
          * to be better for the pipeline join, so it may make sense to use the
          * pipeline join even for local data.
          * 
-         * @todo should identify the strategy by type safe enum or class name
-         *       since we may develop other join strategies.
+         * @deprecated The {@link NestedSubqueryWithJoinThreadsTask} is much
+         *             slower than the pipeline join algorithm, even for a
+         *             single machine.
          */
         String NESTED_SUBQUERY = DefaultRuleTaskFactory.class.getName()
                 + ".nestedSubquery";
@@ -447,12 +448,16 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
                 Options.DEFAULT_MAX_PARALLEL_SUBQUERIES,
                 IntegerValidator.GTE_ZERO);
 
-        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
-                .isScaleOut());
-        
+        /*
+         * Note: The pipeline join is flat out better all around.
+         */
+//        final boolean pipelineIsBetter = (indexManager instanceof IBigdataFederation && ((IBigdataFederation) indexManager)
+//                .isScaleOut());
+//        
         nestedSubquery = Boolean.parseBoolean(getProperty(
-                Options.NESTED_SUBQUERY, Boolean
-                        .toString(!pipelineIsBetter)));
+                Options.NESTED_SUBQUERY, "false"));
+//        Boolean
+//                        .toString(!pipelineIsBetter)));
 
         chunkOfChunksCapacity = getProperty(Options.CHUNK_OF_CHUNKS_CAPACITY,
                 Options.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY,
@@ -540,8 +545,18 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
     /**
      * Return the object used to locate indices, relations, and relation
      * containers and to execute operations on those resources.
+     * <p>
+     * Note: For scale-out, this is <em>always</em> the federation's index
+     * manager NOT the data service local index manager. This is an artifact of
+     * how we resolve the metadata for the relation against the global row
+     * store.
      * 
      * @return The {@link IIndexManager}.
+     * 
+     * @todo If we support the notion of a "relation shard" then this could
+     *       become the shard's data service local index manager in that
+     *       instance but, regardless, we would need a means to resolve the
+     *       metadata for the relation against the federation's index manager
      */
     public IIndexManager getIndexManager() {
         
@@ -717,7 +732,8 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * 
      * @see Configuration
      */
-    protected String getProperty(String localName, String defaultValue) {
+    protected String getProperty(final String localName,
+            final String defaultValue) {
 
         return Configuration.getProperty(indexManager, properties, namespace,
                 localName, defaultValue);
@@ -734,7 +750,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
      * @return
      */
     protected <T> T getProperty(final String name, final String defaultValue,
-            IValidator<T> validator) {
+            final IValidator<T> validator) {
 
         return Configuration.getProperty(indexManager, properties, namespace,
                 name, defaultValue, validator);

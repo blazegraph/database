@@ -27,8 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree;
 
-import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.cache.HardReferenceQueueEvictionListener;
+import com.bigdata.cache.IHardReferenceQueue;
 
 /**
  * Interface to handle evictions of nodes or leaves from the hard reference
@@ -42,6 +42,6 @@ import com.bigdata.cache.HardReferenceQueueEvictionListener;
 public interface IEvictionListener extends
         HardReferenceQueueEvictionListener<PO> {
 
-    public void evicted(HardReferenceQueue<PO> cache, PO ref);
+    public void evicted(IHardReferenceQueue<PO> cache, PO ref);
 
 }

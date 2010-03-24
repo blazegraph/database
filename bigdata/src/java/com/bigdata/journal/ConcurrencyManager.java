@@ -1193,29 +1193,10 @@ public class ConcurrencyManager implements IConcurrencyManager {
      */
     private void journalOverextended(final AbstractTask task) {
 
-        // Only for the data service with overflow enabled.
-        if (!resourceManager.isOverflowEnabled()) {
+        final double overextension = getJournalOverextended();
 
-            return;
+        if (overextension >= 2d) {
             
-        }
-        
-        // And even then only for the distributed federation
-        try {
-            if (!(resourceManager.getFederation() instanceof AbstractDistributedFederation)) {
-                return;
-            }
-        } catch (UnsupportedOperationException ex) {
-            // note: thrown by some unit tests, but not by real services.
-            return;
-        }
-        
-        final AbstractJournal journal = resourceManager.getLiveJournal();
-
-        final long overextension = journal.size() / journal.getMaximumExtent();
-
-        if (overextension > 2) {
-
             /*
              * Note: This is being used to diagnose a problem where the live
              * journal can continue to grow because asynchronous overflow tasks
@@ -1223,10 +1204,44 @@ public class ConcurrencyManager implements IConcurrencyManager {
              * 
              * @todo convert to WARN
              */
-            log.error("overextended=" + overextension + "x : "
+            log.error("overextended=" + (int)overextension + "x : "
                     + task.toString());
 
         }
+
+    }
+
+    /**
+     * Return the overextension multiplier for the journal. This is the ratio of
+     * the bytes written on the journal against its nominal maximum extent. For
+     * example, an overextension of two means that the journal has reached twice
+     * is nominal maximum extent. This is zero unless we are running in a
+     * distributed federation.
+     * 
+     * @return The overextension multipler.
+     */
+    public double getJournalOverextended() {
+
+        // Only for the data service with overflow enabled.
+        if (!resourceManager.isOverflowEnabled()) {
+
+            return 0;
+            
+        }
+        
+        // And even then only for the distributed federation
+        try {
+            if (!(resourceManager.getFederation() instanceof AbstractDistributedFederation)) {
+                return 0;
+            }
+        } catch (UnsupportedOperationException ex) {
+            // note: thrown by some unit tests, but not by real services.
+            return 0;
+        }
+        
+        final AbstractJournal journal = resourceManager.getLiveJournal();
+
+        return ((double)journal.size()) / journal.getMaximumExtent();
 
     }
     

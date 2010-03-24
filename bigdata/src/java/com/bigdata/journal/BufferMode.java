@@ -26,7 +26,6 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.service.DataService;
 
 /**
  * <p>
@@ -43,7 +42,6 @@ import com.bigdata.service.DataService;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-
 public enum BufferMode {
 
     /**
@@ -114,6 +112,38 @@ public enum BufferMode {
 
     /**
      * <p>
+     * The journal is managed on disk. This option may be used with files of
+     * more than {@link Integer#MAX_VALUE} bytes in extent. Journal performance
+     * for large files should be fair on write, but performance will degrade as
+     * the journal is NOT optimized for random reads (poor locality).
+     * </p>
+     * 
+     * @see WORMStrategy
+     * 
+     * @deprecated This mode exists to test a new version of the
+     *             {@link DiskOnlyStrategy} which does not require
+     *             synchronization for disk read/write operations except when
+     *             the file size is being changed. Once this is working properly
+     *             it will replace the {@link DiskOnlyStrategy}.
+     */
+    DiskWORM(true/* stable */, false/* fullyBuffered */),
+
+    /**
+     * <p>
+     * The journal is managed on disk. This option may be used with files of
+     * more than {@link Integer#MAX_VALUE} bytes in extent. RW indicates that
+     * it is not a WORM with append only semantics but rather a disk alloc/realloc
+     * mechanism that supports updates to values.  In general the store locality
+     * may be poor but should normally benefit in comparison to a WORM with
+     * smaller disk size.
+     * </p>
+     * 
+     * @see RWStrategy
+     */
+    DiskRW(true/* stable */, false/* fullyBuffered */),
+
+    /**
+     * <p>
      * A variant on the {@link #Disk} mode that is not restart-safe. This mode
      * is useful for all manners of temporary data with full concurrency control
      * and scales-up to very large temporary files. The backing file (if any) is
@@ -123,31 +153,7 @@ public enum BufferMode {
      * 
      * @see DiskOnlyStrategy
      */
-    Temporary(false/* stable */, false/* fullyBuffered */),
-
-    /**
-     * <p>
-     * The journal is managed on disk, but with a direct {@link ByteBuffer}
-     * equal in size to the {@link Options#INITIAL_EXTENT}. This option is
-     * designed for use with periodic overflow of the live journal for a
-     * {@link DataService}. You pay a modest premium for the fully buffered
-     * journal (~200M of RAM per journal, and the data service maintains both
-     * the live journal and the historical journal). However, this mode offers
-     * higher read concurrency than {@link #Disk} and faster asynchronous
-     * overflow processing (since it is not reading through to the disk).
-     * </p>
-     * <p>
-     * Note: The implementation in fact limits the capacity of the buffer to a
-     * maximum extent. Beyond that, this solution degrades into a partly
-     * buffered approach.
-     * </p>
-     * 
-     * @see BufferedDiskStrategy
-     * 
-     * @deprecated This has not been implemented yet. It may not be necessary
-     *             with the use of global buffers for B+Tree nodes and leaves.
-     */
-    BufferedDisk(true/* stable */, false/* fullyBuffered */);
+    Temporary(false/* stable */, false/* fullyBuffered */);
 
     private final boolean stable;
     private final boolean fullyBuffered;

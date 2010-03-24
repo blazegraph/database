@@ -102,7 +102,9 @@ public class DataServicesClient extends
     }
 
     /**
-     * Return the proxy for an {@link IDataService} from the local cache.
+     * Return the proxy for an {@link IDataService} from the local cache -or-
+     * the reference to this service if the {@link UUID} identifies this service
+     * (this avoids RMI requests from a service to itself).
      * 
      * @param serviceUUID
      *            The {@link UUID} for the {@link IDataService}.
@@ -117,6 +119,17 @@ public class DataServicesClient extends
      */
     public IDataService getDataService(final UUID serviceUUID) {
 
+        if (serviceUUID.equals(thisServiceUUID)) {
+
+            /*
+             * Return the actual service reference rather than a proxy to avoid
+             * RMI when this service makes a request to itself.
+             */
+
+            return (IDataService) thisService;
+
+        }
+        
         final ServiceItem serviceItem = getServiceItem(serviceUUID);
         
         if (serviceItem == null) {

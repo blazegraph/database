@@ -18,7 +18,7 @@ public class TermIdComparator2 implements Comparator<Long> {
      * Note: comparison avoids possible overflow of <code>long</code> by
      * not computing the difference directly.
      */
-    public int compare(Long term1, Long term2) {
+    public int compare(final Long term1, final Long term2) {
 
         final long id1 = term1.longValue();
         final long id2 = term2.longValue();

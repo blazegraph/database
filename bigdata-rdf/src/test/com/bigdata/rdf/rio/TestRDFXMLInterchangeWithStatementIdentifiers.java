@@ -78,7 +78,7 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -88,7 +88,7 @@ import com.bigdata.striterator.IChunkedOrderedIterator;
 /**
  * Test suite for correct handling of blank nodes and statement identifiers
  * during interchange of RDF/XML using the custom extensions described by
- * {@link BNS#SID}. When statement identifers are NOT enabled, the test suite
+ * {@link BD#SID}. When statement identifers are NOT enabled, the test suite
  * instead verifies that blank nodes are handled propertly (that is, that the
  * RDF/XML parser assigns term identifiers to blank nodes instead of unifying
  * them with statement identifiers in the KB).
@@ -536,7 +536,7 @@ public class TestRDFXMLInterchangeWithStatementIdentifiers extends
     /**
      * Test verifies the correct unification of blank nodes appearing in an
      * RDF/XML document with the statement identifiers represented in the same
-     * document using the custom {@value BNS#SID} attribute.
+     * document using the custom {@value BD#SID} attribute.
      * 
      * @param store
      * 

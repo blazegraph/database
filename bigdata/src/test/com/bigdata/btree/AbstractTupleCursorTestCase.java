@@ -34,6 +34,7 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
@@ -89,12 +90,12 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
 
     /**
      * Return a B+Tree populated with data for
-     * {@link #doBaseCaseTest(IndexSegment)}
+     * {@link #doBaseCaseTest(AbstractBTree)}.
      */
     protected BTree getBaseCaseBTree() {
 
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
-                UUID.randomUUID()));
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(),
+                new IndexMetadata(UUID.randomUUID()));
 
         btree.insert(10, "Bryan");
         btree.insert(20, "Mike");
@@ -106,7 +107,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
     
     /**
      * Test helper tests first(), last(), next(), prior(), and seek() given a
-     * B+Tree that has been pre-popluated with some known tuples.
+     * B+Tree that has been pre-populated with some known tuples.
      * 
      * @param btree
      *            The B+Tree.
@@ -247,8 +248,8 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
          */
         {
 
-            ITupleCursor<String> cursor = newCursor(btree, IRangeQuery.DEFAULT,
-                    null/* fromKey */, null/* toKey */);
+            final ITupleCursor<String> cursor = newCursor(btree,
+                    IRangeQuery.DEFAULT, null/* fromKey */, null/* toKey */);
 
             // probe(30)
             assertEquals(new TestTuple<String>(30, "James"), cursor.seek(30));
@@ -281,7 +282,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
          */
         {
 
-            ITupleCursor2<String> cursor = newCursor(btree);
+            final ITupleCursor2<String> cursor = newCursor(btree);
 
             // seek to a probe key that does not exist.
             assertEquals(null, cursor.seek(29));
@@ -452,10 +453,293 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
                 
             }
 
-        }
+            /*
+             * Test when the toKey does not exist for reverse traversal.
+             */
+            {
+
+                final byte[] fromKey = KeyBuilder.asSortKey(10);
+                
+                final byte[] toKey = KeyBuilder.asSortKey(19);
+
+                final ITupleCursor2<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                // seek to last and scan backward.
+//                assertEquals(null, cursor.last());
+//                assertEquals(null, cursor.tuple());
+//                assertEquals(KeyBuilder.asSortKey(19),cursor.currentKey());
+                assertTrue(cursor.hasPrior());
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+                assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+                assertFalse(cursor.hasPrior());
+
+            }
+            
+            /*
+             * Test when the toKey does not exist for reverse traversal.
+             */
+            {
+
+                final byte[] fromKey = KeyBuilder.asSortKey(10);
+                
+                final byte[] toKey = KeyBuilder.asSortKey(29);
+
+                final ITupleCursor2<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertTrue(cursor.hasPrior());
+                assertEquals(new TestTuple<String>(20, "Mike"), cursor.prior());
+                assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+                assertTrue(cursor.hasPrior());
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+                assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+                assertFalse(cursor.hasPrior());
+
+            }
+            
+            /*
+             * Test when the toKey does not exist for reverse traversal.
+             */
+            {
+
+                final byte[] fromKey = KeyBuilder.asSortKey(10);
+                
+                final byte[] toKey = KeyBuilder.asSortKey(11);
+
+                final ITupleCursor2<String> cursor = newCursor(btree,
+                        IRangeQuery.DEFAULT, fromKey, toKey);
+
+                assertTrue(cursor.hasPrior());
+                assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+                assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+                assertFalse(cursor.hasPrior());
+
+            }
+            
+        } // end test optional range constraints
         
     }
 
+    /**
+     * Return a B+Tree populated with data for
+     * {@link #doReverseTraversalTest(AbstractBTree)}.
+     * <p>
+     * Note: this unit test is setup to create a B+Tree with 2 leaves and a root
+     * node. This allows us to test the edge case where reverse traversal begins
+     * with a key that is LTE the first key in the 2nd leaf.
+     * <p>
+     * Note: This unit test does not work for the {@link IndexSegment} because
+     * the {@link IndexSegmentBuilder} will fill up each leaf in turn, so the
+     * first leaf winds up with 3 tuples and the second with only 2 rather than
+     * it being the other way around.
+     */
+    protected BTree getReverseTraversalBTree() {
+
+        final IndexMetadata md = new IndexMetadata(UUID.randomUUID());
+
+        md.setBranchingFactor(3);
+
+        md.setIndexSegmentBranchingFactor(3);
+
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(), md);
+
+        // leaf one.
+        btree.insert(10, "Bryan");
+        btree.insert(20, "Mike");
+        // leaf two.
+        btree.insert(30, "James");
+        btree.insert(40, "Amy");
+        btree.insert(50, "Mary");
+//        btree.insert(60, "Karen");
+
+        assertReverseTraversalData(btree);
+
+        return btree;
+
+    }
+
+    /**
+     * Verify the data expectations.
+     * 
+     * @todo Is this possible when the {@link IndexSegment} is generated since
+     *       the plan can assign 3 tuples to the first leaf and two to the 2nd
+     *       leaf.
+     */
+    private void assertReverseTraversalData(final AbstractBTree btree) {
+
+        assertEquals("height", 1, btree.getHeight());
+        assertEquals("nnodes", 1, btree.getNodeCount());
+        assertEquals("nleaves", 2, btree.getLeafCount());
+        assertEquals("ntuples", 5, btree.getEntryCount());
+
+        // The separator key is (30).
+        assertEquals(KeyBuilder.asSortKey(30), ((Node) btree.getRoot())
+                .getKeys().get(0));
+        
+        // Verify the expected keys in the 1st leaf.
+        AbstractBTreeTestCase.assertKeys(
+                //
+                new ReadOnlyKeysRaba(new byte[][] {//
+                        KeyBuilder.asSortKey(10), //
+                        KeyBuilder.asSortKey(20), //
+                        }),//
+                ((Node) btree.getRoot()).getChild(0/* 1st leaf */).getKeys());
+
+        // Verify the expected keys in the 2nd leaf.
+        AbstractBTreeTestCase.assertKeys(
+                //
+                new ReadOnlyKeysRaba(new byte[][] {//
+                        KeyBuilder.asSortKey(30), //
+                        KeyBuilder.asSortKey(40), //
+                        KeyBuilder.asSortKey(50),//
+                        }),//
+                ((Node) btree.getRoot()).getChild(1/* 2nd leaf */).getKeys());
+
+    }
+    
+    /**
+     * Unit test for reverse traversal under a variety of edge cases. The data
+     * is a B+Tree with two leaves
+     * 
+     * <pre>
+     * (10,Bryan)
+     * (20,Mike)
+     * 
+     * and
+     * 
+     * (30,James)
+     * (40,Amy)
+     * (50,Mary)
+     * </pre>
+     * 
+     * This allows us to test the edge case where reverse traversal begins with
+     * a key that is LTE the first key in the 2nd leaf.
+     * 
+     * @param btree
+     */
+    protected void doReverseTraversalTest(final AbstractBTree btree) {
+
+        assertReverseTraversalData(btree);
+
+        /*
+         * Test when the toKey exists and is at index zero on the 2nd leaf. 
+         */
+        {
+
+            final byte[] fromKey = KeyBuilder.asSortKey(10);
+            
+            final byte[] toKey = KeyBuilder.asSortKey(30);
+
+            final ITupleCursor2<String> cursor = newCursor(btree,
+                    IRangeQuery.DEFAULT, fromKey, toKey);
+
+            assertTrue(cursor.hasPrior());
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.prior());
+            assertEquals(KeyBuilder.asSortKey(20),cursor.currentKey());
+
+        }
+
+        /*
+         * Test when the toKey does not exist for reverse traversal and the
+         * insertion point returned by the search on the leaf is -2 for the
+         * FIRST leaf.
+         */
+        {
+
+            final byte[] fromKey = KeyBuilder.asSortKey(0);
+            
+            final byte[] toKey = KeyBuilder.asSortKey(19);
+
+            final ITupleCursor2<String> cursor = newCursor(btree,
+                    IRangeQuery.DEFAULT, fromKey, toKey);
+
+            assertTrue(cursor.hasPrior());
+            assertEquals(new TestTuple<String>(10, "Bryan"), cursor.prior());
+            assertEquals(KeyBuilder.asSortKey(10),cursor.currentKey());
+            assertFalse(cursor.hasPrior());
+
+        }
+        
+        /*
+         * Test when the toKey does not exist for reverse traversal and the
+         * insertion point returned by the search on the leaf is -1 for the
+         * FIRST leaf.
+         */
+        {
+
+            final byte[] fromKey = KeyBuilder.asSortKey(0);
+            
+            final byte[] toKey = KeyBuilder.asSortKey(9);
+
+            final ITupleCursor2<String> cursor = newCursor(btree,
+                    IRangeQuery.DEFAULT, fromKey, toKey);
+
+            assertFalse(cursor.hasPrior());
+
+        }
+
+        /*
+         * Test when the toKey does not exist for reverse traversal and the
+         * insertion point returned by search on the 2nd leaf is -1, which
+         * corresponds to index 0 when it is converted to an index position in
+         * the leaf. In this case the cursor should be adjusted to the last
+         * tuple in the prior leaf.
+         * 
+         * Note: This condition can not arise if the separator key in the parent
+         * is the first tuple in the rightSibling. This is normally the case.
+         * However, if delete markers are not enabled then we can delete the
+         * first tuple in the 2nd leaf, at which point the separatorKey no
+         * longer corresponds to the first tuple in that leaf.
+         */
+        if (!btree.isReadOnly() && !btree.getIndexMetadata().getDeleteMarkers()) {
+
+            /*
+             * Verify that the separatorKey in the parent is the first tuple we
+             * expect to find in the 2nd leaf.
+             */
+            assertEquals(KeyBuilder.asSortKey(30), ((Node) btree.getRoot())
+                    .getKeys().get(0));
+
+            /*
+             * Modify the B+Tree such that (30) is still the separatorKey for
+             * the two leaves, so anything GTE (30) is directed to the 2nd leaf.
+             * However, the key (30) is no longer found in the B+Tree (not even
+             * as a deleted tuple).
+             */
+            
+            // Remove the first tuple in the 2nd leaf.
+            btree.remove(30);
+            // The separator key has not been changed.
+            assertEquals(((Node) btree.getRoot()).getKeys().get(0), KeyBuilder
+                    .asSortKey(30));
+            // The #of leaves has not been changed.
+            assertEquals(2, btree.getLeafCount());
+            // Verify the expected keys in the 2nd leaf.
+            AbstractBTreeTestCase.assertKeys(//
+                    new ReadOnlyKeysRaba(new byte[][]{//
+                            KeyBuilder.asSortKey(40),//
+                            KeyBuilder.asSortKey(50),//
+                            }),//
+                    ((Node) btree.getRoot()).getChild(1/*2nd leaf*/).getKeys());
+            
+            final byte[] fromKey = KeyBuilder.asSortKey(10);
+
+            // search for the tuple we just deleted from the 2nd leaf.
+            final byte[] toKey = KeyBuilder.asSortKey(30);
+
+            final ITupleCursor2<String> cursor = newCursor(btree,
+                    IRangeQuery.DEFAULT, fromKey, toKey);
+
+            assertTrue(cursor.hasPrior());
+            assertEquals(new TestTuple<String>(20, "Mike"), cursor.prior());
+            assertEquals(KeyBuilder.asSortKey(20), cursor.currentKey());
+            assertTrue(cursor.hasPrior());
+
+        }
+
+    }
+    
     /**
      * Test helper tests for fence posts when the index is empty
      * <p>
@@ -465,7 +749,7 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      * @param btree
      *            An empty B+Tree.
      */
-    protected void doEmptyIndexTest(AbstractBTree btree) {
+    protected void doEmptyIndexTest(final AbstractBTree btree) {
 
         /*
          * Test with no range limits.
@@ -696,8 +980,8 @@ abstract public class AbstractTupleCursorTestCase extends TestCase2 {
      */
     protected BTree getOneTupleBTree() {
 
-        BTree btree = BTree.create(new SimpleMemoryRawStore(), new IndexMetadata(
-                UUID.randomUUID()));
+        final BTree btree = BTree.create(new SimpleMemoryRawStore(),
+                new IndexMetadata(UUID.randomUUID()));
 
         btree.insert(10, "Bryan");
 

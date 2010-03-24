@@ -36,8 +36,11 @@ import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * A interface representing an RDF triple, an RDF triple with a statement
@@ -118,10 +121,6 @@ public interface ISPO {
      * Note: {@link BigdataStatement}s are not fully bound when they are
      * instantiated during parsing until their term identifiers have been
      * resolved against a database's lexicon.
-     * 
-     * FIXME quads : this method might need to be aware of the database mode,
-     * e.g., pass in [boolean quads]. if its semantics are restricted to whether
-     * the triple pattern is fully bound, then clarify that here.
      */
     boolean isFullyBound();
 
@@ -229,6 +228,39 @@ public interface ISPO {
      * statement (which would also delete its justifications).
      */
     public boolean isOverride();
+
+    /**
+     * Set a transient flag indicating whether or not the persistent state of
+     * the statement was modified when it was last written onto the database.
+     * Modification can indicate that the statement was inserted, retracted, or
+     * had its associated {@link StatementEnum} in the database updated.
+     */
+    public void setModified(boolean modified);
+
+    /**
+     * Return the state of the transient <i>modified</i> flag. This flag
+     * indicates whether or not the persistent state of the statement was
+     * modified when it was written onto the database. Modification can indicate
+     * that the statement was inserted, retracted, or had its associated
+     * {@link StatementEnum} in the database updated.
+     * 
+     * @todo This flag is set by
+     *       {@link SPORelation#insert(ISPO[], int, IElementFilter)} and
+     *       {@link SPORelation#delete(IChunkedOrderedIterator)}. The state of
+     *       this flag generally DOES NOT survive across higher level APIs such
+     *       as the {@link StatementBuffer} because they formulate new
+     *       {@link ISPO} objects which are distinct from the caller's
+     *       {@link ISPO} objects.
+     *       <p>
+     *       In order to use take advantage of this information right now, you
+     *       should batch resolve the RDF values to their term identifiers,
+     *       construct the appropriate {@link SPO}[], and invoke the
+     *       corresponding method on {@link SPORelation}.
+     *       <p>
+     *       Because this information is set at a low-level it can not currently
+     *       be used in combination with truth maintenance mechanisms.
+     */
+    public boolean isModified();
 
     /**
      * Return the byte[] that would be written into a statement index for this

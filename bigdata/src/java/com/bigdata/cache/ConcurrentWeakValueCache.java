@@ -769,7 +769,7 @@ public class ConcurrentWeakValueCache<K, V> implements
      * @param <K>
      * @param <V>
      */
-    public static class WeakRef<K,V> extends WeakReference<V> {
+    protected static class WeakRef<K,V> extends WeakReference<V> {
         
         private final K k;
         

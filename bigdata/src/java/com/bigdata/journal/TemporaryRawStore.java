@@ -32,8 +32,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
@@ -44,7 +42,6 @@ import com.bigdata.mdi.AbstractResourceMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IMRMW;
-import com.bigdata.rawstore.IUpdateStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.util.ChecksumUtility;
@@ -59,9 +56,10 @@ import com.bigdata.util.ChecksumUtility;
  * @see DiskOnlyStrategy
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: TemporaryRawStore.java 2356 2010-01-28 17:36:13Z martyncutcher
+ *          $
  */
-public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateStore, IMRMW {
+public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 
     protected static final Logger log = Logger.getLogger(TemporaryRawStore.class);
 
@@ -76,16 +74,16 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
      */
     private final DiskOnlyStrategy buf;
     
-    /**
-     * When non-<code>null</code> this is a direct {@link ByteBuffer}
-     * allocated using the {@link DirectBufferPool} during
-     * {@link #overflowToDisk()} and handed off to the {@link DiskOnlyStrategy}
-     * for use as its write cache. When non-<code>null</code> this buffer is
-     * {@link DirectBufferPool#release(ByteBuffer)}ed back to the
-     * {@link DirectBufferPool} in {@link #finalize()} to avoid a native memory
-     * leak.
-     */
-    private ByteBuffer writeCache = null;
+//    /**
+//     * When non-<code>null</code> this is a direct {@link ByteBuffer}
+//     * allocated using the {@link DirectBufferPool} during
+//     * {@link #overflowToDisk()} and handed off to the {@link DiskOnlyStrategy}
+//     * for use as its write cache. When non-<code>null</code> this buffer is
+//     * {@link DirectBufferPool#release(ByteBuffer)}ed back to the
+//     * {@link DirectBufferPool} in {@link #finalize()} to avoid a native memory
+//     * leak.
+//     */
+//    private ByteBuffer writeCache = null;
     
     /**
      * Store identifier.
@@ -133,11 +131,20 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
     static public File getTempFile(final File tmpDir) {
 
         try {
-     
-            if(tmpDir.exists()) {
-                
-                tmpDir.mkdirs();
-                
+
+            if (!tmpDir.exists()) {
+
+                if (!tmpDir.mkdirs()) {
+
+                    /*
+                     * The return code is ignored. The directory could have been
+                     * concurrently created so there is no reason to look at the
+                     * return code here. If we can't create the file below then
+                     * we have a problem and it will get reported.
+                     */
+                    
+                }
+
             }
             
             final File file = File.createTempFile("bigdata", ".tmp", tmpDir);
@@ -225,32 +232,34 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         // Note: timestamp is NOT assigned by a centralized service!
         this.createTime = System.currentTimeMillis();
         
-        try {
-
-            /*
-             * Try and acquire a direct buffer to serve as the initial in-memory
-             * extent and the write cache.
-             */
-            
-            this.writeCache = DirectBufferPool.INSTANCE.acquire(2000L,
-                    TimeUnit.MILLISECONDS);
-            
-        } catch (InterruptedException e) {
-            
-            throw new RuntimeException(e);
-            
-        } catch (TimeoutException e) {
-            
-            throw new RuntimeException(e);
-            
-        }
+//        try {
+//
+//            /*
+//             * Try and acquire a direct buffer to serve as the initial in-memory
+//             * extent and the write cache.
+//             */
+//            // Note: the timeout here is not such a good idea.  It could
+//            // be triggered by a GC pause with the resulting temp store 
+//            // then lacking a write cache.
+//            this.writeCache = DirectBufferPool.INSTANCE.acquire(2000L,
+//                    TimeUnit.MILLISECONDS);
+//            
+//        } catch (InterruptedException e) {
+//            
+//            throw new RuntimeException(e);
+//            
+//        } catch (TimeoutException e) {
+//            
+//            throw new RuntimeException(e);
+//            
+//        }
         
         /*
          * Note: The initial on disk capacity is exactly the capacity of the
          * write cache.  This implies that the file will be extended 32M at
          * a time (the default when the initialExtent is less than 32M).  
          */
-        final long initialExtent = writeCache.capacity();
+        final long initialExtent = DirectBufferPool.INSTANCE.getBufferCapacity();
         
         /*
          * Note: This is the overflow trigger point. Since this class does not
@@ -271,17 +280,19 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
                 false, // readOnly
                 ForceEnum.No, // forceWrites
                 offsetBits,//
-                0, // readCacheCapacity
-                0, // readCacheMaxRecordSize
-                writeCache,//
+//                0, // readCacheCapacity
+//                0, // readCacheMaxRecordSize
+                true, // writeCacheEnabled
                 false, // validateChecksum (desperation option for restart).
                 createTime,//
                 new ChecksumUtility(), // checker (root blocks generated but not saved).
                 false // alternateRootBlock
         );
         
-        buf = new DiskOnlyStrategy(maximumExtent, md);
-        
+        buf = new DiskOnlyStrategy(maximumExtent, //
+//                Long.valueOf(Options.DEFAULT_MINIMUM_EXTENSION), 
+                md);
+
     }
 
     /**
@@ -345,21 +356,21 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
 
             } finally {
 
-                if (writeCache != null) {
-
-                    try {
-
-                        DirectBufferPool.INSTANCE.release(writeCache);
-
-                        writeCache = null;
-
-                    } catch (Throwable t) {
-
-                        log.error(t, t);
-
-                    }
-
-                }
+//                if (writeCache != null) {
+//
+//                    try {
+//
+//                        DirectBufferPool.INSTANCE.release(writeCache);
+//
+//                        writeCache = null;
+//
+//                    } catch (Throwable t) {
+//
+//                        log.error(t, t);
+//
+//                    }
+//
+//                }
 
                 if (LRUNexus.INSTANCE != null) {
 
@@ -435,8 +446,11 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         public ResourceMetadata(final TemporaryRawStore store,
                 final String fileStr) {
 
-            super(fileStr, /* store.buf.getExtent(), */store.uuid,
-                    store.createTime);
+            super(fileStr, // store.buf.getExtent()
+                    store.uuid,//
+                    store.createTime, //
+                    0L// commitTime
+            );
 
         }
 
@@ -468,7 +482,8 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
      */
     final public void destroy() {
 
-        close();
+        if(!isOpen())
+            close();
 
     }
 
@@ -541,17 +556,17 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
                 
     }
 
-    final public long allocate(int nbytes) {
-
-        return buf.allocate(nbytes);
-        
-    }
-
-    final public void update(long addr, int off, ByteBuffer data) {
-
-        buf.update(addr, off, data);
-        
-    }
+//    final public long allocate(int nbytes) {
+//
+//        return buf.allocate(nbytes);
+//        
+//    }
+//
+//    final public void update(long addr, int off, ByteBuffer data) {
+//
+//        buf.update(addr, off, data);
+//        
+//    }
 
     /**
      * The maximum length of a record that may be written on the store.
@@ -568,5 +583,11 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IUpdateSt
         return buf.getCounters();
         
     }
+
+	@Override
+	public void delete(long addr) {
+		// void
+		
+	}
 
 }

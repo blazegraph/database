@@ -61,7 +61,7 @@ cp -v $LAS/LoadBalancerServer/logicalService*/*/counters* $targetDir/counters
 
 # Copy the index dumps if you are running the lubm test harness.
 if [ -d "$NAS/lubm" ]; then
-	cp -vr $NAS/lubm/*indexDumps* $targetDir/indexDumps
+	cp -vr $NAS/*indexDumps* $targetDir/indexDumps
 fi
 
 # Extract performance counters for analysis.

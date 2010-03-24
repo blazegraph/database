@@ -86,9 +86,9 @@ public class JournalIndex extends BTree {
      *            The metadata record for the index.
      */
     public JournalIndex(final IRawStore store, final Checkpoint checkpoint,
-            final IndexMetadata metadata) {
+            final IndexMetadata metadata, final boolean readOnly) {
 
-        super(store, checkpoint, metadata);
+        super(store, checkpoint, metadata, readOnly);
 
     }
     

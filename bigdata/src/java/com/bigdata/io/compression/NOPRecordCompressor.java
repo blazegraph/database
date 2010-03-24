@@ -43,6 +43,11 @@ import java.nio.ByteBuffer;
  */
 public class NOPRecordCompressor implements IRecordCompressor, Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 7525025093457384099L;
+    
     public static final transient NOPRecordCompressor INSTANCE = new NOPRecordCompressor();
 
     /**

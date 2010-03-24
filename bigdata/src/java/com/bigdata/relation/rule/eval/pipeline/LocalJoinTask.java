@@ -37,8 +37,6 @@ public class LocalJoinTask extends JoinTask {
     final private IBuffer<ISolution[]> solutionBuffer;
     
     /**
-     * @param concurrencyManager
-     * @param indexName
      * @param rule
      * @param joinNexusFactory
      * @param order
@@ -49,7 +47,7 @@ public class LocalJoinTask extends JoinTask {
      * @param solutionBuffer
      */
     public LocalJoinTask(
-            final String indexName, final IRule rule,
+            /*final String indexName, */final IRule rule,
             final IJoinNexus joinNexus, final int[] order,
             final int orderIndex, 
             final IJoinMaster masterProxy,
@@ -57,7 +55,7 @@ public class LocalJoinTask extends JoinTask {
             final IAsynchronousIterator<IBindingSet[]> source,
             final IBuffer<ISolution[]> solutionBuffer) {
 
-        super(indexName, rule, joinNexus, order, orderIndex,
+        super(/*indexName,*/ rule, joinNexus, order, orderIndex,
                 -1/* partitionId */, masterProxy, masterUUID);
 
         if (source == null)

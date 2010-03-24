@@ -1028,36 +1028,14 @@ public class AsynchronousOverflowTask implements Callable<Object> {
         }
 
     }
-    
-    /**
-     * Identify index partitions which are global hot spots and either schedule
-     * them for a move (if this host is at peak CPU, low disk, or swapping
-     * heavily) or a split (if the CPU is underutilized).
-     * <p>
-     * The LBS ranks services based on their average queuing time. When a
-     * service is "highly utilized" according to the LBS, we consider its
-     * resource utilization. If the service is utilizing most of its CPU, if it
-     * is swapping heavily, or if it is low on disk, then we need to shed an
-     * index partition in order to reduce the workload. On the other hand, if
-     * the service is NOT utilizing a significant percentage of its CPU then its
-     * concurrency generally can be improved by splitting a "hot" index
-     * partition since this allows the host to allocate two cores to handle the
-     * same key range which was previously being serviced by a single core.
-     * 
-     * @return
-     */
-    protected List<AbstractTask> chooseMoveOrSplit() {
 
-        /*
-         * Figure out if this data service is considered to be highly utilized.
-         * 
-         * Note: We consult the load balancer service on this since it is able
-         * to put the load of this service into perspective by also considering
-         * the load on the other services in the federation.
-         * 
-         * Note: This is robust to failure of the load balancer service. When it
-         * is not available we simply do not consider index partition moves.
-         */
+    /**
+     * Return the {@link ILoadBalancerService} if it can be discovered.
+     * 
+     * @return the {@link ILoadBalancerService} if it can be discovered and
+     *         otherwise <code>null</code>.
+     */
+    protected ILoadBalancerService getLoadBalancerService() {
 
         // lookup the load balancer service.
         final ILoadBalancerService loadBalancerService;
@@ -1071,7 +1049,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
             log.warn("Could not discover the load balancer service", ex);
 
-            return EMPTY_LIST;
+            return null;
             
         }
         
@@ -1079,9 +1057,29 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
             log.warn("Could not discover the load balancer service");
 
-            return EMPTY_LIST;
+            return null;
             
         }
+
+        return loadBalancerService;
+        
+    }
+
+    /**
+     * Figure out if this data service is considered to be highly utilized, in
+     * which case the DS should shed some index partitions.
+     * <p>
+     * Note: We consult the load balancer service on this since it is able to
+     * put the load of this service into perspective by also considering the
+     * load on the other services in the federation.
+     * 
+     * @param loadBalancerService
+     *            The load balancer.
+     */
+    protected boolean shouldMove(final ILoadBalancerService loadBalancerService) {
+
+        if (loadBalancerService == null)
+            throw new IllegalArgumentException();
 
         // inquire if this service is highly utilized.
         final boolean highlyUtilizedService;
@@ -1096,7 +1094,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
             log.warn("Could not determine if this data service is highly utilized");
             
-            return EMPTY_LIST;
+            return false;
             
         }
 
@@ -1105,7 +1103,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             if(log.isInfoEnabled())
                 log.info("Service is not highly utilized.");
             
-            return EMPTY_LIST;
+            return false;
             
         }
         
@@ -1141,14 +1139,15 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             // running out of disk (tmp dir).
             (resourceScores.dataDirBytesFree < Bytes.gigabyte * .5)
             ;
-        
-        if (shouldMove) {
 
-            return chooseMoves(loadBalancerService);
-            
-        }
+        return shouldMove;
+//        if (shouldMove) {
+//
+//            return chooseMoves(loadBalancerService);
+//            
+//        }
 
-        return chooseHotSplits();
+//        return chooseHotSplits();
         
     }
         
@@ -1748,231 +1747,231 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
     }
 
-    /**
-     * Return tasks which will split "hot" index partitions.
-     * <p>
-     * Note: This method should not be invoked: (a) unless the LBS deems that
-     * this service is heavily utilized; and (b) if the local host and service
-     * performance counters indicate exhaustion of any critical resources (CPU,
-     * RAM or DISK).
-     * <p>
-     * Note: This chooses "hot splits" based on the assumption that an index
-     * partition with a high {@link Score} (which means a lot of write time)
-     * will continue to grow. If there are heavy writes on an index partition
-     * but it does not continue to grow, then it is possible that the index
-     * partition will later be JOINed with itself.
-     */
-    protected List<AbstractTask> chooseHotSplits() {
-
-        // just those indices that survive the cuts we impose here.
-        final List<Score> scores = new LinkedList<Score>();
-
-        // filter the scores for just the most active indices.
-        for (Score score : overflowMetadata.getScores()) {
-
-            final String name = score.name;
-            
-            if(isUsed(name)) continue;
-
-            if (overflowMetadata.isCopied(name)) {
-
-                /*
-                 * The write set from the old journal was already copied to the
-                 * new journal so we do not need to do a build.
-                 */
-
-                putUsed(name, "wasCopied(name=" + name + ")");
-
-                continue;
-                
-            }
-
-            // test for indices that have been split, joined, or moved.
-            final StaleLocatorReason reason = resourceManager
-                    .getIndexPartitionGone(score.name);
-
-            if (reason != null) {
-                
-                /*
-                 * Note: The counters are accumulated over the life of the
-                 * journal. This tells us that the named index was moved, split,
-                 * or joined sometimes during the live of that old journal.
-                 * Since it is gone we skip over it here.
-                 */
-                
-                if (log.isInfoEnabled())
-                    log.info("Skipping index: name=" + score.name + ", reason="
-                            + reason);
-                
-                continue;
-                
-            }
-            
-            // get the view metadata.
-            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
-            
-            if (vmd == null) {
-
-                /*
-                 * Note: The counters are accumulated over the live of the
-                 * journal. This tells us that the named index was dropped
-                 * sometimes during the life cycle of that old journal. Since it
-                 * is gone we skip over it here.
-                 */
-
-                if (log.isInfoEnabled())
-                    log.info("Skipping index: name=" + name
-                            + ", reason=dropped");
-
-                continue;
-
-            }
-
-            if (vmd.pmd.getSourcePartitionId() != -1) {
-
-                /*
-                 * This index is currently being moved onto this data service so
-                 * it is NOT a candidate for a split, join, or move.
-                 */
-
-                if (log.isInfoEnabled())
-                    log.info("Skipping index: name=" + name
-                            + ", reason=moveInProgress");
-
-                continue;
-
-            }
-
-            /*
-             * Don't hot split an index partition if it is the only partition
-             * for that index and scatter splits are enabled.
-             */
-            if (vmd.getIndexPartitionCount() == 1
-                    && resourceManager.scatterSplitEnabled
-                    && vmd.indexMetadata.getScatterSplitConfiguration()
-                            .isEnabled()) {
-
-                if (log.isInfoEnabled())
-                    log.info("Skipping index: name=" + name
-                            + ", reason=preferScatterSplit");
-
-                continue;
-
-            }
-
-            /*
-             * If the Score is high in the ordinal ranking or above a threshold
-             * in the double precision rank then we will consider a hot split
-             * for this index partition.
-             */
-            if (score.rank >= scores.size() - 2 || score.drank > .8) {
-
-                /*
-                 * There must be enough data in the index partition to make it
-                 * worth while to split.
-                 * 
-                 * Note: Avoid hot splits which do not lead to increased
-                 * concurrency.
-                 * 
-                 * For example, an index which is hot for tailSplits is NOT a
-                 * good candidate for a hot split since only one of the
-                 * resulting index partitions (the rightSibling) will have a
-                 * significant workload.
-                 * 
-                 * FIXME However, there are other conditions under which hot
-                 * splits do not help. For instance, if the indices are all more
-                 * or less equally active but the workload is not high enough to
-                 * increase the CPU utilization. [This condition occurs when we
-                 * use a counter with some fast high bits to randomly distribute
-                 * writes.]
-                 * 
-                 * FIXME Even worse, there is nothing to prevent a split from
-                 * being hot split again. That is, this acceleration term does
-                 * not take history into account.
-                 */
-                if (vmd.getPercentOfSplit() > resourceManager.hotSplitThreshold
-                        && vmd.percentTailSplits < .25) {
-
-                    // this is an index that we will consider again below.
-                    scores.add(score);
-
-                }
-
-            }
-            
-        }
-
-        // convert to an array.
-        final Score[] a = scores.toArray(new Score[0]);
-        
-        // put into descending order (highest score first).
-        Arrays.sort(a, new Score.DESC());
-        
-        /*
-         * Now consider the move candidates in their assigned priority order.
-         */
-        int nsplit = 0;
-        final int maxHotSplits = a.length; // @todo config maxHotSplits
-
-        final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxHotSplits);
-        
-        // the surviving scores in order from highest to lowest.
-        final Iterator<Score> itr = Arrays.asList(a).iterator();
-        
-        while (nsplit < maxHotSplits && itr.hasNext()) {
-
-            final Score score = itr.next();
-            
-            final String name = score.name;
-            
-            // the highest priority candidate for a split.
-            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
-            
-            if (log.isInfoEnabled())
-                log.info("Considering hot split candidate: " + vmd);
-
-            if (vmd.percentTailSplits >= resourceManager.tailSplitThreshold) {
-
-                /*
-                 * Do an index (tail) split task.
-                 */
-
-                final AbstractTask task = new SplitTailTask(vmd, null/* moveTarget */);
-
-                // add to set of tasks to be run.
-                tasks.add(task);
-
-                overflowMetadata.setAction(vmd.name,
-                        OverflowActionEnum.TailSplit);
-
-                putUsed(name, "tailSplit(name=" + vmd + ")");
-
-                if (log.isInfoEnabled())
-                    log.info("will tailSpl: " + vmd);
-
-                continue;
-
-            }
-            
-            /*
-             * Do a normal split.
-             */
-
-            final AbstractTask task = new SplitIndexPartitionTask(vmd,
-                    (UUID) null/* moveTarget */);
-
-            // add to set of tasks to be run.
-            tasks.add(task);
-
-            overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
-
-            putUsed(name, "willSplit(name=" + vmd + ")");
-
-        } // itr.hasNext()
-
-        return tasks;
-        
-    }
+//    /**
+//     * Return tasks which will split "hot" index partitions.
+//     * <p>
+//     * Note: This method should not be invoked: (a) unless the LBS deems that
+//     * this service is heavily utilized; and (b) if the local host and service
+//     * performance counters indicate exhaustion of any critical resources (CPU,
+//     * RAM or DISK).
+//     * <p>
+//     * Note: This chooses "hot splits" based on the assumption that an index
+//     * partition with a high {@link Score} (which means a lot of write time)
+//     * will continue to grow. If there are heavy writes on an index partition
+//     * but it does not continue to grow, then it is possible that the index
+//     * partition will later be JOINed with itself.
+//     */
+//    protected List<AbstractTask> chooseHotSplits() {
+//
+//        // just those indices that survive the cuts we impose here.
+//        final List<Score> scores = new LinkedList<Score>();
+//
+//        // filter the scores for just the most active indices.
+//        for (Score score : overflowMetadata.getScores()) {
+//
+//            final String name = score.name;
+//            
+//            if(isUsed(name)) continue;
+//
+//            if (overflowMetadata.isCopied(name)) {
+//
+//                /*
+//                 * The write set from the old journal was already copied to the
+//                 * new journal so we do not need to do a build.
+//                 */
+//
+//                putUsed(name, "wasCopied(name=" + name + ")");
+//
+//                continue;
+//                
+//            }
+//
+//            // test for indices that have been split, joined, or moved.
+//            final StaleLocatorReason reason = resourceManager
+//                    .getIndexPartitionGone(score.name);
+//
+//            if (reason != null) {
+//                
+//                /*
+//                 * Note: The counters are accumulated over the life of the
+//                 * journal. This tells us that the named index was moved, split,
+//                 * or joined sometimes during the live of that old journal.
+//                 * Since it is gone we skip over it here.
+//                 */
+//                
+//                if (log.isInfoEnabled())
+//                    log.info("Skipping index: name=" + score.name + ", reason="
+//                            + reason);
+//                
+//                continue;
+//                
+//            }
+//            
+//            // get the view metadata.
+//            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
+//            
+//            if (vmd == null) {
+//
+//                /*
+//                 * Note: The counters are accumulated over the live of the
+//                 * journal. This tells us that the named index was dropped
+//                 * sometimes during the life cycle of that old journal. Since it
+//                 * is gone we skip over it here.
+//                 */
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Skipping index: name=" + name
+//                            + ", reason=dropped");
+//
+//                continue;
+//
+//            }
+//
+//            if (vmd.pmd.getSourcePartitionId() != -1) {
+//
+//                /*
+//                 * This index is currently being moved onto this data service so
+//                 * it is NOT a candidate for a split, join, or move.
+//                 */
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Skipping index: name=" + name
+//                            + ", reason=moveInProgress");
+//
+//                continue;
+//
+//            }
+//
+//            /*
+//             * Don't hot split an index partition if it is the only partition
+//             * for that index and scatter splits are enabled.
+//             */
+//            if (vmd.getIndexPartitionCount() == 1
+//                    && resourceManager.scatterSplitEnabled
+//                    && vmd.indexMetadata.getScatterSplitConfiguration()
+//                            .isEnabled()) {
+//
+//                if (log.isInfoEnabled())
+//                    log.info("Skipping index: name=" + name
+//                            + ", reason=preferScatterSplit");
+//
+//                continue;
+//
+//            }
+//
+//            /*
+//             * If the Score is high in the ordinal ranking or above a threshold
+//             * in the double precision rank then we will consider a hot split
+//             * for this index partition.
+//             */
+//            if (score.rank >= scores.size() - 2 || score.drank > .8) {
+//
+//                /*
+//                 * There must be enough data in the index partition to make it
+//                 * worth while to split.
+//                 * 
+//                 * Note: Avoid hot splits which do not lead to increased
+//                 * concurrency.
+//                 * 
+//                 * For example, an index which is hot for tailSplits is NOT a
+//                 * good candidate for a hot split since only one of the
+//                 * resulting index partitions (the rightSibling) will have a
+//                 * significant workload.
+//                 * 
+//                 * FIXME However, there are other conditions under which hot
+//                 * splits do not help. For instance, if the indices are all more
+//                 * or less equally active but the workload is not high enough to
+//                 * increase the CPU utilization. [This condition occurs when we
+//                 * use a counter with some fast high bits to randomly distribute
+//                 * writes.]
+//                 * 
+//                 * FIXME Even worse, there is nothing to prevent a split from
+//                 * being hot split again. That is, this acceleration term does
+//                 * not take history into account.
+//                 */
+//                if (vmd.getPercentOfSplit() > resourceManager.hotSplitThreshold
+//                        && vmd.percentTailSplits < .25) {
+//
+//                    // this is an index that we will consider again below.
+//                    scores.add(score);
+//
+//                }
+//
+//            }
+//            
+//        }
+//
+//        // convert to an array.
+//        final Score[] a = scores.toArray(new Score[0]);
+//        
+//        // put into descending order (highest score first).
+//        Arrays.sort(a, new Score.DESC());
+//        
+//        /*
+//         * Now consider the move candidates in their assigned priority order.
+//         */
+//        int nsplit = 0;
+//        final int maxHotSplits = a.length; // @todo config maxHotSplits
+//
+//        final List<AbstractTask> tasks = new ArrayList<AbstractTask>(maxHotSplits);
+//        
+//        // the surviving scores in order from highest to lowest.
+//        final Iterator<Score> itr = Arrays.asList(a).iterator();
+//        
+//        while (nsplit < maxHotSplits && itr.hasNext()) {
+//
+//            final Score score = itr.next();
+//            
+//            final String name = score.name;
+//            
+//            // the highest priority candidate for a split.
+//            final ViewMetadata vmd = overflowMetadata.getViewMetadata(name);
+//            
+//            if (log.isInfoEnabled())
+//                log.info("Considering hot split candidate: " + vmd);
+//
+//            if (vmd.percentTailSplits >= resourceManager.tailSplitThreshold) {
+//
+//                /*
+//                 * Do an index (tail) split task.
+//                 */
+//
+//                final AbstractTask task = new SplitTailTask(vmd, null/* moveTarget */);
+//
+//                // add to set of tasks to be run.
+//                tasks.add(task);
+//
+//                overflowMetadata.setAction(vmd.name,
+//                        OverflowActionEnum.TailSplit);
+//
+//                putUsed(name, "tailSplit(name=" + vmd + ")");
+//
+//                if (log.isInfoEnabled())
+//                    log.info("will tailSpl: " + vmd);
+//
+//                continue;
+//
+//            }
+//            
+//            /*
+//             * Do a normal split.
+//             */
+//
+//            final AbstractTask task = new SplitIndexPartitionTask(vmd,
+//                    (UUID) null/* moveTarget */);
+//
+//            // add to set of tasks to be run.
+//            tasks.add(task);
+//
+//            overflowMetadata.setAction(vmd.name, OverflowActionEnum.Split);
+//
+//            putUsed(name, "willSplit(name=" + vmd + ")");
+//
+//        } // itr.hasNext()
+//
+//        return tasks;
+//        
+//    }
 
     /**
      * Examine each named index on the old journal and decide what, if anything,
@@ -2159,8 +2158,18 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             /*
              * Identify index partitions that will be split or moved when this
              * service is highly utilized.
+             * 
+             * Note: This is robust to failure of the load balancer service.
+             * When it is not available we simply do not consider index
+             * partition moves.
              */
-            tasks.addAll(chooseMoveOrSplit());
+            final ILoadBalancerService lbs = getLoadBalancerService();
+            
+            if(lbs != null && shouldMove(lbs)) {
+
+                tasks.addAll(chooseMoves(lbs));
+                
+            }
 
         }
 
@@ -2211,7 +2220,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * 
      * </ul>
      * 
-     * Note: Compacting merges are decided in two passes. First manditory
+     * Note: Compacting merges are decided in two passes. First mandatory
      * compacting merges and splits are identified and a "merge" priority is
      * computed for the remaining index partitions. In the second pass, we
      * consume the remaining index partitions in "merge priority" order,
@@ -2224,6 +2233,20 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      *            for all index partitions.
      * 
      * @return The list of tasks.
+     * 
+     *         FIXME Should schedule builds for all remaining shards and then
+     *         prioritize merges. Merge should do split if size on disk exceeds
+     *         threshold after the merge. If running a build, then withdraw the
+     *         merge task until the build is complete and then reschedule the
+     *         merge task. Merges can run across overflow processing unless that
+     *         specific merge is already a clear candidate for a split (200M+ on
+     *         the disk), and even then we will not lock out overflow if the
+     *         journal is 2x overextended when we start the merge.
+     *         <p>
+     *         Remove all support for splits from this method. Splits are
+     *         decided by {@link CompactingMergeTask}. Run the split logic
+     *         against the {@link IndexSegment} to choose the separatorKeys.
+     *         Then submit the split task.
      */
     protected List<AbstractTask> chooseSplitBuildOrMerge(
             final boolean compactingMerge) {
@@ -2294,8 +2317,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                 
             }
 
-            // manditory merge.
-            if (compactingMerge || vmd.manditoryMerge) {
+            // Mandatory merge.
+            if (compactingMerge || vmd.mandatoryMerge) {
 
                 /*
                  * Mandatory compacting merge.
@@ -2409,29 +2432,8 @@ public class AsynchronousOverflowTask implements Callable<Object> {
 
             }
             
-            /*
-             * Compute a score that will be used to prioritize compacting merges
-             * vs builds for index partitions where either option is allowable.
-             * The higher the score, the more we want to make sure that we do a
-             * compacting merge for that index.
-             * 
-             * Note: The main purpose of an index partition build is to convert
-             * from a write-order to a read-order and permit the release of the
-             * old journal. However, applications which require frequent access
-             * to historical commit points on the old journals will continue to
-             * rely on the write-order journals.
-             * 
-             * @todo if the application requires access to modest amounts of
-             * history then consider a policy where the buffers are retained for
-             * old journals up to the minReleaseAge. Of course, this can run
-             * into memory constraints so that needs to be traded off against
-             * IOWAIT.
-             */
-            final double mergePriority = (vmd.sourceJournalCount - 1) * 3
-                    + vmd.sourceSegmentCount;
-
             // put into priority queue to be processed below.
-            mergeQueue.add(new Priority<ViewMetadata>(mergePriority, vmd));
+            mergeQueue.add(new Priority<ViewMetadata>(vmd.mergePriority, vmd));
             
         } // itr.hasNext()
 

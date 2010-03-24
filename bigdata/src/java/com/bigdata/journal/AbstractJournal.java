@@ -27,16 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -69,7 +65,6 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.rawstore.AbstractRawWormStore;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.rawstore.WormAddressManager;
@@ -546,56 +541,56 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
     }
 
-    /**
-     * Used to allocate the {@link ByteBuffer} for the {@link BufferMode#Disk}
-     * write cache.
-     * 
-     * @param properties
-     *            The properties that will be used to configure the journal.
-     * 
-     * @return The write cache buffer -or- <code>null</code> iff no buffer is
-     *         required (either because the selected {@link BufferMode} does not
-     *         support a write cache, because the journal would be opened in a
-     *         read-only mode, or because the configured write cache capacity
-     *         was ZERO(0)).
-     * 
-     * @see Options#BUFFER_MODE
-     * @see Options#READ_ONLY
-     * @see Options#WRITE_CACHE_CAPACITY
-     */
-    public static ByteBuffer getWriteCache(final Properties properties) {
-
-        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
-                properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
-
-        final boolean readOnly = Boolean.parseBoolean(getProperty(properties,
-                Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
-
-        if (bufferMode.equals(BufferMode.Disk) && !readOnly) {
-
-            final int capacity = Integer.parseInt(getProperty(properties,
-                    Options.WRITE_CACHE_CAPACITY,
-                    Options.DEFAULT_WRITE_CACHE_CAPACITY));
-
-            final int minWriteCacheCapacity = (int) Math.min(
-                    Options.minimumInitialExtent,
-                    Options.minimumWriteCacheCapacity);
-
-            if (capacity > 0 && capacity < minWriteCacheCapacity) {
-
-                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
-                        + " must be ZERO (0) or at least "
-                        + minWriteCacheCapacity + " bytes");
-
-            }
-
-           return ByteBuffer.allocateDirect(capacity);
-            
-        }
-        
-        return null;
-
-    }
+//    /**
+//     * Used to allocate the {@link ByteBuffer} for the {@link BufferMode#Disk}
+//     * write cache.
+//     * 
+//     * @param properties
+//     *            The properties that will be used to configure the journal.
+//     * 
+//     * @return The write cache buffer -or- <code>null</code> iff no buffer is
+//     *         required (either because the selected {@link BufferMode} does not
+//     *         support a write cache, because the journal would be opened in a
+//     *         read-only mode, or because the configured write cache capacity
+//     *         was ZERO(0)).
+//     * 
+//     * @see Options#BUFFER_MODE
+//     * @see Options#READ_ONLY
+//     * @see Options#WRITE_CACHE_CAPACITY
+//     */
+//    public static ByteBuffer getWriteCache(final Properties properties) {
+//
+//        final BufferMode bufferMode = BufferMode.valueOf(getProperty(
+//                properties, Options.BUFFER_MODE, Options.DEFAULT_BUFFER_MODE));
+//
+//        final boolean readOnly = Boolean.parseBoolean(getProperty(properties,
+//                Options.READ_ONLY, "" + Options.DEFAULT_READ_ONLY));
+//
+//        if (bufferMode.equals(BufferMode.Disk) && !readOnly) {
+//
+//            final int capacity = Integer.parseInt(getProperty(properties,
+//                    Options.WRITE_CACHE_CAPACITY,
+//                    Options.DEFAULT_WRITE_CACHE_CAPACITY));
+//
+//            final int minWriteCacheCapacity = (int) Math.min(
+//                    Options.minimumInitialExtent,
+//                    Options.minimumWriteCacheCapacity);
+//
+//            if (capacity > 0 && capacity < minWriteCacheCapacity) {
+//
+//                throw new RuntimeException(Options.WRITE_CACHE_CAPACITY
+//                        + " must be ZERO (0) or at least "
+//                        + minWriteCacheCapacity + " bytes");
+//
+//            }
+//
+//           return ByteBuffer.allocateDirect(capacity);
+//            
+//        }
+//        
+//        return null;
+//
+//    }
     
     /**
      * Resolves the property value (static variant for ctor initialization).
@@ -654,41 +649,41 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * 
      * @see Options
      */
-    protected AbstractJournal(final Properties properties) {
+    protected AbstractJournal(Properties properties) {
         
-        this(properties, getWriteCache(properties));
-        
-    }
-    
-    /**
-     * Create or re-open a journal.
-     * <p>
-     * Note: Creating a new journal registers some internal indices but does NOT
-     * perform a commit. Those indices will become restart safe with the first
-     * commit.
-     * 
-     * @param properties
-     *            The properties as defined by {@link Options}.
-     * @param writeCache
-     *            When non-<code>null</code> and when {@link BufferMode#Disk}
-     *            is selected, this {@link ByteBuffer} will be used as the write
-     *            cache. This allows the same write cache to be used by the next
-     *            journal when the current journal overflows. This is
-     *            necessitated by JVM bug <a
-     *            href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
-     *            6210541</a>
-     *            which describes a failure by
-     *            <code>releaseTemporaryDirectBuffer()</code> to release
-     *            temporary direct {@link ByteBuffer}s that are allocated for
-     *            channel IO.
-     * 
-     * @throws RuntimeException
-     *             If there is a problem when creating, opening, or reading from
-     *             the journal file.
-     * 
-     * @see Options
-     */
-    protected AbstractJournal(Properties properties, final ByteBuffer writeCache) {
+//        this(properties, getWriteCache(properties));
+//        
+//    }
+//    
+//    /**
+//     * Create or re-open a journal.
+//     * <p>
+//     * Note: Creating a new journal registers some internal indices but does NOT
+//     * perform a commit. Those indices will become restart safe with the first
+//     * commit.
+//     * 
+//     * @param properties
+//     *            The properties as defined by {@link Options}.
+//     * @param writeCache
+//     *            When non-<code>null</code> and when {@link BufferMode#Disk}
+//     *            is selected, this {@link ByteBuffer} will be used as the write
+//     *            cache. This allows the same write cache to be used by the next
+//     *            journal when the current journal overflows. This is
+//     *            necessitated by JVM bug <a
+//     *            href="http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8fab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541">
+//     *            6210541</a>
+//     *            which describes a failure by
+//     *            <code>releaseTemporaryDirectBuffer()</code> to release
+//     *            temporary direct {@link ByteBuffer}s that are allocated for
+//     *            channel IO.
+//     * 
+//     * @throws RuntimeException
+//     *             If there is a problem when creating, opening, or reading from
+//     *             the journal file.
+//     * 
+//     * @see Options
+//     */
+//    protected AbstractJournal(Properties properties, final ByteBuffer writeCache) {
 
         boolean create = Boolean.parseBoolean(Options.DEFAULT_CREATE);
         boolean isEmptyFile = false;
@@ -751,6 +746,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 Options.DEFAULT_MAXIMUM_EXTENT, new LongRangeValidator(
                         initialExtent, Long.MAX_VALUE));
         
+        final long minimumExtension = getProperty(Options.MINIMUM_EXTENSION,
+                Options.DEFAULT_MINIMUM_EXTENSION, new LongRangeValidator(
+                        Options.minimumMinimumExtension, Long.MAX_VALUE));
+
         /*
          * Note: The default depends on the AbstractJournal implementation.
          */
@@ -762,13 +761,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 new IntegerRangeValidator(WormAddressManager.MIN_OFFSET_BITS,
                         WormAddressManager.MAX_OFFSET_BITS));
 
-        final int readCacheCapacity = getProperty(Options.READ_CACHE_CAPACITY,
-                Options.DEFAULT_READ_CACHE_CAPACITY, IntegerValidator.GTE_ZERO);
-
-        final int readCacheMaxRecordSize = getProperty(
-                Options.READ_CACHE_MAX_RECORD_SIZE,
-                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE,
-                IntegerValidator.GT_ZERO);
+//        final int readCacheCapacity = getProperty(Options.READ_CACHE_CAPACITY,
+//                Options.DEFAULT_READ_CACHE_CAPACITY, IntegerValidator.GTE_ZERO);
+//
+//        final int readCacheMaxRecordSize = getProperty(
+//                Options.READ_CACHE_MAX_RECORD_SIZE,
+//                Options.DEFAULT_READ_CACHE_MAX_RECORD_SIZE,
+//                IntegerValidator.GT_ZERO);
 
         final boolean createTempFile = Boolean.parseBoolean(getProperty(
                 Options.CREATE_TEMP_FILE, Options.DEFAULT_CREATE_TEMP_FILE));
@@ -844,6 +843,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         final boolean deleteOnExit = Boolean.parseBoolean(getProperty(
                 Options.DELETE_ON_EXIT, Options.DEFAULT_DELETE_ON_EXIT));
 
+        final boolean writeCacheEnabled = Boolean.parseBoolean(getProperty(
+                Options.WRITE_CACHE_ENABLED, Options.DEFAULT_WRITE_CACHE_ENABLED));
+        
         /*
          * "file"
          */
@@ -1011,8 +1013,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     BufferMode.Direct,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, 0/* readCacheCapacity */,
-                    0/* readCacheMaxRecordSize */, null/* writeCache */,
+                    offsetBits, //0/* readCacheCapacity */,
+                    //0/* readCacheMaxRecordSize */,
+                    false, // writeCacheEnabled
+                    //null/* writeCache */,
                     validateChecksum, createTime, checker, alternateRootBlock);
 
             _bufferStrategy = new DirectBufferStrategy(
@@ -1034,8 +1038,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     BufferMode.Mapped, useDirectBuffers, initialExtent,
                     maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, 0/*readCacheCapacity*/,
-                    0/* readCacheMaxRecordSize */, null/* writeCache */,
+                    offsetBits, //0/*readCacheCapacity*/,
+                    //0/* readCacheMaxRecordSize */,
+                    false, // writeCacheEnabled
+                    //null/* writeCache */,
                     validateChecksum, createTime, checker, alternateRootBlock);
 
             /*
@@ -1061,12 +1067,65 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             fileMetadata = new FileMetadata(file, BufferMode.Disk,
                     useDirectBuffers, initialExtent, maximumExtent, create,
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
-                    readOnly ? null : writeCache, validateChecksum,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    //readOnly ? null : writeCache,
+                    writeCacheEnabled,
+                    validateChecksum,
                     createTime, checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
+                    0L/* soft limit for maximumExtent */,
+//                    minimumExtension,
+                    fileMetadata);
+
+            this._rootBlock = fileMetadata.rootBlock;
+
+            break;
+
+        }
+        
+        case DiskWORM: {
+
+            /*
+             * Setup the buffer strategy.
+             */
+
+            fileMetadata = new FileMetadata(file, BufferMode.DiskWORM,
+                    useDirectBuffers, initialExtent, maximumExtent, create,
+                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    //readOnly ? null : writeCache,
+                    writeCacheEnabled,
+                    validateChecksum,
+                    createTime, checker, alternateRootBlock);
+
+            _bufferStrategy = new WORMStrategy(
+                    0L/* soft limit for maximumExtent */,
+                    minimumExtension,
+                    fileMetadata);
+
+            this._rootBlock = fileMetadata.rootBlock;
+
+            break;
+
+        }
+        
+        case DiskRW: {
+
+            /*
+             * Setup the buffer strategy.
+             */
+
+            fileMetadata = new FileMetadata(file, BufferMode.DiskRW,
+                    useDirectBuffers, initialExtent, maximumExtent, create,
+                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    //readOnly ? null : writeCache,
+                    writeCacheEnabled,
+                    validateChecksum,
+                    createTime, checker, alternateRootBlock);
+
+            _bufferStrategy = new RWStrategy(fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1087,12 +1146,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     useDirectBuffers, initialExtent, maximumExtent,
                     true/* create */, isEmptyFile, true/* deleteOnExit */,
                     false/* readOnly */, ForceEnum.No/* forceWrites */,
-                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
-                    writeCache, false/* validateChecksum */, createTime,
+                    offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
+                    writeCacheEnabled, // writeCacheEnabled
+                    //writeCache,
+                    false/* validateChecksum */, createTime,
                     checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
+                    0L/* soft limit for maximumExtent */,
+//                    minimumExtension,
+                    fileMetadata);
 
             this._rootBlock = fileMetadata.rootBlock;
             
@@ -1100,38 +1163,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             
         }
 
-        case BufferedDisk: {
-
-            /*
-             * Setup the buffer strategy.
-             * 
-             * FIXME Must set the initial and maximumExtent from the supplied
-             * DirectBufferPool (or another static instance for that purpose in
-             * which case we just ignore these parameters), not the other way
-             * around. Always use direct buffers for this mode. NO readCache.
-             * 
-             * FIXME Modify FileMetadata to fully buffer the (user?) extent (up
-             * to the available bytes) on restart.
-             */
-
-            if(true)throw new UnsupportedOperationException();
-            
-            fileMetadata = new FileMetadata(file, BufferMode.BufferedDisk,
-                    useDirectBuffers, initialExtent, maximumExtent, create,
-                    isEmptyFile, deleteOnExit, readOnly, forceWrites,
-                    offsetBits, readCacheCapacity, readCacheMaxRecordSize,
-                    readOnly ? null : writeCache, validateChecksum,
-                    createTime, checker, alternateRootBlock);
-
-            _bufferStrategy = new DiskOnlyStrategy(
-                    0L/* soft limit for maximumExtent */, fileMetadata);
-
-            this._rootBlock = fileMetadata.rootBlock;
-
-            break;
-
-        }
-        
         default:
 
             throw new AssertionError();
@@ -1642,91 +1673,101 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             _commitRecord = _getCommitRecord();
 
             /*
-             * Convert all of the unisolated BTree objects into read-historical
-             * BTrees as of the lastCommitTime on the journal. This is done in
-             * order to benefit from any data buffered by those BTrees since
-             * buffered data is data that we don't need to read from disk and we
-             * don't need to de-serialize. This is especially important for
-             * asynchronous overflow processing which performs full index scans
-             * of the BTree's shortly after synchronous overflow process (and
-             * which is the main reason why closeForWrites() exists).
-             * 
-             * Note: The caller already promises that they hold the exclusive
-             * write lock so we don't really need to synchronize on [name2Addr].
-             * 
-             * Note: If we find a dirty mutable BTree then we ignore it rather
-             * than repurposing it. This allows the possibility that there are
-             * uncommitted writes.
+             * FIXME Verify that we can safely convert the writeRetentionQueue
+             * and readOnly flags on the BTree and then re-enable this code
+             * block. The tricky issue is the safe publication of the change to
+             * the writeRetentionQueue field (and populating it with the old
+             * queue's data) and the readOnly field. If those changes are not
+             * safely published then I also need to consider what the side
+             * effects of inconsistent views of those fields might be. One way
+             * to handle the safe publication is using AtomicBoolean and
+             * AtomicReference for those fields.
              */
-            synchronized (_name2Addr) {
-
-                final Iterator<Map.Entry<String, WeakReference<BTree>>> itr = _name2Addr
-                        .indexCacheEntryIterator();
-
-                while (itr.hasNext()) {
-
-                    final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr
-                            .next();
-
-                    final String name = entry.getKey();
-
-                    final BTree btree = entry.getValue().get();
-
-                    if (btree == null) {
-
-                        // Note: Weak reference was cleared.
-                        continue;
-
-                    }
-
-                    if (btree.needsCheckpoint()) {
-
-                        // Note: Don't convert a dirty BTree.
-                        continue;
-
-                    }
-
-                    // Recover the Entry which has the last checkpointAddr.
-                    final Name2Addr.Entry _entry = _name2Addr.getEntry(name);
-
-                    if (_entry == null) {
-
-                        /*
-                         * There must be an Entry for each index in Name2Addr's
-                         * cache.
-                         */
-
-                        throw new AssertionError("No entry: name=" + name);
-
-                    }
-
-                    /*
-                     * Mark the index as read-only (the whole journal no longer
-                     * accepts writes) before placing it in the historical index
-                     * cache (we don't want concurrent requests to be able to
-                     * obtain a BTree that is not marked as read-only from the
-                     * historical index cache).
-                     */
-
-                    btree.setReadOnly(true);
-
-                    /*
-                     * Put the BTree into the historical index cache under that
-                     * checkpointAddr.
-                     * 
-                     * Note: putIfAbsent() avoids the potential problem of
-                     * having more than one object for the same checkpointAddr.
-                     */
-
-                    historicalIndexCache.putIfAbsent(_entry.checkpointAddr,
-                            btree);
-
-                } // next index.
-
-                // discard since no writers are allowed.
-                _name2Addr = null;
-
-            }
+//            /* Convert all of the unisolated BTree objects into read-historical
+//             * BTrees as of the lastCommitTime on the journal. This is done in
+//             * order to benefit from any data buffered by those BTrees since
+//             * buffered data is data that we don't need to read from disk and we
+//             * don't need to de-serialize. This is especially important for
+//             * asynchronous overflow processing which performs full index scans
+//             * of the BTree's shortly after synchronous overflow process (and
+//             * which is the main reason why closeForWrites() exists).
+//             * 
+//             * Note: The caller already promises that they hold the exclusive
+//             * write lock so we don't really need to synchronize on [name2Addr].
+//             * 
+//             * Note: If we find a dirty mutable BTree then we ignore it rather
+//             * than repurposing it. This allows the possibility that there are
+//             * uncommitted writes.
+//             */
+//            synchronized (_name2Addr) {
+//
+//                final Iterator<Map.Entry<String, WeakReference<BTree>>> itr = _name2Addr
+//                        .indexCacheEntryIterator();
+//
+//                while (itr.hasNext()) {
+//
+//                    final java.util.Map.Entry<String, WeakReference<BTree>> entry = itr
+//                            .next();
+//
+//                    final String name = entry.getKey();
+//
+//                    final BTree btree = entry.getValue().get();
+//
+//                    if (btree == null) {
+//
+//                        // Note: Weak reference was cleared.
+//                        continue;
+//
+//                    }
+//
+//                    if (btree.needsCheckpoint()) {
+//
+//                        // Note: Don't convert a dirty BTree.
+//                        continue;
+//
+//                    }
+//
+//                    // Recover the Entry which has the last checkpointAddr.
+//                    final Name2Addr.Entry _entry = _name2Addr.getEntry(name);
+//
+//                    if (_entry == null) {
+//
+//                        /*
+//                         * There must be an Entry for each index in Name2Addr's
+//                         * cache.
+//                         */
+//
+//                        throw new AssertionError("No entry: name=" + name);
+//
+//                    }
+//
+//                    /*
+//                     * Mark the index as read-only (the whole journal no longer
+//                     * accepts writes) before placing it in the historical index
+//                     * cache (we don't want concurrent requests to be able to
+//                     * obtain a BTree that is not marked as read-only from the
+//                     * historical index cache).
+//                     */
+//
+//                    btree.convertToReadOnly();
+//
+//                    /*
+//                     * Put the BTree into the historical index cache under that
+//                     * checkpointAddr.
+//                     * 
+//                     * Note: putIfAbsent() avoids the potential problem of
+//                     * having more than one object for the same checkpointAddr.
+//                     */
+//
+//                    historicalIndexCache.putIfAbsent(_entry.checkpointAddr,
+//                            btree);
+//
+//                } // next index.
+//
+//                // discard since no writers are allowed.
+//                _name2Addr = null;
+//
+//            }
 
             // close();
 
@@ -1991,6 +2032,25 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             }
 
             /*
+             * The buffer strategy has a hook which is used to discard buffered
+             * writes. This is both an optimization (it ensures that those
+             * writes are not asynchronously laid down on the disk) and a
+             * requirement for the WORM store.
+             * 
+             * Note: The WriteCache for the WORM store has internal state giving
+             * the firstOffset of the records in the internal buffer - if we do
+             * not call reset() on that write cache then the firstOffset will be
+             * incorrect and the records will be laid down on the wrong offsets
+             * on the store. This correctness issue does not arise for the RW
+             * store because the WriteCache has the actual offset at which each
+             * record will be written and ordered writes are used to lay down
+             * those records. However, for the WORM store we use a single large
+             * write and require that the data in the buffer exactly matches the
+             * target state on the backing file.
+             */
+            _bufferStrategy.abort();
+
+            /*
              * Discard hard references to any indices. The Name2Addr reference
              * will also be discarded below. This should be sufficient to ensure
              * that any index requested by the methods on the AbstractJournal
@@ -2195,16 +2255,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             if (log.isInfoEnabled())
                 log.info("commitTime=" + commitTime);
 
-            if (commitTime <= _rootBlock.getLastCommitTime()) {
-
-                /*
-                 * The commit times must strictly advance.
-                 */
-
-                throw new IllegalArgumentException();
-
-            }
-
+            assertCommitTimeAdvances(commitTime);
+            
             /*
              * First, run each of the committers accumulating the updated root
              * addresses in an array. In general, these are btrees and they may
@@ -2221,7 +2273,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * See if anything has been written on the store since the last
              * commit.
              */
-            if (_bufferStrategy.getNextOffset() == _rootBlock.getNextOffset()) {
+            if (!_bufferStrategy.requiresCommit(_rootBlock)) {
 
                 /*
                  * No data was written onto the store so the commit can not
@@ -2232,9 +2284,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     log.info("Nothing to commit");
 
                 return 0L;
-
             }
-
+            
             /*
              * Write the commit record onto the store.
              */
@@ -2271,6 +2322,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     .writeCheckpoint();
 
             /*
+             * Call to ensure strategy does everything required for itself
+             * before final root block commit.  At a minimum it must flush
+             * its write cache to the backing file (issue the writes).
+             */
+            _bufferStrategy.commit();
+
+            /*
              * Force application data to stable storage _before_ we update the
              * root blocks. This option guarantees that the application data is
              * stable on the disk before the atomic commit. Some operating
@@ -2280,11 +2338,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * in the loss of application data addressed by the new root blocks
              * (data loss on restart).
              * 
-             * Note: We do not force the file metadata to disk
+             * Note: We do not force the file metadata to disk. If that is done,
+             * it will be done by a force() after we write the root block on the
+             * disk.
              */
             if (doubleSync) {
 
-                _bufferStrategy.force(false);
+                _bufferStrategy.force(false/* metadata */);
 
             }
 
@@ -2332,12 +2392,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 }
 
                 final long lastCommitTime = commitTime;
+                final long metaStartAddr = _bufferStrategy.getMetaStartAddr();
+                final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
 
                 // Create the new root block.
                 final IRootBlockView newRootBlock = new RootBlockView(!old
                         .isRootBlock0(), old.getOffsetBits(), nextOffset,
                         firstCommitTime, lastCommitTime, newCommitCounter,
                         commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
+                        metaStartAddr, metaBitsAddr, old.getStoreType(),
                         old.getCreateTime(), old.getCloseTime(), checker);
 
                 _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
@@ -2375,6 +2438,31 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
+    /**
+     * Method verifies that the commit time strictly advances on the local store
+     * by checking against the current root block.
+     * 
+     * @param commitTime
+     *            The proposed commit time.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>commitTime</i> is LTE the value reported by
+     *             {@link IRootBlockView#getLastCommitTime()}.
+     */
+    protected void assertCommitTimeAdvances(final long commitTime) {
+
+        if (commitTime <= _rootBlock.getLastCommitTime()) {
+
+            /*
+             * The commit times must strictly advance.
+             */
+
+            throw new IllegalArgumentException();
+
+        }
+
+    }
+
     public void force(final boolean metadata) {
 
         assertOpen();
@@ -2387,6 +2475,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         return _bufferStrategy.size();
         
+    }
+    
+    public long write(ByteBuffer data, long oldAddr) {
+        return _bufferStrategy.write(data, oldAddr);
+    }
+    
+    public void delete(long addr) {
+        _bufferStrategy.delete(addr);
     }
     
     public long write(final ByteBuffer data) {
@@ -2572,7 +2668,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         } else {
 
             /*
-             * Reload the btree from its checkpoint address.
+             * Reload the mutable btree from its checkpoint address.
              * 
              * Note: This is the live view of the B+Tree. In this specific case
              * we DO NOT use the canonicalizing mapping since we do not want
@@ -2721,7 +2817,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         } else {
 
             /*
-             * Reload the btree from its root address.
+             * Reload the mutable btree from its root address.
              */
 
             ndx = (CommitRecordIndex) BTree.load(this, addr);
@@ -2897,7 +2993,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             /*
              * Resolve the address of the historical Name2Addr object using the
              * canonicalizing object cache. This prevents multiple historical
-             * Name2Addr objects springing into existance for the same commit
+             * Name2Addr objects springing into existence for the same commit
              * record.
              */
             final Name2Addr name2Addr = (Name2Addr) getIndex(checkpointAddr);
@@ -3214,26 +3310,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
 
     /*
-     * IStoreSerializer
-     */
-    
-    final public Object deserialize(byte[] b, int off, int len) {
-        return _bufferStrategy.deserialize(b, off, len);
-    }
-
-    final public Object deserialize(byte[] b) {
-        return _bufferStrategy.deserialize(b);
-    }
-
-    final public Object deserialize(ByteBuffer buf) {
-        return _bufferStrategy.deserialize(buf);
-    }
-
-    final public byte[] serialize(Object obj) {
-        return _bufferStrategy.serialize(obj);
-    }
-
-    /*
      * IAddressManager
      */
 
@@ -3244,11 +3320,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     final public int getByteCount(long addr) {
         return _bufferStrategy.getByteCount(addr);
     }
-
-    final public void packAddr(DataOutput out, long addr) throws IOException {
-        _bufferStrategy.packAddr(out, addr);
-    }
-
+    
     final public long toAddr(int nbytes, long offset) {
         return _bufferStrategy.toAddr(nbytes, offset);
     }
@@ -3257,24 +3329,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return _bufferStrategy.toString(addr);
     }
 
-    final public long unpackAddr(DataInput in) throws IOException {
-        return _bufferStrategy.unpackAddr(in);
-    }
-
     final public int getOffsetBits() {
-        
-        return ((AbstractRawWormStore)_bufferStrategy).getOffsetBits();
-        
+        return _bufferStrategy.getOffsetBits();
     }
     
     /**
      * The maximum length of a record that may be written on the store.
      */
     final public int getMaxRecordSize() {
-
-        return ((AbstractRawWormStore) _bufferStrategy).getAddressManager()
-                .getMaxByteCount();
-
+        return _bufferStrategy.getMaxRecordSize();
     }
 
 }

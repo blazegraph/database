@@ -120,8 +120,10 @@ abstract public class AbstractTestCase
         log.info("\n\n================:BEGIN:" + testCase.getName()
                 + ":BEGIN:====================");
 
-        // flush everything before/after a unit test.
-        LRUNexus.INSTANCE.discardAllCaches();
+        if (LRUNexus.INSTANCE != null) {
+            // flush everything before/after a unit test.
+            LRUNexus.INSTANCE.discardAllCaches();
+        }
         
     }
 
@@ -130,8 +132,10 @@ abstract public class AbstractTestCase
      */
     protected void tearDown(final ProxyTestCase testCase) throws Exception {
 
-        // flush everything before/after a unit test.
-        LRUNexus.INSTANCE.discardAllCaches();
+        if (LRUNexus.INSTANCE != null) {
+            // flush everything before/after a unit test.
+            LRUNexus.INSTANCE.discardAllCaches();
+        }
         
         final long elapsed = System.currentTimeMillis() - begin;
         

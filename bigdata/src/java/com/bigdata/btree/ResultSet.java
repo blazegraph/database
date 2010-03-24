@@ -75,12 +75,17 @@ import com.bigdata.service.IDataService;
  */
 public class ResultSet implements ILeafData, Externalizable {
 
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1334143885190084268L;
+
     protected transient static final Logger log = Logger.getLogger(ResultSet.class);
 
     protected transient static final boolean INFO = log.isInfoEnabled();
 
     protected transient static final boolean DEBUG = log.isDebugEnabled();
-    
+
     /** true iff keys were requested. */
     private boolean sendKeys;
 

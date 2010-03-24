@@ -28,14 +28,14 @@ import org.openrdf.rio.RDFWriter;
 
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.store.BNS;
+import com.bigdata.rdf.store.BD;
 
 /**
  * An implementation of the RDFWriter interface that writes RDF documents in
  * XML-serialized RDF format using a private extension of designed to support
  * the interchange of statement-level provenance.
  * 
- * @see BNS#SID
+ * @see BD#SID
  */
 public class RDFXMLWriter implements RDFWriter {
 
@@ -105,7 +105,7 @@ public class RDFXMLWriter implements RDFWriter {
 			setNamespace("rdf", RDF.NAMESPACE, false);
 
             // Namespace the [graph] attribute.
-            setNamespace("bigdata", BNS.NAMESPACE, false);
+            setNamespace("bigdata", BD.NAMESPACE, false);
 
 			writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
@@ -273,11 +273,11 @@ public class RDFXMLWriter implements RDFWriter {
                  */
                 if (context instanceof BNode) {
                     BNode bNode = (BNode)context;
-                    writeAttribute(BNS.NAMESPACE, BNS.SID, bNode.getID());
+                    writeAttribute(BD.NAMESPACE, BD.SID.getLocalName(), bNode.getID());
                 }
                 else {
                     URI uri = (URI)context;
-                    writeAttribute(BNS.NAMESPACE, BNS.SID, uri.toString());
+                    writeAttribute(BD.NAMESPACE, BD.SID.getLocalName(), uri.toString());
                 }
             }
             
@@ -288,7 +288,7 @@ public class RDFXMLWriter implements RDFWriter {
                 
                 if(type != null) {
                     
-                    writeAttribute(BNS.NAMESPACE, BNS.STATEMENT_TYPE, type.toString());
+                    writeAttribute(BD.NAMESPACE, BD.STATEMENT_TYPE.getLocalName(), type.toString());
                     
                 }
                 

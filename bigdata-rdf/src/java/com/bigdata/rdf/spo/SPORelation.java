@@ -48,6 +48,7 @@ import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.IndexMetadata;
@@ -55,7 +56,6 @@ import com.bigdata.btree.filter.FilterConstructor;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.isolation.IConflictResolver;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.proc.BatchRemove;
 import com.bigdata.btree.proc.LongAggregator;
 import com.bigdata.btree.raba.codec.EmptyRabaValueCoder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
@@ -75,17 +75,21 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.IRawTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.AbstractRelation;
+import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.relation.rule.Constant;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IConstant;
 import com.bigdata.relation.rule.IPredicate;
+import com.bigdata.relation.rule.ISolutionExpander;
 import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.IVariableOrConstant;
 import com.bigdata.relation.rule.Var;
 import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.AbstractSolutionBuffer.InsertSolutionBuffer;
+import com.bigdata.service.DataService;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -828,14 +832,27 @@ public class SPORelation extends AbstractRelation<ISPO> {
         public boolean resolveConflict(IIndex writeSet, ITuple txTuple,
                 ITuple currentTuple) throws Exception {
 
-            if (txTuple.isDeletedVersion() && currentTuple.isDeletedVersion()) {
-
-//                System.err.println("Resolved retract/retract conflict");
-                
-                // retract/retract is not a conflict.
-                return true;
-
-            }
+            /*
+             * Note: In fact, retract-retract conflicts SHOULD NOT be resolved
+             * because retracts are often used to remove an old property value
+             * when a new value will be assigned for that property. For example,
+             * 
+             * tx1: -red, +green
+             * 
+             * tx2: -red, +blue
+             * 
+             * if we resolve the retract-retract conflict, then we will get
+             * {green,blue} after the transactions run, rather than either
+             * {green} or {blue}.
+             */
+//            if (txTuple.isDeletedVersion() && currentTuple.isDeletedVersion()) {
+//
+////                System.err.println("Resolved retract/retract conflict");
+//                
+//                // retract/retract is not a conflict.
+//                return true;
+//
+//            }
 
             if (!txTuple.isDeletedVersion() && !currentTuple.isDeletedVersion()) {
 
@@ -1042,6 +1059,24 @@ public class SPORelation extends AbstractRelation<ISPO> {
          * on allocation costs, formatting the from/to keys, etc.
          */
 
+//        if (predicate.getPartitionId() != -1) {
+//
+//            /*
+//             * Note: This handles a read against a local index partition.
+//             * 
+//             * Note: This does not work here because it has the federation's
+//             * index manager rather than the data service's index manager. That
+//             * is because we always resolve relations against the federation
+//             * since their metadata is stored in the global row store. Maybe
+//             * this could be changed if we developed the concept of a
+//             * "relation shard" accessed the metadata via a catalog and which
+//             * was aware that only one index shard could be resolved locally.
+//             */
+//
+//            return getAccessPathForIndexPartition(predicate);
+//
+//        }
+
         return _getAccessPath(predicate);
               
     }
@@ -1066,6 +1101,137 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+    /**
+     * This handles a request for an access path that is restricted to a
+     * specific index partition.
+     * <p>
+     * Note: This path is used with the scale-out JOIN strategy, which
+     * distributes join tasks onto each index partition from which it needs to
+     * read. Those tasks constrain the predicate to only read from the index
+     * partition which is being serviced by that join task.
+     * <p>
+     * Note: Since the relation may materialize the index views for its various
+     * access paths, and since we are restricted to a single index partition and
+     * (presumably) an index manager that only sees the index partitions local
+     * to a specific data service, we create an access path view for an index
+     * partition without forcing the relation to be materialized.
+     * <p>
+     * Note: Expanders ARE NOT applied in this code path. Expanders require a
+     * total view of the relation, which is not available during scale-out
+     * pipeline joins.
+     * 
+     * @param indexManager
+     *            This MUST be the data service local index manager so that the
+     *            returned access path will read against the local shard.
+     * @param predicate
+     *            The predicate.
+     * 
+     * @throws IllegalArgumentException
+     *             if either argument is <code>null</code>.
+     * @throws IllegalArgumentException
+     *             unless the {@link IIndexManager} is a <em>local</em> index
+     *             manager providing direct access to the specified shard.
+     * @throws IllegalArgumentException
+     *             unless the predicate identifies a specific shard using
+     *             {@link IPredicate#getPartitionId()}.
+     * 
+     * @todo Raise this method into the {@link IRelation} interface.
+     */
+    public IAccessPath<ISPO> getAccessPathForIndexPartition(
+            final IIndexManager indexManager, //
+            final IPredicate<ISPO> predicate//
+            ) {
+
+// Note: This is the federation's index manager _always_.
+//        final IIndexManager indexManager = getIndexManager();
+
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+
+        if (indexManager instanceof IBigdataFederation<?>) {
+
+            /*
+             * This will happen if you fail to re-create the JoinNexus within
+             * the target execution environment.
+             * 
+             * This is disallowed because the predicate specifies an index
+             * partition and expects to have access to the local index objects
+             * for that index partition. However, the index partition is only
+             * available when running inside of the ConcurrencyManager and when
+             * using the IndexManager exposed by the ConcurrencyManager to its
+             * tasks.
+             */
+
+            throw new IllegalArgumentException(
+                    "Expecting a local index manager, not: "
+                            + indexManager.getClass().toString());
+
+        }
+        
+        if (predicate == null)
+            throw new IllegalArgumentException();
+
+        final int partitionId = predicate.getPartitionId();
+
+        if (partitionId == -1) // must be a valid partition identifier.
+            throw new IllegalArgumentException();
+
+        // @todo This condition should probably be an error since the expander will be ignored.
+//        if (predicate.getSolutionExpander() != null)
+//            throw new IllegalArgumentException();
+
+        if (predicate.getRelationCount() != 1) {
+
+            /*
+             * This is disallowed. The predicate must be reading on a single
+             * local index partition, not a view comprised of more than one
+             * index partition.
+             * 
+             * @todo In fact, we could allow a view here as long as all parts of
+             * the view are local. That would be relevant when the other view
+             * component was a shard of a focusStore for parallel decomposition
+             * of RDFS closure, etc.
+             */
+            
+            throw new IllegalStateException();
+            
+        }
+        
+        final String namespace = getNamespace();//predicate.getOnlyRelationName();
+
+        /*
+         * Find the best access path for that predicate.
+         */
+        final SPOKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(predicate,
+                keyArity);
+
+        // The name of the desired index partition.
+        final String name = DataService.getIndexPartitionName(namespace + "."
+                + keyOrder.getIndexName(), predicate.getPartitionId());
+
+        /*
+         * Note: whether or not we need both keys and values depends on the
+         * specific index/predicate.
+         * 
+         * Note: If the timestamp is a historical read, then the iterator will
+         * be read only regardless of whether we specify that flag here or not.
+         */
+//      * Note: We can specify READ_ONLY here since the tail predicates are not
+//      * mutable for rule execution.
+        final int flags = IRangeQuery.KEYS | IRangeQuery.VALS;// | IRangeQuery.READONLY;
+
+        final long timestamp = getTimestamp();//getReadTimestamp();
+        
+        // MUST be a local index view.
+        final ILocalBTreeView ndx = (ILocalBTreeView) indexManager
+                .getIndex(name, timestamp);
+
+        return new SPOAccessPath(indexManager, timestamp, predicate,
+                keyOrder, ndx, flags, getChunkOfChunksCapacity(),
+                getChunkCapacity(), getFullyBufferedReadThreshold()).init();
+
+    }
+    
     /**
      * Core impl.
      * 
@@ -1169,7 +1335,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
         return distinctTermScan(keyOrder,/* termIdFilter */null);
         
     }
-    
+
     /**
      * Efficient scan of the distinct term identifiers that appear in the first
      * position of the keys for the statement index corresponding to the
@@ -1181,6 +1347,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            The selected index order.
      * 
      * @return An iterator visiting the distinct term identifiers.
+     * 
+     * @todo add the ability to specify {@link IRangeQuery#PARALLEL} here for
+     *       fast scans across multiple shards when chunk-wise order is Ok.
      */
     public IChunkedIterator<Long> distinctTermScan(
             final IKeyOrder<ISPO> keyOrder, final ITermIdFilter termIdFilter) {
@@ -1450,11 +1619,13 @@ public class SPORelation extends AbstractRelation<ISPO> {
     /**
      * Deletes {@link SPO}s, writing on the statement indices in parallel.
      * <p>
+     * Note: The {@link ISPO#isModified()} flag is set by this method.
+     * <p>
      * Note: This does NOT write on the justifications index. If justifications
-     * are being maintained then the {@link ISolution}s MUST report binding
-     * sets and an {@link InsertSolutionBuffer} MUST be used that knows how to
-     * write on the justifications index AND delegate writes on the statement
-     * indices to this method.
+     * are being maintained then the {@link ISolution}s MUST report binding sets
+     * and an {@link InsertSolutionBuffer} MUST be used that knows how to write
+     * on the justifications index AND delegate writes on the statement indices
+     * to this method.
      * <p>
      * Note: This does NOT perform truth maintenance!
      * <p>
@@ -1462,7 +1633,8 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * (statements that need to be deleted because they are about a statement
      * that is being deleted).
      * 
-     * @see AbstractTripleStore#removeStatements(IChunkedOrderedIterator, boolean)
+     * @see AbstractTripleStore#removeStatements(IChunkedOrderedIterator,
+     *      boolean)
      * @see SPOAccessPath#removeAll()
      */
     public long delete(final IChunkedOrderedIterator<ISPO> itr) {
@@ -1490,12 +1662,34 @@ public class SPORelation extends AbstractRelation<ISPO> {
     }
 
     /**
+     * Deletes {@link SPO}s, writing on the statement indices in parallel.
+     * <p>
+     * Note: The {@link ISPO#isModified()} flag is set by this method.
+     * <p>
+     * Note: This does NOT write on the justifications index. If justifications
+     * are being maintained then the {@link ISolution}s MUST report binding sets
+     * and an {@link InsertSolutionBuffer} MUST be used that knows how to write
+     * on the justifications index AND delegate writes on the statement indices
+     * to this method.
+     * <p>
+     * Note: This does NOT perform truth maintenance!
+     * <p>
+     * Note: This does NOT compute the closure for statement identifiers
+     * (statements that need to be deleted because they are about a statement
+     * that is being deleted).
+     * 
      * Note: The statements are inserted into each index in parallel. We clone
      * the statement[] and sort and bulk load each statement index in parallel
-     * using a thread pool.
+     * using a thread pool. All mutation to the statement indices goes through
+     * this method.
      * 
      * @param a
-     *            An {@link SPO}[].
+     *            An {@link ISPO}[] of the statements to be written onto the
+     *            statement indices. For each {@link ISPO}, the
+     *            {@link ISPO#isModified()} flag will be set iff the tuple
+     *            corresponding to the statement was : (a) inserted; (b) updated
+     *            (state change, such as to the {@link StatementEnum} value), or
+     *            (c) removed.
      * @param numStmts
      *            The #of elements of that array that will be written.
      * @param filter
@@ -1534,43 +1728,60 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
+        /*
+         * When true, mutations on the primary index (SPO or SPOC) will be
+         * reported. That metadata is used to set the isModified flag IFF the
+         * tuple corresponding to the statement in the indices was (a) inserted;
+         * (b) modified; or (c) removed.
+         */
+        final boolean reportMutation = true;
+        
         if (keyArity == 3) {
 
             tasks.add(new SPOIndexWriter(this, a, numStmts, false/* clone */,
-                    SPOKeyOrder.SPO, filter, sortTime, insertTime, mutationCount));
+                    SPOKeyOrder.SPO, filter, sortTime, insertTime, mutationCount,
+                    reportMutation));
     
             if (!oneAccessPath) {
     
                 tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.POS, filter, sortTime, insertTime, mutationCount));
+                        SPOKeyOrder.POS, filter, sortTime, insertTime, mutationCount,
+                        false/*reportMutation*/));
     
                 tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.OSP, filter, sortTime, insertTime, mutationCount));
+                        SPOKeyOrder.OSP, filter, sortTime, insertTime, mutationCount,
+                        false/*reportMutation*/));
     
             }
-            
+
         } else {
-            
+
             tasks.add(new SPOIndexWriter(this, a, numStmts, false/* clone */,
-                    SPOKeyOrder.SPOC, filter, sortTime, insertTime, mutationCount));
-    
+                    SPOKeyOrder.SPOC, filter, sortTime, insertTime,
+                    mutationCount, reportMutation));
+
             if (!oneAccessPath) {
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.POCS, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.OCSP, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.CSPO, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.PCSO, filter, sortTime, insertTime, mutationCount));
-    
-                tasks.add(new SPOIndexWriter(this, a, numStmts, true/* clone */,
-                        SPOKeyOrder.SOPC, filter, sortTime, insertTime, mutationCount));
-    
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.POCS, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.OCSP, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.CSPO, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.PCSO, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexWriter(this, a, numStmts,
+                        true/* clone */, SPOKeyOrder.SOPC, filter, sortTime,
+                        insertTime, mutationCount, false/* reportMutation */));
+
             }
             
         }
@@ -1594,7 +1805,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
             for (int i = 0; i < tasks.size(); i++) {
                 
                 futures.get(i).get();
-                
+
             }
 /*
             elapsed_SPO = futures.get(0).get();
@@ -1637,7 +1848,9 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     /**
      * Delete the {@link SPO}s from the statement indices. Any justifications
-     * for those statements will also be deleted.
+     * for those statements will also be deleted. The {@link ISPO#isModified()}
+     * flag is set by this method if the {@link ISPO} was pre-existing in the
+     * database and was therefore deleted by this operation.
      * 
      * @param stmts
      *            The {@link SPO}s.
@@ -1645,15 +1858,17 @@ public class SPORelation extends AbstractRelation<ISPO> {
      *            The #of elements in that array to be processed.
      * 
      * @return The #of statements that were removed (mutationCount).
-     * 
-     * FIXME This needs to return the mutationCount. Resolve what is actually
-     * being reported. I expect that {@link BatchRemove} only removes those
-     * statements that it finds and that there is no constraint in place to
-     * assure that this method only sees {@link SPO}s known to exist (but
-     * perhaps it does since you can only do this safely for explicit
-     * statements).
      */
     public long delete(final ISPO[] stmts, final int numStmts) {
+
+        if (stmts == null)
+            throw new IllegalArgumentException();
+
+        if (numStmts < 0 || numStmts > stmts.length)
+            throw new IllegalArgumentException();
+
+        if (numStmts == 0)
+            return 0L;
         
         final long begin = System.currentTimeMillis();
 
@@ -1668,59 +1883,63 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         final List<Callable<Long>> tasks = new ArrayList<Callable<Long>>(3);
 
+        /*
+         * When true, mutations on the primary index (SPO or SPOC) will be
+         * reported. That metadata is used to set the isModified flag IFF the
+         * tuple corresponding to the statement in the indices was (a) inserted;
+         * (b) modified; or (c) removed.
+         */
+        final boolean reportMutation = true;
+
         if (keyArity == 3) {
-        
+
             tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                    SPOKeyOrder.SPO, false/* clone */, sortTime, writeTime));
-    
+                    SPOKeyOrder.SPO, false/* clone */, sortTime, writeTime,
+                    mutationCount, reportMutation));
+
             if (!oneAccessPath) {
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.POS, true/* clone */, sortTime,
-                                writeTime));
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.OSP, true/* clone */, sortTime,
-                                writeTime));
-    
-            }
-            
-        } else {
-            
-            tasks.add(new SPOIndexRemover(this, stmts, numStmts,
-                    SPOKeyOrder.SPOC, false/* clone */, sortTime, writeTime));
-    
-            if (!oneAccessPath) {
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.POCS, true/* clone */, sortTime,
-                                writeTime));
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.OCSP, true/* clone */, sortTime,
-                                writeTime));
-    
-                tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.CSPO, true/* clone */, sortTime,
-                                writeTime));
-        
-                        tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.PCSO, true/* clone */, sortTime,
-                                writeTime));
-        
-                        tasks
-                        .add(new SPOIndexRemover(this, stmts, numStmts,
-                                SPOKeyOrder.SOPC, true/* clone */, sortTime,
-                                writeTime));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.POS, true/* clone */, sortTime, writeTime,
+                        mutationCount,
+                        false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.OSP, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
 
             }
-            
+
+        } else {
+
+            tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                    SPOKeyOrder.SPOC, false/* clone */, sortTime, writeTime,
+                    mutationCount, reportMutation));
+
+            if (!oneAccessPath) {
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.POCS, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.OCSP, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.CSPO, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.PCSO, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+                tasks.add(new SPOIndexRemover(this, stmts, numStmts,
+                        SPOKeyOrder.SOPC, true/* clone */, sortTime, writeTime,
+                        mutationCount, false/* reportMutation */));
+
+            }
+
         }
 
         if (justify) {
@@ -1802,7 +2021,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         }
 
-        return numStmts;
+        return mutationCount.get();
         
     }
     

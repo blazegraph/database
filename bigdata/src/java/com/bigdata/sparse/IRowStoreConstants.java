@@ -73,7 +73,7 @@ public interface IRowStoreConstants {
 
     /**
      * A value which indicates that the timestamp will be assigned by the server -
-     * unique timestamps are NOT guarenteed with this constant. If the server
+     * unique timestamps are NOT guaranteed with this constant. If the server
      * assigns the same timestamp to two different writes on the same property
      * values then only one of those property values will be persisted in the
      * index - the other will be <em>overwritten</em> since it will have

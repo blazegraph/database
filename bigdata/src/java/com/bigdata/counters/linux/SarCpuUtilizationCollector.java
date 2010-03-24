@@ -65,9 +65,9 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 //    final protected static boolean DEBUG = log.isDebugEnabled();
 //
 //    /**
-//     * True iff the {@link #log} level is INFO or less.
+//     * True iff the {@link #log} level is log.isInfoEnabled() or less.
 //     */
-//    final protected static boolean INFO = log.isInfoEnabled();
+//    final protected static boolean log.isInfoEnabled() = log.isInfoEnabled();
 
     /**
      * Inner class integrating the current values with the {@link ICounterSet}
@@ -291,19 +291,19 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
         @Override
         protected void readProcess() throws Exception {
             
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("begin");
 
             for(int i=0; i<10 && !getActiveProcess().isAlive(); i++) {
 
-                if(INFO)
+                if(log.isInfoEnabled())
                     log.info("waiting for the readerFuture to be set.");
 
                 Thread.sleep(100/*ms*/);
                 
             }
 
-            if(INFO)
+            if(log.isInfoEnabled())
                 log.info("running");
             
             // The most recently read header.
@@ -312,7 +312,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
             // skip banner.
             final String banner = readLine();
             
-            if(INFO) log.info("banner: " + banner);
+            if(log.isInfoEnabled()) log.info("banner: " + banner);
 
             {
             
@@ -323,7 +323,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
                 // header.
                 header = readLine();
                 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("header: "+header);
 
             }
@@ -337,7 +337,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
                     
                     header = readLine();
 
-                    if (INFO)
+                    if (log.isInfoEnabled())
                         log.info("header: "+header);
 
                     continue;
@@ -353,7 +353,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 //                    final String s = data.substring(0, 11);
 //                    try {
 //                        lastModified = f.parse(s).getTime();
-//                        if(INFO)
+//                        if(log.isInfoEnabled())
 //                            log.info("["
 //                                        + s
 //                                        + "] parsed as milliseconds="
@@ -394,7 +394,7 @@ public class SarCpuUtilizationCollector extends AbstractProcessCollector
 //                final String steal = fields[6];
                 final String idle = fields[7];
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("\n%user=" + user + ", %system=" + system
                             + ", iowait=" + iowait + ", idle="+idle+ "\n" + header + "\n"
                             + data);

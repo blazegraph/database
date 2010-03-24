@@ -91,8 +91,6 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.DataServer.AdministrableDataService;
-import com.bigdata.service.mapred.jini.MapServer;
-import com.bigdata.service.mapred.jini.ReduceServer;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
 import com.sun.jini.admin.DestroyAdmin;
@@ -351,10 +349,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * <code>true</code> iff this is a persistent service (one that you can
      * shutdown and restart).
-     * 
-     * @todo should be false for things like the {@link MapServer} and the
-     *       {@link ReduceServer} if we keep those classes.
      */
+//    * @todo should be false for things like the {@link MapServer} and the
+//    *       {@link ReduceServer} if we keep those classes.
     protected boolean isPersistent() {
         
         return true;
