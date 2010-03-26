@@ -865,11 +865,20 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
 
         this.store = store;
 
+//        /*
+//         * The Memoizer is not used by the mutable B+Tree since it is not safe
+//         * for concurrent operations.
+//         */
+//        memo = !readOnly ? null : new ChildMemoizer(loadChild);
         /*
-         * The Memoizer is not used by the mutable B+Tree since it is not safe
-         * for concurrent operations.
+         * Note: The Memoizer pattern is now used for both mutable and read-only
+         * B+Trees. This is because the real constraint on the mutable B+Tree is
+         * that mutation may not be concurrent with any other operation but
+         * concurrent readers ARE permitted. The UnisolatedReadWriteIndex
+         * explicitly permits concurrent read operations by virtue of using a
+         * ReadWriteLock rather than a single lock.
          */
-        memo = !readOnly ? null : new ChildMemoizer(loadChild);
+        memo = new ChildMemoizer(loadChild);
         
         /*
          * Setup buffer for Node and Leaf objects accessed via top-down
