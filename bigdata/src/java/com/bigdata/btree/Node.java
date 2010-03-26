@@ -2500,10 +2500,18 @@ public class Node extends AbstractNode<Node> implements INodeData {
 
         }
 
-        if (!btree.isReadOnly()) {
+//        if (!btree.isReadOnly()) {
+        if (btree.memo == null) {
 
             /*
              * Optimization for the mutable B+Tree.
+             * 
+             * Note: This optimization depends on the assumption that concurrent
+             * operations are never submitted to the mutable B+Tree. In fact,
+             * the UnisolatedReadWriteIndex *DOES* allow concurrent readers (it
+             * uses a ReentrantReadWriteLock). Therefore this code path is now
+             * expressed conditionally on whether or not the Memoizer object is
+             * initialized by AbstractBTree.
              * 
              * Note: Since the caller is single-threaded for the mutable B+Tree
              * we do not need to use the Memoizer, which just delegates to
