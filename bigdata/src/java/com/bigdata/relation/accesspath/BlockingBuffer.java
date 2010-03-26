@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.util.NoSuchElementException;
 import java.util.Queue;
@@ -51,6 +52,7 @@ import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.NestedSubqueryWithJoinThreadsTask;
 import com.bigdata.striterator.ICloseableIterator;
+import com.bigdata.util.InnerCause;
 
 /**
  * <p>
@@ -233,8 +235,14 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
      */
     private final boolean ordered;
     
+    /**
+     * The future of the producer.
+     */
     private volatile Future future;
     
+    /**
+     * Set the future of the producer feeding the {@link BlockingBuffer}.
+     */
     public void setFuture(final Future future) {
     
         synchronized (this) {
@@ -252,7 +260,7 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
     }
 
     /**
-     * The {@link Future} set by {@link #setFuture(Future)}.
+     * The {@link Future} of the producer feeding the {@link BlockingBuffer}.
      * 
      * @return The {@link Future} -or- <code>null</code> if no {@link Future}
      *         has been set.
@@ -1335,6 +1343,11 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
                     
                 }
 
+                /*
+                 * Note: Cancelling the Future may cause a
+                 * ClosedByInterruptException to be thrown. That will be noticed
+                 * by checkFuture(), which logs this as a warning.
+                 */
                 future.cancel(true/* mayInterruptIfRunning */);
 
             }
@@ -1406,6 +1419,29 @@ public class BlockingBuffer<E> implements IBlockingBuffer<E> {
 
                 } catch (ExecutionException e) {
 
+                    if (InnerCause.isInnerCause(e,
+                            ClosedByInterruptException.class)) {
+
+                        /*
+                         * Note: ClosedByInterruptException indicates that the
+                         * producer was interrupted. This occurs any time the
+                         * iterator is closed prematurely. For example, if there
+                         * is a LIMIT on a query then the join will be broken
+                         * when the limit is satisfied. That causes the
+                         * producer's Future to be cancelled, which means that
+                         * it gets interrupted. This is not an error.
+                         */
+
+                        if (log.isInfoEnabled())
+                            log.info(e.getMessage());
+
+                        // itr will not deliver any more elements.
+                        _close();
+
+                        return;
+
+                    }
+                    
                     log.error(e, e);
 
                     // itr will not deliver any more elements.
