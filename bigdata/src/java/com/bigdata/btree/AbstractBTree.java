@@ -3806,12 +3806,12 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             btreeCounters.bytesRead.addAndGet(bytesRead);
             
         }
-
-        if (Thread.interrupted()) {
-
-            throw new RuntimeException(new InterruptedException());
-
-        }
+// Note: This is not necessary.  The most likely place to be interrupted is in the IO on the raw store.  It is not worth testing for an interrupt here since we are more liklely to notice one in the raw store and this method is low latency except for the potential IO read.
+//        if (Thread.interrupted()) {
+//
+//            throw new RuntimeException(new InterruptedException());
+//
+//        }
 
         /* 
          * Extract the node from the buffer.
