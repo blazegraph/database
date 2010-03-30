@@ -998,31 +998,56 @@ ${postInstallMessage}</echo>
 	<!--                                                                   -->
 	<!--                    STANDALONE FEDERATION TARGETS                  -->
 	<!--                                                                   -->
-		
-<!-- @todo this should explicitly start jini. The problem is metavariables
-     in the jini script.  We can not just use the unit test startLookup
-     target because it has different assumptions about how jar versions
-     are treated.  This could also be addressed by using system properties
-     instead of metavariable substution in startAll.config or by cloning
-     all of the jini config files for standalone. 
-<target name="standalone-start-jini" description="Start the jini services.">
-	<java classname="com.sun.jini.start.ServiceStarter"
-		failonerror="true" fork="true" logerror="true">
-		<classpath refid="runtime.classpath" />
-		<jvmarg value="-Xmx200m" />
-		<jvmarg value="-showversion"/>
-		<jvmarg value="-Djava.security.policy=policy.all"/>
-		<arg value="src/resources/config/jini/startAll.config" />
-	</java>
+
+<target name="standalone-setup" description="Setup properties used by the standalone federation and LUS start/stop.">
+    <property name="app.home" location="${bigdata.dir}" />
+    <property name="test.codebase.port" value="23333"/>
+    <property name="test.codebase.dir" location="${bigdata.dir}/bigdata-jini/lib/jini/lib-dl" />
+    <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar"/>
+    <property name="java.security.policy" value="${bigdata.dir}/policy.all"/>
+	<property name="log4j.configuration" value="${bigdata.dir}/src/resources/config/standalone/log4j.properties"/>
+    <property name="java.net.preferIPv4Stack" value="true"/>
+    <property name="bigdata.fedname" value="${standalone.fed}"/>
 </target>
--->
+
+<target name="standalone-startLookup" depends="jar,standalone-setup" description="Start the lookup service for the standalone federation.">
+  <java classname="com.bigdata.service.jini.util.LookupStarter"
+		fork="true" spawn="true">
+		<classpath refid="runtime.classpath" />
+    <sysproperty key="app.home" value="${app.home}"/>
+    <sysproperty key="jini.lib" value="${dist.lib}"/>
+    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
+    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
+    <sysproperty key="java.security.debug" value="off"/>
+    <sysproperty key="java.protocol.handler.pkgs" value="net.jini.url"/>
+    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
+    <sysproperty key="codebase.port" value="${test.codebase.port}"/>
+    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
+    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+  </java>
+</target>
+
+<target name="standalone-stopLookup" depends="jar,standalone-setup" description="Stop the lookup service for the standalone federation.">
+  <java classname="com.bigdata.service.jini.util.LookupStarter"
+	failonerror="true" fork="true" logerror="true">
+	<classpath refid="runtime.classpath" />
+    <sysproperty key="app.home" value="${app.home}"/>
+    <sysproperty key="jini.lib" value="${dist.lib}"/>
+    <sysproperty key="jini.lib.dl" value="${dist.lib.dl}"/>
+    <sysproperty key="java.security.policy" value="${java.security.policy}"/>
+    <sysproperty key="log4j.configuration" value="${log4j.configuration}"/>
+    <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}"/>
+    <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
+    <arg value="-stop" />
+  </java>
+</target>
 
 <!-- Note: You should 'nohup' this, e.g., "nohup ant standalone-start" to 
      avoid taking down the ServicesManagerServer if you are disconnected
      from a terminal. -->
-<target name="standalone-start" depends="jar" description="Start the standalone federation.">
-	<!-- @todo start jini automatically. -->
-    <!--<antcall target="standalone-start-jini" />-->
+<target name="standalone-start" depends="jar,standalone-setup" description="Start the standalone federation.">
+    <!-- Start the lookup service. -->
+	<antcall target="standalone-startLookup" />
 	<java classname="com.bigdata.jini.start.ServicesManagerServer"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1038,9 +1063,7 @@ ${postInstallMessage}</echo>
 	</java>
 </target>
 
-<target name="standalone-stop" depends="jar" description="Stop the standalone federation.">
-	<!-- @todo stop jini automatically. -->
-    <!--<antcall target="standalone-start-jini" />-->
+<target name="standalone-stop" depends="jar,standalone-setup" description="Stop the standalone federation.">
 	<java classname="com.bigdata.service.jini.util.ShutdownFederation"
 		failonerror="true" fork="true" logerror="true">
 		<classpath refid="runtime.classpath" />
@@ -1054,6 +1077,8 @@ ${postInstallMessage}</echo>
 		<jvmarg value="-Dlog4j.configuration=file:src/resources/config/standalone/log4j.properties"/>
 		<arg value="src/resources/config/standalone/bigdataStandalone.config" />
 	</java>
+	<!-- Then take down the lookup service as well. -->
+    <antcall target="standalone-stopLookup" />
 </target>
 
 <!-- @todo Add target to stand up a SPARQL endpoint for a KB namespace. Could be
