@@ -1873,5 +1873,42 @@ ${postInstallMessage}</echo>
 				
 	</target>
 
+	<path id="samples.build.classpath">
+		<pathelement location="${build.dir}/classes" />
+		<path refid="build.classpath" />
+	</path>
+
+	<path id="samples.runtime.classpath">
+		<pathelement location="${build.dir}/samples/classes"/>
+		<path refid="samples.build.classpath" />
+	</path>
+
+	<target name="samples.compile" depends="compile">
+		<mkdir dir="${build.dir}/samples/classes" />
+		<javac destdir="${build.dir}/samples/classes" classpathref="samples.build.classpath"
+		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+	     encoding="${javac.encoding}"
+	     	>
+			<src path="${bigdata.dir}/bigdata-sails/src/samples" />
+			<compilerarg value="-version"/>
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/samples/classes">
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/samples">
+				<exclude name="**/*.java" />
+			</fileset>
+		</copy>
+	</target>
+	
+	<target name="DemoSesameServer" depends="samples.compile" description="Runs the DemoSesameServer sample code.">
+		<java classname="com.bigdata.samples.remoting.DemoSesameServer"
+			failonerror="true" fork="false" logerror="true">
+			<classpath refid="samples.runtime.classpath" />
+			<arg value="http://localhost:8080/openrdf-sesame"/>
+			<arg value="bigdata"/>
+		</java>
+	</target>
+
+
 
 </project>
