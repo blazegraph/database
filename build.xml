@@ -1288,7 +1288,7 @@ ${postInstallMessage}</echo>
 
       <copy file="${bigdata-rdf.lib}/iris-0.58.jar"
             tofile="${dist.lib}/iris.jar"/>
-      <copy file="${bigdata-rdf.lib}/openrdf-sesame-2.2.4-onejar.jar"
+      <copy file="${bigdata-rdf.lib}/openrdf-sesame-2.3.0-onejar.jar"
             tofile="${dist.lib}/openrdf-sesame.jar"/>
       <copy file="${bigdata-rdf.lib}/slf4j-api-1.4.3.jar"
             tofile="${dist.lib}/slf4j.jar"/>
@@ -1443,7 +1443,8 @@ ${postInstallMessage}</echo>
 
       <property name="junit.jar" location="${bigdata.lib}/junit-3.8.1.jar" />
       <property name="cweb-junit-ext.jar" location="${bigdata.lib}/cweb-junit-ext-1.1-b3-dev.jar" />
-      <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-2.2.4.jar" />
+      <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-2.3.0.jar" />
+      <property name="sesame-store-test.jar" location="${bigdata-sails.lib}/sesame-store-testsuite-2.3.0.jar" />
 
       <property name="classes.test.dir" location="${classes.dir}/test" />
       <mkdir dir="${classes.test.dir}"/>
@@ -1452,7 +1453,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}"/>
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>javac
 </echo>
@@ -1684,6 +1685,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${bigdata-test.jar}"/>
         <pathelement location="${cweb-junit-ext.jar}"/>
         <pathelement location="${sesame-sparql-test.jar}"/>
+        <pathelement location="${sesame-store-test.jar}"/>
         <pathelement location="${dist.lib}/bigdata.jar"/>
         <pathelement location="${dist.lib}/colt.jar"/>
         <pathelement location="${dist.lib}/cweb-commons.jar"/>
@@ -1704,7 +1706,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/zookeeper.jar"/>
       </path>
 
-      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>    classpath:    ${run.class.path}
 </echo>
