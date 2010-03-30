@@ -1848,13 +1848,23 @@ ${postInstallMessage}</echo>
 
     </target>
 
-	<target name="install-sesame-server" depends="jar">
+	<target name="install.sesame.server" depends="jar">
 	
 		<!-- copy resources to Sesame webapp. -->
 		<copy toDir="${sesame.server.dir}/WEB-INF/lib" 
 				file="${build.dir}/${version}.jar"/>
 				
 		<copy toDir="${sesame.server.dir}/WEB-INF/lib" flatten="true">
+			<fileset dir="${bigdata.dir}/bigdata/lib">
+			    <include name="**/*.jar" />
+			</fileset>
+		</copy>
+		
+		<!-- copy resources to Workbench webapp. -->
+		<copy toDir="${workbench.server.dir}/WEB-INF/lib" 
+				file="${build.dir}/${version}.jar"/>
+				
+		<copy toDir="${workbench.server.dir}/WEB-INF/lib" flatten="true">
 			<fileset dir="${bigdata.dir}/bigdata/lib">
 			    <include name="**/*.jar" />
 			</fileset>
