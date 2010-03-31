@@ -71,7 +71,7 @@ public class TestZNodeCreatedWatcher extends AbstractZooTestCase {
      */
     public void test_awaitCreate() throws KeeperException, InterruptedException {
 
-        // a node that is guarenteed to be unique w/in the test namespace.
+        // a node that is guaranteed to be unique w/in the test namespace.
         final String zpath = "/test/" + getName() + UUID.randomUUID();
 
         final Thread mainThread = Thread.currentThread();
