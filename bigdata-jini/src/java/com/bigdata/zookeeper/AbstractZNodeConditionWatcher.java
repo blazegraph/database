@@ -47,10 +47,6 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
 
     final static protected Logger log = Logger.getLogger(AbstractZNodeConditionWatcher.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
     protected final ZooKeeper zookeeper;
     
     /**
@@ -76,7 +72,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
     
     private volatile boolean disconnected = false;
 
-    private volatile boolean conditionSatisified = false;
+    private volatile boolean conditionsatisfied = false;
 
     /**
      * The zpath that is being watched.
@@ -94,7 +90,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
 
         sb.append(getClass().getSimpleName());
         sb.append("{ zpath=" + zpath);
-        sb.append(", conditionSatisified=" + conditionSatisified);
+        sb.append(", conditionsatisfied=" + conditionsatisfied);
         sb.append(", disconnected=" + disconnected);
         toString(sb); // extension hook
         sb.append("}");
@@ -124,7 +120,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
         
         try {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Clearing watch: " + this);
         
             clearWatch();
@@ -151,7 +147,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
      */
     public void process(final WatchedEvent event) {
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(event.toString());
         
         synchronized (this) {
@@ -171,7 +167,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
             
             boolean satisifed;
             try {
-                satisifed = isConditionSatisified(event);
+                satisifed = isConditionSatisfied(event);
             } catch (KeeperException e) {
                 log.warn(this.toString(), e);
                 return;
@@ -198,33 +194,33 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
 
     /**
      * Implementation must inspect the event and determine if the conditions are
-     * satisified.
+     * satisfied.
      * 
      * @param event
      *            The {@link WatchedEvent}
      * 
-     * @return <code>true</code> if the event satisified the condition.
+     * @return <code>true</code> if the event satisfied the condition.
      * 
      * @throws KeeperException
      * @throws InterruptedException
      */
-    abstract protected boolean isConditionSatisified(WatchedEvent event)
+    abstract protected boolean isConditionSatisfied(WatchedEvent event)
             throws KeeperException, InterruptedException;
      
     /**
      * Implementation must check the state of the znode using the {@link #zpath}
-     * and determine if the conditions are satisified <em>always</em>
+     * and determine if the conditions are satisfied <em>always</em>
      * resetting the watch(es) as a side-effect.
      * <p>
      * This is used to handle the initial case, where we need to know whether or
-     * not the condition is satisified before waiting for an event.
+     * not the condition is satisfied before waiting for an event.
      * 
      * @return
      * 
      * @throws KeeperException
      * @throws InterruptedException
      */
-    abstract protected boolean isConditionSatisified() throws KeeperException,
+    abstract protected boolean isConditionSatisfied() throws KeeperException,
             InterruptedException;
 
     /**
@@ -237,18 +233,18 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
             InterruptedException;
         
     /**
-     * Resumes watching the zpath. However, if the condition is satisified then
+     * Resumes watching the zpath. However, if the condition is satisfied then
      * we report {@link #success(String)} and clear the watch.
      */
     protected void _resumeWatch() {
 
         try {
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("will reset watch");
 
             // reset the watch.
-            if (isConditionSatisified()) {
+            if (isConditionSatisfied()) {
 
                 // in case we were disconnected.
                 disconnected = false;
@@ -261,7 +257,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
             // in case we were disconnected.
             disconnected = false;
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("did reset watch");
             
         } catch (Throwable t) {
@@ -277,9 +273,9 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
      */
     protected void success(final String msg) {
 
-        conditionSatisified = true;
+        conditionsatisfied = true;
 
-        if(INFO)
+        if(log.isInfoEnabled())
             log.info(msg + " : " + this);
 
         this.notify();
@@ -308,16 +304,16 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
      * An instance of this watcher is set on a <strong>single</strong> znode.
      * The caller then {@link Object#wait()}s on the watcher until the watcher
      * notifies itself. When the caller wakes up it checks the time remaining
-     * and whether or not the condition has been satisified. If the timeout has
+     * and whether or not the condition has been satisfied. If the timeout has
      * noticeably expired then it returns false. If the condition has been
-     * satisified and the timeout has not expired it returns true. Otherwise we
+     * satisfied and the timeout has not expired it returns true. Otherwise we
      * continue to wait.
      * <p>
-     * The {@link Thread} MUST test {@link #conditionSatisified} while holding
+     * The {@link Thread} MUST test {@link #conditionsatisfied} while holding
      * the lock and before waiting (in case the event has already occurred), and
      * again each time {@link Object#wait()} returns (since wait and friends MAY
      * return spuriously). The watch will be re-established until the timeout
-     * has elapsed or the condition has been satisified, at which point the
+     * has elapsed or the condition has been satisfied, at which point the
      * watch is explicitly cleared before returning to the caller.
      * <p>
      * This pattern should be robust in the face of a service disconnect. When a
@@ -366,9 +362,9 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
 
                 try {
 
-                    if (isConditionSatisified()) {
+                    if (isConditionSatisfied()) {
 
-                        // condition was satisified before waiting.
+                        // condition was satisfied before waiting.
 
                         success("on entry.");
 
@@ -392,15 +388,15 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
             
             }
 
-            while (millis > 0 && !conditionSatisified && !isCancelled()) {
+            while (millis > 0 && !conditionsatisfied && !isCancelled()) {
 
                 this.wait(millis);
 
                 millis -= (System.currentTimeMillis() - begin);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("woke up: conditionSatisifed="
-                            + conditionSatisified + ", remaining=" + millis
+                            + conditionsatisfied + ", remaining=" + millis
                             + "ms");
                 
             }

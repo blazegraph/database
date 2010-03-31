@@ -36,6 +36,7 @@ import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.service.IService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
@@ -65,13 +66,11 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
     private final JiniFederation fed;
     
-    private final ZooKeeper zookeeper;
-    
     private final IServiceListener listener;
     
     /**
      * Used to serialize physical service creates on a given host. This is
-     * important in order for constaints on the maximum #of service instances on
+     * important in order for constraints on the maximum #of service instances on
      * a single host to be respected (and assumes only a single services manager
      * per host).
      * <p>
@@ -90,7 +89,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * host. We are not enforcing that constraint.
      * <p>
      * Note: This is also used to serialize service restarts. This prevents the
-     * possiblity of a service restart for a service which is concurrently
+     * possibility of a service restart for a service which is concurrently
      * starting. See {@link RestartPersistentServices} and
      * {@link #restartPhysicalService(ManagedServiceConfiguration, String, String, Entry[])}
      */
@@ -108,8 +107,6 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         this.fed = fed;
         
         this.listener = listener;
-        
-        this.zookeeper = fed.getZookeeper();
 
     }
 
@@ -131,6 +128,51 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         final String locksZPath = fed.getZooConfig().zroot + "/"
                 + BigdataZooDefs.LOCKS_CREATE_PHYSICAL_SERVICE;
 
+        while (true) {
+
+            try {
+
+                acquireWatcherAndRun(locksZPath);
+
+            } catch(Throwable t) {
+
+                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+                
+                    if(log.isInfoEnabled())
+                        log.info("Interrupted");
+                    
+                    throw new RuntimeException(t);
+                    
+                }
+                
+                log.error(this, t);
+
+                /*
+                 * @todo A tight loop can appear here if the znodes for the
+                 * federation are destroyed. This shows up as a NoNodeException
+                 * thrown out of getZLock(), which indicates that zroot/locks
+                 * does not exist so the lock node can not be created.
+                 * 
+                 * A timeout introduces a delay which reduces the problem. This
+                 * can arise if the federation is being destroyed -or- if this
+                 * is a new federation but we are not yet connected to a
+                 * zookeeper ensemble so the znodes for the federation do not
+                 * yet exist.
+                 */
+
+                Thread.sleep(2000/* ms */);
+                
+            }
+            
+        }
+
+    }
+
+    protected void acquireWatcherAndRun(final String locksZPath)
+            throws KeeperException, InterruptedException {
+
+        final ZooKeeper zookeeper = fed.getZookeeper();
+        
         /*
          * Note: The UnknownChildrenWatcher will keep trying until it is
          * able to establish the watch. 
@@ -205,7 +247,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
         }
 
     }
-
+    
     /**
      * Task contends for the {@link ZLock}. If the lock is obtained, the
      * {@link ServiceConfiguration} is fetched using the zpath written into the
@@ -251,7 +293,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * Note: If we are unable to create the service while we are holding the
          * lock then we wait a little bit and try again. This covers the case
          * where there are preconditions for the service start which have not
-         * been met but which might become satisified at any time.
+         * been met but which might become satisfied at any time.
          * <p>
          * Note: If the lock node is deleted, then we will exit and return
          * <code>false</code>.
@@ -304,7 +346,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 /*
                  * We did not create the service this time. This can occur if
                  * there is a precondition for the service which is not
-                 * satisified. Wait a bit a try again.
+                 * satisfied. Wait a bit a try again.
                  * 
                  * Note: We have released the both the local [lock] and the
                  * [zlock] so other service creates can proceed while we sleep
@@ -335,6 +377,8 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          */
         private boolean runOnce() throws Exception {
 
+            final ZooKeeper zookeeper = fed.getZookeeper();
+            
             if (zookeeper.exists(lockNodeZPath, false) == null) {
 
                 /*
@@ -373,7 +417,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
                 if (log.isInfoEnabled())
                     log.info("have lock: zpath=" + lockNodeZPath);
                 
-                if (runWithZLock()) {
+                if (runWithZLock(zookeeper)) {
 
                     // iff successful, then destroy the lock.
                     zlock.destroyLock();
@@ -397,7 +441,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * Either barges in or waits at most a short while before yielding to
          * another process (by returning false).
          * <p>
-         * Note: We are using nexted locks (a global {@link ZLock} and a local
+         * Note: We are using nested locks (a global {@link ZLock} and a local
          * {@link #lock}). The global {@link ZLock} allows at most one process
          * to proceed per logical service. The local {@link #lock} allows only
          * one task to create a service at a time on a given host (well, a given
@@ -410,7 +454,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * 
          * @throws Exception
          */
-        private boolean runWithZLock()
+        private boolean runWithZLock(final ZooKeeper zookeeper)
                 throws Exception {
 
             /*
@@ -422,7 +466,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
                 try {
 
-                    return runWithLocalLock();
+                    return runWithLocalLock(zookeeper);
 
                 } finally {
 
@@ -436,15 +480,16 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
         }
 
-        private boolean runWithLocalLock() throws Exception {
-            
-            return checkConstraintsAndStartService();
-            
+        private boolean runWithLocalLock(final ZooKeeper zookeeper)
+                throws Exception {
+
+            return checkConstraintsAndStartService(zookeeper);
+
         }
 
         /**
          * Starts the service if the the {@link IServiceConstraint}s are
-         * satisified.
+         * satisfied.
          * <p>
          * Note: This fetches the {@link ServiceConfiguration} and tests the
          * {@link IServiceConstraint}s after we hold the {@link ZLock} and then
@@ -454,7 +499,8 @@ public class MonitorCreatePhysicalServiceLocksTask implements
          * 
          * @throws Exception
          */
-        private boolean checkConstraintsAndStartService() throws Exception {
+        private boolean checkConstraintsAndStartService(
+                final ZooKeeper zookeeper) throws Exception {
 
             /*
              * Note: The data is the logicalService zpath.
@@ -645,7 +691,9 @@ public class MonitorCreatePhysicalServiceLocksTask implements
 
             try {
 
-                if(!shouldRestartPhysicalService(serviceConfig,
+                final ZooKeeper zookeeper = fed.getZookeeper();
+                
+                if (!shouldRestartPhysicalService(zookeeper, serviceConfig,
                         physicalServiceZPath, attributes)) {
                     
                     if (log.isInfoEnabled())
@@ -770,6 +818,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      *       children in order to figure this out.
      */
     private boolean shouldRestartPhysicalService(
+            final ZooKeeper zookeeper,
             final ManagedServiceConfiguration serviceConfig,
             final String physicalServiceZPath,
             final Entry[] attributes)
@@ -782,7 +831,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
             log.info("Considering: className=" + serviceConfig.className
                     + ", physicalServiceZPath=" + physicalServiceZPath);
 
-        if (!isPersistentService(serviceConfig, physicalServiceZPath)) {
+        if (!isPersistentService(zookeeper, serviceConfig, physicalServiceZPath)) {
 
             /*
              * Not a persistent service according to the state in zookeeper.
@@ -998,6 +1047,7 @@ public class MonitorCreatePhysicalServiceLocksTask implements
      * @throws InterruptedException
      */
     private boolean isPersistentService(
+            final ZooKeeper zookeeper,
             final ManagedServiceConfiguration serviceConfig,
             final String physicalServiceZPath) throws KeeperException,
             InterruptedException {

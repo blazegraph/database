@@ -855,7 +855,7 @@ abstract public class JiniServiceConfiguration extends
         }
         
         /**
-         * Waits up to timeout units for the znode for the phsyical service to
+         * Waits up to timeout units for the znode for the physical service to
          * be created or the process to die.
          * 
          * @param processHelper
@@ -879,7 +879,8 @@ abstract public class JiniServiceConfiguration extends
                     + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER + "/"
                     + serviceUUID;
 
-            if (!ZNodeCreatedWatcher.awaitCreate(zookeeper,
+            // @todo this should pass in the ZooKeeperAccessor.
+            if (!ZNodeCreatedWatcher.awaitCreate(fed.getZookeeper(),
                     physicalServiceZPath, timeout, unit)) {
 
                 throw new TimeoutException("zpath does not exist: "

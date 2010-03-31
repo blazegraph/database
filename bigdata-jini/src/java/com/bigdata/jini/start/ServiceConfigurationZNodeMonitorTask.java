@@ -11,6 +11,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
@@ -45,18 +46,12 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
     final static protected Logger log = Logger
             .getLogger(ServiceConfigurationZNodeMonitorTask.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-    
     protected final JiniFederation fed;
 
     protected final IServiceListener listener;
     
     protected final String className;
 
-    final ZooKeeper zookeeper;
-    
     final String zroot;
     
     /** zpath for the lock node. */
@@ -90,8 +85,6 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
         
         this.className = className;
 
-        zookeeper = fed.getZookeeper();
-        
         zroot = fed.getZooConfig().zroot;
         
         // zpath for the lock node.
@@ -138,7 +131,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
 
                 if(InnerCause.isInnerCause(t, InterruptedException.class)) {
                 
-                    if(INFO)
+                    if(log.isInfoEnabled())
                         log.info("Interrupted");
                     
                     throw new RuntimeException(t);
@@ -169,12 +162,22 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
     }
 
     /**
-     * Waits until it acquires the lock and then {@link #runWithLock(ZLock)}
+     * Waits until it acquires the lock and then {@link #runWithLock(ZLock)}.
+     * <p>
+     * Note: This is invoked by {@link #call()}. If there is any problem, for
+     * example a {@link SessionExpiredException}, then {@link #call()} will
+     * re-run this method. Therefore, this method MUST request a
+     * {@link ZooKeeper} each time in order to guarantee that it has a valid zk
+     * session when it runs. That zk connection is then passed down so it is
+     * available to the invoked methods.
      * 
-     * @throws Exception 
+     * @throws Exception
      */
     protected void acquireLockAndRun() throws Exception {
 
+        // Note: We MUST request a valid zk connection here.
+        final ZooKeeper zookeeper = fed.getZookeeper();
+        
         final ZLock zlock = ZLockImpl.getLock(zookeeper,
                 lockZPath, fed.getZooConfig().acl);
 
@@ -182,7 +185,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
 
         try {
 
-            runWithLock(zlock);
+            runWithLock(zookeeper, zlock);
         
         } finally {
 
@@ -191,17 +194,19 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
         }
 
     }
-    
+
     /**
      * Runs with the zlock held.
      * 
+     * @param zookeeper
      * @param zlock
      * 
-     * @throws Exception 
+     * @throws Exception
      */
-    protected void runWithLock(final ZLock zlock) throws Exception {
+    protected void runWithLock(final ZooKeeper zookeeper, final ZLock zlock)
+            throws Exception {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Setting watcher: zlock=" + zlock
                     + ", serviceConfigZPath=" + serviceConfigZPath);
 
@@ -226,7 +231,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                 .deserialize(zookeeper.getData(serviceConfigZPath, false,
                         new Stat()));
 
-        balanceAll(config, watchedSet);
+        balanceAll(zookeeper, config, watchedSet);
 
         try {
 
@@ -241,7 +246,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
 
                 }
 
-                handleEvent(watcher, e);
+                handleEvent(zookeeper, watcher, e);
 
             }
 
@@ -260,18 +265,19 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      * @param watchedSet
      * @throws Exception
      */
-    protected void balanceAll(final ManagedServiceConfiguration config,
-            final String[] watchedSet) throws Exception {
+    protected void balanceAll(final ZooKeeper zookeeper,
+            final ManagedServiceConfiguration config, final String[] watchedSet)
+            throws Exception {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("serviceConfigZPath=" + serviceConfigZPath
                     + ", watchedSet=" + Arrays.toString(watchedSet));
         
         // rebalance the logical service instances w/ the config.
-        balanceLogicalServices(config);
+        balanceLogicalServices(zookeeper, config);
         
         // rebalance the physical service instances w/ the config.
-        balancePhysicalServices(config, watchedSet);
+        balancePhysicalServices(zookeeper, config, watchedSet);
    
     }
     
@@ -285,14 +291,14 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      * 
      * @throws Exception
      */
-    protected void balanceLogicalServices(
+    protected void balanceLogicalServices(final ZooKeeper zookeeper,
             final ManagedServiceConfiguration config) throws Exception {
 
         // get children (the list of logical services).
         final List<String> children = zookeeper.getChildren(serviceConfigZPath,
                 false);
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("serviceConfigZPath=" + serviceConfigZPath
                     + ", targetServiceCount=" + config.serviceCount
                     + ", #children=" + children.size() + ", children="
@@ -313,7 +319,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      * to create or destroy a physical service instance for each logical service
      * that is out of balance. The competition itself is handled by the
      * {@link MonitorCreatePhysicalServiceLocksTask}, which watches a well
-     * known znode for the appearence of new lock nodes and then enters into a
+     * known znode for the appearance of new lock nodes and then enters into a
      * competition to create a new physical service instance. Therefore while
      * this initiates the competition for processing to handle the imbalance,
      * the imbalance is NOT correct while we are in this method.
@@ -328,6 +334,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      * @throws KeeperException
      */
     protected void balancePhysicalServices(
+            final ZooKeeper zookeeper,
             final ManagedServiceConfiguration config, final String[] watchedSet)
             throws KeeperException, InterruptedException {
 
@@ -352,7 +359,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                                 + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER,
                         false);
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("serviceConfigZPath=" + serviceConfigZPath
                             + ", logicalServiceZPath=" + logicalServiceZPath
                             + ", targetReplicationCount="
@@ -381,7 +388,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                                 .serialize(logicalServiceZPath), fed
                                 .getZooConfig().acl, CreateMode.PERSISTENT);
 
-                        if (INFO)
+                        if (log.isInfoEnabled())
                             log.info("Created lock node: " + lockNodeZPath);
 
                     } catch (NodeExistsException ex) {
@@ -429,6 +436,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      * application thread NOT the zookeeper event thread.
      */
     protected void handleEvent(
+            final ZooKeeper zookeeper,
             final ServiceConfigurationHierarchyWatcher watcher,
             final WatchedEvent e) throws Exception {
 
@@ -466,7 +474,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                     .deserialize(zookeeper.getData(serviceConfigZPath, false,
                             new Stat()));
 
-            balanceAll(config, watchedSet);
+            balanceAll(zookeeper, config, watchedSet);
 
             break;
 
@@ -479,7 +487,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                     .deserialize(zookeeper.getData(serviceConfigZPath, false,
                             new Stat()));
 
-            balanceLogicalServices(config);
+            balanceLogicalServices(zookeeper, config);
 
             break;
 
@@ -492,7 +500,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
                     .deserialize(zookeeper.getData(serviceConfigZPath, false,
                             new Stat()));
 
-            balancePhysicalServices(config, watchedSet);
+            balancePhysicalServices(zookeeper, config, watchedSet);
 
             break;
 
@@ -505,12 +513,12 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
     /**
      * Extended to accept the various znodes of interest under a
      * {@link ServiceConfiguration} znode. The znodes of interest are the
-     * logical service instances and the physical service instances. Thisa also
+     * logical service instances and the physical service instances. This also
      * keeps a watch on the data for the {@link ServiceConfiguration} znode
      * itself.
      * 
-     * FIXME Zookeeper DOES NOT guarentee that you will see all events. To have
-     * a more robust guarentee you need to impose additional constraints. Make
+     * FIXME Zookeeper DOES NOT guarantee that you will see all events. To have
+     * a more robust guarantee you need to impose additional constraints. Make
      * sure that we are imposing sufficient constraints to see all events when
      * we hold the {@link ZLock} for a {@link ServiceConfiguration}. This might
      * require that we explicitly message this class with paths to be watched as

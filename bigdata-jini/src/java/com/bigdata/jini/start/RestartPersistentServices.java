@@ -2,12 +2,14 @@ package com.bigdata.jini.start;
 
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceRegistrar;
 
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.data.Stat;
@@ -15,6 +17,7 @@ import org.apache.zookeeper.data.Stat;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.jini.start.config.ManagedServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.InnerCause;
 
 /**
  * Task restarts persistent physical services that should be running on this
@@ -28,7 +31,7 @@ import com.bigdata.service.jini.JiniFederation;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class RestartPersistentServices implements Callable<Void> {
+public class RestartPersistentServices implements Callable<Boolean> {
 
     protected static final Logger log = Logger.getLogger(RestartPersistentServices.class);
     
@@ -40,7 +43,7 @@ public class RestartPersistentServices implements Callable<Void> {
     
     protected final JiniFederation fed;
     
-    protected final ZooKeeper zookeeper;
+//    protected final ZooKeeper zookeeper;
     
     final MonitorCreatePhysicalServiceLocksTask monitorCreatePhysicalServiceLocksTask;
     
@@ -56,42 +59,90 @@ public class RestartPersistentServices implements Callable<Void> {
         
         this.fed = fed;
         
-        this.zookeeper = fed.getZookeeper();
+//        this.zookeeper = fed.getZookeeper();
         
         this.monitorCreatePhysicalServiceLocksTask = monitorCreatePhysicalServiceLocksTask;
         
     }
     
-    public Void call() throws Exception {
+    /**
+     * Runs until all services are running.
+     */
+    public Boolean call() throws Exception {
 
         if(log.isInfoEnabled())
             log.info("Running.");
-        
-        /*
-         * Make sure that the zookeeper client is connected (of course it could
-         * disconnect at any time).
-         */
-        {
-            final ZooKeeper.States state = zookeeper.getState();
-            switch (state) {
-            default:
-                log.error(ERR_WILL_NOT_RESTART_SERVICES
-                        + " : zookeeper not connected: state=" + state);
-                return null;
-            case CONNECTED:
-                break;
-            }
-        }
 
-        /*
-         * Make sure that we are joined with at least one jini registrar.
-         */
-        if (fed.getDiscoveryManagement().getRegistrars().length == 0) {
+        while (true) {
+
+            try {
+
+                return runOnce();
+
+            } catch(Throwable t) {
+
+                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+                
+                    if(log.isInfoEnabled())
+                        log.info("Interrupted");
+                    
+                    throw new RuntimeException(t);
+                    
+                }
+                
+                log.error(this, t);
+
+                /*
+                 * @todo A tight loop can appear here if the znodes for the
+                 * federation are destroyed. This shows up as a NoNodeException
+                 * thrown out of getZLock(), which indicates that zroot/locks
+                 * does not exist so the lock node can not be created.
+                 * 
+                 * A timeout introduces a delay which reduces the problem. This
+                 * can arise if the federation is being destroyed -or- if this
+                 * is a new federation but we are not yet connected to a
+                 * zookeeper ensemble so the znodes for the federation do not
+                 * yet exist.
+                 */
+
+                Thread.sleep(2000/* ms */);
+                
+            }
+            
+        }
+        
+    }
+    
+    private boolean runOnce() throws KeeperException, InterruptedException {
+        
+//        /*
+//         * Make sure that the zookeeper client is connected (of course it could
+//         * disconnect at any time).
+//         */
+//        {
+//            final ZooKeeper.States state = zookeeper.getState();
+//            switch (state) {
+//            default:
+//                log.error(ERR_WILL_NOT_RESTART_SERVICES
+//                        + " : zookeeper not connected: state=" + state);
+//                return null;
+//            case CONNECTED:
+//                break;
+//            }
+//        }
+
+        // Obtain valid zk connection.
+        final ZooKeeper zookeeper = fed.getZookeeper();
+        
+        // Make sure that we are joined with at least one jini registrar.
+        if(!fed.awaitJiniRegistrars(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+        
+//        if (fed.getDiscoveryManagement().getRegistrars().length == 0) {
             
             log.error(ERR_WILL_NOT_RESTART_SERVICES
                     + " : not joined with any service registrars.");
             
-            return null;
+            return false;
             
         }
         
@@ -113,7 +164,7 @@ public class RestartPersistentServices implements Callable<Void> {
             log.error(ERR_WILL_NOT_RESTART_SERVICES
                     + " : configuration znode not found: " + zconfig);
 
-            return null;
+            return false;
             
         }
 
@@ -197,7 +248,8 @@ public class RestartPersistentServices implements Callable<Void> {
 
         }
 
-        return null;
+        // Success.
+        return true;
 
     }
     

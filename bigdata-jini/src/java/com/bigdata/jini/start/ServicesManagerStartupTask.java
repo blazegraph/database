@@ -183,6 +183,11 @@ public class ServicesManagerStartupTask implements Callable<Void> {
 
             nanos -= (System.nanoTime() - begin);
 
+            /*
+             * @todo Should have its own timeout value (using zk's). Or just get
+             * rid of these timeouts? SMS can run until zk and jini are
+             * discovered and you can kill it if there is a problem.
+             */
             // await jini registrar(s)
             if (!fed.awaitJiniRegistrars(nanos, TimeUnit.NANOSECONDS)) {
 

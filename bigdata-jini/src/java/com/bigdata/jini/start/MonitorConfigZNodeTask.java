@@ -27,13 +27,7 @@ public class MonitorConfigZNodeTask implements Callable<Void> {
     final static protected Logger log = Logger
             .getLogger(MonitorConfigZNodeTask.class);
 
-    final static protected boolean INFO = log.isInfoEnabled();
-
-    final static protected boolean DEBUG = log.isDebugEnabled();
-
     private final JiniFederation fed;
-    
-    private final ZooKeeper zookeeper;
     
     private final IServiceListener listener;
     
@@ -49,8 +43,6 @@ public class MonitorConfigZNodeTask implements Callable<Void> {
         this.fed = fed;
         
         this.listener = listener;
-        
-        this.zookeeper = fed.getZookeeper();
 
     }
 
@@ -77,6 +69,51 @@ public class MonitorConfigZNodeTask implements Callable<Void> {
         final String configZPath = fed.getZooConfig().zroot + "/"
                 + BigdataZooDefs.CONFIG;
 
+        while (true) {
+
+            try {
+
+                acquireWatcherAndRun(configZPath);
+
+            } catch(Throwable t) {
+
+                if(InnerCause.isInnerCause(t, InterruptedException.class)) {
+                
+                    if(log.isInfoEnabled())
+                        log.info("Interrupted");
+                    
+                    throw new RuntimeException(t);
+                    
+                }
+                
+                log.error(this, t);
+
+                /*
+                 * @todo A tight loop can appear here if the znodes for the
+                 * federation are destroyed. This shows up as a NoNodeException
+                 * thrown out of getZLock(), which indicates that zroot/locks
+                 * does not exist so the lock node can not be created.
+                 * 
+                 * A timeout introduces a delay which reduces the problem. This
+                 * can arise if the federation is being destroyed -or- if this
+                 * is a new federation but we are not yet connected to a
+                 * zookeeper ensemble so the znodes for the federation do not
+                 * yet exist.
+                 */
+
+                Thread.sleep(2000/* ms */);
+                
+            }
+            
+        }
+        
+    }
+
+    protected void acquireWatcherAndRun(final String configZPath)
+            throws KeeperException, InterruptedException {
+
+        final ZooKeeper zookeeper = fed.getZookeeper();
+        
         final UnknownChildrenWatcher watcher = new UnknownChildrenWatcher(
                 zookeeper, configZPath);
 
@@ -89,33 +126,8 @@ public class MonitorConfigZNodeTask implements Callable<Void> {
                 // path to the new config node.
                 final String serviceConfigZPath = configZPath + "/" + znode;
 
-                try {
-                    
-                    handleNewConfigZNode(serviceConfigZPath);
-                    
-                } catch (Throwable t) {
+                handleNewConfigZNode(zookeeper, serviceConfigZPath);
 
-                    /*
-                     * Continue processing if there are errors, but not if
-                     * the cause was an interrupt since we need to be
-                     * responsive if the task is cancelled.
-                     */
-                    
-                    if (InnerCause.isInnerCause(t,
-                            InterruptedException.class)) {
-
-                        if(INFO)
-                            log.info("interrupted", t);
-
-                        // exit
-                        return null;
-                        
-                    }
-                    
-                    log.error(this, t);
-                    
-                }
-                
             }
 
         } finally {
@@ -136,17 +148,18 @@ public class MonitorConfigZNodeTask implements Callable<Void> {
      * @throws InterruptedException
      * @throws KeeperException
      */
-    public void handleNewConfigZNode(final String serviceConfigZPath)
-            throws KeeperException, InterruptedException {
+    protected void handleNewConfigZNode(final ZooKeeper zookeeper,
+            final String serviceConfigZPath) throws KeeperException,
+            InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("new config: zpath=" + serviceConfigZPath);
         
         final ManagedServiceConfiguration config = (ManagedServiceConfiguration) SerializerUtil
                 .deserialize(zookeeper.getData(serviceConfigZPath, false,
                         new Stat()));
         
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("config state: " + config);
 
         // create task.

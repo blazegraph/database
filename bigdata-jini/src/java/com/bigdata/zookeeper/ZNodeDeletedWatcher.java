@@ -45,14 +45,14 @@ public class ZNodeDeletedWatcher extends AbstractZNodeConditionWatcher {
 
     }
 
-    protected boolean isConditionSatisified(WatchedEvent event)
+    protected boolean isConditionSatisfied(WatchedEvent event)
             throws KeeperException, InterruptedException {
 
         return event.getType().equals(Watcher.Event.EventType.NodeDeleted);
 
     }
 
-    protected boolean isConditionSatisified() throws KeeperException,
+    protected boolean isConditionSatisfied() throws KeeperException,
             InterruptedException {
 
         return zookeeper.exists(zpath, this) == null;
