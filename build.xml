@@ -1517,12 +1517,13 @@ ${postInstallMessage}</echo>
 
         <fileset dir="${classes.test.dir}">
             <include name="**/*.class"/>
-            <include name="**/log4j.properties"/>
+            <include name="**/log4j*.properties"/>
         </fileset>
 
         <fileset dir="${bigdata.dir}/bigdata/src/test">
             <include name="**/*.csv"/>
             <include name="**/*.xml"/>
+            <include name="**/*.dtd"/>
         </fileset>
 
         <fileset dir="${bigdata.dir}/bigdata-rdf/src/test">
