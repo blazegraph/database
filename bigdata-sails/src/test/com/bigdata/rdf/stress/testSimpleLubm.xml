@@ -23,15 +23,18 @@
 		<property name="com.bigdata.rdf.store.AbstractTripleStore.justify">false</property>
 		<property name="com.bigdata.rdf.store.AbstractTripleStore.termCache.capacity">50000</property>
 		<property name="com.bigdata.rdf.store.AbstractTripleStore.bloomFilter">true</property>
+		<!--  Also see NoAxioms and NoVocabulary -->
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.axiomsClass">com.bigdata.rdf.axioms.RdfsAxioms</property>
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass">com.bigdata.rdf.vocab.RDFSVocabulary</property>
 		<!-- Inference options. -->
 		<property name="com.bigdata.rdf.rules.InferenceEngine.forwardChainOwlInverseOf">true</property>
-		<property name="com.bigdata.rdf.rules.InferenceEngine.truthMaintenance">false</property>
 		<property name="com.bigdata.rdf.rules.InferenceEngine.forwardChainOwlTransitiveProperty">true</property>
 		<!-- Data loader options. -->
 		<property name="com.bigdata.rdf.store.DataLoader.commit">None</property>
 		<property name="com.bigdata.rdf.store.DataLoader.closure">None</property>
 		<!-- Sail Options. -->
 		<property name="com.bigdata.rdf.sail.nativeJoins">true</property>
+		<property name="com.bigdata.rdf.sail.truthMaintenance">false</property>
 	</defaults>
 	<condition>
 		<property name="databaseModel">LTS</property>
