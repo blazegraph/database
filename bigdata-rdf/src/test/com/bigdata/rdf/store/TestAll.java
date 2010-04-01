@@ -83,8 +83,8 @@ public class TestAll extends TestCase {
 
 //        suite.addTest( TestScaleOutTripleStoreWithLocalDataServiceFederation.suite() );
 
-        suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
-                        .suite());
+//        suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
+//                        .suite());
 
 //        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
 //                "false"))
