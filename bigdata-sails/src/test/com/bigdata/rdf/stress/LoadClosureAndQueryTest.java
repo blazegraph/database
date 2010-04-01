@@ -669,6 +669,11 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         String DATABASE_MODEL = "databaseModel";
         
         /**
+         * Optional resource identifying a file containing an ontology.
+         */
+        String ONTOLOGY = "ontology";
+
+        /**
          * Optional resource identifying a file or directory to be loaded
          * as data.
          */
@@ -835,6 +840,15 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         final long begin = System.currentTimeMillis();
 
+        if (properties.getProperty(TestOptions.ONTOLOGY) != null) {
+
+            final File ontologyFile = new File(properties
+                    .getProperty(TestOptions.ONTOLOGY));
+
+            loadOntology(ontologyFile.getAbsolutePath().toString());
+            
+        }
+        
         /*
          * Load data.
          */
@@ -916,7 +930,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         /*
          * If incremental truth maintenance was not performed the axiom model
-         * includes at least RDFS then wecompute the database-at-once closure.
+         * includes at least RDFS then we compute the database-at-once closure.
          */
         final boolean didDatabaseAtOnceClosure = !didTruthMaintenance
                 && sail.getDatabase().getAxioms().isRdfSchema();
@@ -976,6 +990,48 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         
     }
 
+    /**
+     * Loads just the ontology file.
+     */
+    protected void loadOntology(String ontology) {
+
+        final long begin = System.currentTimeMillis();
+        
+        final DataLoader dataLoader = sail.getDatabase().getDataLoader();
+        
+        // load the ontology.
+        try {
+
+            final String filename = ontology;
+
+            System.out.print("Loading ontology: " + ontology + "...");
+
+            final String baseURI = new File(filename).toURI().toString();
+            
+            final RDFFormat rdfFormat = RDFFormat.forFileName(filename);
+
+            if (rdfFormat == null) {
+
+                throw new RuntimeException("Could not identify RDF format: "
+                        + filename);
+                
+            }
+            
+            dataLoader.loadData(filename, baseURI, rdfFormat);
+
+            System.out.println("done.");
+            
+        } catch (Throwable ex) {
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            throw new RuntimeException("Exception loading ontology: " + ex
+                    + " after " + elapsed + "ms", ex);
+            
+        }
+
+    }
+        
     /**
      * Commits the store and writes some basic information onto {@link System#out}.
      */
