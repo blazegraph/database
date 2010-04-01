@@ -85,14 +85,12 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.RelationSchema;
-import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.resources.OverflowManager;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.EmbeddedClient;
@@ -393,6 +391,9 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
     /**
      * Return various interesting metadata about the KB state.
+     * 
+     * @todo add some information about nextOffset for the WORM and space waster
+     *       for the RW store.
      */
     protected StringBuilder getKBInfo(final AbstractTripleStore tripleStore) {
         
@@ -622,22 +623,13 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         /*
          * Destroy the database.
          */
-        
-        if(indexManager instanceof Journal) {
-            
-            ((Journal)indexManager).destroy();
-            
-        } else if( fed != null ) {
-            
-            fed.destroy();
-            
-        } else if (jiniServicesHelper != null) {
+        if (jiniServicesHelper != null) {
             
             jiniServicesHelper.destroy();
             
         } else {
             
-            throw new AssertionError();
+            indexManager.destroy();
             
         }
             
@@ -1040,17 +1032,17 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         // make the changes restart-safe
         sail.getDatabase().commit();
 
-        if (sail.getDatabase().getIndexManager() instanceof Journal) {
-
-            /*
-             * This reports the #of bytes used on the Journal.
-             */
-            
-            System.out.println("nextOffset: "
-                    + ((Journal) sail.getDatabase().getIndexManager()).getRootBlockView()
-                            .getNextOffset());
-            
-        }
+//        if (sail.getDatabase().getIndexManager() instanceof Journal) {
+//
+//            /*
+//             * This reports the #of bytes used on the Journal.
+//             */
+//            
+//            System.out.println("nextOffset: "
+//                    + ((Journal) sail.getDatabase().getIndexManager()).getRootBlockView()
+//                            .getNextOffset());
+//            
+//        }
 
         // show some info on the KB state (#of triples, #of terms).
         System.out.println(getKBInfo(sail.getDatabase()));
