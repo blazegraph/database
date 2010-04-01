@@ -1,6 +1,5 @@
 <?xml version="1.0"?>
-<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "bigdata/src/test/com/bigdata/test/Experiment.dtd">
-<!-- There are 6 conditions. -->
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
 <experiment class="com.bigdata.rdf.stress.LoadClosureAndQueryTest">
 	<defaults>
 		<property name="nparallel">1</property>
@@ -8,7 +7,6 @@
 		<property name="query">bigdata-lubm/resources/config/config.query.sparql</property>
 		<property name="ontology">bigdata-lubm/resources/config/univ-bench.owl</property>
 		<property name="data">D:/bigdata-perf-analysis/lubm/U1</property>
-		<property name="com.bigdata.journal.AbstractJournal.bufferMode">DiskRW</property>
 		<property name="ndataServices">1</property>
 		<property name="com.bigdata.journal.AbstractJournal.initialExtent">209715200</property>
 		<property name="com.bigdata.journal.AbstractJournal.maximumExtent">209715200</property>
@@ -37,5 +35,6 @@
 	</defaults>
 	<condition>
 		<property name="databaseModel">LTS</property>
+		<property name="com.bigdata.journal.AbstractJournal.bufferMode">DiskWORM</property>
 	</condition>
 </experiment>
