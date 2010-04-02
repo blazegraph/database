@@ -131,7 +131,7 @@ public class IndexSegmentAddressManager extends WormAddressManager {
      * applies the appropriate offset for that region in order to convert the
      * offset into an absolute offset into the store.
      */
-    final public long getOffset(long addr) {
+    final public long getOffset(final long addr) {
     
         if (addr == 0L)
             return 0L;
@@ -157,9 +157,10 @@ public class IndexSegmentAddressManager extends WormAddressManager {
             offset = decodedOffset; // + 0L (offsetBase);
 
             // range check address.
-            assert (decodedOffset + nbytes) <= maxOffset : "Region=" + region
-                    + ", addr=" + toString(addr) + ", offset=" + offset
-                    + ", byteCount=" + nbytes + ", maxOffset=" + maxOffset;
+            if ((decodedOffset + nbytes) > maxOffset)
+                throw new AssertionError("Region=" + region + ", addr="
+                        + toString(addr) + ", offset=" + offset
+                        + ", byteCount=" + nbytes + ", maxOffset=" + maxOffset);
 
             break;
 
@@ -169,9 +170,11 @@ public class IndexSegmentAddressManager extends WormAddressManager {
             offset = decodedOffset + offsetNodes;
 
             // range check address.
-            assert (decodedOffset + nbytes) <= extentNodes : "Region=" + region
-                    + ", addr=" + toString(addr) + ", offset=" + offset
-                    + ", byteCount=" + nbytes + ", sizeNodes=" + extentNodes;
+            if ((decodedOffset + nbytes) > extentNodes)
+                throw new AssertionError("Region=" + region + ", addr="
+                        + toString(addr) + ", offset=" + offset
+                        + ", byteCount=" + nbytes + ", sizeNodes="
+                        + extentNodes);
 
             break;
 
@@ -181,10 +184,12 @@ public class IndexSegmentAddressManager extends WormAddressManager {
             offset = decodedOffset + offsetBlobs;
 
             // range check address.
-            assert (decodedOffset + nbytes) <= extentBlobs : "Region=" + region
-                    + ", addr=" + toString(addr) + ", offset=" + offset
-                    + ", byteCount=" + nbytes + ", sizeBlobs=" + extentBlobs;
-            
+            if ((decodedOffset + nbytes) > extentBlobs)
+                throw new AssertionError("Region=" + region + ", addr="
+                        + toString(addr) + ", offset=" + offset
+                        + ", byteCount=" + nbytes + ", sizeBlobs="
+                        + extentBlobs);
+
             break;
             
         default:

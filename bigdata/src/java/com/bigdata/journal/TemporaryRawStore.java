@@ -482,7 +482,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
      */
     final public void destroy() {
 
-        if(!isOpen())
+        if(isOpen())
             close();
 
     }
