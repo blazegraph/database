@@ -6,7 +6,7 @@
 		<property name="ntrials">10</property>
 		<property name="query">bigdata-lubm/resources/config/config.query.sparql</property>
 		<property name="ontology">bigdata-lubm/resources/config/univ-bench.owl</property>
-		<property name="data">D:/bigdata-perf-analysis/lubm/U1</property>
+		<property name="data">bigdata-rdf/src/resources/data/lehigh/U1</property>
 		<property name="ndataServices">1</property>
 		<property name="com.bigdata.journal.AbstractJournal.initialExtent">209715200</property>
 		<property name="com.bigdata.journal.AbstractJournal.maximumExtent">209715200</property>

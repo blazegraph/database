@@ -39,8 +39,8 @@
 
 	<target name="clean" description="cleans everything in [build.dir], but not the releases.">
 		<delete dir="${build.dir}" />
-                <delete dir="${bigdata.dir}/bigdata-test" quiet="true" />
-                <delete dir="${bigdata.dir}/dist" quiet="true" />
+        <delete dir="${bigdata.dir}/bigdata-test" quiet="true" />
+        <delete dir="${bigdata.dir}/dist" quiet="true" />
 	</target>
 
 	<target name="prepare">
@@ -1412,7 +1412,7 @@ ${postInstallMessage}</echo>
     </target>
 
     <target name="testCompile"
-            description="compiles the test source and generates the appropiate jar files."
+            description="compiles the test source and generates the appropriate jar files."
             depends="stage">
 
       <property name="classes.dir" location="${bigdata.dir}/${build.dir}/classes" />
@@ -1621,7 +1621,7 @@ ${postInstallMessage}</echo>
           <arg value="-verbose"                   />
           <arg value="-stoppable"                 />
           <arg line="-port ${test.codebase.port}" />
-          <arg line="-dir  ${test.codebase.dir}"  />
+          <arg line="-dir  '${test.codebase.dir}'"  />
         </java>
     </target>
 
@@ -1632,7 +1632,7 @@ ${postInstallMessage}</echo>
               fork="true"
               failonerror="true">
           <arg line="-port ${test.codebase.port}" />
-          <arg line="-dir  ${test.codebase.dir}"  />
+          <arg line="-dir  '${test.codebase.dir}'"  />
           <arg value="-stop"                      />
         </java>
     </target>
@@ -1891,6 +1891,7 @@ ${postInstallMessage}</echo>
 	      </path>
 	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 		<java classname="com.bigdata.test.ExperimentDriver" dir="./" fork="yes">
+			<!-- @todo parametize the location of the data sets and ontology files? -->
 			<arg value="bigdata-sails/src/test/com/bigdata/rdf/stress/testSimpleLubm.xml"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx1g"/>

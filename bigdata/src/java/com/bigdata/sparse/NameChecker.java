@@ -41,12 +41,12 @@ public class NameChecker {
     /**
      * The constraint on schema and column names.
      */
-    public final static Pattern pattern_name = Pattern.compile("[\\w._/]+");
+    public final static Pattern pattern_name = Pattern.compile("[\\w._\\-/]+");
     
     /**
      * Assert that the string is valid as the name of a schema. Names must be
      * alphanumeric and may also include any of {<code>.</code>,
-     * <code>_</code>, or <code>/</code>}.
+     * <code>_</code>, <code>-</code>, or <code>/</code>}.
      * 
      * @param s
      *            The string.
