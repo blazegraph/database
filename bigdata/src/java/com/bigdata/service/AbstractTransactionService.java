@@ -923,7 +923,7 @@ abstract public class AbstractTransactionService extends AbstractService
     }
    
     /**
-     * This method is invoked each time a transaction completes with the
+     * This method MUST be invoked each time a transaction completes with the
      * absolute value of the transaction identifier that has just been
      * deactivated. The method will remove the transaction entry in the ordered
      * set of running transactions ({@link #startTimeIndex}). If the specified
@@ -1517,6 +1517,7 @@ abstract public class AbstractTransactionService extends AbstractService
             if (state == null)
                 throw new IllegalStateException(ERR_NO_SUCH);
 
+            boolean wasActive = false;
             state.lock.lock();
 
             try {
@@ -1526,6 +1527,7 @@ abstract public class AbstractTransactionService extends AbstractService
                     throw new IllegalStateException(ERR_NOT_ACTIVE);
 
                 }
+                wasActive = true;
 
                 try {
 
@@ -1537,16 +1539,44 @@ abstract public class AbstractTransactionService extends AbstractService
 
                     log.error(state.toString(),t);
                     
-                } finally {
-
-                    deactivateTx(state);
-                    
+//                } finally {
+//
+//                    deactivateTx(state);
+//                    
                 }
 
             } finally {
 
-                state.lock.unlock();
-
+//                state.lock.unlock();
+                try {
+                    if (wasActive) {
+                        deactivateTx(state);
+                    }
+                } finally {
+                    /*
+                     * Note: This avoids a lock ordering problem by releasing
+                     * the inner lock (state.lock) before acquiring the order
+                     * lock.
+                     */
+                    state.lock.unlock();
+                    if (wasActive) {
+                        lock.lock();
+                        try {
+                            updateReleaseTime(Math.abs(state.tx));
+                            /*
+                             * Note: signalAll() is required. See code that
+                             * searches the half-open range for a
+                             * read-historical timestamp. It waits on this
+                             * signal, but there can be more than one request
+                             * waiting an requests can be waiting on different
+                             * half-open ranges.
+                             */
+                            txDeactivate.signalAll();
+                        } finally {
+                            lock.unlock();
+                        }
+                    }
+                }
             }
 
         } finally {
@@ -1579,6 +1609,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
             }
 
+            boolean wasActive = false;
             state.lock.lock();
 
             try {
@@ -1588,6 +1619,7 @@ abstract public class AbstractTransactionService extends AbstractService
                     throw new IllegalStateException(ERR_NOT_ACTIVE);
 
                 }
+                wasActive = true;
 
                 try {
 
@@ -1618,7 +1650,9 @@ abstract public class AbstractTransactionService extends AbstractService
             } finally {
 
                 try {
-                    deactivateTx(state);
+                    if (wasActive) {
+                        deactivateTx(state);
+                    }
                 } finally {
                     /*
                      * Note: This avoids a lock ordering problem by releasing
@@ -1626,19 +1660,22 @@ abstract public class AbstractTransactionService extends AbstractService
                      * lock.
                      */
                     state.lock.unlock();
-                    lock.lock();
-                    try {
-                        updateReleaseTime(Math.abs(state.tx));
-                        /*
-                         * Note: signalAll() is required. See code that searches
-                         * the half-open range for a read-historical timestamp.
-                         * It waits on this signal, but there can be more than
-                         * one request waiting an requests can be waiting on
-                         * different half-open ranges.
-                         */
-                        txDeactivate.signalAll();
-                    } finally {
-                        lock.unlock();
+                    if (wasActive) {
+                        lock.lock();
+                        try {
+                            updateReleaseTime(Math.abs(state.tx));
+                            /*
+                             * Note: signalAll() is required. See code that
+                             * searches the half-open range for a
+                             * read-historical timestamp. It waits on this
+                             * signal, but there can be more than one request
+                             * waiting an requests can be waiting on different
+                             * half-open ranges.
+                             */
+                            txDeactivate.signalAll();
+                        } finally {
+                            lock.unlock();
+                        }
                     }
                 }
 
