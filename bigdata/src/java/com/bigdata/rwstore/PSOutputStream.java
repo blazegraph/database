@@ -29,6 +29,9 @@ import java.io.ObjectOutputStream;
 import java.io.FilterOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+
+import org.apache.log4j.Logger;
 
 /************************************************************************
  * PSOutputStream
@@ -70,6 +73,7 @@ import java.io.IOException;
  *	are requested for.
  **/
 public class PSOutputStream extends OutputStream {
+    protected static final Logger log = Logger.getLogger(FixedAllocator.class);
 
 	protected static java.util.logging.Logger cat = java.util.logging.Logger.getLogger(PSOutputStream.class.getName());
 
@@ -125,7 +129,8 @@ public class PSOutputStream extends OutputStream {
 		}
 	}
 	
-	final int cBufsize = 16 * 1024; // ensure big enough for reasonable requested blobThresholds
+	final int cBufsize = RWStore.MAX_FIXED_ALLOC; // must be big enough to atomic writes
+	int[] m_blobHeader = null;
 	byte[] m_buf = new byte[cBufsize];
 	boolean m_isSaved = false;
 	long m_headAddr = 0;
@@ -136,6 +141,8 @@ public class PSOutputStream extends OutputStream {
 	IStore m_store;
 	
 	private PSOutputStream m_next = null;
+
+	private int m_blobHdrIdx;
 	
 	private PSOutputStream next() {
 		return m_next;
@@ -158,9 +165,11 @@ public class PSOutputStream extends OutputStream {
 		m_bytesWritten = 0;
 		m_store = store;
 		m_isSaved = false;
-		m_blobThreshold = m_store.bufferChainOffset();
+		// m_blobThreshold = m_store.bufferChainOffset();
+		m_blobThreshold = cBufsize-4; // allow for checksum
 		
-		m_store.startTransaction();
+		// FIXME: if autocommit then we should provide start/commit via init and save
+		// m_store.startTransaction();
 	}			
 
 	/****************************************************************
@@ -169,37 +178,26 @@ public class PSOutputStream extends OutputStream {
 	 * this is the one place where the blobthreshold is handled
 	 *	and its done one byte at a time so should be easy enough,
 	 *
-	 * The last byte of an 8K buffer is used to indicate whether
-	 *	the buffer is extended.  If not, it is set to 0x00.  If
-	 *	it is extended, it is set to 0xFF - any other value is an
-	 *	error.
-	 *
-	 * If the buffer is extended, then the previous 4 bytes, hold the
-	 *	address of the next buffer, and so on.
-	 *
-	 * Must store previous address for link forward, and must also
-	 *	store head address.
+	 * We no longer store continuation addresses, instead we allocate
+	 * blob allocations via a blob header block.
 	 **/
   public void write(int b) throws IOException {
   	if (m_store == null) {
-  		return;
+  		throw new IllegalStateException("NULL store");
   	}
   	
   	if (m_isSaved) {
-  		throw new Error("What the ?");
+  		throw new IllegalStateException("Writing to saved PSOutputStream");
   	}
   	
-  	if (m_count == m_blobThreshold) {  		
-  		long curAddr = m_store.alloc(m_buf, m_count + m_store.getAddressSize()); // allow for continuation address!
+  	if (m_count == m_blobThreshold) {
+  		if (m_blobHeader == null) {
+  			m_blobHeader = new int[128];
+  			m_blobHdrIdx = 0;
+  		}
   		
-  		if (m_prevAddr != 0) {
-  			m_store.absoluteWriteAddress(m_prevAddr, m_blobThreshold, curAddr);
-  		}
-  	
-  		m_prevAddr = curAddr;
-  		if (m_headAddr == 0) {
-  			m_headAddr = m_prevAddr;
-  		}
+  		int curAddr = (int) m_store.alloc(m_buf, m_count);
+  		m_blobHeader[m_blobHdrIdx++] = curAddr;
   		
   		m_count = 0;
   	}
@@ -228,35 +226,31 @@ public class PSOutputStream extends OutputStream {
   
 	/****************************************************************
 	 * write byte array to the buffer
+	 * 
+	 * we need to be able to efficiently handle large arrays beyond size
+	 * of the blobThreshold, so
 	 **/
   public void write(byte b[], int off, int len) throws IOException {
   	if (m_store == null) {
-  		
-  		return;
+  		throw new IllegalStateException("PSOutputStream with unitilialized store");
   	}
   	
   	if (m_isSaved) {
-  		throw new RuntimeException("PSOutputStream: already been saved");
+  		throw new IllegalStateException("PSOutputStream: already been saved");
   	}
   	
   	if ((m_count + len) > m_blobThreshold) {
   		// not optimal, but this will include a disk write anyhow so who cares
-  		for (int i = off; i < len; i++) {
-  			write(b[i]);
+  		for (int i = 0; i < len; i++) {
+  			write(b[off+i]);
   		}
   	} else {
-  		if (len > 4096) {
-  			cat.warning("Unexpected large single object: " + len);
-  		}
-			System.arraycopy(b, off, m_buf, m_count, len);
-			
-			m_count += len;
-			m_bytesWritten += len;
-			
-  		if (m_count > 8192) {
-  			cat.warning("Unexpected large write: " + m_count);
-  		}
-		}
+		System.arraycopy(b, off, m_buf, m_count, len);
+		
+		m_count += len;
+		m_bytesWritten += len;
+		
+	}
   }
   
 	/****************************************************************
@@ -268,7 +262,7 @@ public class PSOutputStream extends OutputStream {
 	 **/
   public void write(InputStream instr) throws IOException {
   	if (m_isSaved) {
-  		throw new RuntimeException("PSOutputStream: already been saved");
+  		throw new IllegalStateException("PSOutputStream: already been saved");
   	}
   	
   	byte b[] = new byte[512];
@@ -287,35 +281,45 @@ public class PSOutputStream extends OutputStream {
   /****************************************************************
    * on save() the current buffer is allocated and written to the
    *	store, and the address of its location returned
+   * If saving as Blob then addr must index to the BlobAllocator that then
+   * points to the BlobHeader
    **/
   public long save() {
   	if (m_isSaved) {
-  		throw new RuntimeException("PSOutputStream: already been saved");
+  		throw new IllegalStateException("PSOutputStream: already been saved");
   	}
   	
   	if (m_store == null) {
   		return 0;
   	}
   	
-  	/*
-  	if (m_bytesWritten == 0) {
-  		cat.info("PSOutputStream: No data has been written before save()");
-  	}
-  	*/
+  	int addr = (int) m_store.alloc(m_buf, m_count);
   	
-  	long addr = m_store.alloc(m_buf, m_count);
-  	
-  	if (m_headAddr == 0) {
-  		m_headAddr = addr;
-  	} else {
-  		m_store.absoluteWriteAddress(m_prevAddr, m_blobThreshold, addr);
-  	}
+  	if (m_blobHeader != null) {
+  		m_blobHeader[m_blobHdrIdx++] = addr;
+  		m_count = 0;
+		try {
+	  		writeInt(m_blobHdrIdx);
+	  		for (int i = 0; i < m_blobHdrIdx; i++) {
+					writeInt(m_blobHeader[i]);
+	 		}
+	  		addr = (int) m_store.alloc(m_buf, m_count);
+	  		
+	  		if (log.isDebugEnabled())
+	  			log.debug("Writing BlobHdrIdx with " + m_blobHdrIdx + " allocations");
+	  		
+	  		addr = m_store.registerBlob(addr); // returns handle
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+   	}
   
   	m_isSaved = true;
   	
-  	m_store.commitTransaction(); // What about transaction count?
+  	// FIXME: if autocommit then we need callback to commitTransaction here
+  	// m_store.commitTransaction();
   		
-  	return m_headAddr;
+  	return addr;
   }
   
   public void close() throws IOException {
@@ -335,11 +339,11 @@ public class PSOutputStream extends OutputStream {
    **/
   public long getAddrAndClear() {
   	if (!m_isSaved) {
-  		throw new RuntimeException("The stream has not been saved");
+  		throw new IllegalStateException("The stream has not been saved");
   	}
   	
   	if (m_store == null) {
-  		throw new RuntimeException("The stream must not be closed");
+  		throw new IllegalStateException("The stream must not be closed");
   	}
   	
   	long retval = m_headAddr;
