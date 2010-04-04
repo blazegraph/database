@@ -141,13 +141,17 @@ public class ChecksumUtility {
     }
 
     public int checksum(final byte[] buf, int sze) {
+        return checksum(buf, 0, sze);
+    }
+    
+    public int checksum(final byte[] buf, int off, int sze) {
         
         assert buf != null;
 
         // reset before computing the checksum.
         chk.reset();
     
-        chk.update(buf, 0, sze);
+        chk.update(buf, off, sze);
             
         /*
          * The Adler checksum is a 32-bit value.
