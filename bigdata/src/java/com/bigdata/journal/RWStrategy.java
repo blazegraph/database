@@ -246,7 +246,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 	}
 
 	public void delete(long addr) {
-		m_store.free(decodeAddr(addr));
+		m_store.free(decodeAddr(addr), decodeSize(addr));
 	}
 
 	public static class RWAddressManager implements IAddressManager {
@@ -384,8 +384,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 	}
 
 	public void deleteResources() {
-		// TODO Auto-generated method stub
-
+		if (m_fileMetadata.raf.getChannel().isOpen()) {
+			throw new IllegalStateException("Backing store is open");
+		}
+		
+		destroy();
 	}
 
 	public void destroy() {
