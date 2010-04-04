@@ -1914,7 +1914,7 @@ ${postInstallMessage}</echo>
 		<java classname="com.bigdata.test.ExperimentDriver" dir="./" fork="yes">
 			<classpath refid="run.class.path.id"/>
 			<jvmarg value="-server"/>
-			<jvmarg value="-Xmx4g"/>
+			<jvmarg value="-Xmx2g"/>
 			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
 			<arg value="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml"/>
 		</java>
