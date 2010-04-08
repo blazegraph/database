@@ -291,28 +291,49 @@ public class TestRWJournal extends AbstractJournalTestCase {
         public void test_allocate_then_read() {}
 
         /**
-         * Test allocate and update of a record for a record where
-         * {@link IRawStore#write(ByteBuffer)} was never invoked.
-         * <p>
-         * Note: Since the record was allocated but never written then it will
-         * not be found in the write cache by update().
+         * Reallocates the same object several times, then commits and tests read back.
          * 
-         * Hmmm....
          * 
-         * The idea of a writeCache doesn't make so much sense for the RWStore as it was
-         * developed as a backing store for an ObjectManager, where "dirty" objects are
-         * always retained until they have been saved, so the "cache" is handled by the
-         * ObjectManager rather than the store.
-         * 
-         * At the point that the allocation has been made the writeBlock has already been queued
-         * and may have already been written.
-         * 
-         * The only aspect of buffer caching is that a buffered write block can be removed
-         * if it is "freed" before writing.  Statistics did however indicate it was only
-         * worth replacing when it was reallocated, in which case the sorted writes handle
-         * removal of the "old" write.
          */
-        public void test_allocate_plus_update() {}
+        public void test_reallocate() {
+            final Journal store = (Journal) getStore();
+
+            byte[] buf = new byte[1024]; // 2Mb buffer of random data
+            r.nextBytes(buf);
+            
+            ByteBuffer bb = ByteBuffer.wrap(buf);
+
+            try {
+
+                RWStrategy bs = (RWStrategy) store
+                        .getBufferStrategy();
+
+                RWStore rw = bs.getRWStore();
+                
+                long faddr1 = bs.write(bb);
+                bb.position(0);
+                //bs.delete(faddr);
+                
+                long faddr2 = bs.write(bb);
+                bb.position(0);
+                
+                bs.commit();
+                
+                rw.reopen();
+                
+                ByteBuffer inbb1 = bs.read(faddr1);
+                ByteBuffer inbb2 = bs.read(faddr2);
+                
+                assertEquals(bb, inbb1);
+                assertEquals(bb, inbb2);
+                
+            } catch (Exception e) {
+            	e.printStackTrace();
+            	fail();
+            }
+                
+                
+        }
         
         /**
          * Test write of a record and then update of a slice of that record.
@@ -412,6 +433,23 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        return curAddress;
         }
 
+        int[] allocBatchBuffer(RWStore rw, int bsize, int base, int scope) {
+        	int[] retaddrs = new int[bsize];
+        	
+            byte[] batchBuffer = new byte[base+scope];
+            r.nextBytes(batchBuffer);
+	        for (int i = 0; i < bsize; i++) {
+	        	int as = base + r.nextInt(scope);
+	        	System.out.println("Allocating " + i + " - " + as + " bytes");
+	        	if (i == 400) {
+		        	System.out.println("About to allocate the 401th");
+	        	}
+	        	retaddrs[i] = (int) rw.alloc(batchBuffer, as);
+	        }
+	        
+	        return retaddrs;
+        }
+
         
         /**
          * Reallocation tests the freeing of allocated address and the re-use within a transaction.
@@ -451,13 +489,144 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	for (int i = 0; i < grp; i++) {
             		long old = addr[i];
             		addr[i] = rw.alloc(sze);
-            		rw.free(old);
+            		rw.free(old, sze);
             	}       		
         	}
 	        
 	        return 0L;
 		}
 
+        /**
+         * Test of blob allocation, does not check on read back, just the allocation
+         */
+        public void test_blob_allocs() {
+            
+            final Journal store = (Journal) getStore();
+
+            try {
+
+                RWStrategy bufferStrategy = (RWStrategy) store
+                        .getBufferStrategy();
+
+                RWStore rw = bufferStrategy.getRWStore();
+                long numAllocs = rw.getTotalAllocations();
+                long startAllocations = rw.getTotalAllocationsSize();
+                int startBlob = 1024 * 256;
+                int endBlob = 1024 * 1256;
+                int[] faddrs = allocBatchBuffer(rw, 500, startBlob, endBlob);
+                
+                System.out.println("Final allocation: " + rw.physicalAddress(faddrs[499])
+                		+ ", allocations: " + (rw.getTotalAllocations() - numAllocs)
+                		+ ", allocated bytes: " + (rw.getTotalAllocationsSize() - startAllocations));
+            } finally {
+
+                store.destroy();
+            
+            }
+        	
+        }
+        /**
+         * Test of blob allocation and read-back, firstly from cache and then from disk.
+         */
+        public void test_blob_readBack() {
+            
+            final Journal store = (Journal) getStore();
+
+            byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
+            r.nextBytes(buf);
+            
+            ByteBuffer bb = ByteBuffer.wrap(buf);
+
+            try {
+
+                RWStrategy bs = (RWStrategy) store
+                        .getBufferStrategy();
+
+                RWStore rw = bs.getRWStore();
+                
+                long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
+                
+                bb.position(0);
+                
+                ByteBuffer rdBuf = bs.read(faddr);
+                
+                assertEquals(bb, rdBuf);
+                
+                System.out.println("Now commit to disk");
+                
+                bs.commit();
+                
+                // Now reset - clears writeCache and reinits from disk
+                rw.reopen();
+                
+                rdBuf = bs.read(faddr);
+                assertEquals(bb, rdBuf);
+
+            } finally {
+
+                store.destroy();
+            
+            }
+        	
+        }
+        
+        /**
+         * Test of blob allocation and read-back, firstly from cache and then from disk.
+         */
+        public void test_blob_realloc() {
+            
+            final Journal store = (Journal) getStore();
+
+            byte[] buf = new byte[1024 * 2048]; // 2Mb buffer of random data
+            r.nextBytes(buf);
+            
+            ByteBuffer bb = ByteBuffer.wrap(buf);
+
+            try {
+
+                RWStrategy bs = (RWStrategy) store
+                        .getBufferStrategy();
+
+                RWStore rw = bs.getRWStore();
+                
+                long faddr = bs.write(bb); // rw.alloc(buf, buf.length);
+                
+                bb.position(0);
+                
+                ByteBuffer rdBuf = bs.read(faddr);
+                
+                assertEquals(bb, rdBuf);
+                
+                System.out.println("Now commit to disk");
+                
+                bs.commit();
+                
+                
+                // Now reset - clears writeCache and reinits from disk
+                rw.reopen();
+                
+                rdBuf = bs.read(faddr);
+                assertEquals(bb, rdBuf);
+
+                // now delete the memory
+                bs.delete(faddr);
+                
+                try {
+                	rdBuf = bs.read(faddr); // should fail with illegal state
+                	throw new RuntimeException("Fail");
+                } catch (Exception ise) {
+                	assertTrue("Expected IllegalStateException", ise instanceof IllegalStateException);
+                }
+
+            } finally {
+
+                store.destroy();
+            
+            }
+        	
+        }
+
+        
 		/**
          * Ttest write() + flush() + update() - for this case the data have been
          * flushed from the write cache so the update will be a random write on

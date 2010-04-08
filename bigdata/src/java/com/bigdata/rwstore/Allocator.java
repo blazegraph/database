@@ -33,7 +33,7 @@ public interface Allocator extends Comparable {
   public boolean verify(int addr);
   public long getStartAddr();
   public boolean addressInRange(int addr);
-  public boolean free(int addr);
+  public boolean free(int addr, int size);
   public int alloc(RWStore store, int size);
   public long getDiskAddr();
   public void setDiskAddr(long addr);
@@ -46,4 +46,6 @@ public interface Allocator extends Comparable {
   public String getStats();
   public void preserveSessionData();
   public void addAddresses(ArrayList addrs);
+  public int getRawStartAddr();
+  public int getIndex();
 }

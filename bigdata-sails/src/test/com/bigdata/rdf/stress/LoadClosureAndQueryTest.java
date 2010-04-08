@@ -54,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.CognitiveWeb.util.PropertyUtil;
 import org.apache.log4j.Logger;
+import org.apache.system.SystemUtil;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
@@ -748,6 +749,9 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
         // load the data and optionally compute the closure
         loadData(properties);
 
+        // OS specific hook to drop the file system cache.
+        dropFileSystemCache();
+        
         // run the queries.
         runQueries(properties, queryParser, queries);
 
@@ -755,6 +759,36 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
     }
 
+    /**
+     * @todo only handles linux right now.
+     * 
+     * @todo move to a test utility class?
+     */
+    protected void dropFileSystemCache() {
+        try {
+            if (SystemUtil.isLinux()) {
+                /*
+                 * See http://linux-mm.org/Drop_Caches
+                 * 
+                 * sync && echo 3 > /proc/sys/vm/drop_caches
+                 */
+                Runtime
+                        .getRuntime()
+                        .exec(new String[] {//
+                                "/bin/bash",//
+                                        "-c",//
+                                        "\"sync && echo 3 > /proc/sys/vm/drop_caches && echo dropped cache\"" });
+            } else {
+                log.error("Do not know how to drop the file system cache: "
+                        + SystemUtil.operatingSystem());
+            }
+        } catch (IOException ex) {
+            log.error("Did drop the file system cache: "
+                    + SystemUtil.operatingSystem() + ", ex");
+        }
+        log.info("Dropped file system cache.");
+    }
+    
     /**
      * Filter accepts anything that looks like an RDF data file.
      */
@@ -985,7 +1019,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     /**
      * Loads just the ontology file.
      */
-    protected void loadOntology(String ontology) {
+    protected void loadOntology(final String ontology) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1440,7 +1474,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
             final long queryTime = System.currentTimeMillis() - begin;
 
-            result.put("queryTime", "" + queryTime);
+            // report the average total query time across the trials.
+            result.put("queryTime", "" + queryTime/ntrials);
 
         }
 

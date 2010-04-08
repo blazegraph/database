@@ -267,7 +267,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
                 try {
 
-                    if (dirtyList.isEmpty()) {
+    	            while (dirtyList.isEmpty()) {
                     	Thread.sleep(50);
                     	continue;
                     }
@@ -600,6 +600,11 @@ abstract public class WriteCacheService implements IWriteCache {
         	
             final WriteCache tmp = current.get();
             if (!tmp.isEmpty()) {
+            	while (cleanList.peek() == null) {
+            		writeLock.unlock();
+            		// wait for something to be added
+            		writeLock.lockInterruptibly();
+            	}
 	            final WriteCache nxt = cleanList.take();
 	            nxt.resetWith(recordMap);
 	            current.set(nxt); // 
@@ -747,7 +752,10 @@ abstract public class WriteCacheService implements IWriteCache {
                      * method since we will always be looking at a new buffer in
                      * those code paths.
                      */
-                    recordMap.put(offset, cache);
+                    if (recordMap.put(offset, cache) != null) {
+                        throw new AssertionError(
+                                "Record already in cache: offset=" + offset);
+                    }
 
                     return true;
 
@@ -852,7 +860,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     // Try to write on the new buffer.
                     if (cache.writeChk(offset, data, chk)) {
 
-                        // This should be the first record in the new cache.
+                        // This must be the only occurrence of this record.
                         if (recordMap.put(offset, cache) != null) {
                             throw new AssertionError(
                                     "Record already in cache: offset=" + offset);
@@ -865,7 +873,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     /*
                      * Should never happen.
                      */
-                    throw new RuntimeException();
+                    throw new IllegalStateException("Unable to write into current WriteCache");
 
                 } finally {
 

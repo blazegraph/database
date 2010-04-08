@@ -481,13 +481,13 @@ public class DataLoader {
 
         this.database = database;
 
-        inferenceEngine = database.getInferenceEngine();
-
         if (closureEnum != ClosureEnum.None) {
 
             /*
              * Truth maintenance: buffer will write on a tempStore.
              */
+
+            inferenceEngine = database.getInferenceEngine();
 
             tm = new TruthMaintenance(inferenceEngine);
 
@@ -496,6 +496,8 @@ public class DataLoader {
             /*
              * No truth maintenance: buffer will write on the database.
              */
+
+            inferenceEngine = null;
 
             tm = null;
 

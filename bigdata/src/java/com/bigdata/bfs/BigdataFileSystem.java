@@ -85,12 +85,12 @@ import cutthecrap.utils.striterators.Striterator;
  * processing.
  * <p>
  * The distributed file system uses two scale-out indices to support ACID
- * operations on file metadata and atomic file append. These ACID guarentees
+ * operations on file metadata and atomic file append. These ACID guarantees
  * arise from the use of unisolated operations on the respective indices and
  * therefore apply only to the individual file metadata or file block
  * operations. In particular, file metadata read and write are atomic and all
  * individual file block IO (read, write, and append) operations are atomic.
- * Atomicity is NOT guarenteed when performing more than a single file block IO
+ * Atomicity is NOT guaranteed when performing more than a single file block IO
  * operation, e.g., multiple appends MIGHT NOT write sequential blocks since
  * other block operations could have intervened.
  * <p>
@@ -101,7 +101,7 @@ import cutthecrap.utils.striterators.Striterator;
  * least one block. Streaming processing is advised in all cases when handling
  * large files, including when the file is to be delivered via HTTP.
  * <p>
- * The {@link #getFilleMetadataIndex() metadata index} uses a {@link SparseRowStore}
+ * The {@link #getFileMetadataIndex() metadata index} uses a {@link SparseRowStore}
  * design, similar to Google's bigtable or Hadoop's HBase. All updates to file
  * version metadata are atomic. The primary key in the metadata index for every
  * file is its {@link FileMetadataSchema#ID}. In addition, each version of a file
@@ -117,8 +117,8 @@ import cutthecrap.utils.striterators.Striterator;
  * uses the {@link FileMetadataSchema#ID} as the first field in a compound key. The
  * second field is the {@link FileMetadataSchema#VERSION} - a 32-bit integer. The
  * remainder of the key is a 64-bit signed block identifier (2^63-1 distinct
- * block identifiers). The block identifiers are strictly monotonic (e.g., up
- * one) and their sequence orders the blocks into the logical byte order of the
+ * block identifiers). The block identifiers are strictly monotonic (e.g., one
+ * up) and their sequence orders the blocks into the logical byte order of the
  * file.
  * <p>
  * Operations that create a new file actually create a new file version. The old
@@ -141,7 +141,7 @@ import cutthecrap.utils.striterators.Striterator;
  * <p>
  * Use case: The same as the use case above, but large files are being processed
  * and there is a requirement to "break" the files into splits and hand off the
- * splits. This can be achieved by estimating the file system using a range
+ * splits. This can be achieved by estimating the file size using a range
  * count and multiplying through by the block size. Blocks may be handed off to
  * the clients in parallel (of course, clients need to deal with the hassle of
  * processing files where records will cross split boundaries unless they always
@@ -184,7 +184,7 @@ import cutthecrap.utils.striterators.Striterator;
  *       and media indexing). access control could also be part of the zones.
  * 
  * @todo should compression be applied? applications are obviously free to apply
- *       their own compression, but it could be convienent to stored compressed
+ *       their own compression, but it could be convenient to stored compressed
  *       blocks. the caller could specify the compression method on a per block
  *       basis (we don't want to lookup the file metadata for this). the
  *       compression method would be written into a block header. blocks can
