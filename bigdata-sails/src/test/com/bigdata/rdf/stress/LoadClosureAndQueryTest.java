@@ -1019,7 +1019,7 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
     /**
      * Loads just the ontology file.
      */
-    protected void loadOntology(String ontology) {
+    protected void loadOntology(final String ontology) {
 
         final long begin = System.currentTimeMillis();
         
@@ -1474,7 +1474,8 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
             final long queryTime = System.currentTimeMillis() - begin;
 
-            result.put("queryTime", "" + queryTime);
+            // report the average total query time across the trials.
+            result.put("queryTime", "" + queryTime/ntrials);
 
         }
 
