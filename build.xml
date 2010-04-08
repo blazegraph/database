@@ -1862,7 +1862,7 @@ ${postInstallMessage}</echo>
 	<!--                    PERFORMANCE TESTS                              -->
 	<!--                                                                   -->
 
-	<target name="run-performance-tests" depends="testCompile" description="Runs a variety of performance tests.">
+	<target name="run-performance-tests" depends="testCompile, lubm-jar" description="Runs a variety of performance tests.">
 		<!-- Note: This depends on the stage target. -->
 	      <path id="run.class.path.id">
 	        <pathelement location="${junit.jar}"/>
@@ -1890,14 +1890,35 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/zookeeper.jar"/>
 	      </path>
 	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
-		<java classname="com.bigdata.test.ExperimentDriver" dir="./" fork="yes">
-			<!-- @todo parametize the location of the data sets and ontology files? -->
-			<arg value="bigdata-sails/src/test/com/bigdata/rdf/stress/testSimpleLubm.xml"/>
+		<!-- Generate the LUBM dataset. -->
+		<!-- Note: testLubm.xml MUST know the dataset location! -->
+		<property name="dataset" value="/tmp/bigdata-perf-lubm"/>
+		<mkdir dir="${dataset}"/>
+		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${dataset}" fork="yes">
+			<classpath>
+				<path refid="run.class.path.id"/>
+				<pathelement location="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
+			</classpath>
 			<jvmarg value="-server"/>
-			<jvmarg value="-Xmx1g"/>
+			<jvmarg value="-Xmx400m"/>
 			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
-			<classpath refid="run.class.path.id"/>
+			<arg value="-subdirs"/>
+			<arg value="-compress"/>
+			<arg value="GZip"/>
+			<arg value="-univ"/>
+			<arg value="50"/>
+			<arg value="-onto"/>
+			<arg value="http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl"/>
 		</java>
+		<!-- Run the data load, closure and query performance tests. -->
+		<java classname="com.bigdata.test.ExperimentDriver" dir="./" fork="yes">
+			<classpath refid="run.class.path.id"/>
+			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx2g"/>
+			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
+			<arg value="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml"/>
+		</java>
+		<delete dir="${dataset}"/>
 	</target>
 
 	<!--                                                                   -->
