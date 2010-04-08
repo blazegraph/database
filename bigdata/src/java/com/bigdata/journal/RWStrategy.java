@@ -384,7 +384,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 	}
 
 	public void deleteResources() {
-		if (m_fileMetadata.raf.getChannel().isOpen()) {
+		if (m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen()) {
 			throw new IllegalStateException("Backing store is open");
 		}
 		
