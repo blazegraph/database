@@ -13,7 +13,6 @@
 		<property name="com.bigdata.journal.AbstractJournal.initialExtent">209715200</property>
 		<property name="com.bigdata.journal.AbstractJournal.maximumExtent">209715200</property>
 		<!-- B+Tree and query options. -->
-		<property name="com.bigdata.btree.BTree.branchingFactor">64</property>
 			<!--  Note: Default is currently much smaller, but servers use a larger value. -->
 		<property name="com.bigdata.btree.writeRetentionQueue.capacity">4000</property>
 		<property name="com.bigdata.relation.accesspath.IBuffer.chunkCapacity">100</property>
