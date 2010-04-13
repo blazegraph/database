@@ -38,6 +38,7 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.lookup.entry.Name;
 
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.SessionExpiredException;
 
 import com.bigdata.jini.lookup.entry.ServiceUUID;
 import com.bigdata.jini.start.BigdataZooDefs;
@@ -155,7 +156,7 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
 
         protected final String logicalServiceZPath;
 
-        protected final ZooKeeper zookeeper;
+//        protected final ZooKeeper zookeeper;
 
         /**
          * The znode for the logical service (the last component of the
@@ -234,7 +235,7 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
             
             this.logicalServiceZPath = logicalServiceZPath;
             
-            this.zookeeper = fed.getZookeeper();
+//            this.zookeeper = fed.getZookeeper();
             
             // just the child name for the logical service.
             logicalServiceZNode = logicalServiceZPath
@@ -310,6 +311,15 @@ abstract public class ManagedServiceConfiguration extends JavaServiceConfigurati
          */
         protected void setUp() throws Exception {
 
+            /*
+             * Note: This is not robust to a SessionExpiredException. Such an
+             * event will be propagated up and the service will not be started.
+             * The failure to start the service is handled by the logic which
+             * decides which service to start on a node.
+             */
+            
+            final ZooKeeper zookeeper = fed.getZookeeper();
+            
             String zpath = logicalServiceZPath;
 
             if (zookeeper.exists(zpath, false/* watch */) == null) {

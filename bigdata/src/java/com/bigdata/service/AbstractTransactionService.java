@@ -515,9 +515,18 @@ abstract public class AbstractTransactionService extends AbstractService
 
                     state.lock.unlock();
 
+                    /*
+                     * Note: We are already holding the outer lock so we do not
+                     * need to acquire it here.
+                     */
+                    updateReleaseTime(Math.abs(state.tx));
+                    
                 }
 
-            }
+            } // foreach tx in activeTx
+
+            // signal once now that we are run.
+            txDeactivate.signalAll();
 
             final int activeCount = getActiveCount();
 
@@ -688,11 +697,15 @@ abstract public class AbstractTransactionService extends AbstractService
      * respect to the state of the transaction service. Mostly this is used to
      * serialize the assignment of transaction identifiers and the update of the
      * release time as transactions complete.
+     * <p>
+     * Note: To avoid lock ordering problems DO NOT acquire this {@link #lock}
+     * if you are already holding a {@link TxState#lock}. This causes a lock
+     * ordering problem and can result in deadlock.
      */
     protected final ReentrantLock lock = new ReentrantLock();
     
     /**
-     * Signalled by {@link #deactivateTx(TxState)}.
+     * Signalled by {@link #deactivateTx(TxState)} and based on {@link #lock}.
      */
     protected final Condition txDeactivate = lock.newCondition();
 
@@ -835,84 +848,82 @@ abstract public class AbstractTransactionService extends AbstractService
         }
         
     }
-    
+
     /**
      * Removes the transaction from the local tables.
+     * <p>
+     * Note: The caller MUST own {@link TxState#lock} across this method and
+     * MUST then do
+     * 
+     * <pre>
+     * updateReleaseTime(long)
+     * deactivateTx.signallAll()
+     * </pre>
+     * 
+     * while holding the outer {@link #lock}.
+     * <p>
+     * Note: Normally this method is invoked without the outer {@link #lock}
+     * which necessitates lifting those method calls out of this method and into
+     * the caller.
      * 
      * @param state
      *            The transaction.
+     * 
+     * @throws IllegalMonitorStateException
+     *             unless the caller is holding the {@link TxState#lock}.
      */
     protected void deactivateTx(final TxState state) {
-        
+
         if (state == null)
             throw new IllegalArgumentException();
 
-        state.lock.lock();
-
-        try {
+        if (!state.lock.isHeldByCurrentThread())
+            throw new IllegalMonitorStateException();
         
+//        try {
+
             if (!state.isComplete())
                 throw new IllegalArgumentException();
-            
-            if(state.isAborted()) {
-                
+
+            if (state.isAborted()) {
+
                 abortCount++;
-                
+
             } else {
-                
+
                 commitCount++;
-                
+
             }
-            
-            if(state.isReadOnly()) {
-                
+
+            if (state.isReadOnly()) {
+
                 readOnlyActiveCount.decrementAndGet();
-                
+
             } else {
-                
+
                 readWriteActiveCount.decrementAndGet();
-                
+
             }
 
             if (activeTx.remove(state.tx) == null) {
-                
+
                 log.warn("Transaction not in table: " + state);
-                
+
             }
 
             if (INFO)
                 log.info(state.toString());
 
-            lock.lock();
-            try {
+//        } finally {
+//
+//            state.lock.unlock();
+//
+//        }
 
-                updateReleaseTime(Math.abs(state.tx));
-
-                /*
-                 * Note: signalAll() is required. See code that searches the
-                 * half-open range for a read-historical timestamp. It waits on
-                 * this signal, but there can be more than one request waiting
-                 * an requests can be waiting on different half-open ranges.
-                 */
-
-                txDeactivate.signalAll();
-
-            } finally {
-
-                lock.unlock();
-
-            }
-
-        } finally {
-
-            state.lock.unlock();
-            
-        }
-        
     }
    
     /**
-     * This method is invoked each time a transaction completes with the
+     * This method MUST be invoked each time a transaction completes with the
      * absolute value of the transaction identifier that has just been
      * deactivated. The method will remove the transaction entry in the ordered
      * set of running transactions ({@link #startTimeIndex}). If the specified
@@ -921,7 +932,7 @@ abstract public class AbstractTransactionService extends AbstractService
      * be set using {@link #setReleaseTime(long)}.
      * <p>
      * Note that the {@link #startTimeIndex} contains the absolute value of the
-     * transaction identifers!
+     * transaction identifiers!
      * 
      * @param timestamp
      *            The absolute value of a transaction identifier that has just
@@ -1506,6 +1517,7 @@ abstract public class AbstractTransactionService extends AbstractService
             if (state == null)
                 throw new IllegalStateException(ERR_NO_SUCH);
 
+            boolean wasActive = false;
             state.lock.lock();
 
             try {
@@ -1515,6 +1527,7 @@ abstract public class AbstractTransactionService extends AbstractService
                     throw new IllegalStateException(ERR_NOT_ACTIVE);
 
                 }
+                wasActive = true;
 
                 try {
 
@@ -1526,16 +1539,44 @@ abstract public class AbstractTransactionService extends AbstractService
 
                     log.error(state.toString(),t);
                     
-                } finally {
-
-                    deactivateTx(state);
-                    
+//                } finally {
+//
+//                    deactivateTx(state);
+//                    
                 }
 
             } finally {
 
-                state.lock.unlock();
-
+//                state.lock.unlock();
+                try {
+                    if (wasActive) {
+                        deactivateTx(state);
+                    }
+                } finally {
+                    /*
+                     * Note: This avoids a lock ordering problem by releasing
+                     * the inner lock (state.lock) before acquiring the order
+                     * lock.
+                     */
+                    state.lock.unlock();
+                    if (wasActive) {
+                        lock.lock();
+                        try {
+                            updateReleaseTime(Math.abs(state.tx));
+                            /*
+                             * Note: signalAll() is required. See code that
+                             * searches the half-open range for a
+                             * read-historical timestamp. It waits on this
+                             * signal, but there can be more than one request
+                             * waiting an requests can be waiting on different
+                             * half-open ranges.
+                             */
+                            txDeactivate.signalAll();
+                        } finally {
+                            lock.unlock();
+                        }
+                    }
+                }
             }
 
         } finally {
@@ -1568,6 +1609,7 @@ abstract public class AbstractTransactionService extends AbstractService
 
             }
 
+            boolean wasActive = false;
             state.lock.lock();
 
             try {
@@ -1577,6 +1619,7 @@ abstract public class AbstractTransactionService extends AbstractService
                     throw new IllegalStateException(ERR_NOT_ACTIVE);
 
                 }
+                wasActive = true;
 
                 try {
 
@@ -1606,9 +1649,35 @@ abstract public class AbstractTransactionService extends AbstractService
 
             } finally {
 
-                deactivateTx(state);
-
-                state.lock.unlock();
+                try {
+                    if (wasActive) {
+                        deactivateTx(state);
+                    }
+                } finally {
+                    /*
+                     * Note: This avoids a lock ordering problem by releasing
+                     * the inner lock (state.lock) before acquiring the order
+                     * lock.
+                     */
+                    state.lock.unlock();
+                    if (wasActive) {
+                        lock.lock();
+                        try {
+                            updateReleaseTime(Math.abs(state.tx));
+                            /*
+                             * Note: signalAll() is required. See code that
+                             * searches the half-open range for a
+                             * read-historical timestamp. It waits on this
+                             * signal, but there can be more than one request
+                             * waiting an requests can be waiting on different
+                             * half-open ranges.
+                             */
+                            txDeactivate.signalAll();
+                        } finally {
+                            lock.unlock();
+                        }
+                    }
+                }
 
             }
 
@@ -1896,11 +1965,16 @@ abstract public class AbstractTransactionService extends AbstractService
             return dataServices.toArray(new UUID[] {});
             
         }
-        
+
         /**
          * A per-transaction lock used to serialize operations on a given
          * transaction. You need to hold this lock for most of the operations on
          * this class, including any access to the {@link RunState}.
+         * <p>
+         * Note: DO NOT attempt to acquire the outer
+         * {@link AbstractTransactionService#lock} if you are already holding
+         * this {@link #lock}. This is a lock ordering problem and can result in
+         * a deadlock.
          */
         final protected ReentrantLock lock = new ReentrantLock();
         

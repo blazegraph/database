@@ -1,10 +1,5 @@
 package com.bigdata.samples.remoting;
 
-import java.io.BufferedInputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.Collection;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -16,9 +11,6 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.http.HTTPRepository;
-import com.bigdata.rdf.sail.remoting.GraphRepository;
-import com.bigdata.rdf.sail.remoting.GraphRepositoryClient;
-import com.bigdata.rdf.sail.remoting.IOUtils;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.samples.SparqlBuilder;
 
@@ -43,6 +35,16 @@ public class DemoSesameServer {
     
     public static void _main(String[] args) throws Exception {
 
+        String sesameURL, repoID;
+        
+        if (args != null && args.length == 2) {
+            sesameURL = args[0];
+            repoID = args[1];
+        } else {
+            sesameURL = DemoSesameServer.sesameURL;
+            repoID = DemoSesameServer.repoID;
+        }
+        
         Repository repo = new HTTPRepository(sesameURL, repoID);
         repo.initialize();
         

@@ -312,7 +312,7 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
-	public boolean free(int addr) {
+	public boolean free(int addr, int size) {
 		if (addr < 0) {
 			int offset = ((-addr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
 
@@ -405,5 +405,16 @@ public class FixedAllocator implements Allocator {
 
 			baseAddr -= 32 * m_bitSize;
 		}
+	}
+
+	/**
+	 * returns the raw start address
+	 */
+	public int getRawStartAddr() {
+		return m_startAddr;
+	}
+
+	public int getIndex() {
+		return m_index;
 	}
 }

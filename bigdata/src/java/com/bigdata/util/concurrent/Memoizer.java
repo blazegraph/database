@@ -36,6 +36,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
+import com.bigdata.util.InnerCause;
+
 /**
  * Pattern using a {@link FutureTask} to force synchronization only on tasks
  * waiting for the same computation.  This is based on Java Concurrency in
@@ -70,6 +72,7 @@ public class Memoizer<A, V> implements Computable<A, V> {
     public V compute(final A arg) throws InterruptedException {
         while (true) {
             Future<V> f = cache.get(arg);
+            boolean willRun = false;
             if (f == null) {
                 final Callable<V> eval = new Callable<V>() {
                     public V call() throws InterruptedException {
@@ -79,6 +82,7 @@ public class Memoizer<A, V> implements Computable<A, V> {
                 final FutureTask<V> ft = new FutureTask<V>(eval);
                 f = cache.putIfAbsent(arg, ft);
                 if (f == null) {
+                    willRun = true; // Note: MUST set before running!
                     f = ft;
                     ft.run(); // call to c.compute() happens here.
                 }
@@ -89,6 +93,27 @@ public class Memoizer<A, V> implements Computable<A, V> {
                 // remove cancelled task iff still our task.
                 cache.remove(arg, f);
             } catch (ExecutionException e) {
+                if (!willRun
+                        && InnerCause.isInnerCause(e,
+                                InterruptedException.class)) {
+                    /*
+                     * Since the task was executed by another thread (ft.run()),
+                     * remove the interrupted task and retry.
+                     * 
+                     * Note: Basically, what has happened is that the thread
+                     * which got to cache.putIfAbsent() first ran the Computable
+                     * and was interrupted while doing so, so that thread needs
+                     * to propagate the InterruptedException back to its caller.
+                     * However, other threads which concurrently request the
+                     * same computation MUST NOT see the InterruptedException
+                     * since they were not actually interrupted. Therefore, we
+                     * yank out the FutureTask and retry for any thread which
+                     * did not run the task itself.
+                     */ 
+                    cache.remove(arg, f);
+                    // Retry.
+                    continue;
+                }
                 throw launderThrowable(e.getCause());
             }
         }

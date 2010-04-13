@@ -90,8 +90,9 @@ public class TestAll extends TestCase {
         // run the test suite without statement identifiers enabled.
         suite.addTest(TestBigdataSailWithoutSids.suite());
         
-        // quad store test suite w/ nested subquery joins.
-        suite.addTest(TestBigdataSailWithQuads.suite());
+        // nestedSubquery is deprecated.
+//        // quad store test suite w/ nested subquery joins.
+//        suite.addTest(TestBigdataSailWithQuads.suite());
         
         // quad store test suite w/ pipeline joins.
         suite.addTest(TestBigdataSailWithQuadsAndPipelineJoins.suite());

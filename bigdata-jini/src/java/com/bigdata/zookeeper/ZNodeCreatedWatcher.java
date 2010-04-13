@@ -73,7 +73,7 @@ public class ZNodeCreatedWatcher extends AbstractZNodeConditionWatcher {
         
     }
     
-    protected boolean isConditionSatisified(WatchedEvent event)
+    protected boolean isConditionSatisfied(final WatchedEvent event)
             throws KeeperException, InterruptedException {
 
         return event.getType().equals(
@@ -81,7 +81,7 @@ public class ZNodeCreatedWatcher extends AbstractZNodeConditionWatcher {
 
     }
 
-    protected boolean isConditionSatisified() throws KeeperException,
+    protected boolean isConditionSatisfied() throws KeeperException,
             InterruptedException {
         
         return zookeeper.exists(zpath, this) != null;

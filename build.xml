@@ -39,8 +39,8 @@
 
 	<target name="clean" description="cleans everything in [build.dir], but not the releases.">
 		<delete dir="${build.dir}" />
-                <delete dir="${bigdata.dir}/bigdata-test" quiet="true" />
-                <delete dir="${bigdata.dir}/dist" quiet="true" />
+        <delete dir="${bigdata.dir}/bigdata-test" quiet="true" />
+        <delete dir="${bigdata.dir}/dist" quiet="true" />
 	</target>
 
 	<target name="prepare">
@@ -1314,7 +1314,7 @@ ${postInstallMessage}</echo>
 
       <copy file="${bigdata-rdf.lib}/iris-0.58.jar"
             tofile="${dist.lib}/iris.jar"/>
-      <copy file="${bigdata-rdf.lib}/openrdf-sesame-2.2.4-onejar.jar"
+      <copy file="${bigdata-rdf.lib}/openrdf-sesame-2.3.0-onejar.jar"
             tofile="${dist.lib}/openrdf-sesame.jar"/>
       <copy file="${bigdata-rdf.lib}/slf4j-api-1.4.3.jar"
             tofile="${dist.lib}/slf4j.jar"/>
@@ -1438,7 +1438,7 @@ ${postInstallMessage}</echo>
     </target>
 
     <target name="testCompile"
-            description="compiles the test source and generates the appropiate jar files."
+            description="compiles the test source and generates the appropriate jar files."
             depends="stage">
 
       <property name="classes.dir" location="${bigdata.dir}/${build.dir}/classes" />
@@ -1469,7 +1469,8 @@ ${postInstallMessage}</echo>
 
       <property name="junit.jar" location="${bigdata.lib}/junit-3.8.1.jar" />
       <property name="cweb-junit-ext.jar" location="${bigdata.lib}/cweb-junit-ext-1.1-b3-dev.jar" />
-      <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-2.2.4.jar" />
+      <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-2.3.0.jar" />
+      <property name="sesame-store-test.jar" location="${bigdata-sails.lib}/sesame-store-testsuite-2.3.0.jar" />
 
       <property name="classes.test.dir" location="${classes.dir}/test" />
       <mkdir dir="${classes.test.dir}"/>
@@ -1478,7 +1479,7 @@ ${postInstallMessage}</echo>
       <mkdir dir="${bigdata-test.lib}"/>
       <property name="bigdata-test.jar" location="${bigdata-test.lib}/bigdata-test.jar" />
 
-      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="javac.test.classpath" value="${classes.dir}:${junit.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/classserver.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/log4j.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>javac
 </echo>
@@ -1542,12 +1543,13 @@ ${postInstallMessage}</echo>
 
         <fileset dir="${classes.test.dir}">
             <include name="**/*.class"/>
-            <include name="**/log4j.properties"/>
+            <include name="**/log4j*.properties"/>
         </fileset>
 
         <fileset dir="${bigdata.dir}/bigdata/src/test">
             <include name="**/*.csv"/>
             <include name="**/*.xml"/>
+            <include name="**/*.dtd"/>
         </fileset>
 
         <fileset dir="${bigdata.dir}/bigdata-rdf/src/test">
@@ -1645,7 +1647,7 @@ ${postInstallMessage}</echo>
           <arg value="-verbose"                   />
           <arg value="-stoppable"                 />
           <arg line="-port ${test.codebase.port}" />
-          <arg line="-dir  ${test.codebase.dir}"  />
+          <arg line="-dir  '${test.codebase.dir}'"  />
         </java>
     </target>
 
@@ -1656,7 +1658,7 @@ ${postInstallMessage}</echo>
               fork="true"
               failonerror="true">
           <arg line="-port ${test.codebase.port}" />
-          <arg line="-dir  ${test.codebase.dir}"  />
+          <arg line="-dir  '${test.codebase.dir}'"  />
           <arg value="-stop"                      />
         </java>
     </target>
@@ -1710,6 +1712,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${bigdata-test.jar}"/>
         <pathelement location="${cweb-junit-ext.jar}"/>
         <pathelement location="${sesame-sparql-test.jar}"/>
+        <pathelement location="${sesame-store-test.jar}"/>
         <pathelement location="${dist.lib}/bigdata.jar"/>
         <pathelement location="${dist.lib}/colt.jar"/>
         <pathelement location="${dist.lib}/cweb-commons.jar"/>
@@ -1730,7 +1733,7 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/zookeeper.jar"/>
       </path>
 
-      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
 
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -1846,9 +1849,12 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.striterator.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.counters.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rawstore.TestAll" todir="${test.results.dir}" unless="testName" />
+
         <test name="com.bigdata.btree.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
+
+<!-- Temporarily commented out for CI.
         <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -1859,8 +1865,12 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
+      	-->
+<!-- Temporary inclusion of select RDF and SAIL tests. -->
+        <test name="com.bigdata.rdf.store.TestLocalTripleStore" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.TestBigdataSailWithQuadsAndPipelineJoins" todir="${test.results.dir}" unless="testName" />
 
-<!--
+<!-- All tests.
         <test name="com.bigdata.TestAll" todir="${test.results.dir}" unless="testName" />
 -->
       </junit>
@@ -1874,13 +1884,90 @@ ${postInstallMessage}</echo>
 
     </target>
 
-	<target name="install-sesame-server" depends="jar">
+	<!--                                                                   -->
+	<!--                    PERFORMANCE TESTS                              -->
+	<!--                                                                   -->
+
+	<target name="run-performance-tests" depends="testCompile, lubm-jar" description="Runs a variety of performance tests.">
+		<!-- Note: This depends on the stage target. -->
+	      <path id="run.class.path.id">
+	        <pathelement location="${junit.jar}"/>
+	        <pathelement location="${bigdata-test.jar}"/>
+	        <pathelement location="${cweb-junit-ext.jar}"/>
+	        <pathelement location="${sesame-sparql-test.jar}"/>
+	        <pathelement location="${sesame-store-test.jar}"/>
+	        <pathelement location="${dist.lib}/bigdata.jar"/>
+	        <pathelement location="${dist.lib}/colt.jar"/>
+	        <pathelement location="${dist.lib}/cweb-commons.jar"/>
+	        <pathelement location="${dist.lib}/cweb-extser.jar"/>
+	        <pathelement location="${dist.lib}/ctc_utils.jar"/>
+	        <pathelement location="${dist.lib}/dsiutils.jar"/>
+	        <pathelement location="${dist.lib}/fastutil.jar"/>
+	        <pathelement location="${dist.lib}/icu4j.jar"/>
+	        <pathelement location="${dist.lib}/iris.jar"/>
+	        <pathelement location="${dist.lib}/jsk-lib.jar"/>
+	        <pathelement location="${dist.lib}/jsk-platform.jar"/>
+	        <pathelement location="${dist.lib}/log4j.jar"/>
+	        <pathelement location="${dist.lib}/lucene-analyzer.jar"/>
+	        <pathelement location="${dist.lib}/lucene-core.jar"/>
+	        <pathelement location="${dist.lib}/openrdf-sesame.jar"/>
+	        <pathelement location="${dist.lib}/slf4j.jar"/>
+	        <pathelement location="${dist.lib}/slf4j-log4j.jar"/>
+	        <pathelement location="${dist.lib}/zookeeper.jar"/>
+	      </path>
+	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
+		<!-- Generate the LUBM dataset. -->
+		<!-- Note: testLubm.xml MUST know the dataset location! -->
+		<property name="dataset" value="/tmp/bigdata-perf-lubm"/>
+		<mkdir dir="${dataset}"/>
+		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${dataset}" fork="yes">
+			<classpath>
+				<path refid="run.class.path.id"/>
+				<pathelement location="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
+			</classpath>
+			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx400m"/>
+			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
+			<arg value="-subdirs"/>
+			<arg value="-compress"/>
+			<arg value="GZip"/>
+			<arg value="-univ"/>
+			<arg value="50"/>
+			<arg value="-onto"/>
+			<arg value="http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl"/>
+		</java>
+		<!-- Run the data load, closure and query performance tests. -->
+		<java classname="com.bigdata.test.ExperimentDriver" dir="./" fork="yes">
+			<classpath refid="run.class.path.id"/>
+			<jvmarg value="-server"/>
+			<jvmarg value="-Xmx2g"/>
+			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
+			<arg value="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml"/>
+		</java>
+		<delete dir="${dataset}"/>
+	</target>
+
+	<!--                                                                   -->
+	<!--                    SESAME SERVER TARGETS                          -->
+	<!--                                                                   -->
+	
+	<target name="install.sesame.server" depends="jar">
 	
 		<!-- copy resources to Sesame webapp. -->
 		<copy toDir="${sesame.server.dir}/WEB-INF/lib" 
 				file="${build.dir}/${version}.jar"/>
 				
 		<copy toDir="${sesame.server.dir}/WEB-INF/lib" flatten="true">
+			<fileset dir="${bigdata.dir}/bigdata/lib">
+			    <include name="**/*.jar" />
+			</fileset>
+		</copy>
+		
+		<!-- copy resources to Workbench webapp. -->
+		<copy toDir="${workbench.server.dir}/WEB-INF/lib" 
+				file="${build.dir}/${version}.jar"/>
+				
+		<copy toDir="${workbench.server.dir}/WEB-INF/lib" flatten="true">
 			<fileset dir="${bigdata.dir}/bigdata/lib">
 			    <include name="**/*.jar" />
 			</fileset>
@@ -1898,6 +1985,43 @@ ${postInstallMessage}</echo>
 				file="${build.dir}/${version}.jar"/>
 				
 	</target>
+
+	<path id="samples.build.classpath">
+		<pathelement location="${build.dir}/classes" />
+		<path refid="build.classpath" />
+	</path>
+
+	<path id="samples.runtime.classpath">
+		<pathelement location="${build.dir}/samples/classes"/>
+		<path refid="samples.build.classpath" />
+	</path>
+
+	<target name="samples.compile" depends="compile">
+		<mkdir dir="${build.dir}/samples/classes" />
+		<javac destdir="${build.dir}/samples/classes" classpathref="samples.build.classpath"
+		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
+	     encoding="${javac.encoding}"
+	     	>
+			<src path="${bigdata.dir}/bigdata-sails/src/samples" />
+			<compilerarg value="-version"/>
+		</javac>
+		<!-- copy resources. -->
+		<copy toDir="${build.dir}/samples/classes">
+			<fileset dir="${bigdata.dir}/bigdata-sails/src/samples">
+				<exclude name="**/*.java" />
+			</fileset>
+		</copy>
+	</target>
+	
+	<target name="DemoSesameServer" depends="samples.compile" description="Runs the DemoSesameServer sample code.">
+		<java classname="com.bigdata.samples.remoting.DemoSesameServer"
+			failonerror="true" fork="false" logerror="true">
+			<classpath refid="samples.runtime.classpath" />
+			<arg value="http://localhost:8080/openrdf-sesame"/>
+			<arg value="bigdata"/>
+		</java>
+	</target>
+
 
 
 </project>

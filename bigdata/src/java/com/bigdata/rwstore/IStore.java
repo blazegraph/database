@@ -86,7 +86,7 @@ public interface IStore {
 	 *
 	 * @param addr the storage address to be freed
 	 **/
-	public void free(long addr);
+	public void free(long addr, int size);
 
 	/**************************************************************
 	 * Reallocates storage
@@ -94,7 +94,7 @@ public interface IStore {
 	 * @param oldAddr is the existing address to be freed
 	 * @return a stream to write to the store
 	 **/
-	public PSOutputStream realloc(long oldAddr);
+	public PSOutputStream realloc(long oldAddr, int size);
 	
 	public PSInputStream getData(long value);
 
@@ -122,7 +122,7 @@ public interface IStore {
 	 * <p>Note that the Write Once Store will not automatically preserve historical
 	 *	address information if explicit buffers are used.</p>
 	 **/	
-	public long realloc(long oldaddr, byte buf[]);
+	public long realloc(long oldaddr, int oldsze, byte buf[]);
 	
 	/**************************************************************
 	 * Used to retrieve data of a known size, typically after having
@@ -277,4 +277,17 @@ public interface IStore {
 	public void absoluteWriteAddress(long addr, int threshold, long addr2);
 
 	public int getAddressSize();
+
+	/**
+	 * Called by the PSOutputStream to register the header bloc of a blob.  The store
+	 * must return a new address that is used to retrieve the blob header. This double
+	 * indirection is required to be able to manage the blobs, since the blob header
+	 * itself is of variable size and is handled by the standard FixedAllocators in the
+	 * RWStore.  For a WORM implementation the address of the blob header can be returned
+	 * directly
+	 * 
+	 * @param addr
+	 * @return
+	 */
+	public int registerBlob(int addr);
 }

@@ -146,7 +146,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
     }
 
     @Override
-    protected boolean isConditionSatisified(final WatchedEvent event)
+    protected boolean isConditionSatisfied(final WatchedEvent event)
             throws KeeperException, InterruptedException {
 
         if(cancelled) {
@@ -181,7 +181,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
             
         }
         
-        return isConditionSatisified();
+        return isConditionSatisfied();
 
     }
 
@@ -203,7 +203,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
      * @return Return <code>true</code> iff the process holds the lock
      */
     @Override
-    protected boolean isConditionSatisified() throws KeeperException,
+    protected boolean isConditionSatisfied() throws KeeperException,
             InterruptedException {
 
         if(cancelled) {
@@ -521,7 +521,7 @@ public class ZNodeLockWatcher extends AbstractZNodeConditionWatcher {
                  * Note: isCancelled() must be tested after
                  * isCondititionSatisified() since it is set as a side effect.
                  */
-                final boolean ret = watcher.isConditionSatisified()
+                final boolean ret = watcher.isConditionSatisfied()
                         && !watcher.isCancelled();
                 
                 if (INFO)
