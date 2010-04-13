@@ -81,7 +81,7 @@ public class TestAll extends TestCase {
          * requires the scale-out architecture. SIDs are not supported yet.
          */
         suite.addTestSuite(TestAsynchronousStatementBufferFactory.class);
-        
+
         return suite;
         
     }

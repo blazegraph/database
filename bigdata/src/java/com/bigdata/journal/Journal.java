@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
@@ -214,22 +215,22 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
-    synchronized public CounterSet getCounters() {
+    public CounterSet getCounters() {
 
-        if (counters == null) {
+//        if (counters == null) {
 
-            counters = super.getCounters();
+        final CounterSet counters = super.getCounters();
             
-            counters.attach(concurrencyManager.getCounters());
-    
-            counters.attach(localTransactionManager.getCounters());
+        counters.attach(concurrencyManager.getCounters());
+
+        counters.attach(localTransactionManager.getCounters());
             
-        }
+//        }
         
         return counters;
         
     }
-    private CounterSet counters;
+//    private CounterSet counters;
     
     /*
      * IResourceManager
@@ -1014,41 +1015,105 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     /*
      * global row store.
+     * 
+     * Note: An atomic reference provides us with a "lock" object which doubles
+     * as a reference. We are not relying on its CAS properties.
      */
-    synchronized public SparseRowStore getGlobalRowStore() {
+    public SparseRowStore getGlobalRowStore() {
 
-        if (globalRowStoreHelper == null) {
+        GlobalRowStoreHelper t = globalRowStoreHelper.get();
+        
+        if (t == null) {
 
-            globalRowStoreHelper = new GlobalRowStoreHelper(this);
+            synchronized (globalRowStoreHelper) {
+
+                /*
+                 * Note: Synchronized to avoid race conditions when updating
+                 * (this allows us to always return our reference if we create a
+                 * new helper instance).
+                 */
+
+                t = globalRowStoreHelper.get();
+
+                if (t == null) {
+
+                    globalRowStoreHelper
+                            .set(t = new GlobalRowStoreHelper(this));
+
+                }
+                
+            }
 
         }
 
-        return globalRowStoreHelper.getGlobalRowStore();
+        return globalRowStoreHelper.get().getGlobalRowStore();
 
     }
-    private GlobalRowStoreHelper globalRowStoreHelper;
+    final private AtomicReference<GlobalRowStoreHelper> globalRowStoreHelper = new AtomicReference<GlobalRowStoreHelper>();
 
     /*
      * global file system.
+     * 
+     * Note: An atomic reference provides us with a "lock" object which doubles
+     * as a reference. We are not relying on its CAS properties.
      */
-    synchronized public BigdataFileSystem getGlobalFileSystem() {
+    public BigdataFileSystem getGlobalFileSystem() {
 
-        if (globalFileSystemHelper == null) {
+        GlobalFileSystemHelper t = globalFileSystemHelper.get();
+        
+        if (t == null) {
 
-            globalFileSystemHelper = new GlobalFileSystemHelper(this);
+            synchronized (globalFileSystemHelper) {
+
+                /*
+                 * Note: Synchronized to avoid race conditions when updating
+                 * (this allows us to always return our reference if we create a
+                 * new helper instance).
+                 */
+
+                t = globalFileSystemHelper.get();
+
+                if (t == null) {
+
+                    globalFileSystemHelper
+                            .set(t = new GlobalFileSystemHelper(this));
+
+                }
+                
+            }
 
         }
 
-        return globalFileSystemHelper.getGlobalFileSystem();
+        return globalFileSystemHelper.get().getGlobalFileSystem();
 
     }
-    private GlobalFileSystemHelper globalFileSystemHelper;
+    final private AtomicReference<GlobalFileSystemHelper> globalFileSystemHelper = new AtomicReference<GlobalFileSystemHelper>();
 
     protected void discardCommitters() {
 
         super.discardCommitters();
 
-        globalRowStoreHelper = null;
+        synchronized (globalRowStoreHelper) {
+
+            /*
+             * Note: Synchronized even though atomic. We are using this as an
+             * mutable lock object without regard to its CAS behavior.
+             */
+
+            globalRowStoreHelper.set(null);
+
+        }
+        
+        synchronized (globalFileSystemHelper) {
+
+            /*
+             * Note: Synchronized even though atomic. We are using this as an
+             * mutable lock object without regard to its CAS behavior.
+             */
+
+            globalFileSystemHelper.set(null);
+            
+        }
 
     }
     

@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<experiment class="com.bigdata.rdf.stress.LoadClosureAndQueryTest">
+	<defaults>
+		<property name="nparallel">1</property>
+		<property name="ntrials">10</property>
+		<property name="query">bigdata-lubm/resources/config/config.query.sparql</property>
+		<property name="ontology">bigdata-lubm/resources/config/univ-bench.owl</property>
+		<property name="data">bigdata-rdf/src/resources/data/lehigh/U1</property>
+		<property name="ndataServices">1</property>
+		<property name="com.bigdata.journal.AbstractJournal.initialExtent">209715200</property>
+		<property name="com.bigdata.journal.AbstractJournal.maximumExtent">209715200</property>
+		<!-- B+Tree and query options. -->
+		<property name="com.bigdata.btree.BTree.branchingFactor">64</property>
+		<property name="com.bigdata.btree.writeRetentionQueue.capacity">4000</property>
+		<property name="com.bigdata.relation.accesspath.IBuffer.chunkCapacity">100</property>
+		<property name="com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity">1000</property>
+		<property name="com.bigdata.relation.accesspath.AbstractAccessPath.fullyBufferedReadThreadshold">2000</property>
+		<property name="maxParallelSubqueries">5</property>
+		<!-- Triple store options -->
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers">false</property>
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.textIndex">false</property>
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.justify">false</property>
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.termCache.capacity">50000</property>
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.bloomFilter">true</property>
+		<!--  Also see NoAxioms and NoVocabulary -->
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.axiomsClass">com.bigdata.rdf.axioms.RdfsAxioms</property>
+		<property name="com.bigdata.rdf.store.AbstractTripleStore.vocabularyClass">com.bigdata.rdf.vocab.RDFSVocabulary</property>
+		<!-- Inference options. -->
+		<property name="com.bigdata.rdf.rules.InferenceEngine.forwardChainOwlInverseOf">true</property>
+		<property name="com.bigdata.rdf.rules.InferenceEngine.forwardChainOwlTransitiveProperty">true</property>
+		<!-- Data loader options. -->
+		<property name="com.bigdata.rdf.store.DataLoader.commit">None</property>
+		<property name="com.bigdata.rdf.store.DataLoader.closure">None</property>
+		<!-- Sail Options. -->
+		<property name="com.bigdata.rdf.sail.nativeJoins">true</property>
+		<property name="com.bigdata.rdf.sail.truthMaintenance">false</property>
+	</defaults>
+	<condition>
+		<property name="databaseModel">LTS</property>
+		<property name="com.bigdata.journal.AbstractJournal.bufferMode">DiskWORM</property>
+	</condition>
+</experiment>

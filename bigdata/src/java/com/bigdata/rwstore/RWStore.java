@@ -128,10 +128,19 @@ import com.bigdata.util.ChecksumUtility;
  * allocation rounding and 32 bits at a time allocation. Note that 4181 * 64 =
  * 267,584 and 256K is 262,144
  * 
- * TODO HA Checksums. To support HA and reliability we will add checksums to all
- * metadata including MetaAllocation blocks and Allocators. We should also
- * consider adding checksums to all data allocations, for GPO binary storage
- * this is also especially relevant.
+ * All data is checksummed, both allocated/saved data and the allocation blocks.
+ * 
+ * BLOB allocation is not handled using chained data buffers but with a blob
+ * header record.  This is indicated with a BlobAllocator that provides indexed
+ * offsets to the header record (the address encodes the BlobAllocator and the
+ * offset to the address). The header record stores the number of component
+ * allocations and the address of each.
+ * 
+ * This approach makes for much more efficient freeing/re-allocation of Blob
+ * storage, in particular avoiding the need to read in the component blocks
+ * to determine chained blocks for freeing.  This is particularly important
+ * for larger stores where a disk cache could be flushed through simply freeing
+ * BLOB allocations.
  */
 
 public class RWStore implements IStore {
@@ -177,6 +186,9 @@ public class RWStore implements IStore {
 
 	// lists of free alloc blocks
 	ArrayList m_freeFixed[];
+	
+	// lists of free blob allocators
+	ArrayList m_freeBlobs;
 
 	// lists of blocks requiring commitment
 	ArrayList m_commitList;
@@ -204,15 +216,17 @@ public class RWStore implements IStore {
 		for (int i = 0; i < numFixed; i++) {
 			m_freeFixed[i] = new ArrayList();
 		}
+		
+		m_freeBlobs = new ArrayList();
 
 		m_transactionCount = 0;
 		m_committing = false;
 
 		try {
-			// m_writeCache = new RWWriteCacheService(5, m_fd, "rw"); // choose
-			// 5 buffers for the hell of it
-			m_writeCache = new RWWriteCacheService(10, m_fd, "rw"); // hack for
-																	// testing
+			/**
+			 * TODO: Configure number of WriteCache buffers for WriteCacheService
+			 */
+			m_writeCache = new RWWriteCacheService(6, m_fd, "rw");
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -247,6 +261,9 @@ public class RWStore implements IStore {
 		reopen(fileMetadataView);
 	}
 
+	public void reopen() {
+		reopen(m_fmv);
+	}
 	public void reopen(FileMetadataView fileMetadataView) {
 		m_fmv = fileMetadataView;
 		m_fd = fileMetadataView.getFile();
@@ -421,22 +438,29 @@ public class RWStore implements IStore {
 
 				m_raf.seek(addr);
 				m_raf.readFully(buf);
-
+				
 				DataInputStream strBuf = new DataInputStream(new ByteArrayInputStream(buf));
 
-				int allocSize = strBuf.readInt();
-				Allocator allocator = new FixedAllocator(allocSize, m_preserveSession, m_writeCache);
+				int allocSize = strBuf.readInt(); // will return Blob startAddress if Blob and be < 0
+				Allocator allocator = null;
+				if (allocSize > 0) {
+					int index = 0;
+					int fixedSize = MIN_FIXED_ALLOC;
+					while (fixedSize < allocSize)
+						fixedSize = 64 * ALLOC_SIZES[++index];
+
+					allocator = new FixedAllocator(allocSize, m_preserveSession, m_writeCache);
+					
+					allocator.setFreeList(m_freeFixed[index]);
+				} else {
+					allocator = new BlobAllocator(this, allocSize);
+					allocator.setFreeList(m_freeBlobs);
+				}
 
 				allocator.read(strBuf);
 
-				int index = 0;
-				int fixedSize = MIN_FIXED_ALLOC;
-				while (fixedSize < allocSize)
-					fixedSize = 64 * ALLOC_SIZES[++index];
 
 				blocks.add(allocator);
-
-				allocator.setFreeList(m_freeFixed[index]);
 
 				allocator.setDiskAddr(addr);
 			}
@@ -516,13 +540,59 @@ public class RWStore implements IStore {
 	private int m_frees = 0;
 	private long m_nativeAllocBytes = 0;
 
+	/**
+	 * If the buf[] size is greater than the maximum fixed allocation, then the direct read
+	 * will be the blob header record.  In this case we should hand over the streaming to a PSInputStream.
+	 * 
+	 * FIXME: For now we do not use the PSInputStream but instead process directly
+	 * 
+	 * If it is a BlobAllocation, then the BlobAllocation address points to the address of the BlobHeader
+	 * record.  
+	 */
 	public void getData(long addr, byte buf[]) {
+		getData(addr, buf, 0, buf.length);
+	}
+	
+	public void getData(long addr, byte buf[], int offset, int length) {
 		if (addr == 0) {
 			return;
 		}
 
 		synchronized (this) {
-			// m_writes.flush();
+			if (length > (MAX_FIXED_ALLOC-4)) {
+				try {
+					int nblocks = 1 + (length/(MAX_FIXED_ALLOC-4));
+					byte[] hdrbuf = new byte[4 * (nblocks + 1)];
+					BlobAllocator ba = (BlobAllocator) getBlock((int) addr);
+					getData(ba.getBlobHdrAddress(getOffset((int) addr)), hdrbuf); // read in header 
+					DataInputStream hdrstr = new DataInputStream(new ByteArrayInputStream(hdrbuf));
+					int rhdrs = hdrstr.readInt();
+					if (rhdrs != nblocks) {
+						throw new IllegalStateException("Incompatible BLOB header record, expected: " + nblocks + ", got: " + rhdrs);
+					}
+					int[] blobHdr = new int[nblocks];
+					for (int i = 0; i < nblocks; i++) {
+						blobHdr[i] = hdrstr.readInt();
+					}
+					// Now we have the header addresses, we can read MAX_FIXED_ALLOCS until final buffer
+					int cursor = 0;
+					int rdlen = MAX_FIXED_ALLOC-4;
+					for (int i = 0; i < nblocks; i++) {
+						if (i == (nblocks - 1)) {
+							rdlen = length - cursor;
+						}
+						getData(blobHdr[i], buf, cursor, rdlen);
+						cursor += rdlen;
+					}
+					
+					return;
+					
+				} catch (IOException e) {
+					e.printStackTrace();
+					
+					throw new IllegalStateException("Unable to restore Blob allocation", e);
+				}
+			}
 
 			try {
 				long paddr = physicalAddress((int) addr);
@@ -536,33 +606,29 @@ public class RWStore implements IStore {
 				 */
 				ByteBuffer bbuf = m_writeCache.read(paddr);
 				if (bbuf != null) {
-					byte[] in = bbuf.array(); // reads in with checksum - no nee to check!
-					if (in.length != (buf.length+4)) {
+					byte[] in = bbuf.array(); // reads in with checksum - no need to check if in cache
+					if (in.length != (length+4)) {
 						throw new IllegalStateException("Incompatible buffer size for addr: " + addr + ", " + in.length
-								+ " != " + buf.length);
+								+ " != " + length);
 					}
-					for (int i = 0; i < buf.length; i++) {
-						buf[i] = in[i];
+					for (int i = 0; i < length; i++) {
+						buf[offset+i] = in[i];
 					}
 					m_cacheReads++;
 				} else {
 					m_raf.seek(paddr);
-					m_raf.readFully(buf, 0, buf.length);
+					m_raf.readFully(buf, offset, length);
 					int chk = m_raf.readInt(); // read checksum
-					if (chk != ChecksumUtility.getCHK().checksum(buf, buf.length)) {
+					if (chk != ChecksumUtility.getCHK().checksum(buf, offset, length)) {
 						throw new IllegalStateException("Invalid data checksum");
 					}
 					
 					m_diskReads++;
 				}
-			} catch (IOException e) {
-				throw new StorageTerminalError("Unable to read data", e);
-			} catch (IllegalStateException e) {
-				// TODO Auto-generated catch block
+			} catch (Exception e) {
 				e.printStackTrace();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				
+				throw new IllegalStateException("Unable to read data", e);
 			}
 		}
 	}
@@ -598,14 +664,15 @@ public class RWStore implements IStore {
 	/**
 	 * free
 	 * 
-	 * Biggest problem is finding the block. Sorted blocks helps this
-	 * enormously, aint with the block type encoding in the address.
+	 * If the address is greater than zero than it is interpreted as a physical address and
+	 * the allocators are searched to find the allocations.  Otherwise the address directly encodes
+	 * the allocator index and bit offset, allowing direct access to clear the allocation.
 	 * 
-	 * The encoding is made by adding to the address. 0 is added for a minimum
-	 * fixed block and then 1, 2, 3 etc for the increasing fixed sizes. 15 is
-	 * added for a blob.
+	 * A blob allocator contains the allocator index and offset, so an allocator contains up to
+	 * 245 blob references.
+	 * @param sze 
 	 */
-	public void free(long laddr) {
+	public void free(long laddr, int sze) {
 
 		int addr = (int) laddr;
 
@@ -620,18 +687,14 @@ public class RWStore implements IStore {
 			while (addr != 0) {
 				Allocator alloc = getBlockByAddress(addr);
 				long pa = alloc.getPhysicalAddress(getOffset(addr));
-				if (pa == 65536L) {
-					System.out.println("Freeing 65536");
-				}
 				m_writeCache.clearWrite(pa);
-				alloc.free(addr);
+				alloc.free(addr, sze);
 				m_frees++;
 	
 				if (!m_commitList.contains(alloc)) {
 					m_commitList.add(alloc);
 				}
 	
-				// FIXME: Handle Blob allocations!
 				addr = 0;
 			}
 		}
@@ -659,6 +722,9 @@ public class RWStore implements IStore {
 	 * support storage of objects such as Bloom filters. These could be upto
 	 * 1Mb, so we'd need to allocate a set (not necessarily 32), of these
 	 * objects and provide an enhanced interface.
+	 * 
+	 * TODO: Alternatively, and more generally, a BLOB mechanism would allocate
+	 * an array of blocks and store/write into a master block.
 	 */
 	boolean allocCurrent = false;
 
@@ -701,8 +767,8 @@ public class RWStore implements IStore {
 
 					addr = allocator.alloc(this, size);
 
-					if (log.isInfoEnabled())
-						log.info("New FixedAllocator for " + cmp + " byte allocations at " + addr);
+					if (log.isDebugEnabled())
+						log.debug("New FixedAllocator for " + cmp + " byte allocations at " + addr);
 
 					m_allocs.add(allocator);
 				} else {
@@ -724,9 +790,6 @@ public class RWStore implements IStore {
 				if (pa == 0L) {
 					throw new IllegalStateException();
 				}
-				if (pa == 65536L) {
-					System.out.println("Allocated 65536 from " + addr);
-				}
 
 				m_allocations++;
 				m_nativeAllocBytes += size;
@@ -747,21 +810,47 @@ public class RWStore implements IStore {
 	 * The base realloc method that returns a stream for writing to rather than
 	 * handle the reallocation immediately.
 	 **/
-	public PSOutputStream realloc(long oldAddr) {
-		free(oldAddr);
+	public PSOutputStream realloc(long oldAddr, int size) {
+		free(oldAddr, size);
 
 		return PSOutputStream.getNew(this);
 	}
 	
 	/****************************************************************************
-	 * Called by PSOutputStream to make to actual allocation.
+	 * Called by PSOutputStream to make to actual allocation or directly by lower
+	 * level API clients.
+	 * 
+	 * If the allocation is for greater than MAX_FIXED_ALLOC, then a PSOutputStream
+	 * is used to manage the chained buffers.
 	 **/
 	public long alloc(byte buf[], int size) {
+		if (size >= MAX_FIXED_ALLOC) {
+			if (log.isDebugEnabled())
+				log.debug("BLOB ALLOC: " + size);
+			
+			PSOutputStream psout = PSOutputStream.getNew(this);
+			try {
+				int i = 0;
+				int lsize = size - 512;
+				while (i < lsize) {
+					psout.write(buf, i, 512); // add 512 bytes at a time
+					i += 512;
+				}
+				psout.write(buf, i, size - i);
+				
+				return psout.save();
+			} catch (IOException e) {
+				throw new RuntimeException("Close Store", e);
+			}
+			
+		}
+		
 		int newAddr = alloc(size+4); // allow size for checksum
 		
 		int chk = ChecksumUtility.getCHK().checksum(buf, size);
 
 		try {
+			
 			m_writeCache.writeChk(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
 		} catch (IllegalStateException e) {
 			reopen(m_fmv);
@@ -777,12 +866,16 @@ public class RWStore implements IStore {
 	/****************************************************************************
 	 * Fixed buffer size reallocation
 	 **/
-	public long realloc(long oldAddr, byte buf[]) {
-		free(oldAddr);
+	public long realloc(long oldAddr, int oldSize, byte buf[]) {
+		free(oldAddr, oldSize);
 
 		return alloc(buf, buf.length);
 	}
 
+	/**
+	 * Must handle valid possibility that a request to start/commit transaction
+	 * could be made within a commitCallback request
+	 */
 	synchronized public void startTransaction() {
 		if (m_committing) {
 			return;
@@ -792,12 +885,13 @@ public class RWStore implements IStore {
 	}
 
 	synchronized public void commitTransaction() {
-		System.out.println("Commit Transaction");
-		
 		if (m_committing) {
 			return;
 		}
 
+		if (log.isDebugEnabled())
+			log.debug("Commit Transaction");
+		
 		if (--m_transactionCount <= 0) {
 			commitChanges();
 
@@ -948,19 +1042,23 @@ public class RWStore implements IStore {
 				}
 
 				// Allocate storage for metaBits
+				long oldMetaBits = m_metaBitsAddr;
+				int oldMetaBitsSize = m_metaBitsSize * 4;
 				m_metaBitsAddr = alloc(getRequiredMetaBitsStorage());
+				free(oldMetaBits, oldMetaBitsSize);
 
 				// save allocation headers
 				Iterator iter = m_commitList.iterator();
 				while (iter.hasNext()) {
-					FixedAllocator allocator = (FixedAllocator) iter.next();
+					Allocator allocator = (Allocator) iter.next();
 					long old = allocator.getDiskAddr();
 					metaFree(old);
+					
 					long naddr = metaAlloc();
 					allocator.setDiskAddr(naddr);
-
+					
 					if (log.isDebugEnabled())
-						log.debug("Update allocator " + allocator.m_index + ", old addr: " + old + ", new addr: "
+						log.debug("Update allocator " + allocator.getIndex() + ", old addr: " + old + ", new addr: "
 								+ naddr);
 
 					try {
@@ -1064,7 +1162,7 @@ public class RWStore implements IStore {
 		long lnextAlloc = convertAddr(m_nextAllocation);
 
 		if (lmetaStart <= lnextAlloc) {
-			throw new Error("Core Allocation Error");
+			throw new IllegalStateException("Core Allocation Error");
 		}
 	}
 
@@ -1157,6 +1255,8 @@ public class RWStore implements IStore {
 			} else {
 				clrBit(m_metaTransientBits, bit);
 			}
+			
+			m_writeCache.clearWrite(addr);
 		}
 	}
 
@@ -1243,13 +1343,6 @@ public class RWStore implements IStore {
 
 			adjust = -1200 + (m_nextAllocation - m_metaStartAddr) + (m_fileSize - m_metaStartAddr) + (m_fileSize / 10);
 
-			StringBuffer dbg = new StringBuffer("Extend file, adjust: " + adjust);
-			dbg.append("m_nextAllocation: " + m_nextAllocation);
-			dbg.append(", m_metaStartAddr: " + m_metaStartAddr);
-			dbg.append(", m_fileSize: " + m_fileSize);
-
-			// System.out.println(dbg.toString()); // DEBUG!!
-
 			if (adjust > 0) {
 				throw new Error("Extend file is NEGATIVE!!");
 			}
@@ -1262,9 +1355,6 @@ public class RWStore implements IStore {
 				throw new Error("System greater than maximum size");
 			}
 
-			// System.out.println("Extending file from: " + fromAddr + " to " +
-			// convertAddr(m_fileSize));
-
 			long toAddr = convertAddr(m_fileSize);
 			if (log.isInfoEnabled()) log.info("Extending file to: " + toAddr);
 			m_raf.setLength(toAddr);
@@ -1275,14 +1365,6 @@ public class RWStore implements IStore {
 			m_raf.readFully(buf);
 			m_raf.seek(toAddr - sze);
 			m_raf.write(buf);
-			// while (fromAddr > oldMetaStart) {
-			// fromAddr -= 1024;
-			// toAddr -= 1024;
-			// m_raf.seek(fromAddr);
-			// m_raf.readFully(buf);
-			// m_raf.seek(toAddr);
-			// m_raf.write(buf);
-			// }
 
 			// adjust alloc offsets
 			ArrayList list = m_allocs;
@@ -1584,7 +1666,7 @@ public class RWStore implements IStore {
 	 * Needed by PSOutputStream for BLOB buffer chaining.
 	 **/
 	public int bufferChainOffset() {
-		return 8188; // 8192 - 4
+		return MAX_FIXED_ALLOC - 4;
 	}
 
 	/*********************************************************************************************
@@ -1691,15 +1773,53 @@ public class RWStore implements IStore {
 	}
 
 	public long getTotalAllocations() {
-		// TODO Auto-generated method stub
 		return m_allocations;
 	}
 	public long getTotalFrees() {
-		// TODO Auto-generated method stub
 		return m_frees;
 	}
 	public long getTotalAllocationsSize() {
-		// TODO Auto-generated method stub
 		return m_nativeAllocBytes;
+	}
+
+	/**
+	 * A Blob Allocator maintains a list of Blob headers.  The allocator stores upto 255 blob headers plus
+	 * a checksum.
+	 * When a request is made to read the blob data, the blob allocator retrieves the blob header and reads the data
+	 * from that into the passed byte array.
+	 */
+	public int registerBlob(int addr) {
+		if (m_freeBlobs == null) {
+			m_freeBlobs = new ArrayList();
+		}
+		BlobAllocator ba = null;
+		if (m_freeBlobs.size() > 0) {
+			ba = (BlobAllocator) m_freeBlobs.get(0);
+		}
+		if (ba == null) {
+			Allocator lalloc = (Allocator) m_allocs.get(m_allocs.size()-1);
+			int psa = lalloc.getRawStartAddr(); // previous block start address
+			assert (psa-1) < m_nextAllocation;
+			ba = new BlobAllocator(this, psa-1);
+			ba.setFreeList(m_freeBlobs); // will add itself to the free list
+			ba.setIndex(m_allocs.size());
+			m_allocs.add(ba);
+		}
+		
+		if (!m_commitList.contains(ba)) {
+			m_commitList.add(ba);
+		}
+		
+		return ba.register(addr);
+	}
+
+	public void addToCommit(Allocator allocator) {
+		if (!m_commitList.contains(allocator)) {
+			m_commitList.add(allocator);
+		}
+	}
+
+	public Allocator getAllocator(int i) {
+		return (Allocator) m_allocs.get(i);
 	}
 }

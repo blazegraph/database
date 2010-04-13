@@ -79,29 +79,29 @@ public class TestAll extends TestCase {
 //        suite.addTest( com.bigdata.rdf.store.TestLocalTripleStoreWithIsolatableIndices.suite() );
 
         // @todo test quad store for LDS and EDS.
-        suite.addTest( com.bigdata.rdf.store.TestLocalQuadStore.suite() );
+//        suite.addTest( com.bigdata.rdf.store.TestLocalQuadStore.suite() );
 
-        suite.addTest( TestScaleOutTripleStoreWithLocalDataServiceFederation.suite() );
+//        suite.addTest( TestScaleOutTripleStoreWithLocalDataServiceFederation.suite() );
 
-        suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
-                        .suite());
+//        suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithEmbeddedFederation
+//                        .suite());
 
-        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
-                "false"))
-                || !JiniServicesHelper.isJiniRunning()) {
-
-            /*
-             * Test scale-out RDF database.
-             * 
-             * Note: This test suite sets up a local bigdata federation for each
-             * test. See the test suite for more information about required Java
-             * properties.
-             */
-
-            suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithJiniFederation
-                    .suite());
-
-        }
+//        if (Boolean.parseBoolean(System.getProperty("maven.test.services.skip",
+//                "false"))
+//                || !JiniServicesHelper.isJiniRunning()) {
+//
+//            /*
+//             * Test scale-out RDF database.
+//             * 
+//             * Note: This test suite sets up a local bigdata federation for each
+//             * test. See the test suite for more information about required Java
+//             * properties.
+//             */
+//
+//            suite.addTest(com.bigdata.rdf.store.TestScaleOutTripleStoreWithJiniFederation
+//                    .suite());
+//
+//        }
 
         return suite;
         
