@@ -34,6 +34,9 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.Random;
 
+import org.apache.log4j.Logger;
+
+import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 
 import com.bigdata.rawstore.Bytes;
@@ -68,7 +71,8 @@ import com.bigdata.rawstore.Bytes;
  */
 public class TestRandomAccessFileSynchronousWrites extends TestCase {
 
-    Random r = new Random();
+    protected static final Logger log = Logger
+            .getLogger(TestRandomAccessFileSynchronousWrites.class);
 
     public TestRandomAccessFileSynchronousWrites() {
         
@@ -81,21 +85,17 @@ public class TestRandomAccessFileSynchronousWrites extends TestCase {
     }
 
     /**
-     * Performance comparision when NOT requesting synchronous IO.
-     */
-    public void test_syncWrites_rw() throws IOException {
-
-        doSyncWriteTest("rw");
-        
-    }
-
-    /**
      * Test verifies whether or not the platform appears to perform synchronous
      * IOs when creating a {@link RandomAccessFile} with mode <code>rws</code>.
      */
     public void test_syncWrites_rds() throws IOException {
 
-        doSyncWriteTest("rws");
+        // Performance comparison when NOT requesting synchronous IO.
+        final Stats rw = doSyncWriteTest("rw");
+        
+        final Stats rws = doSyncWriteTest("rws");
+
+        assertWriteCacheDisabled(rw, rws);
         
     }
     
@@ -105,10 +105,54 @@ public class TestRandomAccessFileSynchronousWrites extends TestCase {
      */
     public void test_syncWrites_rdd() throws IOException {
 
-        doSyncWriteTest("rwd");
+        // Performance comparison when NOT requesting synchronous IO.
+        final Stats rw = doSyncWriteTest("rw");
+        
+        final Stats rwd = doSyncWriteTest("rwd");
+
+        assertWriteCacheDisabled(rw, rwd);
         
     }
-    
+
+    /**
+     * Verify that the request to sync to disk with each IO (<code>rws</code> or
+     * <code>rwd</code>) was honored by the underlying platform.
+     * 
+     * @param baseline
+     *            The <code>rw</code> performance {@link Stats}.
+     * @param syncio
+     *            The performance for either the <code>rws</code> or
+     *            <code>rwd</code> modes, which require synchronization to the
+     *            disk after each write.
+     * 
+     * @throws AssertionFailedError
+     *             unless the write IOPs are significantly lower for the
+     *             <i>syncio</i> condition.
+     */
+    protected void assertWriteCacheDisabled(final Stats baseline,
+            final Stats syncio) {
+
+        final double ratio = Math
+                .round(100. * (syncio.writesPerSec / (double) baseline.writesPerSec)) / 100.;
+
+        final String msg = "ratio=" + ratio + ", " + baseline + ", " + syncio;
+        
+        if (ratio > .5) {
+
+            /*
+             * We are seeing more write operations per second (or more bytes
+             * written per second) than can reasonably be expected synchronous
+             * writes.
+             */
+
+            fail("Write cache in effect: " + msg);
+
+        }
+        
+        System.out.println(msg);
+        
+    }
+
     /**
      * Test helper attempts to detect when a request for synchronous writes is
      * being ignored by the platform.
@@ -135,7 +179,7 @@ public class TestRandomAccessFileSynchronousWrites extends TestCase {
      *  elapsed=1797ms, mode=rwd, writesPerSec=2782, bytesPerSec=2849193
      *  elapsed=1969ms, mode=rws, writesPerSec=2539, bytesPerSec=2600305
      *  elapsed=62ms, mode=rw, writesPerSec=80645, bytesPerSec=82580645
-     *  
+     * 
      * </pre>
      * 
      * Based on the data above, you can see that merely requesting synchronous
@@ -143,21 +187,13 @@ public class TestRandomAccessFileSynchronousWrites extends TestCase {
      * 
      * @param mode
      *            The file mode to be used.
+     * 
+     * @return The {@link Stats} for that mode.
      */
-    protected void doSyncWriteTest(String mode) throws IOException {
-        
-        /*
-         * The maximum #of records written per second that we believe can be
-         * achieved using synchronous IO.
-         */
-        final int MAX_BELIEVABLE_WRITES_PER_SEC = 5000; 
+    protected Stats doSyncWriteTest(final String mode) throws IOException {
 
-        /*
-         * The maximum #of bytes written per second that we believe can be
-         * achieved using synchronous IO.
-         */
-        final int MAX_BELIEVABLE_BYTES_WRITTEN_PER_SEC = 40 * Bytes.megabyte32;
-        
+        final Random r = new Random();
+
         // #of records to write.
         final int LIMIT = 5000;
         
@@ -173,7 +209,7 @@ public class TestRandomAccessFileSynchronousWrites extends TestCase {
         r.nextBytes(record);
 
         // create a temp file.
-        File file = File.createTempFile("test", ".tmp");
+        final File file = File.createTempFile(getName(), ".tmp");
 
         try {
 
@@ -210,29 +246,9 @@ public class TestRandomAccessFileSynchronousWrites extends TestCase {
                 
                 final long bytesPerSec = (long)((LIMIT*RECSIZE*1000./elapsed)+.5);
                 
-                System.out.println("elapsed=" + elapsed + "ms, mode=" + mode
-                        + ", writesPerSec=" + writesPerSec + ", bytesPerSec="
-                        + bytesPerSec ); // + ", file=" + file);
-
-                // if invoked with "rws" or "rwd".
-                boolean test = mode.equals("rws")||mode.equals("rwd");
+                final Stats stats = new Stats(mode,elapsed,writesPerSec,bytesPerSec);
                 
-                if (test) {
-                    
-                    if (writesPerSec > MAX_BELIEVABLE_WRITES_PER_SEC
-                            || bytesPerSec > MAX_BELIEVABLE_BYTES_WRITTEN_PER_SEC) {
-
-                        /*
-                         * We are seeing more write operations per second (or
-                         * more bytes written per second) than can reasonably be
-                         * expected synchronous writes.
-                         */
-
-                        fail("Write cache in effect: writesPerSec="
-                                + writesPerSec + ", bytesPerSec=" + bytesPerSec);
-                    }
-                    
-                }
+                return stats;
                 
             } finally {
 
@@ -242,7 +258,34 @@ public class TestRandomAccessFileSynchronousWrites extends TestCase {
 
         } finally {
 
-            file.delete();
+            if (!file.delete())
+                log.warn("Could not delete: file=" + file);
+
+        }
+
+    }
+
+    private static class Stats {
+
+        final String mode;
+
+        final long elapsed, writesPerSec, bytesPerSec;
+
+        public Stats(final String mode, final long elapsed,
+                final long writesPerSec, final long bytesPerSec) {
+
+            this.mode = mode;
+            this.elapsed = elapsed;
+            this.writesPerSec = writesPerSec;
+            this.bytesPerSec = bytesPerSec;
+
+        }
+
+        public String toString() {
+
+            return "elapsed=" + elapsed + "ms, mode=" + mode
+                    + ", writesPerSec=" + writesPerSec + ", bytesPerSec="
+                    + bytesPerSec;
 
         }
 
