@@ -297,7 +297,7 @@ public class JournalTransactionService extends AbstractTransactionService {
              * Note: This task MUST go through the ConcurrencyManager to obtain
              * its locks.
              */
-            concurrencyManager./*getWriteService().*/submit(task).get();
+            concurrencyManager./* getWriteService(). */submit(task).get();
 
             /*
              * FIXME The state changes for the local tx should be atomic across
