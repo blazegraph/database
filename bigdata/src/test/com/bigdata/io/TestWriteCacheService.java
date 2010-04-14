@@ -68,25 +68,27 @@ public class TestWriteCacheService extends TestCase2 {
         
     }
     
-    public void test_simpleRWService() {
+    public void test_simpleRWService() throws IOException {
         
-        File file;
+        final File file = File.createTempFile(getName(), ".rw.tmp");
 		try {
-			file = File.createTempFile(getName(), ".rw.tmp");
 
 			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, "rw");
 			
 		} catch (Exception e) {
 			fail("Unexpected  Exception", e);
+		} finally {
+		    if(!file.delete()) {
+		        log.warn("Could not delete: file="+file);
+		    }
 		}
         
     }
     
-    public void test_simpleDataRWService() {
+    public void test_simpleDataRWService() throws IOException {
         
-        File file;
+        final File file = File.createTempFile(getName(), ".rw.tmp");
 		try {
-			file = File.createTempFile(getName(), ".rw.tmp");
 
 			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, "rw");
 			
@@ -104,6 +106,10 @@ public class TestWriteCacheService extends TestCase2 {
             }
 		} catch (Exception e) {
 			fail("Unexpected  Exception", e);
+		} finally {
+		    if(!file.delete()) {
+		     log.warn("Could not delete: file="+file);   
+		    }
 		}
         
     }

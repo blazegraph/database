@@ -1828,7 +1828,7 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
 
-<!-- Temporarily commented out for CI.
+<!-- Temporarily commented out for CI. -->
         <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -1839,16 +1839,21 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
-      	-->
-<!-- Temporary inclusion of select RDF and SAIL tests. -->
+      	<!-- -->
+<!-- Temporary inclusion of select RDF and SAIL tests. 
         <test name="com.bigdata.rdf.store.TestLocalTripleStore" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestBigdataSailWithQuadsAndPipelineJoins" todir="${test.results.dir}" unless="testName" />
-
+-->
+      	
 <!-- All tests.
         <test name="com.bigdata.TestAll" todir="${test.results.dir}" unless="testName" />
 -->
       </junit>
 
+      <!-- Clean out the SPARQL test suite unpacked by Sesame. -->
+      <antcall target="clean-sparql-test-suite"/>
+
+      <!-- Generate an HTML report. -->
       <junitreport todir="${test.results.dir}">
         <fileset dir="${test.results.dir}">
           <include name="TEST-*.xml"/>
@@ -1858,6 +1863,13 @@ ${postInstallMessage}</echo>
 
     </target>
 
+	<target name="clean-sparql-test-suite" description="delete the files unpacked by the Sesame SPARQL test suite.">
+		<echo>"clearing: ${java.io.tmpdir}/sparql-*"</echo>
+	    <delete verbose="true">
+	    	<dirset dir="${java.io.tmpdir}" includes="sparql-*"/>
+		</delete>
+	</target>
+	
 	<!--                                                                   -->
 	<!--                    PERFORMANCE TESTS                              -->
 	<!--                                                                   -->

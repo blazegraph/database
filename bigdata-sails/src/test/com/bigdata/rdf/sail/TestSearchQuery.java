@@ -97,7 +97,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
             file = File.createTempFile(getName(), ".tmp");
 
-            System.err.println("file=" + file);
+            if (log.isInfoEnabled())
+                log.info("file=" + file);
 
         } catch (IOException ex) {
 
@@ -138,7 +139,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
     public void test_query() throws SailException, IOException,
             RDFHandlerException, QueryEvaluationException {
 
-        // overriden to use a disk-backed file.
+        // overridden to use a disk-backed file.
         final Properties properties = super.getProperties();
 
         // use a disk-based mode since we will re-open the store to test restart
@@ -151,10 +152,10 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
         BigdataSail sail = getSail(properties);
 
-        sail.initialize();
-        
         try {
 
+            sail.initialize();
+            
 //            if (!sail.database.getStatementIdentifiers()) {
 //
 //                log.warn("Statement identifiers are not enabled");
@@ -357,7 +358,7 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
                     new LiteralImpl("SYSTAP")));
         }
         
-        // overriden to use a disk-backed file.
+        // overridden to use a disk-backed file.
         final Properties properties = super.getProperties();
 
         // use a disk-based mode since we will re-open the store to test restart
@@ -501,6 +502,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
     public void testWithNamedGraphs() throws Exception {
         
         final BigdataSail sail = getSail();
+        try {
+            
         if (sail.getDatabase().isQuads() == false) {
             return;
         }
@@ -655,6 +658,8 @@ public class TestSearchQuery extends ProxyBigdataSailTestCase {
 
         } finally {
             cxn.close();
+        }
+        } finally {
             sail.__tearDownUnitTest();
         }
         
