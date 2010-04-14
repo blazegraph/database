@@ -957,7 +957,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
      * @throws UnsupportedOperationException
      *             since {@link #overflow()} is not supported.
      */
-    public File getIndexSegmentFile(IndexMetadata indexMetadata) {
+    public File getIndexSegmentFile(final IndexMetadata indexMetadata) {
         
         throw new UnsupportedOperationException();
         
