@@ -4,15 +4,15 @@
 	<defaults>
 		<property name="nparallel">1</property>
 		<property name="ntrials">10</property>
-		<property name="query">bigdata-lubm/resources/config/config.query.sparql</property>
-		<property name="ontology">bigdata-lubm/resources/config/univ-bench.owl</property>
-		<property name="data">bigdata-rdf/src/resources/data/lehigh/U1</property>
+		<property name="query">/ubt/config/config.query.sparql</property>
+		<property name="ontology">/ubt/univ-bench.owl</property>
+		<property name="data">/ubt/testdata/U50</property>
 		<property name="ndataServices">1</property>
 		<property name="com.bigdata.journal.AbstractJournal.initialExtent">209715200</property>
 		<property name="com.bigdata.journal.AbstractJournal.maximumExtent">209715200</property>
 		<!-- B+Tree and query options. -->
-		<property name="com.bigdata.btree.BTree.branchingFactor">64</property>
-		<property name="com.bigdata.btree.writeRetentionQueue.capacity">4000</property>
+		<property name="com.bigdata.btree.BTree.branchingFactor">256</property>
+		<property name="com.bigdata.btree.writeRetentionQueue.capacity">1000</property>
 		<property name="com.bigdata.relation.accesspath.IBuffer.chunkCapacity">100</property>
 		<property name="com.bigdata.relation.accesspath.BlockingBuffer.chunkOfChunksCapacity">1000</property>
 		<property name="com.bigdata.relation.accesspath.AbstractAccessPath.fullyBufferedReadThreadshold">2000</property>
@@ -38,6 +38,6 @@
 	</defaults>
 	<condition>
 		<property name="databaseModel">LTS</property>
-		<property name="com.bigdata.journal.AbstractJournal.bufferMode">DiskWORM</property>
+		<property name="com.bigdata.journal.AbstractJournal.bufferMode">DiskRW</property>
 	</condition>
 </experiment>
