@@ -732,19 +732,30 @@ public class DataLoader {
 
         if (rdfStream == null) {
 
-            /*
-             * If we do not find as a Resource then try the file system.
-             */
+            // Searching for the resource from the root of the class returned
+            // by getClass() (relative to the class' package) failed.
+            // Next try searching for the desired resource from the root
+            // of the jar; that is, search the jar file for an exact match
+            // of the input string.
+            rdfStream = 
+               getClass().getClassLoader().getResourceAsStream(resource);
+
+            if (rdfStream == null) {
+
+                /*
+                 * If we do not find as a Resource then try the file system.
+                 */
             
-            final File file = new File(resource);
+                final File file = new File(resource);
             
-            if(file.exists()) {
+                if(file.exists()) {
                 
-                loadFiles(totals, 0/* depth */, file, baseURL,
+                    loadFiles(totals, 0/* depth */, file, baseURL,
                         rdfFormat, filter, endOfBatch);
 
-                return;
+                    return;
                 
+                }
             }
             
         }
@@ -893,7 +904,7 @@ public class DataLoader {
 
             try {
 
-                // baseURI for this file.
+                // baseURI for this file. @todo do we need to encode this URI?
                 final String s = baseURI != null ? baseURI : file.toURI()
                         .toString();
 

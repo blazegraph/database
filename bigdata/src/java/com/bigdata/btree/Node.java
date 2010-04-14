@@ -1031,7 +1031,7 @@ public class Node extends AbstractNode<Node> implements INodeData {
     @Override
     final public byte[] keyAt(final int entryIndex) {
 
-        assert rangeCheckSpannedTupleIndex(entryIndex);
+        /*assert*/ rangeCheckSpannedTupleIndex(entryIndex);
         
         // index of the child that spans the desired entry.
         int childIndex = 0;

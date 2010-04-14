@@ -744,15 +744,35 @@ public class Leaf extends AbstractNode<Leaf> implements ILeafData {
     @Override
     public byte[] keyAt(final int entryIndex) {
 
+        rangeCheck(entryIndex);
+
         return getKeys().get(entryIndex);
         
     }
 
     @Override
     public void valueAt(final int entryIndex, final Tuple tuple) {
+
+        rangeCheck(entryIndex);
         
         tuple.copy(entryIndex, this);
-        
+
+    }
+
+    final protected boolean rangeCheck(final int index)
+            throws IndexOutOfBoundsException {
+
+        final int nkeys = data.getKeyCount();
+
+        if (index < 0 || index >= nkeys) {
+
+            throw new IndexOutOfBoundsException("index=" + index + ", nkeys="
+                    + nkeys);
+
+        }
+
+        return true;
+
     }
 
     /**
