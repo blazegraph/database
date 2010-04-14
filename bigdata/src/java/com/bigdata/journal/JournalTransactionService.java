@@ -414,7 +414,7 @@ public class JournalTransactionService extends AbstractTransactionService {
              * Lock out other operations on this tx.
              */
 
-            state.lock.lock();
+            state.lock.lockInterruptibly();
 
             try {
 

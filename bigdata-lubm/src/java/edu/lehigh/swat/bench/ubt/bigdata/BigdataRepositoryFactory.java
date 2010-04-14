@@ -32,6 +32,7 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.btree.IndexMetadata.Options;
 import com.bigdata.config.Configuration;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
@@ -142,7 +143,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
          * You MUST specify Options#FILE for this buffer mode (when using a
          * journal that does not overflow onto index segments).
          */
-        properties.setProperty(BigdataSail.Options.BUFFER_MODE, BufferMode.Disk.toString());
+        properties.setProperty(BigdataSail.Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 
         /*
          * Override the initial and maximum extent so that they are more suited
@@ -218,6 +219,8 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
         
 //      properties.setProperty(Options.BUFFER_CAPACITY, "20000");
         properties.setProperty(Options.CHUNK_CAPACITY, "100");
+        properties.setProperty(Options.CHUNK_OF_CHUNKS_CAPACITY, "64"); // should be near branching factor, why not just use branching factor?
+
 //      properties.setProperty(Options.QUERY_BUFFER_CAPACITY, "10000");
 //      properties.setProperty(Options.FULLY_BUFFERED_READ_THRESHOLD, "10000");
 
@@ -254,6 +257,11 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
             properties.setProperty(Options.TEXT_INDEX, "false");
             
         }
+
+        /*
+         * Set the branching factory.
+         */
+        properties.setProperty(IndexMetadata.Options.BTREE_BRANCHING_FACTOR, "64");
 
         /*
          * Turn on bloom filter for the SPO index (good up to ~2M index entries
@@ -344,7 +352,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
             // write retention queue (default is 500).
             properties.setProperty(
                     IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY,
-                    "8000");
+                    "4000");
 
             if(false){ // custom OSP index override
                 final String namespace = getNamespace();
@@ -558,7 +566,7 @@ abstract public class BigdataRepositoryFactory extends RepositoryFactory {
 
 //                System.err.println(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY + "="
 //                        + p.getProperty(IndexMetadata.Options.BTREE_READ_RETENTION_QUEUE_CAPACITY));
-                
+              
                 System.err.println(Options.CHUNK_CAPACITY + "="
                         + p.getProperty(Options.CHUNK_CAPACITY));
                 
