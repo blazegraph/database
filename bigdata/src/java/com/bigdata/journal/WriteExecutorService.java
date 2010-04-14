@@ -28,6 +28,7 @@ import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
@@ -1124,6 +1125,34 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         sb.append("}");
         
         return sb.toString();
+        
+    }
+    
+    /**
+     * Overridden to shutdown the embedded lock manager service.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    public void shutdown() {
+        
+        lockManager.shutdown();
+        
+        super.shutdown();
+        
+    }
+    
+    /**
+     * Overridden to shutdown the embedded lock manager service.
+     * <p>
+     * {@inheritDoc}
+     */
+    @Override
+    public List<Runnable>shutdownNow() {
+
+        lockManager.shutdownNow();
+        
+        return super.shutdownNow();
         
     }
     
