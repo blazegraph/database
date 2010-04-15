@@ -230,7 +230,7 @@ public class ManageLogicalServiceTask<V extends ServiceConfiguration>
              * 
              * Note: MonitorCreatePhysicalServiceLocksTasks will notice the
              * create of this lock node, contend for the zlock, and create a new
-             * service instance if it gains the lock, if it can satisify the
+             * service instance if it gains the lock, if it can satisfy the
              * constraints for the new physical service on the local host, and
              * we are still short at least one physical service for this logical
              * service when it checks. If successful, it will ZLock#destroy()
