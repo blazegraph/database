@@ -89,7 +89,7 @@ public class TestAll extends TestCase {
          * down the nightly build demands.
          */
         
-        if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
+//        if(Boolean.parseBoolean(System.getProperty("minimizeUnitTests","false"))) {
 
             suite.addTest( TestTransientJournal.suite() );
 
@@ -106,18 +106,13 @@ public class TestAll extends TestCase {
             
 //            suite.addTest( TestMappedJournal.suite() );
 
-        }
+//        }
 
         suite.addTest( TestDiskJournal.suite() );
 
         suite.addTest( TestWORMStrategy.suite() );
 
         suite.addTest( com.bigdata.rwstore.TestAll.suite() );
-
-        /*
-         * FIXME enable this test suite once the journal mode is ready.
-         */
-//        suite.addTest( TestBufferedDiskJournal.suite() );
 
         return suite;
 
