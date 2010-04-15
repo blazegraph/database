@@ -1923,6 +1923,7 @@ ${postInstallMessage}</echo>
 		-->
 		<!-- Run the data load, closure and query performance tests. -->
 		<copy file="bigdata/src/resources/logging/log4j-perf-tests.properties" todir="${perf.run.dir}"/>
+		<copy file="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml" todir="${java.io.tmpdir}"/>
 		<java classname="com.bigdata.test.ExperimentDriver" dir="${perf.run.dir}" fork="yes">
 			<classpath refid="run.class.path.id"/>
 			<jvmarg value="-server"/>
@@ -1931,7 +1932,7 @@ ${postInstallMessage}</echo>
 			<jvmarg value="-Dontology=${perf.data.dir}/lubm/univ-bench.owl"/>
 			<jvmarg value="-Ddata=${perf.data.dir}/lubm/U50"/>
 			<jvmarg value="-Dquery=${perf.data.dir}/lubm/config.query.sparql"/>
-			<arg value="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml"/>
+			<arg value="${java.io.tmpdir}/testLubm.xml"/>
 		</java>
 		<!-- Delete the runs directory, but FIRST copy out the results (with append).
 		<copy></copy>
