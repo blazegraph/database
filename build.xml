@@ -1932,7 +1932,7 @@ ${postInstallMessage}</echo>
 			<jvmarg value="-Djava.io.tmpdir=${perf.data.dir}"/>
 			<jvmarg value="-Dlog4j.configuration=file:log4j-perf-tests.properties"/>
 			<jvmarg value="-Dontology=${perf.data.dir}/lubm/univ-bench.owl"/>
-			<jvmarg value="-Ddata=${perf.data.dir}/lubm/U50"/>
+			<jvmarg value="-Ddata=${perf.data.dir}/lubm/U1"/>
 			<jvmarg value="-Dquery=${perf.data.dir}/lubm/config.query.sparql"/>
 			<arg value="testLubm.xml"/>
 		</java>
