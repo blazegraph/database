@@ -1828,7 +1828,6 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
 
-<!-- Temporarily commented out for CI. -->
         <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -1836,15 +1835,12 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.relation.TestAll" todir="${test.results.dir}" unless="testName" />
 
+      	<!-- See https://sourceforge.net/apps/trac/bigdata/ticket/53 -->
         <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />
+        	
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
-      	<!-- -->
-<!-- Temporary inclusion of select RDF and SAIL tests. 
-        <test name="com.bigdata.rdf.store.TestLocalTripleStore" todir="${test.results.dir}" unless="testName" />
-        <test name="com.bigdata.rdf.sail.TestBigdataSailWithQuadsAndPipelineJoins" todir="${test.results.dir}" unless="testName" />
--->
-      	
+
 <!-- All tests.
         <test name="com.bigdata.TestAll" todir="${test.results.dir}" unless="testName" />
 -->
