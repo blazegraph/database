@@ -1923,17 +1923,25 @@ ${postInstallMessage}</echo>
 		-->
 		<!-- Run the data load, closure and query performance tests. -->
 		<copy file="bigdata/src/resources/logging/log4j-perf-tests.properties" todir="${perf.run.dir}"/>
-		<copy file="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml" todir="${java.io.tmpdir}"/>
+		<copy file="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml" todir="${perf.run.dir}"/>
 		<java classname="com.bigdata.test.ExperimentDriver" dir="${perf.run.dir}" fork="yes">
 			<classpath refid="run.class.path.id"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx2g"/>
+			<!-- Override the temporary directory to the specified run directory. -->
+			<jvmarg value="-Djava.io.tmpdir=${perf.data.dir}"/>
 			<jvmarg value="-Dlog4j.configuration=file:log4j-perf-tests.properties"/>
 			<jvmarg value="-Dontology=${perf.data.dir}/lubm/univ-bench.owl"/>
 			<jvmarg value="-Ddata=${perf.data.dir}/lubm/U50"/>
 			<jvmarg value="-Dquery=${perf.data.dir}/lubm/config.query.sparql"/>
-			<arg value="${java.io.tmpdir}/testLubm.xml"/>
+			<arg value="testLubm.xml"/>
 		</java>
+		<!-- Copy the results from the performance run @todo w/ append! 
+		
+		Consider an after-action to do that and then delete the perf.run.dir.
+		
+		<copy file="${perf.run.dir}/com.bigdata.rdf.stress.LoadClosureAndQueryTest.exp.csv" todir="."/>
+		-->
 		<!-- Delete the runs directory, but FIRST copy out the results (with append).
 		<copy></copy>
 		<delete dir=${perf.run.dir}/>
