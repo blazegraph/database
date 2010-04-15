@@ -154,15 +154,15 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
 
     public void deleteResources() {
 
-        if(isOpen()) throw new IllegalStateException();
-        
-        if(!file.delete()) {
-            
-            throw new RuntimeException("Could not delete: "
-                    + file.getAbsolutePath());
-            
+        if (isOpen())
+            throw new IllegalStateException();
+
+        if (file.exists() && !file.delete()) {
+
+            log.warn("Could not delete file: " + file.getAbsoluteFile());
+
         }
-        
+
     }
 
     DiskBackedBufferStrategy(long maximumExtent, BufferMode bufferMode,
@@ -182,7 +182,7 @@ abstract public class DiskBackedBufferStrategy extends BasicBufferStrategy
    
     public ByteBuffer readRootBlock(final boolean rootBlock0) {
         
-        if(isOpen()) throw new IllegalStateException();
+        if(!isOpen()) throw new IllegalStateException();
 
         final ByteBuffer tmp = ByteBuffer
                 .allocate(RootBlockView.SIZEOF_ROOT_BLOCK);
