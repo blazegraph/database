@@ -1929,7 +1929,7 @@ ${postInstallMessage}</echo>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx2g"/>
 			<!-- Override the temporary directory to the specified run directory. -->
-			<jvmarg value="-Djava.io.tmpdir=${perf.data.dir}"/>
+			<jvmarg value="-Djava.io.tmpdir=${perf.run.dir}"/>
 			<jvmarg value="-Dlog4j.configuration=file:log4j-perf-tests.properties"/>
 			<jvmarg value="-Dontology=${perf.data.dir}/lubm/univ-bench.owl"/>
 			<jvmarg value="-Ddata=${perf.data.dir}/lubm/U1"/>
