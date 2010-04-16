@@ -62,6 +62,16 @@ public interface IRule<E> extends IStep {
     public Iterator<IVariable> getVariables();
 
     /**
+     * The #of distinct required variables declared by the rule.
+     */
+    public int getRequiredVariableCount();
+
+    /**
+     * The required variables declared by the rule in no particular order.
+     */
+    public Iterator<IVariable> getRequiredVariables();
+
+    /**
      * The head of the rule -or- <code>null</code> iff there is no head for
      * this rule. Note that rules that are executed as queries DO NOT need to
      * specify a head. However, rules that will be executed as mutation
