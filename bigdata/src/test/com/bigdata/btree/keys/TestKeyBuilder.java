@@ -1431,17 +1431,12 @@ public class TestKeyBuilder extends TestCase2 {
 
     }
 
-//    /*
-//     * Note: BigInteger has both leading sign bit and a variable length
-//     * encoding, each of which means that BigInteger#toByteArray() does not
-//     * return a byte[] that respects a total ordering over the BigInteger value
-//     * space. I think that the only way to handle this is to promote all values
-//     * out to some fixed byte[] size.
-//     */
-//    /*
-//     * BigInteger.
-//     */
-//    
+    /*
+     * BigInteger.
+     * 
+     * Note: The code below does not work correctly yet.
+     */
+    
 //    /**
 //     * Convert an unsigned byte[] into a {@link BigInteger}.
 //     * 
@@ -1452,18 +1447,25 @@ public class TestKeyBuilder extends TestCase2 {
 //     */
 //    private BigInteger decodeBigInteger(final byte[] key) {
 //
-////        // decode w/ conversion from unsigned byte[].
-////        final byte[] b = key.clone();
-////        for (int i = 0; i < b.length; i++) {
-////            b[i] = KeyBuilder.decodeByte(b[i]);
-////        }
-////        return new BigInteger(b);
+//        // @todo add parameter for offset into key[] when moving to KeyBuilder.
+//        int offset = 0;
+//        final int runLength = KeyBuilder.decodeShort(key, offset);
+//        offset += 2;
+//        final int signum = runLength < 0 ? -1 : runLength == 0 ? 0 : 1;
+//        final byte[] b = new byte[runLength < 0 ? -runLength : runLength];
+//        if (runLength < 0) {
+//            // BigInteger is negative.
+//            for (int i = 0, j = offset + b.length - 1; j >= offset; j--, i++) {
+//                b[i] = ((byte) ((/*0xff +*/ key[j]-0xff) & 0xff));
+//            }
+//        } else {
+//            // BigInteger is positive.
+//            for (int i = 0, j = offset + b.length - 1; j >= offset; j--, i++) {
+//                b[i] = key[j];
+//            }
+//        }
 //        
-//        // decode w/o conversion from unsigned byte[]. 
-//        return new BigInteger(key);
-//
-////        // decode and negate from unsigned byte[]. 
-////        return new BigInteger(key).negate();
+//        return new BigInteger(signum, b);
 //        
 //    }
 //
@@ -1473,18 +1475,23 @@ public class TestKeyBuilder extends TestCase2 {
 //        
 //        keyBuilder.reset();
 //
-////        // encode w/ conversion to unsigned byte[].
-////        for(byte b : i.toByteArray()) {
-////            
-////            keyBuilder.append(b);
-////            
-////        }
-//
-//        // encode w/o conversion to unsigned byte[].
-//        keyBuilder.append(i.toByteArray());
-//        
-////        // encode negation of the big integer as an unsigned byte[]. 
-////        keyBuilder.append(i.negate().toByteArray());
+//        // Note: BigInteger.ZERO is represented as byte[]{0}.
+//        final byte[] b = i.toByteArray();
+//        final int runLength = i.signum() == -1 ? -b.length : b.length;
+//        keyBuilder.ensureFree(runLength < 0 ? -runLength + 2 : runLength + 2);
+//        keyBuilder.append((short)runLength);
+//        // Note: BigInteger.toByteArray() is big-endian.
+//        if (runLength < 0) {
+//            // The BigInteger is negative, so bytes need to be converted.
+//            for (int j = b.length - 1; j >= 0; j--) {
+//                keyBuilder.appendUnsigned((byte) ((0xff - b[j]) & 0xff));
+//            }
+//        } else {
+//            // The BigInteger is positive, so do not convert the bytes.
+//            for (int j = b.length - 1; j >= 0; j--) {
+//                keyBuilder.appendUnsigned(b[j]);
+//            }
+//        }
 //        
 //        final byte[] key = keyBuilder.getKey();
 //        
@@ -1493,40 +1500,62 @@ public class TestKeyBuilder extends TestCase2 {
 //    }
 //
 //    protected void doEncodeDecodeTest(final BigInteger expected) {
-//        
-//        final byte[] encoded = encodeBigInteger(expected);
 //
-//        final BigInteger actual = decodeBigInteger(encoded);
+//        byte[] encoded = null;
+//        BigInteger actual = null;
+//        Throwable cause = null;
+//        try {
 //
-//        if(log.isInfoEnabled()) {
-//            log.info("BigInteger"+
-//                     "\nexpected="+expected+//
-//                     "\nencoded ="+BytesUtil.toString(encoded)+//
-//                     "\nactual  ="+actual//
-//                     );
+//            encoded = encodeBigInteger(expected);
+//
+//            actual = decodeBigInteger(encoded);
+//
+//        } catch (Throwable t) {
+//
+//            cause = t;
+//
 //        }
-//        
-//        assertEquals(expected, actual);
+//
+//        if (cause != null || !expected.equals(actual)) {
+//
+//            final String msg = "BigInteger" + //
+//                    "\nexpected=" + expected + //
+//                    "\nencoded =" + BytesUtil.toString(encoded) + //
+//                    "\nactual  =" + actual;
+//
+//            if (cause == null) {
+//
+//                fail(msg);
+//                
+//            } else {
+//                
+//                fail(msg, cause);
+//                
+//            }
+//            
+//        }
 //
 //    }
 //
 //    protected void doLTTest(final BigInteger i1, final BigInteger i2) {
-//
+//        
 //        final byte[] k1 = encodeBigInteger(i1);
+//
 //        final byte[] k2 = encodeBigInteger(i2);
+//
 //        final int ret = BytesUtil.compareBytes(k1, k2);
-//        
-//        if(log.isInfoEnabled()) {
-//            log.info("BigInteger"+
-//                     "\ni1="+i1+//
-//                     "\ni2="+i2+//
-//                     "\nk1="+BytesUtil.toString(k1)+//
-//                     "\nk2="+BytesUtil.toString(k2)+//
-//                     "\nret="+(ret==0?"EQ":(ret<0?"LT":"GT"))
-//                     );
+//
+//        if (ret >= 0) {
+//
+//            fail("BigInteger" + //
+//                    "\ni1=" + i1 + //
+//                    "\ni2=" + i2 + //
+//                    "\nk1=" + BytesUtil.toString(k1) + //
+//                    "\nk2=" + BytesUtil.toString(k2) + //
+//                    "\nret=" + (ret == 0 ? "EQ" : (ret < 0 ? "LT" : "GT"))//
+//            );
+//
 //        }
-//        
-//        assertTrue(ret < 0);
 //
 //    }
 //    
@@ -1535,61 +1564,89 @@ public class TestKeyBuilder extends TestCase2 {
 //     */
 //    public void test_bigIntegerKey() {
 //
-////        assertEquals(BigInteger.valueOf(0), decodeKey(new byte[0]));
-////        
-////        assertEquals(BigInteger.valueOf(0), decodeBigInteger(new byte[] { 0 }));
-////
-////        assertEquals(BigInteger.valueOf(1), decodeBigInteger(new byte[] { 1 }));
-////
-////        assertEquals(BigInteger.valueOf(-1), decodeBigInteger(new byte[] { -1 }));
-//
-////        assertEquals(BigInteger.valueOf(Long.MIN_VALUE + 1),
-////                decodeBigInteger(KeyBuilder.asSortKey(1L)));
-//
 //        doEncodeDecodeTest(BigInteger.valueOf(0));
+//        
 //        doEncodeDecodeTest(BigInteger.valueOf(1));
-//        doEncodeDecodeTest(BigInteger.valueOf(-1));
-//        doEncodeDecodeTest(BigInteger.valueOf(Long.MIN_VALUE));
-//        doEncodeDecodeTest(BigInteger.valueOf(Long.MAX_VALUE));
-//        doEncodeDecodeTest(BigInteger.valueOf(Long.MIN_VALUE-1));
-//        doEncodeDecodeTest(BigInteger.valueOf(Long.MAX_VALUE+1));
+//        doEncodeDecodeTest(BigInteger.valueOf(8));
+//        doEncodeDecodeTest(BigInteger.valueOf(255));
+//        doEncodeDecodeTest(BigInteger.valueOf(256));
+//        doEncodeDecodeTest(BigInteger.valueOf(512));
+//        doEncodeDecodeTest(BigInteger.valueOf(1028));
 //
-////        assertEquals(Long.MAX_VALUE, decodeBigInteger(KeyBuilder.asSortKey(-1L))
-////                .longValue());
+////        doEncodeDecodeTest(BigInteger.valueOf(-1));
+////        doEncodeDecodeTest(BigInteger.valueOf(-8));
+////        doEncodeDecodeTest(BigInteger.valueOf(-255));
+////        doEncodeDecodeTest(BigInteger.valueOf(-256));
+////        doEncodeDecodeTest(BigInteger.valueOf(-512));
+////        doEncodeDecodeTest(BigInteger.valueOf(-1028));
+//
+////        doEncodeDecodeTest(BigInteger.valueOf(Long.MIN_VALUE));
+//        doEncodeDecodeTest(BigInteger.valueOf(Long.MAX_VALUE));
+////        doEncodeDecodeTest(BigInteger.valueOf(Long.MIN_VALUE - 1));
+//        doEncodeDecodeTest(BigInteger.valueOf(Long.MAX_VALUE + 1));
 //
 //        doLTTest(BigInteger.valueOf(1), BigInteger.valueOf(2));
 //
 //        doLTTest(BigInteger.valueOf(0), BigInteger.valueOf(1));
 //
-//        doLTTest(BigInteger.valueOf(-1), BigInteger.valueOf(0));
+////        doLTTest(BigInteger.valueOf(-1), BigInteger.valueOf(0));
 //
-//        doLTTest(BigInteger.valueOf(-2), BigInteger.valueOf(-1));
+////        doLTTest(BigInteger.valueOf(-2), BigInteger.valueOf(-1));
 //
-//        /*
-//         * try codings that go beyond a single byte.
-//         */
-//        assertTrue(BytesUtil.compareBytes(//
-//                BigInteger.valueOf(10).toByteArray(),//
-//                BigInteger.valueOf(11).toByteArray()//
-//                ) < 0);
+//        doLTTest(BigInteger.valueOf(10), BigInteger.valueOf(11));
 //
-//        assertTrue(BytesUtil.compareBytes(//
-//                BigInteger.valueOf(258).toByteArray(),//
-//                BigInteger.valueOf(259).toByteArray()//
-//                ) < 0);
+//        doLTTest(BigInteger.valueOf(258), BigInteger.valueOf(259));
+//
+//        doLTTest(BigInteger.valueOf(3), BigInteger.valueOf(259));
 //
 //        /*
-//         * try codings that have different byte lengths.
+//         * Complete coverage for 2 byte long values (with edge coverage into 3
+//         * byte long values).
 //         */
-//        assertTrue(BytesUtil.compareBytes(//
-//                BigInteger.valueOf(3).toByteArray(),// codes as [3]
-//                BigInteger.valueOf(259).toByteArray()// codes as [1,3]
-//                ) < 0);
+//        for (int i = 516; i >= -516; i--) {
 //
-////      assertTrue(BytesUtil.compareBytes(//
-////      BigInteger.valueOf(-1).toByteArray(),//
-////      BigInteger.valueOf(0).toByteArray()//
-////      ) < 0);
+//            doEncodeDecodeTest(BigInteger.valueOf(i));
+//
+//            doLTTest(BigInteger.valueOf(i), BigInteger.valueOf(i + 1));
+//
+//        }
+//        
+//        // Stress test.
+//        final Random r = new Random();
+//        
+//        for (int i = 0; i < 1000; i++) {
+//            
+//            final BigInteger t1 = BigInteger.valueOf(r.nextLong());
+//            
+//            final BigInteger v2 = BigInteger.valueOf(Math.abs(r.nextLong()));
+//            
+//            // x LT t1
+//            final BigInteger t2 = t1.subtract(v2);
+//            final BigInteger t4 = t1.subtract(BigInteger.valueOf(5));
+//            final BigInteger t5 = t1.subtract(BigInteger.valueOf(9));
+//
+//            // t1 LT x
+//            final BigInteger t3 = t1.add(v2);
+//            final BigInteger t6 = t1.add(BigInteger.valueOf(5));
+//            final BigInteger t7 = t1.add(BigInteger.valueOf(9));
+//            
+//            doEncodeDecodeTest(t1);
+//            doEncodeDecodeTest(t2);
+//            doEncodeDecodeTest(t3);
+//            doEncodeDecodeTest(t4);
+//            doEncodeDecodeTest(t5);
+//            doEncodeDecodeTest(t6);
+//            doEncodeDecodeTest(t7);
+//
+//            doLTTest(t2, t1);
+//            doLTTest(t4, t1);
+//            doLTTest(t5, t1);
+//
+//            doLTTest(t1, t3);
+//            doLTTest(t1, t6);
+//            doLTTest(t1, t7);
+//
+//        }
 //
 //    }
     

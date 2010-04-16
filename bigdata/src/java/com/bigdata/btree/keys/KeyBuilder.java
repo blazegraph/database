@@ -563,9 +563,9 @@ public class KeyBuilder implements IKeyBuilder {
                 /*
                  * Note: The successor of an empty string is not defined since
                  * it maps to an empty byte[] (an empty value space). However an
-                 * empty string is semantically equivilent to all pad characters
+                 * empty string is semantically equivalent to all pad characters
                  * so we use the successor of a string containing a single pad
-                 * character, which is equivilent to a string containing a
+                 * character, which is equivalent to a string containing a
                  * single byte whose value is pad+1.
                  */
                 
@@ -606,7 +606,7 @@ public class KeyBuilder implements IKeyBuilder {
              * Note: Changed this to append the pad character (a space) as if it
              * was already an unsigned value (0x20) rather than its signed value
              * (0x160). This causes "bro" to sort before "brown", which is
-             * designed. (bbt, 10/1/08)
+             * desired. (bbt, 10/1/08)
              */
             appendUnsigned(pad);
             
@@ -742,7 +742,7 @@ public class KeyBuilder implements IKeyBuilder {
         return this;
         
     }
-    
+
     /**
      * Return the value that will impose the lexiographic ordering as an
      * unsigned long integer.
@@ -750,8 +750,8 @@ public class KeyBuilder implements IKeyBuilder {
      * @param v
      *            The signed long integer.
      * 
-     * @return The value that will impose the lexiograph ordering as an unsigned
-     *         long integer.
+     * @return The value that will impose the lexiographic ordering as an
+     *         unsigned long integer.
      */
     static final /*public*/ long encode(long v) {
 
