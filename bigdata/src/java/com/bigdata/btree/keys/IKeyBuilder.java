@@ -299,7 +299,7 @@ public interface IKeyBuilder extends ISortKeyBuilder {
      * and converts the low byte to an unsigned byte.
      * <p>
      * Note: This method is potentially much faster than the Unicode aware
-     * {@link #append(String)}. However, this method is NOT uncode aware and
+     * {@link #append(String)}. However, this method is NOT unicode aware and
      * non-ASCII characters will not be encoded correctly. This method MUST NOT
      * be mixed with keys whose corresponding component is encoded by the
      * unicode aware methods, e.g., {@link #append(String)}.

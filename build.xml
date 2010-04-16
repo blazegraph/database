@@ -1091,6 +1091,7 @@ ${postInstallMessage}</echo>
      output files (24 x 24 = 576) and only 100 if you are using number suffixes.
      For example, split an NT file into files of 200000 lines each: 
      
+     mkdir splits; cd splits
      split -l 200000 ../dataset.nt dataset
      
      You will also have to fix up the file extensions.  You can do this using
@@ -1854,7 +1855,6 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.concurrent.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.journal.TestAll" todir="${test.results.dir}" unless="testName" />
 
-<!-- Temporarily commented out for CI.
         <test name="com.bigdata.resources.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -1862,19 +1862,21 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.relation.TestAll" todir="${test.results.dir}" unless="testName" />
 
+      	<!-- See https://sourceforge.net/apps/trac/bigdata/ticket/53 -->
         <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />
+        	
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
-      	-->
-<!-- Temporary inclusion of select RDF and SAIL tests. -->
-        <test name="com.bigdata.rdf.store.TestLocalTripleStore" todir="${test.results.dir}" unless="testName" />
-        <test name="com.bigdata.rdf.sail.TestBigdataSailWithQuadsAndPipelineJoins" todir="${test.results.dir}" unless="testName" />
 
 <!-- All tests.
         <test name="com.bigdata.TestAll" todir="${test.results.dir}" unless="testName" />
 -->
       </junit>
 
+      <!-- Clean out the SPARQL test suite unpacked by Sesame. -->
+      <antcall target="clean-sparql-test-suite"/>
+
+      <!-- Generate an HTML report. -->
       <junitreport todir="${test.results.dir}">
         <fileset dir="${test.results.dir}">
           <include name="TEST-*.xml"/>
@@ -1884,6 +1886,13 @@ ${postInstallMessage}</echo>
 
     </target>
 
+	<target name="clean-sparql-test-suite" description="delete the files unpacked by the Sesame SPARQL test suite.">
+		<echo>"clearing: ${java.io.tmpdir}/sparql-*"</echo>
+	    <delete verbose="true">
+	    	<dirset dir="${java.io.tmpdir}" includes="sparql-*"/>
+		</delete>
+	</target>
+	
 	<!--                                                                   -->
 	<!--                    PERFORMANCE TESTS                              -->
 	<!--                                                                   -->
@@ -1916,11 +1925,9 @@ ${postInstallMessage}</echo>
 	        <pathelement location="${dist.lib}/zookeeper.jar"/>
 	      </path>
 	      <property name="run.class.path" value="${junit.jar}:${bigdata-test.jar}:${cweb-junit-ext.jar}:${sesame-sparql-test.jar}:${sesame-store-test.jar}:${dist.lib}/bigdata.jar:${dist.lib}/colt.jar:${dist.lib}/cweb-commons.jar:${dist.lib}/cweb-extser.jar:${dist.lib}/ctc_utils.jar:${dist.lib}/dsiutils.jar:${dist.lib}/fastutil.jar:${dist.lib}/icu4j.jar:${dist.lib}/iris.jar:${dist.lib}/jsk-lib.jar:${dist.lib}/jsk-platform.jar:${dist.lib}/log4j.jar:${dist.lib}/lucene-analyzer.jar:${dist.lib}/lucene-core.jar:${dist.lib}/openrdf-sesame.jar:${dist.lib}/slf4j.jar:${dist.lib}/slf4j-log4j.jar:${dist.lib}/zookeeper.jar"/>
-		<!-- Generate the LUBM dataset. -->
-		<!-- Note: testLubm.xml MUST know the dataset location! -->
-		<property name="dataset" value="/tmp/bigdata-perf-lubm"/>
-		<mkdir dir="${dataset}"/>
-		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${dataset}" fork="yes">
+		<!-- Generate the LUBM dataset. 
+		<mkdir dir="${data}"/>
+		<java classname="edu.lehigh.swat.bench.uba.Generator" dir="${data}" fork="yes">
 			<classpath>
 				<path refid="run.class.path.id"/>
 				<pathelement location="${build.dir}/lubm/lib/bigdata-lubm.jar"/>
@@ -1936,15 +1943,35 @@ ${postInstallMessage}</echo>
 			<arg value="-onto"/>
 			<arg value="http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl"/>
 		</java>
+		-->
+		<!-- Delete the generated LUBM data set.
+		<delete dir="${data}"/>
+		-->
 		<!-- Run the data load, closure and query performance tests. -->
-		<java classname="com.bigdata.test.ExperimentDriver" dir="./" fork="yes">
+		<copy file="bigdata/src/resources/logging/log4j-perf-tests.properties" todir="${perf.run.dir}"/>
+		<copy file="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml" todir="${perf.run.dir}"/>
+		<java classname="com.bigdata.test.ExperimentDriver" dir="${perf.run.dir}" fork="yes">
 			<classpath refid="run.class.path.id"/>
 			<jvmarg value="-server"/>
 			<jvmarg value="-Xmx2g"/>
-			<jvmarg value="-Dlog4j.configuration=file:bigdata/src/resources/logging/log4j-perf-tests.properties"/>
-			<arg value="bigdata-sails/src/test/com/bigdata/rdf/stress/testLubm.xml"/>
+			<!-- Override the temporary directory to the specified run directory. -->
+			<jvmarg value="-Djava.io.tmpdir=${perf.run.dir}"/>
+			<jvmarg value="-Dlog4j.configuration=file:log4j-perf-tests.properties"/>
+			<jvmarg value="-Dontology=${perf.data.dir}/lubm/univ-bench.owl"/>
+			<jvmarg value="-Ddata=${perf.data.dir}/lubm/U50"/>
+			<jvmarg value="-Dquery=${perf.data.dir}/lubm/config.query.sparql"/>
+			<arg value="testLubm.xml"/>
 		</java>
-		<delete dir="${dataset}"/>
+		<!-- Copy the results from the performance run @todo w/ append! 
+		
+		Consider an after-action to do that and then delete the perf.run.dir.
+		
+		<copy file="${perf.run.dir}/com.bigdata.rdf.stress.LoadClosureAndQueryTest.exp.csv" todir="."/>
+		-->
+		<!-- Delete the runs directory, but FIRST copy out the results (with append).
+		<copy></copy>
+		<delete dir=${perf.run.dir}/>
+		-->
 	</target>
 
 	<!--                                                                   -->

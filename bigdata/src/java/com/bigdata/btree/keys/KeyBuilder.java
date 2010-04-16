@@ -464,7 +464,7 @@ public class KeyBuilder implements IKeyBuilder {
     /**
      * The default pad character (a space).
      * <p>
-     * Note: Any character may be choosen as the pad character as long as it has
+     * Note: Any character may be chosen as the pad character as long as it has
      * a one byte representation. In practice this means you can choose 0x20 (a
      * space) or 0x00 (a nul). This limit arises in
      * {@link #appendText(String, boolean, boolean)} which assumes that it can

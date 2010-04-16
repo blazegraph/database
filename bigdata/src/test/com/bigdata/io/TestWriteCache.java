@@ -1142,12 +1142,12 @@ public class TestWriteCache extends TestCase2 {
 
             expected = new byte[len];
 
-            actual.get(expected);
+            expectedBuffer.get(expected);
 
         }
 
         // evaluate byte[] against actual.
-        assertEquals(expectedBuffer.array(), actual);
+        assertEquals(expected, actual);
 
     }
 

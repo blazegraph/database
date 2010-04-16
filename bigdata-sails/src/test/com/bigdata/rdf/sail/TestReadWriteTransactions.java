@@ -23,8 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import java.util.Iterator;
 import java.util.Properties;
+
 import org.openrdf.model.BNode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -36,6 +36,7 @@ import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
+
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.store.BD;
@@ -100,14 +101,15 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
 
         // final LocalTripleStore store = (LocalTripleStore) getStore();
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final BigdataSailRepositoryConnection isolated = 
             (BigdataSailRepositoryConnection) repo.getReadWriteConnection();
         isolated.setAutoCommit(false);
-        final BigdataSailRepositoryConnection unisolated = 
-            (BigdataSailRepositoryConnection) repo.getUnisolatedConnection();
-        isolated.setAutoCommit(false);
+//        final BigdataSailRepositoryConnection unisolated = 
+//            (BigdataSailRepositoryConnection) repo.getUnisolatedConnection();
+//        unisolated.setAutoCommit(false);
 
 
         // read-committed view of the same database.
@@ -127,9 +129,9 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
 //                    1);
             isolated.add(stmt(s, p, o));
             
-            final boolean stmtInUnisolated = unisolated.hasStatement(s, p, o, true);
-
-            if(log.isInfoEnabled()) log.info("stmtInUnisolated: " + stmtInUnisolated);
+//            final boolean stmtInUnisolated = unisolated.hasStatement(s, p, o, true);
+//
+//            if(log.isInfoEnabled()) log.info("stmtInUnisolated: " + stmtInUnisolated);
 
             final boolean stmtInIsolated = isolated.hasStatement(s, p, o, true);
 
@@ -139,8 +141,8 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
 
             if(log.isInfoEnabled()) log.info("stmtInView: " + stmtInView);
 
-            // not visible in the repo.
-            assertFalse(stmtInUnisolated);
+//            // not visible in the repo.
+//            assertFalse(stmtInUnisolated);
 
             // not visible in the view.
             assertFalse(stmtInView);
@@ -151,6 +153,7 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
             // commit the transaction.
             isolated.commit();
 
+            // verify that the write was published.
             readView = repo.getReadOnlyConnection();
             
             // now visible in the view
@@ -168,9 +171,11 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
 
             readView.close();
             isolated.close();
-            unisolated.close();
-            sail.__tearDownUnitTest();
+//            unisolated.close();
 
+        }
+        } finally {
+            sail.__tearDownUnitTest();
         }
         
     }
@@ -186,6 +191,7 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
 
 //        final LocalTripleStore store = (LocalTripleStore) getStore();
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final RepositoryConnection store = repo.getReadWriteConnection();
@@ -218,8 +224,10 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
         } finally {
 
             store.close();
+            
+        }
+        } finally {
             sail.__tearDownUnitTest();
-
         }
 
     }
@@ -228,6 +236,7 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
 
         // final LocalTripleStore store = (LocalTripleStore) getStore();
         final BigdataSail sail = getSail();
+        try {
         sail.initialize();
         final BigdataSailRepository repo = new BigdataSailRepository(sail);
         final RepositoryConnection tx1 = repo.getReadWriteConnection();
@@ -287,39 +296,8 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
 
             tx1.close();
             tx2.close();
-            sail.__tearDownUnitTest();
 
         }
-        
-    }
-    
-    /**
-     * Need to test how the system reacts to concurrent reads and writes.
-     * Simulate real work load.  Incremental writes, outnumbered by reads by
-     * some factor, say somewhere between 10 to 100.  Write size will vary, say 
-     * from 1 to 10000 statements.
-     * <p>
-     * How should we generate the data?
-     * N write tasks
-     * each write tasks update information about one "entity"
-     * each "entity" has P properties
-     * each property has A chance of being an attribute and (1-A) chance of being a link to another "entity"
-     * attribute predicate and link predicate can be constants
-     * attribute value is a randomly assigned literal
-     * link value is randomly chosen from pool of already created "entities"  
-     * 
-     * @throws Exception
-     */
-    public void test_stress() throws Exception {
-        
-        final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-        try {
-
-            
-            
         } finally {
 
             sail.__tearDownUnitTest();
@@ -327,5 +305,40 @@ public class TestReadWriteTransactions extends ProxyBigdataSailTestCase {
         }
         
     }
+    
+//    /**
+//     * @todo Need to test how the system reacts to concurrent reads and writes.
+//     * Simulate real work load.  Incremental writes, outnumbered by reads by
+//     * some factor, say somewhere between 10 to 100.  Write size will vary, say 
+//     * from 1 to 10000 statements.
+//     * <p>
+//     * How should we generate the data?
+//     * N write tasks
+//     * each write tasks update information about one "entity"
+//     * each "entity" has P properties
+//     * each property has A chance of being an attribute and (1-A) chance of being a link to another "entity"
+//     * attribute predicate and link predicate can be constants
+//     * attribute value is a randomly assigned literal
+//     * link value is randomly chosen from pool of already created "entities"  
+//     * 
+//     * @throws Exception
+//     */
+//    public void test_stress() throws Exception {
+//        
+//        final BigdataSail sail = getSail();
+//        sail.initialize();
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//
+//        try {
+//
+//            
+//            
+//        } finally {
+//
+//            sail.__tearDownUnitTest();
+//
+//        }
+//        
+//    }
     
 }
