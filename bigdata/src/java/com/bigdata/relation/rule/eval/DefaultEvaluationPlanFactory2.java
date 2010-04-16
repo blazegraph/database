@@ -14,7 +14,7 @@ public class DefaultEvaluationPlanFactory2 implements IEvaluationPlanFactory {
 
     public static final transient DefaultEvaluationPlanFactory2 INSTANCE = new DefaultEvaluationPlanFactory2();
 
-    public DefaultEvaluationPlan2 newPlan(IJoinNexus joinNexus, IRule rule) {
+    public IEvaluationPlan newPlan(IJoinNexus joinNexus, IRule rule) {
 
         return new DefaultEvaluationPlan2(joinNexus, rule);
 

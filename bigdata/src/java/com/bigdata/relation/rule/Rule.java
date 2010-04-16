@@ -121,6 +121,13 @@ public class Rule<E> implements IRule<E> {
      * The set of distinct variables declared by the rule.
      */
     final private Set<IVariable> vars;
+    
+    /**
+     * The set of distinct required variables declared by the rule.  These
+     * are used in the projection (select or construct) and for aggregation,
+     * and thus can never be dropped from the binding sets.
+     */
+    final private Set<IVariable> requiredVars;
 
     final public int getVariableCount() {
         
@@ -131,6 +138,18 @@ public class Rule<E> implements IRule<E> {
     final public Iterator<IVariable> getVariables() {
         
         return vars.iterator();
+        
+    }
+    
+    final public int getRequiredVariableCount() {
+        
+        return requiredVars.size();
+        
+    }
+
+    final public Iterator<IVariable> getRequiredVariables() {
+        
+        return requiredVars.iterator();
         
     }
     
@@ -340,10 +359,19 @@ public class Rule<E> implements IRule<E> {
             final IQueryOptions queryOptions, IConstraint[] constraints) {
 
         this(name, head, tail, queryOptions, constraints,
-                null/* constants */, null/* taskFactory */);
+                null/* constants */, null/* taskFactory */, null/* requiredVars*/);
 
     }
 
+    public Rule(String name, IPredicate head, IPredicate[] tail,
+            IQueryOptions queryOptions, IConstraint[] constraints,
+            IBindingSet constants, IRuleTaskFactory taskFactory) {
+
+        this(name, head, tail, queryOptions, constraints,
+                null/* constants */, taskFactory, null /* requiredVars */);
+
+    }
+    
     /**
      * Fully specified ctor.
      * 
@@ -367,10 +395,14 @@ public class Rule<E> implements IRule<E> {
      * @param taskFactory
      *            Optional override for rule evaluation (MAY be
      *            <code>null</code>).
+     * @param requiredVars
+     *            Optional set of required variables.  If <code>null</code>,
+     *            all variables are assumed to be required.           
      */
     public Rule(String name, IPredicate head, IPredicate[] tail,
             IQueryOptions queryOptions, IConstraint[] constraints,
-            IBindingSet constants, IRuleTaskFactory taskFactory) {
+            IBindingSet constants, IRuleTaskFactory taskFactory, 
+            IVariable[] requiredVars) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -476,6 +508,17 @@ public class Rule<E> implements IRule<E> {
         
         // MAY be null
         this.taskFactory = taskFactory;
+        
+        // required variables may be null
+        final Set<IVariable> s = new HashSet<IVariable>();
+        if (requiredVars == null) {
+            s.addAll(vars);
+        } else {
+            for (IVariable v : requiredVars) {
+                s.add(v);
+            }
+        }
+        this.requiredVars = Collections.unmodifiableSet(s);
 
     }
 
@@ -548,7 +591,8 @@ public class Rule<E> implements IRule<E> {
         final IRuleTaskFactory taskFactory = getTaskFactory();
 
         final IRule<E> newRule = new Rule<E>(name, newHead, newTail,
-                queryOptions, newConstraint, bindingSet, taskFactory);
+                queryOptions, newConstraint, bindingSet, taskFactory, 
+                requiredVars.toArray(new IVariable[requiredVars.size()]));
 
         return newRule;
 
