@@ -971,7 +971,7 @@ public class TestKeyBuilder extends TestCase2 {
     }
     
     /**
-     * Test helper forms two keys and verifies succesor semantics:
+     * Test helper forms two keys and verifies successor semantics:
      * <pre>
      *  
      *  [text][nextValue] LT [successor(text)][nextValue]

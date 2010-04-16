@@ -26,7 +26,6 @@ import com.bigdata.jini.start.config.ManagedServiceConfiguration.ManagedServiceS
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.jini.IReplicatableService;
 import com.bigdata.service.jini.JiniFederation;
-import com.sun.jini.resource.ServiceConfigurationError;
 import com.sun.jini.tool.ClassServer;
 
 /**
@@ -573,6 +572,7 @@ abstract public class ServiceConfiguration implements Serializable {
 
                 } finally {
 
+                    // Kill and await process death (we ignore the exit value).
                     processHelper.kill(true/* immediateShutdown */);
 
                 }

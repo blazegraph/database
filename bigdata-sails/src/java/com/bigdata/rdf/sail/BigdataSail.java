@@ -2438,15 +2438,16 @@ public class BigdataSail extends SailBase implements Sail {
 //            // discard any changes that might be lying around.
 //            rollback();
 
-            // notify the SailBase that the connection is no longer in use.
-            BigdataSail.this.connectionClosed(this);
-
-            // release the reentrant lock
-            if (lock != null) {
-                lock.unlock();
+            try {
+                // notify the SailBase that the connection is no longer in use.
+                BigdataSail.this.connectionClosed(this);
+            } finally {
+                // release the reentrant lock
+                if (lock != null) {
+                    lock.unlock();
+                }
+                open = false;
             }
-            
-            open = false;
             
         }
         
