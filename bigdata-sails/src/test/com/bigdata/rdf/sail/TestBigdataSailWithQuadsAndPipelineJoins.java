@@ -69,6 +69,9 @@ public class TestBigdataSailWithQuadsAndPipelineJoins extends AbstractBigdataSai
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with Quads (pipline joins)");
 
+        // test pruning of variables not required for downstream processing.
+        suite.addTestSuite(TestPruneBindingSets.class);
+
         // misc named graph API stuff.
         suite.addTestSuite(TestQuadsAPI.class);
 
