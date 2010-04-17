@@ -927,42 +927,6 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
 
-    /**
-     * Convert an unsigned byte[] into a {@link BigInteger}.
-     * 
-     * @param key
-     *            The bytes.
-     *            
-     * @return The big integer value.
-     */
-    static public BigInteger decodeBigInteger(final int offset, final byte[] key) {
-
-        final int tmp = KeyBuilder.decodeShort(key, offset);
-
-        final int runLength = tmp < 0 ? -tmp : tmp;
-        
-        final byte[] b = new byte[runLength];
-        
-        System.arraycopy(key/* src */, offset + 2/* srcpos */, b/* dst */,
-                0/* destPos */, runLength);
-        
-        return new BigInteger(b);
-        
-    }
-
-    /**
-     * Encode a {@link BigInteger} into an unsigned byte[] and append it into
-     * the key buffer.
-     * <P>
-     * The encoding is a 2 byte run length whose leading bit is set iff the
-     * {@link BigInteger} is negative followed by the <code>byte[]</code> as
-     * returned by {@link BigInteger#toByteArray()}.
-     * 
-     * @param The
-     *            {@link BigInteger} value.
-     * 
-     * @return The unsigned byte[].
-     */
     public IKeyBuilder append(final BigInteger i) {
 
         // Note: BigInteger.ZERO is represented as byte[]{0}.
@@ -1086,6 +1050,10 @@ public class KeyBuilder implements IKeyBuilder {
         } else if (val instanceof Long) {
 
             append(((Long) val).longValue());
+
+        } else if (val instanceof BigInteger) {
+
+            append((BigInteger) val);
 
         } else if (val instanceof Float) {
 
@@ -1332,6 +1300,29 @@ public class KeyBuilder implements IKeyBuilder {
         }
 
         return (short) v;
+        
+    }
+
+    /**
+     * Convert an unsigned byte[] into a {@link BigInteger}.
+     * 
+     * @param key
+     *            The bytes.
+     *            
+     * @return The big integer value.
+     */
+    static public BigInteger decodeBigInteger(final int offset, final byte[] key) {
+
+        final int tmp = KeyBuilder.decodeShort(key, offset);
+
+        final int runLength = tmp < 0 ? -tmp : tmp;
+        
+        final byte[] b = new byte[runLength];
+        
+        System.arraycopy(key/* src */, offset + 2/* srcpos */, b/* dst */,
+                0/* destPos */, runLength);
+        
+        return new BigInteger(b);
         
     }
 
