@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.keys;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
 import java.text.Collator;
 import java.util.Locale;
 import java.util.Properties;
@@ -621,7 +622,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(byte[] a) {
+    final public IKeyBuilder append(final byte[] a) {
         
         return append(0, a.length, a);
         
@@ -683,7 +684,7 @@ public class KeyBuilder implements IKeyBuilder {
 
     }
 
-    static public float decodeFloat(byte[] key,int off) {
+    static public float decodeFloat(final byte[] key, final int off) {
         
         int v = decodeInt(key, off);
         
@@ -698,7 +699,7 @@ public class KeyBuilder implements IKeyBuilder {
         
     }
     
-    final public IKeyBuilder append(UUID uuid) {
+    final public IKeyBuilder append(final UUID uuid) {
 
         if (len + 16 > buf.length) ensureCapacity(len+16);
 
@@ -922,6 +923,59 @@ public class KeyBuilder implements IKeyBuilder {
         
         buf[len++] = (byte) 0;
         
+        return this;
+        
+    }
+
+    /**
+     * Convert an unsigned byte[] into a {@link BigInteger}.
+     * 
+     * @param key
+     *            The bytes.
+     *            
+     * @return The big integer value.
+     */
+    static public BigInteger decodeBigInteger(final int offset, final byte[] key) {
+
+        final int tmp = KeyBuilder.decodeShort(key, offset);
+
+        final int runLength = tmp < 0 ? -tmp : tmp;
+        
+        final byte[] b = new byte[runLength];
+        
+        System.arraycopy(key/* src */, offset + 2/* srcpos */, b/* dst */,
+                0/* destPos */, runLength);
+        
+        return new BigInteger(b);
+        
+    }
+
+    /**
+     * Encode a {@link BigInteger} into an unsigned byte[] and append it into
+     * the key buffer.
+     * <P>
+     * The encoding is a 2 byte run length whose leading bit is set iff the
+     * {@link BigInteger} is negative followed by the <code>byte[]</code> as
+     * returned by {@link BigInteger#toByteArray()}.
+     * 
+     * @param The
+     *            {@link BigInteger} value.
+     * 
+     * @return The unsigned byte[].
+     */
+    public IKeyBuilder append(final BigInteger i) {
+
+        // Note: BigInteger.ZERO is represented as byte[]{0}.
+        final byte[] b = i.toByteArray();
+        
+        final int runLength = i.signum() == -1 ? -b.length : b.length;
+        
+        ensureFree(b.length + 2);
+        
+        append((short) runLength);
+        
+        append(b);
+
         return this;
         
     }
