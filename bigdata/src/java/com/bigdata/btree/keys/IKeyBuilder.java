@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.btree.keys;
 
+import java.math.BigInteger;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
@@ -427,6 +428,21 @@ public interface IKeyBuilder extends ISortKeyBuilder {
      * @return <i>this</i>
      */
     public IKeyBuilder appendNul();
+
+    /**
+     * Encode a {@link BigInteger} into an unsigned byte[] and append it into
+     * the key buffer.
+     * <P>
+     * The encoding is a 2 byte run length whose leading bit is set iff the
+     * {@link BigInteger} is negative followed by the <code>byte[]</code> as
+     * returned by {@link BigInteger#toByteArray()}.
+     * 
+     * @param The
+     *            {@link BigInteger} value.
+     * 
+     * @return The unsigned byte[].
+     */
+    public IKeyBuilder append(final BigInteger i);
 
     /**
      * Append the value to the buffer, encoding it as appropriate based on the
