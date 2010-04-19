@@ -2,12 +2,14 @@ package com.bigdata.rdf.sail;
 
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.EmptyIteration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -24,12 +26,20 @@ import org.openrdf.query.algebra.Compare;
 import org.openrdf.query.algebra.Filter;
 import org.openrdf.query.algebra.Join;
 import org.openrdf.query.algebra.LeftJoin;
+import org.openrdf.query.algebra.MathExpr;
 import org.openrdf.query.algebra.Or;
+import org.openrdf.query.algebra.Order;
+import org.openrdf.query.algebra.OrderElem;
+import org.openrdf.query.algebra.Projection;
+import org.openrdf.query.algebra.ProjectionElem;
+import org.openrdf.query.algebra.ProjectionElemList;
 import org.openrdf.query.algebra.QueryModelNode;
 import org.openrdf.query.algebra.QueryModelNodeBase;
+import org.openrdf.query.algebra.QueryRoot;
 import org.openrdf.query.algebra.SameTerm;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.UnaryTupleOperator;
 import org.openrdf.query.algebra.Union;
 import org.openrdf.query.algebra.ValueConstant;
 import org.openrdf.query.algebra.ValueExpr;
@@ -880,6 +890,40 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
             }
         }
         
+        /*
+         * Collect a set of variables required beyond just the join (i.e.
+         * aggregation, projection, filters, etc.)
+         */
+        Set<String> required = new HashSet<String>(); 
+        
+        QueryModelNode p = join;
+        while (true) {
+            p = p.getParentNode();
+            if (p instanceof Projection) {
+                List<ProjectionElem> elems = 
+                    ((Projection) p).getProjectionElemList().getElements();
+                for (ProjectionElem elem : elems) {
+                    required.add(elem.getSourceName());
+                }
+            } else if (p instanceof UnaryTupleOperator) {
+                required.addAll(
+                        ((UnaryTupleOperator) p).getAssuredBindingNames());
+            }
+            if (p instanceof QueryRoot) {
+                break;
+            }
+        }
+        
+        IVariable[] requiredVars = new IVariable[required.size()];
+        int i = 0;
+        for (String v : required) {
+            requiredVars[i++] = com.bigdata.relation.rule.Var.var(v);
+        }
+        
+        if (DEBUG) {
+            log.debug("required binding names: " + Arrays.toString(requiredVars));
+        }
+        
         // generate native rule
         IRule rule = new Rule("nativeJoin", 
                 // @todo should serialize the query string here for the logs.
@@ -887,7 +931,8 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
                 tails.toArray(new IPredicate[tails.size()]), queryOptions,
                 // constraints on the rule.
                 constraints.size() > 0 ? constraints
-                        .toArray(new IConstraint[constraints.size()]) : null);
+                        .toArray(new IConstraint[constraints.size()]) : null,
+                null/* constants */, null/* taskFactory */, requiredVars);
         
         if (BigdataStatics.debug) {
             System.err.println(join.toString());
@@ -1750,6 +1795,14 @@ public class BigdataEvaluationStrategyImpl2 extends EvaluationStrategyImpl {
 
         public Iterator getVariables() {
             return rule.getVariables();
+        }
+
+        public int getRequiredVariableCount() {
+            return rule.getRequiredVariableCount();
+        }
+
+        public Iterator getRequiredVariables() {
+            return rule.getRequiredVariables();
         }
 
         public boolean isConsistent(IBindingSet bindingSet) {
