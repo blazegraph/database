@@ -660,22 +660,25 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
          * Any of the constants defined by {@link DatabaseModel}.
          */
         String DATABASE_MODEL = "databaseModel";
-        
+
         /**
-         * Optional resource identifying a file containing an ontology.
+         * Optional resource identifying a file containing an ontology. This can
+         * also be specified using the {@link System} property of the same name.
          */
         String ONTOLOGY = "ontology";
 
         /**
-         * Optional resource identifying a file or directory to be loaded
-         * as data.
+         * Optional resource identifying a file or directory to be loaded as
+         * data. This can also be specified using the {@link System} property of
+         * the same name.
          */
         String DATA = "data";
 
         /**
          * Optional resource identifying a file or directory containing SPARQL
          * queries. Queries will be executed after all data has been loaded and
-         * the optional closure has been computed.
+         * the optional closure has been computed. This can also be specified
+         * using the {@link System} property of the same name.
          */
         String QUERY = "query";
 
@@ -825,7 +828,12 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      */
     public void loadData(Properties properties) throws InterruptedException {
 
-        final File dataDir = new File(properties.getProperty(TestOptions.DATA));
+        /*
+         * Note: This makes it possible to override the DATA directory from a
+         * system property.  That feature is used by the ant tasks.
+         */
+        final File dataDir = new File(System.getProperty(TestOptions.DATA,
+                properties.getProperty(TestOptions.DATA)));
 
         if (!dataDir.exists()) {
             
@@ -866,13 +874,23 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
 
         final long begin = System.currentTimeMillis();
 
-        if (properties.getProperty(TestOptions.ONTOLOGY) != null) {
-
-            final File ontologyFile = new File(properties
-                    .getProperty(TestOptions.ONTOLOGY));
-
-            loadOntology(ontologyFile.getAbsolutePath().toString());
+        {
             
+            /*
+             * Note: This makes it possible to override the DATA directory from
+             * a system property. That feature is used by the ant tasks.
+             */
+            final String tmp = System.getProperty(TestOptions.ONTOLOGY,
+                    properties.getProperty(TestOptions.ONTOLOGY));
+
+            if (tmp != null) {
+
+                final File ontologyFile = new File(tmp);
+
+                loadOntology(ontologyFile.getAbsolutePath().toString());
+
+            }
+
         }
         
         /*
@@ -1215,11 +1233,14 @@ public class LoadClosureAndQueryTest implements IComparisonTest {
      * Read the queries from file(s), parse them into label and query, and
      * return an ordered collection of those {@link Query}s.
      */
-    public List<Query> readQueries(Properties properties) {
+    public List<Query> readQueries(final Properties properties) {
 
         // source file/dir containing queries.
-        final File file = new File(properties.getProperty(TestOptions.QUERY));
-        
+        final File file = new File(System.getProperty(TestOptions.QUERY,
+                properties.getProperty(TestOptions.QUERY)));
+
+        System.out.println("Reading queries from: "+file);
+
         final List<Query> list = new LinkedList<Query>();
         
         try {

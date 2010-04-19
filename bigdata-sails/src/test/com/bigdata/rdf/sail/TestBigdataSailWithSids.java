@@ -61,6 +61,9 @@ public class TestBigdataSailWithSids extends AbstractBigdataSailTestCase {
 
         final ProxyTestSuite suite = new ProxyTestSuite(delegate, "SAIL with SIDS");
 
+        // test pruning of variables not required for downstream processing.
+        suite.addTestSuite(TestPruneBindingSets.class);
+
         // test of the search magic predicate
         suite.addTestSuite(TestSearchQuery.class);
         

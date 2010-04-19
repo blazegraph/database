@@ -121,6 +121,22 @@ public class TestServiceStarter extends AbstractFedZooTestCase {
                 + BigdataZooDefs.LOGICAL_SERVICE_PREFIX, SerializerUtil.serialize(UUID
                 .randomUUID()), acl, CreateMode.PERSISTENT_SEQUENTIAL);
 
+        /*
+         * Create the znode that is the parent for the physical service
+         * instances (direct child of the logicalSevice znode).
+         */
+        zookeeper.create(logicalServiceZPath + "/"
+                + BigdataZooDefs.PHYSICAL_SERVICES_CONTAINER, new byte[0], acl,
+                CreateMode.PERSISTENT);
+
+        /*
+         * Create the znode for the election of the primary physical service for
+         * this logical service (direct child of the logicalSevice znode).
+         */
+        zookeeper.create(logicalServiceZPath + "/"
+                + BigdataZooDefs.MASTER_ELECTION, new byte[0], acl,
+                CreateMode.PERSISTENT);
+
         // will be zero unless we started a zookeeper server above.
         final int processCountBefore = listener.running.size();
         

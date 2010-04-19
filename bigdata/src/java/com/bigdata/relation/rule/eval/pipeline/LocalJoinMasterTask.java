@@ -101,7 +101,8 @@ public class LocalJoinMasterTask extends JoinMasterTask {
             // create the local join task.
             final LocalJoinTask joinTask = new LocalJoinTask(/*indexName, */rule,
                     joinNexus, order, orderIndex, this/* master */,
-                    masterUUID, src, getSolutionBuffer());
+                    masterUUID, src, getSolutionBuffer(), 
+                    ruleState.getRequiredVars());
 
             if (!lastJoin) {
 

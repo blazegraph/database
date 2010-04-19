@@ -153,6 +153,12 @@ public interface IBindingSet extends Cloneable, Serializable {
     public IBindingSet clone();
     
     /**
+     * Return a shallow copy of the binding set, eliminating unecessary 
+     * variables.
+     */
+    public IBindingSet copy(IVariable[] variablesToKeep);
+    
+    /**
      * True iff the variables and their bound values are the same
      * for the two binding sets.
      * 

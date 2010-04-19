@@ -57,6 +57,7 @@ import com.bigdata.relation.rule.IProgram;
 import com.bigdata.relation.rule.IQueryOptions;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.ISlice;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -785,8 +786,12 @@ public class NestedSubqueryWithJoinThreadsTask implements IStepTask {
              * violate the constaints on the JOIN).
              */
 
+            final IVariable[] variablesToKeep = 
+                this.ruleState.getRequiredVars()[tailIndex];
+            
             // clone binding set.
-            final IBindingSet bset = bindingSet.clone();
+            // final IBindingSet bset = bindingSet.clone();
+            final IBindingSet bset = bindingSet.copy(variablesToKeep);
             
             // bind element to propagate bindings.
             if (joinNexus.bind(rule, tailIndex, e, bset)) {

@@ -130,8 +130,10 @@ public class TestJournalBasics extends TestCase {
 
         /*
          * Test suite for low-level data replication.
+         * 
+         * @todo test basic replication here 
          */
-        suite.addTestSuite(TestReplicatedStore.class);
+//        suite.addTestSuite(TestReplicatedStore.class);
         
         return suite;
         
