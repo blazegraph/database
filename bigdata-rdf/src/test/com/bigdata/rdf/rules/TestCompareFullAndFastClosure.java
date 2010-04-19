@@ -90,7 +90,7 @@ public class TestCompareFullAndFastClosure extends AbstractRuleTestCase {
         
         // String[] resource = new String[]{"/com/bigdata/rdf/rules/testOwlSameAs.rdf"};
         // String[] resource = new String[]{"/com/bigdata/rdf/rules/testOwlSameAs.rdf"};
-        String[] resource = new String[]{"/com/bigdata/rdf/rules/small.rdf"};
+        String[] resource = new String[]{"com/bigdata/rdf/rules/small.rdf"};
         String[] baseURL = new String[]{""};
         RDFFormat[] format = new RDFFormat[]{RDFFormat.RDFXML};
 
