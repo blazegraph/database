@@ -1726,9 +1726,13 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
 
             if (lockService.serviceRunState.tasksCancelled()) {
 
-                // tasks are cancelled in this run state.
+                /*
+                 * Tasks are cancelled in this run state. mayInterruptIfRunning
+                 * is true so the interrupt can be propagated if necessary even
+                 * though the task is not running.
+                 */
 
-                cancel(false/* taskIsNotRunning */);
+                cancel(true/* mayInterruptIfRunning */);
 
                 return true;
 
@@ -2073,16 +2077,18 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                 }
                 case ShutdownNow: {
                     /*
-                     * Cancel all tasks, clearing all queues. Note that only
-                     * tasks which are on [runningTasks] need to be interrupted
-                     * as tasks on the other queues are NOT running.
+                     * Cancel all tasks, clearing all queues.
+                     * 
+                     * Note that even tasks on the retryQueue need to be
+                     * interrupted so the interrupt can be propagated out of the
+                     * LockFutureTask.
                      */
                     lockManager.lock.lock();
                     try {
                         if (INFO)
                             log.info(lockManager.serviceRunState);
                         // clear retry queue (tasks will not be run).
-                        cancelTasks(lockManager.retryQueue.iterator(), false/* mayInterruptIfRunning */);
+                        cancelTasks(lockManager.retryQueue.iterator(), true/* mayInterruptIfRunning */);
                         // nothing on the retry queue.
                         lockManager.counters.nretry = 0;
                         // change the run state?
@@ -2602,7 +2608,19 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
                     task.setTaskRunState(TaskRunState.LocksReady);
                     counters.nwaiting--;
                     counters.nready++;
-                    ready(task);
+                    try {
+                        ready(task);
+                    } catch (Throwable t2) {
+                        /*
+                         * Note: If the implementation of ready(task) submits
+                         * the task to an Executor, that Executor can throw a
+                         * RejectedExecutionException here (e.g., because it was
+                         * shutdown). We set the exception (whatever it is) on
+                         * the task, which will cause its run state to shift to
+                         * Halted.
+                         */
+                        task.setException(t2);
+                    }
 
                 }
                 

@@ -388,11 +388,27 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 			throw new IllegalStateException("Backing store is open");
 		}
 		
-		destroy();
+		if (m_fileMetadata.file.exists()) {
+			try {
+				if (!m_fileMetadata.file.delete()) {
+					log.warn("Unable to delete file: " + m_fileMetadata.file);
+				}
+			} catch (SecurityException e) {
+				log.warn("Problem deleting file", e);
+			}
+		}
 	}
 
 	public void destroy() {
-		m_fileMetadata.file.delete();
+		if (m_fileMetadata.raf != null && m_fileMetadata.raf.getChannel().isOpen()) {
+			try {
+				m_fileMetadata.raf.close();
+			} catch (IOException e) {
+				log.warn("Problem with file close", e);
+			}
+		}
+		
+		deleteResources();
 	}
 
 	public IRootBlockView getRootBlock() {

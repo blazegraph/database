@@ -3,9 +3,7 @@ package com.bigdata.relation.rule.eval.pipeline;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-
 import org.apache.log4j.Logger;
-
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IIndex;
@@ -18,7 +16,9 @@ import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.eval.IJoinNexusFactory;
+import com.bigdata.relation.rule.eval.IRuleState;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.AbstractDistributedFederation;
@@ -115,6 +115,12 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
     final IAsynchronousIterator<IBindingSet[]> sourceItrProxy;
     
     final IKeyOrder[] keyOrders;
+    
+    /**
+     * A list of variables required for each tail, by tailIndex. Used to filter 
+     * downstream variable binding sets.  
+     */
+    final IVariable[][] requiredVars;
 
 //    /**
 //     * Set by the {@link DataService} which recognized that this class
@@ -161,7 +167,8 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
             final IJoinMaster masterProxy,
             final UUID masterUUID,
             final IAsynchronousIterator<IBindingSet[]> sourceItrProxy,
-            final IKeyOrder[] keyOrders) {
+            final IKeyOrder[] keyOrders,
+            final IVariable[][] requiredVars) {
         
         if (scaleOutIndexName == null)
             throw new IllegalArgumentException();
@@ -186,6 +193,8 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
             throw new IllegalArgumentException();
         if (keyOrders == null || keyOrders.length != order.length)
             throw new IllegalArgumentException();
+        if (requiredVars == null)
+            throw new IllegalArgumentException();
 
         this.scaleOutIndexName = scaleOutIndexName;
         this.rule = rule;
@@ -197,6 +206,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
         this.masterUUID = masterUUID;
         this.sourceItrProxy = sourceItrProxy;
         this.keyOrders = keyOrders;
+        this.requiredVars = requiredVars;
         
     }
 
@@ -319,7 +329,7 @@ public class JoinTaskFactoryTask extends DataServiceCallable<Future> {
             task = new DistributedJoinTask(/*scaleOutIndexName,*/ rule,
                     joinNexusFactory.newInstance(indexManager), order,
                     orderIndex, partitionId, fed, masterProxy, masterUUID,
-                    sourceItrProxy, keyOrders, getDataService());
+                    sourceItrProxy, keyOrders, getDataService(), requiredVars);
             
         }
 

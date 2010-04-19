@@ -41,6 +41,7 @@ import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.JiniCoreServicesStarter;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.JiniServicesHelper;
+import com.bigdata.service.jini.util.LookupStarter;
 
 /**
  * Class for starting the jini services.
@@ -74,6 +75,10 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
      * @return <code>true</code> if an instance was started.
      * 
      * @throws Exception
+     * 
+     * FIXME We need to specify the discovery groups and then modify this to
+     * start the lookup service (the only thing that we need) using the correct
+     * groups override. See {@link LookupStarter}.
      */
     public static boolean startCoreServices(final Configuration config,
             final IServiceListener listener) throws Exception {

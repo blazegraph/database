@@ -31,6 +31,7 @@ package com.bigdata.relation.rule.eval;
 import com.bigdata.relation.rule.IBindingSet;
 import com.bigdata.relation.rule.IPredicate;
 import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IVariable;
 import com.bigdata.relation.rule.Rule;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -67,7 +68,13 @@ public interface IRuleState {
      * the relation for that predicate plus {@link IKeyOrder#getIndexName()}.
      */
     public IKeyOrder[] getKeyOrder();
-
+    
+    /**
+     * A list of variables required for each tail, by tailIndex. Used to filter 
+     * downstream variable binding sets.  
+     */
+    public IVariable[][] getRequiredVars();
+    
     /**
      * Externalizes the rule and the evaluation order.
      */

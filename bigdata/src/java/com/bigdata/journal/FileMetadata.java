@@ -558,8 +558,10 @@ public class FileMetadata {
                     }
                     buffer.limit((int)nextOffset);
                     buffer.position(0);
-                    // Read the file image into the direct buffer.
-                    FileChannelUtility.readAll(opener, buffer, headerSize0);
+                    if (nextOffset > 0) {
+                        // Read the file image into the direct buffer.
+                        FileChannelUtility.readAll(opener, buffer, headerSize0);
+                    }
                     break;
                 }
                 case Mapped: {

@@ -440,9 +440,20 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
             }
 
         }
+        
+        /*
+         * Start the jini lookup service.
+         * 
+         * FIXME Pass all required parameters by setting -Dfoo, etc. 
+         */
+//        new Thread(new Runnable() {
+//            public void run() {
+//                LookupStarter.main(new String[] {});
+//            }
+//        }).start();
 
         /*
-         * COnnect the client and wait until zookeeper is up.
+         * Connect the client and wait until zookeeper is up.
          */
         {
 
@@ -692,6 +703,13 @@ public class JiniServicesHelper extends JiniCoreServicesHelper {
             recursiveDelete(zooDataDir);
 
         }
+        
+//        // Stop the lookup service.
+//        new Thread(new Runnable() {
+//            public void run() {
+//                LookupStarter.main(new String[] { "-stop" });
+//            }
+//        }).start();
         
         if (fedServiceDir != null && fedServiceDir.exists()) {
 
