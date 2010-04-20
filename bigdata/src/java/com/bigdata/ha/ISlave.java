@@ -49,7 +49,8 @@ public interface ISlave {
 	 * It is assumed that the data has already been validated by the call, the separate
 	 * checksum can be used to validate the data remoting
 	 * 
-	 * @param address where data should be added
+	 * @param newaddr where data should be added
+	 * @param oldaddr where previous version data was written
 	 * @param data to be written
 	 * @param chk the checksum to be appended
 	 */
@@ -63,11 +64,15 @@ public interface ISlave {
 	 * become a read/write Master.  See updateMetaAllocation for issues with DiskRW
 	 */
 	public void commitRootBlock(IRootBlockView rootBlock);
+	
 	/**
-	 * For a RWStrategy the allocation block cannot be updated using addWrite, since the in-memory
-	 * blocks must be updated to allow address decoding to support read-access.  For non RWStrategies
+	 * For a RWStrategy the allocation blocks must be updated 
+	 * to allow address decoding to support read-access.  For non RWStrategies
 	 * this should never be requested.  The request to the RWStrategy would be generated as part of
 	 * the master commit.
+	 * 
+	 * Although the addWrite passes the oldAddr, the allocationBlocks need a separate method to keep their
+	 * new allocation areas in sync
 	 */
 	public void updateAllocationBlock(int index, long addr, byte[] data);
 
