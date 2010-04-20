@@ -282,8 +282,27 @@ abstract public class WriteCacheService implements IWriteCache {
                         
                         final WriteCache cache = dirtyList.take();
                         
-                        cache.flush(false/* force */);
+                        /**
+                         * On occasion we have seen lock exceptions from the write to disk, so catch any exception
+                         * and retry.
+                         */
+                        int ioretry = 20;
+                        while (--ioretry > 0) {
+	                        try {
+	                        	cache.flush(false/* force */);
+	                        	break;
+	                        } catch (IOException ioe) {
+	                        	log.warn(ioe);
+	                        }
+                        }
 
+                        /**
+                         * if ioretry == 0 then the write did not succeed, this is an error condition
+                         */
+                        if (ioretry == 0) {
+                        	throw new RuntimeException("IO retry limit exhausted");
+                        }
+                        
                         cleanList.add(cache);
                         
                         if (dirtyList.isEmpty()) {
@@ -303,8 +322,10 @@ abstract public class WriteCacheService implements IWriteCache {
                     }
                     
                 } catch (Throwable t) {
-                	if (!m_closing) {
-                		log.error(t, t); // will be interrupted in close, so not necessarily a problem
+                	if (!m_closing) { // will be interrupted in close, so not necessarily a problem
+                		log.error(t, t);
+                		
+                		throw new IllegalStateException("Error writing to backing store", t);
                 	}
 
                 }
@@ -539,7 +560,13 @@ abstract public class WriteCacheService implements IWriteCache {
 
         try {
 
-            if (!flush(force, Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
+        	/**
+        	 * What is a reasonable time to wait for a flush?
+        	 * 
+        	 * Anymore than a few seconds would be suspicious.
+        	 */
+        	final int flushTimeout = 10;
+            if (!flush(force, flushTimeout, TimeUnit.SECONDS)) {
 
                 throw new RuntimeException();
 
