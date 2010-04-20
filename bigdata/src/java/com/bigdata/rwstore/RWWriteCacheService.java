@@ -60,12 +60,14 @@ public class RWWriteCacheService extends WriteCacheService {
 
         private volatile RandomAccessFile raf;
 
-        public ReopenFileChannel(final File file, final String mode)
+        public ReopenFileChannel(final File file, final RandomAccessFile raf, final String mode)
                 throws IOException {
 
             this.file = file;
 
             this.mode = mode;
+            
+            this.raf = raf;
 
             reopenChannel();
 
@@ -117,8 +119,8 @@ public class RWWriteCacheService extends WriteCacheService {
 
     };
 
-    public RWWriteCacheService(int nbuffers, final File file, final String mode) throws InterruptedException, IOException {
-		super(nbuffers, new ReopenFileChannel(file, mode));
+    public RWWriteCacheService(int nbuffers, final File file, final RandomAccessFile raf, final String mode) throws InterruptedException, IOException {
+		super(nbuffers, new ReopenFileChannel(file, raf, mode));
 		// TODO Auto-generated constructor stub
 	}
 
