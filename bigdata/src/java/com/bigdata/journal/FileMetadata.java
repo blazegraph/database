@@ -66,7 +66,7 @@ public class FileMetadata {
     final int MAGIC = 0xe6b4c275;
     
     /**
-     * Journal version number (version 1).
+     * Journal version number (version 1). @todo What relation is there between this and version info in the root blocks?
      */
     final int VERSION1 = 0x1;
     
