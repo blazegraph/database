@@ -31,6 +31,30 @@ BufferDescriptor:
 1. Write replication (write(oldadd,newaddr,chksum,bd), extend(length),
    prepare(commitCounter), commit(rootBlock), abort(commitCounter)).
 
+   - The integration point for write() is the WriteCacheService's newWriteCache()
+     method.  This returns a WriteCache whose writeOnChannel() method must be
+     overridden to write on the next node in the failover chain which is also
+     a member of the quorum.  The pipeline write can be issued first, obtaining
+     a Future.  Then issue the write on the local disk, which will block on the
+     IO.  Then wait on the Future.  This will minimize the latency.
+
+   - The integration point for extend() is the RWStrategy or WORMStrategy.
+   
+   - The integration point for commitNow() / abort() is the AbstractJournal. 
+     These translate down into other messages at the HA glue layer, include
+     prepare2Phase(commitCounter,bd), commit2Phase(commitCounter), and
+     abort2Phase(commitCount).  The master is the only one who would validate
+     a high level transaction.  By the time the master calls commitNow(long)
+     it has validated the transaction and has a specific commitTime and can
+     form the exact root block image.
+     
+        - prepare2Phase will read the new root block from the master, log the
+          old root block, and optionally flush to the disk. 
+        
+     	- commit2Phase will write the new root block and flush to the disk.
+     	
+     	- abort2Phase will reload from the current root block.
+
    - Pattern is send a FutureTask and wait on the Future.
 
    - Write pipeline with nio using direct buffers.
@@ -158,7 +182,7 @@ BufferDescriptor:
 
      5) set correct file extent
 
-Open questions:
+5. Robust messaging.
 
 - If you are not part of the quorum, then what do you with a read
   request?  With a write request?  How does the client encapsulate
@@ -194,7 +218,12 @@ Open questions:
   sail#runQuery(...) or whatever.  Load balancing of requests for a
   journal needs to be handled at the application level.
 
-- How to handle resynchronization for the RW store?
+Open questions:
+
+- How to make the resynchronization process one which guarantees eventual
+  consistency without allowing any intermediate bad states?   This is partly
+  a question of distributed atomic decision making and partly a question for
+  the RW store, which has more complex state transitions than the WORM.
 
 - Can we do 2 phase commits for a quorum w/ the existing AbstractTask
   and WriteExecutorService lock (this might only show up as a problem
