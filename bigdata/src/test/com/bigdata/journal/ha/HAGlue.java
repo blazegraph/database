@@ -27,181 +27,46 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.security.SecureRandom;
-import java.util.HashMap;
-import java.util.UUID;
 import java.util.concurrent.RunnableFuture;
 
-import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.bd.BufferDescriptor;
 import com.bigdata.service.ResourceService;
 
 /**
+ * The High Availability nexus for a set of journals or data services having
+ * shared persistent state.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
 public class HAGlue {
 
     /**
-     * A descriptor of a buffer from which a remote node may read some data.
+     * The {@link ResourceService} used to deliver raw records to the members of
+     * the quorum.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     * @version $Id$
-     * 
-     * FIXME make this into a smart proxy which exposes the ability to read
-     * the data from the buffer on the remote node.  use DGC to avoid GC of
-     * the entry for the buffer descriptor in the cache on the remote node.
+     * @todo Should this be the same or different from the one used to handle
+     *       resynchronization of the entire store and used to ship index
+     *       segment files around (for a data service). E.g., questions about
+     *       latency, throttling, concurrency, etc. Also, this needs to read
+     *       from and write on buffers, so the implementation needs to be a bit
+     *       different.
      */
-    public static class BufferDescriptor implements Externalizable {
-
-        private UUID id;
-        private int size;
-        private int chksum;
-        
-        /**
-         * An identifier for a specific buffer view when is assigned when the
-         * buffer is registered to make its contents available to the failover
-         * group
-         */
-        public UUID getId() {return id;}
-
-        /**
-         * The #of bytes to be read from the buffer.
-         */
-        public int size() {return size;}
-        
-        /**
-         * The checksum of the data in the buffer.
-         */
-        public int getChecksum() {return chksum;}
-        
-        /**
-         * Deserialization constructor.
-         */
-        public BufferDescriptor() {
-            
-        }
-
-        BufferDescriptor(final UUID id, final int size, final int checksum) {
-
-            this.id = id;
-            this.size = size;
-            this.chksum = checksum;
-            
-        }
-
-        public void readExternal(ObjectInput in) throws IOException,
-                ClassNotFoundException {
-
-            final long mostSigBits = in.readLong();
-            final long leastSigBits = in.readLong();
-            this.id = new UUID(mostSigBits, leastSigBits);
-            this.size = in.readInt();
-            this.chksum = in.readInt();
-            
-        }
-
-        public void writeExternal(ObjectOutput out) throws IOException {
-            
-            out.writeLong(id.getMostSignificantBits());
-            out.writeLong(id.getLeastSignificantBits());
-            out.writeInt(size);
-            out.writeInt(chksum);
-            
-        }
-        
+    ResourceService getResourceService() {
+        throw new UnsupportedOperationException();
     }
 
-    /*
-     * @todo Factory for buffer descriptors, resolving ids to buffers, sending
-     * data to the requester on a socket, and managing the release of those
-     * buffers.
+    /**
+     * Write a record on the failover chain. Only quorum members will accept the
+     * write.
+     * 
+     * @param newaddr
+     * @param oldaddr
+     * @param bd
+     * @return
      */
-    static class BufferDescriptionFactory {
-
-        private static class Wrapper {
-            final BufferDescriptor bd;
-            final ByteBuffer b;
-            Wrapper(BufferDescriptor bd,ByteBuffer b) {
-                this.bd = bd;
-                this.b = b;
-            }
-        }
-        
-        /**
-         * Weak value cache.  Entries are cleared once the wrapper is no longer
-         * 
-         * @todo could be a weak
-         */
-        final private ConcurrentWeakValueCache<UUID, Wrapper> cache = new ConcurrentWeakValueCache<UUID, Wrapper>();
-
-        /**
-         * @todo This is being done using a UUID for quick reuse of the
-         *       {@link ResourceService}. Refactor the {@link ResourceService}
-         *       to abstract the identifier for the resource so we do not need
-         *       to use a {@link UUID} here, which is both a stress for the
-         *       {@link SecureRandom} generator and for the {@link HashMap}.
-         */
-        private UUID nextId() {
-
-            return UUID.randomUUID();
-
-        }
-
-        /**
-         * Return a {@link BufferDescriptor} for the caller's buffer. The
-         * position, limit, and mark of the buffer must not be changed by this
-         * operation.
-         * 
-         * @param b
-         * @param chksum
-         * @return
-         */
-        public BufferDescriptor addBuffer(final ByteBuffer b, final int chksum) {
-
-            while(true) {
-            
-                final UUID id = nextId();
-                
-                final Wrapper w = new Wrapper( new BufferDescriptor(id, b
-                        .remaining(), chksum), b);
-
-                if (cache.putIfAbsent(id, w) == null) {
-                    
-                    return w.bd;
-                    
-                }
-                
-                // try again.
-            
-            }
-            
-        }
-
-        public Buffer get(final BufferDescriptor bd) {
-
-            final Wrapper w = cache.get(bd.getId());
-
-            if (w == null)
-                return null;
-
-            return w.b;
-
-        }
-        
-    }
-    
-    /*
-     * write pipeline.
-     */
-    
     public RunnableFuture<Void> write(long newaddr, long oldaddr, BufferDescriptor bd) {
         
         throw new UnsupportedOperationException();
@@ -219,15 +84,50 @@ public class HAGlue {
     }
 
     /*
+     * bad reads
+     */
+
+    /**
+     * Read a record from another member of the quorum. This is used to handle
+     * bad reads (when a checksum or IO error is reported by the local disk).
+     * 
+     * @todo hook for monitoring (nagios, etc). bad reads indicate a probable
+     *       problem.
+     */
+    public RunnableFuture<Void> read(long addr, ByteBuffer b) {
+
+        throw new UnsupportedOperationException();
+
+    }
+    
+    /*
      * commit protocol.
      */
 
+    /**
+     * Request a commit by the quorum. This method is invoked on the master. The
+     * master will issue the appropriate prepare and related messages to the
+     * failover nodes. The commit will go foward if a quorum votes "yes". An
+     * {@link #abort()} will be taken if the quorum votes "no".
+     * 
+     * @param commitTime
+     *            The commit time assigned to this commit by the transaction
+     *            service.
+     * 
+     * @todo add timeout configuration parameters for commit.
+     */
     public void commitNow(long commitTime) {
      
         throw new UnsupportedOperationException();
 
     }
-    
+
+    /**
+     * Request an abort by the quorum. This message is invoked on the master
+     * (all write operations are restricted to the master). The master will
+     * issue the appropriate request to the failover nodes, directing them to
+     * discard their current write set and reload from the current root block.
+     */
     public void abort() {
  
         throw new UnsupportedOperationException();
@@ -285,7 +185,9 @@ public class HAGlue {
     }
 
     /*
-     * @todo Quorum membership
+     * Quorum membership
+     * 
+     * @todo dynamics of quorum membership changes.
      */
 
     /**
@@ -320,5 +222,11 @@ public class HAGlue {
         throw new UnsupportedOperationException();
         
     }
+
+    /*
+     * Resynchronization.
+     * 
+     * @todo resynchronization API.
+     */
     
 }
