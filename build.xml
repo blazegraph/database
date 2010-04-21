@@ -1216,6 +1216,7 @@ ${postInstallMessage}</echo>
       <property name="dist.dir" location="${bigdata.dir}/dist/bigdata" />
 
       <property name="dist.bin" location="${dist.dir}/bin" />
+      <property name="dist.bin.config" location="${dist.bin}/config" />
       <property name="dist.lib" location="${dist.dir}/lib" />
       <property name="dist.lib.dl" location="${dist.dir}/lib-dl" />
       <property name="dist.lib.ext" location="${dist.dir}/lib-ext" />
@@ -1356,6 +1357,14 @@ ${postInstallMessage}</echo>
             todir="${dist.bin}"/>
       <chmod file="${dist.bin}/pstart" perm="ugo+x"/>
 
+      <copy file="${src.resources}/bin/config/browser.config"
+            todir="${dist.bin.config}"/>
+      <copy file="${src.resources}/bin/config/reggie.config"
+            todir="${dist.bin.config}"/>
+      <copy file="${src.resources}/bin/config/serviceStarter.config"
+            todir="${dist.bin.config}"/>
+      <copy file="${src.resources}/bin/config/zookeeper.config"
+            todir="${dist.bin.config}"/>
 
       <!-- Stage security policy (config) files -->
       <copy file="${src.resources.config}/policy.all"
@@ -1400,15 +1409,11 @@ ${postInstallMessage}</echo>
       <copy file="${src.resources.config}/bigdataCluster16.config"
             todir="${dist.var.config.jini}"/>
 
-      <copy file="${src.resources.config}/jini/zookeeper.config"
-            todir="${dist.var.config.jini}"/>
       <copy file="${src.resources.config}/jini/reggie.config"
             todir="${dist.var.config.jini}"/>
       <copy file="${src.resources.config}/jini/browser.config"
             todir="${dist.var.config.jini}"/>
-      <copy file="${src.resources.config}/jini/serviceStarterAll.config"
-            todir="${dist.var.config.jini}"/>
-      <copy file="${src.resources.config}/jini/serviceStarterOne.config"
+      <copy file="${src.resources.config}/jini/startAll.config"
             todir="${dist.var.config.jini}"/>
     </target>
 
@@ -1805,6 +1810,7 @@ ${postInstallMessage}</echo>
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}"/>
 
         <classpath refid="run.class.path.id"/>
+        <sysproperty key="java.class.path" value="${run.class.path}" />
 
         <!-- Individual test suite to run when -DtestName is set -->
         <!-- to the fully-qualified name of the test suite       -->
