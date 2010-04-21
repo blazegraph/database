@@ -1,0 +1,386 @@
+Milestones:
+
+k: The target replication count and MUST be odd.
+
+Failover chain: The ordered collection of physical service instances
+for the same logical service.
+
+Quorum: The set of (k+1)/2 physical service instances for the same
+logical service with an agreement on the lastCommitTime.
+
+Configuration:
+
+   - port on which to talk to the peers.
+
+   - protocol version?
+
+   - ???
+
+BufferDescriptor:
+
+   - int:bufferId
+
+   - int:messageId (The buffer descriptor must be associated with a
+                    message identifier to prevent read/write on a
+                    buffer whose contents have been changed. This
+                    could be the bufferId depending on how we manage
+                    logical/physical buffers.)
+
+   - ByteBuffer (will be direct; may be a slice).
+
+1. Write replication (write(oldadd,newaddr,chksum,bd), extend(length),
+   prepare(commitCounter), commit(rootBlock), abort(commitCounter)).
+
+   - Pattern is send a FutureTask and wait on the Future.
+
+   - Write pipeline with nio using direct buffers.
+
+   - 2/3-phase commit with quorum voting "yes".  otherwise you are
+     under quorum on this commit and we need to send an abort message
+     to the members of the failover chain for that commit (this
+     suggests that we need to send the commitCounter and/or commit
+     time with the prepare and the abort; the commit message will have
+     the root block).
+
+2. Handle bad reads (read(addr,bd))
+
+   - Read on a peer in the quorum and alerting interface since node
+     may be flakey.
+
+3. Quorum membership (A quorum protects against choosing a new master
+   with stale state following a federation restart after failure of
+   one or more nodes).
+
+   - Need a Quorum object. Who is in the quorum and who is the master.
+     The failover chain is every node which is live according to zk.
+     The quorum is only the nodes that are online for client requests
+     and is formed from an agreement among (k+1)/2 nodes over state.
+
+   - The write pipeline must skip over nodes which are not in the
+     quorum.
+
+   - Once a quorum membership is established, if the master is not
+     part of the quorum, then it closes and then reopens its zookeeper
+     connection in order to relinquish its role as the master.
+
+   - Once a quorum membership is established, anyone who is not in the
+     quorum must resynchronize before they can join the quorum.
+
+4. Resynchronization.  There are two cases: leading and trailing.  We
+   can resynchronize from anyone in the quorum (and could do scattered
+   reads on the quorum).  
+
+   (*) The RW and WORM each require some atomic decision making about
+   what delta is required and each must not update their root blocks
+   or invalidate existing state until they are current with the quorum
+   to avoid creating a database state which is incoherent (one that
+   can not be reopened from its root blocks).
+
+   The node will begin to start accepting writes from the pipeline as
+   soon as it has computed its deltas, but will not join the quorum
+   until it is current.  "Current" means all deltas are cleared (this
+   is defined for the WORM as a file byte delta and for the RW as an
+   allocation bit map delta). We need to do something interesting,
+   such as continuous approximation, since the delta computation is
+   not atomic across the failover set.
+
+   - WORM
+     
+     Trailing.  Send the file delta.  This should be ultra direct.
+     Just transmit the delta in the file from the channel to the
+     socket.  Update the root blocks once the file delta is up to
+     date.
+
+     Leading.  Just get the root blocks and the file length. If the
+     file is too long, then truncate it.  Update the root blocks and
+     you are done.
+
+   - RW.  The RW store requires allocation block checkpoints (aka
+     "session").  For example, maintaining 24 hours of session.
+
+     Wrong session.  If you are past the session checkpoint then you
+     can not do incremental synchronization and you must request the
+     entire store.  This is true whether you are leading or trailing.
+
+     Otherwise, first obtain a lock which prevents the master from
+     expiring the session during resynchronization.
+
+     For the RW store the one non-atomic change is in saving the
+     allocation blocks, especially if we have resized the file.  From
+     transaction to transaction this is not a problem since the
+     committed data is never re-used in the next transaction.  The
+     final update should always be to the rootblock, but at the point
+     the allocation blocks are written this is could be out of sync.
+     The solution is to write the blocks in a two-phase update -
+     temporarily extend the file to store the new allocation blocks,
+     then write the root block to reference these.  This secures the
+     data, now we can write the allocation blocks to the correct area,
+     update the rootblock and lastly set the corect file extent.
+
+     trailing. With a current session, we know that no current data
+     has been overwritten.
+     
+       1) If the file needs extention then we do that first, and
+          update the rootblock.  This creates the space for the
+          updates.
+
+       2) Compute delta using current in-memory allocation blocks and
+          new in-memory allocation blocks.
+
+       3) Request delta state and add writes.
+
+       4) Temporarily extend file to write new allocation blocks and
+          update rootblock. (committing new state).
+
+       5) Overwrite 'old' allocation blocks with new blocks and update
+          rootblock.
+
+       6) Set correct file extent.
+
+     leading.  In the same session we will not have overwritten data,
+     so we need to address any file extention and synchronize the
+     allocation blocks and metaallocation bits.
+     
+     Since the metallocation bits are referenced from the main heap,
+     updating the rootblock is all that is necessary to reference the
+     correct state.
+     
+     We will use the two-phase update to sync the allocation blocks
+     
+     1) extend the file and write the updated blocks to the extended
+        file
+
+     2) update the root block to point to extended bits (and flush)
+
+     3) copy allocation blocks to correct area
+
+     4) final update of rootblock
+
+     5) set correct file extent
+
+Open questions:
+
+- If you are not part of the quorum, then what do you with a read
+  request?  With a write request?  How does the client encapsulate
+  handling redirects?  We could send back the quorum metadata, which
+  says which nodes are in the quorum, whether or not a quorum exists,
+  and the master is only the master if the quorum exists.
+
+  ? How do we tell the client when the quorum changes such that it
+    could have use another node for its read request?
+
+  ? Maybe we should forward read requests to a peer in the quorum
+    since all the client is aware of is which nodes are in the
+    failover chain?
+
+    Write requests to a node which is in the master position but is
+    not in the quorum should block until a quorum is established,
+    which may require the node to yield the master role. If the node
+    yields master role to another node, then it will forward the
+    request to the new master once that node comes online as the
+    master.
+
+    Requests can still be dropped if a node has the request and it
+    dies.  How does the client ever notice this?  By a timeout on the
+    FutureTask?  How does the client deal with retries for reads and
+    writes?  It can cancel the FutureTask and submit a new one to
+    another node.  The buffer descriptor must be associated with a
+    message identifier to prevent read/write on a buffer whose
+    contents have been changed.
+
+  This is related to the concept of shard affinity, which is also not
+  directly visible to clients.  There is also the question of how
+  clients are able to make any requests at all... e.g.,
+  sail#runQuery(...) or whatever.  Load balancing of requests for a
+  journal needs to be handled at the application level.
+
+- How to handle resynchronization for the RW store?
+
+- Can we do 2 phase commits for a quorum w/ the existing AbstractTask
+  and WriteExecutorService lock (this might only show up as a problem
+  for the DS since we don't tend to use this for the journal).
+
+- Under quorum recovery: 
+
+   - Quorum could be defined by the minimum value of the
+     lastCommitTime across (k+1)/2 peers?  This is an interesting
+     notion which is made possible by the temporal database structure.
+     This could get around the 2-phase commit requirement.  We still
+     want the (k+1)/2 bit because that protects us against choosing a
+     quorum with older data when we could have waited and gotten a
+     quorum with newer data.  E.g., treat the "minimum" as a fallback
+     posture if we can not achieve a quorum otherwise.  This could
+     happen if a 2-phase commit fails on the "commit" message.  Note
+     that a rollback at this level should probably be applied to all
+     indices having data on the shards which have gone under the
+     quorum.
+
+   - Another option is to choose the most recent lastCommitTime and
+     replicate the data to another node. As long as the root blocks
+     are good and all data can be read this should be a safe
+     under-quorum recovery option.
+
+   - Should we allow the system to operate under quorum?  You can read
+     from historical data up to the time when you lost the quorum.
+     However, if you write on a logical node which is under quorum
+     then your writes are at risk if your node goes down and an older
+     node comes up.
+
+- Can we kill a client's zk connection if it is not reachable or are
+  we going to wait until it times out?
+
+TODO:
+
+   - RWStore, write cache, write replication, standalone HA in
+     JOURNAL_HA_BRANCH.
+
+     - The RW store needs to record delete blocks and needs a thread,
+       periodic task, or commit time task for releasing old commit
+       points. (Will be done with allocation block bitmap deltas, but
+       must retain session for resynchronization to be possible.)
+
+     - WORM checksums. Historical WORM stores will not support this so
+       it needs to be captured by the WORM version number.
+
+     - WORM integration with the write cache service.
+
+     - WriteCacheService lock, sleep and possible gap and deadlock
+       issues.
+
+       - Interrupted during sleep logs error.
+
+       - WARN : 6938 main
+         com.bigdata.io.WriteCache.resetWith(WriteCache.java:1368):
+         Written WriteCache but with no records
+
+     - RW is always using 6 buffers.  This must be a configuration
+       option so we can stress test the WriteCacheService under heavy
+       write loads and mixed write/read loads with lots of concurrency
+       and only a few buffers.  We need to do this to look for
+       deadlocks.
+
+     - AbstractJournal: Modify to log the root block to be overwritten
+       during the commit protocol so we can potentially restore it
+       from the file.  This is easier to do for the WORM and would
+       require a search of the appropriate allocation block's records
+       for the RW looking for anything which has the right magic value
+       and can also be interpreted as a RootBlockView (passes the
+       checksum, etc).
+
+     - API to accept a pipeline update (watch on the children of a
+       znode for the logical journal) and to notify if you are no
+       longer the master (SessionExpiredException when you try some
+       zookeeper operation).  Internally, the code has to handle the
+       join / leave.
+
+     - API for replication and resynchronization writes.  Slaves
+       should verify checksums as calculated by the master.
+       Differentiate between replication (ascending writes for the
+       WORM), resynchronization (delta to the end of the file for the
+       WORM), and write replacement (random write for both).
+
+     - Journal must be aware of master/slave state and whether it is
+       caught up and can therefore support reads.
+
+     - Handle read errors by reading on a peer.  Note that some file
+       systems will retry MANY times, which could hang the caller
+       (timed reads?  how?).  Consider doing replacement writes over
+       the bad region (again, we have a problem with timeouts.  I am
+       not even sure if Java IO is really interruptable once it gets
+       down to the OS layer).  This might be a problem for Windows and
+       HA.
+
+     - Report read errors in support of decision making about failure.
+
+============================================================
+
+During BSBM 2785 data load on laptop. 4/20/2010
+
+java.lang.RuntimeException: java.util.concurrent.ExecutionException: java.lang.AssertionError: There are 2 outstanding permits (should be just one).
+	at com.bigdata.rdf.spo.SPORelation.insert(SPORelation.java:1826)
+	at com.bigdata.rdf.store.AbstractTripleStore.addStatements(AbstractTripleStore.java:3261)
+	at com.bigdata.rdf.rio.StatementBuffer.writeSPOs(StatementBuffer.java:989)
+	at com.bigdata.rdf.rio.StatementBuffer.addStatements(StatementBuffer.java:869)
+	at com.bigdata.rdf.rio.StatementBuffer.incrementalWrite(StatementBuffer.java:708)
+	at com.bigdata.rdf.rio.StatementBuffer.add(StatementBuffer.java:784)
+	at com.bigdata.rdf.rio.StatementBuffer.add(StatementBuffer.java:766)
+	at com.bigdata.rdf.sail.BigdataSail$BigdataSailConnection.addStatement(BigdataSail.java:1918)
+	at com.bigdata.rdf.sail.BigdataSail$BigdataSailConnection.addStatement(BigdataSail.java:1879)
+	at org.openrdf.repository.sail.SailRepositoryConnection.addWithoutCommit(SailRepositoryConnection.java:228)
+	at org.openrdf.repository.base.RepositoryConnectionBase.add(RepositoryConnectionBase.java:455)
+	at org.openrdf.repository.util.RDFInserter.handleStatement(RDFInserter.java:196)
+	at org.openrdf.rio.ntriples.NTriplesParser.parseTriple(NTriplesParser.java:260)
+	at org.openrdf.rio.ntriples.NTriplesParser.parse(NTriplesParser.java:170)
+	at org.openrdf.rio.ntriples.NTriplesParser.parse(NTriplesParser.java:112)
+	at org.openrdf.repository.base.RepositoryConnectionBase.addInputStreamOrReader(RepositoryConnectionBase.java:353)
+	at org.openrdf.repository.base.RepositoryConnectionBase.add(RepositoryConnectionBase.java:242)
+	at org.openrdf.repository.base.RepositoryConnectionBase.add(RepositoryConnectionBase.java:239)
+	at org.openrdf.repository.base.RepositoryConnectionBase.add(RepositoryConnectionBase.java:202)
+	at benchmark.bigdata.BigdataLoader.loadData(BigdataLoader.java:159)
+	at benchmark.bigdata.BigdataLoader.main(BigdataLoader.java:109)
+Caused by: java.util.concurrent.ExecutionException: java.lang.AssertionError: There are 2 outstanding permits (should be just one).
+	at java.util.concurrent.FutureTask$Sync.innerGet(FutureTask.java:222)
+	at java.util.concurrent.FutureTask.get(FutureTask.java:83)
+	at com.bigdata.rdf.spo.SPORelation.insert(SPORelation.java:1807)
+	... 20 more
+Caused by: java.lang.AssertionError: There are 2 outstanding permits (should be just one).
+	at com.bigdata.io.WriteCacheService.writeChk(WriteCacheService.java:834)
+	at com.bigdata.rwstore.RWStore.alloc(RWStore.java:854)
+	at com.bigdata.journal.RWStrategy.write(RWStrategy.java:201)
+	at com.bigdata.journal.AbstractJournal.write(AbstractJournal.java:2498)
+	at com.bigdata.btree.AbstractBTree.writeNodeOrLeaf(AbstractBTree.java:3664)
+	at com.bigdata.btree.AbstractBTree.writeNodeRecursive(AbstractBTree.java:3477)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:102)
+	at com.bigdata.btree.DefaultEvictionListener.evicted(DefaultEvictionListener.java:1)
+	at com.bigdata.cache.HardReferenceQueue.evict(HardReferenceQueue.java:226)
+	at com.bigdata.cache.HardReferenceQueue.beforeOffer(HardReferenceQueue.java:199)
+	at com.bigdata.cache.RingBuffer.add(RingBuffer.java:159)
+	at com.bigdata.cache.HardReferenceQueue.add(HardReferenceQueue.java:176)
+	at com.bigdata.btree.AbstractBTree.doTouch(AbstractBTree.java:3365)
+	at com.bigdata.btree.AbstractBTree.touch(AbstractBTree.java:3331)
+	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:297)
+	at com.bigdata.btree.AbstractNode.<init>(AbstractNode.java:333)
+	at com.bigdata.btree.Leaf.<init>(Leaf.java:345)
+	at com.bigdata.btree.AbstractNode.copyOnWrite(AbstractNode.java:492)
+	at com.bigdata.btree.AbstractNode.copyOnWrite(AbstractNode.java:417)
+	at com.bigdata.btree.Leaf.insert(Leaf.java:490)
+	at com.bigdata.btree.Node.insert(Node.java:900)
+	at com.bigdata.btree.Node.insert(Node.java:900)
+	at com.bigdata.btree.Node.insert(Node.java:900)
+	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:2006)
+	at com.bigdata.btree.AbstractBTree.insert(AbstractBTree.java:1950)
+	at com.bigdata.rdf.spo.SPOIndexWriteProc.apply(SPOIndexWriteProc.java:247)
+	at com.bigdata.btree.UnisolatedReadWriteIndex.submit(UnisolatedReadWriteIndex.java:796)
+	at com.bigdata.rdf.spo.SPOIndexWriter.call(SPOIndexWriter.java:329)
+	at com.bigdata.rdf.spo.SPOIndexWriter.call(SPOIndexWriter.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+	at java.lang.Thread.run(Thread.java:619)
+ERROR: 37844      com.bigdata.rwstore.RWWriteCacheService1 com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:307): java.nio.channels.ClosedByInterruptException
+java.nio.channels.ClosedByInterruptException
+	at java.nio.channels.spi.AbstractInterruptibleChannel.end(AbstractInterruptibleChannel.java:184)
+	at sun.nio.ch.FileChannelImpl.write(FileChannelImpl.java:653)
+	at com.bigdata.io.FileChannelUtility.writeAll(FileChannelUtility.java:402)
+	at com.bigdata.io.WriteCache$FileChannelScatteredWriteCache.writeOnChannel(WriteCache.java:1313)
+	at com.bigdata.io.WriteCache.flushAndReset(WriteCache.java:745)
+	at com.bigdata.io.WriteCache.flush(WriteCache.java:658)
+	at com.bigdata.io.WriteCache.flush(WriteCache.java:604)
+	at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:285)
+	at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+	at java.lang.Thread.run(Thread.java:619)
+ERROR: 37844      com.bigdata.rwstore.RWWriteCacheService1 com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:307): java.lang.InterruptedException: sleep interrupted
+java.lang.InterruptedException: sleep interrupted
+	at java.lang.Thread.sleep(Native Method)
+	at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:271)
+	at com.bigdata.io.WriteCacheService$WriteTask.call(WriteCacheService.java:1)
+	at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+	at java.lang.Thread.run(Thread.java:619)
