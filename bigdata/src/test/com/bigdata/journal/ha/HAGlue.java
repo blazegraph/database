@@ -31,11 +31,10 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.util.concurrent.Executor;
+import java.nio.ByteBuffer;
 import java.util.concurrent.RunnableFuture;
 
-import net.jini.core.lookup.ServiceID;
-
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.AbstractJournal;
 
 /**
@@ -113,6 +112,65 @@ public class HAGlue {
      * data to the requester on a socket, and managing the release of those
      * buffers.
      */
+    static class BufferDescriptionFactory {
+
+        final private ConcurrentWeakValueCache<Integer, BufferDescriptor> cache = new ConcurrentWeakValueCache<Integer, BufferDescriptor>();
+
+        private int nextId = 0;
+
+        /*
+         * @todo would be nice to have an eventually consistent approach for
+         * this which did not rely on CAS operations (not AtomicInteger). There
+         * are some things like this in the transactional memory literature. It
+         * would also have to handle rollover, which makes it tricker.
+         */
+        private synchronized int nextId() {
+
+            if (nextId == Integer.MAX_VALUE) {
+
+                nextId = 0;
+                
+            } else {
+                
+                nextId++;
+                
+            }
+
+            return nextId;
+            
+        }
+        
+        /**
+         * Return a {@link BufferDescriptor} for the caller's buffer. The
+         * position, limit, and mark of the buffer must not be changed by this
+         * operation.
+         * 
+         * @param b 
+         * @param chksum
+         * @return
+         */
+        public BufferDescriptor addBuffer(ByteBuffer b,int chksum) {
+            
+            while(true) {
+            
+                final int id = nextId();
+                
+                final BufferDescriptor bd = new BufferDescriptor(id, b
+                        .remaining(), chksum);
+
+                if (cache.putIfAbsent(bd.getId(), bd) == null) {
+                    
+                    return bd;
+                    
+                }
+                
+                // try again.
+            
+            }
+            
+        }
+        
+    }
     
     /*
      * write pipeline.
@@ -223,15 +281,15 @@ public class HAGlue {
          */
         <T> void applyNext(RunnableFuture<T> r);
 
-        /**
-         * The set of nodes which are discovered and have an agreement on the
-         * distributed state of the journal.
-         */
-        ServiceID[] getServicesInQuorum();
+//        /**
+//         * The set of nodes which are discovered and have an agreement on the
+//         * distributed state of the journal.
+//         */
+//        ServiceID[] getServiceIDsInQuorum();
         
     }
     
-    public Executor[] getQuorum() {
+    public Quorum getQuorum() {
 
         throw new UnsupportedOperationException();
         
