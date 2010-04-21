@@ -27,9 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.concurrent.RunnableFuture;
 
-import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.AbstractJournal;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -37,15 +41,80 @@ import com.bigdata.journal.IRootBlockView;
  */
 public class HAGlue {
 
-    public interface BufferDescriptor {
+    /**
+     * A descriptor of a buffer from which a remote node may read some data.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    public static class BufferDescriptor implements Externalizable {
 
+        private int id;
+        private int size;
+        private int chksum;
+        
+        /**
+         * An identifier for a specific buffer view when is assigned when the
+         * buffer is registered to make its contents available to the failover
+         * group
+         */
+        public int getId() {return id;}
+
+        /**
+         * The #of bytes to be read from the buffer.
+         */
+        public int size() {return size;}
+        
+        /**
+         * The checksum of the data in the buffer.
+         */
+        public int getChecksum() {return chksum;}
+        
+        /**
+         * Deserialization constructor.
+         */
+        public BufferDescriptor() {
+            
+        }
+
+        BufferDescriptor(final int id, final int size, final int checksum) {
+
+            this.id = id;
+            this.size = size;
+            this.chksum = checksum;
+            
+        }
+
+        public void readExternal(ObjectInput in) throws IOException,
+                ClassNotFoundException {
+
+            this.id = in.readInt();
+            this.size = in.readInt();
+            this.chksum = in.readInt();
+            
+        }
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+            
+            out.writeInt(id);
+            out.writeInt(size);
+            out.writeInt(chksum);
+            
+        }
+        
     }
 
+    /*
+     * Factory for buffer descriptors, resolving ids to buffers, sending data to
+     * the requester on a socket, and managing the release of those buffers.
+     */
+    
     /*
      * write pipeline.
      */
     
-    public RunnableFuture<Void> write(long newaddr, long oldaddr, long chk, BufferDescriptor bd) {
+    public RunnableFuture<Void> write(long newaddr, long oldaddr, BufferDescriptor bd) {
         
         throw new UnsupportedOperationException();
         
@@ -76,24 +145,51 @@ public class HAGlue {
         throw new UnsupportedOperationException();
 
     }
-    
-    public interface Vote {
-        int getYesCount();
-        int getNoCount();
-    }
-    
-    RunnableFuture<Vote> prepare2Phase(long commitCounter,BufferDescriptor bd) {
+
+    /**
+     * Message sent to each non-master member of the quorum. The node should
+     * retrieve the root block from the master, flush all writes to the backing
+     * channel, and acknowledge "yes" if ready to commit.  If the node can not
+     * prepare for any reason, then it must return "no".
+     * 
+     * @param commitCounter
+     * @param bd
+     *            A buffer from which the node can obtain the root block for the
+     *            commit operation.
+     * 
+     * @return Vote yes/no on prepared to commit.
+     */
+    RunnableFuture<Boolean> prepare2Phase(long commitCounter, BufferDescriptor bd) {
 
         throw new UnsupportedOperationException();
 
     }
 
+    /**
+     * Message sent to each non-master member of the quorum telling it to commit
+     * using the root block from the corresponding prepare message.
+     * 
+     * @param commitCounter
+     * 
+     * @return
+     */
     RunnableFuture<Void> commit2Phase(long commitCounter) {
 
         throw new UnsupportedOperationException();
 
     }
 
+    /**
+     * Message sent to each non-master member of the quorum telling it to
+     * discard any writes which would be associated with the specified commit
+     * counter. If the node had prepared, then it would also discard the root
+     * block image if it had been read. The node then issues an
+     * {@link AbstractJournal#abort()} request, reloading all state from the
+     * last root block.
+     * 
+     * @param commitCounter
+     * @return
+     */
     RunnableFuture<Void> abort2Phase(long commitCounter) {
 
         throw new UnsupportedOperationException();
@@ -103,5 +199,5 @@ public class HAGlue {
     /*
      * @todo Quorum membership
      */
-    
+
 }

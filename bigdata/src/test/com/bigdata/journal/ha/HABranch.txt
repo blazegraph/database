@@ -19,12 +19,8 @@ Configuration:
 BufferDescriptor:
 
    - int:bufferId
-
-   - int:messageId (The buffer descriptor must be associated with a
-                    message identifier to prevent read/write on a
-                    buffer whose contents have been changed. This
-                    could be the bufferId depending on how we manage
-                    logical/physical buffers.)
+ 
+   - long:chksum
 
    - ByteBuffer (will be direct; may be a slice).
 
@@ -182,7 +178,7 @@ BufferDescriptor:
 
      5) set correct file extent
 
-5. Robust messaging.
+5. Robust messaging and liveness.
 
 - If you are not part of the quorum, then what do you with a read
   request?  With a write request?  How does the client encapsulate
@@ -217,6 +213,16 @@ BufferDescriptor:
   clients are able to make any requests at all... e.g.,
   sail#runQuery(...) or whatever.  Load balancing of requests for a
   journal needs to be handled at the application level.
+
+- Do we send messages to everyone in the failover chain and only have those
+  who are in the quorum respond or do we only send messages to everyone in
+  the quorum?  On the one hand a quorum state transition could cause a message
+  to be missed.  On the other hand, sending messages to a node which is dead
+  to RMI but still zookeeper could cause significant latency while the RMI
+  message times out.
+
+- There is a broad question about "liveness" and heart beats which is related
+  to these issues.
 
 Open questions:
 
