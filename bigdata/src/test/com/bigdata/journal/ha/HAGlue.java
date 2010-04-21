@@ -33,10 +33,14 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.UUID;
 import java.util.concurrent.RunnableFuture;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.service.ResourceService;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -57,7 +61,7 @@ public class HAGlue {
      */
     public static class BufferDescriptor implements Externalizable {
 
-        private int id;
+        private UUID id;
         private int size;
         private int chksum;
         
@@ -66,7 +70,7 @@ public class HAGlue {
          * buffer is registered to make its contents available to the failover
          * group
          */
-        public int getId() {return id;}
+        public UUID getId() {return id;}
 
         /**
          * The #of bytes to be read from the buffer.
@@ -85,7 +89,7 @@ public class HAGlue {
             
         }
 
-        BufferDescriptor(final int id, final int size, final int checksum) {
+        BufferDescriptor(final UUID id, final int size, final int checksum) {
 
             this.id = id;
             this.size = size;
@@ -96,7 +100,9 @@ public class HAGlue {
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
-            this.id = in.readInt();
+            final long mostSigBits = in.readLong();
+            final long leastSigBits = in.readLong();
+            this.id = new UUID(mostSigBits, leastSigBits);
             this.size = in.readInt();
             this.chksum = in.readInt();
             
@@ -104,7 +110,8 @@ public class HAGlue {
 
         public void writeExternal(ObjectOutput out) throws IOException {
             
-            out.writeInt(id);
+            out.writeLong(id.getMostSignificantBits());
+            out.writeLong(id.getLeastSignificantBits());
             out.writeInt(size);
             out.writeInt(chksum);
             
@@ -119,7 +126,7 @@ public class HAGlue {
      */
     static class BufferDescriptionFactory {
 
-        private class Wrapper {
+        private static class Wrapper {
             final BufferDescriptor bd;
             final ByteBuffer b;
             Wrapper(BufferDescriptor bd,ByteBuffer b) {
@@ -128,46 +135,40 @@ public class HAGlue {
             }
         }
         
-        final private ConcurrentWeakValueCache<Integer, Wrapper> cache = new ConcurrentWeakValueCache<Integer,Wrapper>();
-
-        private int nextId = 0;
-
-        /*
-         * @todo would be nice to have an eventually consistent approach for
-         * this which did not rely on CAS operations (not AtomicInteger). There
-         * are some things like this in the transactional memory literature. It
-         * would also have to handle rollover, which makes it tricker.
+        /**
+         * Weak value cache.  Entries are cleared once the wrapper is no longer
+         * 
+         * @todo could be a weak
          */
-        private synchronized int nextId() {
+        final private ConcurrentWeakValueCache<UUID, Wrapper> cache = new ConcurrentWeakValueCache<UUID, Wrapper>();
 
-            if (nextId == Integer.MAX_VALUE) {
+        /**
+         * @todo This is being done using a UUID for quick reuse of the
+         *       {@link ResourceService}. Refactor the {@link ResourceService}
+         *       to abstract the identifier for the resource so we do not need
+         *       to use a {@link UUID} here, which is both a stress for the
+         *       {@link SecureRandom} generator and for the {@link HashMap}.
+         */
+        private UUID nextId() {
 
-                nextId = 0;
-                
-            } else {
-                
-                nextId++;
-                
-            }
+            return UUID.randomUUID();
 
-            return nextId;
-            
         }
-        
+
         /**
          * Return a {@link BufferDescriptor} for the caller's buffer. The
          * position, limit, and mark of the buffer must not be changed by this
          * operation.
          * 
-         * @param b 
+         * @param b
          * @param chksum
          * @return
          */
-        public BufferDescriptor addBuffer(ByteBuffer b, int chksum) {
-            
+        public BufferDescriptor addBuffer(final ByteBuffer b, final int chksum) {
+
             while(true) {
             
-                final int id = nextId();
+                final UUID id = nextId();
                 
                 final Wrapper w = new Wrapper( new BufferDescriptor(id, b
                         .remaining(), chksum), b);
@@ -187,11 +188,12 @@ public class HAGlue {
         public Buffer get(final BufferDescriptor bd) {
 
             final Wrapper w = cache.get(bd.getId());
-            
-            if(w == null) return null;
-            
+
+            if (w == null)
+                return null;
+
             return w.b;
-            
+
         }
         
     }
