@@ -61,6 +61,63 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("journal/HA");
 
+        /*
+         * write pipeline unit tests.
+         */
+        
+        /*
+         * 1. bootstrap 3 journals in a specified failover chain and demonstrate
+         * pipelined writes and the commit protocol.
+         */
+
+        /*
+         * 2. bootstrap 3 journals in a specified failover chain, pipeline some
+         * writes, attempt a commit (prepare) and have one of the journals vote
+         * "no" but the other 2 vote "yes" and the commit goes through. This
+         * test will not attempt to deal with the fact that the quorum has no
+         * changed.
+         */
+
+        /*
+         * 3. bootstrap 3 journals in a specified failover chain, pipeline some
+         * writes, attempt a commit (prepare) and have 2 of the journals vote
+         * "no" so the commit does not proceed and the master send out an
+         * abort() message instead.
+         */
+
+        /*
+         * 4. throughput test. bootstrap 3 journals in a specified failover
+         * chain and write a bunch of data using raw records of a configured
+         * size and committing at a configured delay interval.
+         */
+
+        /*
+         * bad read unit tests.
+         */
+
+        /*
+         * 1. bootstrap 3 journals in a specified failover chain, pipeline some
+         * writes, prepare and commit the write set.  Now have the 2nd journal
+         * send a read request to the 1st journal, simulating how we handle a
+         * bad read.
+         */
+        
+        /*
+         * quorum membership unit tests.
+         */
+
+        /*
+         * resynchronization unit tests.
+         */
+
+        /*
+         * robust messaging unit tests.
+         * 
+         * unit tests for robust forwarding of client messages to peers in the
+         * quorum. some of these will deal with dynamic quorum changes and
+         * blocking until someone is elected the master who is in the quorum.
+         */
+
         return suite;
 
     }
