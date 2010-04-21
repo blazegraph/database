@@ -31,7 +31,10 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.concurrent.Executor;
 import java.util.concurrent.RunnableFuture;
+
+import net.jini.core.lookup.ServiceID;
 
 import com.bigdata.journal.AbstractJournal;
 
@@ -106,8 +109,9 @@ public class HAGlue {
     }
 
     /*
-     * Factory for buffer descriptors, resolving ids to buffers, sending data to
-     * the requester on a socket, and managing the release of those buffers.
+     * @todo Factory for buffer descriptors, resolving ids to buffers, sending
+     * data to the requester on a socket, and managing the release of those
+     * buffers.
      */
     
     /*
@@ -200,4 +204,37 @@ public class HAGlue {
      * @todo Quorum membership
      */
 
+    /**
+     * 
+     */
+    public interface Quorum {
+       
+        /** The #of members of the quorum. */
+        int size();
+        
+        /** The quorum target capacity is the replication factor (k). */
+        int capacity();
+        
+        /** Return true iff size GTE (capacity + 1). */
+        boolean isQuorumMet();
+        
+        /**
+         * Submits the message for execution by the next node in the quorum.
+         */
+        <T> void applyNext(RunnableFuture<T> r);
+
+        /**
+         * The set of nodes which are discovered and have an agreement on the
+         * distributed state of the journal.
+         */
+        ServiceID[] getServicesInQuorum();
+        
+    }
+    
+    public Executor[] getQuorum() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
 }
