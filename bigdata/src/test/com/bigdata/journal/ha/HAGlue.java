@@ -31,6 +31,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.concurrent.RunnableFuture;
 
@@ -49,6 +50,10 @@ public class HAGlue {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * @version $Id$
+     * 
+     * FIXME make this into a smart proxy which exposes the ability to read
+     * the data from the buffer on the remote node.  use DGC to avoid GC of
+     * the entry for the buffer descriptor in the cache on the remote node.
      */
     public static class BufferDescriptor implements Externalizable {
 
@@ -114,7 +119,16 @@ public class HAGlue {
      */
     static class BufferDescriptionFactory {
 
-        final private ConcurrentWeakValueCache<Integer, BufferDescriptor> cache = new ConcurrentWeakValueCache<Integer, BufferDescriptor>();
+        private class Wrapper {
+            final BufferDescriptor bd;
+            final ByteBuffer b;
+            Wrapper(BufferDescriptor bd,ByteBuffer b) {
+                this.bd = bd;
+                this.b = b;
+            }
+        }
+        
+        final private ConcurrentWeakValueCache<Integer, Wrapper> cache = new ConcurrentWeakValueCache<Integer,Wrapper>();
 
         private int nextId = 0;
 
@@ -149,24 +163,34 @@ public class HAGlue {
          * @param chksum
          * @return
          */
-        public BufferDescriptor addBuffer(ByteBuffer b,int chksum) {
+        public BufferDescriptor addBuffer(ByteBuffer b, int chksum) {
             
             while(true) {
             
                 final int id = nextId();
                 
-                final BufferDescriptor bd = new BufferDescriptor(id, b
-                        .remaining(), chksum);
+                final Wrapper w = new Wrapper( new BufferDescriptor(id, b
+                        .remaining(), chksum), b);
 
-                if (cache.putIfAbsent(bd.getId(), bd) == null) {
+                if (cache.putIfAbsent(id, w) == null) {
                     
-                    return bd;
+                    return w.bd;
                     
                 }
                 
                 // try again.
             
             }
+            
+        }
+
+        public Buffer get(final BufferDescriptor bd) {
+
+            final Wrapper w = cache.get(bd.getId());
+            
+            if(w == null) return null;
+            
+            return w.b;
             
         }
         
