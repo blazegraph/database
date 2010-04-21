@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry path="bigdata-rdf/src/java" kind="src"/>
+	<classpathentry path="dsi-utils/src/java" kind="src"/>
 	<classpathentry path="bigdata-bsbm/src/java" kind="src"/>
 	<classpathentry path="bigdata/src/resources/logging" kind="src"/>
 	<classpathentry path="bigdata-sails/src/samples" kind="src"/>
@@ -17,7 +18,6 @@
 	<classpathentry path="bigdata-jini/lib/apache/zookeeper-3.2.1.jar" kind="lib"/>
 	<classpathentry path="bigdata-sails/lib/commons-httpclient.jar" kind="lib"/>
 	<classpathentry path="bigdata-sails/lib/servlet-api.jar" kind="lib"/>
-	<classpathentry path="bigdata/lib/lgpl-utils-1.0-b5-dev-090210.jar" kind="lib"/>
 	<classpathentry path="lgpl-utils/src/java" kind="src"/>
 	<classpathentry path="lgpl-utils/src/test" kind="src"/>
 	<classpathentry path="bigdata/lib/icu/icu4j-3_6.jar" exported="true" kind="lib"/>
@@ -49,7 +49,6 @@
 	<classpathentry path="bigdata-jini/lib/jini/lib/start.jar" exported="true" kind="lib"/>
 	<classpathentry path="bigdata-jini/lib/jini/lib/sun-util.jar" exported="true" kind="lib"/>
 	<classpathentry path="bigdata-jini/lib/jini/lib/tools.jar" exported="true" kind="lib"/>
-	<classpathentry sourcepath="/dsiutils-1.0.10/src" path="bigdata/lib/unimi/dsiutils-1.0.10.jar" exported="true" kind="lib"/>
 	<classpathentry path="bigdata/lib/unimi/fastutil-5.1.5.jar" exported="true" kind="lib"/>
 	<classpathentry path="bigdata-bsbm/lib/jdom.jar" kind="lib"/>
 	<classpathentry path="bigdata-bsbm/lib/ssj.jar" kind="lib"/>
@@ -59,5 +58,7 @@
 	<classpathentry path="bigdata-rdf/lib/openrdf-sesame-2.3.0-onejar.jar" kind="lib"/>
 	<classpathentry path="bigdata-sails/lib/sesame-sparql-testsuite-2.3.0.jar" kind="lib"/>
 	<classpathentry path="bigdata-sails/lib/sesame-store-testsuite-2.3.0.jar" kind="lib"/>
+	<classpathentry path="bigdata/lib/dsi-utils-1.0-b5-dev-200410.jar" kind="lib"/>
+	<classpathentry path="bigdata/lib/lgpl-utils-1.0-b5-dev-200410.jar" kind="lib"/>
 	<classpathentry path="bin" kind="output"/>
 </classpath>
