@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IBufferStrategy;
@@ -88,11 +89,11 @@ public class SlaveJournal implements ISlave {
 	 * It is assumed that the data has already been validated
 	 * 
 	 * @param address where data should be added
-	 * @param data to be written
+	 * @param m_data to be written
 	 * @param chk the checksum to be appended
 	 */
-	public void addWrite(long newaddr, long oldaddr, byte[] data, long chk) {
-		m_journal.addWrite(newaddr, oldaddr, data, chk);
+	public void addWrite(long newaddr, long oldaddr, ByteBuffer m_data, long chk) {
+		m_journal.addWrite(newaddr, oldaddr, m_data, chk);
 	}
 
 	/**
@@ -186,5 +187,11 @@ public class SlaveJournal implements ISlave {
 			}
 			
 		};
+	}
+
+	@Override
+	public void awaitsQuorumWithAgreement() {
+		// TODO Auto-generated method stub
+		
 	}
 }

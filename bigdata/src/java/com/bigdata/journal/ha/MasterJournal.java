@@ -22,18 +22,27 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-package com.bigdata.ha;
+package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.HAMessage;
+import com.bigdata.ha.SlaveJournal;
+import com.bigdata.ha.HAMessage.HAAddWrite;
+import com.bigdata.ha.HAMessage.HACommitRootBlock;
+import com.bigdata.ha.HAMessage.HAExtendFile;
 import com.bigdata.ha.HAMessage.HASlaveMessage;
+import com.bigdata.ha.HAMessage.HAUpdateAllocationBlock;
+import com.bigdata.ha.HAMessage.HAUpdateMetaAllocation;
+import com.bigdata.io.WriteCache;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.rwstore.RWStore;
@@ -103,8 +112,8 @@ public class MasterJournal {
 	 * @param data to be written
 	 * @param chk the checksum to be appended
 	 */
-	public void addWrite(long newaddr, long oldaddr, byte[] data, long chk) {
-		processMessage(new HAMessage.HAAddWrite(newaddr, oldaddr, data, chk));
+	public void addWrite(WriteCache wc) {
+		// processMessage(new SocketMessage.HAWriteMessage(wc));
 	}
 
 	/**
