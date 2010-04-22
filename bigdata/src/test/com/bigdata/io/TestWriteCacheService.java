@@ -74,7 +74,7 @@ public class TestWriteCacheService extends TestCase2 {
 		try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
-			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, "rw");
+			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, null, "rw");
 			
 		} catch (Exception e) {
 			fail("Unexpected  Exception", e);
@@ -88,7 +88,7 @@ public class TestWriteCacheService extends TestCase2 {
 		try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
-			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, "rw");
+			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, null, "rw");
 			
             final ByteBuffer data1 = getRandomData();
             final long addr1 = 2048;
@@ -152,7 +152,7 @@ public class TestWriteCacheService extends TestCase2 {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
 	        final ReopenFileChannel opener = new ReopenFileChannel(file, "rw");
-			RWWriteCacheService writeCache = new RWWriteCacheService(4, file, "rw");
+			RWWriteCacheService writeCache = new RWWriteCacheService(4, file, null, "rw");
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay
