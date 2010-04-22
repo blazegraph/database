@@ -956,6 +956,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         lock.lock();
         
         try {
+
+        /*
+         * Initialize the HA components.
+         */
+
+        quorumManager = newQuorumManager();
+        
+        haGlue = newHAGlue();
         
         /*
          * Create the appropriate IBufferStrategy object.
@@ -3374,18 +3382,53 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return _bufferStrategy.getMaxRecordSize();
     }
 
+    /*
+     * High Availability
+     */
+
     /**
-     * The {@link QuorumManager} for this service.  The default is a fixed 
-     * quorum formed from a single service - this journal.  This method may
-     * be overridden to create a highly available journal.
+     * The {@link QuorumManager} for this service.
      */
     protected QuorumManager getQuorumManager() {
         
         return quorumManager;
         
     }
-    
-    private final QuorumManager quorumManager = new SingletonQuorumManager();
+
+    /**
+     * {@link QuorumManager} factory. The default behavior returns a fixed
+     * quorum formed from a single service - this journal. This method may be
+     * overridden to create a highly available journal or to create highly
+     * available services which embed a journal, such as the data service.
+     */
+    protected QuorumManager newQuorumManager() {
+        
+        return new SingletonQuorumManager();
+        
+    }
+    private final QuorumManager quorumManager;
+
+    /**
+     * The object which is used to coordinate various low-level operations among
+     * the members of a {@link Quorum}.
+     */
+    protected HAGlue getHAGlue() {
+        
+        return haGlue;
+        
+    }
+    private final HAGlue haGlue;
+
+    /**
+     * Factory for the {@link HAGlue} object for this {@link AbstractJournal}.
+     * This may be overridden to publish additional methods for the low-level HA
+     * API.
+     */
+    protected HAGlue newHAGlue() {
+
+        return new BasicHAGlue();
+        
+    }
 
     /**
      * A manager for a quorum consisting of just this journal.
@@ -3543,16 +3586,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
-    /*
-     * High Availability
-     */
-
-    public HAGlue getHAGlue() {
-        
-        return haGlue;
-        
-    }
-
     /**
      * A prepare request for the HA 2-phase commit protocol.
      * 
@@ -3592,7 +3625,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * Implementation hooks into the various low-level operations required
      * to support HA for the journal.
      */
-    private final HAGlue haGlue = new HAGlue() {
+    protected class BasicHAGlue implements HAGlue {
 
         /**
          * The most recent prepare request.
