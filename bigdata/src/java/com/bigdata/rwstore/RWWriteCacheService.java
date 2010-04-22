@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
+import com.bigdata.io.WriteCacheService2;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.WriteCacheService;
 
@@ -44,7 +45,7 @@ import com.bigdata.io.WriteCacheService;
  * @author mgc
  *
  */
-public class RWWriteCacheService extends WriteCacheService {
+public class RWWriteCacheService extends WriteCacheService2 {
 
     protected static final Logger log = Logger.getLogger(RWWriteCacheService.class);
     
@@ -60,12 +61,14 @@ public class RWWriteCacheService extends WriteCacheService {
 
         private volatile RandomAccessFile raf;
 
-        public ReopenFileChannel(final File file, final String mode)
+        public ReopenFileChannel(final File file, final RandomAccessFile raf, final String mode)
                 throws IOException {
 
             this.file = file;
 
             this.mode = mode;
+            
+            this.raf = raf;
 
             reopenChannel();
 
@@ -117,8 +120,8 @@ public class RWWriteCacheService extends WriteCacheService {
 
     };
 
-    public RWWriteCacheService(int nbuffers, final File file, final String mode) throws InterruptedException, IOException {
-		super(nbuffers, new ReopenFileChannel(file, mode));
+    public RWWriteCacheService(int nbuffers, final File file, final RandomAccessFile raf, final String mode) throws InterruptedException, IOException {
+		super(nbuffers, new ReopenFileChannel(file, raf, mode));
 		// TODO Auto-generated constructor stub
 	}
 
