@@ -36,7 +36,11 @@ import java.nio.channels.FileChannel;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -63,6 +67,9 @@ import com.bigdata.config.LongValidator;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.Name2Addr.Entry;
+import com.bigdata.journal.ha.HAGlue;
+import com.bigdata.journal.ha.Quorum;
+import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.rawstore.IRawStore;
@@ -1977,6 +1984,28 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
     }
 
+    public void abort() {
+
+        final WriteLock lock = _fieldReadWriteLock.writeLock();
+
+        lock.lock();
+
+        try {
+
+            getQuorumManager().awaitQuorum().abort2Phase();
+            
+        } catch (Throwable e) {
+            
+            throw new RuntimeException(e);
+            
+        } finally {
+            
+            lock.unlock();
+            
+        }
+
+    }
+
     /**
      * Discards any unisolated writes since the last {@link #commitNow(long)()}
      * and also discards the unisolated (aka live) btree objects, reloading them
@@ -1997,7 +2026,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * group was aborted. This is done automatically when we re-load the current
      * {@link ICommitRecord} from the root blocks of the store.
      */
-    public void abort() {
+    private void _abort() {
 
         final WriteLock lock = _fieldReadWriteLock.writeLock();
         
@@ -2285,9 +2314,14 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
                 return 0L;
             }
-            
+
             /*
              * Write the commit record onto the store.
+             * 
+             * @todo Modify to log the current root block and set the address of
+             * that root block in the commitRecord. This will be of use solely
+             * in disaster recovery scenarios where your root blocks are toast,
+             * but good root blocks can be found elsewhere in the file.
              */
 
             final IRootBlockView old = _rootBlock;
@@ -2321,39 +2355,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             final long commitRecordIndexAddr = _commitRecordIndex
                     .writeCheckpoint();
 
-            /*
-             * Call to ensure strategy does everything required for itself
-             * before final root block commit.  At a minimum it must flush
-             * its write cache to the backing file (issue the writes).
-             */
-            _bufferStrategy.commit();
-
-            /*
-             * Force application data to stable storage _before_ we update the
-             * root blocks. This option guarantees that the application data is
-             * stable on the disk before the atomic commit. Some operating
-             * systems and/or file systems may otherwise choose an ordered write
-             * with the consequence that the root blocks are laid down on the
-             * disk before the application data and a hard failure could result
-             * in the loss of application data addressed by the new root blocks
-             * (data loss on restart).
-             * 
-             * Note: We do not force the file metadata to disk. If that is done,
-             * it will be done by a force() after we write the root block on the
-             * disk.
-             */
-            if (doubleSync) {
-
-                _bufferStrategy.force(false/* metadata */);
-
-            }
-
             // next offset at which user data would be written.
             final long nextOffset = _bufferStrategy.getNextOffset();
 
             /*
-             * update the root block.
+             * Prepare the new root block.
              */
+            final IRootBlockView newRootBlock;
             {
 
                 /*
@@ -2396,19 +2404,45 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
 
                 // Create the new root block.
-                final IRootBlockView newRootBlock = new RootBlockView(!old
+                newRootBlock = new RootBlockView(!old
                         .isRootBlock0(), old.getOffsetBits(), nextOffset,
                         firstCommitTime, lastCommitTime, newCommitCounter,
                         commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
                         metaStartAddr, metaBitsAddr, old.getStoreType(),
                         old.getCreateTime(), old.getCloseTime(), checker);
 
-                _bufferStrategy.writeRootBlock(newRootBlock, forceOnCommit);
+            }
 
-                _rootBlock = newRootBlock;
+            Quorum q = null;
+            try {
 
-                _commitRecord = commitRecord;
+                q = getQuorumManager().awaitQuorum();
 
+                final int minYes = (q.replicationFactor() + 1) >> 1;
+
+                // @todo config prepare timeout.
+                final int nyes = q.prepare2Phase(commitTime, newRootBlock,
+                        1000/* timeout */, TimeUnit.MILLISECONDS);
+
+                if (nyes >= minYes) {
+
+                    q.commit2Phase(commitTime);
+
+                } else {
+
+                    q.abort2Phase();
+
+                }
+
+            } catch (Throwable e) {
+                if (q != null) {
+                    try {
+                        q.abort2Phase();
+                    } catch (Throwable t) {
+                        log.warn(t);
+                    }
+                }
+                throw new RuntimeException(e);
             }
 
             final long elapsedNanos = System.nanoTime() - beginNanos;
@@ -3339,5 +3373,382 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     final public int getMaxRecordSize() {
         return _bufferStrategy.getMaxRecordSize();
     }
+
+    /**
+     * The {@link QuorumManager} for this service.  The default is a fixed 
+     * quorum formed from a single service - this journal.  This method may
+     * be overridden to create a highly available journal.
+     */
+    protected QuorumManager getQuorumManager() {
+        
+        return quorumManager;
+        
+    }
+    
+    private final QuorumManager quorumManager = new SingletonQuorumManager();
+
+    /**
+     * A manager for a quorum consisting of just this journal.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private class SingletonQuorumManager implements QuorumManager {
+
+        private final Quorum quorum = new SingletonQuorum();
+        
+        public int replicationFactor() {
+            return 1;
+        }
+        
+        public Quorum getQuorum() {
+            return quorum;
+        }
+
+        public Quorum awaitQuorum() throws InterruptedException {
+            return quorum;
+        }
+
+        public void assertQuorum(long token) {
+            // NOP - the quorum is static and always valid.
+        }
+
+    }
+
+    /**
+     * An immutable quorum consisting of just this journal. The quorum is always
+     * met.
+     * <p>
+     * This implementation directly tunnels requests to the {@link HAGlue}
+     * instance for the {@link AbstractJournal} and assumes that there is only
+     * one member in the quorum. An HA implementation needs to perform these
+     * operations on each member of the quorum.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     * @version $Id$
+     */
+    final private class SingletonQuorum implements Quorum {
+
+        public int replicationFactor() {
+            return 1;
+        }
+
+        public boolean isMaster() {
+            return true;
+        }
+
+        public boolean isQuorumMet() {
+            return true;
+        }
+
+        public int size() {
+            return 1;
+        }
+
+        /**
+         * Always return 0 since we never have to negotiate an agreement with
+         * anyone else.
+         */
+        public long token() {
+            return 0;
+        }
+
+        /**
+         * There are no other members in the quorum so failover reads are not
+         * supported.
+         * 
+         * @todo return false to indicate that the read operation failed?
+         */
+        public void readFromQuorum(long addr, ByteBuffer b) {
+           throw new UnsupportedOperationException(); 
+        }
+
+        /**
+         * This is a NOP because the master handles this for its local backing
+         * file and there are no other services in the singleton quorum.
+         */
+        public void truncate(final long extent) {
+            try {
+                final RunnableFuture<Void> f = haGlue.truncate(token(), extent);
+                f.run();
+                f.get();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public int prepare2Phase(long commitTime, IRootBlockView rootBlock,
+                long timeout, TimeUnit unit) throws InterruptedException,
+                TimeoutException, IOException {
+            try {
+                final RunnableFuture<Boolean> f = haGlue.prepare2Phase(token(),
+                        commitTime, rootBlock);
+                /*
+                 * Note: In order to avoid a deadlock, this must run() on the
+                 * master in the caller's thread and use a local method call.
+                 * For the other services in the quorum it should submit the
+                 * RunnableFutures to an Executor and then await their outcomes.
+                 * To minimize latency, first submit the futures for the other
+                 * services and then do f.run() on the master. This will allow
+                 * the other services to prepare concurrently with the master's
+                 * IO.
+                 */
+                f.run();
+                return f.get(timeout, unit) ? 1 : 0;
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+        
+        public void commit2Phase(final long commitTime) throws IOException {
+            try {
+                final RunnableFuture<Void> f = haGlue.commit2Phase(commitTime);
+                /*
+                 * Note: In order to avoid a deadlock, this must run() on the
+                 * master in the caller's thread and use a local method call.
+                 * For the other services in the quorum it should submit the
+                 * RunnableFutures to an Executor and then await their outcomes.
+                 * To minimize latency, first submit the futures for the other
+                 * services and then do f.run() on the master. This will allow
+                 * the other services to prepare concurrently with the master's
+                 * IO.
+                 */
+                f.run();
+                f.get();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+        
+        public void abort2Phase() throws IOException {
+            try {
+                final RunnableFuture<Void> f = haGlue.abort2Phase(token());
+                /*
+                 * Note: In order to avoid a deadlock, this must run() on the
+                 * master in the caller's thread and use a local method call.
+                 * For the other services in the quorum it should submit the
+                 * RunnableFutures to an Executor and then await their outcomes.
+                 * To minimize latency, first submit the futures for the other
+                 * services and then do f.run() on the master. This will allow
+                 * the other services to prepare concurrently with the master's
+                 * IO.
+                 */
+                f.run();
+                f.get();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+    }
+
+    /*
+     * High Availability
+     */
+
+    public HAGlue getHAGlue() {
+        
+        return haGlue;
+        
+    }
+
+    /**
+     * A prepare request for the HA 2-phase commit protocol.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     * @version $Id$
+     */
+    private static class PrepareRequest {
+        
+        /**
+         * The token associated with the quorum for which the prepare request
+         * was issued.
+         */
+        public final long token;
+        
+        /**
+         * The commitTime associated with the last "prepare" message.
+         */
+        public final long commitTime;
+        
+        /**
+         * The root block associated with the last "prepare" message.
+         */
+        public final IRootBlockView rootBlock;
+
+        public PrepareRequest(final long token, final long commitTime,
+                final IRootBlockView rootBlock) {
+
+            this.token = token;
+            this.commitTime = commitTime;
+            this.rootBlock = rootBlock;
+            
+        }
+        
+    }
+
+    /**
+     * Implementation hooks into the various low-level operations required
+     * to support HA for the journal.
+     */
+    private final HAGlue haGlue = new HAGlue() {
+
+        /**
+         * The most recent prepare request.
+         */
+        private final AtomicReference<PrepareRequest> prepareRequest = new AtomicReference<PrepareRequest>();
+        
+        /**
+         * @todo probably send a byte[] and then validate the root block when we
+         *       wrap it as a view.
+         */
+        public RunnableFuture<Boolean> prepare2Phase(final long token,
+                final long commitTime, final IRootBlockView rootBlock)
+                throws IOException {
+
+            if (commitTime <= getLastCommitTime())
+                throw new IllegalStateException();
+
+            if (rootBlock == null)
+                throw new IllegalStateException();
+
+            prepareRequest.set(new PrepareRequest(token, commitTime, rootBlock));
+            
+            return new FutureTask<Boolean>(new Runnable() {
+
+                public void run() {
+
+                    final PrepareRequest req = prepareRequest.get();
+
+                    if (req == null)
+                        throw new IllegalStateException();
+                    
+                    getQuorumManager().assertQuorum(req.token);
+
+                    /*
+                     * Call to ensure strategy does everything required for
+                     * itself before final root block commit. At a minimum it
+                     * must flush its write cache to the backing file (issue the
+                     * writes).
+                     */
+                    _bufferStrategy.commit();
+
+                    /*
+                     * Force application data to stable storage _before_ we
+                     * update the root blocks. This option guarantees that the
+                     * application data is stable on the disk before the atomic
+                     * commit. Some operating systems and/or file systems may
+                     * otherwise choose an ordered write with the consequence
+                     * that the root blocks are laid down on the disk before the
+                     * application data and a hard failure could result in the
+                     * loss of application data addressed by the new root blocks
+                     * (data loss on restart).
+                     * 
+                     * Note: We do not force the file metadata to disk. If that
+                     * is done, it will be done by a force() after we write the
+                     * root block on the disk.
+                     */
+                    if (doubleSync) {
+
+                        _bufferStrategy.force(false/* metadata */);
+
+                    }
+
+                }
+            }, true/* vote=yes */);
+
+        }
+
+        /**
+         * Note: Deadlocks will occur if the writeLock is held by the master
+         * across commitNow() and a different thread runs commit2Phase() for the
+         * master since commit2Phase() must acquire the writeLock.
+         */
+        public RunnableFuture<Void> commit2Phase(final long commitTime)
+                throws IOException {
+
+            return new FutureTask<Void>(new Runnable() {
+                public void run() {
+
+                    final PrepareRequest req = prepareRequest.get();
+
+                    if (req == null)
+                        throw new IllegalStateException();
+
+                    if (req.commitTime != commitTime)
+                        throw new IllegalStateException();
+                    
+                    _fieldReadWriteLock.writeLock().lock();
+
+                    try {
+
+                        getQuorumManager().assertQuorum(req.token);
+
+                        _bufferStrategy.writeRootBlock(req.rootBlock,
+                                forceOnCommit);
+
+                        // set the new root block.
+                        _rootBlock = req.rootBlock;
+
+                        // reload the commit record from the new root block.
+                        _commitRecord = _getCommitRecord();
+
+                        prepareRequest.set(null/* discard */);
+
+                    } finally {
+
+                        _fieldReadWriteLock.writeLock().unlock();
+
+                    }
+                    
+                }
+            }, null/* Void */);
+
+        }
+
+        /**
+         * Note: Deadlocks will occur if the writeLock is held by the master
+         * across commitNow() and a different thread runs abort2Phase() for the
+         * master since abort() will attempt to acquire the writeLock as well.
+         */
+        public RunnableFuture<Void> abort2Phase(final long token)
+                throws IOException {
+
+            return new FutureTask<Void>(new Runnable() {
+                public void run() {
+
+                    getQuorumManager().assertQuorum(token);
+
+                    prepareRequest.set(null/* discard */);
+                    
+                    _abort();
+                    
+                }
+            }, null/* Void */);
+
+        }
+
+        /**
+         * FIXME The {@link IBufferStrategy} implementations need to have hooks
+         * to invoke the method on the quorum and need to avoid problems with
+         * re-entrant calls on the master (infinite recursion).
+         */
+        public RunnableFuture<Void> truncate(final long token, final long extent)
+                throws IOException {
+
+            return new FutureTask<Void>(new Runnable() {
+                public void run() {
+
+                    getQuorumManager().assertQuorum(token);
+
+                    _bufferStrategy.truncate(extent);
+                    
+                }
+            }, null/* Void */);
+            
+        }
+
+    };
 
 }

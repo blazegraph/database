@@ -61,10 +61,31 @@ BufferDescriptor:
      suggests that we need to send the commitCounter and/or commit
      time with the prepare and the abort; the commit message will have
      the root block).
+     
+   - The write pipeline should be reconfigured each time a new quorum is
+     established.  The configuration should include specific end points
+     (addr,port) for each node.  Each node makes a request from its 
+     predecessor in the pipeline.  Data streams through from node to node
+     as it arrives, sending deltas down the socket in efficient chunk sizes
+     for the network protocol but not blocking to wait for the entire record
+     to arrive at a node before streaming to the downstream requester.
+     
+     The ResourceService bears some similarity to the write pipeline, but is
+     focused on replication of entire files.  Also, while the write pipeline
+     always flows from the master along the quorum order, it is expected that
+     index builds will occur on the node with affinity for the shard and then
+     replicated to the failover nodes.  Index segment files are significantly
+     larger than raw records, so the overhead to establish a write order for
+     each file shipped is acceptable in this case.  However, this is not an
+     acceptable overhead for the write pipeline.
+     
+     We need to explore resynchronization in more depth.  This differs from
+     the write pipeline because any node in the quorum can be read on.  In
+     this way it is more like failover reads. 
 
 2. Handle bad reads (read(addr,bd))
 
-   - Read on a peer in the quorum and alerting interface since node
+    - Read on a peer in the quorum and alerting interface since node
      may be flakey.
 
 3. Quorum membership (A quorum protects against choosing a new master
@@ -85,7 +106,49 @@ BufferDescriptor:
 
    - Once a quorum membership is established, anyone who is not in the
      quorum must resynchronize before they can join the quorum.
-
+     
+   - Identification of a quorum will be coordinated using zookeeper.  Any
+     node which is not a member of a quorum will create an ephemeral znode
+     under the following zpath:
+     
+     	.../logicalService/quorums/[commitTime]/[epheremalChild]
+     	
+     where "commitTime" is the commitTime of its current root block.  A quorum
+     exists (has "met") when there are (k+1)/2 children for a specific commitTime.
+     Any node which is not part of a "met" quorum must undergo resynchronization
+     to bring it into the quorum.  This can be either leading resynchronization
+     (discarding committed state) or trailing resynchronization (acquiring state
+     committed in the quorum).  
+     
+     The failover chain is simply the ordered set of (k+1)/2 ephemeral znodes
+     under a given commitTime znode, e.g., the current met quorum.
+     
+     The quorum is only renegotiated if the #of members in the quorum falls 
+     below (k+1)/2.  Until then, the ephemeral znodes remain associated with
+     the commitTime under which the quorum was formed even though subsequent
+     commits may have flowed through the system.  Once a quorum is met, other
+     nodes must synchronize with the quorums current state and then join the
+     quorum under its commitTime.
+     
+     Note that the commitTime is simply a token.  Its semantics are purely those
+     of the commitTime for which the quorum was established.  Once the quorum is
+     active, new commits will flow through the quorum.  However the commitTime
+     token for the quorum DOES NOT update even though new commits have been
+     processed.  Only if the quorum breaks (falls below (k+1)/2 members) do
+     nodes publish themselves under their then current commitTime, thus starting
+     the search for a new quorum.
+     
+     In order to manage quorums, each node must watch the znode hierarchy under
+     .../logicalService/quorums.  There is existing code for this sort of thing.
+     
+     In addition to the above zpath, each logical service also maintains a list
+     of all physical instances.  The ServicesManagerService (SMS) is responsible
+     for creating and destroying service instances as necessary to maintain a
+     given failover capacity (k).  It uses persistent child znodes to represent
+     the known physical service instances for a given logical service.  It
+     currently uses ephemeral znodes to manage a master election, but I think
+     that this needs to be changed to be quorum based as described above.
+     
 4. Resynchronization.  There are two cases: leading and trailing.  We
    can resynchronize from anyone in the quorum (and could do scattered
    reads on the quorum).  

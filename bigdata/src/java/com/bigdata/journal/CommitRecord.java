@@ -121,5 +121,24 @@ public class CommitRecord implements ICommitRecord {
         return sb.toString();
         
     }
+
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (!(o instanceof ICommitRecord))
+            return false;
+        final ICommitRecord t = (ICommitRecord) o;
+        if (timestamp != t.getTimestamp())
+            return false;
+        if (commitCounter != t.getCommitCounter())
+            return false;
+        if (roots.length != t.getRootAddrCount())
+            return false;
+        for (int i = 0; i < roots.length; i++) {
+            if (roots[i] != t.getRootAddr(i))
+                return false;
+        }
+        return true;
+    }
     
 }
