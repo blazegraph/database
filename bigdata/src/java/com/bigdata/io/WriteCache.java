@@ -30,6 +30,7 @@ package com.bigdata.io;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
@@ -201,7 +202,7 @@ abstract public class WriteCache implements IWriteCache {
 	/**
 	 * The metadata associated with a record in the {@link WriteCache}.
 	 */
-	protected static class RecordMetadata {
+	public static class RecordMetadata {
 
 		/**
 		 * The offset of the record in the file.
@@ -1370,5 +1371,14 @@ abstract public class WriteCache implements IWriteCache {
 		}
 		
 		reset(); // must ensure reset state even if cache already empty
+	}
+
+	public void setRecordMap(Collection<RecordMetadata> map) {
+		throw new RuntimeException("setRecordMap NotImplemented");
+	}
+
+	public Collection<RecordMetadata> getRecordMap() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

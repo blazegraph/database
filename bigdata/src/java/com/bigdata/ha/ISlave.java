@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.ha;
 
+import java.nio.ByteBuffer;
+
 import com.bigdata.journal.ForceEnum;
 import com.bigdata.journal.IRootBlockView;
 
@@ -31,11 +33,16 @@ import com.bigdata.journal.IRootBlockView;
  * Any Journal to be used in HA must implement the ISlave interface.  This is an intermediate level
  * interface covering both raw IO but also commit dependencies with RootBlock synchronization.
  * 
+ * Zookeeper manages the configuration of the Federation - starting up the Slaves - with the head being
+ * the Master.
+ * 
  * @author Martyn Cutcher
  *
  */
 public interface ISlave {
 
+	public void awaitsQuorumWithAgreement();
+	
 	/**
 	 * Ensures the slave journal is synchronized with the master.
 	 *
@@ -51,10 +58,10 @@ public interface ISlave {
 	 * 
 	 * @param newaddr where data should be added
 	 * @param oldaddr where previous version data was written
-	 * @param data to be written
+	 * @param m_data to be written
 	 * @param chk the checksum to be appended
 	 */
-	public void addWrite(long newaddr, long oldaddr, byte[] data, long chk);
+	public void addWrite(long newaddr, long oldaddr, ByteBuffer m_data, long chk);
 
 	/**
 	 * It is assumed that when a rootblock is sent, this implies a commit, so the buffer strategy
