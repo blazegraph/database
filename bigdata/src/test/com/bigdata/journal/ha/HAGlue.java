@@ -27,202 +27,127 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.rmi.Remote;
 import java.util.concurrent.RunnableFuture;
 
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.bd.BufferDescriptor;
-import com.bigdata.service.ResourceService;
+import com.bigdata.journal.IRootBlockView;
+import com.sun.corba.se.impl.orbutil.closure.Future;
 
 /**
- * The High Availability nexus for a set of journals or data services having
- * shared persistent state.
+ * A remote interface for methods supporting high availability for a set of
+ * journals or data services having shared persistent state.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo Scale-out needs to add {@link AbstractJournal#closeForWrites(long)} to
+ *       this API.
  */
-public class HAGlue {
+public interface HAGlue extends Remote {
 
-    /**
-     * The {@link ResourceService} used to deliver raw records to the members of
-     * the quorum.
-     * 
-     * @todo Should this be the same or different from the one used to handle
-     *       resynchronization of the entire store and used to ship index
-     *       segment files around (for a data service). E.g., questions about
-     *       latency, throttling, concurrency, etc. Also, this needs to read
-     *       from and write on buffers, so the implementation needs to be a bit
-     *       different.
-     */
-    ResourceService getResourceService() {
-        throw new UnsupportedOperationException();
-    }
+//    /**
+//     * The {@link ResourceService} used to deliver raw records to the members of
+//     * the quorum.
+//     * 
+//     * @todo Should this be the same or different from the one used to handle
+//     *       resynchronization of the entire store and used to ship index
+//     *       segment files around (for a data service). E.g., questions about
+//     *       latency, throttling, concurrency, etc. Also, this needs to read
+//     *       from and write on buffers, so the implementation needs to be a bit
+//     *       different.
+//     */
+//    ResourceService getResourceService() {
+//        throw new UnsupportedOperationException();
+//    }
 
-    /**
-     * Write a record on the failover chain. Only quorum members will accept the
-     * write.
-     * 
-     * @param newaddr
-     * @param oldaddr
-     * @param bd
-     * @return
+    /*
+     * Note: write() is handled at the WriteCache.  Entire WriteCache instances
+     * are send down a configured pipeline at a time.
      */
-    public RunnableFuture<Void> write(long newaddr, long oldaddr, BufferDescriptor bd) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
+//    /**
+//     * Write a record on the failover chain. Only quorum members will accept the
+//     * write.
+//     * 
+//     * @param newaddr
+//     * @param oldaddr
+//     * @param bd
+//     * @return
+//     */
+//    public RunnableFuture<Void> write(long newaddr, long oldaddr, BufferDescriptor bd) {
+//        
+//        throw new UnsupportedOperationException();
+//        
+//    }
 
     /*
      * file extension.
      */
-    
-    public RunnableFuture<Void> truncate(long extent) {
-        
-        throw new UnsupportedOperationException();
-        
-    }
+
+    /**
+     * Set the file length on on the backing store for this service.
+     * 
+     * @param token The token for the quorum making the request.
+     * @param extent The new extent for the backing file.
+     */
+    public RunnableFuture<Void> truncate(long token, long extent)
+            throws IOException;
 
     /*
      * bad reads
      */
 
-    /**
-     * Read a record from another member of the quorum. This is used to handle
-     * bad reads (when a checksum or IO error is reported by the local disk).
-     * 
-     * @todo hook for monitoring (nagios, etc). bad reads indicate a probable
-     *       problem.
-     */
-    public RunnableFuture<Void> read(long addr, ByteBuffer b) {
-
-        throw new UnsupportedOperationException();
-
-    }
+//    /**
+//     * @todo This could be implemented over the {@link ResourceService} with
+//     *       the modification to read from and write on a {@link ByteBuffer}
+//     *       . In that case, it does not need to be a remote method call and
+//     *       could be removed from the {@link HAGlue} interface.
+//     */
+//    public RunnableFuture<Void> readFromQuorum(long addr, BufferDescriptor b)
+//            throws IOException;
     
     /*
      * commit protocol.
      */
 
     /**
-     * Request a commit by the quorum. This method is invoked on the master. The
-     * master will issue the appropriate prepare and related messages to the
-     * failover nodes. The commit will go foward if a quorum votes "yes". An
-     * {@link #abort()} will be taken if the quorum votes "no".
-     * 
-     * @param commitTime
-     *            The commit time assigned to this commit by the transaction
-     *            service.
-     * 
-     * @todo add timeout configuration parameters for commit.
-     */
-    public void commitNow(long commitTime) {
-     
-        throw new UnsupportedOperationException();
-
-    }
-
-    /**
-     * Request an abort by the quorum. This message is invoked on the master
-     * (all write operations are restricted to the master). The master will
-     * issue the appropriate request to the failover nodes, directing them to
-     * discard their current write set and reload from the current root block.
-     */
-    public void abort() {
- 
-        throw new UnsupportedOperationException();
-
-    }
-
-    /**
-     * Message sent to each non-master member of the quorum. The node should
-     * retrieve the root block from the master, flush all writes to the backing
-     * channel, and acknowledge "yes" if ready to commit.  If the node can not
+     * Save a reference to the caller's root block, flush writes to the backing
+     * channel and acknowledge "yes" if ready to commit. If the node can not
      * prepare for any reason, then it must return "no".
      * 
-     * @param commitCounter
-     * @param bd
-     *            A buffer from which the node can obtain the root block for the
-     *            commit operation.
+     * @param token
+     *            The token for the quorum for which this request was made.
+     * @param commitTime
+     *            The commit time that will be assigned to the new commit point.
+     * @param rootBlock
+     *            The new root block.
      * 
-     * @return Vote yes/no on prepared to commit.
+     * @return A {@link Future} which evaluates to a yes/no vote on whether the
+     *         service is prepared to commit.
      */
-    RunnableFuture<Boolean> prepare2Phase(long commitCounter, BufferDescriptor bd) {
-
-        throw new UnsupportedOperationException();
-
-    }
+    RunnableFuture<Boolean> prepare2Phase(long token, long commitTime,
+            IRootBlockView rootBlock) throws IOException;
 
     /**
-     * Message sent to each non-master member of the quorum telling it to commit
-     * using the root block from the corresponding prepare message.
+     * Commit using the root block from the corresponding prepare message. It is
+     * an error if a commit message is observed without the corresponding
+     * prepare message.
      * 
-     * @param commitCounter
-     * 
-     * @return
+     * @param commitTime
+     *            The commit time that will be assigned to the new commit point.
      */
-    RunnableFuture<Void> commit2Phase(long commitCounter) {
-
-        throw new UnsupportedOperationException();
-
-    }
+    RunnableFuture<Void> commit2Phase(long commitTime) throws IOException;
 
     /**
-     * Message sent to each non-master member of the quorum telling it to
-     * discard any writes which would be associated with the specified commit
-     * counter. If the node had prepared, then it would also discard the root
-     * block image if it had been read. The node then issues an
-     * {@link AbstractJournal#abort()} request, reloading all state from the
-     * last root block.
+     * Discard the current write set using {@link AbstractJournal#abort()},
+     * reloading all state from the last root block, etc.
      * 
-     * @param commitCounter
-     * @return
+     * @param token
+     *            The token for the quorum for which this request was made.
      */
-    RunnableFuture<Void> abort2Phase(long commitCounter) {
-
-        throw new UnsupportedOperationException();
-
-    }
-
-    /*
-     * Quorum membership
-     * 
-     * @todo dynamics of quorum membership changes.
-     */
-
-    /**
-     * 
-     */
-    public interface Quorum {
-       
-        /** The #of members of the quorum. */
-        int size();
-        
-        /** The quorum target capacity is the replication factor (k). */
-        int capacity();
-        
-        /** Return true iff size GTE (capacity + 1). */
-        boolean isQuorumMet();
-        
-        /**
-         * Submits the message for execution by the next node in the quorum.
-         */
-        <T> void applyNext(RunnableFuture<T> r);
-
-//        /**
-//         * The set of nodes which are discovered and have an agreement on the
-//         * distributed state of the journal.
-//         */
-//        ServiceID[] getServiceIDsInQuorum();
-        
-    }
+    RunnableFuture<Void> abort2Phase(long token) throws IOException;
     
-    public Quorum getQuorum() {
-
-        throw new UnsupportedOperationException();
-        
-    }
-
     /*
      * Resynchronization.
      * 

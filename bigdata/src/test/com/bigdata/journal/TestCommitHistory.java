@@ -375,8 +375,8 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
          */
         ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
 
-        // should be the same instance that is held by the journal.
-        assertTrue(commitRecord0 == journal.getCommitRecord());
+        // should be the same data that is held by the journal.
+        assertEquals(commitRecord0, journal.getCommitRecord());
 
         /*
          * write a record on the store, commit the store, and note the commit
@@ -453,8 +453,8 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
              */
             ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
 
-            // should be the same instance that is held by the journal.
-            assertTrue(commitRecord0 == journal.getCommitRecord());
+            // should be the same data that is held by the journal.
+            assertEquals(commitRecord0, journal.getCommitRecord());
 
             /*
              * verify that a request for last committed state the named index
