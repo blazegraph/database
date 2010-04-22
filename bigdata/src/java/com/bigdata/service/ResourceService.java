@@ -30,6 +30,7 @@ package com.bigdata.service;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -64,6 +65,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.IndexSegmentStore;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.io.ByteBufferOutputStream;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.ShutdownHelper;
@@ -1321,4 +1323,93 @@ abstract public class ResourceService {
 
 	}
 
+	public static class ReadBufferTask extends FetchResourceTask<ByteBuffer> {
+
+		protected static final Logger log = Logger.getLogger(ReadResourceTask.class);
+
+		// protected final boolean DEBUG = log.isDebugEnabled();
+
+		final Integer id;
+
+		final ByteBuffer outbuf;
+
+		/**
+		 * @param addr
+		 *            The address of the service from which the resource will be
+		 *            read.
+		 * @param port
+		 *            The port at which to connect to the service from which the
+		 *            resource will be read.
+		 * @param id
+		 *            The id that identifies the source ByteBuffer.
+		 * @param outbuf
+		 *            The ByteBuffer to which the source ByteBuffer must be written.
+		 */
+		public ReadBufferTask(final InetAddress addr, final int port, final Integer id, final ByteBuffer outbuf) {
+			super(addr, port);
+
+			if (id == null)
+				throw new IllegalArgumentException();
+			if (outbuf == null)
+				throw new IllegalArgumentException();
+
+			this.id = id;
+			this.outbuf = outbuf;
+
+		}
+
+		public Object logId() {
+			return id;
+		}
+
+		public Object logResource() {
+			return outbuf;
+		}
+		
+		/**
+		 * Return the {@link ByteBuffer} on which the resource was written.
+		 * 
+		 */
+		public ByteBuffer call() throws Exception {
+			Socket s = null;
+			final OutputStream os = new ByteBufferOutputStream(outbuf);
+			try {
+				s = new Socket(addr, port);
+
+				// send the UUID of the resource that we want.
+				{
+
+					final DataOutputStream dos = new DataOutputStream(s.getOutputStream());
+
+					dos.writeInt(id);
+
+					// flush the request.
+					dos.flush();
+
+				}
+
+				// buffered input stream for reading from the socket.
+				final InputStream is = new BufferedInputStream(s.getInputStream());
+
+				transfer(is, os);
+
+				return outbuf;
+			} finally {
+				// close the socket (if open).
+				try {
+					if (s != null)
+						s.close();
+				} catch (Throwable t) {/* ignore */
+				}
+
+				// release the file lock (if acquired).
+				try {
+					os.close();
+				} catch (Throwable t) {/* ignore */
+				}
+			}
+		}
+
+
+	}
 }
