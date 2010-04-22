@@ -373,7 +373,7 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
         /*
          * obtain the commit record for that commit timestamp.
          */
-        ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
+        final ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
 
         // should be the same data that is held by the journal.
         assertEquals(commitRecord0, journal.getCommitRecord());
@@ -391,11 +391,11 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
         /*
          * obtain the commit record for that commit timestamp.
          */
-        ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
+        final ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
 
-        // should be the same instance that is held by the journal.
-        assertTrue(commitRecord1 == journal.getCommitRecord());
-        
+        // should be the same data that is held by the journal.
+        assertEquals(commitRecord1, journal.getCommitRecord());
+
         /*
          * verify that we obtain the same instance with find as with an exact
          * match.
@@ -451,7 +451,7 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
             /*
              * obtain the commit record for that commit timestamp.
              */
-            ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
+            final ICommitRecord commitRecord0 = journal.getCommitRecord(commitTime0);
 
             // should be the same data that is held by the journal.
             assertEquals(commitRecord0, journal.getCommitRecord());
@@ -503,10 +503,10 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
                     .getCheckpointAddr());
 
             // obtain the commit record for that commit timestamp.
-            ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
+            final ICommitRecord commitRecord1 = journal.getCommitRecord(commitTime1);
 
-            // should be the same instance that is held by the journal.
-            assertTrue(commitRecord1 == journal.getCommitRecord());
+            // should be the same data.
+            assertEquals(commitRecord1, journal.getCommitRecord());
 
             /*
              * verify that we get the same historical index object for the new
@@ -547,10 +547,10 @@ public class TestCommitHistory extends ProxyTestCase<Journal> {
             assertTrue(commitTime2 > commitTime1);
 
             // obtain the commit record for that commit timestamp.
-            ICommitRecord commitRecord2 = journal.getCommitRecord(commitTime2);
+            final ICommitRecord commitRecord2 = journal.getCommitRecord(commitTime2);
 
             // should be the same instance that is held by the journal.
-            assertTrue(commitRecord2 == journal.getCommitRecord());
+            assertEquals(commitRecord2, journal.getCommitRecord());
 
             // must be a different index object.
 
