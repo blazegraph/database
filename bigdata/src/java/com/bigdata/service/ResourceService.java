@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-*/
+ */
 /*
  * Created on Feb 18, 2009
  */
@@ -78,1264 +78,1247 @@ import com.bigdata.util.concurrent.ShutdownHelper;
  */
 abstract public class ResourceService {
 
-    protected static final Logger log = Logger.getLogger(ResourceService.class);
-
-//    protected final boolean DEBUG = log.isDebugEnabled();
-
-    /**
-     * The port on which the service is accepting connections.
-     */
-    public final int port;
-
-    /**
-     * The server socket.
-     */
-    private final ServerSocket ss;
-
-    /**
-     * <code>true</code> once running and until closed.
-     */
-    private volatile boolean open = false;
-
-    /**
-     * Performance counters for the {@link ResourceService}.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo could also monitor the accept and request thread pools. The latter
-     *       is the more interesting from a workload perspective.
-     */
-    public class Counters {
-     
-        /**
-         * #of requests.
-         */
-        public long requestCount;
-
-        /**
-         * #of requests which are denied.
-         */
-        public long denyCount;
-
-        /**
-         * #of requests for which the resource was not found.
-         */
-        public long notFoundCount;
-
-        /**
-         * #of requests which end in an internal error.
-         */
-        public long internalErrorCount;
-
-        /**
-         * #of errors for responses where we attempt to write the file on the
-         * socket.
-         */
-        public long writeErrorCount;
-
-        /**
-         * #of responses where we attempt to write the file on the socket.
-         */
-        public long nwrites;
-
-        /**
-         * #of bytes in the files sent.
-         */
-        public long bytesWritten;
-
-        /**
-         * The largest response written so far.
-         */
-        public long maxWriteSize;
-
-        /**
-         * A lock used to make updates to {@link #maxWriteSize} atomic.
-         */
-        final private Object maxWriteSizeLock = new Object();
-        
-        /**
-         * #of nanoseconds sending files (this will double count time for files
-         * that are served concurrently).
-         */
-        public long elapsedWriteNanos;
-        
-        synchronized public CounterSet getCounters() {
-
-            if (root == null) {
-
-                root = new CounterSet();
-
-                /*
-                 * #of requests and their status outcome counters.
-                 */
-                {
-                    final CounterSet tmp = root.makePath("status");
-
-                    tmp.addCounter("Request Count", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(requestCount);
-                        }
-                    });
-
-                    tmp.addCounter("Deny Count", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(denyCount);
-                        }
-                    });
-
-                    tmp.addCounter("Not Found Count", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(notFoundCount);
-                        }
-                    });
-
-                    tmp.addCounter("Internal Error Count",
-                            new Instrument<Long>() {
-                                public void sample() {
-                                    setValue(internalErrorCount);
-                                }
-                            });
-                    
-                }
-                
-                /*
-                 * writes (A write is a response where we try to write the file
-                 * on the socket).
-                 */
-                {
-
-                    final CounterSet tmp = root.makePath("writes");
-                    tmp.addCounter("nwrites", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(nwrites);
-                        }
-                    });
-
-                    tmp.addCounter("bytesWritten", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(bytesWritten);
-                        }
-                    });
-
-                    tmp.addCounter("writeSecs", new Instrument<Double>() {
-                        public void sample() {
-                            final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                            setValue(writeSecs);
-                        }
-                    });
-
-                    tmp.addCounter("bytesWrittenPerSec",
-                            new Instrument<Double>() {
-                                public void sample() {
-                                    final double writeSecs = (elapsedWriteNanos / 1000000000.);
-                                    final double bytesWrittenPerSec = (writeSecs == 0L ? 0d
-                                            : (bytesWritten / writeSecs));
-                                    setValue(bytesWrittenPerSec);
-                                }
-                            });
-
-                    tmp.addCounter("maxWriteSize", new Instrument<Long>() {
-                        public void sample() {
-                            setValue(maxWriteSize);
-                        }
-                    });
-
-                }
-
-            }
-
-            return root;
-
-        }
-        private CounterSet root = null;
-        
-    }
-
-    /**
-     * Performance counters for this service.
-     */
-    public final Counters counters = new Counters();
-    
-    /**
-     * Start the service on any open port using a cached thread pool to handle
-     * requests.
-     * 
-     * @throws IOException
-     */
-    public ResourceService() throws IOException {
-
-        this(0/* port */, 0/* requestServicePoolSize */);
-
-    }
-
-    /**
-     * 
-     * @param port
-     *            The port on which to start the service or ZERO (0) to use any
-     *            open port.
-     * @throws IOException
-     */
-    public ResourceService(int port) throws IOException {
-
-        this(port, 0/* requestServicePoolSize */);
-
-    }
-
-    /**
-     * 
-     * @param port
-     *            The port on which to start the service or ZERO (0) to use any
-     *            open port.
-     * @param requestServicePoolSize
-     *            The size of the thread pool that will handle requests. When
-     *            ZERO (0) a cached thread pool will be used with no specific
-     *            size limit.
-     * 
-     * @throws IOException
-     */
-    public ResourceService(final int port, final int requestServicePoolSize)
-            throws IOException {
-
-        if (port != 0) {
-
-            /*
-             * Use the specified port.
-             */
-            this.port = port;
-
-            ss = new ServerSocket(this.port);
-
-        } else {
-
-            /*
-             * Use any open port.
-             */
-            ss = new ServerSocket(0);
-
-            this.port = ss.getLocalPort();
-
-        }
-
-        if (log.isInfoEnabled())
-            log.info("Running on port=" + this.port);
-
-        if (requestServicePoolSize == 0) {
-
-            requestService = (ThreadPoolExecutor) Executors
-                    .newCachedThreadPool(new DaemonThreadFactory(getClass()
-                            .getName()
-                            + ".requestService"));
-
-        } else {
-
-            requestService = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-                    requestServicePoolSize, new DaemonThreadFactory(getClass()
-                            .getName()
-                            + ".requestService"));
-
-        }
-
-        // Begin accepting connections.
-        acceptService.submit(new AcceptTask());
-
-    }
-
-    public void awaitRunning(final long timeout, final TimeUnit unit)
-            throws InterruptedException, TimeoutException {
-
-        lock.lock();
-        try {
-
-            if (!open) {
-
-                running.await(timeout, unit);
+	protected static final Logger log = Logger.getLogger(ResourceService.class);
+
+	// protected final boolean DEBUG = log.isDebugEnabled();
+
+	/**
+	 * The port on which the service is accepting connections.
+	 */
+	public final int port;
+
+	/**
+	 * The server socket.
+	 */
+	private final ServerSocket ss;
+
+	/**
+	 * <code>true</code> once running and until closed.
+	 */
+	private volatile boolean open = false;
+
+	/**
+	 * Performance counters for the {@link ResourceService}.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id: ResourceService.java 2265 2009-10-26 12:51:06Z thompsonbry
+	 *          $
+	 * 
+	 * @todo could also monitor the accept and request thread pools. The latter
+	 *       is the more interesting from a workload perspective.
+	 */
+	public class Counters {
+
+		/**
+		 * #of requests.
+		 */
+		public long requestCount;
+
+		/**
+		 * #of requests which are denied.
+		 */
+		public long denyCount;
+
+		/**
+		 * #of requests for which the resource was not found.
+		 */
+		public long notFoundCount;
+
+		/**
+		 * #of requests which end in an internal error.
+		 */
+		public long internalErrorCount;
+
+		/**
+		 * #of errors for responses where we attempt to write the file on the
+		 * socket.
+		 */
+		public long writeErrorCount;
+
+		/**
+		 * #of responses where we attempt to write the file on the socket.
+		 */
+		public long nwrites;
+
+		/**
+		 * #of bytes in the files sent.
+		 */
+		public long bytesWritten;
+
+		/**
+		 * The largest response written so far.
+		 */
+		public long maxWriteSize;
+
+		/**
+		 * A lock used to make updates to {@link #maxWriteSize} atomic.
+		 */
+		final private Object maxWriteSizeLock = new Object();
+
+		/**
+		 * #of nanoseconds sending files (this will double count time for files
+		 * that are served concurrently).
+		 */
+		public long elapsedWriteNanos;
+
+		synchronized public CounterSet getCounters() {
+
+			if (root == null) {
+
+				root = new CounterSet();
+
+				/*
+				 * #of requests and their status outcome counters.
+				 */
+				{
+					final CounterSet tmp = root.makePath("status");
+
+					tmp.addCounter("Request Count", new Instrument<Long>() {
+						public void sample() {
+							setValue(requestCount);
+						}
+					});
+
+					tmp.addCounter("Deny Count", new Instrument<Long>() {
+						public void sample() {
+							setValue(denyCount);
+						}
+					});
+
+					tmp.addCounter("Not Found Count", new Instrument<Long>() {
+						public void sample() {
+							setValue(notFoundCount);
+						}
+					});
+
+					tmp.addCounter("Internal Error Count", new Instrument<Long>() {
+						public void sample() {
+							setValue(internalErrorCount);
+						}
+					});
+
+				}
+
+				/*
+				 * writes (A write is a response where we try to write the file
+				 * on the socket).
+				 */
+				{
+
+					final CounterSet tmp = root.makePath("writes");
+					tmp.addCounter("nwrites", new Instrument<Long>() {
+						public void sample() {
+							setValue(nwrites);
+						}
+					});
+
+					tmp.addCounter("bytesWritten", new Instrument<Long>() {
+						public void sample() {
+							setValue(bytesWritten);
+						}
+					});
+
+					tmp.addCounter("writeSecs", new Instrument<Double>() {
+						public void sample() {
+							final double writeSecs = (elapsedWriteNanos / 1000000000.);
+							setValue(writeSecs);
+						}
+					});
+
+					tmp.addCounter("bytesWrittenPerSec", new Instrument<Double>() {
+						public void sample() {
+							final double writeSecs = (elapsedWriteNanos / 1000000000.);
+							final double bytesWrittenPerSec = (writeSecs == 0L ? 0d : (bytesWritten / writeSecs));
+							setValue(bytesWrittenPerSec);
+						}
+					});
+
+					tmp.addCounter("maxWriteSize", new Instrument<Long>() {
+						public void sample() {
+							setValue(maxWriteSize);
+						}
+					});
 
-            }
-
-            if (open)
-                return;
-
-            throw new TimeoutException();
-
-        } finally {
-            lock.unlock();
-        }
-        
-    }
-    
-    private final Lock lock = new ReentrantLock();
-    private final Condition running = lock.newCondition();
-    
-    private class AcceptTask implements Runnable {
+				}
 
-        public void run() {
+			}
 
-            lock.lock();
-            try {
-        
-                open = true;
-                
-                running.signal();
-                
-            } finally {
-                
-                lock.unlock();
-                
-            }
+			return root;
 
-            try {
+		}
 
-                while (open) {
+		private CounterSet root = null;
 
-                    /*
-                     * Hand off request to a pool of worker threads.
-                     * 
-                     * Note: The Future of this task is ignored. If there is a
-                     * problem a message is logged, the client socket is closed,
-                     * the execution of the task is aborted.
-                     */
+	}
 
-                    requestService.submit(new RequestTask(ss.accept()));
+	/**
+	 * Performance counters for this service.
+	 */
+	public final Counters counters = new Counters();
 
-                }
+	/**
+	 * Start the service on any open port using a cached thread pool to handle
+	 * requests.
+	 * 
+	 * @throws IOException
+	 */
+	public ResourceService() throws IOException {
 
+		this(0/* port */, 0/* requestServicePoolSize */);
 
-            } catch (IOException ex) {
+	}
 
-                if (!open) {
+	/**
+	 * 
+	 * @param port
+	 *            The port on which to start the service or ZERO (0) to use any
+	 *            open port.
+	 * @throws IOException
+	 */
+	public ResourceService(int port) throws IOException {
 
-                    if (log.isInfoEnabled())
-                        log.info("closed.");
+		this(port, 0/* requestServicePoolSize */);
 
-                    return;
+	}
 
-                }
+	/**
+	 * 
+	 * @param port
+	 *            The port on which to start the service or ZERO (0) to use any
+	 *            open port.
+	 * @param requestServicePoolSize
+	 *            The size of the thread pool that will handle requests. When
+	 *            ZERO (0) a cached thread pool will be used with no specific
+	 *            size limit.
+	 * 
+	 * @throws IOException
+	 */
+	public ResourceService(final int port, final int requestServicePoolSize) throws IOException {
 
-                log.error(ex);
+		if (port != 0) {
 
-            }
+			/*
+			 * Use the specified port.
+			 */
+			this.port = port;
 
-        }
+			ss = new ServerSocket(this.port);
 
-    }
-    
-    /**
-     * Runs a single thread which accepts connections.
-     */
-    private final ExecutorService acceptService = Executors
-            .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
-                    .getName()
-                    + ".acceptService"));
+		} else {
 
-    /**
-     * Runs a pool of threads for handling requests.
-     */
-    private final ExecutorService requestService;
+			/*
+			 * Use any open port.
+			 */
+			ss = new ServerSocket(0);
 
-    public boolean isOpen() {
+			this.port = ss.getLocalPort();
 
-        return open;
+		}
 
-    }
+		if (log.isInfoEnabled())
+			log.info("Running on port=" + this.port);
 
-    synchronized public void shutdown() {
+		if (requestServicePoolSize == 0) {
 
-        if (!isOpen()) {
+			requestService = (ThreadPoolExecutor) Executors.newCachedThreadPool(new DaemonThreadFactory(getClass()
+					.getName()
+					+ ".requestService"));
 
-            log.warn("Not running");
+		} else {
 
-        }
+			requestService = (ThreadPoolExecutor) Executors.newFixedThreadPool(requestServicePoolSize,
+					new DaemonThreadFactory(getClass().getName() + ".requestService"));
 
-        if (log.isInfoEnabled())
-            log.info("");
+		}
 
-        /*
-         * Immediate shutdown of the accept thread. No new requests will be
-         * accepted or will start.
-         */
-        acceptService.shutdownNow();
+		// Begin accepting connections.
+		acceptService.submit(new AcceptTask());
 
-        try {
+	}
 
-            new ShutdownHelper(requestService, 10/* logTimeout */,
-                    TimeUnit.SECONDS) {
+	public void awaitRunning(final long timeout, final TimeUnit unit) throws InterruptedException, TimeoutException {
 
-                public void logTimeout() {
+		lock.lock();
+		try {
 
-                    log.warn("Awaiting request service termination: elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(elapsed()) + "ms");
+			if (!open) {
 
-                }
+				running.await(timeout, unit);
 
-            };
+			}
 
-        } catch (InterruptedException ex) {
+			if (open)
+				return;
 
-            log.warn("Interrupted awaiting request service termination.");
+			throw new TimeoutException();
 
-        }
+		} finally {
+			lock.unlock();
+		}
 
-        // Note: Runnable will terminate when open == false.
-        open = false;
+	}
 
-        try {
+	private final Lock lock = new ReentrantLock();
+	private final Condition running = lock.newCondition();
 
-            ss.close();
+	private class AcceptTask implements Runnable {
 
-        } catch (IOException e) {
-
-            log.warn(e);
-
-        }
-
-    }
-
-    synchronized public void shutdownNow() {
-
-        if (!isOpen()) {
-
-            log.warn("Not running");
-
-        }
-
-        if (log.isInfoEnabled())
-            log.info("");
-
-        acceptService.shutdownNow();
-
-        requestService.shutdownNow();
-
-        // Note: Runnable will terminate when open == false.
-        open = false;
-
-        try {
-
-            ss.close();
-
-        } catch (IOException e) {
-
-            log.warn(e);
-
-        }
-
-    }
-
-    /**
-     * Known status codes.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    public enum StatusEnum {
-       
-        OK(0),
-        DENY(1),
-        NOT_FOUND(2),
-        INTERNAL_ERROR(3),
-        ;
-        
-        private final byte b;
-        
-        private StatusEnum(final int b) {
-            
-            this.b = (byte)b;
-            
-        }
-        
-        public byte get() {
-            
-            return b;
-            
-        }
-        
-        public static StatusEnum valueOf(final byte b) {
-
-            switch (b) {
-            case 0:
-                return OK;
-            case 1:
-                return NOT_FOUND;
-            case 2:
-                return INTERNAL_ERROR;
-            default:
-                throw new IllegalArgumentException("Invalid byte: " + b);
-            }
-            
-        }
-        
-    }
-
-    /**
-     * Handles a request and is run (by the caller) on a worker thread pool.
-     * <p>
-     * The request consists of the resource {@link UUID} to be read.
-     * <p>
-     * The response consists for the following fields:
-     * <dl>
-     * <dt>status</dt>
-     * <dd>A single byte. 0 is Ok. Anything else is an error. The defined
-     * status codes are:
-     * <dl>
-     * <dt>0</dt>
-     * <dd>Ok. The file will be sent.</dd>
-     * <dt>1</dt>
-     * <dd>Resource not found (there is no managed resource for that UUID).</dd>
-     * <dt></dt>
-     * <dd></dd>
-     * <dt></dt>
-     * <dd></dd>
-     * </dl>
-     * The rest of the fields only apply for normal operation. </dd>
-     * <dt>length</dt>
-     * <dd>A 64-bit integer in network byte order specifying the length of the
-     * file.</dd>
-     * <dt>data</dt>
-     * <dd>the data bytes.</dd>
-     * <dt>checksum</dt>
-     * <dd>A 64-bit long in network byte order specifying the {@link Adler32}
-     * checksum of the data bytes as computed by the service. The receiver
-     * should compute the checksum on its end and verify that they agree.</dd>
-     * </dl>
-     * If anything goes wrong then the socket will be asynchronously closed by
-     * the service.
-     */
-    private class RequestTask implements Runnable
-    {
-        
-        /**
-         * The client socket.
-         */
-        final private Socket s;
-        
-        /**
-         * Set true once we sent the status code and any associated data in the
-         * header.
-         * <p>
-         * Note: Once we send the status and the header (file length) we flush
-         * the output stream and are committed to the response. At that point we
-         * can no longer send an error code instead. All we can do is log the
-         * error and close the client socket.
-         */
-        private boolean sentStatus = false;
-        
-        /**
-         * 
-         * @param s
-         *            The client socket.
-         */
-        public RequestTask(final Socket s) {
-
-            this.s = s;
-            
-            counters.requestCount++;
-
-        }
-
-        /**
-         * Note: {@link OverlappingFileLockException}s can arise when there are
-         * concurrent requests to obtain a shared lock on the same file.
-         * Personally, I think that this is a bug since the lock requests are
-         * shared and should be processed without deadlock. However, the code
-         * handles this case by proceeding without the lock - exactly as it
-         * would handle the case where a shared lock was not available. This is
-         * still somewhat fragile since it someone does not test the
-         * {@link FileLock} and was in fact granted an exclusive lock when they
-         * requested a shared lock then this code will be unwilling to send the
-         * resource. There are two ways to make that work out - either we DO NOT
-         * use {@link FileLock} for read-only files (index segments) or we
-         * ALWAYS discard the {@link FileLock} if it is not shared when we
-         * requested a shared lock and proceed without a lock. For this reason,
-         * the behavior of this class and {@link IndexSegmentStore} MUST match.
-         * 
-         * @see IndexSegmentStore
-         * @see http://blogs.sun.com/DaveB/entry/new_improved_in_java_se1
-         * @see http://forums.sun.com/thread.jspa?threadID=5324314.
-         */
-        public void run()
-        {
-            
-            if (log.isInfoEnabled())
-                log.info("localPort=" + s.getLocalPort());
-
-            InputStream is = null;
-            try {
-
-                is = s.getInputStream();
-
-                // the buffer size is limited to the size of a UUID.
-                final DataInputStream in = new DataInputStream(
-                        new BufferedInputStream(is, Bytes.SIZEOF_UUID));
-
-                final long mostSigBits = in.readLong();
-                final long leastSigBits = in.readLong();
-                final UUID uuid = new UUID(mostSigBits, leastSigBits);
-                
-                if(log.isInfoEnabled())
-                    log.info("Requested: uuid="+uuid);
-                
-                final File file = getResource(uuid);
-                
-                if(file == null) {
-
-                    sendError(StatusEnum.NOT_FOUND);
-
-                    return;
-                    
-                }
-
-                final long length = file.length();
-
-                if (log.isInfoEnabled())
-                    log.info("Sending " + file + ", length=" + length
-                            + ", uuid=" + uuid);
-                
-                // Open the file to be sent.
-                final FileInputStream fis;
-                try {
-
-                    fis = new FileInputStream(file);
-
-                } catch (IOException ex) {
-
-                    log.error("Sending " + file + ", length=" + length
-                            + ", uuid=" + uuid, ex);
-
-                    sendError(StatusEnum.INTERNAL_ERROR);
-
-                    return;
-
-                }
-
-                // try block used to ensure that we close [fis] in finally{}.
-                try {
-
-                    /*
-                     * Seek a shared lock on the file. This will prevent it from
-                     * being deleted while we are sending its data and it will
-                     * also prevent us from sending a file on which someone else
-                     * has a write lock. If we can't get a shared lock then no
-                     * worries.
-                     */
-                    try {
-
-                        final FileLock fileLock = fis.getChannel().tryLock(0,
-                                Long.MAX_VALUE, true/* shared */);
-
-                        if (fileLock == null) {
-
-                            throw new IOException("Resource is locked: " + file);
-
-                        }
-
-                        if (!fileLock.isShared()) {
-
-                            /*
-                             * Do NOT hold the file lock if it is exclusive
-                             * (shared lock requests convert to exclusive lock
-                             * requests on some platforms). We do not want to
-                             * prevent others from accessing this resource,
-                             * especially not the StoreManager itself.
-                             */
-
-                            fileLock.release();
-
-                        }
-
-                    } catch (OverlappingFileLockException ex) {
-
-                        /*
-                         * Note: OverlappingFileLockException can be thrown when
-                         * there are concurrent requests to obtain the same
-                         * shared lock. I consider this a JDK bug. It should be
-                         * possible to service both requests without deadlock.
-                         */
-
-                        if (log.isInfoEnabled())
-                            log.info("Will proceed without lock: file=" + file
-                                    + " : " + ex);
-
-                    } catch (IOException ex) {
-
-                        log.error("Sending " + file + ", length=" + length
-                                + ", uuid=" + uuid, ex);
-
-                        sendError(StatusEnum.INTERNAL_ERROR);
-
-                        return;
-
-                    }
-
-                    // Send the file.
-                    sendResource(uuid, file, length, fis);
-
-                    counters.nwrites++;
-
-                } catch (Exception ex) {
-
-                    counters.writeErrorCount++;
-
-                    // could be client death here.
-                    log.warn(ex, ex);
-
-                    return;
-
-                } finally {
-
-                    try {
-
-                        fis.close();
-
-                    } catch (Throwable t) {
-
-                        /* ignore */
-
-                    }
-
-                }
-
-            } catch (SentErrorException ex) {
-            
-                /*
-                 * This exception is thrown by sendError(). We don't have to do
-                 * anything since an error response was already sent.
-                 */
-
-            } catch (Throwable t) {
-                
-                /*
-                 * Something unexpected. If possible we will send an error
-                 * response. Otherwise we just close the client socket.
-                 */
-                
-                try {
-                
-                    log.error("Unknown error: "+t, t);
-                    
-                    sendError(StatusEnum.INTERNAL_ERROR);
-                    
-                    return;
-                    
-                } catch (Throwable t2) {
-                    
-                    // ignore.
-                    
-                }
-                
-            } finally {
-                
-                if (is != null) {
-                
-                    try {
-                        // close the request input stream.
-                        is.close();
-                    
-                    } catch (IOException ex) {
-                        /* ignore */
-                    
-                    } finally {
-                    
-                        is = null;
-                        
-                    }
-
-                }
-                
-                try {
-                
-                    // close the client socket.
-                    s.close();
-                    
-                } catch (IOException ex) {
-                    
-                    /* ignore */
-                    
-                }
-                
-            }
-
-        }
-
-        /**
-         * Send an error response.
-         * 
-         * @param e
-         *            The error code.
-         * @throws SentErrorException
-         *             normally.
-         * @throws IOException
-         *             if we can't write on the client socket.
-         */
-        private void sendError(final StatusEnum e) throws SentErrorException,
-                IOException {
-
-            assert e != null;
-            assert e != StatusEnum.OK;
-
-            switch (e) {
-            case OK:
-                throw new AssertionError();
-            case DENY:
-                counters.denyCount++;
-                break;
-            case NOT_FOUND:
-                counters.notFoundCount++;
-                break;
-            case INTERNAL_ERROR:
-                counters.internalErrorCount++;
-                break;
-            default:
-                throw new AssertionError();
-            }
-            
-            if (!sentStatus) {
-
-                final OutputStream os = s.getOutputStream();
-
-                try {
-
-                    os.write(new byte[] { e.get() });
-
-                    os.flush();
-                    
-                } finally {
-                    
-                    sentStatus = true;
-
-                    os.close();
-                    
-                }
-                
-            }
-                
-            throw new SentErrorException();
-            
-        }
-
-        /**
-         * Sends given resource to the socket.
-         * 
-         * @param uuid
-         *            The {@link UUID} which identifies the resource (from the
-         *            request).
-         * @param file
-         *            The {@link File} which is to be sent.
-         * @param length
-         *            The length of that file in bytes.
-         * @param is
-         *            The {@link InputStream} reading on that file.
-         * @throws IOException
-         * 
-         * @todo use NIO reads on {@link FileChannel} with direct
-         *       {@link ByteBuffer} and transfer to {@link SocketChannel}. This
-         *       might make it more difficult to compute the checksum so who
-         *       knows if it is worth it. Note that this approach will also add
-         *       {@link InterruptedException} to our throws list.
-         */
-        private void sendResource(final UUID uuid, final File file,
-                final long length, final FileInputStream is) throws IOException {
-
-            assert uuid != null;
-            assert file != null;
-            assert length >= 0;
-            assert is != null;
-            assert !sentStatus;
-
-            long bytesWritten = 0L;
-            final long begin = System.nanoTime();
-            final OutputStream os = s.getOutputStream();
-            try {
-
-                // send the header.
-                {
-
-                    final DataOutputStream dos = new DataOutputStream(os);
-                    
-                    // status byte.
-                    dos.write(new byte[] { StatusEnum.OK.get() });
-                    
-                    // file length.
-                    dos.writeLong(length);
-                    
-                    // flush the data output stream.
-                    dos.flush();
-                    
-                    bytesWritten += 1 + Bytes.SIZEOF_LONG;
-
-                    // Note: Don't have to flush here but can't sendError anymore.
-                    // os.flush();
-                    
-                    // presume status has been sent.
-                    sentStatus = true;
-                    
-                }
-                
-                // send the data
-                final long checksum;
-                {
-
-                    // the size for the writes on the socket.
-                    final int BUFSIZE = Bytes.kilobyte32 * 2;
-                    
-                    // input stream computes checksum as it reads the data.
-                    final CheckedInputStream cis = new CheckedInputStream(
-                            // buffered input stream for reading from the file.
-                            new BufferedInputStream(is),
-                            // checksum impl.
-                            new Adler32());
-                    
-                    final byte[] buff = new byte[BUFSIZE];
-                    
-                    while (true) {
-
-                        // #of bytes read into the buffer.
-                        final int read = cis.read(buff, 0, BUFSIZE);
-                        
-                        if (read <= 0)
-                            break;
-                        
-                        // write on the socket.
-                        os.write(buff, 0, read);
-
-                        bytesWritten += read;
-                        
-                    }
-
-                    // the checksum of the bytes read from the file.
-                    checksum = cis.getChecksum().getValue();
-                    
-                }
-
-                // write the checksum on the socket.
-                {
-
-                    final DataOutputStream dos = new DataOutputStream(os);
-                    
-                    // checksum.
-                    dos.writeLong(checksum);
-
-                    bytesWritten += Bytes.SIZEOF_LONG;
-                    
-                    // flush the data output stream.
-                    dos.flush();
-   
-                }                
-
-                // all done.
-                os.flush();
-
-                if (log.isInfoEnabled())
-                    log.info("Sent: uuid="
-                            + uuid
-                            + ", file="
-                            + file
-                            + ", length="
-                            + length
-                            + ", checksum="
-                            + checksum
-                            + ", elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
-                                    - begin) + "ms");
-                
-            } finally {
-
-                try {
-                
-                    os.close();
-                    
-                } catch (Throwable t) {
-                    
-                    // Ignore.
-                    
-                }
-                
-                counters.bytesWritten += bytesWritten;
-                
-                counters.elapsedWriteNanos += System.nanoTime() - begin;
-                
-                synchronized(counters.maxWriteSizeLock) {
-                
-                    counters.maxWriteSize = Math.max(counters.maxWriteSize,
-                            bytesWritten);
-                    
-                }
-                
-            }
-            
-        }
-
-    }
-
-    /**
-     * An instance of this exception is thrown internally if an error response
-     * is sent. The exception is trapped and ignored. The purpose of the
-     * exception is to recognize that the error response has already been
-     * handled.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class SentErrorException extends RuntimeException {
-
-        /**
+		public void run() {
+
+			lock.lock();
+			try {
+
+				open = true;
+
+				running.signal();
+
+			} finally {
+
+				lock.unlock();
+
+			}
+
+			try {
+
+				while (open) {
+
+					/*
+					 * Hand off request to a pool of worker threads.
+					 * 
+					 * Note: The Future of this task is ignored. If there is a
+					 * problem a message is logged, the client socket is closed,
+					 * the execution of the task is aborted.
+					 */
+
+					requestService.submit(new RequestTask(ss.accept()));
+
+				}
+
+			} catch (IOException ex) {
+
+				if (!open) {
+
+					if (log.isInfoEnabled())
+						log.info("closed.");
+
+					return;
+
+				}
+
+				log.error(ex);
+
+			}
+
+		}
+
+	}
+
+	/**
+	 * Runs a single thread which accepts connections.
+	 */
+	private final ExecutorService acceptService = Executors.newSingleThreadExecutor(new DaemonThreadFactory(getClass()
+			.getName()
+			+ ".acceptService"));
+
+	/**
+	 * Runs a pool of threads for handling requests.
+	 */
+	private final ExecutorService requestService;
+
+	public boolean isOpen() {
+
+		return open;
+
+	}
+
+	synchronized public void shutdown() {
+
+		if (!isOpen()) {
+
+			log.warn("Not running");
+
+		}
+
+		if (log.isInfoEnabled())
+			log.info("");
+
+		/*
+		 * Immediate shutdown of the accept thread. No new requests will be
+		 * accepted or will start.
+		 */
+		acceptService.shutdownNow();
+
+		try {
+
+			new ShutdownHelper(requestService, 10/* logTimeout */, TimeUnit.SECONDS) {
+
+				public void logTimeout() {
+
+					log.warn("Awaiting request service termination: elapsed="
+							+ TimeUnit.NANOSECONDS.toMillis(elapsed()) + "ms");
+
+				}
+
+			};
+
+		} catch (InterruptedException ex) {
+
+			log.warn("Interrupted awaiting request service termination.");
+
+		}
+
+		// Note: Runnable will terminate when open == false.
+		open = false;
+
+		try {
+
+			ss.close();
+
+		} catch (IOException e) {
+
+			log.warn(e);
+
+		}
+
+	}
+
+	synchronized public void shutdownNow() {
+
+		if (!isOpen()) {
+
+			log.warn("Not running");
+
+		}
+
+		if (log.isInfoEnabled())
+			log.info("");
+
+		acceptService.shutdownNow();
+
+		requestService.shutdownNow();
+
+		// Note: Runnable will terminate when open == false.
+		open = false;
+
+		try {
+
+			ss.close();
+
+		} catch (IOException e) {
+
+			log.warn(e);
+
+		}
+
+	}
+
+	/**
+	 * Known status codes.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id: ResourceService.java 2265 2009-10-26 12:51:06Z thompsonbry
+	 *          $
+	 */
+	public enum StatusEnum {
+
+		OK(0), DENY(1), NOT_FOUND(2), INTERNAL_ERROR(3), ;
+
+		private final byte b;
+
+		private StatusEnum(final int b) {
+
+			this.b = (byte) b;
+
+		}
+
+		public byte get() {
+
+			return b;
+
+		}
+
+		public static StatusEnum valueOf(final byte b) {
+
+			switch (b) {
+			case 0:
+				return OK;
+			case 1:
+				return NOT_FOUND;
+			case 2:
+				return INTERNAL_ERROR;
+			default:
+				throw new IllegalArgumentException("Invalid byte: " + b);
+			}
+
+		}
+
+	}
+
+	/**
+	 * Handles a request and is run (by the caller) on a worker thread pool.
+	 * <p>
+	 * The request consists of the resource {@link UUID} to be read.
+	 * <p>
+	 * The response consists for the following fields:
+	 * <dl>
+	 * <dt>status</dt>
+	 * <dd>A single byte. 0 is Ok. Anything else is an error. The defined status
+	 * codes are:
+	 * <dl>
+	 * <dt>0</dt>
+	 * <dd>Ok. The file will be sent.</dd>
+	 * <dt>1</dt>
+	 * <dd>Resource not found (there is no managed resource for that UUID).</dd>
+	 * <dt></dt>
+	 * <dd></dd>
+	 * <dt></dt>
+	 * <dd></dd>
+	 * </dl>
+	 * The rest of the fields only apply for normal operation.</dd>
+	 * <dt>length</dt>
+	 * <dd>A 64-bit integer in network byte order specifying the length of the
+	 * file.</dd>
+	 * <dt>data</dt>
+	 * <dd>the data bytes.</dd>
+	 * <dt>checksum</dt>
+	 * <dd>A 64-bit long in network byte order specifying the {@link Adler32}
+	 * checksum of the data bytes as computed by the service. The receiver
+	 * should compute the checksum on its end and verify that they agree.</dd>
+	 * </dl>
+	 * If anything goes wrong then the socket will be asynchronously closed by
+	 * the service.
+	 */
+	private class RequestTask implements Runnable {
+
+		/**
+		 * The client socket.
+		 */
+		final private Socket s;
+
+		/**
+		 * Set true once we sent the status code and any associated data in the
+		 * header.
+		 * <p>
+		 * Note: Once we send the status and the header (file length) we flush
+		 * the output stream and are committed to the response. At that point we
+		 * can no longer send an error code instead. All we can do is log the
+		 * error and close the client socket.
+		 */
+		private boolean sentStatus = false;
+
+		/**
+		 * 
+		 * @param s
+		 *            The client socket.
+		 */
+		public RequestTask(final Socket s) {
+
+			this.s = s;
+
+			counters.requestCount++;
+
+		}
+
+		/**
+		 * Note: {@link OverlappingFileLockException}s can arise when there are
+		 * concurrent requests to obtain a shared lock on the same file.
+		 * Personally, I think that this is a bug since the lock requests are
+		 * shared and should be processed without deadlock. However, the code
+		 * handles this case by proceeding without the lock - exactly as it
+		 * would handle the case where a shared lock was not available. This is
+		 * still somewhat fragile since it someone does not test the
+		 * {@link FileLock} and was in fact granted an exclusive lock when they
+		 * requested a shared lock then this code will be unwilling to send the
+		 * resource. There are two ways to make that work out - either we DO NOT
+		 * use {@link FileLock} for read-only files (index segments) or we
+		 * ALWAYS discard the {@link FileLock} if it is not shared when we
+		 * requested a shared lock and proceed without a lock. For this reason,
+		 * the behavior of this class and {@link IndexSegmentStore} MUST match.
+		 * 
+		 * @see IndexSegmentStore
+		 * @see http://blogs.sun.com/DaveB/entry/new_improved_in_java_se1
+		 * @see http://forums.sun.com/thread.jspa?threadID=5324314.
+		 */
+		public void run() {
+
+			if (log.isInfoEnabled())
+				log.info("localPort=" + s.getLocalPort());
+
+			InputStream is = null;
+			try {
+
+				is = s.getInputStream();
+
+				// the buffer size is limited to the size of a UUID.
+				final DataInputStream in = new DataInputStream(new BufferedInputStream(is, Bytes.SIZEOF_UUID));
+
+				final long mostSigBits = in.readLong();
+				final long leastSigBits = in.readLong();
+				final UUID uuid = new UUID(mostSigBits, leastSigBits);
+
+				if (log.isInfoEnabled())
+					log.info("Requested: uuid=" + uuid);
+
+				final File file = getResource(uuid);
+
+				if (file == null) {
+
+					sendError(StatusEnum.NOT_FOUND);
+
+					return;
+
+				}
+
+				final long length = file.length();
+
+				if (log.isInfoEnabled())
+					log.info("Sending " + file + ", length=" + length + ", uuid=" + uuid);
+
+				// Open the file to be sent.
+				final FileInputStream fis;
+				try {
+
+					fis = new FileInputStream(file);
+
+				} catch (IOException ex) {
+
+					log.error("Sending " + file + ", length=" + length + ", uuid=" + uuid, ex);
+
+					sendError(StatusEnum.INTERNAL_ERROR);
+
+					return;
+
+				}
+
+				// try block used to ensure that we close [fis] in finally{}.
+				try {
+
+					/*
+					 * Seek a shared lock on the file. This will prevent it from
+					 * being deleted while we are sending its data and it will
+					 * also prevent us from sending a file on which someone else
+					 * has a write lock. If we can't get a shared lock then no
+					 * worries.
+					 */
+					try {
+
+						final FileLock fileLock = fis.getChannel().tryLock(0, Long.MAX_VALUE, true/* shared */);
+
+						if (fileLock == null) {
+
+							throw new IOException("Resource is locked: " + file);
+
+						}
+
+						if (!fileLock.isShared()) {
+
+							/*
+							 * Do NOT hold the file lock if it is exclusive
+							 * (shared lock requests convert to exclusive lock
+							 * requests on some platforms). We do not want to
+							 * prevent others from accessing this resource,
+							 * especially not the StoreManager itself.
+							 */
+
+							fileLock.release();
+
+						}
+
+					} catch (OverlappingFileLockException ex) {
+
+						/*
+						 * Note: OverlappingFileLockException can be thrown when
+						 * there are concurrent requests to obtain the same
+						 * shared lock. I consider this a JDK bug. It should be
+						 * possible to service both requests without deadlock.
+						 */
+
+						if (log.isInfoEnabled())
+							log.info("Will proceed without lock: file=" + file + " : " + ex);
+
+					} catch (IOException ex) {
+
+						log.error("Sending " + file + ", length=" + length + ", uuid=" + uuid, ex);
+
+						sendError(StatusEnum.INTERNAL_ERROR);
+
+						return;
+
+					}
+
+					// Send the file.
+					sendResource(uuid, file, length, fis);
+
+					counters.nwrites++;
+
+				} catch (Exception ex) {
+
+					counters.writeErrorCount++;
+
+					// could be client death here.
+					log.warn(ex, ex);
+
+					return;
+
+				} finally {
+
+					try {
+
+						fis.close();
+
+					} catch (Throwable t) {
+
+						/* ignore */
+
+					}
+
+				}
+
+			} catch (SentErrorException ex) {
+
+				/*
+				 * This exception is thrown by sendError(). We don't have to do
+				 * anything since an error response was already sent.
+				 */
+
+			} catch (Throwable t) {
+
+				/*
+				 * Something unexpected. If possible we will send an error
+				 * response. Otherwise we just close the client socket.
+				 */
+
+				try {
+
+					log.error("Unknown error: " + t, t);
+
+					sendError(StatusEnum.INTERNAL_ERROR);
+
+					return;
+
+				} catch (Throwable t2) {
+
+					// ignore.
+
+				}
+
+			} finally {
+
+				if (is != null) {
+
+					try {
+						// close the request input stream.
+						is.close();
+
+					} catch (IOException ex) {
+						/* ignore */
+
+					} finally {
+
+						is = null;
+
+					}
+
+				}
+
+				try {
+
+					// close the client socket.
+					s.close();
+
+				} catch (IOException ex) {
+
+					/* ignore */
+
+				}
+
+			}
+
+		}
+
+		/**
+		 * Send an error response.
+		 * 
+		 * @param e
+		 *            The error code.
+		 * @throws SentErrorException
+		 *             normally.
+		 * @throws IOException
+		 *             if we can't write on the client socket.
+		 */
+		private void sendError(final StatusEnum e) throws SentErrorException, IOException {
+
+			assert e != null;
+			assert e != StatusEnum.OK;
+
+			switch (e) {
+			case OK:
+				throw new AssertionError();
+			case DENY:
+				counters.denyCount++;
+				break;
+			case NOT_FOUND:
+				counters.notFoundCount++;
+				break;
+			case INTERNAL_ERROR:
+				counters.internalErrorCount++;
+				break;
+			default:
+				throw new AssertionError();
+			}
+
+			if (!sentStatus) {
+
+				final OutputStream os = s.getOutputStream();
+
+				try {
+
+					os.write(new byte[] { e.get() });
+
+					os.flush();
+
+				} finally {
+
+					sentStatus = true;
+
+					os.close();
+
+				}
+
+			}
+
+			throw new SentErrorException();
+
+		}
+
+		/**
+		 * Sends given resource to the socket.
+		 * 
+		 * @param uuid
+		 *            The {@link UUID} which identifies the resource (from the
+		 *            request).
+		 * @param file
+		 *            The {@link File} which is to be sent.
+		 * @param length
+		 *            The length of that file in bytes.
+		 * @param is
+		 *            The {@link InputStream} reading on that file.
+		 * @throws IOException
+		 * 
+		 * @todo use NIO reads on {@link FileChannel} with direct
+		 *       {@link ByteBuffer} and transfer to {@link SocketChannel}. This
+		 *       might make it more difficult to compute the checksum so who
+		 *       knows if it is worth it. Note that this approach will also add
+		 *       {@link InterruptedException} to our throws list.
+		 */
+		private void sendResource(final UUID uuid, final File file, final long length, final FileInputStream is)
+				throws IOException {
+
+			assert uuid != null;
+			assert file != null;
+			assert length >= 0;
+			assert is != null;
+			assert !sentStatus;
+
+			long bytesWritten = 0L;
+			final long begin = System.nanoTime();
+			final OutputStream os = s.getOutputStream();
+			try {
+
+				// send the header.
+				{
+
+					final DataOutputStream dos = new DataOutputStream(os);
+
+					// status byte.
+					dos.write(new byte[] { StatusEnum.OK.get() });
+
+					// file length.
+					dos.writeLong(length);
+
+					// flush the data output stream.
+					dos.flush();
+
+					bytesWritten += 1 + Bytes.SIZEOF_LONG;
+
+					// Note: Don't have to flush here but can't sendError
+					// anymore.
+					// os.flush();
+
+					// presume status has been sent.
+					sentStatus = true;
+
+				}
+
+				// send the data
+				final long checksum;
+				{
+
+					// the size for the writes on the socket.
+					final int BUFSIZE = Bytes.kilobyte32 * 2;
+
+					// input stream computes checksum as it reads the data.
+					final CheckedInputStream cis = new CheckedInputStream(
+					// buffered input stream for reading from the file.
+							new BufferedInputStream(is),
+							// checksum impl.
+							new Adler32());
+
+					final byte[] buff = new byte[BUFSIZE];
+
+					while (true) {
+
+						// #of bytes read into the buffer.
+						final int read = cis.read(buff, 0, BUFSIZE);
+
+						if (read <= 0)
+							break;
+
+						// write on the socket.
+						os.write(buff, 0, read);
+
+						bytesWritten += read;
+
+					}
+
+					// the checksum of the bytes read from the file.
+					checksum = cis.getChecksum().getValue();
+
+				}
+
+				// write the checksum on the socket.
+				{
+
+					final DataOutputStream dos = new DataOutputStream(os);
+
+					// checksum.
+					dos.writeLong(checksum);
+
+					bytesWritten += Bytes.SIZEOF_LONG;
+
+					// flush the data output stream.
+					dos.flush();
+
+				}
+
+				// all done.
+				os.flush();
+
+				if (log.isInfoEnabled())
+					log.info("Sent: uuid=" + uuid + ", file=" + file + ", length=" + length + ", checksum=" + checksum
+							+ ", elapsed=" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - begin) + "ms");
+
+			} finally {
+
+				try {
+
+					os.close();
+
+				} catch (Throwable t) {
+
+					// Ignore.
+
+				}
+
+				counters.bytesWritten += bytesWritten;
+
+				counters.elapsedWriteNanos += System.nanoTime() - begin;
+
+				synchronized (counters.maxWriteSizeLock) {
+
+					counters.maxWriteSize = Math.max(counters.maxWriteSize, bytesWritten);
+
+				}
+
+			}
+
+		}
+
+	}
+
+	/**
+	 * An instance of this exception is thrown internally if an error response
+	 * is sent. The exception is trapped and ignored. The purpose of the
+	 * exception is to recognize that the error response has already been
+	 * handled.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id: ResourceService.java 2265 2009-10-26 12:51:06Z thompsonbry
+	 *          $
+	 */
+	private static class SentErrorException extends RuntimeException {
+
+		/**
          * 
          */
-        private static final long serialVersionUID = 0L;
-        
-    }
-    
-    /**
-     * Return file identified by the UUID.
-     * 
-     * @param uuid
-     * 
-     * @return The file -or- <code>null</code> if there is no file associated
-     *         with that {@link UUID}.
-     * 
-     * @throws Exception
-     *             if the resource may not be served.
-     */
-    abstract protected File getResource(final UUID uuid) throws Exception;
-    
-    /**
-     * Client for a {@link ResourceService} reads a single resource from the
-     * specified service, writing it into the local file system.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     * 
-     * @todo should use a configurable socket factory whose configuration is
-     *       shared by the {@link ResourceService}. This would allow SSL
-     *       connections, etc.
-     */
-    public static class ReadResourceTask implements Callable<File> {
+		private static final long serialVersionUID = 0L;
 
-        protected static final Logger log = Logger.getLogger(ReadResourceTask.class);
+	}
 
-//        protected final boolean DEBUG = log.isDebugEnabled();
+	/**
+	 * Return file identified by the UUID.
+	 * 
+	 * @param uuid
+	 * 
+	 * @return The file -or- <code>null</code> if there is no file associated
+	 *         with that {@link UUID}.
+	 * 
+	 * @throws Exception
+	 *             if the resource may not be served.
+	 */
+	abstract protected File getResource(final UUID uuid) throws Exception;
 
-        final InetAddress addr;
+	/**
+	 * Client for a {@link ResourceService} reads a single resource from the
+	 * specified service, writing it into the local file system.
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * @version $Id: ResourceService.java 2265 2009-10-26 12:51:06Z thompsonbry
+	 *          $
+	 * 
+	 * @todo should use a configurable socket factory whose configuration is
+	 *       shared by the {@link ResourceService}. This would allow SSL
+	 *       connections, etc.
+	 */
+	public static abstract class FetchResourceTask<T> implements Callable<T> {
+		
+		final InetAddress addr;
 
-        final int port;
+		final int port;
+		
+		FetchResourceTask(final InetAddress addr, final int port) {
+			if (addr == null)
+				throw new IllegalArgumentException();
+			if (port <= 0)
+				throw new IllegalArgumentException();
 
-        final UUID uuid;
+			this.addr = addr;
+			this.port = port;
+		}
+		
+		Object logId() {
+			return null;
+		}
 
-        final File file;
+		Object logResource() {
+			return null;
+		}
 
-        /**
-         * @param addr
-         *            The address of the service from which the resource will be
-         *            read.
-         * @param port
-         *            The port at which to connect to the service from which the
-         *            resource will be read.
-         * @param uuid
-         *            The UUID which identifies the desired resource.
-         * @param file
-         *            The local file on which the received data will be written.
-         *            The file may exist but if it exists then it must be empty.
-         */
-        public ReadResourceTask(final InetAddress addr, final int port,
-                final UUID uuid, final File file) {
+		public void transfer(InputStream is, OutputStream os) throws Exception {
 
-            if (addr == null)
-                throw new IllegalArgumentException();
-            if (port <= 0)
-                throw new IllegalArgumentException();
-            if (uuid == null)
-                throw new IllegalArgumentException();
-            if (file == null)
-                throw new IllegalArgumentException();
+			final long begin = System.nanoTime();
 
-            this.addr = addr;
-            this.port = port;
-            this.uuid = uuid;
-            this.file = file;
+			// read the response header.
+			final long length;
+			{
+				final DataInputStream dis = new DataInputStream(is);
 
-        }
+				final StatusEnum e = StatusEnum.valueOf(dis.readByte());
 
-        /**
-         * Return the {@link File} on which the resource was written. If the
-         * operation fails, then the caller is responsible deciding whether or
-         * not the {@link File} specified to the ctor needs to be deleted.
-         * 
-         * @throws IOException
-         *             if the file exists and is not empty.
-         * @throws IOException
-         *             if another process has a lock on the file.
-         */
-        public File call() throws Exception {
+				switch (e) {
+				case OK:
+					length = dis.readLong();
+					break;
+				default:
+					throw new IOException(e.toString() + ", id:" + logId());
+				}
+			}
 
-            if (log.isInfoEnabled())
-                log.info("uuid=" + uuid + ", localFile=" + file);
-            
-            final long begin = System.nanoTime();
-            
-            Socket s = null;
-            
-            final FileOutputStream os = new FileOutputStream(file);
+			// read the data.
+			long nread = 0L;
+			final long checksum;
+			{
 
-            try {
+				// the size for the reads on the socket.
+				final int BUFSIZE = Bytes.kilobyte32 * 2;
 
-                final FileLock fileLock = os.getChannel().tryLock();
+				// input stream computes checksum as it reads the data.
+				final CheckedInputStream cis = new CheckedInputStream(is, new Adler32());
 
-                if (fileLock == null) {
+				final BufferedOutputStream bos = new BufferedOutputStream(os);
 
-                    throw new IOException("File is already locked: " + file);
+				final byte[] buff = new byte[BUFSIZE];
 
-                }
+				while (nread < length) {
 
-                if (os.getChannel().size() != 0L) {
+					final long remaining = length - nread;
 
-                    throw new IOException("File not empty: " + file);
+					final int len = remaining > BUFSIZE ? BUFSIZE : (int) remaining;
 
-                }
+					// #of bytes read into the buffer.
+					final int read = cis.read(buff, 0, len);
 
-                s = new Socket(addr, port);
-                
-                // send the UUID of the resource that we want.
-                {
-                    
-                    final DataOutputStream dos = new DataOutputStream(s
-                            .getOutputStream());
+					if (read <= 0) {
 
-                    dos.writeLong(uuid.getMostSignificantBits());
-                    dos.writeLong(uuid.getLeastSignificantBits());
+						// we have run out of data early.
+						throw new IOException("EOF? #read=" + nread + ", length=" + length + ",id=" + logId());
 
-                    // flush the request.
-                    dos.flush();
-                    
-                }
-                
-                // buffered input stream for reading from the socket.
-                final InputStream is = new BufferedInputStream(s
-                        .getInputStream());
-                
-                // read the response header.
-                final long length;
-                {
-                    final DataInputStream dis = new DataInputStream(is);
+					}
 
-                    final StatusEnum e = StatusEnum.valueOf(dis.readByte());
+					nread += read;
 
-                    switch (e) {
-                    case OK:
-                        length = dis.readLong();
-                        break;
-                    default:
-                        throw new IOException(e + " : uuid=" + uuid);
-                    }
-                }
-                
-                // read the data.
-                long nread = 0L;
-                final long checksum;
-                {
+					if (nread > length) {
 
-                    // the size for the reads on the socket.
-                    final int BUFSIZE = Bytes.kilobyte32 * 2;
-                    
-                    // input stream computes checksum as it reads the data.
-                    final CheckedInputStream cis = new CheckedInputStream(is,
-                            new Adler32());
-                    
-                    final BufferedOutputStream bos = new BufferedOutputStream(os);
-                    
-                    final byte[] buff = new byte[BUFSIZE];
+						// we have too much data.
+						throw new IOException("EOF? #read=" + nread + ", length=" + length + ",id=" + logId());
 
-                    while (nread < length) {
+					}
 
-                        final long remaining = length - nread;
+					// write on the file.
+					bos.write(buff, 0, read);
 
-                        final int len = remaining > BUFSIZE ? BUFSIZE
-                                : (int) remaining;
+				}
 
-                        // #of bytes read into the buffer.
-                        final int read = cis.read(buff, 0, len);
-                        
-                        if (read <= 0) {
+				// flush buffered writes to the file.
+				bos.flush();
 
-                            // we have run out of data early.
-                            throw new IOException("EOF? #read=" + nread
-                                    + ", length=" + length + ", uuid=" + uuid);
-                            
-                        }
-                        
-                        nread += read;
+				// the checksum of the bytes read from the socket.
+				checksum = cis.getChecksum().getValue();
 
-                        if (nread > length) {
+			}
 
-                            // we have too much data.
-                            throw new IOException("EOF? #read=" + nread
-                                    + ", length=" + length + ", uuid=" + uuid);
+			// read checksum from the socket and verify.
+			{
 
-                        }
-                        
-                        // write on the file.
-                        bos.write(buff, 0, read);
-                        
-                    }
+				final DataInputStream dis = new DataInputStream(is);
 
-                    // flush buffered writes to the file.
-                    bos.flush();
-                    
-                    // the checksum of the bytes read from the socket.
-                    checksum = cis.getChecksum().getValue();
+				final long expected = dis.readLong();
 
-                }
-                
-                // read checksum from the socket and verify.
-                {
+				if (expected != checksum) {
 
-                    final DataInputStream dis = new DataInputStream(is);
+					throw new IOException("checksum error: id=" + logId());
 
-                    final long expected = dis.readLong();
+				}
 
-                    if (expected != checksum) {
+			}
 
-                        throw new IOException("checksum error: uuid=" + uuid);
+			if (log.isInfoEnabled()) {
 
-                    }
+				log.info("read " + nread + " bytes, resource=" + logResource() + ", checksum=" + checksum + ", id=" + logId()
+						+ ", elapsed=" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - begin) + "ms");
 
-                }
+			}
 
-                if (log.isInfoEnabled()) {
+		}
+	}
+	
+	public static class ReadResourceTask extends FetchResourceTask<File> {
 
-                    log.info("read "
-                            + nread
-                            + " bytes, file="
-                            + file
-                            + ", checksum="
-                            + checksum
-                            + ", uuid="
-                            + uuid
-                            + ", elapsed="
-                            + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()
-                                    - begin) + "ms");
-                    
-                }
+		protected static final Logger log = Logger.getLogger(ReadResourceTask.class);
 
-            } finally {
+		// protected final boolean DEBUG = log.isDebugEnabled();
 
-                // close the socket (if open).
-                try {
-                    if (s != null)
-                        s.close();
-                } catch (Throwable t) {/* ignore */
-                }
+		final UUID uuid;
 
-                // release the file lock (if acquired).
-                try {
-                    os.close();
-                } catch (Throwable t) {/* ignore */
-                }
+		final File file;
 
-            }
+		/**
+		 * @param addr
+		 *            The address of the service from which the resource will be
+		 *            read.
+		 * @param port
+		 *            The port at which to connect to the service from which the
+		 *            resource will be read.
+		 * @param uuid
+		 *            The UUID which identifies the desired resource.
+		 * @param file
+		 *            The local file on which the received data will be written.
+		 *            The file may exist but if it exists then it must be empty.
+		 */
+		public ReadResourceTask(final InetAddress addr, final int port, final UUID uuid, final File file) {
+			super(addr, port);
 
-            return file;
+			if (uuid == null)
+				throw new IllegalArgumentException();
+			if (file == null)
+				throw new IllegalArgumentException();
 
-        }
+			this.uuid = uuid;
+			this.file = file;
 
-    }
+		}
+
+		public Object logId() {
+			return uuid;
+		}
+
+		public Object logResource() {
+			return file;
+		}
+		
+		/**
+		 * Return the {@link File} on which the resource was written. If the
+		 * operation fails, then the caller is responsible deciding whether or
+		 * not the {@link File} specified to the ctor needs to be deleted.
+		 * 
+		 * @throws IOException
+		 *             if the file exists and is not empty.
+		 * @throws IOException
+		 *             if another process has a lock on the file.
+		 */
+		public File call() throws Exception {
+			Socket s = null;
+			final FileOutputStream os = new FileOutputStream(file);
+			try {
+				if (log.isInfoEnabled())
+					log.info("uuid=" + uuid + ", localFile=" + file);
+
+				final FileLock fileLock = os.getChannel().tryLock();
+
+				if (fileLock == null) {
+
+					throw new IOException("File is already locked: " + file);
+
+				}
+
+				if (os.getChannel().size() != 0L) {
+
+					throw new IOException("File not empty: " + file);
+
+				}
+
+				s = new Socket(addr, port);
+
+				// send the UUID of the resource that we want.
+				{
+
+					final DataOutputStream dos = new DataOutputStream(s.getOutputStream());
+
+					dos.writeLong(uuid.getMostSignificantBits());
+					dos.writeLong(uuid.getLeastSignificantBits());
+
+					// flush the request.
+					dos.flush();
+
+				}
+
+				// buffered input stream for reading from the socket.
+				final InputStream is = new BufferedInputStream(s.getInputStream());
+
+				transfer(is, os);
+
+				return file;
+			} finally {
+				// close the socket (if open).
+				try {
+					if (s != null)
+						s.close();
+				} catch (Throwable t) {/* ignore */
+				}
+
+				// release the file lock (if acquired).
+				try {
+					os.close();
+				} catch (Throwable t) {/* ignore */
+				}
+			}
+		}
+
+
+	}
 
 }
