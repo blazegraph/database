@@ -197,9 +197,9 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     /*
      * XSD support. 
      */
-    private static final transient String NAMESPACE_XSD = "http://www.w3.org/2001/XMLSchema";
+    public static final transient String NAMESPACE_XSD = "http://www.w3.org/2001/XMLSchema";
     
-    private static final transient String xsd = NAMESPACE_XSD + "#";
+    public static final transient String xsd = NAMESPACE_XSD + "#";
 
     private final BigdataURIImpl xsd_long = new BigdataURIImpl(this, xsd
             + "long");

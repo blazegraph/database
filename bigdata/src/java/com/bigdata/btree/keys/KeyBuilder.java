@@ -1313,6 +1313,27 @@ public class KeyBuilder implements IKeyBuilder {
      */
     static public BigInteger decodeBigInteger(final int offset, final byte[] key) {
 
+        return new BigInteger(decodeBigInteger2(offset, key));
+        
+    }
+
+    /**
+     * Decodes a {@link BigInteger} key, returning a byte[] which may be used to
+     * construct a {@link BigInteger} having the decoded value. The number of
+     * bytes consumed by the key component is <code>2 + runLength</2>. The
+     * <code>2</code> is a fixed length field coding the signum of the value and
+     * its runLength. The length of the returned array is the runLength of the
+     * variable length portion of the value. This method may be used to scan
+     * through a key containing {@link BigInteger} components.
+     * 
+     * @param offset
+     *            The offset of the start of the {@link BigInteger} in the key.
+     * @param key
+     *            The key.
+     * @return The byte[] to be passed to {@link BigInteger#BigInteger(byte[])}.
+     */
+    static public byte[] decodeBigInteger2(final int offset, final byte[] key) {
+
         final int tmp = KeyBuilder.decodeShort(key, offset);
 
         final int runLength = tmp < 0 ? -tmp : tmp;
@@ -1322,7 +1343,7 @@ public class KeyBuilder implements IKeyBuilder {
         System.arraycopy(key/* src */, offset + 2/* srcpos */, b/* dst */,
                 0/* destPos */, runLength);
         
-        return new BigInteger(b);
+        return b;
         
     }
 
