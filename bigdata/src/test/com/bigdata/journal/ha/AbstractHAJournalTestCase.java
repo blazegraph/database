@@ -27,12 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import java.io.File;
 import java.util.Properties;
 
 import junit.framework.TestCase;
 
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Options;
 import com.bigdata.journal.ProxyTestCase;
 
 /**
@@ -84,29 +86,53 @@ abstract public class AbstractHAJournalTestCase
      */
     public void tearDown(ProxyTestCase testCase) throws Exception {
 
-        super.tearDown(testCase);
+        if (stores != null) {
+            for (Journal store : stores) {
+                store.destroy();
+            }
+        }
 
-        if (quorumManager != null)
-            quorumManager.destroy();
+        super.tearDown(testCase);
 
     }
 
-    private MockQuorumManager quorumManager;
+    private Journal[] stores = null;
 
     @Override
     protected Journal getStore(final Properties properties) {
 
-        quorumManager = AbstractHAJournalTestCase.this
-                .newQuorumManager(properties);
+        final int k = 3; // @todo config by Properties?
+
+        for (int i = 0; i < k; i++) {
+
+            stores[i] = newJournal(i, properties);
+
+        }
 
         // return the master.
-        return quorumManager.stores[0];
+        return stores[0];
 
     }
 
-    protected MockQuorumManager newQuorumManager(final Properties properties) {
+    protected Journal newJournal(final int index, final Properties properties) {
 
-        return new MockQuorumManager(properties);
+        return new Journal(properties) {
+        
+            protected QuorumManager newQuorumManager() {
+
+                return AbstractHAJournalTestCase.this.newQuorumManager(index,
+                        stores);
+
+            };
+            
+        };
+
+    }
+
+    protected MockQuorumManager newQuorumManager(final int index,
+            final Journal[] stores) {
+
+        return new MockQuorumManager(index, stores);
 
     };
 
@@ -125,15 +151,44 @@ abstract public class AbstractHAJournalTestCase
     @Override
     protected Journal reopenStore(final Journal store) {
 
-        assertTrue(store.getQuorumManager()==quorumManager);
+        if (stores[0] != store)
+            throw new AssertionError();
         
-//        final MockQuorumManager quorumManager = ((MockQuorumManager) store
-//                .getQuorumManager());
+        for (int i = 0; i < stores.length; i++) {
 
-        quorumManager.reopen();
+            Journal aStore = stores[i];
 
-        return quorumManager.stores[0];
+            // close the store.
+            aStore.close();
 
+            if (!aStore.isStable()) {
+
+                throw new UnsupportedOperationException(
+                        "The backing store is not stable");
+
+            }
+
+            // Note: clone to avoid modifying!!!
+            final Properties properties = (Properties) getProperties().clone();
+
+            // Turn this off now since we want to re-open the same store.
+            properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+
+            // The backing file that we need to re-open.
+            final File file = aStore.getFile();
+
+            if (file == null)
+                throw new AssertionError();
+
+            // Set the file property explicitly.
+            properties.setProperty(Options.FILE, file.toString());
+
+            stores[i] = newJournal(i, properties);
+
+        }
+
+        return stores[0];
+        
     }
 
 }

@@ -19,49 +19,35 @@ import com.bigdata.journal.Journal;
 public class MockQuorumImpl implements Quorum {
 
     private final int index;
-    private final AbstractJournal[] failoverChain;
+    private final Journal[] stores;
 
     /**
      * 
      * @param index
      *            The index of this service in the failover chain. The service
      *            at index ZERO (0) is the master.
-     * @param failoverChain
+     * @param stores
      *            The failover chain.
      */
-    public MockQuorumImpl(final int index, final AbstractJournal[] failoverChain) {
+    public MockQuorumImpl(final int index, final Journal[] stores) {
 
         this.index = index;
 
-        this.failoverChain = failoverChain;
+        this.stores = stores;
 
     }
-
-    // public <T> void applyNext(RunnableFuture<T> r) {
-    //
-    // // must be invoked by the master (for this mock impl).
-    // if (!isMaster())
-    // throw new IllegalStateException();
-    //
-    // for(AbstractJournal j : failoverChain) {
-    //            
-    // j.getExecutorService().execute(r);
-    //                
-    // }
-    //            
-    // }
-
+    
     /** A fixed token value of ZERO (0L). */
     public long token() {
         return 0;
     }
 
     public int replicationFactor() {
-        return failoverChain.length;
+        return stores.length;
     }
 
     public int size() {
-        return failoverChain.length;
+        return stores.length;
     }
 
     /** assumed true. */
