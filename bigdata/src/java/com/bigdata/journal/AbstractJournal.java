@@ -3410,7 +3410,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     /**
      * The {@link QuorumManager} for this service.
      */
-    protected QuorumManager getQuorumManager() {
+    public QuorumManager getQuorumManager() {
         
         return quorumManager;
         

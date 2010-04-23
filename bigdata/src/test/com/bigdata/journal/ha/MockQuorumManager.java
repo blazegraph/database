@@ -27,40 +27,75 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
+import java.io.File;
 import java.util.Properties;
 
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.Options;
 
 public class MockQuorumManager implements QuorumManager {
 
+    /** Properties from the unit test setup. */
+    private final Properties properties;
+    
+    private final int k;
+
+    private long token;
+    
     final Journal[] stores;
 
+    /**
+     * Properties from the unit test setup.
+     */
+    protected Properties getProperties() {
+        
+        return properties;
+        
+    }
+    
+    public int replicationFactor() {
+
+        return k;
+        
+    }
+    
     public MockQuorumManager(final Properties properties) {
 
-        final int k = 3;
+        this.properties = properties;
+        
+        // @todo configure w/ property?
+        k = 3;
 
         stores = new Journal[k];
                               
         for (int i = 0; i < k; i++) {
 
-            stores[i] = new Journal(properties) {
-
-                protected QuorumManager newQuorumManager() {
-
-                    return MockQuorumManager.this;
-
-                };
-
-            };
+            stores[i] = newJournal(properties);
 
         }
+        
+        // Start the quorum as met on token ZERO (0).
+        token = 0L;
 
     }
     
-    public void assertQuorum(long token) {
-        // TODO Auto-generated method stub
+    protected Journal newJournal(final Properties properties) {
+
+        return new Journal(properties) {
         
+            protected QuorumManager newQuorumManager() {
+
+                return MockQuorumManager.this;
+
+            };
+            
+        };
+
+    }
+
+    public void assertQuorum(long token) {
+        if (token != this.token)
+            throw new IllegalStateException();
     }
 
     public Quorum awaitQuorum() throws InterruptedException {
@@ -73,9 +108,57 @@ public class MockQuorumManager implements QuorumManager {
         return null;
     }
 
-    public int replicationFactor() {
-        // TODO Auto-generated method stub
-        return 0;
+    /**
+     * Unit test helper tears down the stores.
+     */
+    void destroy() {
+        
+        for(Journal store : stores) {
+            
+            store.destroy();
+            
+        }
+        
     }
-    
+
+    /**
+     * Unit test helper reopens the stores in the quorum.
+     */
+    void reopen() {
+
+        for (int i = 0; i < k; i++) {
+
+            Journal store = stores[i];
+
+            // close the store.
+            store.close();
+
+            if (!store.isStable()) {
+
+                throw new UnsupportedOperationException(
+                        "The backing store is not stable");
+
+            }
+
+            // Note: clone to avoid modifying!!!
+            final Properties properties = (Properties) getProperties().clone();
+
+            // Turn this off now since we want to re-open the same store.
+            properties.setProperty(Options.CREATE_TEMP_FILE, "false");
+
+            // The backing file that we need to re-open.
+            final File file = store.getFile();
+
+            if (file == null)
+                throw new AssertionError();
+
+            // Set the file property explicitly.
+            properties.setProperty(Options.FILE, file.toString());
+
+            stores[i] = newJournal(properties);
+
+        }
+
+    }
+
 }
