@@ -82,21 +82,21 @@ public class MockQuorumImpl implements Quorum {
         // TODO Auto-generated method stub
     }
 
-    public int prepare2Phase(long commitCounter, IRootBlockView rootBlock,
-            long timeout, TimeUnit unit) throws InterruptedException,
-            TimeoutException, IOException {
+    public int prepare2Phase(IRootBlockView rootBlock, long timeout,
+            TimeUnit unit) throws InterruptedException, TimeoutException,
+            IOException {
         // TODO Auto-generated method stub
         return 0;
     }
 
     public void commit2Phase(long commitTime) throws IOException {
         // TODO Auto-generated method stub
-        
+
     }
 
     public void abort2Phase() throws IOException {
         // TODO Auto-generated method stub
-        
+
     }
 
 }

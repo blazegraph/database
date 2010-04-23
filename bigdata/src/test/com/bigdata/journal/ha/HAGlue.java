@@ -116,18 +116,14 @@ public interface HAGlue extends Remote {
      * channel and acknowledge "yes" if ready to commit. If the node can not
      * prepare for any reason, then it must return "no".
      * 
-     * @param token
-     *            The token for the quorum for which this request was made.
-     * @param commitTime
-     *            The commit time that will be assigned to the new commit point.
      * @param rootBlock
      *            The new root block.
      * 
      * @return A {@link Future} which evaluates to a yes/no vote on whether the
      *         service is prepared to commit.
      */
-    RunnableFuture<Boolean> prepare2Phase(long token, long commitTime,
-            IRootBlockView rootBlock) throws IOException;
+    RunnableFuture<Boolean> prepare2Phase(IRootBlockView rootBlock)
+            throws IOException;
 
     /**
      * Commit using the root block from the corresponding prepare message. It is

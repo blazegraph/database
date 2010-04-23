@@ -30,6 +30,7 @@ package com.bigdata.journal;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
+import com.bigdata.journal.ha.Quorum;
 import com.bigdata.rawstore.WormAddressManager;
 
 /**
@@ -232,6 +233,11 @@ public interface IRootBlockView {
      * allocation blocks.
      */
     public long getMetaStartAddr();
+    
+    /**
+     * The {@link Quorum} token associated with this commit point.
+     */
+    public long getQuorumToken();
 
     /**
      * A read-only buffer whose contents are the root block. The position,
