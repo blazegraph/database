@@ -60,6 +60,12 @@ public class MockQuorumImpl implements Quorum {
         return index == 0;
     }
 
+    public HAGlue getHAGlue(int index) {
+
+        return stores[index].getHAGlue();
+        
+    }
+
     public void readFromQuorum(long addr, ByteBuffer b) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException();
@@ -70,28 +76,28 @@ public class MockQuorumImpl implements Quorum {
             throw new IllegalStateException();
     }
 
-    public void truncate(final long extent) {
-        assertMaster();
-        for (int i = 0; i < stores.length; i++) {
-            Journal store = stores[i];
-            if (i == 0) {
-                /*
-                 * This is a NOP because the master handles this for its local
-                 * backing file and there are no other services in the singleton
-                 * quorum.
-                 */
-                continue;
-            }
-            try {
-                final RunnableFuture<Void> f = store.getHAGlue().truncate(
-                        token(), extent);
-                f.run();
-                f.get();
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
+//    public void truncate(final long extent) {
+//        assertMaster();
+//        for (int i = 0; i < stores.length; i++) {
+//            Journal store = stores[i];
+//            if (i == 0) {
+//                /*
+//                 * This is a NOP because the master handles this for its local
+//                 * backing file and there are no other services in the singleton
+//                 * quorum.
+//                 */
+//                continue;
+//            }
+//            try {
+//                final RunnableFuture<Void> f = store.getHAGlue().truncate(
+//                        token(), extent);
+//                f.run();
+//                f.get();
+//            } catch (Throwable e) {
+//                throw new RuntimeException(e);
+//            }
+//        }
+//    }
 
     public int prepare2Phase(final IRootBlockView rootBlock,
             final long timeout, final TimeUnit unit)

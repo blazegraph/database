@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.sun.corba.se.impl.orbutil.closure.Future;
 
@@ -63,6 +62,17 @@ public interface Quorum {
      */
     boolean isMaster();
 
+    /**
+     * Return the remote interface used to perform HA operations on the members
+     * of quorum.
+     * 
+     * @param index
+     *            The index of the quorum member in [0:{@link #size()}-1].
+     *            
+     * @return The remote interface for that quorum member.
+     */
+    HAGlue getHAGlue(int index);
+    
     // /**
     // * The set of nodes which are discovered and have an agreement on the
     // * distributed state of the journal.
@@ -98,19 +108,22 @@ public interface Quorum {
 //    }
 
     /*
-     * file extension.
+     * Note: Moved down to the write pipeline.
      */
-
-    /**
-     * Set the file length on all the services in the quorum.
-     * <p>
-     * Note: This method is invoked automatically by the master if the
-     * {@link IBufferStrategy} needs to extend the file length for its managed
-     * backing file. The hook is within the {@link IBufferStrategy}
-     * implementation since the request to extend the file to make room for
-     * additional writes does not go through the {@link AbstractJournal}.
-     */
-    void truncate(long extent);
+//    /*
+//     * file extension.
+//     */
+//
+//    /**
+//     * Set the file length on all the services in the quorum.
+//     * <p>
+//     * Note: This method is invoked automatically by the master if the
+//     * {@link IBufferStrategy} needs to extend the file length for its managed
+//     * backing file. The hook is within the {@link IBufferStrategy}
+//     * implementation since the request to extend the file to make room for
+//     * additional writes does not go through the {@link AbstractJournal}.
+//     */
+//    void truncate(long extent);
 
     /*
      * bad reads
