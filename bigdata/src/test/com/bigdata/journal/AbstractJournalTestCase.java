@@ -87,13 +87,13 @@ abstract public class AbstractJournalTestCase
         
     }
     
-    public void tearDown() throws Exception {
-        
-        super.tearDown();
-        
-        deleteTestFile();
-        
-    }
+//    public void tearDown() throws Exception {
+//        
+//        super.tearDown();
+//        
+//        deleteTestFile();
+//        
+//    }
 
     /**
      * Note: your unit must close the store for delete to work.
@@ -190,7 +190,7 @@ abstract public class AbstractJournalTestCase
         
     }
 
-    final protected Journal getStore(final Properties properties) {
+    protected Journal getStore(final Properties properties) {
         
         return new Journal(properties);
         
