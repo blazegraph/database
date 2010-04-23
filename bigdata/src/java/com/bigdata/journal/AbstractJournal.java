@@ -2264,6 +2264,11 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * committer was {@link #registerCommitter(int, ICommitter) registered}. We
      * then force the data to stable store, update the root block, and force the
      * root block and the file metadata to stable store.
+     * <p>
+     * Note: Each invocation of this method MUST use a distinct
+     * <i>commitTime</i> and the commitTimes MUST be monotonically increasing.
+     * These guarantees support both the database version history mechanisms and
+     * the High Availability mechanisms.
      * 
      * @param commitTime
      *            The commit time either of a transaction or of an unisolated
@@ -2367,6 +2372,25 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             final long nextOffset = _bufferStrategy.getNextOffset();
 
             /*
+             * Await a quorum. This commit can only proceed for this quorum.
+             * 
+             * @todo The quorum token should be a field protected by the write
+             * lock on the journal. This code will then abort() if we have lost
+             * the quorum.
+             * 
+             * @todo We need to handle two cases in read() and write(). If there
+             * is no quorum token on the journal, then we need to await() a
+             * token. If there is a quorum, then we need to assertQuorum(token)
+             * and abort() if the token has broken.
+             */
+            Quorum q = null;
+            try {
+                q = getQuorumManager().awaitQuorum();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            /*
              * Prepare the new root block.
              */
             final IRootBlockView newRootBlock;
@@ -2411,7 +2435,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 final long metaStartAddr = _bufferStrategy.getMetaStartAddr();
                 final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
 
-                // Create the new root block.
+                // Create the new root block. @todo add quorum token here?
                 newRootBlock = new RootBlockView(!old
                         .isRootBlock0(), old.getOffsetBits(), nextOffset,
                         firstCommitTime, lastCommitTime, newCommitCounter,
@@ -2421,15 +2445,12 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
             }
 
-            Quorum q = null;
             try {
-
-                q = getQuorumManager().awaitQuorum();
 
                 final int minYes = (q.replicationFactor() + 1) >> 1;
 
                 // @todo config prepare timeout.
-                final int nyes = q.prepare2Phase(commitTime, newRootBlock,
+                final int nyes = q.prepare2Phase(newRootBlock,
                         1000/* timeout */, TimeUnit.MILLISECONDS);
 
                 if (nyes >= minYes) {
@@ -3521,12 +3542,12 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             }
         }
 
-        public int prepare2Phase(long commitTime, IRootBlockView rootBlock,
-                long timeout, TimeUnit unit) throws InterruptedException,
-                TimeoutException, IOException {
+        public int prepare2Phase(final IRootBlockView rootBlock,
+                final long timeout, final TimeUnit unit)
+                throws InterruptedException, TimeoutException, IOException {
             try {
-                final RunnableFuture<Boolean> f = haGlue.prepare2Phase(token(),
-                        commitTime, rootBlock);
+                final RunnableFuture<Boolean> f = haGlue
+                        .prepare2Phase(rootBlock);
                 /*
                  * Note: In order to avoid a deadlock, this must run() on the
                  * master in the caller's thread and use a local method call.
@@ -3630,34 +3651,35 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         /**
          * The most recent prepare request.
          */
-        private final AtomicReference<PrepareRequest> prepareRequest = new AtomicReference<PrepareRequest>();
+        private final AtomicReference<IRootBlockView> prepareRequest = new AtomicReference<IRootBlockView>();
         
         /**
          * @todo probably send a byte[] and then validate the root block when we
          *       wrap it as a view.
          */
-        public RunnableFuture<Boolean> prepare2Phase(final long token,
-                final long commitTime, final IRootBlockView rootBlock)
-                throws IOException {
-
-            if (commitTime <= getLastCommitTime())
-                throw new IllegalStateException();
+        public RunnableFuture<Boolean> prepare2Phase(
+                final IRootBlockView rootBlock) throws IOException {
 
             if (rootBlock == null)
                 throw new IllegalStateException();
 
-            prepareRequest.set(new PrepareRequest(token, commitTime, rootBlock));
+            if (rootBlock.getLastCommitTime() <= getLastCommitTime())
+                throw new IllegalStateException();
+
+            getQuorumManager().assertQuorum(rootBlock.getQuorumToken());
+
+            prepareRequest.set(rootBlock);
             
             return new FutureTask<Boolean>(new Runnable() {
 
                 public void run() {
 
-                    final PrepareRequest req = prepareRequest.get();
+                    final IRootBlockView rootBlock = prepareRequest.get();
 
-                    if (req == null)
+                    if (rootBlock == null)
                         throw new IllegalStateException();
                     
-                    getQuorumManager().assertQuorum(req.token);
+                    getQuorumManager().assertQuorum(rootBlock.getQuorumToken());
 
                     /*
                      * Call to ensure strategy does everything required for
@@ -3704,25 +3726,28 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             return new FutureTask<Void>(new Runnable() {
                 public void run() {
 
-                    final PrepareRequest req = prepareRequest.get();
+                    final IRootBlockView rootBlock = prepareRequest.get();
 
-                    if (req == null)
+                    if (rootBlock == null)
                         throw new IllegalStateException();
 
-                    if (req.commitTime != commitTime)
-                        throw new IllegalStateException();
-                    
                     _fieldReadWriteLock.writeLock().lock();
 
                     try {
 
-                        getQuorumManager().assertQuorum(req.token);
+                        if (rootBlock.getLastCommitTime() != commitTime)
+                            throw new IllegalStateException();
+                        
+                        // verify that the qourum has not changed.
+                        getQuorumManager().assertQuorum(
+                                rootBlock.getQuorumToken());
 
-                        _bufferStrategy.writeRootBlock(req.rootBlock,
-                                forceOnCommit);
+                        // write the root block on to the backing store.
+                        _bufferStrategy
+                                .writeRootBlock(rootBlock, forceOnCommit);
 
                         // set the new root block.
-                        _rootBlock = req.rootBlock;
+                        _rootBlock = rootBlock;
 
                         // reload the commit record from the new root block.
                         _commitRecord = _getCommitRecord();

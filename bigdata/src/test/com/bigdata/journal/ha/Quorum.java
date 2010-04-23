@@ -35,14 +35,18 @@ public interface Quorum {
      * The token for the quorum. Each met quorum has a distinct token which
      * identifies the committed state on which the agreement was achieved for at
      * least <code>(k + 1)/2</code> services. The token is based on an agreement
-     * on the <em>lastCommitTime</em> and is monotonically increasing. A
-     * collection of new services will first achieve agreement on a
-     * lastCommitTime of ZERO (0), since that is the initial value as reported
-     * by {@link AbstractJournal#getLastCommitTime()} before any commits have
-     * been performed. For this reason, the initial token before any quorum has
-     * been met should be <code>-1L</code> which is before all valid commit
-     * times and also LT the initial value reported for the lastCommitTime,
-     * which is ZERO (0).
+     * on the <em>lastCommitTime</em>.
+     * <p>
+     * A set of new services will first achieve agreement on a
+     * <i>lastCommitTime</i> of ZERO (0), since that is the initial value as
+     * reported by {@link AbstractJournal#getLastCommitTime()} before any
+     * commits have been performed.
+     * <p>
+     * If the quorum is broken, the token is set to <code>-1L</code>, which is
+     * never a legal quorum token. For this reason, the initial token before any
+     * quorum has been met should be <code>-1L</code> which is before all valid
+     * commit times and also LT the initial value reported for the
+     * lastCommitTime, which is ZERO (0).
      */
     long token();
     
@@ -130,12 +134,6 @@ public interface Quorum {
      * writes to the backing channel, and acknowledge "yes" if ready to commit.
      * If the node can not prepare for any reason, then it must return "no".
      * 
-     * @param commitTime
-     *            The commit time that will be assigned to the new commit point.
-     *            The commit times for the database are monotonically increasing
-     *            and are never reused. Also, unlike the commitCounter, the
-     *            commitTimes are never reused, even in the case of an aborted
-     *            commit.
      * @param rootBlock
      *            The new root block.
      * @param timeout
@@ -146,13 +144,23 @@ public interface Quorum {
      * @return A {@link Future} which evaluates to a yes/no vote on whether the
      *         service is prepared to commit.
      */
-    int prepare2Phase(long commitTime, IRootBlockView rootBlock, long timeout,
-            TimeUnit unit) throws InterruptedException, TimeoutException,
-            IOException;
+    int prepare2Phase(IRootBlockView rootBlock, long timeout, TimeUnit unit)
+            throws InterruptedException, TimeoutException, IOException;
 
     /**
      * Send a message to each member of the quorum telling it to commit using
      * the root block from the corresponding prepare message.
+     * <p>
+     * Note: The commitTime is a sufficient indicator of the corresponding
+     * "prepare" message. The commit times for the database are monotonically
+     * increasing and are never reused. Also, unlike the commitCounter, the
+     * commitTimes are never reused, even in the case of an aborted commit.
+     * Therefore, each prepare message is guaranteed to have a root block with a
+     * distinct commit time, regardless of the quorum for which it was formed.
+     * However, neither the quorum token nor the commitCounter provide this
+     * guarantee. The implementation of the commit message MUST verify that the
+     * current quorum token is the same as the quorum token in the root block
+     * for the "prepare" message.
      * 
      * @param commitTime
      *            The commit time that assigned to the new commit point.
@@ -161,7 +169,9 @@ public interface Quorum {
 
     /**
      * Send a message to each member of the quorum telling it to discard its
-     * write set, reloading all state from the last root block.
+     * write set, reloading all state from the last root block. If the node has
+     * not observed the corresponding "prepare" message then it should ignore
+     * this message.
      */
     void abort2Phase() throws IOException;
 
