@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io;
 
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
@@ -1377,8 +1379,41 @@ abstract public class WriteCache implements IWriteCache {
 		throw new RuntimeException("setRecordMap NotImplemented");
 	}
 
-	public Collection<RecordMetadata> getRecordMap() {
+	/**
+	 * Method called by HA to send to socket.
+	 * 
+	 * WriteCache serializes the recordMap and then the buffer.  Enabling the use of DirectBuffers if
+	 * available.
+	 * 
+	 * @param ostr
+	 */
+	public void sendTo(ObjectOutputStream out) {
+		sendRecordMap(out);
+		
+	}
+
+	/**
+	 * This is the HA chaining method for the writeCache.  Setting this writeCache to the
+	 * state defined by the inputStream, and parsing data on to the output stream if not null
+	 * 
+	 * @param in
+	 * @param out
+	 */
+	public void receiveAndForward(ObjectInputStream in, ObjectOutputStream out) {
+		receiveRecordMap(in);
+		if (out != null) {
+			sendRecordMap(out);
+		}
+		
+	}
+
+	private void sendRecordMap(ObjectOutputStream out) {
 		// TODO Auto-generated method stub
-		return null;
+		
+	}
+
+	private void receiveRecordMap(ObjectInputStream in) {
+		// TODO Auto-generated method stub
+		
 	}
 }
