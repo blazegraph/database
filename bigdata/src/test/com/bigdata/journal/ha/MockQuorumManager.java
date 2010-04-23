@@ -27,8 +27,37 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
-class MockQuorumManager implements QuorumManager {
+import java.util.Properties;
 
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.Journal;
+
+public class MockQuorumManager implements QuorumManager {
+
+    final Journal[] stores;
+
+    public MockQuorumManager(final Properties properties) {
+
+        final int k = 3;
+
+        stores = new Journal[k];
+                              
+        for (int i = 0; i < k; i++) {
+
+            stores[i] = new Journal(properties) {
+
+                protected QuorumManager newQuorumManager() {
+
+                    return MockQuorumManager.this;
+
+                };
+
+            };
+
+        }
+
+    }
+    
     public void assertQuorum(long token) {
         // TODO Auto-generated method stub
         

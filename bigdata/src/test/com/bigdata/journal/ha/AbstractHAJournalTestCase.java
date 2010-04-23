@@ -88,7 +88,7 @@ abstract public class AbstractHAJournalTestCase
 
         super.tearDown(testCase);
 
-        // @todo tear down all journals in the HA cluster.
+        // FIXME tear down all journals in the HA cluster, e.g. MockQuorumManager.destroy()
 //        deleteTestFile();
         
     }
@@ -96,21 +96,17 @@ abstract public class AbstractHAJournalTestCase
     @Override
     protected Journal getStore(final Properties properties) {
         
-        return new Journal(properties) {
-          
-            protected QuorumManager newQuorumManager() {
-                
-                return AbstractHAJournalTestCase.this.newQuorumManager();
-                
-            };
-            
-        };
+        final MockQuorumManager quorumManager = AbstractHAJournalTestCase.this
+                .newQuorumManager(properties);
         
+        // return the master.
+        return quorumManager.stores[0];
+
     }
 
-    protected QuorumManager newQuorumManager() {
+    protected MockQuorumManager newQuorumManager(final Properties properties) {
       
-        return new MockQuorumManager();
+        return new MockQuorumManager(properties);
         
     };
     
