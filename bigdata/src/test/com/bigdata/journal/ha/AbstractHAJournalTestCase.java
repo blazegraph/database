@@ -27,14 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal.ha;
 
-import java.io.File;
 import java.util.Properties;
 
 import junit.framework.TestCase;
 
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.Options;
 import com.bigdata.journal.ProxyTestCase;
 
 /**
@@ -88,28 +86,30 @@ abstract public class AbstractHAJournalTestCase
 
         super.tearDown(testCase);
 
-        // FIXME tear down all journals in the HA cluster, e.g. MockQuorumManager.destroy()
-//        deleteTestFile();
-        
+        if (quorumManager != null)
+            quorumManager.destroy();
+
     }
+
+    private MockQuorumManager quorumManager;
 
     @Override
     protected Journal getStore(final Properties properties) {
-        
-        final MockQuorumManager quorumManager = AbstractHAJournalTestCase.this
+
+        quorumManager = AbstractHAJournalTestCase.this
                 .newQuorumManager(properties);
-        
+
         // return the master.
         return quorumManager.stores[0];
 
     }
 
     protected MockQuorumManager newQuorumManager(final Properties properties) {
-      
+
         return new MockQuorumManager(properties);
-        
+
     };
-    
+
     /**
      * Re-open the same backing store.
      * 
@@ -124,32 +124,16 @@ abstract public class AbstractHAJournalTestCase
      */
     @Override
     protected Journal reopenStore(final Journal store) {
+
+        assertTrue(store.getQuorumManager()==quorumManager);
         
-        // close the store.
-        store.close();
-        
-        if(!store.isStable()) {
-            
-            throw new UnsupportedOperationException("The backing store is not stable");
-            
-        }
-        
-        // Note: clone to avoid modifying!!!
-        final Properties properties = (Properties)getProperties().clone();
-        
-        // Turn this off now since we want to re-open the same store.
-        properties.setProperty(Options.CREATE_TEMP_FILE,"false");
-        
-        // The backing file that we need to re-open.
-        final File file = store.getFile();
-        
-        assertNotNull(file);
-        
-        // Set the file property explictly.
-        properties.setProperty(Options.FILE,file.toString());
-        
-        return new Journal( properties );
-        
+//        final MockQuorumManager quorumManager = ((MockQuorumManager) store
+//                .getQuorumManager());
+
+        quorumManager.reopen();
+
+        return quorumManager.stores[0];
+
     }
 
 }
