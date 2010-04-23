@@ -59,6 +59,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.WriteCache.RecordMetadata;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.Latch;
@@ -151,12 +152,18 @@ abstract public class WriteCacheService2 implements IWriteCache {
      * A single threaded service which writes dirty {@link WriteCache}s onto the
      * backing store.
      */
-    final private ExecutorService writeService;
+    final private ExecutorService localWriteService;
 
     /**
-     * The {@link Future} of the task running on the {@link #writeService}.
+     * The {@link Future} of the task running on the {@link #localWriteService}.
      */
-    final private Future<Void> writeFuture;
+    final private Future<Void> localWriteFuture;
+
+    /**
+     * A single threaded service which writes dirty {@link WriteCache}s onto the
+     * downstream service in the quorum.
+     */
+    final private ExecutorService remoteWriteService;
 
     /**
      * A list of dirty buffers. Writes from these may be combined, but not
@@ -199,6 +206,11 @@ abstract public class WriteCacheService2 implements IWriteCache {
     final private IReopenChannel<? extends Channel> opener;
 
     /**
+     * The object which notices the quorum change events.
+     */
+    final protected QuorumManager quorumManager;
+    
+    /**
      * A map from the offset of the record on the backing file to the cache
      * buffer on which that record was written.
      */
@@ -216,7 +228,8 @@ abstract public class WriteCacheService2 implements IWriteCache {
      * @throws InterruptedException
      */
     public WriteCacheService2(final int nbuffers,
-            final IReopenChannel<? extends Channel> opener)
+            final IReopenChannel<? extends Channel> opener,
+            final QuorumManager quorumManager)
             throws InterruptedException {
 
         if (nbuffers <= 0)
@@ -225,8 +238,13 @@ abstract public class WriteCacheService2 implements IWriteCache {
         if (opener == null)
             throw new IllegalArgumentException();
 
+        if (quorumManager == null)
+            throw new IllegalArgumentException();
+
         this.opener = opener;
 
+        this.quorumManager = quorumManager;
+        
         dirtyList = new LinkedBlockingQueue<WriteCache>();
 
         deferredDirtyList = new LinkedBlockingQueue<WriteCache>();
@@ -249,12 +267,21 @@ abstract public class WriteCacheService2 implements IWriteCache {
                 * (capacity / 1024));
 
         // start service to write on the backing channel.
-        writeService = Executors
+        localWriteService = Executors
                 .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
                         .getName()));
 
+        if (quorumManager.replicationFactor() > 1) {
+            // service used to write on the downstream node in the quorum.
+            remoteWriteService = Executors
+                    .newSingleThreadExecutor(new DaemonThreadFactory(getClass()
+                            .getName()));
+        } else {
+            remoteWriteService = null;
+        }
+        
         // run the write task
-        writeFuture = writeService.submit(new WriteTask());
+        localWriteFuture = localWriteService.submit(new WriteTask());
 
     }
 
@@ -269,7 +296,7 @@ abstract public class WriteCacheService2 implements IWriteCache {
     private class WriteTask implements Callable<Void> {
 
         public Void call() throws Exception {
-            while (true) {
+            while (m_closing) {
 
                 try {
                     // @todo This should be awaiting a Condition or doing a blocking take, not sleeping.
@@ -288,8 +315,22 @@ abstract public class WriteCacheService2 implements IWriteCache {
                         // FIXME an error during cache.flush() will cause the [cache] buffer to be dropped.  it needs to be put back onto the dirtyList in the correct position, which suggests using a LinkedDeque.
                         final WriteCache cache = dirtyList.take();
                         
+                        Future<?> remoteWriteFuture = null;
+                        
+                        if (remoteWriteService != null) {
+                            // Start downstream IOs (network IO).
+                            remoteWriteService.submit(cache
+                                    .getDownstreamWriteRunnable(quorumManager));
+                        }
+                        
+                        // Do the local IOs.
                         cache.flush(false/* force */);
 
+                        if (remoteWriteFuture != null) {
+                            // Wait for the downstream IOs to finish.
+                            remoteWriteFuture.get();
+                        }
+                        
                         cleanList.add(cache);
                         
                         if (dirtyList.isEmpty()) {
@@ -308,15 +349,23 @@ abstract public class WriteCacheService2 implements IWriteCache {
                         
                     }
                     
+                } catch (InterruptedException t) {
+                    /*
+                     * This task can only be interrupted by a thread with its
+                     * Future, so this interrupt is a clear signal that the
+                     * write cache service is closing down.
+                     */
+                    break;
                 } catch (Throwable t) {
-                	if (!m_closing) {
-                		log.error(t, t); // will be interrupted in close, so not necessarily a problem
-                	}
-
+                    /*
+                     * Anything else is an error, but we will not halt
+                     * processing.
+                     */
+                    log.error(t, t);
                 }
-
             }
-
+            // Done.
+            return null;
         }
 
     }
@@ -366,7 +415,11 @@ abstract public class WriteCacheService2 implements IWriteCache {
 
     }
 
-    private boolean m_closing = false;
+    /**
+     * Set when closing. This field is volatile so its state is noticed by the
+     * {@link WriteTask} without explicit synchronization.
+     */
+    private volatile boolean m_closing = false;
     
     public void close() throws InterruptedException {
 
@@ -376,11 +429,18 @@ abstract public class WriteCacheService2 implements IWriteCache {
             	m_closing = true;
             	
                 // Interrupt the write task.
-                writeFuture.cancel(true/* mayInterruptIfRunning */);
+                localWriteFuture.cancel(true/* mayInterruptIfRunning */);
 
                 // Immediate shutdown of the write service.
-                writeService.shutdownNow();
+                localWriteService.shutdownNow();
 
+                if (remoteWriteService != null) {
+
+                    // Immediate shutdown of the write service.
+                    remoteWriteService.shutdownNow();
+
+                }
+                
             } finally {
 
                 /*
@@ -463,7 +523,7 @@ abstract public class WriteCacheService2 implements IWriteCache {
         if (!open.get())
             throw new IllegalStateException();
 
-        if (writeFuture.isDone()) {
+        if (localWriteFuture.isDone()) {
 
             /*
              * If the write task terminates abnormally then throw the exception
@@ -472,7 +532,7 @@ abstract public class WriteCacheService2 implements IWriteCache {
 
             try {
 
-                writeFuture.get();
+                localWriteFuture.get();
 
             } catch (Throwable t) {
 

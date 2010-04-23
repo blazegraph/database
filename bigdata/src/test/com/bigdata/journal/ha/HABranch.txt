@@ -149,6 +149,10 @@ BufferDescriptor:
      currently uses ephemeral znodes to manage a master election, but I think
      that this needs to be changed to be quorum based as described above.
      
+   - ? Master specific caches must be discarded if the quorum breaks or if the
+     master fails over to another node.  This is because the failover nodes
+     are not always maintaining these caches.
+     
 4. Resynchronization.  There are two cases: leading and trailing.  We
    can resynchronize from anyone in the quorum (and could do scattered
    reads on the quorum).  

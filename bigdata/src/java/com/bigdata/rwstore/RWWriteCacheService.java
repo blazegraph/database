@@ -33,12 +33,11 @@ import java.nio.channels.FileChannel;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService2;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
-import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.QuorumManager;
 
 /**
  * Defines the WriteCacheService to be used by the RWStore.
@@ -120,8 +119,8 @@ public class RWWriteCacheService extends WriteCacheService2 {
 
     };
 
-    public RWWriteCacheService(int nbuffers, final File file, final RandomAccessFile raf, final String mode) throws InterruptedException, IOException {
-		super(nbuffers, new ReopenFileChannel(file, raf, mode));
+    public RWWriteCacheService(int nbuffers, final File file, final RandomAccessFile raf, final String mode,final QuorumManager quorumManager) throws InterruptedException, IOException {
+		super(nbuffers, new ReopenFileChannel(file, raf, mode), quorumManager);
 		// TODO Auto-generated constructor stub
 	}
 

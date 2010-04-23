@@ -55,6 +55,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
+import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
@@ -808,6 +809,14 @@ abstract public class WriteCache implements IWriteCache {
             final Map<Long, RecordMetadata> recordMap, final long nanos)
             throws InterruptedException, TimeoutException, IOException;
 
+    /**
+     * Return a {@link Runnable} which will write the cache contents onto the
+     * downstream service in the quorum. This method is not used unless the
+     * journal is highly available.
+     */
+    abstract protected Runnable getDownstreamWriteRunnable(
+            QuorumManager quorumManager);
+    
     /**
      * {@inheritDoc}.
      * <p>
