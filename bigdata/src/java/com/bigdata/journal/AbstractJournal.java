@@ -30,6 +30,7 @@ package com.bigdata.journal;
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
@@ -3433,7 +3434,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      * The object which is used to coordinate various low-level operations among
      * the members of a {@link Quorum}.
      */
-    protected HAGlue getHAGlue() {
+    public HAGlue getHAGlue() {
         
         return haGlue;
         
@@ -3608,41 +3609,6 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     }
 
     /**
-     * A prepare request for the HA 2-phase commit protocol.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
-     */
-    private static class PrepareRequest {
-        
-        /**
-         * The token associated with the quorum for which the prepare request
-         * was issued.
-         */
-        public final long token;
-        
-        /**
-         * The commitTime associated with the last "prepare" message.
-         */
-        public final long commitTime;
-        
-        /**
-         * The root block associated with the last "prepare" message.
-         */
-        public final IRootBlockView rootBlock;
-
-        public PrepareRequest(final long token, final long commitTime,
-                final IRootBlockView rootBlock) {
-
-            this.token = token;
-            this.commitTime = commitTime;
-            this.rootBlock = rootBlock;
-            
-        }
-        
-    }
-
-    /**
      * Implementation hooks into the various low-level operations required
      * to support HA for the journal.
      */
@@ -3805,6 +3771,16 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 }
             }, null/* Void */);
             
+        }
+
+        /** Not implemented for standalone. */
+        public InetAddress getWritePipelineAddr() {
+            throw new UnsupportedOperationException();
+        }
+
+        /** Not implemented for standalone. */
+        public int getWritePipelinePort() {
+            throw new UnsupportedOperationException();
         }
 
     };

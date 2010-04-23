@@ -2,6 +2,7 @@ package com.bigdata.journal.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -61,28 +62,101 @@ public class MockQuorumImpl implements Quorum {
 
     public void readFromQuorum(long addr, ByteBuffer b) {
         // TODO Auto-generated method stub
-
+        throw new UnsupportedOperationException();
     }
 
-    public void truncate(long extent) {
-        // TODO Auto-generated method stub
+    protected void assertMaster() {
+        if (!isMaster())
+            throw new IllegalStateException();
     }
 
-    public int prepare2Phase(IRootBlockView rootBlock, long timeout,
-            TimeUnit unit) throws InterruptedException, TimeoutException,
-            IOException {
-        // TODO Auto-generated method stub
-        return 0;
+    public void truncate(final long extent) {
+        assertMaster();
+        for (int i = 0; i < stores.length; i++) {
+            Journal store = stores[i];
+            if (i == 0) {
+                /*
+                 * This is a NOP because the master handles this for its local
+                 * backing file and there are no other services in the singleton
+                 * quorum.
+                 */
+                continue;
+            }
+            try {
+                final RunnableFuture<Void> f = store.getHAGlue().truncate(
+                        token(), extent);
+                f.run();
+                f.get();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
-    public void commit2Phase(long commitTime) throws IOException {
-        // TODO Auto-generated method stub
-
+    public int prepare2Phase(final IRootBlockView rootBlock,
+            final long timeout, final TimeUnit unit)
+            throws InterruptedException, TimeoutException, IOException {
+        assertMaster();
+        try {
+            final RunnableFuture<Boolean> f = haGlue
+                    .prepare2Phase(rootBlock);
+            /*
+             * Note: In order to avoid a deadlock, this must run() on the
+             * master in the caller's thread and use a local method call.
+             * For the other services in the quorum it should submit the
+             * RunnableFutures to an Executor and then await their outcomes.
+             * To minimize latency, first submit the futures for the other
+             * services and then do f.run() on the master. This will allow
+             * the other services to prepare concurrently with the master's
+             * IO.
+             */
+            f.run();
+            return f.get(timeout, unit) ? 1 : 0;
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
-
+    
+    public void commit2Phase(final long commitTime) throws IOException {
+        assertMaster();
+        try {
+            final RunnableFuture<Void> f = haGlue.commit2Phase(commitTime);
+            /*
+             * Note: In order to avoid a deadlock, this must run() on the
+             * master in the caller's thread and use a local method call.
+             * For the other services in the quorum it should submit the
+             * RunnableFutures to an Executor and then await their outcomes.
+             * To minimize latency, first submit the futures for the other
+             * services and then do f.run() on the master. This will allow
+             * the other services to prepare concurrently with the master's
+             * IO.
+             */
+            f.run();
+            f.get();
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
     public void abort2Phase() throws IOException {
-        // TODO Auto-generated method stub
-
+        assertMaster();
+        try {
+            final RunnableFuture<Void> f = haGlue.abort2Phase(token());
+            /*
+             * Note: In order to avoid a deadlock, this must run() on the
+             * master in the caller's thread and use a local method call.
+             * For the other services in the quorum it should submit the
+             * RunnableFutures to an Executor and then await their outcomes.
+             * To minimize latency, first submit the futures for the other
+             * services and then do f.run() on the master. This will allow
+             * the other services to prepare concurrently with the master's
+             * IO.
+             */
+            f.run();
+            f.get();
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

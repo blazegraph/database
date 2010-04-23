@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.journal.ha;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.rmi.Remote;
 import java.util.concurrent.RunnableFuture;
 
@@ -47,6 +48,20 @@ import com.sun.corba.se.impl.orbutil.closure.Future;
  */
 public interface HAGlue extends Remote {
 
+    /**
+     * Return the address that will be used by the write pipeline to talk to the
+     * next service in the quorum order.
+     */
+    InetAddress getWritePipelineAddr();
+
+    /**
+     * Return the port that will be used by the write pipeline to talk to the
+     * next service in the quorum order.
+     */
+    int getWritePipelinePort();
+    
+//    int getReadServicePort();
+    
 //    /**
 //     * The {@link ResourceService} used to deliver raw records to the members of
 //     * the quorum.
