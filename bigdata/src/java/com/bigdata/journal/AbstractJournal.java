@@ -1118,7 +1118,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             _bufferStrategy = new WORMStrategy(
                     0L/* soft limit for maximumExtent */,
                     minimumExtension,
-                    fileMetadata);
+                    fileMetadata,
+                    quorumManager);
 
             this._rootBlock = fileMetadata.rootBlock;
 
@@ -1141,7 +1142,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     validateChecksum,
                     createTime, checker, alternateRootBlock);
 
-            _bufferStrategy = new RWStrategy(fileMetadata);
+            _bufferStrategy = new RWStrategy(fileMetadata,quorumManager);
 
             this._rootBlock = fileMetadata.rootBlock;
 

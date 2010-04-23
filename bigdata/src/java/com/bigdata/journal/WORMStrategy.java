@@ -49,6 +49,7 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
 import com.bigdata.io.WriteCacheService;
+import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -212,6 +213,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
     private final long minimumExtension;
 
+    private final QuorumManager quorumManager;
+    
     /**
      * This lock is used to exclude readers when the extent of the backing file
      * is about to be changed. This is a workaround for an old (an unresolved as
@@ -835,7 +838,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @param fileMetadata
      */
     WORMStrategy(final long maximumExtent, final long minimumExtension,
-            final FileMetadata fileMetadata) {
+            final FileMetadata fileMetadata, final QuorumManager quorumManager) {
 
         super(fileMetadata.extent, maximumExtent, fileMetadata.offsetBits,
                 fileMetadata.nextOffset, fileMetadata.bufferMode,
@@ -866,6 +869,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.minimumExtension = minimumExtension;
 
+        this.quorumManager = quorumManager;
+        
         /*
          * Enable the write cache?
          * 

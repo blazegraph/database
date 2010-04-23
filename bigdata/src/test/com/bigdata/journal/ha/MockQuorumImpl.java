@@ -99,6 +99,11 @@ public class MockQuorumImpl implements Quorum {
 //        }
 //    }
 
+    /*
+     * FIXME run operation on the master in the caller's thread to avoid
+     * deadlock. The other services must run the operation asynchronously on
+     * their side while the master awaits their future's using get().
+     */
     public int prepare2Phase(final IRootBlockView rootBlock,
             final long timeout, final TimeUnit unit)
             throws InterruptedException, TimeoutException, IOException {
