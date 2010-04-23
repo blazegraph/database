@@ -3519,6 +3519,15 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             return 0;
         }
 
+        public HAGlue getHAGlue(int index) {
+
+            if (index != 0)
+                throw new IndexOutOfBoundsException();
+            
+            return AbstractJournal.this.getHAGlue();
+            
+        }
+        
         /**
          * There are no other members in the quorum so failover reads are not
          * supported.
@@ -3529,19 +3538,19 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
            throw new UnsupportedOperationException(); 
         }
 
-        /**
-         * This is a NOP because the master handles this for its local backing
-         * file and there are no other services in the singleton quorum.
-         */
-        public void truncate(final long extent) {
-            try {
-                final RunnableFuture<Void> f = haGlue.truncate(token(), extent);
-                f.run();
-                f.get();
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }
+//        /**
+//         * This is a NOP because the master handles this for its local backing
+//         * file and there are no other services in the singleton quorum.
+//         */
+//        public void truncate(final long extent) {
+//            try {
+//                final RunnableFuture<Void> f = haGlue.truncate(token(), extent);
+//                f.run();
+//                f.get();
+//            } catch (Throwable e) {
+//                throw new RuntimeException(e);
+//            }
+//        }
 
         public int prepare2Phase(final IRootBlockView rootBlock,
                 final long timeout, final TimeUnit unit)
@@ -3753,25 +3762,20 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         }
 
-        /**
-         * FIXME The {@link IBufferStrategy} implementations need to have hooks
-         * to invoke the method on the quorum and need to avoid problems with
-         * re-entrant calls on the master (infinite recursion).
-         */
-        public RunnableFuture<Void> truncate(final long token, final long extent)
-                throws IOException {
-
-            return new FutureTask<Void>(new Runnable() {
-                public void run() {
-
-                    getQuorumManager().assertQuorum(token);
-
-                    _bufferStrategy.truncate(extent);
-                    
-                }
-            }, null/* Void */);
-            
-        }
+//        public RunnableFuture<Void> truncate(final long token, final long extent)
+//                throws IOException {
+//
+//            return new FutureTask<Void>(new Runnable() {
+//                public void run() {
+//
+//                    getQuorumManager().assertQuorum(token);
+//
+//                    _bufferStrategy.truncate(extent);
+//                    
+//                }
+//            }, null/* Void */);
+//            
+//        }
 
         /** Not implemented for standalone. */
         public InetAddress getWritePipelineAddr() {

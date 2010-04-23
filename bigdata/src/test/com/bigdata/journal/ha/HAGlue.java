@@ -97,17 +97,21 @@ public interface HAGlue extends Remote {
 //    }
 
     /*
-     * file extension.
+     * Note: Moved to the write pipeline since this is generally a response to a
+     * local event on the master when it needs to extend its storage.
      */
-
-    /**
-     * Set the file length on on the backing store for this service.
-     * 
-     * @param token The token for the quorum making the request.
-     * @param extent The new extent for the backing file.
-     */
-    public RunnableFuture<Void> truncate(long token, long extent)
-            throws IOException;
+//    /*
+//     * file extension.
+//     */
+//
+//    /**
+//     * Set the file length on on the backing store for this service.
+//     * 
+//     * @param token The token for the quorum making the request.
+//     * @param extent The new extent for the backing file.
+//     */
+//    public RunnableFuture<Void> truncate(long token, long extent)
+//            throws IOException;
 
     /*
      * bad reads
