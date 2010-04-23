@@ -96,10 +96,24 @@ abstract public class AbstractHAJournalTestCase
     @Override
     protected Journal getStore(final Properties properties) {
         
-        return new Journal(properties);
+        return new Journal(properties) {
+          
+            protected QuorumManager newQuorumManager() {
+                
+                return AbstractHAJournalTestCase.this.newQuorumManager();
+                
+            };
+            
+        };
         
     }
-    
+
+    protected QuorumManager newQuorumManager() {
+      
+        return new MockQuorumManager();
+        
+    };
+
     /**
      * Re-open the same backing store.
      * 
