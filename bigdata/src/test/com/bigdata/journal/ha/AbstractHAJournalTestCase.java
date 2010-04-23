@@ -113,7 +113,7 @@ abstract public class AbstractHAJournalTestCase
         return new MockQuorumManager();
         
     };
-
+    
     /**
      * Re-open the same backing store.
      * 
