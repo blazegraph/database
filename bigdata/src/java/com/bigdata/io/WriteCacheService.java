@@ -653,8 +653,8 @@ abstract public class WriteCacheService implements IWriteCache {
 	public boolean write(long offset, ByteBuffer data) throws IllegalStateException, InterruptedException {
 		return writeChk(offset, data, 0);
 	}
-	
-   /**
+
+    /**
      * Write the record onto the cache. If the record is too large for the cache
      * buffers, then it is written synchronously onto the backing channel.
      * Otherwise it is written onto a cache buffer which is lazily flushed onto
@@ -670,6 +670,9 @@ abstract public class WriteCacheService implements IWriteCache {
      * This is even true when the record is too large for the cache since we
      * delegate the write to a temporary {@link WriteCache} wrapping the
      * caller's buffer.
+     * 
+     * @return <code>true</code> since the record is always accepted by the
+     *         {@link WriteCacheService} (unless an exception is thrown).
      * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
      */
@@ -907,9 +910,18 @@ abstract public class WriteCacheService implements IWriteCache {
     /**
      * This is a non-blocking query of all write cache buffers (current, clean
      * and dirty).
+     * <p>
+     * This implementation DOES NOT throw an {@link IllegalStateException} for
+     * an asynchronous close.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException,
-            IllegalStateException {
+    public ByteBuffer read(final long offset) throws InterruptedException {
+
+        if (!open.get()) {
+
+            // Not open.
+            return null;
+            
+        }
 
         final Long off = Long.valueOf(offset);
 
