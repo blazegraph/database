@@ -1183,6 +1183,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     false/* validateChecksum */, createTime, quorumToken,
                     checker, alternateRootBlock);
 
+            // FIXME Change BufferMode.Temporary to use WORMStrategy
             _bufferStrategy = new DiskOnlyStrategy(
                     0L/* soft limit for maximumExtent */,
 //                    minimumExtension,
@@ -1919,6 +1920,21 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
     public boolean isFullyBuffered() {
         
         return _bufferStrategy.isFullyBuffered();
+        
+    }
+
+    /**
+     * Return <code>true</code> if the journal is configured for high
+     * availability. High availability exists (in principle) when the
+     * {@link QuorumManager#replicationFactor()} <em>k</em> is greater than one.
+     * See {@link #getQuorumManager()} to get more information about the actual
+     * replication count, whether this journal is part of an active quorum, etc.
+     * 
+     * @see #getQuorumManager()
+     */
+    public boolean isHighlyAvailable() {
+
+        return getQuorumManager().replicationFactor() > 1;
         
     }
     
