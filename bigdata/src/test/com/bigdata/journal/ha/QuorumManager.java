@@ -71,5 +71,10 @@ public interface QuorumManager {
      *             if the quorum is invalid.
      */
     void assertQuorum(long token);
-    
+
+    /**
+     * Terminate any asynchronous processing associated with the
+     * {@link QuorumManager}.
+     */
+    void terminate();
 }

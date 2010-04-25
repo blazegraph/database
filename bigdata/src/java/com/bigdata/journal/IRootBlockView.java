@@ -213,29 +213,36 @@ public interface IRootBlockView {
     /**
      * A byte value which specifies whether the backing store is a journal
      * (log-structured store or WORM) or a read-write store. Only two values are
-     * defined at present. ZERO (0) is a WORM; ONE is a read/write store.
+     * defined at present. ZERO (0) is a WORM; ONE (1) is a read/write store.
      */
     public StoreTypeEnum getStoreType();
 
     /**
-     * Where we will read the metadata bits from. When we start the store up we
-     * need to retrieve the metabits from this address. This is a byte offset
-     * into the file and is stored as a long integer. Normal addresses are
-     * calculated with reference to the allocation blocks.
+     * For the {@link StoreTypeEnum#RW} store, where we will read the metadata
+     * bits from. When we start the store up we need to retrieve the metabits
+     * from this address. This is a byte offset into the file and is stored as a
+     * long integer. Normal addresses are calculated with reference to the
+     * allocation blocks. The value for a WORM store is ZERO (0).
      */
     public long getMetaBitsAddr();
 
     /**
-     * The start of the area of the file where the allocation blocks are
-     * allocated. This is also a byte offset into the file and is stored as a
-     * 64-bit integer. It is called metaStartAddr because that is the offset
-     * that is used with the metaBitsAddr to determine how to find the
-     * allocation blocks.
+     * For the {@link StoreTypeEnum#RW} store, the start of the area of the file
+     * where the allocation blocks are allocated. This is also a byte offset
+     * into the file and is stored as a 64-bit integer. It is called
+     * metaStartAddr because that is the offset that is used with the
+     * metaBitsAddr to determine how to find the allocation blocks. The value
+     * for a WORM store is ZERO (0).
      */
     public long getMetaStartAddr();
-    
+
     /**
-     * The {@link Quorum} token associated with this commit point.
+     * The {@link Quorum} token associated with this commit point or
+     * {@link Quorum#NO_QUORUM} if there was no quorum.
+     * <p>
+     * Note: If commit points are part of the resynchronization protocol, they
+     * MUST NOT use the current quorum token unless the service is synchronized
+     * with the quorum at that commit point.
      */
     public long getQuorumToken();
 
@@ -245,5 +252,5 @@ public interface IRootBlockView {
      * returned by this method.
      */
     public ByteBuffer asReadOnlyBuffer();
-    
+
 }

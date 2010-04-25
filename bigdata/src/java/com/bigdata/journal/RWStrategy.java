@@ -89,10 +89,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		
 		m_initialExtent = m_fileMetadata.file.length();
 	}
-	
+
+    /**
+     * @param rb0
+     * @return
+     */
 	IRootBlockView copyRootBlock(boolean rb0) {
 		IRootBlockView rbv = new RootBlockView(rb0, m_rb.getOffsetBits(), m_rb.getNextOffset(), m_rb.getFirstCommitTime(), m_rb.getLastCommitTime(),
 				m_rb.getCommitCounter(), m_rb.getCommitRecordAddr(), m_rb.getCommitRecordIndexAddr(), m_fileMetadata.rootBlock.getUUID(),
+				m_rb.getQuorumToken(),
 				m_rb.getMetaStartAddr(), m_rb.getMetaBitsAddr(), StoreTypeEnum.RW, m_fileMetadata.rootBlock.getCreateTime(), m_rb.getCloseTime(),
 				s_ckutil);
 

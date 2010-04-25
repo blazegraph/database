@@ -38,6 +38,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.LRUNexus;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.journal.ha.Quorum;
 import com.bigdata.mdi.AbstractResourceMetadata;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.AbstractRawWormStore;
@@ -285,6 +286,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
                 true, // writeCacheEnabled
                 false, // validateChecksum (desperation option for restart).
                 createTime,//
+                Quorum.NO_QUORUM,// Temporary stores are not HA.
                 new ChecksumUtility(), // checker (root blocks generated but not saved).
                 false // alternateRootBlock
         );

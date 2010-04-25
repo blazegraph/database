@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.sun.corba.se.impl.orbutil.closure.Future;
 
@@ -31,23 +30,33 @@ public interface Quorum {
     int replicationFactor();
 
     /**
-     * The token for the quorum. Each met quorum has a distinct token which
+     * The token for the quorum. Each met quorum has a unique token which
      * identifies the committed state on which the agreement was achieved for at
-     * least <code>(k + 1)/2</code> services. The token is based on an agreement
-     * on the <em>lastCommitTime</em>.
+     * least <code>(k + 1)/2</code> services. While the quorum meets on an
+     * agreement on the <em>lastCommitTime</em>, the quorum token reflects each
+     * such distinct agreement which is achieved even when agreement is on the
+     * same <i>lastCommitTime</i>.
      * <p>
-     * A set of new services will first achieve agreement on a
-     * <i>lastCommitTime</i> of ZERO (0), since that is the initial value as
-     * reported by {@link AbstractJournal#getLastCommitTime()} before any
-     * commits have been performed.
-     * <p>
-     * If the quorum is broken, the token is set to <code>-1L</code>, which is
-     * never a legal quorum token. For this reason, the initial token before any
-     * quorum has been met should be <code>-1L</code> which is before all valid
-     * commit times and also LT the initial value reported for the
-     * lastCommitTime, which is ZERO (0).
+     * If the quorum is broken, the token is set to {@link #NO_QUORUM}, which is
+     * never a legal quorum token. Likewise, the initial token before any quorum
+     * has been met should be {@link #NO_QUORUM}.
+     * 
+     * FIXME Does the quorum token change if services join an existing quorum by
+     * catching up through resynchronization? (Probably not. Synchronization
+     * with an existing quorum needs to be specified in detail, but probably
+     * does not change the quorum token. However, this also implies that changes
+     * in the write pipeline, etc. may occur without a corresponding change in
+     * the quorum token and must be detected and handled without error. This
+     * implies that we must test HA with k=5 in order to test a loss of a
+     * service in the quorum membership which do not cause the quorum to break.)
      */
     long token();
+
+    /**
+     * The constant used to indicate that there is no quorum (@value
+     * {@value #NO_QUORUM}).
+     */
+    long NO_QUORUM = -1;
     
     /** Return true iff size GTE (capacity + 1). */
     boolean isQuorumMet();

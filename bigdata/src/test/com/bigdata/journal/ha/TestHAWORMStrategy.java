@@ -111,7 +111,7 @@ public class TestHAWORMStrategy extends AbstractHAJournalTestCase {
         /*
          * Pickup the HA journal test suite.
          */
-        suite.addTest(TestHAJournal.suite());
+        suite.addTest(TestJournalHA.suite());
 
         return suite;
 

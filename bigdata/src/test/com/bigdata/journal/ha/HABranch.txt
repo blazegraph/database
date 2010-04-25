@@ -170,6 +170,12 @@ BufferDescriptor:
    allocation bit map delta). We need to do something interesting,
    such as continuous approximation, since the delta computation is
    not atomic across the failover set.
+   
+   ? When do we update the root blocks during the resynchronization protocol?
+     By the time the node is synchronized, both of its root blocks should be
+     current.  However, we do not want to write both root blocks at once. Each
+     root block should involve its own commit point so we always have one good
+     root block, even in the event of a failure during the root block update.
 
    - WORM
      

@@ -88,4 +88,10 @@ public class MockQuorumManager implements QuorumManager {
         
     }
 
+    public void terminate() {
+        
+        // NOP.
+        
+    }
+    
 }
