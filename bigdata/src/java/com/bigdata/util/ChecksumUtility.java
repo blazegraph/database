@@ -42,11 +42,25 @@ import com.bigdata.io.IByteArraySlice;
  */
 public class ChecksumUtility {
 	
-	private static ThreadLocal threadChk = new ThreadLocal();
+    /**
+     * ThreadLocal {@link ChecksumUtility} factory.
+     */
+	public static final ThreadLocal<ChecksumUtility> threadChk = new ThreadLocal<ChecksumUtility>() {
+	    
+	    protected ChecksumUtility initialValue() {
+	        
+	        return new ChecksumUtility();
+	        
+	    }
+	    
+	};
+	
 	/**
 	 * static access to a ThreadLocal Checksum utility
 	 * 
 	 * @return the ChecksumUtility
+	 * 
+	 * @deprecated Use {@link #threadChk} and {@link ThreadLocal#get()}.
 	 */
 	public static ChecksumUtility getCHK() {
 		ChecksumUtility chk = (ChecksumUtility) threadChk.get();

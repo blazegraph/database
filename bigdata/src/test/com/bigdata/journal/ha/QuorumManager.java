@@ -42,9 +42,14 @@ package com.bigdata.journal.ha;
 public interface QuorumManager {
 
     /**
-     * Return <em>k</em>, the replication factor. A quorum exists only when
+     * Return <em>k</em>, the replication factor. The replication factor must be
+     * a non-negative odd integer (1, 3, 5, 7, etc). A quorum exists only when
      * <code>(k + 1)/2</code> physical services for the same logical service
-     * have an agreement on state.
+     * have an agreement on state. A single service with <code>k := 1</code> is
+     * the degenerate case and has a minimum quorum size of ONE (1). High
+     * availability is only possible when <code>k</code> is GT ONE (1). Thus
+     * <code>k := 3</code> is the minimum value for which services can be highly
+     * available and has a minimum quorum size of <code>2</code>.
      */
     int replicationFactor();
     
