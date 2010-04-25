@@ -115,9 +115,12 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.rwstore.TestAll.suite() );
 
         /*
-         * FIXME enable this test suite once the journal mode is ready.
+         * High Availability test suite.
+         * 
+         * Note: There is a separate test suite for DataService high
+         * availability and for the zookeeper HA integration.
          */
-//        suite.addTest( TestBufferedDiskJournal.suite() );
+        suite.addTest(com.bigdata.journal.ha.TestAll.suite());
 
         return suite;
 
