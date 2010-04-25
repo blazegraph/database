@@ -56,7 +56,7 @@ public enum BufferMode {
      * 
      * @see TransientBufferStrategy
      */
-    Transient(false/* stable */, true/* fullyBuffered */),
+    Transient(false/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -76,7 +76,7 @@ public enum BufferMode {
      * 
      * @see DirectBufferStrategy
      */
-    Direct(true/* stable */, true/* fullyBuffered */),
+    Direct(true/* stable */, true/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -96,7 +96,7 @@ public enum BufferMode {
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
      * @see MappedBufferStrategy
      */
-    Mapped(true/* stable */, false/* fullyBuffered */),
+    Mapped(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -108,7 +108,7 @@ public enum BufferMode {
      * 
      * @see DiskOnlyStrategy
      */
-    Disk(true/* stable */, false/* fullyBuffered */),
+    Disk(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -126,7 +126,7 @@ public enum BufferMode {
      *             the file size is being changed. Once this is working properly
      *             it will replace the {@link DiskOnlyStrategy}.
      */
-    DiskWORM(true/* stable */, false/* fullyBuffered */),
+    DiskWORM(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM),
 
     /**
      * <p>
@@ -140,7 +140,7 @@ public enum BufferMode {
      * 
      * @see RWStrategy
      */
-    DiskRW(true/* stable */, false/* fullyBuffered */),
+    DiskRW(true/* stable */, false/* fullyBuffered */,StoreTypeEnum.RW),
 
     /**
      * <p>
@@ -153,16 +153,21 @@ public enum BufferMode {
      * 
      * @see DiskOnlyStrategy
      */
-    Temporary(false/* stable */, false/* fullyBuffered */);
+    Temporary(false/* stable */, false/* fullyBuffered */,StoreTypeEnum.WORM);
 
     private final boolean stable;
     private final boolean fullyBuffered;
-    
-    private BufferMode(final boolean stable, final boolean fullyBuffered) {
-        
+
+    private final StoreTypeEnum storeType;
+
+    private BufferMode(final boolean stable, final boolean fullyBuffered,
+            final StoreTypeEnum storeType) {
+
         this.stable = stable;
-        
+
         this.fullyBuffered = fullyBuffered;
+
+        this.storeType = storeType;
         
     }
     
@@ -187,5 +192,16 @@ public enum BufferMode {
         return fullyBuffered;
         
     }
-    
+
+    /**
+     * The kind of persistence store (RW or WORM).
+     * 
+     * @see StoreTypeEnum
+     */
+    public StoreTypeEnum getStoreType() {
+
+        return storeType;
+        
+    }
+
 }

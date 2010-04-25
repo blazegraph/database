@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.journal.ha.Quorum;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.ChecksumUtility;
@@ -254,6 +255,9 @@ public class FileMetadata {
      * @param createTime
      *            The create time to be assigned to the root block iff a new
      *            file is created.
+     * @param quorumToken
+     *            The current quorum token or {@link Quorum#NO_QUORUM} if the
+     *            caller is not met with any {@link Quorum}.
      * @param validateChecksum
      *            When <code>true</code>, the checksum stored in the root blocks
      *            of an existing file will be validated when the file is opened.
@@ -298,6 +302,7 @@ public class FileMetadata {
 //            final int readCacheMaxRecordSize, 
             final boolean writeCacheEnabled,
             final boolean validateChecksum, final long createTime,
+            final long quorumToken,
             final ChecksumUtility checker, final boolean alternateRootBlock)
             throws RuntimeException {
 
@@ -419,6 +424,9 @@ public class FileMetadata {
                  * 
                  * Note: this next line will throw IOException if there is a
                  * file lock contention.
+                 * 
+                 * Note: [raf] was initialized by [opener.reopenChannel()]
+                 * above!
                  */
                 this.extent = raf.length();
                 
@@ -688,8 +696,7 @@ public class FileMetadata {
                 final long commitRecordAddr = 0L;
                 final long commitRecordIndexAddr = 0L;
                 final UUID uuid = UUID.randomUUID(); // journal's UUID.
-                // FIXME This should be a property of BufferMode not a hard coded test.
-                final StoreTypeEnum stenum = bufferMode == BufferMode.DiskRW ? StoreTypeEnum.RW : StoreTypeEnum.WORM;
+                final StoreTypeEnum stenum = bufferMode.getStoreType();
                 if(createTime == 0L) {
                     throw new IllegalArgumentException("Create time may not be zero.");
                 }
@@ -697,12 +704,14 @@ public class FileMetadata {
                 this.closeTime = 0L;
                 final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                         nextOffset, firstCommitTime, lastCommitTime,
-                        commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid, 
+                        commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid,
+                        quorumToken,//
                         0L, 0L, stenum,
                         createTime, closeTime, checker);
                 final IRootBlockView rootBlock1 = new RootBlockView(false,
                         offsetBits, nextOffset, firstCommitTime,
                         lastCommitTime, commitCounter, commitRecordAddr, commitRecordIndexAddr, uuid,
+                        quorumToken,//
                         0L, 0L, stenum,
                         createTime, closeTime,
                         checker);

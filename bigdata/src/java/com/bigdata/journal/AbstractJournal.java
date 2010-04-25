@@ -966,6 +966,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         
         haGlue = newHAGlue();
         
+        // The current quorum token.
+        quorumToken = quorumManager.getQuorum().token();
+        
         /*
          * Create the appropriate IBufferStrategy object.
          */
@@ -1004,12 +1007,18 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             final long closedTime = 0L;
             final IRootBlockView rootBlock0 = new RootBlockView(true, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, commitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, uuid, createTime,
-                    closedTime, checker);
+                    commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,
+                    0L, // metaStartAddr
+                    0L, // metaStartBits
+                    StoreTypeEnum.WORM,//
+                    createTime, closedTime, checker);
             final IRootBlockView rootBlock1 = new RootBlockView(false, offsetBits,
                     nextOffset, firstCommitTime, lastCommitTime, commitCounter,
-                    commitRecordAddr, commitRecordIndexAddr, uuid, createTime,
-                    closedTime, checker);
+                    commitRecordAddr, commitRecordIndexAddr, uuid, quorumToken,
+                    0L, // metaStartAddr
+                    0L, // metaStartBits
+                    StoreTypeEnum.WORM,//
+                    createTime, closedTime, checker);
             _bufferStrategy.writeRootBlock(rootBlock0, ForceEnum.No);
             _bufferStrategy.writeRootBlock(rootBlock1, ForceEnum.No);
 
@@ -1033,7 +1042,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     //0/* readCacheMaxRecordSize */,
                     false, // writeCacheEnabled
                     //null/* writeCache */,
-                    validateChecksum, createTime, checker, alternateRootBlock);
+                    validateChecksum, createTime, quorumToken,
+                    checker, alternateRootBlock);
 
             _bufferStrategy = new DirectBufferStrategy(
                     0L/* soft limit for maximumExtent */, fileMetadata);
@@ -1058,7 +1068,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     //0/* readCacheMaxRecordSize */,
                     false, // writeCacheEnabled
                     //null/* writeCache */,
-                    validateChecksum, createTime, checker, alternateRootBlock);
+                    validateChecksum, createTime, quorumToken,
+                    checker, alternateRootBlock);
 
             /*
              * Note: the maximumExtent is a hard limit in this case only since
@@ -1087,7 +1098,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     //readOnly ? null : writeCache,
                     writeCacheEnabled,
                     validateChecksum,
-                    createTime, checker, alternateRootBlock);
+                    createTime, quorumToken,
+                    checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
                     0L/* soft limit for maximumExtent */,
@@ -1113,7 +1125,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     //readOnly ? null : writeCache,
                     writeCacheEnabled,
                     validateChecksum,
-                    createTime, checker, alternateRootBlock);
+                    createTime, quorumToken,
+                    checker, alternateRootBlock);
 
             _bufferStrategy = new WORMStrategy(
                     0L/* soft limit for maximumExtent */,
@@ -1140,7 +1153,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     //readOnly ? null : writeCache,
                     writeCacheEnabled,
                     validateChecksum,
-                    createTime, checker, alternateRootBlock);
+                    createTime, quorumToken,
+                    checker, alternateRootBlock);
 
             _bufferStrategy = new RWStrategy(fileMetadata,quorumManager);
 
@@ -1166,7 +1180,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
                     writeCacheEnabled, // writeCacheEnabled
                     //writeCache,
-                    false/* validateChecksum */, createTime,
+                    false/* validateChecksum */, createTime, quorumToken,
                     checker, alternateRootBlock);
 
             _bufferStrategy = new DiskOnlyStrategy(
@@ -1453,10 +1467,13 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         assertOpen();
 
         if (log.isInfoEnabled())
-            log.info("file="+getFile());
-        
+            log.info("file=" + getFile());
+
         _bufferStrategy.close();
 
+        // Stop watching for quorum related events.
+        getQuorumManager().terminate();
+        
         // report event.
         ResourceManager.closeJournal(getFile() == null ? null : getFile()
                 .toString());
@@ -1654,6 +1671,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
              * permit a non-zero commitCounter unless the commitRecordAddr and
              * perhaps some other stuff are non-zero as well.
              */
+            final long metaStartAddr = _bufferStrategy.getMetaStartAddr();
+            final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
             final IRootBlockView newRootBlock = new RootBlockView(//
                     !old.isRootBlock0(), old.getOffsetBits(), old
                             .getNextOffset(), old.getFirstCommitTime(), old
@@ -1662,6 +1681,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     old.getCommitRecordAddr(), //
                     old.getCommitRecordIndexAddr(), //
                     old.getUUID(), //
+                    quorumToken,   //
+                    metaStartAddr, //
+                    metaBitsAddr,  //
+                    old.getStoreType(), //
                     old.getCreateTime(), closeTime, //
                     checker);
 
@@ -2374,23 +2397,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             final long nextOffset = _bufferStrategy.getNextOffset();
 
             /*
-             * Await a quorum. This commit can only proceed for this quorum.
-             * 
-             * @todo The quorum token should be a field protected by the write
-             * lock on the journal. This code will then abort() if we have lost
-             * the quorum.
-             * 
-             * @todo We need to handle two cases in read() and write(). If there
-             * is no quorum token on the journal, then we need to await() a
-             * token. If there is a quorum, then we need to assertQuorum(token)
-             * and abort() if the token has broken.
+             * Verify that the last negotiated quorum is still in effect.
              */
-            Quorum q = null;
-            try {
-                q = getQuorumManager().awaitQuorum();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            final Quorum q = getQuorumManager().getQuorum();
+            getQuorumManager().assertQuorum(quorumToken);
 
             /*
              * Prepare the new root block.
@@ -2437,11 +2447,12 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 final long metaStartAddr = _bufferStrategy.getMetaStartAddr();
                 final long metaBitsAddr = _bufferStrategy.getMetaBitsAddr();
 
-                // Create the new root block. @todo add quorum token here?
+                // Create the new root block.
                 newRootBlock = new RootBlockView(!old
                         .isRootBlock0(), old.getOffsetBits(), nextOffset,
                         firstCommitTime, lastCommitTime, newCommitCounter,
                         commitRecordAddr, commitRecordIndexAddr, old.getUUID(),
+                        quorumToken,
                         metaStartAddr, metaBitsAddr, old.getStoreType(),
                         old.getCreateTime(), old.getCloseTime(), checker);
 
@@ -2541,13 +2552,35 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return _bufferStrategy.size();
         
     }
-    
-    public long write(ByteBuffer data, long oldAddr) {
+
+    // Note: RW store method.
+    public long write(final ByteBuffer data, final long oldAddr) {
+
+        assertOpen();
+
+        if(isReadOnly()) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
         return _bufferStrategy.write(data, oldAddr);
+
     }
     
-    public void delete(long addr) {
+    // Note: NOP for WORM.  Used by RW for eventual recycle protocol.
+    public void delete(final long addr) {
+        
+        assertOpen();
+
+        if(isReadOnly()) {
+            
+            throw new UnsupportedOperationException();
+            
+        }
+
         _bufferStrategy.delete(addr);
+        
     }
     
     public long write(final ByteBuffer data) {
@@ -3410,6 +3443,72 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
      */
 
     /**
+     * The current quorum token or {@value Quorum#NO_QUORUM} if the node is not
+     * part of a {@link Quorum}.
+     * <p>
+     * The state of the field changes when a new quorum is negotiated or when an
+     * existing quorum is broken. However, state changes in this field MUST be
+     * coordinated with the journal in order to cover transitions into the
+     * quorum (blocked read/write requests must be released) and transitions
+     * when the quorum breaks (the current write set must be discarded by the
+     * master). In addition, when there is no quorum, the resynchronization
+     * protocol may affect both the persistent state of the journal and any
+     * state which the journal keeps buffered in memory (record cache, address
+     * translation cache, etc).
+     * <p>
+     * Access to this field is protected by the {@link #_fieldReadWriteLock} but
+     * MUST also be coordinated as described above.
+     * 
+     * FIXME Many methods need to be modified to (a) await a quorum if there is
+     * none; and (b) handle a change in the quorum token. When a quorum breaks,
+     * these operations can block until a new quorum meets. As long as the
+     * master has not changed, the master's state remains valid and the other
+     * nodes can be brought into synchronization (they are synchronized if they
+     * are at the same message count for the write pipeline). If the master
+     * fails, then the new master will not have the same buffered write set and
+     * the outstanding operations (both unisolated and read/write tx) must about
+     * so we can resume from a known good commit point (this is true even if the
+     * secondaries remain active since (a) we do not have a strong guarantee
+     * that the new master is at the same message count on the write pipeline as
+     * the old master; and (b) transaction write sets are buffered within the
+     * JVM and/or disk on the master and are not available to the secondaries on
+     * failover.
+     * 
+     * @see #read(long)
+     * @see #write(ByteBuffer)
+     * @see #write(ByteBuffer, long)
+     * @see #delete(long)
+     * @see #closeForWrites(long)
+     * 
+     *      However, some methods probably should be allowed to proceed without
+     *      a quorum (or a node must be permitted to disconnect permanently from
+     *      a quorum). E.g.:
+     * 
+     * @see #close()
+     * @see #destroy()
+     * 
+     *      Another interesting question is whether we have to be in a quorum to
+     *      create a new journal. I would say, "yes" for a data service. The
+     *      atomic cutover to a new journal should only be taken by a quorum.
+     *      <p>
+     *      Probably you need to be in a quorum to create an HA journal (outside
+     *      of a data service) as well. That would appear to be necessary in
+     *      order to create the same initial root blocks on each node. In that
+     *      case we have a bootstrapping problem for new HA journals. Either
+     *      they must have a quorum before hand and go through a coordinated
+     *      "commit" protocol for the journal create or they should be created
+     *      first, then negotiate the quorum membership and who is the master
+     *      and then resynchronize before the journal comes on line.
+     */
+    private volatile long quorumToken;
+
+    /**
+     * The {@link QuorumManager} is initialized when the journal is initialized
+     * and remains in effect until the journal has been shutdown.
+     */
+    private final QuorumManager quorumManager;
+
+    /**
      * The {@link QuorumManager} for this service.
      */
     public QuorumManager getQuorumManager() {
@@ -3429,8 +3528,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         return new SingletonQuorumManager();
         
     }
-    private final QuorumManager quorumManager;
-
+    
     /**
      * The object which is used to coordinate various low-level operations among
      * the members of a {@link Quorum}.
@@ -3479,6 +3577,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
             // NOP - the quorum is static and always valid.
         }
 
+        public void terminate() {
+            // NOP - the quorum is static and does no asynchronous processing.
+        }
+        
     }
 
     /**

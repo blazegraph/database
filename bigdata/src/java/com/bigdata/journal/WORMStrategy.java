@@ -1894,7 +1894,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              */
             createBackingFile();
 
-            // extend (or truncate) the file.
+            /*
+             * Extend (or truncate) the file.
+             * 
+             * FIXME I could see how this might fail with a concurrent interrupt
+             * of a reader. This "extend" needs to be robust just writeAll() on
+             * FileChannelUtility.  It must use the opener and retry if there
+             * is a ClosedByInterruptException.
+             */
             getRandomAccessFile().setLength(newExtent);
 
             /*
