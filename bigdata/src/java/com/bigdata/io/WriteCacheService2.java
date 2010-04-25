@@ -749,6 +749,9 @@ abstract public class WriteCacheService2 implements IWriteCache {
      * delegate the write to a temporary {@link WriteCache} wrapping the
      * caller's buffer.
      * 
+     * @return <code>true</code> since the record is always accepted by the
+     *         {@link WriteCacheService} (unless an exception is thrown).
+     * 
      * @see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6371642
      */
     public boolean writeChk(final long offset, final ByteBuffer data, final int chk)
@@ -757,6 +760,7 @@ abstract public class WriteCacheService2 implements IWriteCache {
     	if (log.isInfoEnabled()) {
     		log.info("offset: " + offset + ", length: " + data.limit());
     	}
+    	
         if (offset < 0)
             throw new IllegalArgumentException();
 
@@ -764,6 +768,8 @@ abstract public class WriteCacheService2 implements IWriteCache {
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_NULL);
 
+        // FIXME if(!open) throw IllegalStateException?
+        
         final int nbytes = data.remaining();
 
         if (nbytes == 0)
@@ -985,9 +991,18 @@ abstract public class WriteCacheService2 implements IWriteCache {
     /**
      * This is a non-blocking query of all write cache buffers (current, clean
      * and dirty).
+     * <p>
+     * This implementation DOES NOT throw an {@link IllegalStateException} for
+     * an asynchronous close.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException,
-            IllegalStateException {
+    public ByteBuffer read(final long offset) throws InterruptedException {
+
+        if (!open.get()) {
+
+            // Not open.
+            return null;
+            
+        }
 
         final Long off = Long.valueOf(offset);
 
