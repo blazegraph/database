@@ -30,8 +30,6 @@ package com.bigdata.io;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -58,6 +56,9 @@ import org.apache.log4j.Logger;
 import com.bigdata.io.WriteCache.RecordMetadata;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
+import com.bigdata.journal.RWStrategy;
+import com.bigdata.journal.WORMStrategy;
+import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -66,61 +67,55 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * A {@link WriteCacheService} is provisioned with some number of
  * {@link WriteCache} buffers and a writer thread. Caller's populate
  * {@link WriteCache} instances. When they are full, they are transferred to a
- * queue which is drained by the {@link WriteCacheService}. Hooks are provided
- * to wait until the current write set has been written (e.g., at a commit point
- * when the cached writes must be written through to the backing channel).
+ * queue which is drained by the thread writing on the local disk. Hooks are
+ * provided to wait until the current write set has been written (e.g., at a
+ * commit point when the cached writes must be written through to the backing
+ * channel). This implementation supports high availability using a write
+ * replication pipeline.
+ * <p>
+ * A pool of {@link WriteCache} instances is used. Readers test all of the
+ * {@link WriteCache} using a shared {@link ConcurrentMap} and will return
+ * immediately the desired record or <code>null</code> if the record is not in
+ * any of the {@link WriteCache} instances. Write caches remain available to
+ * readers until they need to be recycled as the current write cache (the one
+ * servicing new writes).
+ * <p>
+ * The {@link WriteCacheService} maintains a dirty list of {@link WriteCache}
+ * instances. A single thread handle writes onto the disk and onto the write
+ * replication pipeline (for HA). When the caller calls flush() on the write
+ * cache service it flush() the current write cache is transferred to the dirty
+ * list and then wait until the write cache instances now on the dirty list have
+ * been serviced. In order to simplify the design and the provide boundary
+ * conditions for HA decision making, writers block during
+ * {@link #flush(boolean, long, TimeUnit)}.
+ * <p>
+ * Instances of this class are used by both the {@link RWStrategy} and the
+ * {@link WORMStrategy}. These classes differ in how they allocate space on the
+ * backing file and in the concurrency which they permit for writers.
+ * <dl>
+ * <dt>{@link WORMStrategy}</dt>
+ * <dd>The {@link WORMStrategy} serializes all calls to
+ * {@link #writeChk(long, ByteBuffer, int)} since it must guarantee the precise
+ * offset at which each record is written onto the backing file. As a
+ * consequence of its design, each {@link WriteCache} is a single contiguous
+ * chunk of data and is transferred directly to a known offset on the disk. This
+ * append only strategy makes for excellent transfer rates to the disk.</dd>
+ * <dt>{@link RWStrategy}</dt>
+ * <dd>The {@link RWStrategy} only needs to serialize the decision making about
+ * the offset at which the records are allocated. Since the records may be
+ * allocated at any location in the backing file, each {@link WriteCache}
+ * results in a scattered write on the disk.</dd>
+ * </dl>
+ * Both the {@link WORMStrategy} and the {@link RWStrategy} implementations need
+ * to also establish a read-write lock to prevent changes in the file extent
+ * from causing corrupt data for concurrent read or write operations on the
+ * file. See {@link #writeChk(long, ByteBuffer, int)} for more information on
+ * this issue (it is a workaround for a JVM bug).
  * 
  * @see WriteCache
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * FIXME This is an alternative implementation of the {@link WriteCacheService}
- * in which we are working towards clearer use of the lock and condition patterns,
- * away from loops and sleeping patterns, and trying to close any holes which might
- * exist in try/finally patterns.
- * 
- * @todo Build out write cache service for WORM (serialize writes on the cache
- *       but the caller does not wait for the IO and readers are non-blocking).
- *       A pool of write cache instances should be used. Readers should check
- *       the current write cache and also each non-recycled write cache with
- *       writes on it in the pool. Write caches remain available to readers
- *       until they need to be recycled as the current write cache (the one
- *       servicing new writes). The write cache services needs to maintain a
- *       dirty list of write cache instances. A single thread will handle writes
- *       onto the disk. When the caller calls flush() on the write cache service
- *       it flush() the current write cache (if dirty) to the dirty list and
- *       then wait until the specific write cache instances now on the dirty
- *       list have been serviced (new writes MAY continue asynchronously).
- * 
- * @todo Build out write cache service for RW. The salient differences here is
- *       gathered writes on the store. Note that writers do not have more
- *       concurrency since that bit is still synchronized inside of
- *       {@link WriteCache#write(long, ByteBuffer)} and the {@link RWStore}
- *       serializes its allocation requests. Also, the gathering writes can
- *       combine and order records from the dirty write cache list for better
- *       efficiency. However, if it does this during flush(), then it should not
- *       combine records from write caches which are inside of the write cache
- *       set on which the flush() is waiting in order to ensure that flush() is
- *       service in a timely manner.
- * 
- * @todo The WORM (and RW) stores need to also establish a read-write lock to
- *       prevent changes in the file extent from causing corrupt data for
- *       concurrent read or write operations on the file. See
- *       {@link #write(long, ByteBuffer)} for my notes on this.
- * 
- * @todo I wonder if we can take this a step at a time without branching? The
- *       main danger point is when we allow readers (and a single write thread)
- *       to run concurrently on the store. We just need to MUTEX those
- *       conditions with file extension, and a read-write lock is exactly the
- *       tool for that job. We also need to explore whether or not (and if so,
- *       how) to queue disk reads for servicing. I would like to take a metrics
- *       based approach to that once we have concurrent readers. I expect that
- *       performance could be very good on a server grade IO bus such as the
- *       cluster machines. The SAS should already handle the reordering of
- *       concurrent reads. However, it is clear that the SATA (non-SCSI) bus is
- *       not as good at this, so maybe handling in s/w makes sense for non-SCSI
- *       disks?
  * 
  * @todo test @ nbuffers=1 and nbuffers=2 which are the most stressful
  *       conditions.
@@ -128,12 +123,6 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo There needs to be a unit test which verifies overwrite of a record in
  *       the {@link WriteCache}. It is possible for this to occur with the
  *       {@link RWStore} (highly unlikely, but possible).
- * 
- * @todo When integrating with the {@link RWStore} or the
- *       {@link DiskOnlyStrategy} we may need to discard the cache on abort in
- *       order to prevent read-through of records which were written on to the
- *       cache and may even have been written through onto the disk, but which
- *       did not make it into the commit group. Is this a problem or not?
  */
 abstract public class WriteCacheService2 implements IWriteCache {
 
@@ -154,24 +143,17 @@ abstract public class WriteCacheService2 implements IWriteCache {
 
     /**
      * The {@link Future} of the task running on the {@link #localWriteService}.
+     * 
+     * @see WriteTask
+     * @see #reset()
      */
-    final private Future<Void> localWriteFuture;
+    private Future<Void> localWriteFuture;
 
     /**
      * A single threaded service which writes dirty {@link WriteCache}s onto the
      * downstream service in the quorum.
      */
     final private ExecutorService remoteWriteService;
-
-//    /**
-//     * The deferredList is used when WriteCaches should be added to the dirtyList
-//     * but there is an ongoing {@link #flush(boolean)}. In this case the WriteCache is added to the deferredList
-//     * and when the flush is complete, any members are transferred in order to the
-//     * dirtyList.
-//     */
-//    final protected BlockingQueue<WriteCache> deferredDirtyList;
-//
-//    final private Latch deferredLatch = new Latch();
 
     /**
      * A list of clean buffers. By clean, we mean not needing to be written.
@@ -181,14 +163,19 @@ abstract public class WriteCacheService2 implements IWriteCache {
      */
     final private BlockingQueue<WriteCache> cleanList;
 
-//    /**
-//     * This latch tracks the number of operations acting on the {@link #current}
-//     * buffer. It is incremented by {@link #acquire()} and decremented by
-//     * {@link #release()}. The {@link #current} buffer can not be changed until
-//     * this latch reaches zero.
-//     */
-//    final private Latch latch = new Latch();
+    /**
+     * Lock for the {@link #cleanList} allows us to notice when it becomes empty
+     * and not-empty.
+     */
+    final private ReentrantLock cleanListLock = new ReentrantLock();
 
+    /**
+     * Condition <code>!cleanList.isEmpty()</code>
+     * <p>
+     * Note: If you wake up from this condition you MUST also test {@link #halt}.
+     */
+    final private Condition cleanListNotEmpty = cleanListLock.newCondition();
+    
     /**
      * The read lock allows concurrent {@link #acquire()}s while the write lock
      * prevents {@link #acquire()} when we must either reset the
@@ -204,11 +191,8 @@ abstract public class WriteCacheService2 implements IWriteCache {
     final private BlockingQueue<WriteCache> dirtyList;
 
     /**
-     * Condition signaled by the {@link WriteTask} when the {@link #dirtyList}
-     * becomes empty (but not until the last buffer drained from that list has
-     * been written through to the backing channel).
-     * {@link #flush(boolean, long, TimeUnit)} acquires this lock and uses it to
-     * await the {@link #dirtyListEmpty} {@link Condition}.
+     * Lock for the {@link #dirtyList} allows us to notice when it becomes empty
+     * and not-empty.
      */
     final private ReentrantLock dirtyListLock = new ReentrantLock();
 
@@ -218,15 +202,17 @@ abstract public class WriteCacheService2 implements IWriteCache {
      * atomic semantics, otherwise new cache buffers could be added to the dirty
      * list. This lock is distinct from the {@link #lock} because we do not want
      * to yield that lock when awaiting the {@link #dirtyListEmpty} condition.
+     * <p>
+     * Note: If you wake up from this condition you MUST also test {@link #halt}.
      * 
      * @see #dirtyListLock.
      */
     final private Condition dirtyListEmpty = dirtyListLock.newCondition();
 
     /**
-     * Condition signaled whenever the dirty list becomes non-empty. This is
-     * only awaited by {@link WriteTask#call()} so only signalAll() is not
-     * necessary.
+     * Condition signaled whenever the dirty list becomes non-empty.
+     * <p>
+     * Note: If you wake up from this condition you MUST also test {@link #halt}.
      */
     final private Condition dirtyListNotEmpty = dirtyListLock.newCondition();
 
@@ -236,6 +222,29 @@ abstract public class WriteCacheService2 implements IWriteCache {
      */
     final private AtomicReference<WriteCache> current = new AtomicReference<WriteCache>();
 
+    /**
+     * Flag set if {@link WriteTask} encounters an error. The cause is set on
+     * {@link #firstCause} as well.
+     * 
+     * FIXME Error handling for this must cause the write cache service buffers
+     * to be {@link #reset()} and make sure the HA write pipeline is correctly
+     * configured.
+     * <p>
+     * A high-level abort() is necessary. It is NOT Ok to simply re-try writes
+     * of partly filled buffers since they may already have been partly written
+     * to the disk. A high-level abort() is necessary to ensure that we discard
+     * any bad writes. abort() will have to reconfigure the WriteCacheService,
+     * perhaps using a new instance. The abort() will need to propagate to all
+     * members of the {@link Quorum} so they are all reset to the last commit
+     * point and have reconfigured write cache services and write pipelines.
+     */
+    private volatile boolean halt = false;
+    
+    /**
+     * The first cause of an error within the asynchronous {@link WriteTask}.
+     */
+    private final AtomicReference<Throwable> firstCause = new AtomicReference<Throwable>();
+        
     /**
      * The capacity of the cache buffers. This is assumed to be the same for
      * each buffer.
@@ -257,6 +266,14 @@ abstract public class WriteCacheService2 implements IWriteCache {
      * buffer on which that record was written.
      */
     final private ConcurrentMap<Long/* offset */, WriteCache> recordMap;
+
+    /**
+     * An immutable array of the {@link WriteCache} buffer objects owned by the
+     * {@link WriteCacheService} (in contract to those owner by the caller but
+     * placed onto the {@link #dirtyList} by
+     * {@link #writeChk(long, ByteBuffer, int)}).
+     */
+    final private WriteCache[] buffers;
 
     /**
      * Allocates N buffers from the {@link DirectBufferPool}.
@@ -289,17 +306,23 @@ abstract public class WriteCacheService2 implements IWriteCache {
         
         dirtyList = new LinkedBlockingQueue<WriteCache>();
 
-//        deferredDirtyList = new LinkedBlockingQueue<WriteCache>();
-
         cleanList = new LinkedBlockingQueue<WriteCache>();
         
+        buffers = new WriteCache[nbuffers];
+
         for (int i = 0; i < nbuffers - 1; i++) {
 
-            cleanList.add(newWriteCache(null/* buf */, opener));
+            final WriteCache tmp = newWriteCache(null/* buf */, opener);
+
+            buffers[i] = tmp;
+
+            cleanList.add(tmp);
 
         }
 
-        current.set(newWriteCache(null/* buf */, opener));
+        current
+                .set(buffers[nbuffers - 1] = newWriteCache(null/* buf */,
+                        opener));
 
         // assume capacity is the same for each buffer instance.
         capacity = current.get().capacity();
@@ -327,10 +350,10 @@ abstract public class WriteCacheService2 implements IWriteCache {
 
     }
 
-	/**
-     * The task responsible for writing dirty buffers onto the backing channel.
-     * 
-     * There should be only one of these
+    /**
+     * The task responsible for writing dirty buffers onto the backing channel
+     * and onto the downstream {@link Quorum} member if the service is highly
+     * available.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
@@ -338,42 +361,36 @@ abstract public class WriteCacheService2 implements IWriteCache {
     private class WriteTask implements Callable<Void> {
 
         public Void call() throws Exception {
-
             while (true) {
+                assert !halt;
                 dirtyListLock.lockInterruptibly();
                 try {
                     /*
-                     * FIXME an error during cache.flush() will cause the
-                     * [cache] buffer to be dropped. it needs to be put back
-                     * onto the dirtyList in the correct position, which
-                     * suggests using a LinkedDeque.
-                     * 
-                     * If there is an error in this thread then it needs to be
-                     * propagated to the threads write()ing on the cache or
-                     * awaiting flush() and from there back to the caller and an
-                     * abort(). abort() will have to reconfigure the
-                     * WriteCacheService, perhaps using a new instance. HA
-                     * failover will have to do similar things. The way I
-                     * normally do this is a volatile [halt:boolean] and
-                     * [firstCause]. We do not need to bother the readers, but
-                     * the reprovisioning of the write cache service must hold
+                     * Note: If there is an error in this thread then it needs
+                     * to be propagated to the threads write()ing on the cache
+                     * or awaiting flush() and from there back to the caller and
+                     * an abort(). We do not need to bother the readers since
+                     * the read() methods all allow for concurrent close() and
+                     * will return null rather than bad data. The reprovisioning
+                     * of the write cache service (e.g., by reset()) must hold
                      * the writeLock so as to occur when there are no
                      * outstanding reads executing against the write cache
                      * service.
                      */
-                    while (dirtyList.isEmpty()) {
+                    while (dirtyList.isEmpty() && !halt) {
                         dirtyListNotEmpty.await();
                     }
+                    if (halt)
+                        throw new RuntimeException(firstCause.get());
+                    
+                    // Guaranteed available.
                     final WriteCache cache = dirtyList.take();
+
                     if (dirtyList.isEmpty()) {
                         /*
-                         * Will signal Condition when we release the
-                         * dirtyListLock. We only need signal(), rather than
-                         * signalAll(), because it is flush() who waits for this
-                         * signal and flush() already holds the WriteLock so
-                         * there can not be concurrent invocations of flush().
+                         * Signal Condition when we release the dirtyListLock.
                          */
-                        dirtyListEmpty.signal();
+                        dirtyListEmpty.signalAll();
                     }
 
                     Future<?> remoteWriteFuture = null;
@@ -392,7 +409,28 @@ abstract public class WriteCacheService2 implements IWriteCache {
                         remoteWriteFuture.get();
                     }
 
-                    cleanList.add(cache);
+                    /*
+                     * Add to the cleanList IFF this is our cache buffer (versus
+                     * a caller's buffer wrapped as a WriteCache by write()).
+                     */
+                    for (WriteCache t : buffers) {
+                        if (t == cache) {
+                            cleanListLock.lockInterruptibly();
+                            try {
+                                cleanList.add(cache);
+                                cleanListNotEmpty.signalAll();
+                            } finally {
+                                cleanListLock.unlock();
+                            }
+                            break;
+                        }
+                    }
+                    /*
+                     * FIXME signal caller waiting on their wrapper buffer to be
+                     * flushed in write(). We need to do this in a finally {}
+                     * clause or (perhaps) in reset() since they need to wake up
+                     * whether or not the buffer gets written out successfully.
+                     */
 
                 } catch (InterruptedException t) {
                     /*
@@ -403,10 +441,39 @@ abstract public class WriteCacheService2 implements IWriteCache {
                     return null;
                 } catch (Throwable t) {
                     /*
-                     * Anything else is an error, but we will not halt
-                     * processing.
+                     * Anything else is an error and halts processing. Error
+                     * processing MUST a high-level abort() and MUST do a
+                     * reset() if this WriteCacheService instance will be
+                     * reused.
+                     * 
+                     * Note: If a WriteCache was taken from the dirtyList above
+                     * then it will have been dropped. However, all of the
+                     * WriteCache instances owned by the WriteCacheService are
+                     * in [buffers] and reset() is written in terms of [buffers]
+                     * precisely so we do not loose buffers here.
                      */
+                    if(firstCause.compareAndSet(null/*expect*/, t/*update*/)) {
+                        halt = true;
+                    }
+                    /*
+                     * Signal anyone blocked on the dirtyList or cleanList
+                     * Conditions. They need to notice the change in [halt]
+                     * and wrap and rethrow [firstCause].
+                     */
+                    dirtyListEmpty.signalAll();
+                    dirtyListNotEmpty.signalAll();
+                    cleanListLock.lock();
+                    try {
+                        cleanListNotEmpty.signalAll();
+                    } finally {
+                        cleanListLock.unlock();
+                    }
                     log.error(t, t);
+                    /*
+                     * Halt processing. The WriteTask must be restarted by
+                     * reset.
+                     */
+                    return null;
                 } finally {
                     dirtyListLock.unlock();
                 }
@@ -439,106 +506,111 @@ abstract public class WriteCacheService2 implements IWriteCache {
      * {@inheritDoc}
      * <p>
      * This implementation calls {@link IWriteCache#reset()} on all
-     * {@link #dirtyList} objects and moves those buffers to the
-     * {@link #availList}.
+     * {@link #buffers} and moves them onto the {@link #cleanList}. Note that
+     * this approach deliberately does not cause any buffers belonging to the
+     * caller of {@link #writeChk(long, ByteBuffer, int)} to become part of the
+     * {@link #cleanList}.
      */
     public void reset() throws InterruptedException {
-
         final WriteLock writeLock = lock.writeLock();
-
         writeLock.lockInterruptibly();
-
         try {
-
-            final List<WriteCache> c = new LinkedList<WriteCache>();
-
-            dirtyList.drainTo(c);
-
-            for (WriteCache t1 : dirtyList) {
-
-                t1.resetWith(recordMap);
-
-                cleanList.put(t1);
-
+            // reset dirty cache buffers.
+            dirtyListLock.lockInterruptibly();
+            try {
+                while (!dirtyList.isEmpty()) {
+                    final WriteCache t = dirtyList.take();
+                    t.resetWith(recordMap);
+                }
+                dirtyListEmpty.signalAll();
+            } finally {
+                dirtyListLock.unlock();
             }
-            
+            // re-populate the clean list with our buffers.
+            cleanListLock.lockInterruptibly();
+            try {
+                for (WriteCache t : buffers) {
+                    cleanList.put(t);
+                }
+                cleanListNotEmpty.signalAll();
+            } finally {
+                cleanListLock.unlock();
+            }
+            // Restart the WriteTask.
+            if (localWriteFuture.isDone()) {
+                localWriteFuture = localWriteService.submit(new WriteTask());
+            }
         } finally {
-
             writeLock.unlock();
-
         }
-
     }
 
-//    /**
-//     * Set when closing. This field is volatile so its state is noticed by the
-//     * {@link WriteTask} without explicit synchronization.
-//     */
-//    private volatile boolean m_closing = false;
-    
     public void close() throws InterruptedException {
+        final WriteLock writeLock = lock.writeLock();
+        writeLock.lock(); // Note: not interruptible in close()
+        try {
+            if (!open.get()) {
+                // Already closed.
+                return;
+            }
 
-        if (open.compareAndSet(true/* expect */, false/* update */)) {
+            // Interrupt the write task.
+            localWriteFuture.cancel(true/* mayInterruptIfRunning */);
 
-            try {
-//            	m_closing = true;
-            	
-                // Interrupt the write task.
-                localWriteFuture.cancel(true/* mayInterruptIfRunning */);
+            // Immediate shutdown of the write service.
+            localWriteService.shutdownNow();
+
+            if (remoteWriteService != null) {
 
                 // Immediate shutdown of the write service.
-                localWriteService.shutdownNow();
-
-                if (remoteWriteService != null) {
-
-                    // Immediate shutdown of the write service.
-                    remoteWriteService.shutdownNow();
-
-                }
-
-            } finally {
-
-                /*
-                 * Ensure that the buffers are closed in a timely manner.
-                 */
-                final WriteLock writeLock = lock.writeLock();
-
-                writeLock.lock(); // Note: not interruptible in close()
-                
-                try {
-
-                    final List<WriteCache> c = new LinkedList<WriteCache>();
-
-                    dirtyList.drainTo(c);
-
-                    cleanList.drainTo(c);
-
-                    final WriteCache t = current.getAndSet(null);
-
-                    if (t != null) {
-
-                        c.add(t);
-
-                    }
-
-                    for (WriteCache t1 : c) {
-
-                        t1.close();
-
-                    }
-
-                } finally {
-
-                    writeLock.unlock();
-
-                }
-
-//                m_closing = false;
+                remoteWriteService.shutdownNow();
 
             }
 
-        }
+            /*
+             * Ensure that the WriteCache buffers are close()d in a timely
+             * manner.
+             */
 
+            // reset buffers on the dirtyList.
+            dirtyListLock.lockInterruptibly();
+            try {
+                while (!dirtyList.isEmpty()) {
+                    final WriteCache t = dirtyList.take();
+                    t.resetWith(recordMap);
+                    t.close();
+                }
+                dirtyListEmpty.signalAll();
+            } finally {
+                dirtyListLock.unlock();
+            }
+
+            // close() buffers on the cleanList.
+            cleanListLock.lockInterruptibly();
+            try {
+                while(!cleanList.isEmpty()) {
+                    final WriteCache t = cleanList.take();
+                    t.close();
+                }
+            } finally {
+                cleanListLock.unlock();
+            }
+
+            // close() the current buffer.
+            final WriteCache t = current.getAndSet(null);
+            if (t != null) {
+                if (!t.isEmpty()) {
+                    t.resetWith(recordMap);
+                }
+                t.close();
+            }
+
+            // Closed.
+            open.set(false);
+
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     /**
@@ -548,7 +620,9 @@ abstract public class WriteCacheService2 implements IWriteCache {
      * @throws Throwable
      */
     protected void finalized() throws Throwable {
+
         close();
+        
     }
 
     /**
@@ -604,8 +678,9 @@ abstract public class WriteCacheService2 implements IWriteCache {
 
             assertOpen();
 
-//            latch.inc();
-
+            if (halt)
+                throw new RuntimeException(firstCause.get());
+            
             /*
              * Note: acquire() does not block since it holds the ReadLock.
              * Methods which change [current] MUST hold the WriteLock across
@@ -615,8 +690,6 @@ abstract public class WriteCacheService2 implements IWriteCache {
             final WriteCache tmp = current.get();
 
             if (tmp == null) {
-
-//                latch.dec();
 
                 throw new RuntimeException();
 
@@ -693,12 +766,6 @@ abstract public class WriteCacheService2 implements IWriteCache {
         final WriteLock writeLock = lock.writeLock();
         writeLock.lockInterruptibly(); // @todo adjust remaining.
         try {
-            /*
-             * @todo also, monitor [halt] and report [firstCause]. To notice
-             * [halt] while waiting on the [dirtyListEmpty] Condition, we need
-             * to signal that condition when an error occurs in the WriteTask
-             * (or somehow cause it to wake up with an InterruptedException).
-             */
             final WriteCache tmp = current.get();
             dirtyListLock.lockInterruptibly(); // @todo w/ timeout and adjust for time remaining.
             try {
@@ -708,21 +775,40 @@ abstract public class WriteCacheService2 implements IWriteCache {
                  * code is much less complex here.
                  */
                 dirtyList.add(tmp);
-                dirtyListNotEmpty.signal();
-                while (!dirtyList.isEmpty()) {
+                dirtyListNotEmpty.signalAll();
+                while (!dirtyList.isEmpty() && !halt) {
                     // @todo adjust for remaining.
                     if (!dirtyListEmpty.await(timeout, units)) {
                         throw new TimeoutException();
                     }
                 }
+                if (halt)
+                    throw new RuntimeException(firstCause.get());
             } finally {
                 dirtyListLock.unlock();
             }
-            // Replace [current] with a clean cache buffer.
-            final WriteCache nxt = cleanList.take();
-            nxt.resetWith(recordMap);
-            current.set(nxt);
-            return true;
+            /*
+             * Replace [current] with a clean cache buffer.
+             */
+            cleanListLock.lockInterruptibly();
+            try {
+                // Note: use of Condition let's us notice [halt].
+                while (cleanList.isEmpty() && !halt) {
+                    // @todo adjust remaining.
+                    if(!cleanListNotEmpty.await(timeout, units)) {
+                        throw new TimeoutException();
+                    }
+                    if (halt)
+                        throw new RuntimeException(firstCause.get());
+                }
+                // Guaranteed available hence non-blocking. 
+                final WriteCache nxt = cleanList.take();
+                nxt.resetWith(recordMap);
+                current.set(nxt);
+                return true;
+            } finally {
+                cleanListLock.unlock();
+            }
         } finally {
             writeLock.unlock();
         }
@@ -802,12 +888,11 @@ abstract public class WriteCacheService2 implements IWriteCache {
              * onto it, so we do not have starvation even if the caller's record
              * would completely fill a cache buffer.
              * 
-             * FIXME Should this block if we are waiting for the dirty list to
-             * become empty (e.g., a flush)? This might be necessary to gain a
-             * strong guarantee of the state of the write pipeline. An
-             * alternative would be to drop the caller's buffer onto the
-             * dirtyList and await some buffer specific condition until that
-             * buffer has been written through.
+             * FIXME Drop the caller's buffer onto the dirtyList and await some
+             * buffer specific condition until that buffer has been written
+             * through. This ensures that we have strong boundary conditions for
+             * HA and that the write goes through the write replication pipeline
+             * when HA is enabled.
              */
             try {
 
@@ -963,31 +1048,57 @@ abstract public class WriteCacheService2 implements IWriteCache {
                     dirtyListLock.lockInterruptibly();
                     try {
                         dirtyList.add(cache);
-                        dirtyListNotEmpty.signal();
+                        dirtyListNotEmpty.signalAll();
                     } finally {
                         dirtyListLock.unlock();
                     }
 
-                    // Take the buffer from the cleanList (blocks).
-                    final WriteCache newBuffer = cleanList.take();
+                    /*
+                     * Take the buffer from the cleanList and set it has the
+                     * [current] buffer.
+                     * 
+                     * Note: We use the [cleanListNotEmpty] Condition so we can
+                     * notice a [halt].
+                     */
+                    cleanListLock.lockInterruptibly();
 
-                    // Clear the state on the new buffer and remove from cacheService map
-                    newBuffer.resetWith(recordMap);
-
-                    // Set it as the new buffer.
-                    current.set(cache = newBuffer);
-
-                    // Try to write on the new buffer.
-                    if (cache.writeChk(offset, data, chk)) {
-
-                        // This must be the only occurrence of this record.
-                        if (recordMap.put(offset, cache) != null) {
-                            throw new AssertionError(
-                                    "Record already in cache: offset=" + offset);
+                    try {
+                    
+                        while (cleanList.isEmpty() && !halt) {
+                            cleanListNotEmpty.await();
                         }
 
-                        return true;
+                        if (halt)
+                            throw new RuntimeException(firstCause.get());
+                        
+                        // Take a buffer from the cleanList (guaranteed avail).
+                        final WriteCache newBuffer = cleanList.take();
 
+                        // Clear the state on the new buffer and remove from
+                        // cacheService map
+                        newBuffer.resetWith(recordMap);
+
+                        // Set it as the new buffer.
+                        current.set(cache = newBuffer);
+
+                        // Try to write on the new buffer.
+                        if (cache.writeChk(offset, data, chk)) {
+
+                            // This must be the only occurrence of this record.
+                            if (recordMap.put(offset, cache) != null) {
+                                throw new AssertionError(
+                                        "Record already in cache: offset="
+                                                + offset);
+                            }
+
+                            return true;
+
+                        }
+
+                    } finally {
+                        
+                        cleanListLock.unlock();
+                        
                     }
 
                     /*
@@ -1002,7 +1113,9 @@ abstract public class WriteCacheService2 implements IWriteCache {
                 }
 
             } finally {
+
                 writeLock.unlock();
+                
             }
 
         }
