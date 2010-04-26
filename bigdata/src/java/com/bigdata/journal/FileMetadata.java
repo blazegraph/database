@@ -135,6 +135,18 @@ public class FileMetadata {
      * When <code>true</code> the write cache will be enabled.
      */
     final boolean writeCacheEnabled;
+
+    /**
+     * The #of write cache buffers to be used if the write cache is enabled.
+     */
+    final int writeCacheBufferCount;
+
+    /**
+     * <code>true</code> iff record level checksums are enabled. These are used
+     * beginning with {@link RootBlockView#VERSION2} and for the
+     * {@link RWStrategy} from {@link RootBlockView#VERSION1}.
+     */
+    final boolean useChecksums;
     
     /**
      * The next offset at which a record would be written on the store.  The
@@ -301,6 +313,7 @@ public class FileMetadata {
 //            final int readCacheCapacity,
 //            final int readCacheMaxRecordSize, 
             final boolean writeCacheEnabled,
+            final int writeCacheBufferCount,
             final boolean validateChecksum, final long createTime,
             final long quorumToken,
             final ChecksumUtility checker, final boolean alternateRootBlock)
@@ -347,6 +360,8 @@ public class FileMetadata {
 //        this.readCacheMaxRecordSize = readCacheMaxRecordSize;
         
         this.writeCacheEnabled = writeCacheEnabled;
+
+        this.writeCacheBufferCount = writeCacheBufferCount;
         
         this.fileMode = (readOnly ?"r" :forceWrites.asFileMode());
 
@@ -551,7 +566,7 @@ public class FileMetadata {
                                     + closeTime);
                     
                 }
-                
+
                 switch (bufferMode) {
                 case Direct: {
                     // Allocate the buffer buffer.
@@ -778,6 +793,8 @@ public class FileMetadata {
 
             }
 
+            this.useChecksums = useChecksums(rootBlock);
+            
         } catch (IOException ex) {
 
             throw new RuntimeException("file=" + file, ex);
@@ -883,6 +900,23 @@ public class FileMetadata {
 
         return raf.getChannel();
         
+    }
+
+    /**
+     * Record level checksums are enabled for the RW store since
+     * {@link RootBlockView#VERSION1} and for the WORM store since
+     * {@link RootBlockView#VERSION2}.
+     * 
+     * @param rootBlock
+     *            A root block.
+     *            
+     * @return Whether or not record level checksums are enabled.
+     */
+    static private boolean useChecksums(IRootBlockView rootBlock) {
+        
+        return rootBlock.getVersion() >= RootBlockView.VERSION2
+                || (rootBlock.getVersion() == 1 && rootBlock.getStoreType() == StoreTypeEnum.RW);
+
     }
 
 }

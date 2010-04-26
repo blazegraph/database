@@ -854,6 +854,10 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
         final boolean writeCacheEnabled = Boolean.parseBoolean(getProperty(
                 Options.WRITE_CACHE_ENABLED, Options.DEFAULT_WRITE_CACHE_ENABLED));
         
+        final int writeCacheBufferCount = Integer.parseInt(getProperty(
+                Options.WRITE_CACHE_BUFFER_COUNT,
+                Options.DEFAULT_WRITE_CACHE_BUFFER_COUNT));
+
         /*
          * "file"
          */
@@ -1041,6 +1045,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     offsetBits, //0/* readCacheCapacity */,
                     //0/* readCacheMaxRecordSize */,
                     false, // writeCacheEnabled
+                    writeCacheBufferCount,//
                     //null/* writeCache */,
                     validateChecksum, createTime, quorumToken,
                     checker, alternateRootBlock);
@@ -1067,6 +1072,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     offsetBits, //0/*readCacheCapacity*/,
                     //0/* readCacheMaxRecordSize */,
                     false, // writeCacheEnabled
+                    writeCacheBufferCount,//
                     //null/* writeCache */,
                     validateChecksum, createTime, quorumToken,
                     checker, alternateRootBlock);
@@ -1096,8 +1102,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
                     offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
                     //readOnly ? null : writeCache,
-                    writeCacheEnabled,
-                    validateChecksum,
+                    writeCacheEnabled,//
+                    writeCacheBufferCount,//
+                    validateChecksum,//
                     createTime, quorumToken,
                     checker, alternateRootBlock);
 
@@ -1123,7 +1130,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
                     offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
                     //readOnly ? null : writeCache,
-                    writeCacheEnabled,
+                    writeCacheEnabled,//
+                    writeCacheBufferCount,//
                     validateChecksum,
                     createTime, quorumToken,
                     checker, alternateRootBlock);
@@ -1151,7 +1159,8 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     isEmptyFile, deleteOnExit, readOnly, forceWrites,
                     offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
                     //readOnly ? null : writeCache,
-                    writeCacheEnabled,
+                    writeCacheEnabled,//
+                    writeCacheBufferCount,//
                     validateChecksum,
                     createTime, quorumToken,
                     checker, alternateRootBlock);
@@ -1179,6 +1188,7 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                     false/* readOnly */, ForceEnum.No/* forceWrites */,
                     offsetBits, //readCacheCapacity, readCacheMaxRecordSize,
                     writeCacheEnabled, // writeCacheEnabled
+                    writeCacheBufferCount,//
                     //writeCache,
                     false/* validateChecksum */, createTime, quorumToken,
                     checker, alternateRootBlock);
