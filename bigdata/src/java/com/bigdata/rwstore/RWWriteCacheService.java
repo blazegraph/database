@@ -35,7 +35,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.WriteCache;
-import com.bigdata.io.WriteCacheService2;
+import com.bigdata.io.WriteCacheService;
 import com.bigdata.io.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.journal.ha.QuorumManager;
 
@@ -44,7 +44,7 @@ import com.bigdata.journal.ha.QuorumManager;
  * @author mgc
  *
  */
-public class RWWriteCacheService extends WriteCacheService2 {
+public class RWWriteCacheService extends WriteCacheService {
 
     protected static final Logger log = Logger.getLogger(RWWriteCacheService.class);
     

@@ -284,6 +284,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 //                0, // readCacheCapacity
 //                0, // readCacheMaxRecordSize
                 true, // writeCacheEnabled
+                3, // writeCacheBufferCount
                 false, // validateChecksum (desperation option for restart).
                 createTime,//
                 Quorum.NO_QUORUM,// Temporary stores are not HA.

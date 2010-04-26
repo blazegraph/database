@@ -106,16 +106,10 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final private AtomicReference<ByteBuffer> buf;
 
-    /**
-     * This latch tracks the number of read-locks on the buffer. It is
-     * incremented by {@link #acquire()} and decremented by {@link #release()}.
-     * 
-     * @todo This latch pattern is really just a workaround for acquire/release
-     *       not leaving the ReadLock open in acquire and closing it in release.
-     *       it could be discarded and the code in acquire/release modified to
-     *       leave the read lock in place acquire and release the read lock in
-     *       release.
-     */
+	/**
+	 * This latch tracks the number of read-locks on the buffer. It is
+	 * incremented by {@link #acquire()} and decremented by {@link #release()}.
+	 */
 	final private Latch latch = new Latch();
 
 	/**
@@ -527,13 +521,16 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
-	}
+    }
 
-	public boolean write(long offset, ByteBuffer data) throws InterruptedException {
-		return writeChk(offset, data, 0);
-	}
+    public boolean write(long offset, ByteBuffer data)
+            throws InterruptedException {
+        
+        return writeChk(offset, data, 0);
+        
+    }
 
-	/**
+    /**
      * {@inheritDoc}
      * 
      * @throws IllegalStateException
