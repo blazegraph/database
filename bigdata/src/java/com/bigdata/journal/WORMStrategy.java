@@ -2009,9 +2009,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              * 
              * FIXME I could see how this might fail with a concurrent interrupt
              * of a reader. This "extend" needs to be robust just writeAll() on
-             * FileChannelUtility.  It must use the opener and retry if there
-             * is a ClosedByInterruptException.  [See the notes below in the
-             * catch clause.]
+             * FileChannelUtility. It must use the opener and retry if there is
+             * a ClosedByInterruptException. [See the notes below in the catch
+             * clause.]
+             * 
+             * FIXME The extent change needs to be coordinated with the write
+             * cache service in order to be replicated across the quorum.
              */
             getRandomAccessFile().setLength(newExtent);
 
@@ -2031,7 +2034,19 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              */
             if (!temporaryStore) {
 
-                force(true);
+                /*
+                 * Note: This goes direct to FileChannel#force() in order to
+                 * avoid problems with WriteCache#writeOnChannel(). Notice that
+                 * we are holding the [extensionLock]'s WriteLock so a call to
+                 * writeOnChannel in a different thread will deadlock - and the
+                 * call will come from a different thread since
+                 * WriteCacheService#flush() waits on a WriteTask thread to
+                 * actually do the disk IO.
+                 */
+//                opener.reopenChannel().force(true/*metadata*/);
+                extensionLock.readLock().lock();
+                extensionLock.writeLock().unlock();
+                force(true/*metadata*/);
 
             }
 
@@ -2063,7 +2078,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         } finally {
 
-            writeLock.unlock();
+//            writeLock.unlock();
+            extensionLock.readLock().unlock();
 
         }
 
