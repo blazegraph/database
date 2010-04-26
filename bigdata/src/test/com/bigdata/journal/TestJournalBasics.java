@@ -127,11 +127,6 @@ public class TestJournalBasics extends TestCase {
          * @todo we add known transaction processing benchmarks here.
          */
         suite.addTestSuite(StressTestConcurrentTx.class);
-
-        /*
-         * Test suite for low-level data replication.
-         */
-        suite.addTestSuite(TestReplicatedStore.class);
         
         return suite;
         
