@@ -1246,6 +1246,12 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
+		@Override
+		protected Runnable getDownstreamWriteRunnable(QuorumManager quorumManager) {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
 	}
 
     /**
@@ -1336,6 +1342,12 @@ abstract public class WriteCache implements IWriteCache {
 
 		}
 
+		@Override
+		protected Runnable getDownstreamWriteRunnable(QuorumManager quorumManager) {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
 	}
 
     /**
@@ -1395,34 +1407,97 @@ abstract public class WriteCache implements IWriteCache {
 	 * available.
 	 * 
 	 * @param ostr
+	 * @throws InterruptedException 
+	 * @throws IllegalStateException 
 	 */
-	public void sendTo(ObjectOutputStream out) {
-		sendRecordMap(out);
+	public void sendTo(ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException {
+		ObjectOutputStream outstr = out.getOutputStream();
+		sendRecordMap(outstr);
 		
+		ByteBuffer tmp = acquire();
+		try {
+			outstr.writeInt(tmp.position());
+			out.getChannel().write(tmp);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} finally {
+			release();
+		}
 	}
 
 	/**
 	 * This is the HA chaining method for the writeCache.  Setting this writeCache to the
 	 * state defined by the inputStream, and parsing data on to the output stream if not null
 	 * 
+	 * FIXME: The initial implementation populates the ByteBuffer from the input channel and
+	 * then writes to the output.  We would like to be able to write concurrently with the
+	 * input using non-blocking IO.  This isn't necessarily a huge win if the network IO is significantly
+	 * faster than the disk IO, since we need a full buffer in order to write to start the write task.
+	 * 
 	 * @param in
 	 * @param out
+	 * @throws InterruptedException 
+	 * @throws IllegalStateException 
 	 */
-	public void receiveAndForward(ObjectInputStream in, ObjectOutputStream out) {
-		receiveRecordMap(in);
-		if (out != null) {
-			sendRecordMap(out);
+	public void receiveAndForward(ObjectSocketChannelStream in, ObjectSocketChannelStream out) throws IllegalStateException, InterruptedException {
+		receiveRecordMap(in.getInputStream());
+		
+		ByteBuffer tmp = acquire();
+		try {
+			int sze = in.getInputStream().readInt();
+			tmp.position(0);
+			tmp.limit(sze);
+			in.getChannel().read(tmp);
+			
+			if (out != null) {
+				sendRecordMap(out.getOutputStream());
+				
+				out.getChannel().write(tmp);
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} finally {
+			release();
 		}
 		
 	}
 
+	/**
+	 * If scattered writes then send whole map... 
+	 * TODO: optimise for non-scattered! 
+	 */
 	private void sendRecordMap(ObjectOutputStream out) {
-		// TODO Auto-generated method stub
-		
+		Collection<RecordMetadata> data = recordMap.values();
+		try {
+			out.writeInt(data.size());
+			Iterator<RecordMetadata> values = data.iterator();
+			while (values.hasNext()) {
+				RecordMetadata md = values.next();
+				out.writeLong(md.fileOffset);
+				out.writeInt(md.bufferOffset);
+				out.writeInt(md.recordLength);
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	private void receiveRecordMap(ObjectInputStream in) {
-		// TODO Auto-generated method stub
+		try {
+			int mapsize = in.readInt();
+			while (mapsize-- > 0) {
+				long fileOffset = in.readLong();
+				int bufferOffset = in.readInt();
+				int recordLength = in.readInt();
+				
+				recordMap.put(fileOffset, new RecordMetadata(fileOffset, bufferOffset, recordLength));
+				if (recordMap.size() == 1) {
+					firstOffset.set(fileOffset);
+				}
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 		
 	}
 }
