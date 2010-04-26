@@ -296,7 +296,7 @@ abstract public class WriteCacheService2 implements IWriteCache {
     private class WriteTask implements Callable<Void> {
 
         public Void call() throws Exception {
-            while (m_closing) {
+            while (!m_closing) {
 
                 try {
                     // @todo This should be awaiting a Condition or doing a blocking take, not sleeping.
@@ -305,7 +305,7 @@ abstract public class WriteCacheService2 implements IWriteCache {
                     	continue;
                     }
                     
-                    lock.readLock().lockInterruptibly(); // allows shutdown1
+                    lock.readLock().lockInterruptibly(); // allows shutdown
 
                     try {
 
@@ -674,7 +674,20 @@ abstract public class WriteCacheService2 implements IWriteCache {
         writeLock.lockInterruptibly();
         isLocked = true;
         try {
-        	// @todo this should await a cleanListNotEmpty condition.
+            /*
+             * @todo this should await a cleanListNotEmpty condition.
+             * 
+             * FIXME This will deadlock @ nbuffers==1 since we are
+             * attempting to atomically replace [current] with another
+             * buffer before moving the current buffer to the dirtyList for
+             * the flush.  acquire() probably should be modified to block 
+             * if current==null so we can put current onto dirtyList without
+             * having to await something on the cleanList.  This all needs
+             * some review since the point of the read-write lock was to 
+             * allow acquire to run concurrently without the current buffer
+             * being changed.  Perhaps adding another lock for flush() [it
+             * is using synchronized(this) right now]?
+             */
             final WriteCache tmp = current.get();
             if (!tmp.isEmpty()) {
             	while (cleanList.peek() == null) {
