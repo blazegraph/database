@@ -39,6 +39,8 @@ import com.bigdata.io.IByteArraySlice;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo This could stand some review in its API and its usage.
  */
 public class ChecksumUtility {
 	
@@ -79,6 +81,22 @@ public class ChecksumUtility {
     private final Adler32 chk = new Adler32();
 
     /**
+     * Compute the {@link Adler32} checksum of the buffer. The position, mark,
+     * and limit are unchanged by this operation. The operation is optimized
+     * when the buffer is backed by an array.
+     * 
+     * @param buf
+     *            The buffer.
+     *            
+     * @return The checksum.
+     */
+    public int checksum(final ByteBuffer buf) {
+
+        return checksum(buf, buf.position(), buf.limit());
+
+    }
+    
+    /**
      * Compute the {@link Adler32} checksum of the buffer.  The position,
      * mark, and limit are unchanged by this operation.  The operation is
      * optimized when the buffer is backed by an array.
@@ -91,6 +109,8 @@ public class ChecksumUtility {
      *            The limit.
      * 
      * @return The checksum.
+     * 
+     * @todo why pass in the pos/lim when [buf] could incorporate them?
      */
     public int checksum(final ByteBuffer buf, final int pos, final int limit) {
         
@@ -152,6 +172,10 @@ public class ChecksumUtility {
         
         return (int) chk.getValue();
         
+    }
+
+    public int checksum(final byte[] buf) {
+        return checksum(buf, 0, buf.length);
     }
 
     public int checksum(final byte[] buf, int sze) {

@@ -92,7 +92,9 @@ public class IndexSegmentCheckpoint {
      * As the unused bytes are allocated in new versions the value in this field
      * MUST be adjusted down from its original value of 256.
      */
-    static final int SIZEOF_UNUSED = 256;
+    static final int SIZEOF_UNUSED = 256 - (
+            Bytes.SIZEOF_BYTE // useChecksums [VERSION1]
+            );
 
     /**
      * The #of bytes required by the current {@link IndexSegmentCheckpoint}
@@ -109,7 +111,8 @@ public class IndexSegmentCheckpoint {
             Bytes.SIZEOF_LONG * 6 + // {offset,extent} tuples for the {leaves, nodes, blobs} regions.
             SIZEOF_ADDR * 5 + // address of the {root node/leaf, indexMetadata, bloomFilter, {first,last}Leaf}.
             Bytes.SIZEOF_LONG + // file size in bytes.
-            1 + // compactingMerge flag (0 | 1).
+            Bytes.SIZEOF_BYTE + // compactingMerge flag (0 | 1).
+            Bytes.SIZEOF_BYTE + // useChecksums flag (0 | 1) [VERSION1]
             SIZEOF_UNUSED + // available bytes for future versions.
             SIZEOF_CHECKSUM+ // the checksum for the proceeding bytes in the checkpoint record.
             Bytes.SIZEOF_LONG // timestamp1
@@ -126,6 +129,23 @@ public class IndexSegmentCheckpoint {
      */
     static transient final public int VERSION0 = 0x0;
 
+    /**
+     * Version 1 of the serialization format introduces an option for record
+     * level checksums. New fields in this version include:
+     * <dl>
+     * <dt>{@link #useChecksums}</dt>
+     * <dd><code>true</code> iff record level checksums are enabled. The default
+     * for earlier versions is <code>false</code>, which provides backward
+     * compatibility for existing {@link IndexSegment} files.</dd>
+     * </dl>
+     */
+    static transient final public int VERSION1 = 0x1;
+
+    /**
+     * The current serialization version.
+     */
+    static transient final public int currentVersion = VERSION1;
+    
     /**
      * UUID for this {@link IndexSegment} (it is a unique identifier for the
      * index segment resource and is reported as the {@link UUID} of the
@@ -272,6 +292,14 @@ public class IndexSegmentCheckpoint {
      * from its components on various journals and {@link IndexSegmentStore}s.
      */
     final public boolean compactingMerge;
+
+    /**
+     * <code>true</code> iff record level checksums are in use for the
+     * {@link IndexSegment}.
+     * 
+     * @see #VERSION1
+     */
+    final public boolean useChecksums;
     
     /**
      * The commit time associated with the view from which the
@@ -358,7 +386,7 @@ public class IndexSegmentCheckpoint {
 
         final int version = buf.getInt();
 
-        if (version != VERSION0) {
+        if (version < 0 || version > currentVersion) {
 
             throw new RootBlockException("unknown version=" + version);
 
@@ -409,6 +437,16 @@ public class IndexSegmentCheckpoint {
         
         compactingMerge = buf.get() != 0;
         
+        if (version >= VERSION1) {
+            useChecksums = buf.get() != 0;
+        } else {
+            // skip unused byte for prior versions.
+            buf.get();
+            // record checksums were not used for prior versions.
+            useChecksums = false;
+        }
+
+        // advance to beyond the end of the unused section.
         buf.position(buf.position() + SIZEOF_UNUSED);
         
         // Note: this sets the instance field to the checksum read from the record!
@@ -496,6 +534,7 @@ public class IndexSegmentCheckpoint {
             // misc.
             final long length,//
             final boolean compactingMerge,//
+            final boolean useChecksums,
             final UUID segmentUUID,//
             final long commitTime//
     ) {
@@ -546,6 +585,8 @@ public class IndexSegmentCheckpoint {
         this.length = length;
         
         this.compactingMerge = compactingMerge;
+        
+        this.useChecksums = useChecksums;
         
         this.commitTime = commitTime;
         
@@ -799,7 +840,7 @@ public class IndexSegmentCheckpoint {
         
         buf.putInt(MAGIC);
 
-        buf.putInt(VERSION0);
+        buf.putInt(currentVersion);
 
         buf.putLong(commitTime);
         
@@ -847,9 +888,11 @@ public class IndexSegmentCheckpoint {
         buf.putLong(length);
 
         buf.put((byte) (compactingMerge ? 1 : 0));
-        
+
+        buf.put((byte) (useChecksums ? 1 : 0));
+
         // skip over this many bytes.
-        buf.position(buf.position()+SIZEOF_UNUSED);
+        buf.position(buf.position() + SIZEOF_UNUSED);
         
         // Note: this sets the instance field! 
         checksum = new ChecksumUtility().checksum(buf, 0, SIZE
@@ -917,7 +960,8 @@ public class IndexSegmentCheckpoint {
         sb.append(", addrBloom=" + am.toString(addrBloom));
         sb.append(", length=" + length);
         sb.append(", compactingMerge=" + compactingMerge);
-        sb.append(", checksum="+checksum);
+        sb.append(", useChecksums=" + useChecksums);
+        sb.append(", checksum=" + checksum);
         sb.append(", commitTime=" + new Date(commitTime));
 
         return sb.toString();

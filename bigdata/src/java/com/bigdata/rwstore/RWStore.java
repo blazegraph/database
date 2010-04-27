@@ -851,7 +851,7 @@ public class RWStore implements IStore {
 
 		try {
 			
-			m_writeCache.writeChk(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
+			m_writeCache.write(physicalAddress(newAddr), ByteBuffer.wrap(buf, 0, size), chk);
 		} catch (IllegalStateException e) {
 			reopen(m_fmv);
 			

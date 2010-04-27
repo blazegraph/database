@@ -71,6 +71,7 @@ import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Builds an {@link IndexSegment} given a source btree and a target branching
@@ -374,6 +375,32 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
      * The bloom filter iff we build one (errorRate != 0.0).
      */
     final IBloomFilter bloomFilter;
+
+    /**
+     * When <code>true</code> record level checksums will be used in the
+     * generated file.
+     * 
+     * FIXME This can not be enabled until we factor out the direct use of the
+     * {@link WriteCache} since special handling is otherwise required to ensure
+     * that the checksum makes it into the output record when we write directly
+     * on the disk.
+     * 
+     * FIXME When enabling this, make sure that the bloom filter,
+     * {@link IndexMetadata}, and the blobs are all checksummed and make sure
+     * that the {@link IndexSegmentStore} verifies the checksums when it reads
+     * through to the disk and only returns the raw record w/o the trailing
+     * checksum.
+     * 
+     * FIXME The right time to reconcile these things may be when this branch
+     * (HAJournal) is merged with the dynamic shard refactor branch.
+     */
+    final private boolean useChecksums = false;
+
+    /**
+     * Used to compute record level checksums when {@link #useChecksums} is
+     * <code>true</code>.
+     */
+    final private ChecksumUtility checker = new ChecksumUtility();
     
     /**
      * The file on which the {@link IndexSegment} is written. The file is closed
@@ -1183,7 +1210,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             throw new IllegalArgumentException();
 
         final long begin_setup = System.currentTimeMillis();
-
+     
+        // @todo New files SHOUOLD use record level checksums.
+//        this.useChecksums = false;
+        
         // the UUID assigned to this index segment file.
         this.segmentUUID = UUID.randomUUID();
 
@@ -1456,7 +1486,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
             leafWriteCache = plan.nleaves == 0 ? null
                     : new WriteCache.FileChannelWriteCache(
                             IndexSegmentCheckpoint.SIZE, null/* buf */,
-                            new NOPReopener(out));
+                            useChecksums, new NOPReopener(out));
 
             /*
              * Open the node buffer. We only do this if there will be at least
@@ -2455,8 +2485,10 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
 
         try {
 
+            final int chk = useChecksums ? checker.checksum(data) : 0;
+            
             // write leaf on the cache.
-            if(!leafWriteCache.write(offset, data)) {
+            if(!leafWriteCache.write(offset, data, chk)) {
                 
                 // leaf does not fit in the cache, so evict cache to the file.
                 leafWriteCache.flush(false/*force*/);
@@ -2465,7 +2497,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 leafWriteCache.reset();
                 
                 // write leaf on the cache.
-                if(!leafWriteCache.write(offset, data)) {
+                if(!leafWriteCache.write(offset, data, chk)) {
 
                     /*
                      * The leaf is larger than the write cache, so we will write
@@ -2880,7 +2912,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                 
                 // Setup a write cache.
                 final WriteCache.FileChannelWriteCache writeCache = new WriteCache.FileChannelWriteCache(
-                        offsetNodes, null/* buf */, new NOPReopener(out));
+                        offsetNodes, null/* buf */, useChecksums, new NOPReopener(out));
 
                 try {
 
@@ -2902,9 +2934,11 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                         nbytes += slice.len();
                         
                         final ByteBuffer data = slice.asByteBuffer();
+                        
+                        final int chk = useChecksums?checker.checksum(data):0;
 
                         // write onto cache.
-                        if (!writeCache.write(offset, data)) {
+                        if (!writeCache.write(offset, data,chk)) {
 
                             // cache is full, evict to file.
                             writeCache.flush(false/* force */);
@@ -2913,7 +2947,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                             writeCache.reset();
                             
                             // and write on the cache again.
-                            if (!writeCache.write(offset, data)) {
+                            if (!writeCache.write(offset, data,chk)) {
 
                                 // directly write onto the output file.
                                 FileChannelUtility.writeAll(writeCache.opener,
@@ -3084,7 +3118,7 @@ public class IndexSegmentBuilder implements Callable<IndexSegmentCheckpoint> {
                     offsetLeaves, extentLeaves, offsetNodes, extentNodes,
                     offsetBlobs, extentBlobs, addrRoot, addrMetadata,
                     addrBloom, addrFirstLeaf, addrLastLeaf, out.length(),
-                    compactingMerge, segmentUUID, commitTime);
+                    compactingMerge, useChecksums, segmentUUID, commitTime);
 
             md.write(out);
             

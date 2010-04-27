@@ -59,6 +59,7 @@ import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -112,6 +113,23 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * file. See {@link #writeChk(long, ByteBuffer, int)} for more information on
  * this issue (it is a workaround for a JVM bug).
  * 
+ * <h2>Checksums</h2>
+ * 
+ * The WORM and RW buffer strategy implementations, the WriteCacheService, and
+ * the WriteCache all know whether or not checksums are in use. When they are,
+ * the buffer strategy computes the checksum and passes it down (otherwise it
+ * passes down a 0, which will be ignored since checksums are not enabled). The
+ * WriteCache adjusts its capacity by -4 when checksums are enabled and adds the
+ * checksum when transferring the caller's data into the WriteCache. On read,
+ * the WriteCache will verify the checksum if it exists and returns a new
+ * allocation backed by a byte[] showing only the caller's record.
+ * <p>
+ * {@link IAddressManager#getByteCount(long)} must be the actual on the disk
+ * record length, not the size of the record when it reaches the application
+ * layer. This on the disk length is the adjusted size after optional
+ * compression and with the optional checksum. Applications which assume that
+ * lengthOf(addr) == byte[].length will break, but that's life.
+ * 
  * @see WriteCache
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -123,6 +141,14 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo There needs to be a unit test which verifies overwrite of a record in
  *       the {@link WriteCache}. It is possible for this to occur with the
  *       {@link RWStore} (highly unlikely, but possible).
+ * 
+ * @todo When compression is enabled, it is applied above the level of the
+ *       {@link WriteCache} and {@link WriteCacheService} (which after all
+ *       require the caller to pass in the checksum of the compressed record).
+ *       It is an open question as to whether the caller or the store handles
+ *       record compression. Note that the B+Tree leaf and node records may
+ *       require an uncompressed header to allow fixup of the priorAddr and
+ *       nextAddr fields.
  */
 abstract public class WriteCacheService implements IWriteCache {
 
@@ -135,6 +161,11 @@ abstract public class WriteCacheService implements IWriteCache {
      */
     final private AtomicBoolean open = new AtomicBoolean(true);
 
+    /**
+     * <code>true</code> iff record level checksums are enabled.
+     */
+    final private boolean useChecksum;
+    
     /**
      * A single threaded service which writes dirty {@link WriteCache}s onto the
      * backing store.
@@ -284,6 +315,8 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @param nbuffers
      *            The #of buffers to allocate.
+     * @param useChecksum
+     *            <code>true</code> iff record level checksums are enabled.
      * @param opener
      *            The object which knows how to (re-)open the channel to which
      *            cached writes are flushed.
@@ -291,6 +324,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * @throws InterruptedException
      */
     public WriteCacheService(final int nbuffers,
+            final boolean useChecksum,
             final IReopenChannel<? extends Channel> opener,
             final QuorumManager quorumManager)
             throws InterruptedException {
@@ -304,6 +338,8 @@ abstract public class WriteCacheService implements IWriteCache {
         if (quorumManager == null)
             throw new IllegalArgumentException();
 
+        this.useChecksum = useChecksum;
+        
         this.opener = opener;
 
         this.quorumManager = quorumManager;
@@ -314,9 +350,11 @@ abstract public class WriteCacheService implements IWriteCache {
         
         buffers = new WriteCache[nbuffers];
 
+        // N-1 WriteCache instances.
         for (int i = 0; i < nbuffers - 1; i++) {
 
-            final WriteCache tmp = newWriteCache(null/* buf */, opener);
+            final WriteCache tmp = newWriteCache(null/* buf */, useChecksum,
+                    opener);
 
             buffers[i] = tmp;
 
@@ -324,14 +362,14 @@ abstract public class WriteCacheService implements IWriteCache {
 
         }
 
-        current
-                .set(buffers[nbuffers - 1] = newWriteCache(null/* buf */,
-                        opener));
+        // One more WriteCache for [current].
+        current.set(buffers[nbuffers - 1] = newWriteCache(null/* buf */,
+                useChecksum, opener));
 
         // assume capacity is the same for each buffer instance.
         capacity = current.get().capacity();
 
-        // set initial capacity based on an assumption of 1024k buffers.
+        // set initial capacity based on an assumption of 1k buffers.
         recordMap = new ConcurrentHashMap<Long, WriteCache>(nbuffers
                 * (capacity / 1024));
 
@@ -493,6 +531,8 @@ abstract public class WriteCacheService implements IWriteCache {
      * 
      * @param buf
      *            The backing buffer (optional).
+     * @param useChecksum
+     *            <code>true</code> iff record level checksums are enabled.
      * @param opener
      *            The object which knows how to re-open the backing channel
      *            (required).
@@ -503,7 +543,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * @throws InterruptedException
      */
     abstract protected WriteCache newWriteCache(ByteBuffer buf,
-            IReopenChannel<? extends Channel> opener)
+            boolean useChecksum, IReopenChannel<? extends Channel> opener)
             throws InterruptedException;
 
     /**
@@ -851,12 +891,12 @@ abstract public class WriteCacheService implements IWriteCache {
         }
     }
 
-    public boolean write(long offset, ByteBuffer data)
-            throws IllegalStateException, InterruptedException {
-
-        return writeChk(offset, data, 0);
-
-    }
+//    public boolean write(long offset, ByteBuffer data)
+//            throws IllegalStateException, InterruptedException {
+//
+//        return writeChk(offset, data, 0);
+//
+//    }
 
     /**
      * Write the record onto the cache. If the record is too large for the cache
@@ -893,14 +933,9 @@ abstract public class WriteCacheService implements IWriteCache {
      *       that buffer first. This might provide better throughput for the RW
      *       store but would require an override of this method specific to that
      *       implementation.
-     * 
-     * @todo Either replace {@link #write(long, ByteBuffer)} on the
-     *       {@link IWriteCache} API modify {@link #write(long, ByteBuffer)} to
-     *       compute the checksum internally when the persistence store is using
-     *       record-level checksums (a bit more overhead inside of the lock).
      */
-    public boolean writeChk(final long offset, final ByteBuffer data,
-            final int chk) throws InterruptedException, IllegalStateException {
+    public boolean write(final long offset, final ByteBuffer data, final int chk)
+            throws InterruptedException, IllegalStateException {
 
     	if (log.isInfoEnabled()) {
     		log.info("offset: " + offset + ", length: " + data.limit());
@@ -939,6 +974,14 @@ abstract public class WriteCacheService implements IWriteCache {
              * through. This ensures that we have strong boundary conditions for
              * HA and that the write goes through the write replication pipeline
              * when HA is enabled.
+             * 
+             * FIXME We may need to use the DirectBufferPool here in order to
+             * avoid effective leaks of direct ByteBuffers, but the
+             * DirectBufferPool tends to be what we use for the WriteCache
+             * buffers, so we are really stuck on this code path unless the
+             * capacity of the buffers in the DirectBufferPool is increased,
+             * thus moving the write to another code path. Maybe add a counter
+             * for this code path?
              */
             try {
 
@@ -952,7 +995,7 @@ abstract public class WriteCacheService implements IWriteCache {
                  * 
                  * Note: The ByteBuffer MIGHT NOT be direct!
                  */
-                final WriteCache tmp = newWriteCache(data, opener);
+                final WriteCache tmp = newWriteCache(data, useChecksum, opener);
                 
                 // FIXME write pipeline for this buffer as well.
 
@@ -980,7 +1023,7 @@ abstract public class WriteCacheService implements IWriteCache {
             try {
 
                 // write on the cache.
-                if (cache.writeChk(offset, data, chk)) {
+                if (cache.write(offset, data, chk)) {
 
                     /*
                      * Note: We MUST use put() here rather than putIfAbsent()
@@ -1045,7 +1088,7 @@ abstract public class WriteCacheService implements IWriteCache {
                 try {
 
                     // While holding the write lock, see if the record fits.
-                    if (cache.writeChk(offset, data, chk)) {
+                    if (cache.write(offset, data, chk)) {
 
                         /*
                          * It fits: someone already changed to a new cache,
@@ -1128,7 +1171,7 @@ abstract public class WriteCacheService implements IWriteCache {
                         current.set(cache = newBuffer);
 
                         // Try to write on the new buffer.
-                        if (cache.writeChk(offset, data, chk)) {
+                        if (cache.write(offset, data, chk)) {
 
                             // This must be the only occurrence of this record.
                             if (recordMap.put(offset, cache) != null) {
