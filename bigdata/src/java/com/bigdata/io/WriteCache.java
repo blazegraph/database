@@ -59,7 +59,6 @@ import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
-import com.bigdata.util.concurrent.Latch;
 
 /**
  * This class provides a write cache with read-through for NIO writes on a
@@ -106,11 +105,15 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final private AtomicReference<ByteBuffer> buf;
 
-	/**
-	 * This latch tracks the number of read-locks on the buffer. It is
-	 * incremented by {@link #acquire()} and decremented by {@link #release()}.
-	 */
-	final private Latch latch = new Latch();
+//    /**
+//     * This latch tracks the number of read-locks on the buffer. It is
+//     * incremented by {@link #acquire()} and decremented by {@link #release()}.
+//     * 
+//     * @todo The {@link #latch} is not really necessary. It appears to simply
+//     *       replace practice of leaving the {@link ReadLock} locked in
+//     *       {@link #acquire()} and unlocking it in {@link #release()}.
+//     */
+//	final private Latch latch = new Latch();
 
 	/**
 	 * The read lock allows concurrent {@link #acquire()}s while the write lock
@@ -124,56 +127,69 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-	/**
-	 * Return the backing {@link ByteBuffer}. The caller may read or write on
-	 * the buffer. Once they are done, the caller MUST call {@link #release()}.
-	 * This uses the read lock to allow concurrent read/write operations on the
-	 * backing buffer. Note that at most one write operation may execute
-	 * concurrently in order to avoid side effects on the buffers position when
-	 * copying data onto the buffer.
-	 * 
-	 * @return The {@link ByteBuffer}.
-	 * 
-	 * @throws InterruptedException
-	 * @throws IllegalStateException
-	 *             if the {@link WriteCache} is closed.
-	 */
-	private ByteBuffer acquire() throws InterruptedException, IllegalStateException {
+    /**
+     * Return the backing {@link ByteBuffer}. The caller may read or write on
+     * the buffer. Once they are done, the caller MUST call {@link #release()}.
+     * This uses the read lock to allow concurrent read/write operations on the
+     * backing buffer. Note that at most one write operation may execute
+     * concurrently in order to avoid side effects on the buffers position when
+     * copying data onto the buffer.
+     * 
+     * @return The {@link ByteBuffer}.
+     * 
+     * @throws InterruptedException
+     * @throws IllegalStateException
+     *             if the {@link WriteCache} is closed.
+     */
+    private ByteBuffer acquire() throws InterruptedException,
+            IllegalStateException {
 
-		final Lock readLock = lock.readLock();
+        final Lock readLock = lock.readLock();
 
-		readLock.lockInterruptibly();
+        readLock.lockInterruptibly();
 
-		try {
+        try {
 
-			latch.inc();
+            // latch.inc();
 
-			final ByteBuffer tmp = buf.get();
+            final ByteBuffer tmp = buf.get();
 
-			if (tmp == null) {
+            if (tmp == null) {
 
-				latch.dec();
+                // latch.dec();
 
-				throw new IllegalStateException();
+                throw new IllegalStateException();
 
-			}
+            }
 
-			return tmp;
+            // Note: The ReadLock is still held!
+            return tmp;
 
-		} finally {
+        } catch (Throwable t) {
 
-			readLock.unlock();
+            // Release the lock only on the error path.
+            readLock.unlock();
+
+            if (t instanceof InterruptedException)
+                throw (InterruptedException) t;
+
+            if (t instanceof IllegalStateException)
+                throw (IllegalStateException) t;
+
+            throw new RuntimeException(t);
 
 		}
 
 	}
 
 	/**
-	 * Release the latch on an acquired {@link ByteBuffer}.
+	 * Release the read lock on an acquired {@link ByteBuffer}.
 	 */
 	private void release() {
 
-		latch.dec();
+	    lock.readLock().unlock();
+	    
+//		latch.dec();
 
 	}
 
@@ -426,8 +442,8 @@ abstract public class WriteCache implements IWriteCache {
      *             large records. For example, they can be written directly onto
      *             the backing channel.
      */
-    public boolean writeChk(final long offset, final ByteBuffer data, int chk)
-            throws InterruptedException {
+    public boolean writeChk(final long offset, final ByteBuffer data,
+            final int chk) throws InterruptedException {
 
         // Note: The offset MAY be zero. This allows for stores without any
 		// header block.
@@ -710,14 +726,14 @@ abstract public class WriteCache implements IWriteCache {
 
 		    counters.nflush++;
 		    
-			// remaining := (total - elapsed).
-			remaining = nanos - (System.nanoTime() - begin);
-
-			if (!latch.await(remaining, TimeUnit.NANOSECONDS)) {
-
-				throw new TimeoutException();
-
-			}
+//			// remaining := (total - elapsed).
+//			remaining = nanos - (System.nanoTime() - begin);
+//
+//			if (!latch.await(remaining, TimeUnit.NANOSECONDS)) {
+//
+//				throw new TimeoutException();
+//
+//			}
 
 			final ByteBuffer tmp = this.buf.get();
 
@@ -748,6 +764,9 @@ abstract public class WriteCache implements IWriteCache {
 				view.limit(nbytes);
 				view.position(0);
 
+                // remaining := (total - elapsed).
+                remaining = nanos - (System.nanoTime() - begin);
+                
                 // write the data on the disk file.
                 final boolean ret = writeOnChannel(view, Collections
                         .unmodifiableMap(recordMap), remaining);
@@ -838,8 +857,8 @@ abstract public class WriteCache implements IWriteCache {
 
 		try {
 
-			// wait until there are no readers using the buffer.
-			latch.await();
+//			// wait until there are no readers using the buffer.
+//			latch.await();
 
 			final ByteBuffer tmp = buf.get();
 
@@ -881,8 +900,8 @@ abstract public class WriteCache implements IWriteCache {
 
 		try {
 
-			// wait until there are no readers using the buffer.
-			latch.await();
+//			// wait until there are no readers using the buffer.
+//			latch.await();
 
 			/*
 			 * Note: This method is thread safe. Only one thread will manage to

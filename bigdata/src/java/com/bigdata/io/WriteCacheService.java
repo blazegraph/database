@@ -55,12 +55,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.io.WriteCache.RecordMetadata;
 import com.bigdata.journal.AbstractBufferStrategy;
-import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.rwstore.RWWriteCacheService;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -260,12 +260,16 @@ abstract public class WriteCacheService implements IWriteCache {
      * The object which notices the quorum change events.
      */
     final protected QuorumManager quorumManager;
-    
+
     /**
      * A map from the offset of the record on the backing file to the cache
      * buffer on which that record was written.
+     * 
+     * FIXME This field probably should be private.
+     * {@link RWWriteCacheService#clearWrite(long)} currently uses this field,
+     * but I do not believe that it does so in a safe manner.
      */
-    final private ConcurrentMap<Long/* offset */, WriteCache> recordMap;
+    final protected ConcurrentMap<Long/* offset */, WriteCache> recordMap;
 
     /**
      * An immutable array of the {@link WriteCache} buffer objects owned by the
@@ -695,6 +699,7 @@ abstract public class WriteCacheService implements IWriteCache {
 
             }
 
+            // Note: The ReadLock is still held!
             return tmp;
 
         } catch(Throwable t){
@@ -704,6 +709,12 @@ abstract public class WriteCacheService implements IWriteCache {
              */
 
             readLock.unlock();
+
+            if (t instanceof InterruptedException)
+                throw (InterruptedException) t;
+
+            if (t instanceof IllegalStateException)
+                throw (IllegalStateException) t;
 
             throw new RuntimeException(t); 
             
@@ -755,19 +766,40 @@ abstract public class WriteCacheService implements IWriteCache {
      * while holding the {@link WriteLock} and flush() then waits until the
      * dirtyList becomes empty, at which point all dirty records have been
      * written through to the backing file.
+     * <p>
+     * Note: Any exception thrown from this method MUST trigger error handling
+     * resulting in a high-level abort() and {@link #reset()} of the
+     * {@link WriteCacheService}.
      * 
      * @see WriteTask
      * @see #dirtyList
      * @see #dirtyListEmpty
+     * 
+     * @todo flush() is designed to block concurrent writes() in order to give
+     *       us clean decision boundaries for the HA write pipeline and also to
+     *       simplify the internal locking design. Once we get HA worked out
+     *       cleanly we should explore whether or not we can relax this
+     *       constraint such that writes can run concurrently with flush(). That
+     *       would have somewhat higher throughput since mutable B+Tree
+     *       evictions would no longer cause concurrent tasks to block during
+     *       the commit protocol or the file extent protocol.
      */
     public boolean flush(final boolean force, final long timeout,
             final TimeUnit units) throws TimeoutException, InterruptedException {
 
+        final long begin = System.nanoTime();
+        final long nanos = units.toNanos(timeout);
+        long remaining = nanos; 
+
         final WriteLock writeLock = lock.writeLock();
-        writeLock.lockInterruptibly(); // @todo adjust remaining.
+        if (!writeLock.tryLock(remaining, TimeUnit.NANOSECONDS))
+            throw new TimeoutException();
         try {
             final WriteCache tmp = current.get();
-            dirtyListLock.lockInterruptibly(); // @todo w/ timeout and adjust for time remaining.
+            // remaining := (total - elapsed).
+            remaining = nanos - (System.nanoTime() - begin);
+            if (!dirtyListLock.tryLock(remaining, TimeUnit.NANOSECONDS))
+                throw new TimeoutException();
             try {
                 /*
                  * Note: [tmp] may be empty, but there is basically zero cost in
@@ -777,8 +809,9 @@ abstract public class WriteCacheService implements IWriteCache {
                 dirtyList.add(tmp);
                 dirtyListNotEmpty.signalAll();
                 while (!dirtyList.isEmpty() && !halt) {
-                    // @todo adjust for remaining.
-                    if (!dirtyListEmpty.await(timeout, units)) {
+                    // remaining := (total - elapsed).
+                    remaining = nanos - (System.nanoTime() - begin);
+                    if (!dirtyListEmpty.await(remaining, TimeUnit.NANOSECONDS)) {
                         throw new TimeoutException();
                     }
                 }
@@ -790,12 +823,16 @@ abstract public class WriteCacheService implements IWriteCache {
             /*
              * Replace [current] with a clean cache buffer.
              */
-            cleanListLock.lockInterruptibly();
+            // remaining := (total - elapsed).
+            remaining = nanos - (System.nanoTime() - begin);
+            if (!cleanListLock.tryLock(remaining, TimeUnit.NANOSECONDS))
+                throw new TimeoutException();
             try {
                 // Note: use of Condition let's us notice [halt].
                 while (cleanList.isEmpty() && !halt) {
-                    // @todo adjust remaining.
-                    if(!cleanListNotEmpty.await(timeout, units)) {
+                    // remaining := (total - elapsed).
+                    remaining = nanos - (System.nanoTime() - begin);
+                    if (!cleanListNotEmpty.await(remaining,TimeUnit.NANOSECONDS)) {
                         throw new TimeoutException();
                     }
                     if (halt)
@@ -829,7 +866,7 @@ abstract public class WriteCacheService implements IWriteCache {
      * full. This method does not impose synchronization on writes which fit the
      * capacity of a cache buffer.
      * <p>
-     * When integrating with the {@link RWStore} or the {@link DiskOnlyStrategy}
+     * When integrating with the {@link RWStrategy} or the {@link WORMStrategy}
      * there needs to be a read/write lock such that file extension is mutually
      * exclusive with file read/write operations (due to a Sun bug). The caller
      * can override {@link #newWriteCache(ByteBuffer, IReopenChannel)} to
@@ -837,6 +874,10 @@ abstract public class WriteCacheService implements IWriteCache {
      * This is even true when the record is too large for the cache since we
      * delegate the write to a temporary {@link WriteCache} wrapping the
      * caller's buffer.
+     * <p>
+     * Note: Any exception thrown from this method MUST trigger error handling
+     * resulting in a high-level abort() and {@link #reset()} of the
+     * {@link WriteCacheService}.
      * 
      * @return <code>true</code> since the record is always accepted by the
      *         {@link WriteCacheService} (unless an exception is thrown).
@@ -852,6 +893,11 @@ abstract public class WriteCacheService implements IWriteCache {
      *       that buffer first. This might provide better throughput for the RW
      *       store but would require an override of this method specific to that
      *       implementation.
+     * 
+     * @todo Either replace {@link #write(long, ByteBuffer)} on the
+     *       {@link IWriteCache} API modify {@link #write(long, ByteBuffer)} to
+     *       compute the checksum internally when the persistence store is using
+     *       record-level checksums (a bit more overhead inside of the lock).
      */
     public boolean writeChk(final long offset, final ByteBuffer data,
             final int chk) throws InterruptedException, IllegalStateException {
