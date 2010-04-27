@@ -119,19 +119,27 @@ public class RWWriteCacheService extends WriteCacheService {
 
     };
 
-    public RWWriteCacheService(int nbuffers, final File file, final RandomAccessFile raf, final String mode,final QuorumManager quorumManager) throws InterruptedException, IOException {
-		super(nbuffers, new ReopenFileChannel(file, raf, mode), quorumManager);
-		// TODO Auto-generated constructor stub
-	}
+    public RWWriteCacheService(int nbuffers, final File file,
+            final RandomAccessFile raf, final String mode,
+            final QuorumManager quorumManager) throws InterruptedException,
+            IOException {
+        super(nbuffers, true/* useChecksum */, new ReopenFileChannel(file, raf,
+                mode), quorumManager);
+    }
 
     /**
      * Provide default FileChannelScatteredWriteCache
      */
-	@Override
-	protected WriteCache newWriteCache(ByteBuffer buf, IReopenChannel<? extends Channel> opener)
-			throws InterruptedException {
-		return new FileChannelScatteredWriteCache(buf, (IReopenChannel<FileChannel>) opener);
-	}
+    @Override
+    protected WriteCache newWriteCache(final ByteBuffer buf,
+            final boolean useChecksum,
+            final IReopenChannel<? extends Channel> opener)
+            throws InterruptedException {
+
+        return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
+                (IReopenChannel<FileChannel>) opener);
+	    
+    }
 
 	/**
 	 * Called to check if a write has already been flushed.  This is only made if a write has been made to

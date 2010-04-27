@@ -43,8 +43,44 @@ import com.bigdata.journal.IAtomicStore;
  */
 public interface IWriteCache {
 
+//    /**
+//     * Write the record on the cache. This interface DOES NOT provide any
+//     * guarantee about the ordering of writes. Callers who require a specific
+//     * ordering must coordinate that ordering themselves, e.g., by synchronizing
+//     * across their writes onto the cache.
+//     * 
+//     * @param offset
+//     *            The offset of that record (maybe relative to a base offset).
+//     * @param data
+//     *            The record. The bytes from the current
+//     *            {@link ByteBuffer#position()} to the
+//     *            {@link ByteBuffer#limit()} will be written and the
+//     *            {@link ByteBuffer#position()} will be advanced to the
+//     *            {@link ByteBuffer#limit()} . The caller may subsequently
+//     *            modify the contents of the buffer without changing the state
+//     *            of the cache (i.e., the data are copied into the cache).
+//     * 
+//     * @return <code>true</code> iff the caller's record was transferred to the
+//     *         cache. When <code>false</code>, there is not enough room left in
+//     *         the write cache for this record.
+//     * 
+//     * @throws InterruptedException
+//     * @throws IllegalStateException
+//     *             If the buffer is closed.
+//     * @throws IllegalArgumentException
+//     *             If the caller's record is larger than the maximum capacity of
+//     *             cache (the record could not fit within the cache). The caller
+//     *             should check for this and provide special handling for such
+//     *             large records. For example, they can be written directly onto
+//     *             the backing channel.
+//     * 
+//     * @deprecated by {@link #writeChk(long, ByteBuffer, int)}
+//     */
+//    public boolean write(final long offset, final ByteBuffer data)
+//            throws InterruptedException;
+
     /**
-     * Write the records on the cache. This interface DOES NOT provide any
+     * Write the record on the cache. This interface DOES NOT provide any
      * guarantee about the ordering of writes. Callers who require a specific
      * ordering must coordinate that ordering themselves, e.g., by synchronizing
      * across their writes onto the cache.
@@ -59,6 +95,11 @@ public interface IWriteCache {
      *            {@link ByteBuffer#limit()} . The caller may subsequently
      *            modify the contents of the buffer without changing the state
      *            of the cache (i.e., the data are copied into the cache).
+     * @param chk
+     *            The checksum of the <i>data</i> (optional). When checksums are
+     *            not enabled this should be ZERO (0). When checksums are
+     *            enabled, {@link #read(long)} will validate the checksum before
+     *            returning <i>data</i>.
      * 
      * @return <code>true</code> iff the caller's record was transferred to the
      *         cache. When <code>false</code>, there is not enough room left in
@@ -74,7 +115,7 @@ public interface IWriteCache {
      *             large records. For example, they can be written directly onto
      *             the backing channel.
      */
-    public boolean write(final long offset, final ByteBuffer data)
+    public boolean write(final long offset, final ByteBuffer data, final int chk)
             throws InterruptedException;
 
     /**
@@ -91,11 +132,15 @@ public interface IWriteCache {
      *         newly allocated exact fit mutable {@link ByteBuffer} backed by a
      *         Java <code>byte[]</code>. The buffer will be flipped to prepare
      *         for reading (the position will be zero and the limit will be the
-     *         #of bytes read).
+     *         #of bytes read). The data DOES NOT include the bytes used to code
+     *         checksum even when checksums are enabled.
      * 
      * @throws InterruptedException
      * @throws IllegalStateException
      *             if the buffer is closed.
+     * @throws RuntimeException
+     *             if checksums are enabled and the checksum for the record
+     *             could not be validated.
      */
     public ByteBuffer read(final long offset) throws InterruptedException;
 

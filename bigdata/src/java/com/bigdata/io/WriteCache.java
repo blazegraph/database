@@ -59,6 +59,7 @@ import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * This class provides a write cache with read-through for NIO writes on a
@@ -100,6 +101,8 @@ abstract public class WriteCache implements IWriteCache {
 
 	protected static final Logger log = Logger.getLogger(WriteCache.class);
 
+	private final boolean useChecksum;
+	
 	/**
 	 * The buffer used to absorb writes that are destined for some channel.
 	 */
@@ -289,41 +292,45 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	final private boolean releaseBuffer;
 
-	/**
-	 * Create a {@link WriteCache} from either a caller supplied buffer or a
-	 * direct {@link ByteBuffer} allocated from the {@link DirectBufferPool}.
-	 * <p>
-	 * Note: The application MUST ensure that it {@link #close()}s the
-	 * {@link WriteCache} or it can leak direct {@link ByteBuffer}s!
-	 * <p>
-	 * Note: NIO operations are performed using a direct {@link ByteBuffer}
-	 * (that is, one use backing bytes are allocated on the C heap). When the
-	 * caller supplies a {@link ByteBuffer} that is allocated on the Java heap
-	 * as opposed to in native memory, a temporary direct {@link ByteBuffer}
-	 * will be allocated for the IO operation by Java. The JVM can fail to
-	 * release this temporary direct {@link ByteBuffer}, resulting in a memory
-	 * leak. For this reason, the {@link WriteCache} SHOULD use a direct
-	 * {@link ByteBuffer}.
-	 * 
-	 * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8f
-	 *      ab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
-	 * 
-	 * @param buf
-	 *            A {@link ByteBuffer} to be used as the write cache (optional).
-	 *            When <code>null</code> a buffer will be allocated for you from
-	 *            the {@link DirectBufferPool}. Buffers allocated on your behalf
-	 *            will be automatically released by {@link #close()}.
-	 * 
-	 * @throws InterruptedException
-	 */
-	public WriteCache(final ByteBuffer buf) throws InterruptedException {
-	
-        this(buf, false/* scatteredWrites */);
+    /**
+     * Create a {@link WriteCache} from either a caller supplied buffer or a
+     * direct {@link ByteBuffer} allocated from the {@link DirectBufferPool}.
+     * <p>
+     * Note: The application MUST ensure that it {@link #close()}s the
+     * {@link WriteCache} or it can leak direct {@link ByteBuffer}s!
+     * <p>
+     * Note: NIO operations are performed using a direct {@link ByteBuffer}
+     * (that is, one use backing bytes are allocated on the C heap). When the
+     * caller supplies a {@link ByteBuffer} that is allocated on the Java heap
+     * as opposed to in native memory, a temporary direct {@link ByteBuffer}
+     * will be allocated for the IO operation by Java. The JVM can fail to
+     * release this temporary direct {@link ByteBuffer}, resulting in a memory
+     * leak. For this reason, the {@link WriteCache} SHOULD use a direct
+     * {@link ByteBuffer}.
+     * 
+     * @see http://bugs.sun.com/bugdatabase/view_bug.do;jsessionid=8f
+     *      ab76d1d4479fffffffffa5abfb09c719a30?bug_id=6210541
+     * 
+     * @param buf
+     *            A {@link ByteBuffer} to be used as the write cache (optional).
+     *            When <code>null</code> a buffer will be allocated for you from
+     *            the {@link DirectBufferPool}. Buffers allocated on your behalf
+     *            will be automatically released by {@link #close()}.
+     * @param useChecksum
+     *            <code>true</code> iff the write cache will store the caller's
+     *            checksum for a record and validate it on read.
+     * 
+     * @throws InterruptedException
+     */
+    public WriteCache(final ByteBuffer buf, final boolean useChecksum)
+            throws InterruptedException {
+
+        this(buf, false/* scatteredWrites */, useChecksum);
 
     }
 
-    public WriteCache(ByteBuffer buf, final boolean scatteredWrites)
-            throws InterruptedException {
+    public WriteCache(ByteBuffer buf, final boolean scatteredWrites,
+            final boolean useChecksum) throws InterruptedException {
 
         if (buf == null) {
 
@@ -337,6 +344,8 @@ abstract public class WriteCache implements IWriteCache {
 
         }
 
+        this.useChecksum = useChecksum;
+        
 		// save reference to the write cache.
 		this.buf = new AtomicReference<ByteBuffer>(buf);
 
@@ -412,12 +421,16 @@ abstract public class WriteCache implements IWriteCache {
 
 	}
 
-	/**
-	 * The capacity of the buffer.
-	 */
+    /**
+     * The maximum length of a record which could be inserted into the buffer.
+     * <p>
+     * Note: When checksums are enabled, this is 4 bytes less than the actual
+     * capacity of the underlying buffer since each record requires an
+     * additional four bytes for the checksum field.
+     */
 	final public int capacity() {
 
-		return capacity;
+        return capacity - (useChecksum ? 4 : 0);
 
 	}
 
@@ -442,8 +455,8 @@ abstract public class WriteCache implements IWriteCache {
      *             large records. For example, they can be written directly onto
      *             the backing channel.
      */
-    public boolean writeChk(final long offset, final ByteBuffer data,
-            final int chk) throws InterruptedException {
+    public boolean write(final long offset, final ByteBuffer data, final int chk)
+            throws InterruptedException {
 
         // Note: The offset MAY be zero. This allows for stores without any
 		// header block.
@@ -460,17 +473,21 @@ abstract public class WriteCache implements IWriteCache {
 
 		try {
 
+		    final int remaining = data.remaining();
+		    
 			// The #of bytes to transfer into the write cache.
-			final int nbytes = data.remaining() + (chk == 0 ? 0 : 4);
+            final int nbytes = remaining + (useChecksum ? 4 : 0);
 
-			if (nbytes > tmp.capacity()) {
-
-				throw new IllegalArgumentException("Record is too large for cache.");
+			if (nbytes > capacity) {
+			    // This is more bytes than the total capacity of the buffer.
+                throw new IllegalArgumentException(
+                        AbstractBufferStrategy.ERR_BUFFER_OVERRUN);
 
 			}
 
-			if (nbytes == 0)
-				throw new IllegalArgumentException(AbstractBufferStrategy.ERR_BUFFER_EMPTY);
+            if (remaining == 0)
+                throw new IllegalArgumentException(
+                        AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
 			/*
 			 * Note: We need to be synchronized on the ByteBuffer here since
@@ -484,7 +501,7 @@ abstract public class WriteCache implements IWriteCache {
 				// the position() at which the record is cached.
 				pos = tmp.position();
 
-				if (pos + nbytes > tmp.capacity()) {
+				if (pos + nbytes > capacity) {
 
 					/*
 					 * There is not enough room left in the write cache for this
@@ -498,9 +515,9 @@ abstract public class WriteCache implements IWriteCache {
 				// copy the record into the cache, updating position() as we go.
 				tmp.put(data);
 				// write checksum - if any
-				if (chk != 0) {
-					tmp.putInt(chk);
-				}
+                if (useChecksum) {
+                    tmp.putInt(chk);
+                }
 
 				// set while synchronized since no contention.
 				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
@@ -539,13 +556,6 @@ abstract public class WriteCache implements IWriteCache {
 
     }
 
-    public boolean write(long offset, ByteBuffer data)
-            throws InterruptedException {
-        
-        return writeChk(offset, data, 0);
-        
-    }
-
     /**
      * {@inheritDoc}
      * 
@@ -570,6 +580,9 @@ abstract public class WriteCache implements IWriteCache {
 				return null;
 			}
 
+			// length of the record w/o checksum field.
+			final int reclen = md.recordLength - (useChecksum ? 4 : 0);
+			
 			// the start of the record in writeCache.
 			final int pos = md.bufferOffset;
 
@@ -577,7 +590,7 @@ abstract public class WriteCache implements IWriteCache {
 			final ByteBuffer view = tmp.duplicate();
 
 			// adjust the view to just the record of interest.
-			view.limit(pos + md.recordLength);
+            view.limit(pos + reclen);
 			view.position(pos);
 
 			// System.out.println("WriteCache, addr: " + offset + ", from: " + pos + ", " + md.recordLength + ", thread: " + Thread.currentThread().getId());
@@ -587,17 +600,33 @@ abstract public class WriteCache implements IWriteCache {
 			 * only momentary. As soon as we release() the buffer the data in
 			 * the buffer could be changed.
 			 */
-			final ByteBuffer dst = ByteBuffer.allocate(md.recordLength);
 
-			// copy the data into [dst].
+			final byte[] b = new byte[reclen];
+			
+			final ByteBuffer dst = ByteBuffer.wrap(b);
+
+			// copy the data into [dst] (and the backing byte[]).
 			dst.put(view);
 
 			// flip buffer for reading.
 			dst.flip();
 
-			counters.nhit++;
-            
-			return dst;
+            if (useChecksum) {
+
+                final int chk = tmp.getInt(pos + md.recordLength - 4);
+
+                if (chk != ChecksumUtility.threadChk.get().checksum(b,
+                        0/* offset */, b.length)) {
+
+                    throw new RuntimeException("Checksum error");
+
+                }
+
+            }
+
+            counters.nhit++;
+
+            return dst;
 
 		} finally {
 
@@ -1221,10 +1250,12 @@ abstract public class WriteCache implements IWriteCache {
 		 * 
 		 * @throws InterruptedException
 		 */
-		public FileChannelWriteCache(final long baseOffset, final ByteBuffer buf,
-				final IReopenChannel<FileChannel> opener) throws InterruptedException {
+        public FileChannelWriteCache(final long baseOffset,
+                final ByteBuffer buf, final boolean useChecksum,
+                final IReopenChannel<FileChannel> opener)
+                throws InterruptedException {
 
-			super(buf);
+			super(buf, useChecksum);
 
 			if (baseOffset < 0)
 				throw new IllegalArgumentException();
@@ -1298,10 +1329,12 @@ abstract public class WriteCache implements IWriteCache {
 		 * 
 		 * @throws InterruptedException
 		 */
-		public FileChannelScatteredWriteCache(final ByteBuffer buf, final IReopenChannel<FileChannel> opener)
-				throws InterruptedException {
+        public FileChannelScatteredWriteCache(final ByteBuffer buf,
+                final boolean useChecksum,
+                final IReopenChannel<FileChannel> opener)
+                throws InterruptedException {
 
-			super(buf);
+            super(buf, useChecksum);
 
 			if (opener == null)
 				throw new IllegalArgumentException();

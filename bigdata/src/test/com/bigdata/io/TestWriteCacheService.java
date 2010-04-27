@@ -41,11 +41,13 @@ import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ha.HAGlue;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rwstore.RWWriteCacheService;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Test suite for the {@link WriteCacheService}.
@@ -102,7 +104,8 @@ public class TestWriteCacheService extends TestCase2 {
             {
                 assertNull(writeCache.read(addr1));
                 // write record @ addr.
-                assertTrue(writeCache.write(addr1, data1));
+                assertTrue(writeCache.write(addr1, data1,
+                        ChecksumUtility.threadChk.get().checksum(data1)));
                 // verify record @ addr can be read.
                 assertNotNull(writeCache.read(addr1));
                 // verify data read back @ addr.
@@ -151,6 +154,8 @@ public class TestWriteCacheService extends TestCase2 {
         	curAddr += size;
         }
         
+        final ChecksumUtility checker = new ChecksumUtility();
+        
         // Now randomize the array for writing
         randomizeArray(allocs);
         
@@ -167,7 +172,7 @@ public class TestWriteCacheService extends TestCase2 {
              */
             for (int i = 0; i < 500; i++) {
             	AllocView v = allocs.get(i);
-            	writeCache.write(v.addr, v.buf);  
+            	writeCache.write(v.addr, v.buf, checker.checksum(v.buf));  
             	v.buf.position(0);
             }
             for (int i = 0; i < 500; i++) {
@@ -194,7 +199,7 @@ public class TestWriteCacheService extends TestCase2 {
              */
             for (int i = 500; i < 1000; i++) {
             	AllocView v = allocs.get(i);
-            	writeCache.write(v.addr, v.buf);           	
+            	writeCache.write(v.addr, v.buf, checker.checksum(v.buf));           	
             	v.buf.position(0);
             }
             writeCache.flush(true);
@@ -209,11 +214,11 @@ public class TestWriteCacheService extends TestCase2 {
             // writeCache.reset();
             for (int i = 1000; i < 10000; i++) {
             	AllocView v = allocs.get(i);
-            	if (!writeCache.write(v.addr, v.buf)) {
+            	if (!writeCache.write(v.addr, v.buf, checker.checksum(v.buf))) {
             		log.info("flushing and resetting writeCache");
             		writeCache.flush(false);
             		// writeCache.reset();
-            		assertTrue(writeCache.write(v.addr, v.buf));
+            		assertTrue(writeCache.write(v.addr, v.buf, checker.checksum(v.buf)));
             	}
             	v.buf.position(0);
            }
@@ -238,7 +243,7 @@ public class TestWriteCacheService extends TestCase2 {
         		v.buf.reset();           	
             	
         		try {
-        			writeCache.write(v.addr, v.buf);
+        			writeCache.write(v.addr, v.buf, checker.checksum(v.buf));
         		} catch (Throwable t) {
         			assertTrue(t instanceof AssertionError);
         		}
@@ -300,7 +305,101 @@ public class TestWriteCacheService extends TestCase2 {
 
     }
 
-	/**
+    /**
+     * Helper method verifies that the contents of <i>actual</i> from
+     * position() to limit() are consistent with the expected byte[]. A
+     * read-only view of <i>actual</i> is used to avoid side effects on the
+     * position, mark or limit properties of the buffer.
+     * 
+     * @param expected
+     *            Non-null byte[].
+     * @param actual
+     *            Buffer.
+     */
+    public static void assertEquals(ByteBuffer expectedBuffer, ByteBuffer actual) {
+
+        if (expectedBuffer == null)
+            throw new IllegalArgumentException();
+
+        if (actual == null)
+            fail("actual is null");
+
+        if (expectedBuffer.hasArray() && expectedBuffer.arrayOffset() == 0) {
+
+            // evaluate byte[] against actual.
+            assertEquals(expectedBuffer.array(), actual);
+
+            return;
+
+        }
+        
+        /*
+         * Copy the expected data into a byte[] using a read-only view on the
+         * buffer so that we do not mess with its position, mark, or limit.
+         */
+        final byte[] expected;
+        {
+
+            expectedBuffer = expectedBuffer.asReadOnlyBuffer();
+
+            final int len = expectedBuffer.remaining();
+
+            expected = new byte[len];
+
+            actual.get(expected);
+
+        }
+
+        // evaluate byte[] against actual.
+        assertEquals(expectedBuffer.array(), actual);
+
+    }
+
+    /**
+     * Helper method verifies that the contents of <i>actual</i> from
+     * position() to limit() are consistent with the expected byte[]. A
+     * read-only view of <i>actual</i> is used to avoid side effects on the
+     * position, mark or limit properties of the buffer.
+     * 
+     * @param expected
+     *            Non-null byte[].
+     * @param actual
+     *            Buffer.
+     */
+    public static void assertEquals(final byte[] expected, ByteBuffer actual) {
+
+        if (expected == null)
+            throw new IllegalArgumentException();
+
+        if (actual == null)
+            fail("actual is null");
+
+        if (actual.hasArray() && actual.arrayOffset() == 0) {
+
+            assertEquals(expected, actual.array());
+
+            return;
+
+        }
+
+        /*
+         * Create a read-only view on the buffer so that we do not mess with its
+         * position, mark, or limit.
+         */
+        actual = actual.asReadOnlyBuffer();
+
+        final int len = actual.remaining();
+
+        final byte[] actual2 = new byte[len];
+
+        actual.get(actual2);
+
+        // compare byte[]s.
+        assertEquals(expected, actual2);
+
+    }
+
+    /**
      * Simple implementation for a {@link RandomAccessFile} with hook for
      * deleting the test file.
      */

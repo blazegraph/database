@@ -846,14 +846,15 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              */
             try {
                 this.writeCacheService = new WriteCacheService(
-                        fileMetadata.writeCacheBufferCount, opener,
-                        quorumManager) {
+                        fileMetadata.writeCacheBufferCount, useChecksums,
+                        opener, quorumManager) {
                     @Override
-                    protected WriteCache newWriteCache(ByteBuffer buf,
-                            IReopenChannel<? extends Channel> opener)
+                    protected WriteCache newWriteCache(final ByteBuffer buf,
+                            final boolean useChecksum,
+                            final IReopenChannel<? extends Channel> opener)
                             throws InterruptedException {
                         return new WriteCacheImpl(0/* baseOffset */,
-                                null/* buf */,
+                                null/* buf */, useChecksum,
                                 (IReopenChannel<FileChannel>) opener);
                     }
                 };
@@ -867,8 +868,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         System.err.println("WARNING: alpha impl: "
                 + this.getClass().getName()
                 + (writeCacheService != null ? "writeCacheBuffers="
-                        + fileMetadata.writeCacheBufferCount : ""));
-        
+                        + fileMetadata.writeCacheBufferCount
+                        + ", useChecksums=" + useChecksums : ""));
+
     }
 
     /**
@@ -882,10 +884,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     private class WriteCacheImpl extends WriteCache.FileChannelWriteCache {
 
         public WriteCacheImpl(final long baseOffset, final ByteBuffer buf,
+                final boolean useChecksum,
                 final IReopenChannel<FileChannel> opener)
                 throws InterruptedException {
 
-            super(baseOffset, buf, opener);
+            super(baseOffset, buf, useChecksum, opener);
             
         }
 
@@ -1440,11 +1443,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
                 boolean wroteOnCache = false;
                 if (writeCacheService != null) {
-                    if(useChecksums) {
-                        writeCacheService.writeChk(offset, data, chk);
-                    } else {
-                        writeCacheService.write(offset, data);
-                    }
+                    writeCacheService.write(offset, data, chk);
                     wroteOnCache = true;
                 }
 //                final WriteCache writeCache = this.writeCache.get();

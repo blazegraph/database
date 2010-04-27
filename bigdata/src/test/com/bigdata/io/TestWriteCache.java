@@ -33,13 +33,13 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase2;
 
 import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.ChecksumUtility;
 
 /**
  * Test suite for the {@link WriteCache}.
@@ -53,6 +53,12 @@ import com.bigdata.rawstore.Bytes;
  * @version $Id$
  * 
  * @todo test concurrent readers and a single writer.
+ * 
+ *       FIXME Unit tests where useChecksum is false.
+ * 
+ *       FIXME Unit tests where useChecksum is true AND we force a record
+ *       corruption and then verify that the checksum error is correctly
+ *       detected.
  */
 public class TestWriteCache extends TestCase2 {
 
@@ -97,6 +103,15 @@ public class TestWriteCache extends TestCase2 {
         final long baseOffset = 0L;
 
         /*
+         * FIXME These unit tests DO NOT use the checksum feature. They were
+         * written before that feature was added and the presence of checksums
+         * might violate some test assumptions. Derive _additional_ unit tests
+         * which do.
+         */
+        final boolean useChecksum = false;
+        final int no_checksum = 0;
+        
+        /*
          * Note: We need to assign the addresses in strictly increasing order
          * with the just like a WORM store with a known header length so we can
          * disk and read back below.
@@ -118,7 +133,7 @@ public class TestWriteCache extends TestCase2 {
 
                 // ctor correct rejection tests: baseOffset is negative.
                 try {
-                    new WriteCache.FileChannelWriteCache(-1L, buf, opener);
+                    new WriteCache.FileChannelWriteCache(-1L, buf, useChecksum, opener);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -127,7 +142,7 @@ public class TestWriteCache extends TestCase2 {
 
                 // ctor correct rejection tests: opener is null.
                 try {
-                    new WriteCache.FileChannelWriteCache(baseOffset, buf, null/* opener */);
+                    new WriteCache.FileChannelWriteCache(baseOffset, buf, useChecksum, null/* opener */);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -136,7 +151,7 @@ public class TestWriteCache extends TestCase2 {
 
                 // allocate write cache using our buffer.
                 final WriteCache writeCache = new WriteCache.FileChannelWriteCache(
-                        baseOffset, buf, opener);
+                        baseOffset, buf, useChecksum, opener);
 
                 // verify the write cache self-reported capacity.
                 assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity(),
@@ -144,7 +159,7 @@ public class TestWriteCache extends TestCase2 {
 
                 // correct rejection test for null write.
                 try {
-                    writeCache.write(1000L, null);
+                    writeCache.write(1000L, null, no_checksum);
                     fail("Expecting: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -153,7 +168,8 @@ public class TestWriteCache extends TestCase2 {
 
                 // correct rejection test for empty write.
                 try {
-                    writeCache.write(1000L, ByteBuffer.allocate(0));
+                    writeCache
+                            .write(1000L, ByteBuffer.allocate(0), no_checksum);
                     fail("Expecting: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -168,7 +184,7 @@ public class TestWriteCache extends TestCase2 {
                     final ByteBuffer data = ByteBuffer.allocate(10);
                     data.position(0);
                     data.limit(0);
-                    writeCache.write(1000L, data);
+                    writeCache.write(1000L, data, no_checksum);
                     fail("Expecting: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -184,7 +200,7 @@ public class TestWriteCache extends TestCase2 {
                     // verify addr not found before write.
                     assertNull(writeCache.read(addr1));
                     // write record @ addr.
-                    assertTrue(writeCache.write(addr1, data1));
+                    assertTrue(writeCache.write(addr1, data1, no_checksum));
                     // verify record @ addr can be read.
                     assertNotNull(writeCache.read(addr1));
                     // verify data read back @ addr.
@@ -205,7 +221,7 @@ public class TestWriteCache extends TestCase2 {
                     // verify addr not found before write.
                     assertNull(writeCache.read(addr2));
                     // write record @ addr.
-                    assertTrue(writeCache.write(addr2, data2));
+                    assertTrue(writeCache.write(addr2, data2, no_checksum));
                     // verify record @ addr can be read.
                     assertNotNull(writeCache.read(addr2));
                     // verify data read back @ addr.
@@ -361,7 +377,7 @@ public class TestWriteCache extends TestCase2 {
 //                    assertEquals(data3b, opener.read(addr3, data3b.capacity()));
 
                     // write record on the cache.
-                    assertTrue(writeCache.write(addr4, data4));
+                    assertTrue(writeCache.write(addr4, data4, no_checksum));
 
                     // verify read back.
                     assertEquals(data4, writeCache.read(addr4));
@@ -369,7 +385,7 @@ public class TestWriteCache extends TestCase2 {
                     // Verify no more writes are allowed on the cache (it is
                     // full).
                     assertFalse(writeCache.write(addr4 + 1, ByteBuffer
-                            .wrap(new byte[] { 1 })));
+                            .wrap(new byte[] { 1 }), no_checksum));
 
                     // write on the disk.
                     writeCache.flush(force);
@@ -410,7 +426,7 @@ public class TestWriteCache extends TestCase2 {
                     // write fails.
                     try {
                         writeCache.write(1L/* addr */, ByteBuffer
-                                .wrap(new byte[] { 1, 2, 3 }));
+                                .wrap(new byte[] { 1, 2, 3 }), no_checksum);
                         fail("Expected: " + IllegalStateException.class);
                     } catch (IllegalStateException ex) {
                         if (log.isInfoEnabled())
@@ -471,7 +487,9 @@ public class TestWriteCache extends TestCase2 {
         long _addr[] = {4096,1024,3072,8192};
         
         final File file = File.createTempFile(getName(), ".tmp");
-        
+
+        final boolean useChecksum = true;
+        final ChecksumUtility checker = new ChecksumUtility();
 
         try {
 
@@ -485,7 +503,7 @@ public class TestWriteCache extends TestCase2 {
 
                 // ctor correct rejection tests: opener is null.
                 try {
-                    new WriteCache.FileChannelScatteredWriteCache(buf, null/* opener */);
+                    new WriteCache.FileChannelScatteredWriteCache(buf, useChecksum, null/* opener */);
                     fail("Expected: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -494,15 +512,15 @@ public class TestWriteCache extends TestCase2 {
 
                 // allocate write cache using our buffer.
                 final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
-                        buf, opener);
+                        buf, useChecksum, opener);
 
                 // verify the write cache self-reported capacity.
-                assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity(),
-                        writeCache.capacity());
+                assertEquals(DirectBufferPool.INSTANCE.getBufferCapacity()
+                        - (useChecksum ? 4 : 0), writeCache.capacity());
 
                 // correct rejection test for null write.
                 try {
-                    writeCache.write(1000L, null);
+                    writeCache.write(1000L, null, 0/*checksum*/);
                     fail("Expecting: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -511,7 +529,7 @@ public class TestWriteCache extends TestCase2 {
 
                 // correct rejection test for empty write.
                 try {
-                    writeCache.write(1000L, ByteBuffer.allocate(0));
+                    writeCache.write(1000L, ByteBuffer.allocate(0), 0/*checksum*/);
                     fail("Expecting: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -526,7 +544,7 @@ public class TestWriteCache extends TestCase2 {
                     final ByteBuffer data = ByteBuffer.allocate(10);
                     data.position(0);
                     data.limit(0);
-                    writeCache.write(1000L, data);
+                    writeCache.write(1000L, data, 0/*checksum*/);
                     fail("Expecting: " + IllegalArgumentException.class);
                 } catch (IllegalArgumentException ex) {
                     if (log.isInfoEnabled())
@@ -541,7 +559,7 @@ public class TestWriteCache extends TestCase2 {
                     // verify addr not found before write.
                     assertNull(writeCache.read(addr1));
                     // write record @ addr.
-                    assertTrue(writeCache.write(addr1, data1));
+                    assertTrue(writeCache.write(addr1, data1, checker.checksum(data1)));
                     // verify record @ addr can be read.
                     assertNotNull(writeCache.read(addr1));
                     // verify data read back @ addr.
@@ -561,7 +579,7 @@ public class TestWriteCache extends TestCase2 {
                     // verify addr not found before write.
                     assertNull(writeCache.read(addr2));
                     // write record @ addr.
-                    assertTrue(writeCache.write(addr2, data2));
+                    assertTrue(writeCache.write(addr2, data2, checker.checksum(data2)));
                     // verify record @ addr can be read.
                     assertNotNull(writeCache.read(addr2));
                     // verify data read back @ addr.
@@ -715,7 +733,7 @@ public class TestWriteCache extends TestCase2 {
 //                    assertEquals(data3b, opener.read(addr3, data3b.capacity()));
 
                     // write record on the cache.
-                    assertTrue(writeCache.write(addr4, data4));
+                    assertTrue(writeCache.write(addr4, data4, checker.checksum(data4)));
                     
                     assertEquals(data2, opener.read(addr2, data2.capacity()));
 
@@ -724,8 +742,12 @@ public class TestWriteCache extends TestCase2 {
 
                     // Verify no more writes are allowed on the cache (it is
                     // full).
-                    assertFalse(writeCache.write(addr4 + 1, ByteBuffer
-                            .wrap(new byte[] { 1 })));
+                    {
+                        final ByteBuffer tmp = ByteBuffer
+                                .wrap(new byte[] { 1 });
+                        assertFalse(writeCache.write(addr4 + 1, tmp, checker
+                                .checksum(tmp)));
+                    }
 
                     assertEquals(data2, opener.read(addr2, data2.capacity()));
 
@@ -768,8 +790,10 @@ public class TestWriteCache extends TestCase2 {
 
                     // write fails.
                     try {
-                        writeCache.write(1L/* addr */, ByteBuffer
-                                .wrap(new byte[] { 1, 2, 3 }));
+                        final ByteBuffer tmp = ByteBuffer.wrap(new byte[] { 1,
+                                2, 3 });
+                        writeCache.write(1L/* addr */, tmp, checker
+                                .checksum(tmp));
                         fail("Expected: " + IllegalStateException.class);
                     } catch (IllegalStateException ex) {
                         if (log.isInfoEnabled())
@@ -837,6 +861,8 @@ public class TestWriteCache extends TestCase2 {
          */
         final boolean force = false;
         
+        final boolean useChecksum = true;
+        
         /*
          * We will create a list of Random 0-1024 byte writes by creating single random buffer
          * of 2K and generating random views of differing positions and lengths 
@@ -854,26 +880,27 @@ public class TestWriteCache extends TestCase2 {
         	curAddr += size;
         }
         
+        final ChecksumUtility checker = new ChecksumUtility();
+        
         // Now randomize the array for writing
         randomizeArray(allocs);
         
         final File file = File.createTempFile(getName(), ".tmp");
         
-
         try {
 
             final ReopenFileChannel opener = new ReopenFileChannel(file, mode);
 
             // allocate write cache using our buffer.
             final WriteCache writeCache = new WriteCache.FileChannelScatteredWriteCache(
-                    buf, opener);
+                    buf, useChecksum, opener);
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay
              */
             for (int i = 0; i < 500; i++) {
             	AllocView v = allocs.get(i);
-            	writeCache.write(v.addr, v.buf);           	
+            	writeCache.write(v.addr, v.buf,checker.checksum(v.buf));           	
             }
             for (int i = 0; i < 500; i++) {
             	AllocView v = allocs.get(i);
@@ -900,7 +927,7 @@ public class TestWriteCache extends TestCase2 {
              */
             for (int i = 500; i < 1000; i++) {
             	AllocView v = allocs.get(i);
-            	writeCache.write(v.addr, v.buf);           	
+            	writeCache.write(v.addr, v.buf,checker.checksum(v.buf));           	
             }
             writeCache.flush(true);
             for (int i = 0; i < 1000; i++) {
@@ -914,11 +941,11 @@ public class TestWriteCache extends TestCase2 {
             writeCache.reset();
             for (int i = 1000; i < 10000; i++) {
             	AllocView v = allocs.get(i);
-            	if (!writeCache.write(v.addr, v.buf)) {
+            	if (!writeCache.write(v.addr, v.buf,checker.checksum(v.buf))) {
             		log.info("flushing and resetting writeCache");
             		writeCache.flush(false);
             		writeCache.reset();
-            		assertTrue(writeCache.write(v.addr, v.buf));
+            		assertTrue(writeCache.write(v.addr, v.buf,checker.checksum(v.buf)));
             	}
             }
             /*
@@ -939,11 +966,11 @@ public class TestWriteCache extends TestCase2 {
             for (int i = 0; i < 10000; i++) {
             	AllocView v = allocs.get(i);
             	v.buf.reset();
-            	if (!writeCache.write(v.addr, v.buf)) {
+            	if (!writeCache.write(v.addr, v.buf,checker.checksum(v.buf))) {
             		log.info("flushing and resetting writeCache");
             		writeCache.flush(false);
             		writeCache.reset();
-            		assertTrue(writeCache.write(v.addr, v.buf));
+            		assertTrue(writeCache.write(v.addr, v.buf,checker.checksum(v.buf)));
             	}
             }
             /*
