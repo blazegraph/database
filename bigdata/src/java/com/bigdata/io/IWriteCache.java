@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.bigdata.journal.IAtomicStore;
+import com.bigdata.util.ChecksumError;
 
 /**
  * Interface for a write cache with read back and the capability to update
@@ -138,11 +139,12 @@ public interface IWriteCache {
      * @throws InterruptedException
      * @throws IllegalStateException
      *             if the buffer is closed.
-     * @throws RuntimeException
+     * @throws ChecksumError
      *             if checksums are enabled and the checksum for the record
      *             could not be validated.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException;
+    public ByteBuffer read(final long offset) throws InterruptedException,
+            ChecksumError;
 
 //    /**
 //     * Update a record in the write cache.

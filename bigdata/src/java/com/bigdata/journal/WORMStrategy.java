@@ -49,6 +49,7 @@ import com.bigdata.io.WriteCacheService;
 import com.bigdata.journal.ha.Quorum;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -197,6 +198,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * <code>true</code> iff the backing store has record level checksums.
      */
     private final boolean useChecksums;
+
+    @Override
+    public boolean useChecksums() {
+        return useChecksums;
+    }
     
     /**
      * Issues the disk writes for the write cache and recycles the write cache
@@ -281,6 +287,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * 
      * @todo report elapsed time and average latency for force, reopen, and
      *       writeRootBlock.
+     * 
+     *       FIXME Add counter for checksum errors on read and update in read()
+     *       when handling a checksum error.
      * 
      *       FIXME Counters should be thread-local or stripped with periodic
      *       {@link #add(StoreCounters)} to the shared counters to provide
@@ -816,7 +825,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         this.quorumManager = quorumManager;
 
-        this.useChecksums = fileMetadata.useChecksums;
+        this.useChecksums = fileMetadata.useChecksums; //FIXME useChecksums.
         
         /*
          * Enable the write cache?
@@ -836,9 +845,9 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * handles the write pipeline to the downstream quorum members).
          */
         
-        final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
-                && !fileMetadata.readOnly && fileMetadata.closeTime == 0L
-                && quorumManager.replicationFactor() > 1;
+            final boolean useWriteCacheService = fileMetadata.writeCacheEnabled
+                    && !fileMetadata.readOnly && fileMetadata.closeTime == 0L
+                    || (quorumManager.replicationFactor() > 1);
         
         if (useWriteCacheService) {
             /*
@@ -858,16 +867,18 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                                 (IReopenChannel<FileChannel>) opener);
                     }
                 };
+                this._checkbuf = null;
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
         } else {
             this.writeCacheService = null;
+            this._checkbuf = useChecksums ? ByteBuffer.allocateDirect(4) : null;
         }
 
         System.err.println("WARNING: alpha impl: "
                 + this.getClass().getName()
-                + (writeCacheService != null ? "writeCacheBuffers="
+                + (writeCacheService != null ? " : writeCacheBuffers="
                         + fileMetadata.writeCacheBufferCount
                         + ", useChecksums=" + useChecksums : ""));
 
@@ -894,9 +905,10 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         @Override
         protected boolean writeOnChannel(final ByteBuffer data,
+                final long firstOffset,
                 final Map<Long, RecordMetadata> recordMap, final long nanos)
                 throws InterruptedException, IOException {
-            
+
             final long begin = System.nanoTime();
             
             long remaining = nanos;
@@ -921,7 +933,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                  * while only the readLock is required to actually write on the
                  * file.
                  */
-                final int nwrites = writeOnDisk(data, getFirstOffset());
+                final int nwrites = writeOnDisk(data, firstOffset);
 
                 final WriteCacheCounters counters = this.counters.get();
                 counters.nwrite += nwrites;
@@ -1125,11 +1137,16 @@ public class WORMStrategy extends AbstractBufferStrategy implements
              * synchronization internally.
              * 
              * Note: WriteCacheService#read(long) DOES NOT throw an
-             * IllegalStateException for an asynchronous close.
+             * IllegalStateException for an asynchronous close. However, it will
+             * throw a RuntimeException if there is a checksum error on the
+             * record.
              */
             ByteBuffer tmp;
             try {
                 tmp = writeCacheService.read(offset);
+            } catch (ChecksumError e) {
+                // FIXME If HA, then read on the quorum.
+                throw new RuntimeException(e);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -1157,8 +1174,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         /*
          * Read through to the disk.
          * 
-         * FIXME Strip off the checksum from the end of the record and validate
-         * it. When HA enabled, handle a bad checksum by reading on the quorum.
+         * Note: Strip off the checksum from the end of the record and validate
+         * it.
          */
         final Lock readLock = extensionLock.readLock();
         readLock.lock();
@@ -1173,7 +1190,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
 
                 // the offset into the disk file.
-                final long pos = offset + headerSize;
+                final long pos = headerSize + offset;
 
                 storeCounters.ndiskRead += FileChannelUtility.readAll(opener,
                         dst, pos);
@@ -1187,6 +1204,24 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             // flip for reading.
             dst.flip();
 
+            if(useChecksums) {
+
+                // extract the checksum.
+                final int chk = dst.getInt(nbytes - 4);
+
+                // adjust the record length to exclude the checksum.
+                dst.limit(nbytes - 4);
+                
+                if (chk != ChecksumUtility.threadChk.get().checksum(dst)) {
+
+                    // FIXME If HA, then read on the quorum.
+
+                    throw new ChecksumError();
+
+                }
+
+            }
+            
             /*
              * Update counters @todo synchronized.
              */
@@ -1390,10 +1425,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
         if (isReadOnly())
             throw new IllegalStateException(ERR_READ_ONLY);
         
-        // #of bytes to store.
-        final int nbytes = data.remaining();
+        // #of bytes in the record.
+        final int remaining = data.remaining();
+        
+        // #of bytes to write onto the file (includes the optional checksum).
+        final int nwrite = remaining + (useChecksums ? 4 : 0);
 
-        if (nbytes == 0)
+        if (remaining == 0)
             throw new IllegalArgumentException(ERR_BUFFER_EMPTY);
 
         final long begin = System.nanoTime();
@@ -1402,7 +1440,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
 
         // get checksum for the buffer contents.
         final int chk = useChecksums ? ChecksumUtility.threadChk.get()
-                .checksum(data, 0/* pos */, nbytes/* len */) : 0;
+                .checksum(data) : 0;
 
         final long addr; // address in the store.
         try {
@@ -1437,93 +1475,73 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                  * (concurrent readers are allowed, but will be interrupted by
                  * close()).
                  */
-                addr = allocate(nbytes);
+                // Note: allocation must include the optional checksum.
+                addr = allocate(nwrite);
 
                 offset = getOffset(addr);
 
                 boolean wroteOnCache = false;
                 if (writeCacheService != null) {
-                    writeCacheService.write(offset, data, chk);
+                    if (!writeCacheService.write(offset, data, chk))
+                        throw new AssertionError();
                     wroteOnCache = true;
                 }
-//                final WriteCache writeCache = this.writeCache.get();
-//                if (writeCache != null && !wroteOnCache) {
-//                    if (nbytes <= writeCache.capacity()) {
-//                        // FIXME integrate with the writeCacheService
-//                        // Queue up the write in the writeCache.
-//                        if (!writeCache.write(offset, data)) {
-//                            // cache is full, so flush to the disk.
-//                            writeCache.flushAndReset(false/* force */);
-//                            if (!writeCache.write(offset, data)) {
-//                                throw new AssertionError(
-//                                        "Could not write record on cache: nbytes="
-//                                                + nbytes + ", cache.capacity="
-//                                                + writeCache.capacity());
-//                            }
-//                        }
-//                        assert data.position() == data.limit() : "pos="
-//                                + data.position() + " != limit=" + data.limit();
-//                        wroteOnCache = true;
-//                        if (log.isTraceEnabled())
-//                            log.trace("cacheWrite: addr=" + toString(addr));
-//                    } else {
-//                        /*
-//                         * Evict the cache before writing on the disk. This is
-//                         * necessary to keep the write cache dense so that it is
-//                         * a mirror of what we will put down on the disk.
-//                         */
-//                        writeCache.flushAndReset(false/*force*/);
-//                    }
-                    if (!wroteOnCache) {
+                if (!wroteOnCache) {
 
-                        /*
-                         * The writeCache is disabled or the record is too large
-                         * for the write cache, so just write the record
-                         * directly on the disk.
-                         * 
-                         * Note: At this point the backing file is already
-                         * extended.
-                         * 
-                         * Note: Unlike writes on the cache, the order in which
-                         * we lay down this write onto the disk does not matter.
-                         * We have already made the allocation and now the
-                         * caller will block until the record is on the disk.
-                         */
+                    /*
+                     * The writeCache is disabled or the record is too large for
+                     * the write cache, so just write the record directly on the
+                     * disk.
+                     * 
+                     * Note: At this point the backing file is already extended.
+                     * 
+                     * Note: Unlike writes on the cache, the order in which we
+                     * lay down this write onto the disk does not matter. We
+                     * have already made the allocation and now the caller will
+                     * block until the record is on the disk.
+                     */
 
-                        final Lock readLock = extensionLock.readLock();
-                        readLock.lock();
-                        try {
+                    final Lock readLock = extensionLock.readLock();
+                    readLock.lock();
+                    try {
 
-                            writeOnDisk(data, offset);
-                            
-                            if (log.isTraceEnabled())
-                                log.trace("diskWrite: addr=" + toString(addr));
+                        writeOnDisk(data, offset);
 
-                        } finally {
-                            
-                            readLock.unlock();
-                            
+                        if (useChecksums) {
+                            /*
+                             * Note: If [useChecksums] is enabled but we are not
+                             * using the WriteCacheService then we also need to
+                             * write the checksum on the file here.
+                             */
+                            final ByteBuffer b = _checkbuf;
+                            b.clear();
+                            b.putInt(chk);
+                            writeOnDisk(b, offset + remaining);
                         }
 
-                    } // if(!wroteOnCache)
-//                } // if(writeCache!=null)
+                        if (log.isTraceEnabled())
+                            log.trace("diskWrite: addr=" + toString(addr));
+
+                    } finally {
+
+                        readLock.unlock();
+
+                    }
+
+                } // if(!wroteOnCache)
                 /*
                  * Update counters while we are synchronized. If done outside of
                  * the synchronization block then we need to use AtomicLongs
                  * rather than primitive longs.
                  */
                 storeCounters.nwrites++;
-                storeCounters.bytesWritten += nbytes;
+                storeCounters.bytesWritten += nwrite;
                 storeCounters.elapsedWriteNanos += (System.nanoTime() - begin);
-                if (nbytes > storeCounters.maxWriteSize) {
-                    storeCounters.maxWriteSize = nbytes;
+                if (nwrite > storeCounters.maxWriteSize) {
+                    storeCounters.maxWriteSize = nwrite;
                 }
 
             } // synchronized(writeOnCacheLock)
-
-//        } catch(IOException ex) {
-//            
-//            throw new RuntimeException(ex);
             
         } catch(InterruptedException ex) {
             
@@ -1541,6 +1559,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * to make {@link #flushWriteCache()} atomic.
      */
     private final Object writeOnCacheLock = new Object();
+
+    /**
+     * A small direct {@link ByteBuffer} used if we need to write the checksum
+     * on the backing file directly because the {@link WriteCacheService} is not
+     * in use.
+     */
+    private final ByteBuffer _checkbuf;
     
     /**
      * Make sure that the file is large enough to accept a write of
@@ -1643,6 +1668,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      *       pure append for the write cache
      */
     private int writeOnDisk(final ByteBuffer data, final long offset) {
+        
+        assert offset >= 0 : "offset=" + offset;
         
         // Thread MUST have either the read or write lock.
         assert extensionLock.getReadHoldCount() > 0

@@ -59,6 +59,7 @@ import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 
 /**
@@ -226,20 +227,23 @@ abstract public class WriteCache implements IWriteCache {
 	 */
 	public static class RecordMetadata {
 
-		/**
-		 * The offset of the record in the file.
-		 */
+        /**
+         * The offset of the record in the file. The offset may be relative to a
+         * base offset known to the writeOnChannel() implementation.
+         */
 		public final long fileOffset;
 
-		/**
-		 * The offset within the backing {@link ByteBuffer} of the start of the
-		 * record.
-		 */
+        /**
+         * The offset within the {@link WriteCache}'s backing {@link ByteBuffer}
+         * of the start of the record.
+         */
 		public final int bufferOffset;
 
-		/**
-		 * The length of the record in bytes.
-		 */
+        /**
+         * The length of the record in bytes as it will be written on the
+         * channel. If checksums are being written, then the length of the
+         * record has already been incorporated into this value.
+         */
 		public final int recordLength;
 
         public RecordMetadata(final long fileOffset, final int bufferOffset,
@@ -402,20 +406,25 @@ abstract public class WriteCache implements IWriteCache {
         ;
         
     }
-    
-	/**
-	 * The offset of the first record written onto the {@link WriteCache}. This
-	 * information is used when {@link #appendOnly} is <code>true</code> as it
-	 * gives the starting offset at which the entire {@link ByteBuffer} may be
-	 * written in a single IO. When {@link #appendOnly} is <code>false</code>
-	 * this is basically meaningless.
-	 * 
-	 * @return The first offset written into the {@link WriteCache} since it
-	 *         was last {@link #reset()} and <code>-1L</code> if nothing has
-	 *         been written since the {@link WriteCache} was created or was last
-	 *         {@link #reset()}.
-	 */
-	final public long getFirstOffset() {
+
+    /**
+     * The offset of the first record written onto the {@link WriteCache}. This
+     * information is used when {@link #appendOnly} is <code>true</code> as it
+     * gives the starting offset at which the entire {@link ByteBuffer} may be
+     * written in a single IO. When {@link #appendOnly} is <code>false</code>
+     * this is basically meaningless.
+     * <p>
+     * Note: This has been raised into the
+     * {@link #writeOnChannel(ByteBuffer, long, Map, long)} method signature. It
+     * has been reduced to a package private method so it will remain visible to
+     * the unit tests, otherwise it could become private.
+     * 
+     * @return The first offset written into the {@link WriteCache} since it was
+     *         last {@link #reset()} and <code>-1L</code> if nothing has been
+     *         written since the {@link WriteCache} was created or was last
+     *         {@link #reset()}.
+     */
+	final long getFirstOffset() {
 
 		return firstOffset.get();
 
@@ -562,7 +571,8 @@ abstract public class WriteCache implements IWriteCache {
      * @throws IllegalStateException
      *             If the buffer is closed.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException {
+    public ByteBuffer read(final long offset) throws InterruptedException,
+            ChecksumError {
 
         final WriteCacheCounters counters = this.counters.get(); 
             
@@ -618,7 +628,7 @@ abstract public class WriteCache implements IWriteCache {
                 if (chk != ChecksumUtility.threadChk.get().checksum(b,
                         0/* offset */, b.length)) {
 
-                    throw new RuntimeException("Checksum error");
+                    throw new ChecksumError();
 
                 }
 
@@ -797,8 +807,8 @@ abstract public class WriteCache implements IWriteCache {
                 remaining = nanos - (System.nanoTime() - begin);
                 
                 // write the data on the disk file.
-                final boolean ret = writeOnChannel(view, Collections
-                        .unmodifiableMap(recordMap), remaining);
+                final boolean ret = writeOnChannel(view, getFirstOffset(),
+                        Collections.unmodifiableMap(recordMap), remaining);
 
                 if (ret && reset) {
 
@@ -842,6 +852,11 @@ abstract public class WriteCache implements IWriteCache {
      *            The data to be written. Only the dirty bytes are visible in
      *            this view. The implementation should write all bytes from the
      *            current position to the limit.
+     * @param firstOffset
+     *            The offset of the first record in the recordMap into the file
+     *            (may be relative to a base offset within the file). This is
+     *            provided as an optimization for the WORM which writes its
+     *            records contiguously on the backing store.
      * @param recordMap
      *            The mapping of record offsets onto metadata about those
      *            records.
@@ -857,8 +872,9 @@ abstract public class WriteCache implements IWriteCache {
      *             if there was an IO problem.
      */
     abstract protected boolean writeOnChannel(final ByteBuffer buf,
-            final Map<Long, RecordMetadata> recordMap, final long nanos)
-            throws InterruptedException, TimeoutException, IOException;
+            final long firstOffset, final Map<Long, RecordMetadata> recordMap,
+            final long nanos) throws InterruptedException, TimeoutException,
+            IOException;
 
     /**
      * Return a {@link Runnable} which will write the cache contents onto the
@@ -1271,6 +1287,7 @@ abstract public class WriteCache implements IWriteCache {
 
         @Override
         protected boolean writeOnChannel(final ByteBuffer data,
+                final long firstOffset,
                 final Map<Long, RecordMetadata> recordMap, final long nanos)
                 throws InterruptedException, IOException {
 
@@ -1281,7 +1298,7 @@ abstract public class WriteCache implements IWriteCache {
             /*
              * The position in the file at which the record will be written.
              */
-            final long pos = getFirstOffset() + baseOffset;
+            final long pos = baseOffset + firstOffset;
 
             /*
              * Write bytes in [data] from position to limit onto the channel.
@@ -1349,6 +1366,7 @@ abstract public class WriteCache implements IWriteCache {
 		 */
 		@Override
         protected boolean writeOnChannel(final ByteBuffer data,
+                final long firstOffsetIgnored,
                 final Map<Long, RecordMetadata> recordMap, final long nanos)
                 throws InterruptedException, IOException {
 

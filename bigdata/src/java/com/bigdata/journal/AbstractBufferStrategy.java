@@ -654,9 +654,22 @@ public abstract class AbstractBufferStrategy extends AbstractRawWormStore implem
         return getNextOffset() > block.getNextOffset();
     }
 
+    /**
+     * The maximum size of a record for the address manager less 4 bytes iff
+     * checksums are enabled.
+     */
     public int getMaxRecordSize() {
-        return getAddressManager().getMaxByteCount();
+
+        return getAddressManager().getMaxByteCount() - (useChecksums() ? 4 : 0);
 
     }
 
+    /**
+     * <code>false</code> by default since these were added for HA with the
+     * {@link WORMStrategy} and the {@link RWStrategy}.
+     */
+    public boolean useChecksums() {
+        return false;
+    }
+    
 }

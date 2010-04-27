@@ -3795,9 +3795,10 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
             
             assert tmp.position() == 0;
             
-            assert tmp.limit() == store.getByteCount(addr) : "limit="
-                    + tmp.limit() + ", byteCount(addr)="
-                    + store.getByteCount(addr)+", addr="+store.toString(addr);
+            // Note: This assertion is invalidated when checksums are inlined in the store records.
+//            assert tmp.limit() == store.getByteCount(addr) : "limit="
+//                    + tmp.limit() + ", byteCount(addr)="
+//                    + store.getByteCount(addr)+", addr="+store.toString(addr);
 
             btreeCounters.readNanos.addAndGet( System.nanoTime() - begin );
             
