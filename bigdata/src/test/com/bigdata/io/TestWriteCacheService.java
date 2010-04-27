@@ -36,10 +36,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Random;
-
-import com.bigdata.rwstore.RWWriteCacheService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import junit.framework.TestCase2;
+
+import com.bigdata.journal.IRootBlockView;
+import com.bigdata.journal.ha.HAGlue;
+import com.bigdata.journal.ha.Quorum;
+import com.bigdata.journal.ha.QuorumManager;
+import com.bigdata.rwstore.RWWriteCacheService;
 
 /**
  * Test suite for the {@link WriteCacheService}.
@@ -74,8 +80,9 @@ public class TestWriteCacheService extends TestCase2 {
 		try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
-			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, null, "rw");
-			
+            RWWriteCacheService writeCache = new RWWriteCacheService(5, file,
+                    null, "rw", new MockSingletonQuorumManager());
+
 		} catch (Exception e) {
 			fail("Unexpected  Exception", e);
 		}
@@ -88,7 +95,7 @@ public class TestWriteCacheService extends TestCase2 {
 		try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
-			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, null, "rw");
+			RWWriteCacheService writeCache = new RWWriteCacheService(5, file, null, "rw",new MockSingletonQuorumManager());
 			
             final ByteBuffer data1 = getRandomData();
             final long addr1 = 2048;
@@ -151,8 +158,9 @@ public class TestWriteCacheService extends TestCase2 {
 		try {
 			file = File.createTempFile(getName(), ".rw.tmp");
 
-	        final ReopenFileChannel opener = new ReopenFileChannel(file, "rw");
-			RWWriteCacheService writeCache = new RWWriteCacheService(4, file, null, "rw");
+            final ReopenFileChannel opener = new ReopenFileChannel(file, "rw");
+            RWWriteCacheService writeCache = new RWWriteCacheService(4, file,
+                    null, "rw", new MockSingletonQuorumManager());
 
             /*
              * First write 500 records into the cache and confirm they can all be read okay
@@ -402,4 +410,84 @@ public class TestWriteCacheService extends TestCase2 {
 
     	}
     };
+
+    private static class MockSingletonQuorumManager implements QuorumManager {
+
+        final int k = 1;
+        final long token = 0L;
+
+        public void assertQuorum(long token) {
+            if (token != this.token)
+                throw new IllegalStateException();
+        }
+
+        public Quorum awaitQuorum() throws InterruptedException {
+            return quorum;
+        }
+
+        public Quorum getQuorum() {
+            return quorum;
+        }
+
+        public int replicationFactor() {
+            return k;
+        }
+
+        public void terminate() {
+            // NOP
+        }
+        
+        final Quorum quorum = new Quorum() {
+
+            public boolean isMaster() {
+                return true;
+            }
+
+            public boolean isQuorumMet() {
+                return true;
+            }
+
+            public void abort2Phase() throws IOException {
+                // TODO Auto-generated method stub
+                
+            }
+
+            public void commit2Phase(long commitTime) throws IOException {
+                // TODO Auto-generated method stub
+                
+            }
+
+            public HAGlue getHAGlue(int index) {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            public int prepare2Phase(IRootBlockView rootBlock, long timeout,
+                    TimeUnit unit) throws InterruptedException,
+                    TimeoutException, IOException {
+                // TODO Auto-generated method stub
+                return 0;
+            }
+
+            public void readFromQuorum(long addr, ByteBuffer b) {
+                // TODO Auto-generated method stub
+                
+            }
+
+            public int replicationFactor() {
+                return k;
+            }
+
+            public int size() {
+                return 1;
+            }
+
+            public long token() {
+                return token;
+            }
+            
+        };
+        
+    }
+
 }
