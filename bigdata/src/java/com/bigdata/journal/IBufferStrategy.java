@@ -44,7 +44,7 @@ import com.bigdata.rawstore.IRawStore;
  * @version $Id$
  */
 public interface IBufferStrategy extends IRawStore, IMRMW {
-    
+
     /**
      * The next offset at which a data item would be written on the store as an
      * offset into the <em>user extent</em>.
@@ -249,4 +249,12 @@ public interface IBufferStrategy extends IRawStore, IMRMW {
 		 * @return the maximum record size supported by this strategy
 		 */
 	 public int getMaxRecordSize();
+
+    /**
+     * Return <code>true</code> if the store uses per-record checksums. When
+     * <code>true</code>, an additional 4 bytes are written after the record on
+     * the disk. Those bytes contain the checksum of the record.
+     */
+    public boolean useChecksums();
+
 }

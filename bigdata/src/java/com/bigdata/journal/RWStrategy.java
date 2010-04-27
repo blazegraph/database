@@ -318,6 +318,10 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy {
 		return 0L;
 	}
 
+	public boolean useChecksums() {
+	    return true;
+	}
+	
 	public long getNextOffset() {
 		return m_store.getNextOffset();
 	}

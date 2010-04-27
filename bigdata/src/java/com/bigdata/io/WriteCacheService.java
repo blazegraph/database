@@ -62,6 +62,7 @@ import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.RWWriteCacheService;
+import com.bigdata.util.ChecksumError;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -948,16 +949,20 @@ abstract public class WriteCacheService implements IWriteCache {
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_NULL);
 
-        final int nbytes = data.remaining();
+        // #of bytes in the record.
+        final int remaining = data.remaining();
 
-        if (nbytes == 0)
+        // #of bytes to be written.
+        final int nwrite = remaining + (useChecksum ? 4 : 0);
+        
+        if (remaining == 0)
             throw new IllegalArgumentException(
                     AbstractBufferStrategy.ERR_BUFFER_EMPTY);
 
         if (!open.get())
             throw new IllegalStateException();
 
-        if (nbytes > capacity) {
+        if (nwrite > capacity) {
 
             /*
              * Write the record onto the file at that offset. This operation is
@@ -969,11 +974,12 @@ abstract public class WriteCacheService implements IWriteCache {
              * onto it, so we do not have starvation even if the caller's record
              * would completely fill a cache buffer.
              * 
-             * FIXME Drop the caller's buffer onto the dirtyList and await some
-             * buffer specific condition until that buffer has been written
-             * through. This ensures that we have strong boundary conditions for
-             * HA and that the write goes through the write replication pipeline
-             * when HA is enabled.
+             * FIXME Do the write pipeline for this buffer as well by dropping
+             * the caller's buffer onto the dirtyList and await some buffer
+             * specific condition until that buffer has been written through.
+             * This ensures that we have strong boundary conditions for HA and
+             * that the write goes through the write replication pipeline when
+             * HA is enabled.
              * 
              * FIXME We may need to use the DirectBufferPool here in order to
              * avoid effective leaks of direct ByteBuffers, but the
@@ -988,19 +994,43 @@ abstract public class WriteCacheService implements IWriteCache {
                 // A singleton map for that record.
                 final Map<Long, RecordMetadata> recordMap = Collections
                         .singletonMap(offset, new RecordMetadata(offset,
-                                0/* bufferOffset */, nbytes));
+                                0/* bufferOffset */, nwrite));
 
                 /*
                  * Wrap the caller's record as a ByteBuffer.
                  * 
-                 * Note: The ByteBuffer MIGHT NOT be direct!
+                 * Note: This code path must add the checksum to the record if
+                 * checksums are enabled.
                  */
-                final WriteCache tmp = newWriteCache(data, useChecksum, opener);
+                final ByteBuffer t;
+                if(useChecksum) {
+                    // Allocate a larger buffer
+                    t = ByteBuffer.allocate(data.remaining() + 4);
+                    // Copy the caller's data.
+                    t.put(data);
+                    // Add in the record checksum.
+                    t.putInt(chk);
+                    // Prepare for reading.
+                    t.flip();
+                } else {
+                    // just use the caller's data.
+                    t = data;
+                }
                 
-                // FIXME write pipeline for this buffer as well.
+                final WriteCache tmp = newWriteCache(t, useChecksum, opener);
 
-                // Write the record on the channel using write cache factory.
-                tmp.writeOnChannel(data, recordMap, Long.MAX_VALUE/* nanos */);
+                /*
+                 * Write the record on the channel using write cache factory.
+                 * 
+                 * Note: We need to pass in the offset of the sole record in
+                 * order to have it written at the correct offset in the backing
+                 * file (getFirstOffset() on [tmp] will be -1L since we never
+                 * added anything to [tmp] but instead initialized it with the
+                 * data already in the buffer.
+                 */
+                if (!tmp.writeOnChannel(t, offset/* firstOffset */, recordMap,
+                        Long.MAX_VALUE/* nanos */))
+                    throw new RuntimeException();
 
                 return true;
 
@@ -1210,15 +1240,17 @@ abstract public class WriteCacheService implements IWriteCache {
         }
 
     }
-    
+
     /**
      * This is a non-blocking query of all write cache buffers (current, clean
      * and dirty).
      * <p>
      * This implementation DOES NOT throw an {@link IllegalStateException} for
-     * an asynchronous close.
+     * an asynchronous close. Instead it just returns <code>null</code> to
+     * indicate a cache miss.
      */
-    public ByteBuffer read(final long offset) throws InterruptedException {
+    public ByteBuffer read(final long offset) throws InterruptedException,
+            ChecksumError {
 
         if (!open.get()) {
 
@@ -1243,7 +1275,7 @@ abstract public class WriteCacheService implements IWriteCache {
          * cache buffer has been concurrently reset.
          */
 
-        return cache.read(off);
+        return cache.read(off.longValue());
 
     }
 

@@ -32,6 +32,7 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
+import com.bigdata.LRUNexus;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
@@ -157,6 +158,15 @@ abstract public class AbstractHAJournalTestCase
         for (int i = 0; i < stores.length; i++) {
 
             Journal aStore = stores[i];
+
+            if (LRUNexus.INSTANCE != null) {
+                /*
+                 * Drop the record cache for this store on reopen. This makes it
+                 * easier to find errors related to a difference in the bytes on
+                 * the disk versus the bytes in the record cache.
+                 */
+                LRUNexus.INSTANCE.deleteCache(aStore.getUUID());
+            }
 
             // close the store.
             aStore.close();

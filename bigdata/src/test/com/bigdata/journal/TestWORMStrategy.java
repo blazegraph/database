@@ -42,6 +42,9 @@ import com.bigdata.rawstore.IRawStore;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * 
+ * @todo we should also run this entire test suite w/o the write cache to verify
+ *       that the write cache can be safely disabled.
  */
 public class TestWORMStrategy extends AbstractJournalTestCase {
 
