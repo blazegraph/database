@@ -51,6 +51,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.counters.CounterSet;
+import com.bigdata.io.WriteCache.WriteCacheCounters;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.WORMStrategy;
@@ -366,6 +368,13 @@ abstract public class WriteCacheService implements IWriteCache {
         current.set(buffers[nbuffers - 1] = newWriteCache(null/* buf */,
                 useChecksum, opener));
 
+        // Set the same counters object on each of the write cache instances.
+        final WriteCacheServiceCounters counters = new WriteCacheServiceCounters();
+        for (int i = 0; i < buffers.length; i++) {
+            buffers[i].setCounters(counters);
+        }
+        this.counters = new AtomicReference<WriteCacheServiceCounters>(counters);
+        
         // assume capacity is the same for each buffer instance.
         capacity = current.get().capacity();
 
@@ -1636,6 +1645,34 @@ abstract public class WriteCacheService implements IWriteCache {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Performance counters for the {@link WriteCacheService}.
+     * 
+     * @todo extend to capture things which are specific to the service, to the
+     *       HA write pipeline, to quorum behavior, etc.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public static class WriteCacheServiceCounters extends WriteCacheCounters {
+        
+    } // class WriteCacheServiceCounters
+
+    /**
+     * Note: Atomic reference is used so the counters may be imposed from
+     * outside.
+     */
+    private final AtomicReference<WriteCacheServiceCounters> counters;
+
+    /**
+     * Return the performance counters for the {@link WriteCacheService}.
+     */
+    public CounterSet getCounters() {
+
+        return counters.get().getCounters();
+
     }
 
 }
