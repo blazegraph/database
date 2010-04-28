@@ -231,7 +231,16 @@ public class TestAbort extends ProxyTestCase<Journal> {
              * After writing that big record, now register a named index.
              * 
              * Note: This ordering (big record, then index registered) is based
-             * on a bug pattern.
+             * on a bug pattern. The problem arises (for the WORM) when the
+             * large record is written out to disk immediately leaving some
+             * smaller records in a partially filled WriteCache. The WriteCache
+             * is not flushed until we add some more records and do the commit.
+             * At that point we have now partly overwritten our larger record
+             * with the WriteCache's data. Basically, the WORM requires that all
+             * writes onto the backing file are serialized. When it sees a
+             * record which is too large for the write cache it needs to evict
+             * the current write cache, then write the large record, and then
+             * continue with an empty cache.
              */
             {
             
