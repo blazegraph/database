@@ -1705,6 +1705,8 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/iris.jar"/>
         <pathelement location="${dist.lib}/jsk-lib.jar"/>
         <pathelement location="${dist.lib}/jsk-platform.jar"/>
+        <pathelement location="${dist.lib}/start.jar"/>
+        <pathelement location="${dist.lib}/reggie.jar"/>
         <pathelement location="${dist.lib}/log4j.jar"/>
         <pathelement location="${dist.lib}/lucene-analyzer.jar"/>
         <pathelement location="${dist.lib}/lucene-core.jar"/>
