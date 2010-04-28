@@ -2051,7 +2051,9 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
 
         try {
 
-            getQuorumManager().awaitQuorum().abort2Phase();
+            final Quorum q = getQuorumManager().getQuorum();
+            getQuorumManager().assertQuorum(quorumToken);
+            q.abort2Phase();
             
         } catch (Throwable e) {
             
@@ -2503,11 +2505,18 @@ public abstract class AbstractJournal implements IJournal/*, ITimestampService*/
                 }
 
             } catch (Throwable e) {
+                /*
+                 * FIXME At this point the quorum is probably inconsistent in
+                 * terms of their root blocks. Rather than attempting to send an
+                 * abort() message to the quorum, we probably should force the
+                 * master to yield its role at which point the quorum will
+                 * attempt to elect a new master and resynchronize.
+                 */
                 if (q != null) {
                     try {
                         q.abort2Phase();
                     } catch (Throwable t) {
-                        log.warn(t);
+                        log.warn(t, t);
                     }
                 }
                 throw new RuntimeException(e);

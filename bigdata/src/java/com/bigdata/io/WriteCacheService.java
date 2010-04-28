@@ -445,8 +445,11 @@ abstract public class WriteCacheService implements IWriteCache {
 
                     if (remoteWriteService != null) {
                         // Start downstream IOs (network IO).
-                        remoteWriteFuture = remoteWriteService.submit(cache
-                                .getDownstreamWriteRunnable(quorumManager));
+                        final Runnable r = cache
+                                .getDownstreamWriteRunnable(quorumManager);
+                        if (r == null)
+                            throw new AssertionError();
+                        remoteWriteFuture = remoteWriteService.submit(r);
                     }
 
                     // Do the local IOs.

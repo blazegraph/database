@@ -99,11 +99,20 @@ abstract public class AbstractHAJournalTestCase
 
     private Journal[] stores = null;
 
+    /**
+     * Note: Due to the manner in which the {@link MockQuorumManager} is
+     * initialized, the elements in {@link #stores} will be <code>null</code>
+     * initially. This should be Ok as long as the test gets fully setup before
+     * you start making requests of the {@link QuorumManager} or the
+     * {@link Quorum}.
+     */
     @Override
     protected Journal getStore(final Properties properties) {
 
         final int k = 3; // @todo config by Properties?
 
+        stores = new Journal[k];
+        
         for (int i = 0; i < k; i++) {
 
             stores[i] = newJournal(i, properties);
