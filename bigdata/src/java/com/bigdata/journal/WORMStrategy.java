@@ -33,6 +33,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -188,8 +189,8 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @todo This MAY be <code>null</code> for a read-only store or if the write
      *       cache is disabled.
      * 
-     * @todo Is HA read-only allowed? If so, then if the
-     *       {@link WriteCacheService} handles failover reads then it should be
+     * @todo Is HA read-only allowed? If so, then since the
+     *       {@link WriteCacheService} handles failover reads it should be
      *       enabled for HA read-only.
      */
     private final WriteCacheService writeCacheService;
@@ -288,9 +289,6 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @todo report elapsed time and average latency for force, reopen, and
      *       writeRootBlock.
      * 
-     *       FIXME Add counter for checksum errors on read and update in read()
-     *       when handling a checksum error.
-     * 
      *       FIXME Counters should be thread-local or stripped with periodic
      *       {@link #add(StoreCounters)} to the shared counters to provide
      *       eventually consistent values with low-to-no
@@ -335,6 +333,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
          * Total elapsed time for reading on the disk.
          */
         public long elapsedDiskReadNanos;
+
+        /**
+         * The #of checksum errors while reading on the local disk.
+         */
+        public final AtomicLong checksumErrorCount = new AtomicLong();
         
         /**
          * #of write requests.
@@ -423,6 +426,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             maxReadSize += o.maxReadSize;
             elapsedReadNanos += o.elapsedReadNanos;
             elapsedDiskReadNanos += o.elapsedDiskReadNanos;
+            checksumErrorCount.addAndGet(o.checksumErrorCount.get());
 
             nwrites += o.nwrites;
             ndiskWrite += o.ndiskWrite;
@@ -460,6 +464,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             t.maxReadSize -= o.maxReadSize;
             t.elapsedReadNanos -= o.elapsedReadNanos;
             t.elapsedDiskReadNanos -= o.elapsedDiskReadNanos;
+            t.checksumErrorCount.addAndGet(-o.checksumErrorCount.get());
 
             t.nwrites -= o.nwrites;
             t.ndiskWrite -= o.ndiskWrite;
@@ -523,6 +528,12 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                     root.addCounter("maxReadSize", new Instrument<Long>() {
                         public void sample() {
                             setValue(maxReadSize);
+                        }
+                    });
+
+                    root.addCounter("checksumErrorCount", new Instrument<Long>() {
+                        public void sample() {
+                            setValue(checksumErrorCount.get());
                         }
                     });
 
@@ -1152,6 +1163,11 @@ public class WORMStrategy extends AbstractBufferStrategy implements
             try {
                 tmp = writeCacheService.read(offset);
             } catch (ChecksumError e) {
+                /*
+                 * This is a bad read from the local disk as identified by a
+                 * checksum error on the data in the record.
+                 */
+                storeCounters.checksumErrorCount.incrementAndGet();
                 // FIXME If HA, then read on the quorum.
                 throw new RuntimeException(e);
             } catch (InterruptedException e) {
@@ -1220,12 +1236,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
                 dst.limit(nbytes - 4);
                 
                 if (chk != ChecksumUtility.threadChk.get().checksum(dst)) {
-
+                    /*
+                     * This is a bad read from the local disk as identified by a
+                     * checksum error on the data in the record.
+                     */
+                    storeCounters.checksumErrorCount.incrementAndGet();
                     // FIXME If HA, then read on the quorum.
-
                     throw new ChecksumError("offset=" + offset + ", nbytes="
                             + nbytes);
-
                 }
 
             }
@@ -1671,7 +1689,7 @@ public class WORMStrategy extends AbstractBufferStrategy implements
      * @todo When we see a read error from a checksum and attempt to update the
      *       record on the disk we will have to go around the write cache to do
      *       a direct disk write since (at least for the WORM) the assumption is
-     *       pure append for the write cache
+     *       pure append for the write cache.
      */
     private int writeOnDisk(final ByteBuffer data, final long offset) {
         

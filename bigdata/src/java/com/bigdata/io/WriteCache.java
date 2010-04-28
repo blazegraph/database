@@ -54,7 +54,6 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.DiskOnlyStrategy;
-import com.bigdata.journal.DiskOnlyStrategy.StoreCounters;
 import com.bigdata.journal.ha.QuorumManager;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
@@ -557,6 +556,7 @@ abstract public class WriteCache implements IWriteCache {
 				// set while synchronized since no contention.
 				firstOffset.compareAndSet(-1L/* expect */, offset/* update */);
 
+				// update counters while holding the lock.
                 counters.naccept++;
                 counters.bytesAccepted += nwrite;
 
@@ -614,7 +614,7 @@ abstract public class WriteCache implements IWriteCache {
 			if ((md = recordMap.get(offset)) == null) {
 			    
 				// The record is not in this write cache.
-			    counters.nmiss++;
+			    counters.nmiss.incrementAndGet();
 			    
 				return null;
 			}
@@ -663,7 +663,7 @@ abstract public class WriteCache implements IWriteCache {
 
             }
 
-            counters.nhit++;
+            counters.nhit.incrementAndGet();
 
             return dst;
 
@@ -1081,24 +1081,13 @@ abstract public class WriteCache implements IWriteCache {
 
     /**
      * Performance counters for the {@link WriteCache}.
+     * <p>
+     * Note: thread-safety is required for: {@link #nhit} and {@link #nmiss}.
+     * The rest should be Ok without additional synchronization, CAS operators,
+     * etc (mainly because they are updated while holding a lock).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * 
-     *         FIXME Counters should be thread-local or striped with periodic
-     *         {@link #add(StoreCounters)} to the shared counters to provide
-     *         eventually consistent values with low-to-no
-     *         contention/synchronization.
-     *         <p>
-     *         Note: Some counters are going to be thread-safe automatically
-     *         when used in the context of a single {@link WriteCache} instance
-     *         (nhits, etc) and others are going to be safe when used in the
-     *         context of a single writer thread (all of the counters for
-     *         writing on the backing channel). So, different solutions might
-     *         work for different counters.
-     *         <p>
-     *         Added thread-safety is required for: nhit, nmiss. The rest should
-     *         be Ok.
      */
     public static class WriteCacheCounters {
 
@@ -1109,12 +1098,12 @@ abstract public class WriteCache implements IWriteCache {
         /**
          * #of read requests that are satisfied by the write cache.
          */
-        public long nhit;
+        public final AtomicLong nhit = new AtomicLong();
 
         /**
          * The #of read requests that are not satisfied by the write cache.
          */
-        public long nmiss;
+        public final AtomicLong nmiss = new AtomicLong();
 
         /*
          * write on the cache.
@@ -1170,21 +1159,21 @@ abstract public class WriteCache implements IWriteCache {
             
             root.addCounter("nhit", new Instrument<Long>() {
                 public void sample() {
-                    setValue(nhit);
+                    setValue(nhit.get());
                 }
             });
 
             root.addCounter("nmiss", new Instrument<Long>() {
                 public void sample() {
-                    setValue(nmiss);
+                    setValue(nmiss.get());
                 }
             });
 
             root.addCounter("hitRate", new Instrument<Double>() {
                 public void sample() {
-                    final long ntests = nhit + nmiss;
-                    final long nhits = nhit;
-                    setValue(ntests == 0L ? 0d : (double) nhits / ntests);
+                    final long nhit = WriteCacheCounters.this.nhit.get();
+                    final long ntests = nhit + WriteCacheCounters.this.nmiss.get();
+                    setValue(ntests == 0L ? 0d : (double) nhit / ntests);
                 }
             });
 
