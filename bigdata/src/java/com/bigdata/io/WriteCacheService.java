@@ -182,6 +182,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
     /**
      * The {@link Future} of the task running on the {@link #remoteWriteService}.
+     * <p>
+     * Note: Since this is <em>volatile</em> you MUST guard against concurrent
+     * clear to <code>null</code> by {@link #reset()}.
      * 
      * @see WriteTask
      * @see #reset()
@@ -446,9 +449,12 @@ abstract public class WriteCacheService implements IWriteCache {
                     // Do the local IOs.
                     cache.flush(false/* force */);
 
-                    if (remoteWriteFuture != null) {
-                        // Wait for the downstream IOs to finish.
-                        remoteWriteFuture.get();
+                    {
+                        final Future<?> tmp = remoteWriteFuture;
+                        if (tmp != null) {
+                            // Wait for the downstream IOs to finish.
+                            tmp.get();
+                        }
                     }
 
                     /*
@@ -480,9 +486,6 @@ abstract public class WriteCacheService implements IWriteCache {
                      * Future, so this interrupt is a clear signal that the
                      * write cache service is closing down.
                      */
-                    if (remoteWriteFuture != null)
-                        remoteWriteFuture
-                                .cancel(true/* mayInterruptIfRunning */);
                     return null;
                 } catch (Throwable t) {
                     /*
@@ -497,11 +500,6 @@ abstract public class WriteCacheService implements IWriteCache {
                      * in [buffers] and reset() is written in terms of [buffers]
                      * precisely so we do not loose buffers here.
                      */
-                    if (remoteWriteFuture != null) {
-                        // Interrupt any network IO
-                        remoteWriteFuture
-                                .cancel(true/* mayInterruptIfRunning */);
-                    }
                     if(firstCause.compareAndSet(null/*expect*/, t/*update*/)) {
                         halt = true;
                     }
@@ -574,8 +572,9 @@ abstract public class WriteCacheService implements IWriteCache {
 
             // cancel the current WriteTask.
             localWriteFuture.cancel(true/* mayInterruptIfRunning */);
-            if (remoteWriteFuture != null) {
-                remoteWriteFuture.cancel(true/* mayInterruptIfRunning */);
+            final Future<?> rwf = remoteWriteFuture;
+            if (rwf != null) {
+                rwf.cancel(true/* mayInterruptIfRunning */);
             }
 
             // drain the dirty list.
@@ -619,15 +618,15 @@ abstract public class WriteCacheService implements IWriteCache {
             } catch (Throwable t) {
                 // ignored.
             }
-            if (remoteWriteFuture != null) {
+            if (rwf != null) {
                 try {
-                    remoteWriteFuture.get();
+                    rwf.get();
                 } catch (Throwable t) {
                     // ignored.
                 }
             }
-            localWriteFuture = localWriteService.submit(new WriteTask());
-            remoteWriteFuture = null;
+            this.localWriteFuture = localWriteService.submit(new WriteTask());
+            this.remoteWriteFuture = null;
             
         } finally {
             writeLock.unlock();
@@ -651,6 +650,10 @@ abstract public class WriteCacheService implements IWriteCache {
 
             // Interrupt the write task.
             localWriteFuture.cancel(true/* mayInterruptIfRunning */);
+            final Future<?> rwf = remoteWriteFuture;
+            if (rwf != null) {
+                rwf.cancel(true/* mayInterruptIfRunning */);
+            }
 
             // Immediate shutdown of the write service.
             localWriteService.shutdownNow();
